@@ -1,0 +1,1 @@
+export const statusOptions = ['All Statuses', 'Critically Needed', 'Urgent', 'Normal', 'Future Hiring'];

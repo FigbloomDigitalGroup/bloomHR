@@ -1,0 +1,107 @@
+// Phone Number Change Request Functions for Bio.tsx
+// Insert these functions after the fetchData function in Bio.tsx
+
+// Check for pending phone number change requests
+useEffect(() => {
+  const checkPendingRequest = async () => {
+    if (!employee['Employee Number']) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('phone_number_change_requests')
+        .select('*')
+        .eq('employee_number', employee['Employee Number'])
+        .eq('status', 'pending')
+        .order('requested_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      setPendingPhoneRequest(data);
+    } catch (error) {
+      console.error('Error checking pending request:', error);
+    }
+  };
+
+  checkPendingRequest();
+}, [employee]);
+
+// Submit phone number change request
+const submitPhoneChangeRequest = async () => {
+  if (!requestedPhone.trim()) {
+    toast.error('Please enter a new phone number');
+    return;
+  }
+
+  if (!phoneRegex.test(requestedPhone)) {
+    toast.error('Invalid phone number format');
+    return;
+  }
+
+  setIsSubmittingRequest(true);
+  try {
+    const { error } = await supabase
+      .from('phone_number_change_requests')
+      .insert({
+        employee_number: employee['Employee Number'],
+        current_phone: employee['Mobile Number'] || null,
+        requested_phone: requestedPhone,
+        reason: phoneChangeReason || null,
+        status: 'pending'
+      });
+
+    if (error) throw error;
+
+    // Notify admins
+    await notifyAdmins();
+
+    toast.success('Phone number change request submitted successfully');
+    setShowPhoneRequestModal(false);
+    setRequestedPhone('');
+    setPhoneChangeReason('');
+    
+    // Refresh pending request
+    const { data } = await supabase
+      .from('phone_number_change_requests')
+      .select('*')
+      .eq('employee_number', employee['Employee Number'])
+      .eq('status', 'pending')
+      .order('requested_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    setPendingPhoneRequest(data);
+  } catch (error) {
+    console.error('Error submitting request:', error);
+    toast.error('Failed to submit phone number change request');
+  } finally {
+    setIsSubmittingRequest(false);
+  }
+};
+
+// Notify admins about new phone change request
+const notifyAdmins = async () => {
+  try {
+    // Get all admin/HR users
+    const { data: admins } = await supabase
+      .from('employees')
+      .select('"Employee Number"')
+      .in('"Job Title"', ['Admin', 'HR Manager', 'System Administrator']);
+
+    if (admins && admins.length > 0) {
+      const notifications = admins.map(admin => ({
+        employee_number: admin['Employee Number'],
+        type: 'phone_change_requested',
+        title: 'New Phone Number Change Request',
+        message: `${employee['First Name']} ${employee['Last Name']} has requested to change their phone number from ${employee['Mobile Number'] || 'not set'} to ${requestedPhone}.`,
+        priority: 'medium',
+        is_read: false,
+        created_at: new Date().toISOString()
+      }));
+
+      await supabase.from('notifications').insert(notifications);
+    }
+  } catch (error) {
+    console.error('Error notifying admins:', error);
+  }
+};

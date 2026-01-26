@@ -1,0 +1,1 @@
+export const employeeTypes = ['Full-time', 'Part-time', 'Contract', 'Temporary', 'Intern'];
