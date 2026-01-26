@@ -21,64 +21,68 @@ import {
   UserCog,
   GraduationCap,
   Smartphone,
-  Mail
+  Mail,
+  Shield
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
 import solo from '../../../public/solo.png';
-import RoleButtonWrapper from '../ProtectedRoutes/RoleButton'
+import { usePermissions } from '../../hooks/usePermissions';
 
 // Grouping structure for a "Silicon Valley" modern app feel
+// Now using permission IDs instead of hard-coded roles
 const menuGroups = [
   {
     title: "Overview",
     items: [
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-      { id: 'ai-assistant', label: 'AI Assistant', icon: Bot, path: '/ai-assistant' },
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', permission: 'dashboard' },
+      { id: 'ai-assistant', label: 'AI Assistant', icon: Bot, path: '/ai-assistant', permission: 'ai-assistant' },
     ]
   },
   {
     title: "Workspace",
     items: [
-      { id: 'task-manager', label: 'Task Manager', icon: Blocks, path: '/tasks' },
-      { id: 'teams', label: 'Teams', icon: Slack, path: '/teams' },
-      { id: 'messages', label: 'SMS Center', icon: MessageSquareMore, path: '/sms' },
-      { id: 'email-portal', label: 'Email Portal', icon: Mail, path: '/email-portal', allowedRoles: ['ADMIN', 'HR', 'CHECKER', 'MANAGER', 'OPERATIONS'] },
+      { id: 'task-manager', label: 'Task Manager', icon: Blocks, path: '/tasks', permission: 'task-manager' },
+      { id: 'teams', label: 'Teams', icon: Slack, path: '/teams', permission: 'teams' },
+      { id: 'messages', label: 'SMS Center', icon: MessageSquareMore, path: '/sms', permission: 'sms' },
+      { id: 'email-portal', label: 'Email Portal', icon: Mail, path: '/email-portal', permission: 'email-portal' },
     ]
   },
   {
     title: "People & HR",
     items: [
-      { id: 'employees', label: 'Employees', icon: Users, path: '/employees' },
-      { id: 'recruitment', label: 'Recruitment', icon: UserPlus, path: '/recruitment', allowedRoles: ['ADMIN', 'HR', 'OPERATIONS', 'CHECKER'] },
-      { id: 'leaves', label: 'Time Off', icon: Calendar, path: '/leaves' },
-      { id: 'performance', label: 'Performance', icon: BarChart3, path: '/performance' },
-      { id: 'training', label: 'Training', icon: GraduationCap, path: '/training', allowedRoles: ['ADMIN', 'HR', 'OPERATIONS', 'CHECKER'] },
-      { id: 'assign-managers', label: 'Assign Managers', icon: UserCog, path: '/assign-managers', allowedRoles: ['ADMIN', 'HR'] },
-      { id: 'staffcheck', label: 'Disciplinary', icon: Siren, path: '/staffcheck', allowedRoles: ['ADMIN', 'HR', 'OPERATIONS', 'CHECKER'] },
+      { id: 'employees', label: 'Employees', icon: Users, path: '/employees', permission: 'employees' },
+      { id: 'recruitment', label: 'Recruitment', icon: UserPlus, path: '/recruitment', permission: 'recruitment' },
+      { id: 'leaves', label: 'Time Off', icon: Calendar, path: '/leaves', permission: 'leaves' },
+      { id: 'performance', label: 'Performance', icon: BarChart3, path: '/performance', permission: 'performance' },
+      { id: 'training', label: 'Training', icon: GraduationCap, path: '/training', permission: 'training' },
+      { id: 'assign-managers', label: 'Assign Managers', icon: UserCog, path: '/assign-managers', permission: 'assign-managers' },
+      { id: 'staffcheck', label: 'Disciplinary', icon: Siren, path: '/staffcheck', permission: 'staffcheck' },
     ]
   },
   {
     title: "Finance & Assets",
     items: [
-      { id: 'payroll', label: 'Payroll', icon: Wallet, path: '/payroll', allowedRoles: ['ADMIN', 'CHECKER'] },
-      { id: 'expense', label: 'Expenses', icon: HandCoins, path: '/expenses', allowedRoles: ['ADMIN', 'OPERATIONS', 'MANAGER', 'REGIONAL', 'CHECKER'] },
-      { id: 'advanced', label: 'Salary Advance', icon: Wallet, path: '/salaryadmin', allowedRoles: ['ADMIN', 'CHECKER', 'MANAGER', 'REGIONAL'] },
-      { id: 'asset', label: 'Assets', icon: Box, path: '/asset' },
-      { id: 'mpesa-zap', label: 'Mpesa Zap', icon: Smartphone, path: '/mpesa-zap', allowedRoles: ['ADMIN', 'CHECKER'] },
+      { id: 'payroll', label: 'Payroll', icon: Wallet, path: '/payroll', permission: 'payroll' },
+      { id: 'expense', label: 'Expenses', icon: HandCoins, path: '/expenses', permission: 'expenses' },
+      { id: 'advanced', label: 'Salary Advance', icon: Wallet, path: '/salaryadmin', permission: 'salaryadmin' },
+      { id: 'asset', label: 'Assets', icon: Box, path: '/asset', permission: 'asset' },
+      { id: 'mpesa-zap', label: 'Mpesa Zap', icon: Smartphone, path: '/mpesa-zap', permission: 'mpesa-zap' },
     ]
   },
   {
     title: "System",
     items: [
-      { id: 'reports', label: 'Reports', icon: FileText, path: '/reports', allowedRoles: ['ADMIN', 'HR', 'OPERATIONS', 'MANAGER', 'REGIONAL', 'CHECKER'] },
-      { id: 'phone-approvals', label: 'Approvals', icon: PhoneCall, path: '/phone-approvals', allowedRoles: ['ADMIN', 'CHECKER', 'HR'] },
-      { id: 'email admin', label: 'Email Admin', icon: KeyRound, path: '/adminconfirm', allowedRoles: ['ADMIN', 'CHECKER', 'HR'] },
-      { id: 'incident-reports', label: 'Incidents', icon: Siren, path: '/incident-reports', allowedRoles: ['ADMIN', 'CHECKER', 'MANAGER'] },
-      { id: 'settings', label: 'Settings', icon: Settings, path: '/settings', allowedRoles: ['ADMIN', 'CHECKER'] },
+      { id: 'reports', label: 'Reports', icon: FileText, path: '/reports', permission: 'reports' },
+      { id: 'phone-approvals', label: 'Approvals', icon: PhoneCall, path: '/phone-approvals', permission: 'phone-approvals' },
+      { id: 'email admin', label: 'Email Admin', icon: KeyRound, path: '/adminconfirm', permission: 'adminconfirm' },
+      { id: 'incident-reports', label: 'Incidents', icon: Siren, path: '/incident-reports', permission: 'incident-reports' },
+      { id: 'settings', label: 'Settings', icon: Settings, path: '/settings', permission: 'settings' },
+      { id: 'role-permissions', label: 'Role Permissions', icon: Shield, path: '/role-permissions', permission: 'role-permissions' },
     ]
   }
 ];
+
 
 interface SidebarProps {
   user?: { email: string; role: string } | null;
@@ -90,6 +94,9 @@ export default function Sidebar({ user }: SidebarProps) {
   const currentPath = location.pathname;
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+
+  // Use permissions hook for dynamic access control
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
 
   const sidebarVariants: Variants = {
     expanded: {
@@ -225,17 +232,12 @@ export default function Sidebar({ user }: SidebarProps) {
                     </motion.button>
                   );
 
-                  return (
-                    <div key={item.id}>
-                      {item.allowedRoles ? (
-                        <RoleButtonWrapper allowedRoles={item.allowedRoles}>
-                          {NavItem}
-                        </RoleButtonWrapper>
-                      ) : (
-                        NavItem
-                      )}
-                    </div>
-                  );
+                  // Only render if user has permission (or no permission required)
+                  if (item.permission && !hasPermission(item.permission)) {
+                    return null;
+                  }
+
+                  return <div key={item.id}>{NavItem}</div>;
                 })}
               </div>
             </div>

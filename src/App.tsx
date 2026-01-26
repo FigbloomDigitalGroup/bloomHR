@@ -51,6 +51,7 @@ import StatutoryDeductionsReport from './components/Reports/statutory';
 import AssetManagement from './components/Asset/Asset';
 import QRScanner from './components/Asset/scan';
 import MpesaZapPortal from './components/Settings/MpesaZapPortal';
+import RolePermissions from './components/Settings/RolePermissions';
 import EmailPortal from './components/Email/EmailPortal';
 
 interface User {
@@ -1046,6 +1047,9 @@ function App() {
                                     <EmailPortal />
                                   </AuthRoute>
                                 } />
+
+                                <Route path="/role-permissions" element={<RolePermissions />} />
+
                                 <Route path="*" element={<NotFound />} />
                               </Routes>
                             </motion.div>
