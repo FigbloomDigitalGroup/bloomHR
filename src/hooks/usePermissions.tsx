@@ -29,22 +29,14 @@ export function usePermissions(): UsePermissionsReturn {
 
             // Get current user
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user?.email) {
+            if (!user) {
                 setPermissions([]);
                 setUserRole(null);
                 return;
             }
 
-            // Get user's role from employees table
-            const { data: employeeData, error: employeeError } = await supabase
-                .from('employees')
-                .select('"Role"')
-                .eq('"Work Email"', user.email)
-                .single();
-
-            if (employeeError) throw employeeError;
-
-            const role = employeeData?.Role;
+            // Get user's role from user_metadata (not from employees table)
+            const role = user.user_metadata?.role;
             setUserRole(role);
 
             if (!role) {
@@ -52,7 +44,7 @@ export function usePermissions(): UsePermissionsReturn {
                 return;
             }
 
-            // Get role permissions
+            // Get role permissions from database
             const { data: rolePermData, error: permError } = await supabase
                 .from('role_permissions')
                 .select('permissions')
