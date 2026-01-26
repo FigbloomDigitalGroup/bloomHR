@@ -2448,7 +2448,7 @@ export default function PayrollDashboard() {
 
         const { data, error } = await supabase
           .from('salary_advance')
-          .select('"Employee Number", "Amount Requested", payment_processed, status')
+          .select('"Employee Number", "Amount Requested", payment_processed, status, time_added')
           .eq('payment_processed', 'true')
           .eq('status', 'paid')
           .order('time_added', { ascending: false });
@@ -2470,49 +2470,62 @@ export default function PayrollDashboard() {
 
     fetchAllSalaryAdvances();
   }, []); // Empty dependency array = runs once when component mounts
-  // Fetch salary advances - CORRECT VERSION FOR YOUR TABLE STRUCTURE
-  // Fetch salary advances - SIMPLE AND WORKING VERSION
-
 
   // Updated: Just searches in already-loaded data (NO database call)
-  const calculateAdvanceDeduction = (employeeNumber) => {
-    console.log('=== DEBUG: Looking for advance for employee:', employeeNumber);
+  const calculateAdvanceDeduction = (employeeNumber, period) => {
+    // console.log('=== DEBUG: Looking for advance for employee:', employeeNumber, 'Period:', period);
 
     if (!employeeNumber) {
-      console.log('No employee number provided');
       return 0;
     }
 
-    console.log('Total salary advances loaded:', salaryAdvances.length);
-
-    // Find ALL advances for this employee (not just first one)
+    // Find ALL advances for this employee matching the period
     const employeeAdvances = salaryAdvances.filter(adv => {
       const advanceEmpNumber = adv["Employee Number"];
-      console.log('Comparing:', {
-        advanceEmpNumber: advanceEmpNumber,
-        employeeNumber: employeeNumber,
-        match: advanceEmpNumber == employeeNumber,
-        exactMatch: advanceEmpNumber === employeeNumber
-      });
+      const advanceDate = adv.time_added; // Assuming ISO string like 2024-01-26T...
 
-      // Try both loose and strict comparison
-      return advanceEmpNumber == employeeNumber;
+      // Match Employee
+      // Use loose equality to handle string/number differences
+      if (advanceEmpNumber != employeeNumber) return false;
+
+      // Match Period (YYYY-MM)
+      if (period) {
+        if (!advanceDate) return false; // Strict: must have a date to match period
+
+        // Handle various date formats safely
+        let advancePeriod = '';
+        try {
+          // Try substring first for ISO strings
+          if (typeof advanceDate === 'string' && advanceDate.length >= 7) {
+            advancePeriod = advanceDate.substring(0, 7);
+          } else {
+            // Fallback for Date objects or other formats
+            const d = new Date(advanceDate);
+            if (!isNaN(d.getTime())) {
+              advancePeriod = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            }
+          }
+        } catch (e) {
+          console.warn('Error parsing advance date:', advanceDate);
+          return false;
+        }
+
+        if (advancePeriod !== period) return false;
+      }
+
+      return true;
     });
-
-    console.log('Found', employeeAdvances.length, 'advances for this employee');
 
     if (employeeAdvances.length === 0) {
       return 0;
     }
 
-    // Sum ALL advances for this employee
+    // Sum matching advances
     const totalAmount = employeeAdvances.reduce((sum, adv) => {
       const amount = parseFloat(adv["Amount Requested"]) || 0;
-      console.log('Adding advance amount:', amount);
       return sum + amount;
     }, 0);
 
-    console.log('Total advance deduction:', totalAmount);
     return totalAmount;
   };
   // Enhanced SMS notification functions
@@ -2733,7 +2746,17 @@ export default function PayrollDashboard() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   };
 
-  const actualPeriod = selectedPeriod === 'current' ? getCurrentPeriod() : selectedPeriod;
+  const getPeriodString = (period) => {
+    if (!period || period === 'current') {
+      return getCurrentPeriod();
+    }
+    if (period instanceof Date) {
+      return `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, '0')}`;
+    }
+    return period;
+  };
+
+  const actualPeriod = getPeriodString(selectedPeriod);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -3252,7 +3275,8 @@ export default function PayrollDashboard() {
             }
 
             // Calculate salary advance deduction
-            const advanceDeduction = calculateAdvanceDeduction(employeeId);
+            // Calculate salary advance deduction
+            const advanceDeduction = calculateAdvanceDeduction(employeeId, actualPeriod);
 
             // REMOVED VOLUNTARY DEDUCTIONS - set all to 0 except advance
             const loanDeduction = 0;
