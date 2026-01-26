@@ -239,8 +239,58 @@ const PortalCard = ({ icon, title, description, onClick, color = 'green', active
   );
 };
 
-// LeaveApplicationForm Component with enhanced restrictions
-// LeaveApplicationForm Component with corrected restrictions
+// GeolocationWarningModal Component
+const GeolocationWarningModal = ({
+  isOpen,
+  onConfirm
+}: {
+  isOpen: boolean,
+  onConfirm: () => void
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
+      >
+        <div className="flex justify-center mb-4">
+          <MapPin className="h-12 w-12 text-green-500" />
+        </div>
+
+        <h3 className="text-lg font-medium text-gray-900 text-center mb-2">
+          Enable Location Services
+        </h3>
+
+        <p className="text-xs text-gray-600 text-center mb-6">
+          To track your attendance and working hours, we need access to your location.
+          This helps verify your presence and ensures accurate time logging.
+        </p>
+
+        <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg mb-4">
+          <div className="flex">
+            <div className="ml-3">
+              <p className="text-xs text-green-700">
+                <strong>Note:</strong> Enabling location services will automatically log you in and start tracking your work hours.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-center">
+          <button
+            onClick={onConfirm}
+            className="px-6 py-2.5 border border-transparent rounded-xl text-xs font-bold text-white bg-green-600 hover:bg-green-700 shadow-lg shadow-green-200 transition-all"
+          >
+            Enable Location Services
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
 const LeaveApplicationForm = () => {
   const [formData, setFormData] = useState({
     "Employee Number": '',
