@@ -152,7 +152,7 @@ interface TrainingProgress {
   time_spent: number; // in minutes
   last_accessed: string;
 }
-// SidebarNavItem Component
+// Modernized SidebarNavItem
 const SidebarNavItem = ({
   icon,
   label,
@@ -170,373 +170,70 @@ const SidebarNavItem = ({
 }) => (
   <button
     onClick={onClick}
-    className={`flex items-center justify-between w-full px-4 py-3 text-xs font-medium rounded-lg transition-colors ${active
-      ? 'bg-[#42fcff]/60 text-green-700'
-      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+    className={`group flex items-center justify-between w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ease-out ${active
+      ? 'bg-gray-900 text-white shadow-lg shadow-gray-900/20'
+      : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
       }`}
   >
-    <div className="flex items-center">
-      <span className="mr-3">{icon}</span>
-      {label}
+    <div className="flex items-center gap-3">
+      <span className={`transition-colors duration-200 ${active ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`}>
+        {icon}
+      </span>
+      <span>{label}</span>
     </div>
     {hasSubmenu && (
-      <ChevronRight className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+      <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
     )}
   </button>
 );
 
-// PasswordResetModal Component
-
-// GeolocationWarningModal Component
-const GeolocationWarningModal = ({
-  isOpen,
-  onConfirm
-}: {
-  isOpen: boolean,
-  onConfirm: () => void
-}) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
-      >
-        <div className="flex justify-center mb-4">
-          <MapPin className="h-12 w-12 text-green-500" />
-        </div>
-
-        <h3 className="text-lg font-medium text-gray-900 text-center mb-2">
-          Enable Location Services
-        </h3>
-
-        <p className="text-xs text-gray-600 text-center mb-6">
-          To track your attendance and working hours, we need access to your location.
-          This helps verify your presence and ensures accurate time logging.
-        </p>
-
-        <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg mb-4">
-          <div className="flex">
-            <div className="ml-3">
-              <p className="text-xs text-green-700">
-                <strong>Note:</strong> Enabling location services will automatically log you in and start tracking your work hours.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-center">
-          <button
-            onClick={onConfirm}
-            className="px-6 py-2.5 border border-transparent rounded-xl text-xs font-bold text-white bg-green-600 hover:bg-green-700 shadow-lg shadow-green-200 transition-all"
-          >
-            Enable Location Services
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  );
-};
-
-// Geolocation and Time Tracking Functions
-const getCurrentPosition = (): Promise<GeolocationPosition> => {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('Geolocation is not supported by this browser'));
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          timestamp: position.timestamp
-        });
-      },
-      (error) => {
-        reject(error);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      }
-    );
-  });
-};
-
-const logLoginTime = async (employeeNumber: string): Promise<boolean> => {
-  try {
-    let position: GeolocationPosition | null = null;
-
-    try {
-      position = await getCurrentPosition();
-    } catch (error) {
-      console.warn('Could not get geolocation:', error);
-      // We'll still log the login but with null geolocation
-    }
-
-    const { data, error } = await supabase
-      .from('attendance_logs')
-      .insert([{
-        employee_number: employeeNumber,
-        login_time: new Date().toISOString(),
-        logout_time: null,
-        geolocation: position,
-        status: 'logged_in'
-      }])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error logging login time:', error);
-    return false;
-  }
-};
-
-const checkExistingLogin = async (employeeNumber: string): Promise<boolean> => {
-  try {
-    const { data, error } = await supabase
-      .from('attendance_logs')
-      .select('id')
-      .eq('employee_number', employeeNumber)
-      .is('logout_time', null)
-      .order('login_time', { ascending: false })
-      .limit(1)
-      .single();
-
-    return !!data;
-  } catch (error) {
-    return false;
-  }
-};
-
-// Header Status Component with Geolocation Toggle
-const HeaderStatus = ({
-  isLoggedIn,
-  lastLogin,
-  geolocationStatus,
-  userName,
-  onGeolocationToggle
-}: {
-  isLoggedIn: boolean;
-  lastLogin: string | null;
-  geolocationStatus: 'granted' | 'denied' | 'prompt';
-  userName: string;
-  onGeolocationToggle: () => void;
-}) => {
-  const navigate = useNavigate();
-
-  return (
-    <div className="flex items-center space-x-4">
-      {/* Geolocation Status with Toggle */}
-      <div className="flex items-center text-xs">
-        <button
-          onClick={onGeolocationToggle}
-          className="flex items-center space-x-1 px-2 py-1 rounded-lg hover:bg-gray-50 transition-colors group"
-          title={geolocationStatus === 'granted' ? 'Location enabled - Click to refresh' : 'Click to enable location tracking'}
-        >
-          {geolocationStatus === 'granted' ? (
-            <MapPin className="h-4 w-4 text-green-500 mr-1 group-hover:scale-110 transition-transform" />
-          ) : (
-            <MapPinOff className="h-4 w-4 text-gray-400 mr-1 group-hover:scale-110 transition-transform" />
-          )}
-          <span className={geolocationStatus === 'granted' ? 'text-green-600 font-medium' : 'text-gray-500 font-medium'}>
-            {geolocationStatus === 'granted' ? 'Location Enabled' : 'Location Optional'}
-          </span>
-        </button>
-      </div>
-
-      {/* Login Status */}
-      <div className="flex items-center text-xs">
-        <PhClock className="h-4 w-4 text-gray-500 mr-1" weight="duotone" />
-        {isLoggedIn ? (
-          <span className="text-green-600 font-medium">
-            Logged in at {lastLogin ? new Date(lastLogin).toLocaleTimeString() : 'recently'}
-          </span>
-        ) : (
-          <span className="text-gray-500 font-medium">Not logged in</span>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ComingSoon Component
-const ComingSoon = ({ title }: { title: string }) => (
-  <div className="p-12 text-center">
-    <div className="max-w-md mx-auto bg-gray-50 p-8 rounded-lg">
-      <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-full shadow-sm mb-4">
-        <PartyPopper className="h-8 w-8 text-gray-500" />
-      </div>
-      <h2 className="mt-2 text-xl font-medium text-gray-900">{title} Portal</h2>
-      <p className="mt-3 text-xs text-gray-500">
-        This section is currently under development and will be available soon.
-      </p>
-      <div className="mt-6">
-        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-          Coming soon...
-        </span>
-      </div>
-    </div>
-  </div>
-);
-
-// NotificationSidebar Component
-const NotificationSidebar = ({
-  isOpen,
-  onClose,
-  notifications,
-  onMarkRead,
-  onClearAll,
-  onRemove
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  notifications: NotificationItem[];
-  onMarkRead: (n: NotificationItem) => void;
-  onClearAll: () => void;
-  onRemove: (id: string) => void;
-}) => {
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[60]"
-          />
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed right-0 top-0 h-full w-full max-w-sm bg-white shadow-2xl z-[70] flex flex-col"
-          >
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">Notifications</h3>
-                <p className="text-xs text-gray-500">{notifications.length} updates pending</p>
-              </div>
-              <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {notifications.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-center">
-                  <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4 text-gray-300">
-                    <Bell className="w-8 h-8" />
-                  </div>
-                  <p className="text-sm text-gray-500 font-medium">All caught up!</p>
-                  <p className="text-xs text-gray-400">No new notifications at the moment.</p>
-                </div>
-              ) : (
-                notifications.map((n) => (
-                  <motion.div
-                    key={n.id}
-                    layout="position"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`p-4 rounded-2xl border transition-all ${n.isRead ? 'bg-white border-gray-100' : 'bg-green-50/30 border-green-100/50'}`}
-                  >
-                    <div className="flex justify-between items-start mb-1">
-                      <h4 className={`text-[11px] font-bold ${n.isRead ? 'text-gray-700' : 'text-green-700'}`}>{n.title}</h4>
-                      <button onClick={() => onRemove(n.id)} className="text-gray-400 hover:text-red-500 p-1">
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                    <p className="text-[10px] text-gray-600 mb-3 leading-relaxed">{n.message}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[9px] text-gray-400">{new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      {!n.isRead && (
-                        <button
-                          onClick={() => onMarkRead(n)}
-                          className="text-[10px] font-bold text-green-600 hover:text-green-700"
-                        >
-                          Mark as read
-                        </button>
-                      )}
-                    </div>
-                  </motion.div>
-                ))
-              )}
-            </div>
-
-            {notifications.length > 0 && (
-              <div className="p-6 border-t border-gray-100">
-                <button
-                  onClick={onClearAll}
-                  className="w-full py-3 text-xs font-bold text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-xl transition-all border border-gray-100"
-                >
-                  Clear all notifications
-                </button>
-              </div>
-            )}
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
-  );
-};
-
-// PortalCard Component
-const PortalCard = ({ icon, title, description, onClick, color = 'green' }: {
+// Elevated PortalCard Component
+const PortalCard = ({ icon, title, description, onClick, color = 'green', active = false }: {
   icon: React.ReactNode,
   title: string,
   description: string,
   onClick: () => void,
-  color?: 'green' | 'blue' | 'purple' | 'amber' | 'rose' | 'indigo' | 'cyan'
+  color?: 'green' | 'blue' | 'purple' | 'amber' | 'rose' | 'indigo' | 'cyan',
+  active?: boolean
 }) => {
   const themes = {
-    green: { bg: 'bg-emerald-50', icon: 'text-emerald-600', hover: 'group-hover:bg-emerald-600', shadow: 'shadow-emerald-100' },
-    blue: { bg: 'bg-blue-50', icon: 'text-blue-600', hover: 'group-hover:bg-blue-600', shadow: 'shadow-blue-100' },
-    purple: { bg: 'bg-purple-50', icon: 'text-purple-600', hover: 'group-hover:bg-purple-600', shadow: 'shadow-purple-100' },
-    amber: { bg: 'bg-amber-50', icon: 'text-amber-600', hover: 'group-hover:bg-amber-600', shadow: 'shadow-amber-100' },
-    rose: { bg: 'bg-rose-50', icon: 'text-rose-600', hover: 'group-hover:bg-rose-600', shadow: 'shadow-rose-100' },
-    indigo: { bg: 'bg-indigo-50', icon: 'text-indigo-600', hover: 'group-hover:bg-indigo-600', shadow: 'shadow-indigo-100' },
-    cyan: { bg: 'bg-cyan-50', icon: 'text-cyan-600', hover: 'group-hover:bg-cyan-600', shadow: 'shadow-cyan-100' },
+    green: { bg: 'bg-emerald-50', icon: 'text-emerald-600', groupHover: 'group-hover:bg-emerald-600', groupText: 'group-hover:text-white', border: 'hover:border-emerald-100' },
+    blue: { bg: 'bg-blue-50', icon: 'text-blue-600', groupHover: 'group-hover:bg-blue-600', groupText: 'group-hover:text-white', border: 'hover:border-blue-100' },
+    purple: { bg: 'bg-purple-50', icon: 'text-purple-600', groupHover: 'group-hover:bg-purple-600', groupText: 'group-hover:text-white', border: 'hover:border-purple-100' },
+    amber: { bg: 'bg-amber-50', icon: 'text-amber-600', groupHover: 'group-hover:bg-amber-600', groupText: 'group-hover:text-white', border: 'hover:border-amber-100' },
+    rose: { bg: 'bg-rose-50', icon: 'text-rose-600', groupHover: 'group-hover:bg-rose-600', groupText: 'group-hover:text-white', border: 'hover:border-rose-100' },
+    indigo: { bg: 'bg-indigo-50', icon: 'text-indigo-600', groupHover: 'group-hover:bg-indigo-600', groupText: 'group-hover:text-white', border: 'hover:border-indigo-100' },
+    cyan: { bg: 'bg-cyan-50', icon: 'text-cyan-600', groupHover: 'group-hover:bg-cyan-600', groupText: 'group-hover:text-white', border: 'hover:border-cyan-100' },
   };
 
   const theme = themes[color];
 
   return (
     <motion.div
-      whileHover={{
-        y: -5,
-        transition: { duration: 0.2 }
-      }}
+      whileHover={{ y: -4 }}
       whileTap={{ scale: 0.98 }}
-      className={`group relative bg-white/70 backdrop-blur-xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[28px] p-6 cursor-pointer hover:bg-white transition-all duration-300 hover:${theme.shadow}/50`}
+      className={`group relative bg-white border border-gray-100/80 rounded-2xl p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:shadow-gray-200/40 ${theme.border}`}
       onClick={onClick}
     >
-      <div className="relative z-10">
-        <div className={`w-14 h-14 ${theme.bg} rounded-[20px] flex items-center justify-center mb-5 group-hover:scale-110 ${theme.hover} group-hover:text-white transition-all duration-500 group-hover:shadow-lg group-hover:shadow-current/20`}>
-          <div className={`${theme.icon} group-hover:text-white transition-colors duration-300`}>
-            {icon}
-          </div>
-        </div>
+      <div className="flex flex-col h-full justify-between">
         <div>
-          <h3 className="text-sm font-bold text-gray-900 mb-1.5 group-hover:text-gray-900 transition-colors">
+          <div className={`w-12 h-12 ${theme.bg} rounded-xl flex items-center justify-center mb-4 transition-colors duration-300 ${theme.groupHover}`}>
+            <div className={`text-2xl ${theme.icon} transition-colors duration-300 ${theme.groupText}`}>
+              {icon}
+            </div>
+          </div>
+          <h3 className="text-base font-bold text-gray-900 mb-2 tracking-tight group-hover:text-gray-900">
             {title}
           </h3>
-          <p className="text-[11px] text-gray-500 leading-relaxed font-medium">
+          <p className="text-sm text-gray-500 leading-relaxed font-normal">
             {description}
           </p>
         </div>
-      </div>
-      <div className={`absolute bottom-6 right-6 opacity-20 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300 ${theme.icon}`}>
-        <ChevronRight className="w-4 h-4" />
+
+        <div className="mt-6 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 translate-y-2 group-hover:translate-y-0">
+          <span className="text-xs font-semibold text-gray-900 border-b border-gray-900">Access Portal</span>
+          <ChevronRight className="w-4 h-4 text-gray-900" />
+        </div>
       </div>
     </motion.div>
   );
