@@ -843,6 +843,8 @@ function App() {
     navigationHandled.current = false;
   }, [location.pathname]);
 
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
   if (!authChecked || isInitializing) {
     return <Loader />;
   }
@@ -875,11 +877,15 @@ function App() {
                 !session || !user ? (
                   <Login onLoginSuccess={handleLoginSuccess} />
                 ) : (
-                  <div className="flex flex-col min-h-screen bg-gray-50">
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-green-100/30 via-transparent to-transparent"></div>
+                  <div className="flex flex-col min-h-screen bg-gray-50/50">
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-200/40 via-purple-100/20 to-transparent pointer-events-none"></div>
                     <div className="relative flex flex-1 w-full overflow-x-hidden">
-                      <Sidebar user={user} />
-                      <div className="flex-1 min-w-0 flex flex-col">
+                      <Sidebar
+                        user={user}
+                        isCollapsed={isSidebarCollapsed}
+                        onToggle={setIsSidebarCollapsed}
+                      />
+                      <div className={`flex-1 min-w-0 flex flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${isSidebarCollapsed ? 'ml-[88px]' : 'ml-[280px]'}`}>
                         <Header
                           user={user}
                           onLogout={handleLogout}

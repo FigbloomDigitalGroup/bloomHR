@@ -749,7 +749,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
   };
 
   return (
-    <div className="min-h-screen p-6 md:p-8 font-sans bg-gray-50/50">
+    <div className="min-h-screen p-6 md:p-8 font-sans bg-transparent">
       {/* Popup Messages */}
       <AnimatePresence>
         {showUnauthorizedPopup && (
@@ -808,7 +808,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
               </motion.div>
               <div>
                 <motion.h1
-                  className="text-3xl md:text-4xl font-bold tracking-tight mb-2 bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent"
+                  className="text-3xl md:text-4xl font-bold tracking-tight mb-2 bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent font-['Outfit']"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.2 }}
@@ -924,24 +924,24 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
                   label: 'Total Employees',
                   value: stats.employees,
                   icon: Users,
-                  color: 'text-blue-600',
-                  bg: 'bg-blue-50',
+                  color: 'text-indigo-600',
+                  bg: 'bg-indigo-50/50',
                   trend: 'up'
                 },
                 {
                   label: 'Leave Requests',
                   value: stats.leaveRequests,
                   icon: CalendarDays,
-                  color: 'text-amber-600',
-                  bg: 'bg-amber-50',
+                  color: 'text-pink-600',
+                  bg: 'bg-pink-50/50',
                   trend: 'down'
                 },
                 {
                   label: 'Salary Advances',
                   value: stats.salaryAdvances,
                   icon: Wallet,
-                  color: 'text-purple-600',
-                  bg: 'bg-purple-50',
+                  color: 'text-violet-600',
+                  bg: 'bg-violet-50/50',
                   trend: 'up'
                 },
                 {
@@ -949,26 +949,26 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
                   value: stats.jobApplications,
                   icon: NotepadText,
                   color: 'text-emerald-600',
-                  bg: 'bg-emerald-50',
+                  bg: 'bg-emerald-50/50',
                   trend: 'neutral'
                 },
               ].map((stat, i) => (
                 <motion.div
                   key={i}
-                  className="bg-white rounded-[24px] p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-gray-200/50 transition-all duration-300 group"
+                  className="bg-white/80 backdrop-blur-xl rounded-[24px] p-6 border border-white/60 shadow-lg shadow-gray-200/40 hover:shadow-xl hover:shadow-indigo-100/50 transition-all duration-300 group"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.1 }}
-                  whileHover={{ y: -4 }}
+                  whileHover={{ y: -4, scale: 1.02 }}
                 >
                   <div className="flex justify-between items-start mb-4">
-                    <div className={`w-12 h-12 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
-                      <stat.icon className="w-6 h-6 stroke-[1.5px]" />
+                    <div className={`w-12 h-12 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm border border-white/50`}>
+                      <stat.icon className="w-5 h-5 stroke-[2px]" />
                     </div>
                     {getTrend(stat.value, stat.trend as any)}
                   </div>
                   <div>
-                    <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{stat.value}</h3>
+                    <h3 className="text-3xl font-bold text-gray-900 tracking-tight font-['Outfit']">{stat.value}</h3>
                     <p className="text-sm font-medium text-gray-500 mt-1">{stat.label}</p>
                   </div>
                 </motion.div>
@@ -978,18 +978,18 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
             {/* Best Performers - Large Card */}
             <div className="col-span-12 lg:col-span-8">
               <motion.div
-                className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm h-full"
+                className="bg-white/80 backdrop-blur-xl rounded-[32px] p-8 border border-white/60 shadow-lg shadow-gray-200/40 h-full"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
               >
                 <div className="flex items-center justify-between mb-8">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 tracking-tight">Top Performers</h2>
-                    <p className="text-sm text-gray-500">Employee performance rankings for this month</p>
+                    <h2 className="text-xl font-bold text-gray-900 tracking-tight font-['Outfit']">Top Performers</h2>
+                    <p className="text-sm text-gray-500 font-medium mt-1">Employee performance rankings for this month</p>
                   </div>
-                  <button className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 transition-colors">
-                    View All <ChevronRight className="w-4 h-4" />
+                  <button className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 transition-colors bg-indigo-50 px-3 py-1.5 rounded-full hover:bg-indigo-100">
+                    View All <ChevronRight className="w-3 h-3" />
                   </button>
                 </div>
 
@@ -997,26 +997,28 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
                   {topPerformers.map((employee, index) => (
                     <motion.div
                       key={employee.id}
-                      className="group flex items-center gap-4 p-4 rounded-2xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100"
+                      className="group flex items-center gap-4 p-4 rounded-2xl hover:bg-white/80 hover:shadow-md transition-all border border-transparent hover:border-gray-100/50"
                       whileHover={{ x: 4 }}
                     >
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold shadow-sm ${index === 0 ? 'bg-amber-100 text-amber-700 ring-4 ring-amber-50' : 'bg-gray-100 text-gray-600'}`}>
-                        {index + 1}
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold shadow-sm ${index === 0 ? 'bg-amber-100 text-amber-700 ring-4 ring-amber-50' : 'bg-gray-100/80 text-gray-600'}`}>
+                        {index === 0 ? <Crown className="w-6 h-6 fill-amber-700" /> : `#${index + 1}`}
                       </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <h3 className="font-bold text-gray-900 truncate flex items-center gap-2">
-                            {employee.name}
-                            {index === 0 && <Crown className="w-4 h-4 text-amber-500 fill-amber-500" />}
-                          </h3>
-                          <span className="text-sm font-bold text-indigo-600">{employee.performance}%</span>
+                      <div className="flex-1">
+                        <h3 className="font-bold text-gray-900 font-['Outfit']">{employee.name}</h3>
+                        <p className="text-xs text-gray-500 font-medium">{employee.position} • {employee.branch}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-right">
+                          <span className="block text-sm font-bold text-gray-900 font-['Outfit']">{employee.performance}%</span>
+                          <span className="block text-[10px] text-gray-400 font-medium tracking-wide">PERFORMANCE</span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs font-medium text-gray-500">{employee.position} • {employee.branch}</p>
-                          <div className="w-24 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${employee.performance}%` }}></div>
-                          </div>
+                        <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <motion.div
+                            className={`h-full rounded-full ${index === 0 ? 'bg-amber-500' : 'bg-indigo-500'}`}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${employee.performance}%` }}
+                            transition={{ duration: 1, delay: 0.5 + (index * 0.1) }}
+                          />
                         </div>
                       </div>
                     </motion.div>
@@ -1025,57 +1027,77 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
               </motion.div>
             </div>
 
-            {/* News & Updates - Side Card */}
-            <div className="col-span-12 lg:col-span-4">
+            {/* Right Column - News & Quick Stats */}
+            <div className="col-span-12 lg:col-span-4 space-y-8">
+              {/* Company News */}
               <motion.div
-                className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm h-full flex flex-col"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
+                className="bg-white/80 backdrop-blur-xl rounded-[32px] p-6 border border-white/60 shadow-lg shadow-gray-200/40"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.3 }}
               >
-                <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-xl font-bold text-gray-900 tracking-tight">Updates</h2>
-                  <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-xs font-bold">
-                    {newsItems.length} New
-                  </span>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-lg font-bold text-gray-900 tracking-tight font-['Outfit']">Company News</h2>
+                  <div className="p-2 rounded-full bg-gray-50 text-gray-400">
+                    <Send className="w-4 h-4" />
+                  </div>
                 </div>
 
-                {isNewsLoading ? (
-                  <div className="flex-1 flex items-center justify-center">
-                    <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                  </div>
-                ) : (
-                  <div className="space-y-6 flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                    {newsItems.map((item, index) => (
-                      <div key={item.id} className="relative pl-6 border-l-2 border-dashed border-gray-100 pb-6 last:pb-0 last:border-0">
-                        <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-2 border-white shadow-sm ${getNewsBgColor(item.type)}`}></div>
-                        <div className="mb-1 flex items-center justify-between">
-                          <span className={`text-[10px] font-bold uppercase tracking-wider ${getNewsTextColor(item.type)}`}>
-                            {item.type}
-                          </span>
-                          <span className="text-xs text-gray-400 font-medium">{item.date}</span>
+                <div className="space-y-4">
+                  {isNewsLoading ? (
+                    <div className="animate-pulse space-y-4">
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className="flex gap-4">
+                          <div className="w-10 h-10 bg-gray-100 rounded-xl" />
+                          <div className="flex-1">
+                            <div className="h-4 bg-gray-100 rounded w-3/4 mb-2" />
+                            <div className="h-3 bg-gray-50 rounded w-1/2" />
+                          </div>
                         </div>
-                        <h4 className="text-sm font-bold text-gray-900 mb-1">{item.title}</h4>
-                        <p className="text-xs leading-relaxed text-gray-500">{item.description}</p>
-
-                        {item.type === 'birthday' && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); sendAllBirthdaySMS(); }}
-                            disabled={isSendingBirthdaySMS}
-                            className="mt-3 text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 transition-colors"
-                          >
-                            <Send className="w-3 h-3" /> Send Wish
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <button className="mt-8 w-full py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
-                  View All Updates
-                </button>
+                      ))}
+                    </div>
+                  ) : (
+                    newsItems.slice(0, 4).map((news, index) => (
+                      <motion.div
+                        key={news.id}
+                        className="flex gap-4 p-3 rounded-2xl hover:bg-white/60 transition-colors group cursor-pointer"
+                        whileHover={{ x: 4 }}
+                      >
+                        <div className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center ${getNewsBgColor(news.type)} ${getNewsTextColor(news.type)} shadow-sm group-hover:scale-110 transition-transform`}>
+                          {getNewsIcon(news.type)}
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-semibold text-gray-900 line-clamp-1 font-['Outfit']">{news.title}</h3>
+                          <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">{news.description}</p>
+                          <span className="text-[10px] font-medium text-gray-400 mt-1 inline-block bg-white/50 px-1.5 py-0.5 rounded-md border border-gray-100">{news.date}</span>
+                        </div>
+                      </motion.div>
+                    ))
+                  )}
+                </div>
               </motion.div>
+
+              {/* Quick Overview Mini-Cards */}
+              <div className="grid grid-cols-2 gap-4">
+                <motion.div
+                  className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-[28px] p-5 text-white shadow-lg shadow-indigo-500/25 relative overflow-hidden group"
+                  whileHover={{ y: -4 }}
+                >
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10 blur-xl group-hover:bg-white/20 transition-colors"></div>
+                  <HelpCircle className="w-6 h-6 mb-3 text-indigo-100" />
+                  <h3 className="text-2xl font-bold mb-1 font-['Outfit']">98%</h3>
+                  <p className="text-xs text-indigo-100 font-medium">Customer Satisfaction</p>
+                </motion.div>
+
+                <motion.div
+                  className="bg-white/80 backdrop-blur-xl rounded-[28px] p-5 border border-white/60 shadow-lg shadow-gray-200/40 relative overflow-hidden group"
+                  whileHover={{ y: -4 }}
+                >
+                  <Settings className="w-6 h-6 mb-3 text-gray-400 group-hover:text-indigo-600 transition-colors" />
+                  <h3 className="text-2xl font-bold text-gray-900 mb-1 font-['Outfit']">24/7</h3>
+                  <p className="text-xs text-gray-500 font-medium">System Uptime</p>
+                </motion.div>
+              </div>
             </div>
 
           </div>

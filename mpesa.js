@@ -147,9 +147,19 @@ router.post("/transaction-status-result", async (req, res) => {
             // Upsert: Match by OriginatorConversationID. 
             // This preserves the 'employee_id' if we inserted it during the request.
             // If it doesn't exist, it inserts a new one.
+            // Determine the correct Transaction ID
+            // If M-Pesa returns the generic 'UAT1000000', use the actual ReceiptNo from parameters
+            let finalTransactionID = result.TransactionID;
+            if (finalTransactionID === 'UAT1000000' && transactionDetails.ReceiptNo) {
+              console.log(`🔄 Replacing generic ID ${finalTransactionID} with actual ReceiptNo: ${transactionDetails.ReceiptNo}`);
+              finalTransactionID = transactionDetails.ReceiptNo;
+            } else if (!finalTransactionID && transactionDetails.ReceiptNo) {
+              finalTransactionID = transactionDetails.ReceiptNo;
+            }
+
             const { error } = await supabase.from('mpesa_callbacks').upsert({
               originator_conversation_id: result.OriginatorConversationID, // PK preferably
-              transaction_id: result.TransactionID || transactionDetails.ReceiptNo,
+              transaction_id: finalTransactionID,
               result_type: 'TransactionStatus',
               result_code: result.ResultCode,
               result_desc: result.ResultDesc,

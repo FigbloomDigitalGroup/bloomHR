@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, Search, User, LogOut, X, Trash2, CheckCircle, UserPlus, Calendar, Image, Upload } from 'lucide-react';
+import { Bell, LogOut, X, Trash2, CheckCircle, UserPlus, Calendar, Image, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -412,13 +412,13 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
     <>
       {/* Floating Header with Premium Glassmorphism */}
       <motion.header
-        className="z-40 mx-6 mt-4 mb-6 relative font-sans"
+        className="z-40 mx-6 mt-4 mb-6 relative font-['Inter']"
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
       >
         <div
-          className="px-6 py-3 bg-white/80 backdrop-blur-xl rounded-[24px] shadow-sm border border-white/50 flex items-center justify-between transition-all duration-300 hover:shadow-md hover:bg-white/90"
+          className="px-6 py-3 bg-white/70 backdrop-blur-xl rounded-[24px] shadow-sm border border-white/40 flex items-center justify-between transition-all duration-300 hover:shadow-md hover:bg-white/80"
         >
           {/* Company Identity */}
           <motion.div
@@ -432,47 +432,47 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
                 <img
                   src={companyProfile.image_url}
                   alt="Company Logo"
-                  className="w-10 h-10 rounded-xl object-cover shadow-sm ring-2 ring-white group-hover:ring-offset-1 transition-all"
+                  className="w-10 h-10 rounded-xl object-cover shadow-sm ring-2 ring-white/50 group-hover:ring-indigo-100 transition-all"
                 />
               ) : (
-                <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-violet-700 rounded-xl flex items-center justify-center shadow-md ring-2 ring-white text-white font-bold text-lg">
+                <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-violet-700 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-white/50 text-white font-bold text-lg font-['Outfit']">
                   {companyProfile?.company_name?.[0] || 'Z'}
                 </div>
               )}
               {/* Edit indicator on hover */}
-              <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+              <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity text-indigo-600">
+                <div className="w-2.5 h-2.5 bg-indigo-600 rounded-full border-2 border-white"></div>
               </div>
             </div>
 
             <div className="flex flex-col">
-              <h1 className="text-sm font-bold text-gray-800 tracking-tight leading-tight group-hover:text-indigo-600 transition-colors">
+              <h1 className="text-sm font-bold text-gray-900 tracking-tight leading-tight group-hover:text-indigo-600 transition-colors font-['Outfit']">
                 {companyProfile?.company_name || 'ZiraHR'}
               </h1>
-              <p className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">
-                {companyProfile?.company_tagline || 'Dashboard'}
+              <p className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">
+                {companyProfile?.company_tagline || 'Workspace'}
               </p>
             </div>
           </motion.div>
 
           {/* Right Section: Location, Search, Profile */}
-          <div className="flex items-center space-x-2 md:space-x-4">
-            {/* Region/Town Selectors - Restored with Premium Style */}
+          <div className="flex items-center space-x-2 md:space-x-5">
+            {/* Region/Town Selectors - Premium Style */}
             {(regions && onRegionChange) && (
-              <div className="hidden lg:flex items-center bg-gray-50/50 rounded-full p-1 border border-gray-100">
+              <div className="hidden lg:flex items-center bg-gray-50/80 backdrop-blur-sm rounded-full p-1 border border-gray-200/60 shadow-inner">
                 <select
                   value={selectedRegion}
                   onChange={(e) => onRegionChange(e.target.value)}
-                  className="bg-transparent text-xs font-medium text-gray-600 px-3 py-1.5 rounded-full hover:bg-white focus:outline-none cursor-pointer transition-colors appearance-none"
+                  className="bg-transparent text-xs font-semibold text-gray-600 px-4 py-1.5 rounded-full hover:bg-white hover:shadow-sm focus:outline-none cursor-pointer transition-all appearance-none outline-none"
                   style={{ backgroundImage: 'none' }}
                 >
                   {regions.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
-                <div className="w-px h-4 bg-gray-200 mx-1"></div>
+                <div className="w-px h-4 bg-gray-300 mx-1"></div>
                 <select
                   value={selectedTown || ''}
                   onChange={(e) => onTownChange && onTownChange(e.target.value)}
-                  className="bg-transparent text-xs font-medium text-gray-600 px-3 py-1.5 rounded-full hover:bg-white focus:outline-none cursor-pointer transition-colors appearance-none"
+                  className="bg-transparent text-xs font-semibold text-gray-600 px-4 py-1.5 rounded-full hover:bg-white hover:shadow-sm focus:outline-none cursor-pointer transition-all appearance-none outline-none"
                   style={{ backgroundImage: 'none' }}
                 >
                   <option value="">All Towns</option>
@@ -481,34 +481,37 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
               </div>
             )}
 
-            <div className="w-px h-6 bg-gray-200 hidden md:block mx-2"></div>
+            <div className="w-px h-8 bg-gradient-to-b from-transparent via-gray-200 to-transparent hidden md:block"></div>
 
 
             {/* Notification Bell */}
             <motion.button
-              className="relative p-2.5 text-gray-400 hover:text-indigo-600 transition-colors rounded-full hover:bg-indigo-50/50 group"
+              className="relative p-2.5 text-gray-500 hover:text-indigo-600 transition-colors rounded-full hover:bg-indigo-50/50 group border border-transparent hover:border-indigo-100"
               whileTap={{ scale: 0.95 }}
               onClick={handleBellClick}
             >
-              <Bell className="w-5 h-5 stroke-[1.5px]" />
+              <Bell className="w-5 h-5 stroke-[1.8px]" />
               {showNotificationDot && totalNotifications > 0 && (
-                <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>
+                <span className="absolute top-2 right-2.5 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white animate-pulse"></span>
               )}
             </motion.button>
 
             {/* User Profile Pill */}
             <motion.div
-              className="flex items-center gap-3 pl-1 pr-4 py-1 rounded-full bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer group"
+              className="flex items-center gap-3 pl-1 pr-4 py-1 rounded-full bg-white/80 border border-gray-100 shadow-sm hover:shadow-lg hover:border-indigo-100 transition-all cursor-pointer group"
               whileHover={{ y: -1 }}
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-gray-800 to-gray-700 text-white flex items-center justify-center text-xs font-bold ring-2 ring-white shadow-sm">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#1a1c2e] to-[#2e3250] text-white flex items-center justify-center text-xs font-bold ring-2 ring-white shadow-md">
                 {user?.email?.[0].toUpperCase() || 'U'}
               </div>
               <div className="flex flex-col items-start">
-                <span className="text-xs font-bold text-gray-700 group-hover:text-indigo-600 transition-colors">
+                <span className="text-xs font-bold text-gray-800 group-hover:text-indigo-600 transition-colors font-['Outfit']">
                   {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase() : 'Admin'}
                 </span>
-                <span className="text-[10px] text-gray-400 font-medium">Online</span>
+                <div className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                  <span className="text-[10px] text-gray-400 font-medium">Online</span>
+                </div>
               </div>
             </motion.div>
 
@@ -516,12 +519,12 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
             {onLogout && (
               <motion.button
                 onClick={onLogout}
-                className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-all"
+                className="p-2.5 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all border border-transparent hover:border-rose-100"
                 title="Logout"
                 whileHover={{ rotate: 90 }}
                 whileTap={{ scale: 0.9 }}
               >
-                <LogOut className="w-4 h-4 stroke-[1.5px]" />
+                <LogOut className="w-4 h-4 stroke-[2px]" />
               </motion.button>
             )}
           </div>

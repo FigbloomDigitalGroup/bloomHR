@@ -18,6 +18,8 @@ import {
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 import AdvanceApplicationManager from './staffSetting';
 import SearchableDropdown from '../UI/SearchableDropdown';
+import TransactionStatusChecker from './TransactionStatusChecker';
+
 
 // SMS Service Configuration
 const CELCOM_AFRICA_CONFIG = {
@@ -1657,18 +1659,18 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
     try {
       // Extract all phone numbers from callbacks
       const phoneNumbers = callbacks.map(callback => {
-        const transactionData = extractTransactionData(callback);
-        const receiverParty = transactionData?.ReceiverPartyPublicName || '';
+        // Use the phone number we already fixed!
+        let phoneToUse = callback.phone_number;
 
-        // Try to find a phone number in the string (Kenyan format)
-        const match = receiverParty.match(/(?:254|0)[17]\d{8}/);
-        if (match) {
-          return match[0].replace(/^0/, '254').slice(-9);
+        if (!phoneToUse) {
+          const transactionData = extractTransactionData(callback);
+          const receiverParty = transactionData?.ReceiverPartyPublicName || '';
+          const match = receiverParty.match(/(?:254|0)[17]\d{8}/);
+          phoneToUse = match ? match[0] : receiverParty;
         }
 
         // Clean phone number - remove non-digits and get last 9 digits
-        const cleanPhone = receiverParty.replace(/\D/g, '').slice(-9);
-        return cleanPhone;
+        return phoneToUse ? phoneToUse.replace(/\D/g, '').slice(-9) : null;
       }).filter(phone => phone && phone.length >= 9);
 
       // console.log('📞 Phone numbers to match:', phoneNumbers);
@@ -1710,14 +1712,17 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
 
       // Enhance callbacks with employee data
       const enhancedCallbacks = callbacks.map(callback => {
-        const transactionData = extractTransactionData(callback);
-        const receiverParty = transactionData?.ReceiverPartyPublicName || '';
+        // Use the phone number we already fixed!
+        let phoneToUse = callback.phone_number;
 
-        // Extract phone for lookup
-        const match = receiverParty.match(/(?:254|0)[17]\d{8}/);
-        const cleanReceiverPhone = match
-          ? match[0].replace(/^0/, '254').slice(-9)
-          : receiverParty.replace(/\D/g, '').slice(-9);
+        if (!phoneToUse) {
+          const transactionData = extractTransactionData(callback);
+          const receiverParty = transactionData?.ReceiverPartyPublicName || '';
+          const match = receiverParty.match(/(?:254|0)[17]\d{8}/);
+          phoneToUse = match ? match[0] : receiverParty;
+        }
+
+        const cleanReceiverPhone = phoneToUse ? phoneToUse.replace(/\D/g, '').slice(-9) : '';
 
         const employeeData = employeeMap[cleanReceiverPhone];
 
@@ -1765,6 +1770,66 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
 
       // Filter in memory to avoid 404 on restricted columns
       let processedData = data || [];
+
+      // Fix generic UAT1000000 IDs by extracting real ReceiptNo from raw_response
+      processedData = processedData.map(record => {
+        if (record.transaction_id === 'UAT1000000' && record.raw_response) {
+          try {
+            const raw = typeof record.raw_response === 'string' ? JSON.parse(record.raw_response) : record.raw_response;
+            const resultObj = raw.Result || raw;
+            const params = resultObj?.ResultParameters?.ResultParameter;
+
+            if (Array.isArray(params)) {
+              // 1. Find Receipt Number (Transaction ID)
+              const receipt = params.find((p: any) => p.Key === 'ReceiptNo' || p.Key === 'TransactionReceipt');
+
+              // 2. Find Phone Number
+              let updatedPhone = record.phone_number;
+              const phoneKeys = ['CreditPartyName', 'ReceiverPartyPublicName', 'ReceiverPartyName', 'B2CRecipientIsRegisteredCustomer'];
+
+              for (const key of phoneKeys) {
+                const param = params.find((p: any) => p.Key === key);
+                if (param && param.Value) {
+                  // Simpler Regex: Just find 254... or 07... (10-12 digits) anywhere
+                  const match = param.Value.toString().match(/(254\d{9}|0[17]\d{8})/);
+                  if (match) {
+                    updatedPhone = match[0];
+                    break;
+                  }
+                }
+              }
+
+              // 3. Find Amount (if generic N/A)
+              let updatedAmount = record.amount;
+              if (!updatedAmount || updatedAmount == '0' || updatedAmount == 'N/A') {
+                const amountParam = params.find((p: any) => p.Key === 'Amount' || p.Key === 'TransactionAmount');
+                if (amountParam && amountParam.Value) {
+                  updatedAmount = amountParam.Value;
+                }
+              }
+
+              // 4. Apply Updates
+              if (receipt && receipt.Value) {
+                return {
+                  ...record,
+                  transaction_id: receipt.Value,
+                  phone_number: updatedPhone,
+                  amount: updatedAmount
+                };
+              } else if (updatedPhone !== record.phone_number || updatedAmount !== record.amount) {
+                return {
+                  ...record,
+                  phone_number: updatedPhone,
+                  amount: updatedAmount
+                };
+              }
+            }
+          } catch (e) {
+            console.error("❌ Error parsing UAT transaction:", e);
+          }
+        }
+        return record;
+      });
       if (filterType === 'status') {
         processedData = processedData.filter(c => String(c.result_type || '').toLowerCase().includes('status'));
       } else if (filterType === 'payments') {
@@ -2017,7 +2082,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
     const interval = setInterval(() => {
       // console.log('🔄 Auto-refreshing M-Pesa callbacks...');
       fetchCallbacks();
-    }, 30000);
+    }, 300000); // Refresh every 5 minutes
 
     return () => clearInterval(interval);
   }, [filterStatus, filterType, selectedBranch]);
@@ -2435,6 +2500,94 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
     }
   };
 
+  // Bulk Transaction Status Check
+  const checkBulkTransactionStatus = async () => {
+    // Get all pending transactions
+    const pendingTransactions = filteredCallbacks.filter(
+      callback => callback.status?.toLowerCase() === 'pending' && callback.transaction_id
+    );
+
+    if (pendingTransactions.length === 0) {
+      toast.error('No pending transactions to check');
+      return;
+    }
+
+    const toastId = toast.loading(`Checking ${pendingTransactions.length} pending transactions...`);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      setIsCheckingStatus(true);
+
+      // Process in batches to avoid overwhelming the server
+      const batchSize = 5;
+      for (let i = 0; i < pendingTransactions.length; i += batchSize) {
+        const batch = pendingTransactions.slice(i, i + batchSize);
+
+        await Promise.all(
+          batch.map(async (callback) => {
+            try {
+              const response = await fetch('https://mpesa-22p0.onrender.com/api/mpesa/check-transaction-status', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  transactionID: callback.transaction_id,
+                  remarks: 'Bulk status check from Admin Portal',
+                  occasion: 'BulkStatusCheck'
+                }),
+              });
+
+              const result = await response.json();
+              if (result.success) {
+                successCount++;
+              } else {
+                failCount++;
+              }
+            } catch (error) {
+              console.error(`Error checking ${callback.transaction_id}:`, error);
+              failCount++;
+            }
+          })
+        );
+
+        // Update progress
+        toast.loading(
+          `Checking transactions... ${Math.min(i + batchSize, pendingTransactions.length)}/${pendingTransactions.length}`,
+          { id: toastId }
+        );
+
+        // Small delay between batches
+        if (i + batchSize < pendingTransactions.length) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      // Show final result
+      if (failCount === 0) {
+        toast.success(
+          `✅ Successfully initiated status checks for ${successCount} transactions. Results will update shortly.`,
+          { id: toastId, duration: 5000 }
+        );
+      } else {
+        toast.success(
+          `Completed: ${successCount} successful, ${failCount} failed`,
+          { id: toastId, duration: 5000 }
+        );
+      }
+
+      // Refresh after a delay to show updated statuses
+      setTimeout(() => fetchCallbacks(), 10000);
+
+    } catch (error: unknown) {
+      console.error('Bulk status check error:', error);
+      toast.error('Error during bulk status check', { id: toastId });
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex justify-between items-center mb-6">
@@ -2454,15 +2607,6 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
           </p>
         </div>
         <div className="flex items-center gap-4">
-          {/* Export Button */}
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
-          >
-            <Download className="w-4 h-4" />
-            Statement
-          </button>
-
           {/* Search Input */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -2717,12 +2861,19 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
               <tbody className="bg-white divide-y divide-gray-200">
                 {currentItems.map((callback) => {
                   const transactionData = extractTransactionData(callback);
-                  const transactionAmount = transactionData?.TransactionAmount || callback.amount;
+                  // Prioritize the amount we already fixed in processedData
+                  const transactionAmount = callback.amount || transactionData?.TransactionAmount || '0';
+
                   const receiverParty = transactionData?.ReceiverPartyPublicName || 'N/A';
 
-                  // Extract phone number from receiver party
-                  const phoneMatch = receiverParty.match(/(?:254|0)[17]\d{8}/);
-                  const phoneNumber = phoneMatch ? phoneMatch[0] : receiverParty.replace(/\D/g, '').slice(-9);
+                  // Prioritize the phone number we already fixed in processedData
+                  // If not present, try to extract from receiverParty as fallback
+                  let phoneNumber = callback.phone_number;
+
+                  if (!phoneNumber || phoneNumber === 'N/A') {
+                    const phoneMatch = receiverParty.match(/(?:254|0)[17]\d{8}/);
+                    phoneNumber = phoneMatch ? phoneMatch[0] : (receiverParty !== 'N/A' ? receiverParty.replace(/\D/g, '').slice(-9) : 'N/A');
+                  }
 
                   return (
                     <tr key={callback.id} className="hover:bg-gray-50">
@@ -6021,7 +6172,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       ) : activeTab === 'callbacks' ? (
         <MpesaCallbacks filterType="payments" />
       ) : activeTab === 'transaction_status' ? (
-        <MpesaCallbacks filterType="status" />
+        <TransactionStatusChecker />
       ) : (
         <MpesaCallbacks filterType="all" />
       )}

@@ -1,58 +1,95 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Temporary shadcn CSS variables */
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
+  /* Premium Palette - Deep Indigo & Violet */
+  --background: 240 20% 97%;
+  /* Soft Light Gray-Blue */
+  --foreground: 224 71% 4%;
+
   --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
+  --card-foreground: 224 71% 4%;
+
   --popover: 0 0% 100%;
-  --popover-foreground: 222.2 84% 4.9%;
-  --primary: 222.2 47.4% 11.2%;
+  --popover-foreground: 224 71% 4%;
+
+  /* Primary - Deep Indigo */
+  --primary: 262 83% 58%;
   --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96%;
+
+  --secondary: 210 40% 96.1%;
   --secondary-foreground: 222.2 47.4% 11.2%;
-  --muted: 210 40% 96%;
+
+  --muted: 210 40% 96.1%;
   --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96%;
+
+  --accent: 210 40% 96.1%;
   --accent-foreground: 222.2 47.4% 11.2%;
+
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 210 40% 98%;
+
   --border: 214.3 31.8% 91.4%;
   --input: 214.3 31.8% 91.4%;
-  --ring: 222.2 84% 4.9%;
-  --radius: 0.5rem;
+  --ring: 262 83% 58%;
+
+  --radius: 1rem;
 }
 
-/* Force solid backgrounds for dialogs */
-[data-radix-dialog-content] {
-  background: white !important;
-  border: 1px solid #e5e7eb !important;
-  border-radius: 0.5rem !important;
-}
-
-.bg-background {
-  background: white !important;
-}
-
-.bg-card {
-  background: white !important;
-}
 body {
-  font-family: 'Geist', sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: linear-gradient(135deg, #f0f4ff 0%, #eef2ff 100%);
+  color: hsl(var(--foreground));
+  overflow-x: hidden;
 }
 
-/* Custom scrollbar for sidebar */
+/* Glassmorphism Utilities */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.glass-dark {
+  background: rgba(17, 24, 39, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+}
+
+/* Headings */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: 'Outfit', sans-serif;
+  letter-spacing: -0.025em;
+}
+
+/* Custom Scrollbar */
 .sidebar-scroll {
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+  scrollbar-color: rgba(99, 102, 241, 0.2) transparent;
 }
 
 .sidebar-scroll::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 .sidebar-scroll::-webkit-scrollbar-track {
@@ -61,126 +98,53 @@ body {
 }
 
 .sidebar-scroll::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.5);
-  border-radius: 4px;
-  border: 2px solid transparent;
-  background-clip: content-box;
+  background-color: rgba(99, 102, 241, 0.2);
+  border-radius: 20px;
 }
 
 .sidebar-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(156, 163, 175, 0.7);
+  background-color: rgba(99, 102, 241, 0.4);
 }
 
-.sidebar-scroll::-webkit-scrollbar-thumb:active {
-  background-color: rgba(156, 163, 175, 0.9);
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .sidebar-scroll {
-    scrollbar-color: rgba(75, 85, 99, 0.5) transparent;
-  }
-  
-  .sidebar-scroll::-webkit-scrollbar-thumb {
-    background-color: rgba(75, 85, 99, 0.5);
-  }
-  
-  .sidebar-scroll::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(75, 85, 99, 0.7);
-  }
-  
-  .sidebar-scroll::-webkit-scrollbar-thumb:active {
-    background-color: rgba(75, 85, 99, 0.9);
-  }
-}
-
+/* Animations */
 @keyframes scaleIn {
   from {
     transform: scale(0.95);
     opacity: 0;
   }
+
   to {
     transform: scale(1);
     opacity: 1;
   }
 }
 
-@keyframes countdown {
-  from {
-    width: 100%;
-  }
-  to {
-    width: 0%;
-  }
-}
-
 .animate-scaleIn {
-  animation: scaleIn 0.3s ease-out forwards;
+  animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.animate-countdown {
-  animation: countdown linear forwards;
+/* Force solid backgrounds for dialogs/modals from external UI libs */
+[data-radix-dialog-content] {
+  background: white !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.1) !important;
 }
 
-/* A4 Page Styling */
+/* Print Styles */
 @media print {
   @page {
+    margin: 0;
     size: A4;
-    margin: 0;
   }
-  
+
   body {
-    width: 210mm;
-    height: 297mm;
+    background: white;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
-}
 
-.payslip-container {
-  width: 210mm;
-  min-height: 297mm;
-  padding: 15mm;
-  margin: 0 auto;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-  background-color: white;
-}
-
-/* Consistent color scheme - remove red and green */
-.text-red-700 {
-  color: #6b7280 !important; /* Using gray-500 instead of red */
-}
-
-.text-green-700 {
-  color: #6b7280 !important; /* Using gray-500 instead of green */
-}
-
-/* Additional styling for better A4 fit */
-.bg-blue-200 {
-  color: #dbeafe !important;
-}
-
-.content {
-  font-size: 0.875rem; /* text-xs */
-  line-height: 1.25rem;
-}
-
-/* Ensure content fits within A4 */
-#payslip-content {
-  max-width: 100%;
-  overflow: hidden;
-}
-
-/* Print-specific styles */
-@media print {
-  .payslip-container {
-    box-shadow: none;
-    padding: 0;
-    margin: 0;
-    width: 100%;
-    height: 100%;
-  }
-  
-  body, html {
-    width: 100%;
-    height: 100%;
+  .no-print {
+    display: none !important;
   }
 }

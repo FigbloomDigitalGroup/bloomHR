@@ -269,11 +269,37 @@ const MpesaCallbacks: React.FC = () => {
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col">
                                                 <span className="text-sm font-medium text-gray-900 font-mono flex items-center gap-2">
-                                                    {log.transaction_id || '---'}
-                                                    <Copy
-                                                        className="w-3 h-3 text-gray-300 hover:text-gray-600 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        onClick={(e) => { e.stopPropagation(); copyToClipboard(log.transaction_id || ''); }}
-                                                    />
+                                                    {(() => {
+                                                        const isGenericId = log.transaction_id === 'UAT1000000';
+                                                        let displayId = log.transaction_id || '---';
+
+                                                        if (isGenericId && log.raw_response) {
+                                                            try {
+                                                                const raw = JSON.parse(log.raw_response);
+                                                                // Handle both structure variations (Result root or direct)
+                                                                const resultObj = raw.Result || raw;
+                                                                const params = resultObj?.ResultParameters?.ResultParameter;
+
+                                                                if (Array.isArray(params)) {
+                                                                    const receiptParam = params.find((p: any) => p.Key === 'ReceiptNo');
+                                                                    if (receiptParam?.Value) {
+                                                                        displayId = receiptParam.Value;
+                                                                    }
+                                                                }
+                                                            } catch (e) {
+                                                                // fallback to generic ID if parsing fails
+                                                            }
+                                                        }
+                                                        return (
+                                                            <>
+                                                                {displayId}
+                                                                <Copy
+                                                                    className="w-3 h-3 text-gray-300 hover:text-gray-600 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                    onClick={(e) => { e.stopPropagation(); copyToClipboard(displayId); }}
+                                                                />
+                                                            </>
+                                                        );
+                                                    })()}
                                                 </span>
                                                 <span className="text-xs text-gray-500 font-mono mt-0.5">{log.originator_conversation_id}</span>
                                             </div>

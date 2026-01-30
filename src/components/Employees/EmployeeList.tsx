@@ -177,12 +177,10 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
     const searchLower = searchTerm.toLowerCase();
 
     // Search Fields: Name, ID, Email, Phone
-    const matchesSearch =
-      fullName.includes(searchLower) ||
-      employee['Employee Number']?.toLowerCase().includes(searchLower) ||
-      employee['Work Email']?.toLowerCase().includes(searchLower) ||
-      employee['Work Mobile']?.toLowerCase().includes(searchLower) ||
-      employee['Personal Mobile']?.toLowerCase().includes(searchLower);
+    const matchesSearch = fullName.includes(searchLower) ||
+      (employee['Employee Number'] && String(employee['Employee Number']).toLowerCase().includes(searchLower)) ||
+      (employee['Work Email'] && String(employee['Work Email']).toLowerCase().includes(searchLower)) ||
+      (employee['Mobile Number'] && String(employee['Mobile Number']).toLowerCase().includes(searchLower));
     const matchesDepartment = selectedDepartment === 'all' || employee['Employee Type'] === selectedDepartment;
     const matchesBranch = selectedBranch === 'all' || employee.Branch === selectedBranch;
     const matchesEmploymentType = selectedEmploymentType === 'all' || employee.Town === selectedEmploymentType;

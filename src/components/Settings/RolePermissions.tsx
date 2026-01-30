@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     Shield,
     Save,
@@ -7,9 +7,15 @@ import {
     Users,
     Lock,
     Unlock,
-    AlertCircle,
-    CheckCircle2,
-    Search
+    Search,
+    LayoutDashboard,
+    Building2,
+    Wallet,
+    Settings,
+    Briefcase,
+    UserCog,
+    CheckSquare,
+    Square
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
@@ -22,27 +28,31 @@ interface Permission {
     category: string;
 }
 
-interface RolePermission {
-    role_name: string;
-    permissions: string[];
-}
-
 const AVAILABLE_ROLES = [
-    { id: 'ADMIN', name: 'Administrator', color: 'red', description: 'Full system access' },
-    { id: 'HR', name: 'Human Resources', color: 'blue', description: 'HR management access' },
-    { id: 'CHECKER', name: 'Checker', color: 'purple', description: 'Verification and approval access' },
-    { id: 'MANAGER', name: 'Manager', color: 'green', description: 'Team management access' },
-    { id: 'REGIONAL', name: 'Regional Manager', color: 'amber', description: 'Regional oversight access' },
-    { id: 'OPERATIONS', name: 'Operations', color: 'cyan', description: 'Operational access' },
-    { id: 'STAFF', name: 'Staff', color: 'gray', description: 'Basic employee access' },
+    { id: 'ADMIN', name: 'Administrator', description: 'Full system access & configuration' },
+    { id: 'HR', name: 'Human Resources', description: 'Employee & payroll management' },
+    { id: 'CHECKER', name: 'Checker', description: 'Verification & approval workflows' },
+    { id: 'MANAGER', name: 'Manager', description: 'Team oversight & reporting' },
+    { id: 'REGIONAL', name: 'Regional Manager', description: 'Multi-branch supervision' },
+    { id: 'OPERATIONS', name: 'Operations', description: 'Day-to-day system operations' },
+    { id: 'STAFF', name: 'Staff', description: 'Basic portal access' },
 ];
 
+const CATEGORY_ICONS: Record<string, any> = {
+    'overview': LayoutDashboard,
+    'workspace': Building2,
+    'people-hr': Users,
+    'finance': Wallet,
+    'system': Settings,
+    'default': Briefcase
+};
+
 const PERMISSION_CATEGORIES = [
-    { id: 'overview', name: 'Overview', icon: '📊' },
-    { id: 'workspace', name: 'Workspace', icon: '💼' },
-    { id: 'people-hr', name: 'People & HR', icon: '👥' },
-    { id: 'finance', name: 'Finance & Assets', icon: '💰' },
-    { id: 'system', name: 'System', icon: '⚙️' },
+    { id: 'overview', name: 'Overview' },
+    { id: 'workspace', name: 'Workspace' },
+    { id: 'people-hr', name: 'People & HR' },
+    { id: 'finance', name: 'Finance & Assets' },
+    { id: 'system', name: 'System' },
 ];
 
 export default function RolePermissions() {
@@ -180,281 +190,231 @@ export default function RolePermissions() {
     });
 
     const currentRolePermissions = rolePermissions[selectedRole] || [];
-    const selectedRoleData = AVAILABLE_ROLES.find(r => r.id === selectedRole);
 
     const getPermissionsByCategory = (category: string) => {
         return filteredPermissions.filter(p => p.category === category);
     };
 
+    const getCategoryIcon = (categoryId: string) => {
+        const Icon = CATEGORY_ICONS[categoryId] || CATEGORY_ICONS['default'];
+        return <Icon className="w-5 h-5 text-gray-500" />;
+    };
+
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-96">
-                <div className="text-center">
-                    <RefreshCw className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-                    <p className="text-sm text-gray-600">Loading permissions...</p>
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <div className="flex flex-col items-center">
+                    <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin mb-4" />
+                    <p className="text-gray-500 font-medium text-sm">Loading permissions...</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="p-6 space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                        <Shield className="w-8 h-8 text-blue-600" />
-                        Role & Permissions Management
-                    </h1>
-                    <p className="text-sm text-gray-600 mt-1">
-                        Configure access rights for different user roles
-                    </p>
-                </div>
-
-                {hasChanges && (
-                    <motion.button
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        onClick={savePermissions}
-                        disabled={saving}
-                        className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-200"
-                    >
-                        {saving ? (
-                            <>
-                                <RefreshCw className="w-5 h-5 animate-spin" />
-                                Saving...
-                            </>
-                        ) : (
-                            <>
-                                <Save className="w-5 h-5" />
-                                Save Changes
-                            </>
-                        )}
-                    </motion.button>
-                )}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                {/* Role Selection Sidebar */}
-                <div className="lg:col-span-1">
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-                        <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                            <Users className="w-4 h-4" />
-                            Select Role
-                        </h3>
-
-                        <div className="space-y-2">
-                            {AVAILABLE_ROLES.map((role) => {
-                                const permCount = (rolePermissions[role.id] || []).length;
-                                const isSelected = selectedRole === role.id;
-
-                                return (
-                                    <button
-                                        key={role.id}
-                                        onClick={() => {
-                                            if (hasChanges && !window.confirm('You have unsaved changes. Continue?')) {
-                                                return;
-                                            }
-                                            setSelectedRole(role.id);
-                                            setHasChanges(false);
-                                        }}
-                                        className={`w-full text-left p-3 rounded-xl transition-all ${isSelected
-                                            ? 'bg-blue-50 border-2 border-blue-500 shadow-sm'
-                                            : 'bg-gray-50 border-2 border-transparent hover:border-gray-300'
-                                            }`}
-                                    >
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className={`text-sm font-semibold ${isSelected ? 'text-blue-700' : 'text-gray-900'
-                                                }`}>
-                                                {role.name}
-                                            </span>
-                                            <span className={`text-xs px-2 py-1 rounded-full ${isSelected ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'
-                                                }`}>
-                                                {permCount}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-gray-500">{role.description}</p>
-                                    </button>
-                                );
-                            })}
+        <div className="min-h-screen bg-gray-50 font-['Inter',sans-serif] text-gray-900 p-8">
+            <div className="max-w-[1600px] mx-auto space-y-8">
+                {/* Header Section */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div>
+                        <div className="flex items-center gap-3 mb-1">
+                            <Shield className="w-6 h-6 text-indigo-600" />
+                            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Role & Permissions</h1>
                         </div>
-
-                        {/* Quick Actions */}
-                        <div className="mt-6 pt-6 border-t border-gray-200 space-y-2">
-                            <button
-                                onClick={grantAllPermissions}
-                                className="w-full px-3 py-2 text-xs font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center gap-2"
-                            >
-                                <Unlock className="w-4 h-4" />
-                                Grant All
-                            </button>
-                            <button
-                                onClick={clearAllPermissions}
-                                className="w-full px-3 py-2 text-xs font-medium text-red-700 bg-red-50 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
-                            >
-                                <Lock className="w-4 h-4" />
-                                Clear All
-                            </button>
-                        </div>
+                        <p className="text-sm text-gray-500">
+                            Configure access controls and security policies for each role.
+                        </p>
                     </div>
+
+                    <AnimatePresence>
+                        {hasChanges && (
+                            <motion.button
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 10 }}
+                                onClick={savePermissions}
+                                disabled={saving}
+                                className="px-5 py-2.5 bg-gray-900 text-white rounded-lg font-medium shadow-sm hover:bg-black transition-colors flex items-center gap-2 disabled:opacity-70"
+                            >
+                                {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                <span>Save Changes</span>
+                            </motion.button>
+                        )}
+                    </AnimatePresence>
                 </div>
 
-                {/* Permissions Panel */}
-                <div className="lg:col-span-3">
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
-                        {/* Panel Header */}
-                        <div className="p-6 border-b border-gray-200">
-                            <div className="flex items-center justify-between mb-4">
-                                <div>
-                                    <h2 className="text-lg font-bold text-gray-900">
-                                        {selectedRoleData?.name} Permissions
-                                    </h2>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        {currentRolePermissions.length} of {permissions.length} permissions granted
-                                    </p>
-                                </div>
-
-                                {/* Copy from another role */}
-                                <select
-                                    onChange={(e) => e.target.value && copyPermissionsFrom(e.target.value)}
-                                    value=""
-                                    className="px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                >
-                                    <option value="">Copy from role...</option>
-                                    {AVAILABLE_ROLES.filter(r => r.id !== selectedRole).map(role => (
-                                        <option key={role.id} value={role.id}>{role.name}</option>
-                                    ))}
-                                </select>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    {/* Role Selection Sidebar */}
+                    <div className="lg:col-span-3 space-y-6">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                                <UserCog className="w-4 h-4 text-gray-500" />
+                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Select Role</span>
                             </div>
 
-                            {/* Search and Filter */}
-                            <div className="flex gap-3">
-                                <div className="flex-1 relative">
+                            <div className="p-2 space-y-1">
+                                {AVAILABLE_ROLES.map((role) => {
+                                    const permCount = (rolePermissions[role.id] || []).length;
+                                    const isSelected = selectedRole === role.id;
+
+                                    return (
+                                        <button
+                                            key={role.id}
+                                            onClick={() => {
+                                                if (hasChanges && !window.confirm('You have unsaved changes. Continue?')) return;
+                                                setSelectedRole(role.id);
+                                                setHasChanges(false);
+                                            }}
+                                            className={`w-full text-left px-3 py-3 rounded-lg transition-colors flex items-center justify-between group ${isSelected
+                                                ? 'bg-indigo-50 text-indigo-700'
+                                                : 'text-gray-700 hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            <div>
+                                                <span className="text-sm font-semibold block">{role.name}</span>
+                                            </div>
+                                            <div className={`
+                                                px-2 py-0.5 rounded text-xs font-bold
+                                                ${isSelected
+                                                    ? 'bg-indigo-100/50 text-indigo-700'
+                                                    : 'bg-gray-100 text-gray-500 group-hover:bg-gray-200'
+                                                }
+                                            `}>
+                                                {permCount}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="p-3 border-t border-gray-100 bg-gray-50 space-y-2">
+                                <button
+                                    onClick={grantAllPermissions}
+                                    className="w-full px-3 py-2 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Unlock className="w-3.5 h-3.5" />
+                                    Grant All
+                                </button>
+                                <button
+                                    onClick={clearAllPermissions}
+                                    className="w-full px-3 py-2 text-xs font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Lock className="w-3.5 h-3.5" />
+                                    Revoke All
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Main Content Area */}
+                    <div className="lg:col-span-9 space-y-6">
+                        {/* Controls Bar */}
+                        <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                            <div className="flex items-center gap-4 w-full sm:w-auto">
+                                <div className="relative flex-1 sm:flex-none sm:w-64">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                     <input
                                         type="text"
                                         placeholder="Search permissions..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                     />
                                 </div>
                                 <select
                                     value={selectedCategory}
                                     onChange={(e) => setSelectedCategory(e.target.value)}
-                                    className="px-4 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
                                 >
                                     <option value="all">All Categories</option>
                                     {PERMISSION_CATEGORIES.map(cat => (
-                                        <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
+                                        <option key={cat.id} value={cat.id}>
+                                            {cat.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex items-center gap-3 w-full sm:w-auto">
+                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Copy from:</span>
+                                <select
+                                    onChange={(e) => e.target.value && copyPermissionsFrom(e.target.value)}
+                                    value=""
+                                    className="flex-1 sm:flex-none px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                >
+                                    <option value="">Select role...</option>
+                                    {AVAILABLE_ROLES.filter(r => r.id !== selectedRole).map(role => (
+                                        <option key={role.id} value={role.id}>{role.name}</option>
                                     ))}
                                 </select>
                             </div>
                         </div>
 
-                        {/* Permissions List */}
-                        <div className="p-6 max-h-[600px] overflow-y-auto">
-                            {selectedCategory === 'all' ? (
-                                // Group by category
-                                PERMISSION_CATEGORIES.map(category => {
+                        {/* Permissions Grid */}
+                        <div className="space-y-6">
+                            {filteredPermissions.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-dashed border-gray-300">
+                                    <div className="p-3 bg-gray-50 rounded-full mb-3">
+                                        <Search className="w-6 h-6 text-gray-400" />
+                                    </div>
+                                    <h3 className="text-gray-900 font-medium">No permissions found</h3>
+                                    <p className="text-gray-500 text-sm">Try adjusting your search filters.</p>
+                                </div>
+                            ) : (
+                                PERMISSION_CATEGORIES.filter(cat =>
+                                    selectedCategory === 'all' || selectedCategory === cat.id
+                                ).map(category => {
                                     const categoryPerms = getPermissionsByCategory(category.id);
                                     if (categoryPerms.length === 0) return null;
 
                                     return (
-                                        <div key={category.id} className="mb-6 last:mb-0">
-                                            <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                                <span>{category.icon}</span>
-                                                {category.name}
-                                                <span className="text-xs font-normal text-gray-500">
-                                                    ({categoryPerms.filter(p => currentRolePermissions.includes(p.module_id)).length}/{categoryPerms.length})
+                                        <div key={category.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                                            <div className="px-6 py-4 bg-gray-50/50 border-b border-gray-100 flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    {getCategoryIcon(category.id)}
+                                                    <h3 className="font-semibold text-gray-900">{category.name}</h3>
+                                                </div>
+                                                <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                                                    {categoryPerms.filter(p => currentRolePermissions.includes(p.module_id)).length} / {categoryPerms.length} Active
                                                 </span>
-                                            </h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            </div>
+
+                                            <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                                 {categoryPerms.map(permission => {
                                                     const hasPermission = currentRolePermissions.includes(permission.module_id);
 
                                                     return (
-                                                        <motion.button
+                                                        <div
                                                             key={permission.id}
                                                             onClick={() => togglePermission(permission.module_id)}
-                                                            whileHover={{ scale: 1.02 }}
-                                                            whileTap={{ scale: 0.98 }}
-                                                            className={`p-4 rounded-xl border-2 transition-all text-left ${hasPermission
-                                                                ? 'bg-green-50 border-green-500 shadow-sm'
-                                                                : 'bg-gray-50 border-gray-200 hover:border-gray-300'
-                                                                }`}
+                                                            className={`
+                                                                cursor-pointer relative p-4 rounded-xl border text-left transition-all duration-200 group
+                                                                ${hasPermission
+                                                                    ? 'bg-indigo-50/50 border-indigo-200 shadow-sm'
+                                                                    : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                                                }
+                                                            `}
                                                         >
-                                                            <div className="flex items-start justify-between">
-                                                                <div className="flex-1">
-                                                                    <div className="flex items-center gap-2 mb-1">
-                                                                        {hasPermission ? (
-                                                                            <CheckCircle2 className="w-4 h-4 text-green-600" />
-                                                                        ) : (
-                                                                            <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
-                                                                        )}
-                                                                        <span className={`text-sm font-semibold ${hasPermission ? 'text-green-700' : 'text-gray-900'
-                                                                            }`}>
-                                                                            {permission.module_name}
-                                                                        </span>
-                                                                    </div>
-                                                                    <p className="text-xs text-gray-600 ml-6">
+                                                            <div className="flex items-start gap-3">
+                                                                <div className={`mt-0.5 ${hasPermission ? 'text-indigo-600' : 'text-gray-300 group-hover:text-gray-400'}`}>
+                                                                    {hasPermission ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
+                                                                </div>
+                                                                <div>
+                                                                    <p className={`text-sm font-semibold mb-1 ${hasPermission ? 'text-indigo-900' : 'text-gray-700'}`}>
+                                                                        {permission.module_name}
+                                                                    </p>
+                                                                    <p className="text-xs text-gray-500 leading-relaxed">
                                                                         {permission.description}
                                                                     </p>
                                                                 </div>
                                                             </div>
-                                                        </motion.button>
+                                                        </div>
                                                     );
                                                 })}
                                             </div>
                                         </div>
                                     );
                                 })
-                            ) : (
-                                // Single category view
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {filteredPermissions.map(permission => {
-                                        const hasPermission = currentRolePermissions.includes(permission.module_id);
-
-                                        return (
-                                            <motion.button
-                                                key={permission.id}
-                                                onClick={() => togglePermission(permission.module_id)}
-                                                whileHover={{ scale: 1.02 }}
-                                                whileTap={{ scale: 0.98 }}
-                                                className={`p-4 rounded-xl border-2 transition-all text-left ${hasPermission
-                                                    ? 'bg-green-50 border-green-500 shadow-sm'
-                                                    : 'bg-gray-50 border-gray-200 hover:border-gray-300'
-                                                    }`}
-                                            >
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            {hasPermission ? (
-                                                                <CheckCircle2 className="w-4 h-4 text-green-600" />
-                                                            ) : (
-                                                                <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
-                                                            )}
-                                                            <span className={`text-sm font-semibold ${hasPermission ? 'text-green-700' : 'text-gray-900'
-                                                                }`}>
-                                                                {permission.module_name}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-xs text-gray-600 ml-6">
-                                                            {permission.description}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </motion.button>
-                                        );
-                                    })}
-                                </div>
-                            )}
-
-                            {filteredPermissions.length === 0 && (
-                                <div className="text-center py-12">
-                                    <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                                    <p className="text-sm text-gray-600">No permissions found</p>
-                                </div>
                             )}
                         </div>
                     </div>

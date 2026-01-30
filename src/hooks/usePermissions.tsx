@@ -32,15 +32,19 @@ export function usePermissions(): UsePermissionsReturn {
             if (!user) {
                 setPermissions([]);
                 setUserRole(null);
+                setLoading(false);
                 return;
             }
 
             // Get user's role from user_metadata (not from employees table)
-            const role = user.user_metadata?.role;
+            // Normalize to uppercase to match database role_name
+            let rawRole = user.user_metadata?.role;
+            const role = rawRole ? rawRole.toUpperCase() : null;
             setUserRole(role);
 
             if (!role) {
                 setPermissions([]);
+                setLoading(false);
                 return;
             }
 
@@ -54,10 +58,9 @@ export function usePermissions(): UsePermissionsReturn {
             if (permError) {
                 console.error('Error fetching permissions:', permError);
                 setPermissions([]);
-                return;
+            } else {
+                setPermissions(rolePermData?.permissions || []);
             }
-
-            setPermissions(rolePermData?.permissions || []);
         } catch (error) {
             console.error('Error in fetchUserPermissions:', error);
             setPermissions([]);
