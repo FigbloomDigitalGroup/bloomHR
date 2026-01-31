@@ -150,7 +150,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                   className="flex flex-col"
                 >
                   <div className="flex items-center gap-1">
-                    <h1 className="font-['Outfit'] font-bold text-2xl text-gray-900 tracking-tight">
+                    <h1 className="font-['Poppins'] font-bold text-2xl text-gray-900 tracking-tight">
                       Zira<span className="text-primary">Pro</span>
                     </h1>
                   </div>
@@ -197,7 +197,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                       exit={{ opacity: 0 }}
                       className="px-4 mb-2"
                     >
-                      <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider font-['Outfit']">
+                      <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider font-['Poppins']">
                         {group.title}
                       </span>
                     </motion.div>
@@ -242,7 +242,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                               initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
                               exit={{ opacity: 0, x: -10 }}
-                              className={`ml-3 text-[13px] truncate font-['Outfit'] relative z-10 tracking-wide font-medium ${isActive ? 'text-white' : ''}`}
+                              className={`ml-3 text-[13px] truncate font-['Poppins'] relative z-10 tracking-wide font-medium ${isActive ? 'text-white' : ''}`}
                             >
                               {item.label}
                             </motion.span>
@@ -289,7 +289,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                     exit={{ opacity: 0, width: 0 }}
                     className="flex-1 overflow-hidden"
                   >
-                    <p className="text-xs font-bold text-gray-800 truncate font-['Outfit'] capitalize">
+                    <p className="text-xs font-bold text-gray-800 truncate font-['Poppins'] capitalize">
                       {userRole.toLowerCase()}
                     </p>
                     <p className="text-[10px] text-gray-500 truncate">Admin Workspace</p>
