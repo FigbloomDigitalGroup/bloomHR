@@ -57,7 +57,8 @@ import EmailPortal from './components/Email/EmailPortal';
 interface User {
   email: string;
   role: string;
-  town?: string;
+  town: string;
+  branch: string;
 }
 
 interface Branch {
@@ -372,7 +373,7 @@ function App() {
         // Also update user metadata if logged in
         if (session?.user) {
           await supabase.auth.updateUser({
-            data: { town: '' }
+            data: { town: '', branch: '' }
           });
         }
       }
@@ -463,26 +464,35 @@ function App() {
     }
   }, [navigate, clearAllTimers]);
 
-  const handleLoginSuccess = useCallback((town: string, userRole: string) => {
+  const handleLoginSuccess = useCallback((userData: any) => {
+    const { town, role } = userData;
     if (town) {
       handleTownChange(town);
     }
 
     hasShownWelcomeToast.current = true;
 
-    // Set MFA process flag for CHECKER role
-    if (userRole === 'CHECKER') {
+    // Set MFA process flag for CHECKER and ADMIN roles
+    if (role === 'CHECKER' || role === 'ADMIN') {
       sessionStorage.setItem('isMFAProcess', 'true');
+
+      // Store essential MFA data for the verification page
+      const mfaData = {
+        userId: userData.id,
+        email: userData.email,
+        userRole: role,
+        branch: userData.branch || userData.town || ''
+      };
+      sessionStorage.setItem('mfaData', JSON.stringify(mfaData));
+
+      // Navigate to MFA page with context parameters
+      navigate(`/mfa?email=${encodeURIComponent(userData.email)}&userId=${userData.id}&role=${role}`, { replace: true });
+      return; // Stop further navigation
     }
 
     setTimeout(() => {
-      // For CHECKER role, the MFA flow will handle navigation after verification
-      // For other roles, navigate immediately
-      if (userRole !== 'CHECKER') {
-        const targetPath = userRole === 'STAFF' ? '/staff' : '/dashboard';
-        navigate(targetPath, { replace: true });
-      }
-      // CHECKER role will be handled by MFA verification success callback
+      const targetPath = role === 'STAFF' ? '/staff' : '/dashboard';
+      navigate(targetPath, { replace: true });
     }, 100);
   }, [navigate, handleTownChange]);
 
@@ -561,6 +571,7 @@ function App() {
               email: session.user.email || '',
               role: userRole,
               town: userTown,
+              branch: session.user.user_metadata?.branch || ''
             });
 
             if (userTown) {
@@ -637,7 +648,8 @@ function App() {
           const userData = {
             email: session.user.email,
             role: session.user.user_metadata?.role || 'STAFF',
-            town: session.user.user_metadata?.town || ''
+            town: session.user.user_metadata?.town || '',
+            branch: session.user.user_metadata?.branch || ''
           };
 
           setUser(userData);
@@ -731,7 +743,8 @@ function App() {
         const userData = {
           email: session.user.email,
           role: session.user.user_metadata?.role || 'STAFF',
-          town: session.user.user_metadata?.town || ''
+          town: session.user.user_metadata?.town || '',
+          branch: session.user.user_metadata?.branch || ''
         };
 
         setUser(userData);
@@ -740,9 +753,20 @@ function App() {
         if (isMFAProcess && (userData.role === 'CHECKER' || userData.role === 'ADMIN')) {
           console.log('MFA process detected for', userData.role, 'role');
 
+          // Ensure mfaData is set in sessionStorage if missing
+          if (!sessionStorage.getItem('mfaData')) {
+            const mfaData = {
+              userId: session.user.id,
+              email: userData.email,
+              userRole: userData.role,
+              branch: userData.branch || userData.town || ''
+            };
+            sessionStorage.setItem('mfaData', JSON.stringify(mfaData));
+          }
+
           // Navigate to MFA page if not already there
           if (location.pathname !== '/mfa') {
-            navigate('/mfa', { replace: true });
+            navigate(`/mfa?email=${encodeURIComponent(userData.email)}&userId=${session.user.id}&role=${userData.role}`, { replace: true });
           }
           return; // Exit early, let MFA handle the rest
         }

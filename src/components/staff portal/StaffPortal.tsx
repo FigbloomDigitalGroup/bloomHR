@@ -26,7 +26,8 @@ import {
   Briefcase as PhBriefcase,
   Clock as PhClock,
   CurrencyDollar as PhCurrencyDollar,
-  Warning as PhWarning
+  Warning as PhWarning,
+  Lightning as PhLightning
 } from '@phosphor-icons/react';
 
 // Keep Lucide icons for UI elements only
@@ -57,6 +58,7 @@ import EmployeeBioPage from './Bio';
 import IncidentReport from './IncidentReport';
 import JobApplications from './JobApplications';
 import solo from '../../../public/solo.png';
+import bannerAvatar from '../../../public/banner-avatar.png';
 
 interface CompanyProfile {
   id: number;
@@ -199,42 +201,47 @@ function PortalCard({ icon, title, description, onClick, color = 'green', active
   active?: boolean
 }) {
   const themes = {
-    green: { bg: 'bg-emerald-50', icon: 'text-emerald-600', groupHover: 'group-hover:bg-emerald-600', groupText: 'group-hover:text-white', border: 'hover:border-emerald-100' },
-    blue: { bg: 'bg-blue-50', icon: 'text-blue-600', groupHover: 'group-hover:bg-blue-600', groupText: 'group-hover:text-white', border: 'hover:border-blue-100' },
-    purple: { bg: 'bg-purple-50', icon: 'text-purple-600', groupHover: 'group-hover:bg-purple-600', groupText: 'group-hover:text-white', border: 'hover:border-purple-100' },
-    amber: { bg: 'bg-amber-50', icon: 'text-amber-600', groupHover: 'group-hover:bg-amber-600', groupText: 'group-hover:text-white', border: 'hover:border-amber-100' },
-    rose: { bg: 'bg-rose-50', icon: 'text-rose-600', groupHover: 'group-hover:bg-rose-600', groupText: 'group-hover:text-white', border: 'hover:border-rose-100' },
-    indigo: { bg: 'bg-indigo-50', icon: 'text-indigo-600', groupHover: 'group-hover:bg-indigo-600', groupText: 'group-hover:text-white', border: 'hover:border-indigo-100' },
-    cyan: { bg: 'bg-cyan-50', icon: 'text-cyan-600', groupHover: 'group-hover:bg-cyan-600', groupText: 'group-hover:text-white', border: 'hover:border-cyan-100' },
+    green: { bg: 'bg-emerald-50', icon: 'text-emerald-600', shadow: 'shadow-emerald-200/60', glow: 'group-hover:shadow-emerald-400/50', groupHover: 'group-hover:bg-emerald-600', groupText: 'group-hover:text-white', border: 'hover:border-emerald-200' },
+    blue: { bg: 'bg-blue-50', icon: 'text-blue-600', shadow: 'shadow-blue-200/60', glow: 'group-hover:shadow-blue-400/50', groupHover: 'group-hover:bg-blue-600', groupText: 'group-hover:text-white', border: 'hover:border-blue-200' },
+    purple: { bg: 'bg-purple-50', icon: 'text-purple-600', shadow: 'shadow-purple-200/60', glow: 'group-hover:shadow-purple-400/50', groupHover: 'group-hover:bg-purple-600', groupText: 'group-hover:text-white', border: 'hover:border-purple-200' },
+    amber: { bg: 'bg-amber-50', icon: 'text-amber-600', shadow: 'shadow-amber-200/60', glow: 'group-hover:shadow-amber-400/50', groupHover: 'group-hover:bg-amber-600', groupText: 'group-hover:text-white', border: 'hover:border-amber-200' },
+    rose: { bg: 'bg-rose-50', icon: 'text-rose-600', shadow: 'shadow-rose-200/60', glow: 'group-hover:shadow-rose-400/50', groupHover: 'group-hover:bg-rose-600', groupText: 'group-hover:text-white', border: 'hover:border-rose-200' },
+    indigo: { bg: 'bg-indigo-50', icon: 'text-indigo-600', shadow: 'shadow-indigo-200/60', glow: 'group-hover:shadow-indigo-400/50', groupHover: 'group-hover:bg-indigo-600', groupText: 'group-hover:text-white', border: 'hover:border-indigo-200' },
+    cyan: { bg: 'bg-cyan-50', icon: 'text-cyan-600', shadow: 'shadow-cyan-200/60', glow: 'group-hover:shadow-cyan-400/50', groupHover: 'group-hover:bg-cyan-600', groupText: 'group-hover:text-white', border: 'hover:border-cyan-200' },
   };
 
   const theme = themes[color];
 
   return (
     <motion.div
-      whileHover={{ y: -4 }}
+      whileHover={{ y: -10, scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      className={`group relative bg-white border border-gray-100/80 rounded-2xl p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:shadow-gray-200/40 ${theme.border}`}
+      className={`group relative bg-white/70 backdrop-blur-2xl border border-gray-200/80 rounded-[2.5rem] p-6 cursor-pointer transition-all duration-500 hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] hover:bg-white/90 ${theme.border} overflow-hidden`}
       onClick={onClick}
     >
-      <div className="flex flex-col h-full justify-between">
+      {/* Glossy Reflection Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-tr from-white/30 via-transparent to-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+
+      <div className="relative z-10 flex flex-col h-full justify-between">
         <div>
-          <div className={`w-12 h-12 ${theme.bg} rounded-xl flex items-center justify-center mb-4 transition-colors duration-300 ${theme.groupHover}`}>
-            <div className={`text-2xl ${theme.icon} transition-colors duration-300 ${theme.groupText}`}>
+          <div className={`w-16 h-16 ${theme.bg} rounded-2xl flex items-center justify-center mb-6 transition-all duration-500 group-hover:scale-110 shadow-xl ${theme.shadow} ${theme.glow} ${theme.groupHover}`}>
+            <div className={`text-3xl ${theme.icon} transition-colors duration-500 ${theme.groupText} drop-shadow-sm`}>
               {icon}
             </div>
           </div>
-          <h3 className="text-base font-bold text-gray-900 mb-2 tracking-tight group-hover:text-gray-900">
+          <h3 className="text-xl font-bold text-gray-900 mb-2 tracking-tight">
             {title}
           </h3>
-          <p className="text-sm text-gray-500 leading-relaxed font-normal">
+          <p className="text-sm text-gray-500 leading-relaxed font-medium">
             {description}
           </p>
         </div>
 
-        <div className="mt-6 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 translate-y-2 group-hover:translate-y-0">
-          <span className="text-xs font-semibold text-gray-900 border-b border-gray-900">Access Portal</span>
-          <ChevronRight className="w-4 h-4 text-gray-900" />
+        <div className="mt-8 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-4 group-hover:translate-y-0">
+          <span className="text-xs font-bold text-gray-900 px-4 py-1.5 bg-white shadow-md rounded-full">Open Portal</span>
+          <div className={`w-10 h-10 rounded-full ${theme.bg} flex items-center justify-center ${theme.icon} shadow-lg transition-transform group-hover:rotate-[-45deg]`}>
+            <ChevronRight className="w-5 h-5 rotate-45" />
+          </div>
         </div>
       </div>
     </motion.div>
@@ -2774,25 +2781,85 @@ const DocumentUploadForm = ({
 
 // Enhanced DashboardHome with Payslip button
 const DashboardHome = ({ setActiveTab, userName }: { setActiveTab: (tab: string) => void, userName: string }) => {
-  return (
-    <div className="p-4 md:p-8 space-y-10">
-      {/* Welcome Section */}
-      <div className="space-y-4">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-        >
-          <h2 className="text-3xl font-bold tracking-tight text-gray-900">
-            Welcome back, <span className="text-green-600 font-extrabold italic select-none">
-              {userName.split(' ')[0]}
-            </span>! 👋
-          </h2>
-        </motion.div>
+  const currentHour = new Date().getHours();
+  const greeting = currentHour < 12 ? "Good Morning" : currentHour < 17 ? "Good Afternoon" : "Good Evening";
 
-        {/* Slick Thin Line Separator */}
-        <div className="h-[1px] w-full bg-gradient-to-r from-green-600 via-gray-200 to-transparent opacity-60"></div>
-      </div>
+  return (
+    <div className="p-3 md:p-8 space-y-8 md:space-y-10">
+      {/* Premium Welcome Banner */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden bg-[radial-gradient(circle_at_top_left,_var(--tw-gradient-stops))] from-emerald-600 via-emerald-800 to-green-950 rounded-[1.5rem] p-5 md:p-6 text-white shadow-2xl shadow-emerald-900/10 min-h-[160px] flex items-center"
+      >
+        {/* Artistic Background Elements */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-400/10 rounded-full blur-[100px] -mr-32 -mt-32 pointer-events-none" />
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='1' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='0.5'/%3E%3C/g%3E%3C/svg%3E")` }} />
+
+        <div className="relative z-10 w-full flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex-1 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 bg-white/10 backdrop-blur-md border border-white/10 rounded text-[9px] font-bold tracking-[0.2em] text-emerald-200/80 uppercase">
+                System Active
+              </span>
+              <div className="h-px w-8 bg-emerald-500/30" />
+              <span className="text-[9px] font-medium text-emerald-100/60 lowercase tracking-wider">
+                {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-0.5">
+              <h2 className="text-2xl md:text-3xl font-light tracking-tight text-white/90">
+                {greeting}, <span className="font-bold text-white tracking-normal">{userName.split(' ')[0]}</span> <span className="text-emerald-400">.</span>
+              </h2>
+              <p className="text-emerald-50/50 text-xs font-medium max-w-md">
+                Your workspace is optimized and ready for deployment.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <motion.button
+                whileHover={{ scale: 1.02, y: -1 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setActiveTab('details')}
+                className="flex items-center gap-2 px-4 py-1.5 bg-white text-emerald-900 rounded-lg text-xs font-bold hover:bg-emerald-50 transition-all shadow-lg shadow-emerald-900/20"
+              >
+                <PhUserCircle size={14} weight="bold" />
+                Profile
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.02, y: -1 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setActiveTab('VideoConf')}
+                className="flex items-center gap-2 px-4 py-1.5 bg-emerald-500/20 backdrop-blur-md border border-white/10 text-white rounded-lg text-xs font-bold hover:bg-white/10 transition-all"
+              >
+                <PhChatCircleDots size={14} weight="bold" />
+                Hub
+              </motion.button>
+            </div>
+          </div>
+
+          <div className="hidden lg:flex items-end h-full">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              className="relative h-[180px] w-[180px] -mb-6 pointer-events-none"
+            >
+              <div className="absolute inset-0 bg-emerald-400/10 blur-3xl rounded-full scale-125 translate-y-8" />
+              <img
+                src={bannerAvatar}
+                alt="Representative"
+                className="relative z-10 w-full h-full object-contain"
+                style={{
+                  maskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
+                  WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)'
+                }}
+              />
+            </motion.div>
+          </div>
+        </div>
+      </motion.div>
 
       {/* Services Grid */}
       <div className="space-y-6">
@@ -2883,7 +2950,7 @@ const DashboardHome = ({ setActiveTab, userName }: { setActiveTab: (tab: string)
           />
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 
@@ -3428,10 +3495,14 @@ const StaffPortal = () => {
             initial="expanded"
             animate={isExpanded ? "expanded" : "collapsed"}
             variants={sidebarVariants}
-            className="relative flex flex-col z-20 bg-white/80 backdrop-blur-2xl shadow-xl border border-white/50 h-[95vh] rounded-[32px] overflow-hidden"
+            className="relative flex flex-col z-20 shadow-xl border border-white/50 h-[95vh] rounded-[32px] overflow-hidden"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
           >
+            {/* Iridescent Rainbow Background */}
+            <div className="absolute inset-0 bg-white z-[-2]" />
+            <div className="absolute inset-0 opacity-[0.5] bg-[linear-gradient(135deg,_rgba(255,255,255,1)_0%,_rgba(236,253,243,1)_20%,_rgba(238,242,255,1)_40%,_rgba(255,241,242,1)_60%,_rgba(255,251,235,1)_80%,_rgba(236,254,255,1)_100%)] z-[-1]" />
+
 
 
             {/* Mobile Close Button */}
@@ -3443,7 +3514,7 @@ const StaffPortal = () => {
             </button>
 
             {/* Logo Section */}
-            <div className="px-5 pt-8 pb-6 flex items-center justify-between flex-shrink-0">
+            <div className="relative z-10 px-5 pt-8 pb-6 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center">
                 <motion.div
                   className="w-9 h-9 rounded-xl bg-gray-900 flex items-center justify-center shadow-lg border border-gray-700 hover:scale-105 transition-transform"
@@ -3481,7 +3552,7 @@ const StaffPortal = () => {
             </div>
 
             {/* Navigation Area */}
-            <div className="flex-1 px-3 pb-4 space-y-6 overflow-y-auto no-scrollbar scrollbar-hide">
+            <div className="relative z-10 flex-1 px-3 pb-4 space-y-6 overflow-y-auto no-scrollbar scrollbar-hide">
               {staffMenuGroups.map((group) => (
                 <div key={group.title}>
                   {/* Group Title */}
@@ -3591,7 +3662,7 @@ const StaffPortal = () => {
             </div>
 
             {/* Profile Section */}
-            <div className="p-4 border-t border-gray-100 mt-auto">
+            <div className="relative z-10 p-4 border-t border-gray-100 mt-auto">
               <div className={`flex items-center gap-3 p-2 rounded-xl transition-colors hover:bg-gray-50 cursor-pointer ${!isExpanded ? 'justify-center' : ''}`} onClick={() => setActiveTab('details')}>
                 <div className="w-8 h-8 rounded-full bg-green-50 border border-green-100 shadow-sm flex items-center justify-center overflow-hidden flex-shrink-0 text-green-600 font-bold text-xs ring-2 ring-white">
                   {userName[0]?.toUpperCase() || 'S'}
@@ -3620,14 +3691,24 @@ const StaffPortal = () => {
       <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
 
         {/* Mobile Header Toggle */}
-        <div className="md:hidden flex items-center justify-between p-4 bg-white border-b border-gray-200">
+        <div className="md:hidden flex items-center justify-between p-4 bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-40">
           <div className="flex items-center space-x-3">
-            <img src={solo} alt="Logo" className="w-8 h-8" />
-            <span className="font-bold text-gray-800">Staff Portal</span>
+            <div className="relative w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-200">
+              <img src={solo} alt="Logo" className="w-5 h-5 object-contain brightness-0 invert" />
+            </div>
+            <span className="font-['Outfit'] font-bold text-gray-900 tracking-tight">Staff Portal</span>
           </div>
-          <button onClick={() => setSidebarOpen(true)} className="p-2 text-gray-600">
-            <Menu className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveTab('details')}
+              className="w-8 h-8 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xs"
+            >
+              {userName[0]?.toUpperCase()}
+            </button>
+            <button onClick={() => setSidebarOpen(true)} className="p-2 text-gray-500 hover:text-emerald-600">
+              <Menu className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Floating Header */}

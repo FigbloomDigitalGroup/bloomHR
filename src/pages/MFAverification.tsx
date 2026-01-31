@@ -16,8 +16,6 @@ export default function MFAVerification() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [userId, setUserId] = useState('');
-  const [userRole, setUserRole] = useState('');
-  const [branch, setBranch] = useState('');
   const [resendLoading, setResendLoading] = useState(false);
   const [attemptCount, setAttemptCount] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
@@ -27,6 +25,7 @@ export default function MFAVerification() {
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const hasShownSessionError = useRef(false); // Prevent infinite error loop
+  const hasTriggeredInitialSend = useRef(false); // NEW: Prevent race conditions in auto-send
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -71,8 +70,6 @@ export default function MFAVerification() {
         const parsedData: MFAData = JSON.parse(mfaData);
         setEmail(parsedData.email);
         setUserId(parsedData.userId);
-        setUserRole(parsedData.userRole);
-        setBranch(parsedData.branch);
 
         if (parsedData.session) {
           supabase.auth.setSession(parsedData.session);
@@ -92,13 +89,7 @@ export default function MFAVerification() {
 
         const fallbackData = localStorage.getItem(`mfa_${redirectUserId}`);
         if (fallbackData) {
-          try {
-            const parsedData = JSON.parse(fallbackData);
-            setUserRole(parsedData.userRole || 'CHECKER');
-            setBranch(parsedData.branch || '');
-          } catch (error) {
-            console.error('Error parsing fallback data:', error);
-          }
+          // Fallback data exists but we don't need role/branch for logic
         }
       } else {
         // Fallback: Check for active session
@@ -108,8 +99,6 @@ export default function MFAVerification() {
             console.log('Using active session for MFA');
             setEmail(session.user.email || '');
             setUserId(session.user.id);
-            setUserRole(session.user.user_metadata?.role || 'CHECKER');
-            setBranch(session.user.user_metadata?.town || '');
             return true;
           }
           return false;
@@ -143,6 +132,30 @@ export default function MFAVerification() {
 
     return () => clearInterval(countdownInterval);
   }, []); // Empty dependency array - only run once on mount
+
+  // Initial code send effect
+  useEffect(() => {
+    // Only attempt to send if we have all necessary user identity data
+    // and aren't already in the middle of a send/verify operation
+    if (userId && email && !isVerified && !loading && !resendLoading && !hasTriggeredInitialSend.current) {
+      const sentFlag = `mfa_sent_${userId}`;
+      const hasSentInitial = sessionStorage.getItem(sentFlag);
+
+      if (!hasSentInitial) {
+        hasTriggeredInitialSend.current = true; // Mark as triggered immediately
+        console.log('🚀 Triggering initial MFA code send for:', email);
+
+        handleResendCode(true)
+          .then(() => {
+            sessionStorage.setItem(sentFlag, 'true');
+          })
+          .catch((err) => {
+            console.error('Failed initial send:', err);
+            hasTriggeredInitialSend.current = false; // Reset on failure to allow retry
+          });
+      }
+    }
+  }, [userId, email]); // Only re-run if identity changes
 
   // Handle lockout timer
   useEffect(() => {
@@ -276,31 +289,48 @@ export default function MFAVerification() {
     }
   };
 
-  const handleResendCode = async () => {
-    if (isLocked || countdown > 0) {
+  const handleResendCode = async (isInitial = false) => {
+    if (!isInitial && (isLocked || countdown > 0)) {
       toast.error(`Please wait ${countdown} seconds before requesting a new code`);
       return;
     }
 
     setResendLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-mfa-code`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          userId,
-          email
-        }),
-      });
+      // 1. Get phone number
+      const { data: numData, error: numError } = await supabase
+        .from('mfa_numbers')
+        .select('phone_number')
+        .eq('email', email)
+        .single();
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to resend code');
+      if (numError || !numData?.phone_number) {
+        throw new Error('MFA phone number not found. Please contact administrator.');
       }
+
+      const phoneNumber = numData.phone_number;
+
+      // 2. Generate and store code
+      const mfaCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const { error: storeError } = await supabase
+        .from('mfa_codes')
+        .upsert({
+          user_id: userId,
+          email: email,
+          code: mfaCode,
+          phone_number: phoneNumber,
+          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+          used: false
+        });
+
+      if (storeError) throw storeError;
+
+      // 3. Send SMS
+      const message = `Your Mular Credit verification code is: ${mfaCode}. This code expires in 10 minutes.`;
+      const encodedMessage = encodeURIComponent(message);
+      const url = `https://isms.celcomafrica.com/api/services/sendsms/?apikey=***REMOVED***&partnerID=928&message=${encodedMessage}&shortcode=MularCredit&mobile=${phoneNumber}`;
+
+      await fetch(url, { method: 'GET', mode: 'no-cors' });
 
       setCountdown(30);
       const countdownInterval = setInterval(() => {
@@ -313,8 +343,9 @@ export default function MFAVerification() {
         });
       }, 1000);
 
-      toast.success('Verification code resent successfully!');
+      toast.success('Verification code sent successfully!');
     } catch (error: any) {
+      console.error('MFA Resend error:', error);
       toast.error(error.message || 'Failed to resend code');
     } finally {
       setResendLoading(false);
@@ -432,7 +463,7 @@ export default function MFAVerification() {
 
               <button
                 type="button"
-                onClick={handleResendCode}
+                onClick={() => handleResendCode()}
                 disabled={resendLoading || isLocked || countdown > 0}
                 className="text-xs text-green-600 hover:text-green-500 font-medium disabled:text-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
               >

@@ -5366,34 +5366,35 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   const pendingCount = paymentRequests.filter(p => p.status === 'pending').length;
 
   return (
-    <div className="p-6">
-      {/* Tab Navigation */}
-      <div className="mb-6 border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
+    <div className="p-8 font-['Outfit']">
+      {/* Tab Navigation - Modern Pill Style */}
+      <div className="mb-8">
+        <nav className="inline-flex bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 gap-2">
           <button
             onClick={() => setActiveTab('applications')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'applications'
-              ? 'border-green-500 text-green-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            className={`py-2.5 px-5 rounded-xl font-medium text-sm transition-all duration-200 ${activeTab === 'applications'
+              ? 'bg-primary text-white shadow-md shadow-indigo-500/20'
+              : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
               }`}
           >
-            Salary Advance Applications
+            Salary Advance
           </button>
+
           <RoleButtonWrapper allowedRoles={['ADMIN', 'CHECKER']}>
             <button
               onClick={() => setActiveTab('callbacks')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'callbacks'
-                ? 'border-green-500 text-green-600'
-                : 'border-transparent text-blue-500 text-xs hover:text-gray-700 hover:border-gray-300'
+              className={`py-2.5 px-5 rounded-xl font-medium text-sm flex items-center gap-2 transition-all duration-200 ${activeTab === 'callbacks'
+                ? 'bg-primary text-white shadow-md shadow-indigo-500/20'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                 }`}
             >
-              <img src='M-PESA_LOGO-01.svg.png' className='w-14'></img> M-Pesa Results
+              <Smartphone className="w-4 h-4" /> M-Pesa Results
             </button>
             <button
               onClick={() => setActiveTab('transaction_status')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${activeTab === 'transaction_status'
-                ? 'border-green-500 text-green-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              className={`py-2.5 px-5 rounded-xl font-medium text-sm flex items-center gap-2 transition-all duration-200 ${activeTab === 'transaction_status'
+                ? 'bg-primary text-white shadow-md shadow-indigo-500/20'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                 }`}
             >
               <RefreshCw className="w-4 h-4" /> Transaction Status
@@ -5403,12 +5404,12 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
           <RoleButtonWrapper allowedRoles={['ADMIN']}>
             <button
               onClick={() => setActiveTab('settings')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'settings'
-                ? 'border-green-500 text-green-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              className={`py-2.5 px-5 rounded-xl font-medium text-sm flex items-center gap-2 transition-all duration-200 ${activeTab === 'settings'
+                ? 'bg-primary text-white shadow-md shadow-indigo-500/20'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                 }`}
             >
-              <Settings className="w-4 h-4 inline-block mr-1" />
+              <Settings className="w-4 h-4" />
               Settings
             </button>
           </RoleButtonWrapper>
@@ -5658,431 +5659,433 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Employee
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Mobile Number
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {isRegionalManager ? 'Region' : 'Branch'}
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Amount
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Reason
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Approval Status
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Notes
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {currentItems.map((app) => {
-                      const appDate = parseApplicationDate(app);
-                      const now = new Date();
-                      const isCurrentMonth = appDate.getMonth() === now.getMonth() && appDate.getFullYear() === now.getFullYear();
+              <div className="card-premium overflow-hidden border border-gray-100/50">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-100">
+                    <thead className="bg-[#FAFAFB]">
+                      <tr>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                          Employee
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                          Mobile Number
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                          {isRegionalManager ? 'Region' : 'Branch'}
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                          Amount
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                          Reason
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                          Approval Status
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                          Notes
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                          Date
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {currentItems.map((app) => {
+                        const appDate = parseApplicationDate(app);
+                        const now = new Date();
+                        const isCurrentMonth = appDate.getMonth() === now.getMonth() && appDate.getFullYear() === now.getFullYear();
 
-                      return (
-                        <tr key={app.id} className={!isCurrentMonth ? "bg-gray-50 opacity-60 grayscale pointer-events-none" : ""}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-2">
-                              <div>
-                                <div className="text-xs font-medium text-gray-900">{app["Full Name"]}</div>
-                                <div className="text-xs text-gray-500">{app["Employee Number"]}</div>
-                              </div>
-                              <ManagerBadge
-                                isBranchManager={isBranchManagerMap[app["Employee Number"]] || false}
-                                isRegionalManager={false}
-                              />
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
-                            {employeeMobileNumbers[app["Employee Number"]] || 'N/A'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
-                            {app['Office Branch'] || app.Office_Branch || app.office_branch || 'N/A'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            {editingId === app.id ? (
+                        return (
+                          <tr key={app.id} className={!isCurrentMonth ? "bg-gray-50 opacity-60 grayscale pointer-events-none" : ""}>
+                            <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center gap-2">
-                                <input
-                                  type="text"
-                                  value={editedAmount}
-                                  onChange={(e) => setEditedAmount(e.target.value)}
-                                  className="w-24 p-1 border rounded text-xs"
-                                />
-                                <button
-                                  onClick={() => handleAmountSave(app.id)}
-                                  className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  onClick={() => setEditingId(null)}
-                                  className="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                              <div
-                                className="text-xs font-medium text-gray-900 cursor-pointer hover:underline"
-                                onClick={() => handleAmountEdit(app.id, app["Amount Requested"])}
-                              >
-                                {formatKES(Number(app["Amount Requested"]))}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 text-xs text-gray-500 max-w-xs truncate">
-                            {app["Reason for Advance"]}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex flex-col gap-1">
-                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getApprovalBadgeColor(getApprovalStatus(app))}`}>
-                                {getApprovalStatus(app)}
-                              </span>
-                              <div className="flex items-center gap-2 text-xs text-gray-500">
-                                <UserCheck className="h-3 w-3" />
-                                <span>BM: {app.branch_manager_approval ? '✓' : (app.branch_manager_recommendation ? 'Recommended' : 'Pending')}</span>
-                              </div>
-                              <div className="flex items-center gap-2 text-xs text-gray-500">
-                                <ShieldCheck className="h-3 w-3" />
-                                <span>RM: {app.regional_manager_approval ? '✓' : (app.regional_manager_recommendation ? 'Recommended' : 'Pending')}</span>
-                              </div>
-                              {app.regional_manager_comment && (
-                                <div className="flex items-center gap-2 text-xs text-blue-600">
-                                  <Smartphone className="h-3 w-3" />
-                                  <span>RM Comment: {app.regional_manager_comment}</span>
+                                <div>
+                                  <div className="text-xs font-medium text-gray-900">{app["Full Name"]}</div>
+                                  <div className="text-xs text-gray-500">{app["Employee Number"]}</div>
                                 </div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap relative">
-                            <div className="flex items-center">
-                              <button
-                                onClick={() => setShowNotesDropdown(showNotesDropdown === app.id ? null : app.id)}
-                                className="flex items-center text-xs text-gray-500 hover:text-gray-700"
-                              >
-                                Notes <ChevronDown className="h-4 w-4 ml-1" />
-                              </button>
-                            </div>
-                            {showNotesDropdown === app.id && (
-                              <div className="absolute z-10 mt-2 w-64 bg-white shadow-lg rounded-md p-2 border border-gray-200">
-                                <textarea
-                                  value={notes[app.id] || ''}
-                                  onChange={(e) => handleNoteChange(app.id, e.target.value)}
-                                  placeholder="Add admin notes..."
-                                  className="w-full p-2 border rounded text-xs mb-2"
-                                  rows={3}
+                                <ManagerBadge
+                                  isBranchManager={isBranchManagerMap[app["Employee Number"]] || false}
+                                  isRegionalManager={false}
                                 />
-                                <div className="flex justify-end space-x-2">
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
+                              {employeeMobileNumbers[app["Employee Number"]] || 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
+                              {app['Office Branch'] || app.Office_Branch || app.office_branch || 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {editingId === app.id ? (
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    value={editedAmount}
+                                    onChange={(e) => setEditedAmount(e.target.value)}
+                                    className="w-24 p-1 border rounded text-xs"
+                                  />
                                   <button
-                                    onClick={() => setShowNotesDropdown(null)}
-                                    className="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600"
-                                  >
-                                    Cancel
-                                  </button>
-                                  <button
-                                    onClick={() => saveNotes(app.id)}
+                                    onClick={() => handleAmountSave(app.id)}
                                     className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
                                   >
                                     Save
                                   </button>
-                                </div>
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
-                            <div className="flex flex-col">
-                              <span className="text-gray-900 font-medium">{parseApplicationDate(app).toLocaleDateString()}</span>
-                              <span className="text-xs text-gray-500">{parseApplicationDate(app).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-xs font-medium">
-                            <div className="flex flex-col gap-1">
-                              {/* Branch Manager Actions */}
-                              {canBranchManagerApprove(app) && (
-                                <div className="flex flex-col gap-1">
                                   <button
-                                    onClick={() => openRecommendationModal(app, 'bm-recommend-current')}
-                                    className="text-green-600 hover:text-green-900 text-xs border border-green-200 px-2 py-1 rounded bg-green-50 flex items-center gap-1"
+                                    onClick={() => setEditingId(null)}
+                                    className="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600"
                                   >
-                                    <CheckCircle className="w-3 h-3" />
-                                    Recommend Current
-                                  </button>
-                                  <button
-                                    onClick={() => openRecommendationModal(app, 'bm-recommend-adjusted')}
-                                    className="text-blue-600 hover:text-blue-900 text-xs border border-blue-200 px-2 py-1 rounded bg-blue-50 flex items-center gap-1"
-                                  >
-                                    <Edit3 className="w-3 h-3" />
-                                    Recommend Adjusted
-                                  </button>
-                                  <button
-                                    onClick={() => openRecommendationModal(app, 'bm-recommend-reject')}
-                                    className="text-red-600 hover:text-red-900 text-xs border border-red-200 px-2 py-1 rounded bg-red-50 flex items-center gap-1"
-                                  >
-                                    <XCircleIcon className="w-3 h-3" />
-                                    Recommend Reject
+                                    Cancel
                                   </button>
                                 </div>
-                              )}
-
-                              {/* Regional Manager Actions */}
-                              {canRegionalManagerApprove(app) && (
-                                <div className="flex flex-col gap-1">
-                                  <button
-                                    onClick={() => openRecommendationModal(app, 'rm-recommend-current')}
-                                    className="text-green-600 hover:text-green-900 text-xs border border-green-200 px-2 py-1 rounded bg-green-50 flex items-center gap-1"
-                                  >
-                                    <CheckCircle className="w-3 h-3" />
-                                    Recommend Current
-                                  </button>
-                                  <button
-                                    onClick={() => openRecommendationModal(app, 'rm-recommend-adjusted')}
-                                    className="text-blue-600 hover:text-blue-900 text-xs border border-blue-200 px-2 py-1 rounded bg-blue-50 flex items-center gap-1"
-                                  >
-                                    <Edit3 className="w-3 h-3" />
-                                    Recommend Adjusted
-                                  </button>
-                                  <button
-                                    onClick={() => openRecommendationModal(app, 'rm-recommend-reject')}
-                                    className="text-red-600 hover:text-red-900 text-xs border border-red-200 px-2 py-1 rounded bg-red-50 flex items-center gap-1"
-                                  >
-                                    <XCircleIcon className="w-3 h-3" />
-                                    Recommend Reject
-                                  </button>
-                                </div>
-                              )}
-
-                              {/* Regional Manager Comment Action */}
-                              {canRegionalManagerComment(app) && (
-                                <button
-                                  onClick={() => openCommentModal(app)}
-                                  className="text-blue-600 hover:text-blue-900 text-xs border border-blue-200 px-2 py-1 rounded bg-blue-50 flex items-center gap-1"
+                              ) : (
+                                <div
+                                  className="text-xs font-medium text-gray-900 cursor-pointer hover:underline"
+                                  onClick={() => handleAmountEdit(app.id, app["Amount Requested"])}
                                 >
-                                  <Smartphone className="w-3 h-3" />
-                                  Add Comment
-                                </button>
-                              )}
-
-                              {/* Admin Final Approval Action */}
-                              {canAdminApprove(app) && (
-                                <div className="flex flex-col gap-1">
-                                  <button
-                                    onClick={() => openRecommendationModal(app, 'admin-approve-current')}
-                                    className="text-green-600 hover:text-green-900 text-xs border border-green-200 px-2 py-1 rounded bg-green-50 flex items-center gap-1"
-                                  >
-                                    <CheckCircle className="w-3 h-3" />
-                                    Approve Current
-                                  </button>
-                                  <button
-                                    onClick={() => openRecommendationModal(app, 'admin-approve-adjusted')}
-                                    className="text-blue-600 hover:text-blue-900 text-xs border border-blue-200 px-2 py-1 rounded bg-blue-50 flex items-center gap-1"
-                                  >
-                                    <Edit3 className="w-3 h-3" />
-                                    Approve Adjusted
-                                  </button>
-                                  <button
-                                    onClick={() => openRecommendationModal(app, 'admin-reject')}
-                                    className="text-red-600 hover:text-red-900 text-xs border border-red-200 px-2 py-1 rounded bg-red-50 flex items-center gap-1"
-                                  >
-                                    <XCircleIcon className="w-3 h-3" />
-                                    Reject
-                                  </button>
+                                  {formatKES(Number(app["Amount Requested"]))}
                                 </div>
                               )}
-
-                              {/* Self-approval warning */}
-                              {checkIfSelfApproval(app) && !['paid', 'rejected'].includes(app.status?.toLowerCase()) && (
-                                <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200">
-                                  Cannot approve own request
+                            </td>
+                            <td className="px-6 py-4 text-xs text-gray-500 max-w-xs truncate">
+                              {app["Reason for Advance"]}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex flex-col gap-1">
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getApprovalBadgeColor(getApprovalStatus(app))}`}>
+                                  {getApprovalStatus(app)}
                                 </span>
+                                <div className="flex items-center gap-2 text-xs text-gray-500">
+                                  <UserCheck className="h-3 w-3" />
+                                  <span>BM: {app.branch_manager_approval ? '✓' : (app.branch_manager_recommendation ? 'Recommended' : 'Pending')}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-gray-500">
+                                  <ShieldCheck className="h-3 w-3" />
+                                  <span>RM: {app.regional_manager_approval ? '✓' : (app.regional_manager_recommendation ? 'Recommended' : 'Pending')}</span>
+                                </div>
+                                {app.regional_manager_comment && (
+                                  <div className="flex items-center gap-2 text-xs text-blue-600">
+                                    <Smartphone className="h-3 w-3" />
+                                    <span>RM Comment: {app.regional_manager_comment}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap relative">
+                              <div className="flex items-center">
+                                <button
+                                  onClick={() => setShowNotesDropdown(showNotesDropdown === app.id ? null : app.id)}
+                                  className="flex items-center text-xs text-gray-500 hover:text-gray-700"
+                                >
+                                  Notes <ChevronDown className="h-4 w-4 ml-1" />
+                                </button>
+                              </div>
+                              {showNotesDropdown === app.id && (
+                                <div className="absolute z-10 mt-2 w-64 bg-white shadow-lg rounded-md p-2 border border-gray-200">
+                                  <textarea
+                                    value={notes[app.id] || ''}
+                                    onChange={(e) => handleNoteChange(app.id, e.target.value)}
+                                    placeholder="Add admin notes..."
+                                    className="w-full p-2 border rounded text-xs mb-2"
+                                    rows={3}
+                                  />
+                                  <div className="flex justify-end space-x-2">
+                                    <button
+                                      onClick={() => setShowNotesDropdown(null)}
+                                      className="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      onClick={() => saveNotes(app.id)}
+                                      className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
+                                    >
+                                      Save
+                                    </button>
+                                  </div>
+                                </div>
                               )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
+                              <div className="flex flex-col">
+                                <span className="text-gray-900 font-medium">{parseApplicationDate(app).toLocaleDateString()}</span>
+                                <span className="text-xs text-gray-500">{parseApplicationDate(app).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-xs font-medium">
+                              <div className="flex flex-col gap-1">
+                                {/* Branch Manager Actions */}
+                                {canBranchManagerApprove(app) && (
+                                  <div className="flex flex-col gap-1">
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'bm-recommend-current')}
+                                      className="text-green-600 hover:text-green-900 text-xs border border-green-200 px-2 py-1 rounded bg-green-50 flex items-center gap-1"
+                                    >
+                                      <CheckCircle className="w-3 h-3" />
+                                      Recommend Current
+                                    </button>
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'bm-recommend-adjusted')}
+                                      className="text-blue-600 hover:text-blue-900 text-xs border border-blue-200 px-2 py-1 rounded bg-blue-50 flex items-center gap-1"
+                                    >
+                                      <Edit3 className="w-3 h-3" />
+                                      Recommend Adjusted
+                                    </button>
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'bm-recommend-reject')}
+                                      className="text-red-600 hover:text-red-900 text-xs border border-red-200 px-2 py-1 rounded bg-red-50 flex items-center gap-1"
+                                    >
+                                      <XCircleIcon className="w-3 h-3" />
+                                      Recommend Reject
+                                    </button>
+                                  </div>
+                                )}
 
-                              {/* No actions available message */}
-                              {/* Terminal Statuses or Ready for Payment */}
-                              {app.status?.toLowerCase() === 'paid' && (
-                                <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200 flex items-center gap-1">
-                                  <CheckCircle className="w-3 h-3" />
-                                  Payment Processed
-                                </span>
-                              )}
+                                {/* Regional Manager Actions */}
+                                {canRegionalManagerApprove(app) && (
+                                  <div className="flex flex-col gap-1">
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'rm-recommend-current')}
+                                      className="text-green-600 hover:text-green-900 text-xs border border-green-200 px-2 py-1 rounded bg-green-50 flex items-center gap-1"
+                                    >
+                                      <CheckCircle className="w-3 h-3" />
+                                      Recommend Current
+                                    </button>
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'rm-recommend-adjusted')}
+                                      className="text-blue-600 hover:text-blue-900 text-xs border border-blue-200 px-2 py-1 rounded bg-blue-50 flex items-center gap-1"
+                                    >
+                                      <Edit3 className="w-3 h-3" />
+                                      Recommend Adjusted
+                                    </button>
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'rm-recommend-reject')}
+                                      className="text-red-600 hover:text-red-900 text-xs border border-red-200 px-2 py-1 rounded bg-red-50 flex items-center gap-1"
+                                    >
+                                      <XCircleIcon className="w-3 h-3" />
+                                      Recommend Reject
+                                    </button>
+                                  </div>
+                                )}
 
-                              {['approved', 'fully approved'].includes(app.status?.toLowerCase()) && (
-                                <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200 flex items-center gap-1">
-                                  <Clock className="w-3 h-3" />
-                                  Ready for Payment
-                                </span>
-                              )}
+                                {/* Regional Manager Comment Action */}
+                                {canRegionalManagerComment(app) && (
+                                  <button
+                                    onClick={() => openCommentModal(app)}
+                                    className="text-blue-600 hover:text-blue-900 text-xs border border-blue-200 px-2 py-1 rounded bg-blue-50 flex items-center gap-1"
+                                  >
+                                    <Smartphone className="w-3 h-3" />
+                                    Add Comment
+                                  </button>
+                                )}
 
-                              {app.status?.toLowerCase() === 'rejected' && (
-                                <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200 flex items-center gap-1">
-                                  <XCircleIcon className="w-3 h-3" />
-                                  Request Rejected
-                                </span>
-                              )}
+                                {/* Admin Final Approval Action */}
+                                {canAdminApprove(app) && (
+                                  <div className="flex flex-col gap-1">
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'admin-approve-current')}
+                                      className="text-green-600 hover:text-green-900 text-xs border border-green-200 px-2 py-1 rounded bg-green-50 flex items-center gap-1"
+                                    >
+                                      <CheckCircle className="w-3 h-3" />
+                                      Approve Current
+                                    </button>
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'admin-approve-adjusted')}
+                                      className="text-blue-600 hover:text-blue-900 text-xs border border-blue-200 px-2 py-1 rounded bg-blue-50 flex items-center gap-1"
+                                    >
+                                      <Edit3 className="w-3 h-3" />
+                                      Approve Adjusted
+                                    </button>
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'admin-reject')}
+                                      className="text-red-600 hover:text-red-900 text-xs border border-red-200 px-2 py-1 rounded bg-red-50 flex items-center gap-1"
+                                    >
+                                      <XCircleIcon className="w-3 h-3" />
+                                      Reject
+                                    </button>
+                                  </div>
+                                )}
 
-                              {/* No actions available message (Only for true pending states) */}
-                              {!canBranchManagerApprove(app) && !canRegionalManagerApprove(app) && !canRegionalManagerComment(app) && !canAdminApprove(app) &&
-                                !['paid', 'approved', 'fully approved', 'rejected'].includes(app.status?.toLowerCase()) && !checkIfSelfApproval(app) && (
-                                  <span className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded border border-gray-200 flex items-center gap-1">
-                                    <Clock className="w-3 h-3" />
-                                    Awaiting approval
+                                {/* Self-approval warning */}
+                                {checkIfSelfApproval(app) && !['paid', 'rejected'].includes(app.status?.toLowerCase()) && (
+                                  <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200">
+                                    Cannot approve own request
                                   </span>
                                 )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
 
-              {/* Pagination Controls */}
-              {/* Pagination Controls */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center mt-6 px-4 py-4">
-                  {/* Mobile pagination */}
-                  <div className="flex items-center justify-between w-full sm:hidden">
-                    <button
-                      onClick={() => paginate(currentPage - 1)}
-                      disabled={currentPage === 1}
-                      className="relative inline-flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <ChevronLeft className="h-4 w-4 mr-1" />
-                      Previous
-                    </button>
-                    <span className="text-xs text-gray-700">
-                      Page {currentPage} of {totalPages}
-                    </span>
-                    <button
-                      onClick={() => paginate(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                      className="relative inline-flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Next
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </button>
-                  </div>
+                                {/* No actions available message */}
+                                {/* Terminal Statuses or Ready for Payment */}
+                                {app.status?.toLowerCase() === 'paid' && (
+                                  <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200 flex items-center gap-1">
+                                    <CheckCircle className="w-3 h-3" />
+                                    Payment Processed
+                                  </span>
+                                )}
 
-                  {/* Desktop pagination */}
-                  <div className="hidden sm:flex sm:flex-col sm:items-center sm:gap-3">
-                    <p className="text-xs text-gray-700">
-                      Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
-                      <span className="font-medium">
-                        {Math.min(indexOfLastItem, filteredApplications.length)}
-                      </span>{' '}
-                      of <span className="font-medium">{filteredApplications.length}</span> results
-                    </p>
-                    <nav className="inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                                {['approved', 'fully approved'].includes(app.status?.toLowerCase()) && (
+                                  <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200 flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    Ready for Payment
+                                  </span>
+                                )}
+
+                                {app.status?.toLowerCase() === 'rejected' && (
+                                  <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200 flex items-center gap-1">
+                                    <XCircleIcon className="w-3 h-3" />
+                                    Request Rejected
+                                  </span>
+                                )}
+
+                                {/* No actions available message (Only for true pending states) */}
+                                {!canBranchManagerApprove(app) && !canRegionalManagerApprove(app) && !canRegionalManagerComment(app) && !canAdminApprove(app) &&
+                                  !['paid', 'approved', 'fully approved', 'rejected'].includes(app.status?.toLowerCase()) && !checkIfSelfApproval(app) && (
+                                    <span className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded border border-gray-200 flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      Awaiting approval
+                                    </span>
+                                  )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination Controls */}
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center mt-6 px-4 py-4">
+                    {/* Mobile pagination */}
+                    <div className="flex items-center justify-between w-full sm:hidden">
                       <button
                         onClick={() => paginate(currentPage - 1)}
                         disabled={currentPage === 1}
-                        className="relative inline-flex items-center px-2 py-2 text-xs font-medium text-gray-500 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="relative inline-flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <span className="sr-only">Previous</span>
-                        <ChevronLeft className="h-4 w-4" />
+                        <ChevronLeft className="h-4 w-4 mr-1" />
+                        Previous
                       </button>
-
-                      {/* Page numbers - show limited set for better layout */}
-                      {(() => {
-                        const maxVisible = 5;
-                        let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
-                        let endPage = Math.min(totalPages, startPage + maxVisible - 1);
-
-                        if (endPage - startPage < maxVisible - 1) {
-                          startPage = Math.max(1, endPage - maxVisible + 1);
-                        }
-
-                        const pages = [];
-
-                        // First page
-                        if (startPage > 1) {
-                          pages.push(
-                            <button
-                              key={1}
-                              onClick={() => paginate(1)}
-                              className="relative inline-flex items-center px-3 py-2 text-xs font-medium bg-white border-gray-300 text-gray-500 hover:bg-gray-50 border"
-                            >
-                              1
-                            </button>
-                          );
-                          if (startPage > 2) {
-                            pages.push(
-                              <span key="dots1" className="relative inline-flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300">
-                                ...
-                              </span>
-                            );
-                          }
-                        }
-
-                        // Visible pages
-                        for (let i = startPage; i <= endPage; i++) {
-                          pages.push(
-                            <button
-                              key={i}
-                              onClick={() => paginate(i)}
-                              className={`relative inline-flex items-center px-3 py-2 text-xs font-medium ${currentPage === i
-                                ? 'z-10 bg-green-50 border-green-500 text-green-600'
-                                : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                                } border`}
-                            >
-                              {i}
-                            </button>
-                          );
-                        }
-
-                        // Last page
-                        if (endPage < totalPages) {
-                          if (endPage < totalPages - 1) {
-                            pages.push(
-                              <span key="dots2" className="relative inline-flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300">
-                                ...
-                              </span>
-                            );
-                          }
-                          pages.push(
-                            <button
-                              key={totalPages}
-                              onClick={() => paginate(totalPages)}
-                              className="relative inline-flex items-center px-3 py-2 text-xs font-medium bg-white border-gray-300 text-gray-500 hover:bg-gray-50 border"
-                            >
-                              {totalPages}
-                            </button>
-                          );
-                        }
-
-                        return pages;
-                      })()}
-
+                      <span className="text-xs text-gray-700">
+                        Page {currentPage} of {totalPages}
+                      </span>
                       <button
                         onClick={() => paginate(currentPage + 1)}
                         disabled={currentPage === totalPages}
-                        className="relative inline-flex items-center px-2 py-2 text-xs font-medium text-gray-500 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="relative inline-flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        <span className="sr-only">Next</span>
-                        <ChevronRight className="h-4 w-4" />
+                        Next
+                        <ChevronRight className="h-4 w-4 ml-1" />
                       </button>
-                    </nav>
+                    </div>
+
+                    {/* Desktop pagination */}
+                    <div className="hidden sm:flex sm:flex-col sm:items-center sm:gap-3">
+                      <p className="text-xs text-gray-700">
+                        Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
+                        <span className="font-medium">
+                          {Math.min(indexOfLastItem, filteredApplications.length)}
+                        </span>{' '}
+                        of <span className="font-medium">{filteredApplications.length}</span> results
+                      </p>
+                      <nav className="inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                        <button
+                          onClick={() => paginate(currentPage - 1)}
+                          disabled={currentPage === 1}
+                          className="relative inline-flex items-center px-2 py-2 text-xs font-medium text-gray-500 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <span className="sr-only">Previous</span>
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+
+                        {/* Page numbers - show limited set for better layout */}
+                        {(() => {
+                          const maxVisible = 5;
+                          let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+                          let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+
+                          if (endPage - startPage < maxVisible - 1) {
+                            startPage = Math.max(1, endPage - maxVisible + 1);
+                          }
+
+                          const pages = [];
+
+                          // First page
+                          if (startPage > 1) {
+                            pages.push(
+                              <button
+                                key={1}
+                                onClick={() => paginate(1)}
+                                className="relative inline-flex items-center px-3 py-2 text-xs font-medium bg-white border-gray-300 text-gray-500 hover:bg-gray-50 border"
+                              >
+                                1
+                              </button>
+                            );
+                            if (startPage > 2) {
+                              pages.push(
+                                <span key="dots1" className="relative inline-flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300">
+                                  ...
+                                </span>
+                              );
+                            }
+                          }
+
+                          // Visible pages
+                          for (let i = startPage; i <= endPage; i++) {
+                            pages.push(
+                              <button
+                                key={i}
+                                onClick={() => paginate(i)}
+                                className={`relative inline-flex items-center px-3 py-2 text-xs font-medium ${currentPage === i
+                                  ? 'z-10 bg-green-50 border-green-500 text-green-600'
+                                  : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                  } border`}
+                              >
+                                {i}
+                              </button>
+                            );
+                          }
+
+                          // Last page
+                          if (endPage < totalPages) {
+                            if (endPage < totalPages - 1) {
+                              pages.push(
+                                <span key="dots2" className="relative inline-flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300">
+                                  ...
+                                </span>
+                              );
+                            }
+                            pages.push(
+                              <button
+                                key={totalPages}
+                                onClick={() => paginate(totalPages)}
+                                className="relative inline-flex items-center px-3 py-2 text-xs font-medium bg-white border-gray-300 text-gray-500 hover:bg-gray-50 border"
+                              >
+                                {totalPages}
+                              </button>
+                            );
+                          }
+
+                          return pages;
+                        })()}
+
+                        <button
+                          onClick={() => paginate(currentPage + 1)}
+                          disabled={currentPage === totalPages}
+                          className="relative inline-flex items-center px-2 py-2 text-xs font-medium text-gray-500 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <span className="sr-only">Next</span>
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+                      </nav>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </>
           )}
 
