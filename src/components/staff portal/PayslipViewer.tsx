@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { 
-  FileText, 
-  Download, 
-  Printer, 
-  ArrowLeft, 
-  ArrowRight, 
+import {
+  FileText,
+  Download,
+  Printer,
+  ArrowLeft,
+  ArrowRight,
   X,
   Calendar,
   Search,
@@ -47,19 +47,19 @@ const statutorySettings = {
 const statutoryCalculations = {
   calculatePAYE: (taxableIncome) => {
     if (!taxableIncome || taxableIncome <= 0) return 0;
-    
+
     let tax = 0;
     let remainingIncome = taxableIncome;
 
     for (let i = 0; i < statutorySettings.payeBrackets.length; i++) {
       const bracket = statutorySettings.payeBrackets[i];
       const prevBracket = i > 0 ? statutorySettings.payeBrackets[i - 1] : { threshold: 0 };
-      
+
       if (remainingIncome > 0) {
-        const bracketAmount = i === 0 
+        const bracketAmount = i === 0
           ? Math.min(remainingIncome, bracket.threshold)
           : Math.min(remainingIncome, bracket.threshold - prevBracket.threshold);
-        
+
         tax += bracketAmount * bracket.rate;
         remainingIncome -= bracketAmount;
       }
@@ -76,7 +76,7 @@ const statutoryCalculations = {
 
     if (grossSalary > statutorySettings.nssfLowerLimit) {
       const tier2Salary = Math.min(
-        grossSalary - statutorySettings.nssfLowerLimit, 
+        grossSalary - statutorySettings.nssfLowerLimit,
         statutorySettings.nssfUpperLimit - statutorySettings.nssfLowerLimit
       );
       tier2 = tier2Salary * statutorySettings.nssfRate;
@@ -88,7 +88,7 @@ const statutoryCalculations = {
 
   calculateNHIF: (grossPay) => {
     if (!grossPay || grossPay <= 0) return 0;
-    
+
     // UPDATED: Use taxable gross instead of gross pay (minus per diem)
     const nhif = grossPay * statutorySettings.nhifRate;
     return Number(nhif.toFixed(2));
@@ -102,7 +102,7 @@ const statutoryCalculations = {
 };
 
 // UPDATED: EXACT SAME calculation logic as payroll dashboard with salary advances
-const calculatePayrollValues = (employee, overrideStatutoryChecks = true, salaryAdvances = []) => {
+const calculatePayrollValues = (employee, overrideStatutoryChecks = true, salaryAdvances = [], payPeriod = null) => {
   const basicSalary = parseFloat(employee["Basic Salary"] || employee.basic_salary || 0);
   const houseAllowance = parseFloat(employee["House Allowance"] || employee.house_allowance || 0);
   const transportAllowance = parseFloat(employee["Transport Allowance"] || employee.transport_allowance || 0);
@@ -112,24 +112,24 @@ const calculatePayrollValues = (employee, overrideStatutoryChecks = true, salary
   const overtimeRate = parseFloat(employee["Overtime Rate"] || employee.overtime_rate || 0);
   const commission = parseFloat(employee["Commission"] || employee.commission || 0);
   const bonus = parseFloat(employee["Bonus"] || employee.bonus || 0);
-  
+
   // EXACT SAME: Per diem is 33% of basic salary
   const perDiem = basicSalary * 0.33;
-  
+
   // EXACT SAME: Overtime pay
   const overtimePay = overtimeHours * overtimeRate;
-  
+
   // EXACT SAME: Gross pay (basic salary already includes per diem)
-  const grossPay = basicSalary + houseAllowance + transportAllowance + 
-                  medicalAllowance + otherAllowances + overtimePay + 
-                  commission + bonus;
+  const grossPay = basicSalary + houseAllowance + transportAllowance +
+    medicalAllowance + otherAllowances + overtimePay +
+    commission + bonus;
 
   // Get employee info for statutory checks
   const nhifNumber = employee["NHIF Number"] || employee.nhif_number || employee["SHIF Number"] || '';
   const nssfNumber = employee["NSSF Number"] || employee.nssf_number || '';
   const taxPin = employee["Tax PIN"] || employee.tax_pin || '';
   const employeeId = employee["Employee ID"] || employee.employee_id || employee["Employee Number"] || '';
-  
+
   // EXACT SAME: Taxable amount EXCLUDES the per diem portion
   const taxableGross = grossPay - perDiem;
 
@@ -137,67 +137,106 @@ const calculatePayrollValues = (employee, overrideStatutoryChecks = true, salary
   let nhifDeduction = 0;
   let nssfDeduction = 0;
   let housingLevy = 0;
-  
+
   if (overrideStatutoryChecks || nhifNumber) {
     nhifDeduction = statutoryCalculations.calculateNHIF(taxableGross);
   }
-  
+
   if (overrideStatutoryChecks || nssfNumber) {
     nssfDeduction = statutoryCalculations.calculateNSSF(taxableGross);
   }
-  
+
   if (overrideStatutoryChecks || taxPin) {
     housingLevy = statutoryCalculations.calculateHousingLevy(taxableGross);
   }
-  
+
   // EXACT SAME: Calculate taxable income for PAYE AFTER deducting NSSF and Housing Levy
-  const taxableIncomeForPAYE = taxableGross - nssfDeduction - housingLevy; 
-  
+  const taxableIncomeForPAYE = taxableGross - nssfDeduction - housingLevy;
+
   let payeTax = 0;
   let taxRelief = 0;
-  
+
   if (overrideStatutoryChecks || taxPin) {
     payeTax = statutoryCalculations.calculatePAYE(taxableIncomeForPAYE);
     taxRelief = Math.min(payeTax, statutorySettings.personalRelief);
     payeTax = Math.max(0, payeTax - taxRelief);
   }
 
-  // UPDATED: Calculate salary advance deduction
+  // UPDATED: Calculate salary advance deduction for CURRENT PAY PERIOD ONLY
   const calculateAdvanceDeduction = (employeeNumber) => {
     if (!employeeNumber || !salaryAdvances || salaryAdvances.length === 0) return 0;
-    
-    // Find ALL advances for this employee
+
+    // Parse the pay period to get year and month
+    let payPeriodYear = null;
+    let payPeriodMonth = null;
+
+    if (payPeriod) {
+      // Pay period format could be "January 2026" or "2026-01" or a date string
+      const periodStr = String(payPeriod);
+
+      // Try to parse different formats
+      if (periodStr.includes('-')) {
+        // Format: "2026-01" or "2026-01-15"
+        const parts = periodStr.split('-');
+        payPeriodYear = parseInt(parts[0]);
+        payPeriodMonth = parseInt(parts[1]);
+      } else {
+        // Format: "January 2026" or similar
+        const date = new Date(periodStr);
+        if (!isNaN(date.getTime())) {
+          payPeriodYear = date.getFullYear();
+          payPeriodMonth = date.getMonth() + 1; // getMonth() is 0-indexed
+        }
+      }
+    }
+
+    // Find advances for this employee in the CURRENT PAY PERIOD
     const employeeAdvances = salaryAdvances.filter(adv => {
       const advanceEmpNumber = adv["Employee Number"];
-      return advanceEmpNumber == employeeNumber;
+      if (advanceEmpNumber != employeeNumber) return false;
+
+      // If we have a pay period, filter by payment date
+      if (payPeriodYear && payPeriodMonth && adv.payment_date) {
+        const paymentDate = new Date(adv.payment_date);
+        const paymentYear = paymentDate.getFullYear();
+        const paymentMonth = paymentDate.getMonth() + 1;
+
+        // Only include advances paid in the same month/year as the payslip
+        return paymentYear === payPeriodYear && paymentMonth === payPeriodMonth;
+      }
+
+      // If no pay period specified, don't include any advances (safer default)
+      return false;
     });
-    
+
     if (employeeAdvances.length === 0) return 0;
-    
-    // Sum ALL advances for this employee
+
+    // Sum advances for this employee in the current period
     const totalAmount = employeeAdvances.reduce((sum, adv) => {
       return sum + (parseFloat(adv["Amount Requested"]) || 0);
     }, 0);
-    
+
+    console.log(`Advance deduction for ${employeeNumber} in period ${payPeriod}: KSh ${totalAmount} (${employeeAdvances.length} advances)`);
+
     return totalAmount;
   };
 
   const advanceDeduction = calculateAdvanceDeduction(employeeId);
-  
+
   // EXACT SAME: Voluntary deductions set to 0 except welfare
   const loanDeduction = 0;
   const welfareDeduction = 300; // Fixed welfare deduction
   const otherDeductions = 0;
 
   // EXACT SAME: Total deductions
-  const totalDeductions = payeTax + 
-                         nhifDeduction + 
-                         nssfDeduction + 
-                         housingLevy + 
-                         loanDeduction + 
-                         advanceDeduction + 
-                         welfareDeduction + 
-                         otherDeductions;
+  const totalDeductions = payeTax +
+    nhifDeduction +
+    nssfDeduction +
+    housingLevy +
+    loanDeduction +
+    advanceDeduction +
+    welfareDeduction +
+    otherDeductions;
 
   const netPay = grossPay - totalDeductions;
 
@@ -300,13 +339,13 @@ const StatutoryCard = ({
 };
 
 // Glow Button Component
-const GlowButton = ({ 
-  children, 
-  variant = 'primary', 
-  icon: Icon, 
-  size = 'md', 
-  onClick, 
-  disabled = false 
+const GlowButton = ({
+  children,
+  variant = 'primary',
+  icon: Icon,
+  size = 'md',
+  onClick,
+  disabled = false
 }) => {
   const baseClasses = "inline-flex items-center gap-2 rounded-lg font-medium transition-all duration-300 border";
   const sizeClasses = {
@@ -321,7 +360,7 @@ const GlowButton = ({
   };
 
   return (
-    <button 
+    <button
       className={`${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
       onClick={onClick}
       disabled={disabled}
@@ -342,7 +381,9 @@ const PayslipModal = ({
   overrideStatutoryChecks = true,
   salaryAdvances = []
 }) => {
-  const calculated = calculatePayrollValues(record, overrideStatutoryChecks, salaryAdvances);
+  // Extract pay period from record
+  const payPeriod = record["Pay Period"] || record.pay_period || null;
+  const calculated = calculatePayrollValues(record, overrideStatutoryChecks, salaryAdvances, payPeriod);
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
@@ -651,18 +692,18 @@ const PayslipModal = ({
         <div className="sticky top-0 bg-white p-4 border-b border-gray-200 flex justify-between items-center z-10">
           <h2 className="text-xl font-semibold text-gray-900">Modern Payslip</h2>
           <div className="flex gap-2">
-            <GlowButton 
-              variant="secondary" 
-              icon={Download} 
-              size="sm" 
+            <GlowButton
+              variant="secondary"
+              icon={Download}
+              size="sm"
               onClick={handleDownloadPDF}
             >
               Download PDF
             </GlowButton>
-            <GlowButton 
-              variant="danger" 
-              icon={X} 
-              size="sm" 
+            <GlowButton
+              variant="danger"
+              icon={X}
+              size="sm"
               onClick={onClose}
             >
               Close
@@ -685,7 +726,7 @@ const PayslipModal = ({
               <div className="text-right">
                 <h2 className="text-xl font-bold">PAYSLIP</h2>
                 <div className="text-gray-300 text-xs">
-                  {record["Pay Period"] || record.pay_period ? 
+                  {record["Pay Period"] || record.pay_period ?
                     new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'N/A'}
                 </div>
               </div>
@@ -761,8 +802,8 @@ const PayslipModal = ({
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-4 text-center text-xs">
-                <div className="border border-dashed p-2">Employee Signature<br/>Date: __________</div>
-                <div className="border border-dashed p-2">Authorized Signatory<br/>Date: __________</div>
+                <div className="border border-dashed p-2">Employee Signature<br />Date: __________</div>
+                <div className="border border-dashed p-2">Authorized Signatory<br />Date: __________</div>
               </div>
 
               <div className="text-center text-gray-500 text-xs">
@@ -803,7 +844,7 @@ const PayslipViewer = () => {
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [showSummary, setShowSummary] = useState(false);
   const [overrideStatutoryChecks, setOverrideStatutoryChecks] = useState(true);
-  const [salaryAdvances, setSalaryAdvances] = useState([]);
+  const [salaryAdvances, setSalaryAdvances] = useState<any[]>([]);
 
   useEffect(() => {
     fetchPayslips();
@@ -814,89 +855,89 @@ const PayslipViewer = () => {
   const fetchSalaryAdvances = async () => {
     try {
       console.log('Fetching salary advances for payslip viewer...');
-      
+
       const { data, error } = await supabase
         .from('salary_advance')
-        .select('"Employee Number", "Amount Requested", payment_processed, status')
+        .select('"Employee Number", "Amount Requested", payment_processed, status, payment_date')
         .eq('payment_processed', 'true')
         .eq('status', 'paid')
         .order('time_added', { ascending: false });
-      
+
       if (error) {
         console.warn('Salary advances fetch error:', error.message);
         setSalaryAdvances([]);
         return;
       }
-      
+
       console.log(`Loaded ${data?.length || 0} salary advances for payslip viewer`);
       setSalaryAdvances(data || []);
-      
+
     } catch (error) {
       console.warn('Failed to load salary advances:', error.message);
       setSalaryAdvances([]);
     }
   };
 
- const fetchPayslips = async () => {
-  try {
-    setIsLoading(true);
-    
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user?.email) return;
+  const fetchPayslips = async () => {
+    try {
+      setIsLoading(true);
 
-    const { data: employeeData } = await supabase
-      .from('employees')
-      .select('"Employee Number"')
-      .eq('"Work Email"', user.email)
-      .single();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) return;
 
-    if (!employeeData) return;
+      const { data: employeeData } = await supabase
+        .from('employees')
+        .select('"Employee Number"')
+        .eq('"Work Email"', user.email)
+        .single();
 
-    // Try to get data from the current view first
-    const { data: currentData, error: currentError } = await supabase
-      .from('payroll_records_current')
-      .select('*')
-      .eq('"Employee ID"', employeeData["Employee Number"])
-      .order('"Pay Period"', { ascending: false });
+      if (!employeeData) return;
 
-    let data = [];
-
-    if (!currentError && currentData) {
-      data = currentData;
-    } else {
-      // Fallback to payroll_records table
-      const { data: recordsData, error: recordsError } = await supabase
-        .from('payroll_records')
+      // Try to get data from the current view first
+      const { data: currentData, error: currentError } = await supabase
+        .from('payroll_records_current')
         .select('*')
         .eq('"Employee ID"', employeeData["Employee Number"])
         .order('"Pay Period"', { ascending: false });
 
-      if (!recordsError && recordsData) {
-        data = recordsData;
-      } else {
-        // Final fallback to payroll_data table
-        const { data: payrollData, error: payrollError } = await supabase
-          .from('payroll_data')
-          .select('*')
-          .eq('employee_id', employeeData["Employee Number"])
-          .order('pay_period', { ascending: false });
+      let data = [];
 
-        if (!payrollError && payrollData) {
-          data = payrollData;
+      if (!currentError && currentData) {
+        data = currentData;
+      } else {
+        // Fallback to payroll_records table
+        const { data: recordsData, error: recordsError } = await supabase
+          .from('payroll_records')
+          .select('*')
+          .eq('"Employee ID"', employeeData["Employee Number"])
+          .order('"Pay Period"', { ascending: false });
+
+        if (!recordsError && recordsData) {
+          data = recordsData;
         } else {
-          throw currentError || recordsError || payrollError;
+          // Final fallback to payroll_data table
+          const { data: payrollData, error: payrollError } = await supabase
+            .from('payroll_data')
+            .select('*')
+            .eq('employee_id', employeeData["Employee Number"])
+            .order('pay_period', { ascending: false });
+
+          if (!payrollError && payrollData) {
+            data = payrollData;
+          } else {
+            throw currentError || recordsError || payrollError;
+          }
         }
       }
-    }
 
-    setPayslips(data || []);
-  } catch (error) {
-    console.error('Error fetching payslips:', error);
-    toast.error('Failed to load payslips');
-  } finally {
-    setIsLoading(false);
-  }
-};
+      setPayslips(data || []);
+    } catch (error) {
+      console.error('Error fetching payslips:', error);
+      toast.error('Failed to load payslips');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const fetchCompanyInfo = async () => {
     try {
@@ -929,7 +970,7 @@ const PayslipViewer = () => {
     if (currentPayslipIndex === null || !selectedPayslip) return;
 
     const newIndex = direction === 'prev' ? currentPayslipIndex - 1 : currentPayslipIndex + 1;
-    
+
     if (newIndex >= 0 && newIndex < filteredPayslips.length) {
       setSelectedPayslip(filteredPayslips[newIndex]);
       setCurrentPayslipIndex(newIndex);
@@ -952,7 +993,8 @@ const PayslipViewer = () => {
   // Calculate summary totals including advance deductions
   const calculateSummaryTotals = () => {
     const totals = filteredPayslips.reduce((acc, payslip) => {
-      const calculated = calculatePayrollValues(payslip, overrideStatutoryChecks, salaryAdvances);
+      const payPeriod = payslip["Pay Period"] || payslip.pay_period || null;
+      const calculated = calculatePayrollValues(payslip, overrideStatutoryChecks, salaryAdvances, payPeriod);
       return {
         totalGrossPay: acc.totalGrossPay + calculated.grossPay,
         totalDeductions: acc.totalDeductions + calculated.totalDeductions,
@@ -982,13 +1024,13 @@ const PayslipViewer = () => {
     const employeeName = payslip["Employee Name"] || payslip.employee_name || '';
     const employeeId = payslip["Employee ID"] || payslip.employee_id || '';
     const payPeriod = payslip["Pay Period"] || payslip.pay_period || '';
-    
-    const matchesSearch = !searchTerm.trim() || 
+
+    const matchesSearch = !searchTerm.trim() ||
       employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       employeeId.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesPeriod = selectedPeriod === 'all' || payPeriod === selectedPeriod;
-    
+
     return matchesSearch && matchesPeriod;
   });
 
@@ -1050,28 +1092,28 @@ const PayslipViewer = () => {
       {/* Summary Cards - Updated with advance deductions */}
       {showSummary && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <SummaryCard 
-            label="Total Gross Pay" 
-            value={summaryTotals.totalGrossPay} 
-            icon={DollarSign} 
+          <SummaryCard
+            label="Total Gross Pay"
+            value={summaryTotals.totalGrossPay}
+            icon={DollarSign}
             color="emerald"
           />
-          <SummaryCard 
-            label="Total Deductions" 
-            value={summaryTotals.totalDeductions} 
-            icon={Box} 
+          <SummaryCard
+            label="Total Deductions"
+            value={summaryTotals.totalDeductions}
+            icon={Box}
             color="red"
           />
-          <SummaryCard 
-            label="Total Net Pay" 
-            value={summaryTotals.totalNetPay} 
-            icon={Calculator} 
+          <SummaryCard
+            label="Total Net Pay"
+            value={summaryTotals.totalNetPay}
+            icon={Calculator}
             color="blue"
           />
-          <SummaryCard 
-            label="Advance Deductions" 
-            value={summaryTotals.totalAdvanceDeductions} 
-            icon={AlertTriangle} 
+          <SummaryCard
+            label="Advance Deductions"
+            value={summaryTotals.totalAdvanceDeductions}
+            icon={AlertTriangle}
             color="orange"
           />
         </div>
@@ -1142,7 +1184,7 @@ const PayslipViewer = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead className="bg-gray-50 border-b border-gray-200">
@@ -1171,14 +1213,15 @@ const PayslipViewer = () => {
               ) : (
                 filteredPayslips.map((payslip, index) => {
                   const isExpanded = expandedRows.has(payslip.id);
-                  const calculated = calculatePayrollValues(payslip, overrideStatutoryChecks, salaryAdvances);
-                  
+                  const payPeriod = payslip["Pay Period"] || payslip.pay_period || null;
+                  const calculated = calculatePayrollValues(payslip, overrideStatutoryChecks, salaryAdvances, payPeriod);
+
                   return (
                     <React.Fragment key={payslip.id}>
                       <tr className="border-b border-gray-200 hover:bg-gray-50">
                         <td className="sticky left-0 z-10 bg-white px-4 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <button 
+                            <button
                               onClick={(e) => toggleRowExpand(payslip.id, e)}
                               className="mr-2 text-gray-500 hover:text-gray-700"
                             >
@@ -1188,37 +1231,37 @@ const PayslipViewer = () => {
                                 <ChevronDown className="w-4 h-4" />
                               )}
                             </button>
-                           <div>
-  <div className="font-medium text-gray-900">
-    {payslip["Pay Period"] || payslip.pay_period ? 
-      (() => {
-        const period = payslip["Pay Period"] || payslip.pay_period;
-        const [year, month] = period.split('-').map(Number);
-        
-        // Calculate previous month
-        let prevMonth = month - 1;
-        let prevYear = year;
-        
-        if (prevMonth === 0) {
-          prevMonth = 12;
-          prevYear = year - 1;
-        }
-        
-        const prevMonthDate = new Date(prevYear, prevMonth - 1, 1);
-        
-        // Show both period and previous month
-        const currentMonth = new Date(year, month - 1, 1).toLocaleDateString('en-US', { 
-          month: 'long', 
-          year: 'numeric' 
-        });
-        
-        return `${prevMonthDate.toLocaleDateString('en-US', { 
-          month: 'long', 
-          year: 'numeric' 
-        })} `;
-      })() : 'N/A'}
-  </div>
-</div>
+                            <div>
+                              <div className="font-medium text-gray-900">
+                                {payslip["Pay Period"] || payslip.pay_period ?
+                                  (() => {
+                                    const period = payslip["Pay Period"] || payslip.pay_period;
+                                    const [year, month] = period.split('-').map(Number);
+
+                                    // Calculate previous month
+                                    let prevMonth = month - 1;
+                                    let prevYear = year;
+
+                                    if (prevMonth === 0) {
+                                      prevMonth = 12;
+                                      prevYear = year - 1;
+                                    }
+
+                                    const prevMonthDate = new Date(prevYear, prevMonth - 1, 1);
+
+                                    // Show both period and previous month
+                                    const currentMonth = new Date(year, month - 1, 1).toLocaleDateString('en-US', {
+                                      month: 'long',
+                                      year: 'numeric'
+                                    });
+
+                                    return `${prevMonthDate.toLocaleDateString('en-US', {
+                                      month: 'long',
+                                      year: 'numeric'
+                                    })} `;
+                                  })() : 'N/A'}
+                              </div>
+                            </div>
                           </div>
                         </td>
                         <td className="px-4 py-4">
@@ -1255,17 +1298,17 @@ const PayslipViewer = () => {
                           KSh {Math.round(calculated.netPay).toLocaleString()}
                         </td>
                         <td className="sticky right-0 z-10 bg-white px-4 py-4 text-center">
-                          <GlowButton 
-                            variant="primary" 
-                            icon={Eye} 
-                            size="sm" 
+                          <GlowButton
+                            variant="primary"
+                            icon={Eye}
+                            size="sm"
                             onClick={() => handleViewPayslip(payslip, index)}
                           >
                             View
                           </GlowButton>
                         </td>
                       </tr>
-                      
+
                       {isExpanded && (
                         <tr className="bg-gray-50">
                           <td colSpan={12} className="px-4 py-4">
@@ -1293,7 +1336,7 @@ const PayslipViewer = () => {
                                   <span>KSh {calculated.perDiem.toLocaleString()}</span>
                                 </div>
                               </div>
-                              
+
                               <div className="space-y-2">
                                 <h4 className="font-medium text-gray-900">Statutory Deductions</h4>
                                 <div className="flex justify-between">
@@ -1313,7 +1356,7 @@ const PayslipViewer = () => {
                                   <span className="text-red-600">KSh {calculated.housingLevy.toLocaleString()}</span>
                                 </div>
                               </div>
-                              
+
                               <div className="space-y-2">
                                 <h4 className="font-medium text-gray-900">Other Deductions</h4>
                                 <div className="flex justify-between">
@@ -1351,9 +1394,9 @@ const PayslipViewer = () => {
         <PayslipModal
           record={selectedPayslip}
           onClose={() => setSelectedPayslip(null)}
-          onPrevious={currentPayslipIndex !== null && currentPayslipIndex > 0 ? 
+          onPrevious={currentPayslipIndex !== null && currentPayslipIndex > 0 ?
             () => handleNavigatePayslip('prev') : undefined}
-          onNext={currentPayslipIndex !== null && currentPayslipIndex < filteredPayslips.length - 1 ? 
+          onNext={currentPayslipIndex !== null && currentPayslipIndex < filteredPayslips.length - 1 ?
             () => handleNavigatePayslip('next') : undefined}
           companyInfo={companyInfo}
           overrideStatutoryChecks={overrideStatutoryChecks}
