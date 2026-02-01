@@ -418,7 +418,7 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
         transition={{ duration: 0.4, ease: "easeOut" }}
       >
         <div
-          className="px-6 py-3 bg-white/70 backdrop-blur-xl rounded-[24px] shadow-sm border border-white/40 flex items-center justify-between transition-all duration-300 hover:shadow-md hover:bg-white/80"
+          className="px-6 py-3 bg-white/60 backdrop-blur-2xl rounded-[24px] shadow-sm border border-white/40 flex items-center justify-between transition-all duration-300 hover:shadow-md hover:bg-white/70"
         >
           {/* Company Identity */}
           <motion.div
@@ -432,22 +432,22 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
                 <img
                   src={companyProfile.image_url}
                   alt="Company Logo"
-                  className="w-10 h-10 rounded-xl object-cover shadow-sm ring-2 ring-white/50 group-hover:ring-indigo-100 transition-all"
+                  className="w-11 h-11 rounded-xl object-cover shadow-sm ring-2 ring-white/50 group-hover:ring-indigo-100 transition-all"
                 />
               ) : (
-                <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-violet-700 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-white/50 text-white font-bold text-lg font-['Outfit']">
+                <div className="w-11 h-11 bg-gradient-to-br from-blue-600 to-[#03c04a] rounded-xl flex items-center justify-center shadow-lg ring-2 ring-white/50 text-white font-bold text-lg font-['Outfit']">
                   {companyProfile?.company_name?.[0] || 'Z'}
                 </div>
               )}
               {/* Edit indicator on hover */}
-              <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity text-indigo-600">
-                <div className="w-2.5 h-2.5 bg-indigo-600 rounded-full border-2 border-white"></div>
+              <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity text-[#03c04a]">
+                <div className="w-2.5 h-2.5 bg-[#03c04a] rounded-full border-2 border-white"></div>
               </div>
             </div>
 
             <div className="flex flex-col">
-              <h1 className="text-sm font-bold text-gray-900 tracking-tight leading-tight group-hover:text-indigo-600 transition-colors font-['Outfit']">
-                {companyProfile?.company_name || 'ZiraHR'}
+              <h1 className="text-sm font-bold text-gray-900 tracking-tight leading-tight group-hover:text-[#03c04a] transition-colors font-['Outfit']">
+                {companyProfile?.company_name || 'ZiraPro'}
               </h1>
               <p className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">
                 {companyProfile?.company_tagline || 'Workspace'}
@@ -486,7 +486,7 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
 
             {/* Notification Bell */}
             <motion.button
-              className="relative p-2.5 text-gray-500 hover:text-indigo-600 transition-colors rounded-full hover:bg-indigo-50/50 group border border-transparent hover:border-indigo-100"
+              className="relative p-2.5 text-gray-500 hover:text-[#03c04a] transition-colors rounded-full hover:bg-green-50/50 group border border-transparent hover:border-green-100"
               whileTap={{ scale: 0.95 }}
               onClick={handleBellClick}
             >
@@ -498,14 +498,14 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
 
             {/* User Profile Pill */}
             <motion.div
-              className="flex items-center gap-3 pl-1 pr-4 py-1 rounded-full bg-white/80 border border-gray-100 shadow-sm hover:shadow-lg hover:border-indigo-100 transition-all cursor-pointer group"
+              className="flex items-center gap-3 pl-1 pr-4 py-1 rounded-full bg-white/80 border border-gray-100 shadow-sm hover:shadow-lg hover:border-green-100 transition-all cursor-pointer group"
               whileHover={{ y: -1 }}
             >
               <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#1a1c2e] to-[#2e3250] text-white flex items-center justify-center text-xs font-bold ring-2 ring-white shadow-md">
                 {user?.email?.[0].toUpperCase() || 'U'}
               </div>
               <div className="flex flex-col items-start">
-                <span className="text-xs font-bold text-gray-800 group-hover:text-indigo-600 transition-colors font-['Outfit']">
+                <span className="text-xs font-bold text-gray-800 group-hover:text-[#03c04a] transition-colors font-['Outfit']">
                   {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase() : 'Admin'}
                 </span>
                 <div className="flex items-center gap-1">

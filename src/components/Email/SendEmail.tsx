@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Loader2, Send, Filter, Users, User, X, Check, Paperclip } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
 import SearchableDropdown from '../UI/SearchableDropdown';
 
 
@@ -23,6 +24,8 @@ export default function SendEmail() {
 
   // Form State
   const [mode, setMode] = useState<'single' | 'bulk'>('single');
+  const [provider, setProvider] = useState<'resend' | 'cpanel'>('resend'); // Default provider
+  const [cpanelUser, setCpanelUser] = useState<string>('support@mularcredit.com'); // Default cPanel user
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
 
   // Bulk Filters
@@ -177,8 +180,10 @@ export default function SendEmail() {
             body: JSON.stringify({
               to: recipient['Work Email'],
               subject: subject,
-              html: body, // In a real app we might want to wrap this in a template
-              attachments: attachments.length > 0 ? attachments : undefined
+              html: body,
+              attachments: attachments.length > 0 ? attachments : undefined,
+              provider, // Pass selected provider
+              cpanelUser: provider === 'cpanel' ? cpanelUser : undefined // Pass dynamic user
             })
           });
 
@@ -232,30 +237,86 @@ export default function SendEmail() {
         <p className="text-sm text-gray-500 mt-1">Send communication to employees</p>
       </div>
 
-      <div className="p-6 space-y-6">
-        {/* Recipient Selection Mode */}
-        <div className="flex items-center space-x-4">
-          <label className="text-sm font-medium text-gray-700">Send To:</label>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => { setMode('single'); setSelectedEmployeeId(''); }}
-              className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all ${mode === 'single'
-                ? 'bg-green-50 text-green-700 border-green-200 shadow-sm'
-                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                }`}
-            >
-              Single Employee
-            </button>
-            <button
-              onClick={() => { setMode('bulk'); setSelectedBranch('all'); setSelectedDepartment('all'); }}
-              className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all ${mode === 'bulk'
-                ? 'bg-green-50 text-green-700 border-green-200 shadow-sm'
-                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                }`}
-            >
-              Bulk / Groups
-            </button>
+      <div className="p-6 space-y-8">
+        {/* Controls Bar */}
+        <div className="flex flex-col space-y-6 lg:flex-row lg:space-y-0 lg:items-center lg:justify-between bg-gray-50/50 p-4 rounded-2xl border border-gray-100/50">
+
+          <div className="flex flex-wrap items-center gap-6">
+            {/* Provider Selection */}
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 ml-1">Email Provider</label>
+              <div className="flex items-center space-x-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
+                <button
+                  onClick={() => setProvider('resend')}
+                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 ${provider === 'resend'
+                    ? 'bg-[#03c04a] text-white shadow-md'
+                    : 'text-gray-500 hover:bg-gray-50'
+                    }`}
+                >
+                  Resend API
+                </button>
+                <button
+                  onClick={() => setProvider('cpanel')}
+                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 ${provider === 'cpanel'
+                    ? 'bg-[#03c04a] text-white shadow-md'
+                    : 'text-gray-500 hover:bg-gray-50'
+                    }`}
+                >
+                  cPanel (SMTP)
+                </button>
+              </div>
+            </div>
+
+            {/* Recipient Mode Selection */}
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 ml-1">Recipient Type</label>
+              <div className="flex items-center space-x-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
+                <button
+                  onClick={() => { setMode('single'); setSelectedEmployeeId(''); }}
+                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 ${mode === 'single'
+                    ? 'bg-[#03c04a] text-white shadow-md'
+                    : 'text-gray-500 hover:bg-gray-50'
+                    }`}
+                >
+                  Single Employee
+                </button>
+                <button
+                  onClick={() => { setMode('bulk'); setSelectedBranch('all'); setSelectedDepartment('all'); }}
+                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 ${mode === 'bulk'
+                    ? 'bg-[#03c04a] text-white shadow-md'
+                    : 'text-gray-500 hover:bg-gray-50'
+                    }`}
+                >
+                  Bulk / Groups
+                </button>
+              </div>
+            </div>
           </div>
+
+          {/* Conditional cPanel Settings */}
+          <AnimatePresence>
+            {provider === 'cpanel' && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className="flex flex-col space-y-2"
+              >
+                <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 ml-1">cPanel Configuration</label>
+                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-[#03c04a]">
+                  <input
+                    type="text"
+                    placeholder="Username/Email"
+                    className="text-xs font-medium border-none p-0 focus:ring-0 w-40 placeholder:text-gray-300"
+                    value={cpanelUser}
+                    onChange={(e) => setCpanelUser(e.target.value)}
+                  />
+                  <div className="w-px h-4 bg-gray-200" />
+                  <span className="text-[10px] text-gray-400 font-medium">Auth User</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Dynamic Selection Controls */}
@@ -404,5 +465,6 @@ export default function SendEmail() {
         </div>
       </div>
     </div>
+
   );
 }

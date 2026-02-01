@@ -3466,12 +3466,12 @@ const StaffPortal = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 relative flex font-sans text-gray-900 transition-colors duration-300 overflow-hidden">
+    <div className="min-h-screen bg-blue-50/30 relative flex font-sans text-gray-900 transition-colors duration-300 overflow-hidden">
       {/* Dynamic Background Blobs */}
       <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-emerald-200/20 blur-[120px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-sky-200/20 blur-[120px] animate-pulse" />
-        <div className="absolute top-[20%] right-[10%] w-[30%] h-[30%] rounded-full bg-purple-100/20 blur-[100px]" />
+        <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full bg-blue-200/30 blur-[130px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full bg-emerald-200/30 blur-[130px] animate-pulse" />
+        <div className="absolute top-[20%] right-[-5%] w-[40%] h-[40%] rounded-full bg-cyan-100/20 blur-[110px]" />
       </div>
 
       <GeolocationWarningModal
@@ -3495,32 +3495,32 @@ const StaffPortal = () => {
             initial="expanded"
             animate={isExpanded ? "expanded" : "collapsed"}
             variants={sidebarVariants}
-            className="relative flex flex-col z-20 shadow-xl border border-white/50 h-[95vh] rounded-[32px] overflow-hidden"
+            className="relative flex flex-col z-20 shadow-xl border border-white/50 h-[95vh] rounded-[32px] overflow-hidden font-poppins"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
           >
-            {/* Iridescent Rainbow Background */}
+            {/* Blue-Green Gradient Background */}
             <div className="absolute inset-0 bg-white z-[-2]" />
-            <div className="absolute inset-0 opacity-[0.5] bg-[linear-gradient(135deg,_rgba(255,255,255,1)_0%,_rgba(236,253,243,1)_20%,_rgba(238,242,255,1)_40%,_rgba(255,241,242,1)_60%,_rgba(255,251,235,1)_80%,_rgba(236,254,255,1)_100%)] z-[-1]" />
+            <div className="absolute inset-0 opacity-[0.8] bg-[linear-gradient(135deg,_rgba(239,246,255,1)_0%,_rgba(236,253,245,1)_100%)] z-[-1]" />
 
 
 
             {/* Mobile Close Button */}
             <button
               onClick={() => setSidebarOpen(false)}
-              className="absolute top-4 right-4 p-2 text-gray-500 md:hidden"
+              className="absolute top-4 right-4 p-2 text-gray-700 md:hidden z-50"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5 bg-white/50 rounded-full" />
             </button>
 
             {/* Logo Section */}
             <div className="relative z-10 px-5 pt-8 pb-6 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center">
                 <motion.div
-                  className="w-9 h-9 rounded-xl bg-gray-900 flex items-center justify-center shadow-lg border border-gray-700 hover:scale-105 transition-transform"
+                  className="w-10 h-10 rounded-xl bg-gray-900 flex items-center justify-center shadow-lg border border-gray-700 hover:scale-105 transition-transform"
                   layout
                 >
-                  <img src={solo} alt="Logo" className="w-5 h-5 object-contain" />
+                  <img src={solo} alt="Logo" className="w-6 h-6 object-contain" />
                 </motion.div>
 
                 <AnimatePresence>
@@ -3531,19 +3531,19 @@ const StaffPortal = () => {
                       exit={{ opacity: 0, x: -10 }}
                       className="ml-3"
                     >
-                      <h1 className="font-bold text-lg text-gray-800 tracking-tight leading-none">
-                        Staff<span className="text-green-600 font-medium">Portal</span>
+                      <h1 className="font-semibold text-lg text-gray-800 tracking-tight leading-none">
+                        Staff<span className="text-green-600 font-bold">Portal</span>
                       </h1>
-                      <p className="text-[10px] text-gray-400 font-medium tracking-wide mt-0.5">Employee Space</p>
+                      <p className="text-[10px] text-gray-500 font-bold tracking-widest mt-0.5 uppercase">Employee Space</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
 
-              {/* Toggle Button (Hamburger) - Moved here for visibility */}
+              {/* Toggle Button (Hamburger) - Darkened */}
               <motion.button
                 onClick={() => setIsCollapsed(!isCollapsed)}
-                className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900 transition-colors hidden md:block"
+                className="p-2 rounded-lg bg-gray-800 text-white hover:bg-gray-900 shadow-md transition-colors hidden md:block"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -3562,7 +3562,7 @@ const StaffPortal = () => {
                         initial={{ opacity: 0, y: 5 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
-                        className="px-3 mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest"
+                        className="px-3 mb-2 text-[10px] font-bold text-gray-500/70 uppercase tracking-[0.2em]"
                       >
                         {group.title}
                       </motion.h3>
@@ -3586,16 +3586,16 @@ const StaffPortal = () => {
                                 if (window.innerWidth < 768) setSidebarOpen(false);
                               }
                             }}
-                            className={`relative w-full flex items-center p-2 rounded-xl transition-all duration-300 group ${isActive || (item.hasSubmenu && isMenuExpanded) ? 'bg-green-50/80 text-green-600' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}
+                            className={`relative w-full flex items-center p-2.5 rounded-xl transition-all duration-300 group ${isActive || (item.hasSubmenu && isMenuExpanded) ? 'bg-green-600 text-white shadow-lg shadow-green-900/20' : 'text-gray-700 hover:bg-green-50/50 hover:text-green-600'}`}
                             whileTap={{ scale: 0.98 }}
                           >
-                            {/* Active Dot */}
+                            {/* Active Dot - Enhanced */}
                             {(isActive) && (
-                              <motion.div layoutId="activeDot" className="absolute left-0 w-1 h-6 bg-green-500 rounded-r-full" style={{ left: '-12px' }} transition={{ type: "spring", stiffness: 300, damping: 30 }} />
+                              <motion.div layoutId="activeDot" className="absolute left-0 w-1.5 h-8 bg-green-400 rounded-r-full" style={{ left: '-12px' }} transition={{ type: "spring", stiffness: 300, damping: 30 }} />
                             )}
 
                             <div className="relative flex items-center justify-center min-w-[24px]">
-                              <item.icon className={`w-[18px] h-[18px] transition-colors duration-300 ${isActive || (item.hasSubmenu && isMenuExpanded) ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} strokeWidth={isActive ? 2.5 : 2} />
+                              <item.icon className={`w-[20px] h-[20px] transition-colors duration-300 ${isActive || (item.hasSubmenu && isMenuExpanded) ? 'text-white' : 'text-gray-500 group-hover:text-green-600'}`} weight={isActive ? "fill" : "duotone"} />
                             </div>
 
                             <AnimatePresence>
@@ -3605,12 +3605,12 @@ const StaffPortal = () => {
                                     initial={{ opacity: 0, x: -10 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     exit={{ opacity: 0, x: -10 }}
-                                    className={`ml-3 text-[13px] font-medium truncate flex-1 text-left ${isActive ? 'font-semibold' : ''}`}
+                                    className={`ml-3 text-[13px] font-semibold truncate flex-1 text-left ${isActive ? 'text-white' : 'text-gray-700'}`}
                                   >
                                     {item.label}
                                   </motion.span>
                                   {item.hasSubmenu && (
-                                    <ChevronRight className={`w-3 h-3 text-gray-400 transition-transform duration-200 ${isMenuExpanded ? 'rotate-90' : ''}`} />
+                                    <ChevronRight className={`w-3.5 h-3.5 ${isActive || isMenuExpanded ? 'text-white/80' : 'text-gray-400'} transition-transform duration-200 ${isMenuExpanded ? 'rotate-90' : ''}`} />
                                   )}
                                 </>
                               )}
@@ -3644,9 +3644,9 @@ const StaffPortal = () => {
                                         if (window.innerWidth < 768) setSidebarOpen(false);
                                       }
                                     }}
-                                    className={`w-full flex items-center p-2 rounded-lg text-xs font-medium transition-colors ${activeTab === subItem.id ? 'text-green-600 bg-green-50 font-semibold' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
+                                    className={`w-full flex items-center p-2.5 rounded-lg text-xs font-semibold transition-all ${activeTab === subItem.id ? 'text-green-600 bg-green-50 shadow-sm border border-green-100' : 'text-gray-600 hover:text-green-600 hover:bg-green-50/30'}`}
                                   >
-                                    <span className={`w-1.5 h-1.5 rounded-full mr-2 ${activeTab === subItem.id ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                    <span className={`w-2 h-2 rounded-full mr-3 ${activeTab === subItem.id ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-gray-300'}`}></span>
                                     {subItem.label}
                                   </button>
                                 ))}

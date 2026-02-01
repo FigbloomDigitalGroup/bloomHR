@@ -109,40 +109,70 @@ router.post("/send", async (req, res) => {
             return res.status(400).json({ error: "to, subject, and html are required" });
         }
 
-        // Use Resend if available
-        if (resend) {
-            const { data, error } = await resend.emails.send({
-                from: process.env.SMTP_FROM || "onboarding@resend.dev",
-                to,
-                subject,
-                html,
-                attachments, // Resend accepts [{ filename, content }]
-            });
+        const provider = req.body.provider || 'resend';
 
-            if (error) {
-                console.error("❌ Resend error:", error);
-                throw error;
+        // 1. Send via Resend
+        if (provider === 'resend') {
+            if (resend) {
+                const { data, error } = await resend.emails.send({
+                    from: process.env.SMTP_FROM || "onboarding@resend.dev",
+                    to,
+                    subject,
+                    html,
+                    attachments,
+                });
+
+                if (error) {
+                    console.error("❌ Resend error:", error);
+                    throw error;
+                }
+
+                console.log("✅ Email sent via Resend: %s", data.id);
+                return res.json({ message: "Email sent successfully", id: data.id });
+            } else {
+                // Fallback if Resend selected but not configured? 
+                // Or maybe just error out? For now, let's fallthrough to SMTP ? 
+                // No, existing logic was: if resend configured, use it. If not, fallback.
+                console.log("⚠️ Resend selected but not configured, falling back to default SMTP");
             }
-
-            console.log("✅ Email sent via Resend: %s", data.id);
-            return res.json({ message: "Email sent successfully", id: data.id });
         }
 
-        // Fallback to Nodemailer
-        // ensure attachments are properly formatted if present
-        const nodemailerAttachments = attachments ? attachments.map(att => ({
-            filename: att.filename,
-            content: att.content,
-            encoding: 'base64'
-        })) : [];
-
-        const info = await transporter.sendMail({
+        // 2. Send via cPanel (SMTP)
+        let mailOptions = {
             from: process.env.SMTP_FROM || `"Zira HR" <${process.env.SMTP_USER}>`,
             to,
             subject,
             html,
-            attachments: nodemailerAttachments
-        });
+            attachments: attachments ? attachments.map(att => ({
+                filename: att.filename,
+                content: att.content,
+                encoding: 'base64'
+            })) : []
+        };
+
+        if (provider === 'cpanel') {
+            const cpanelUser = req.body.cpanelUser || "support@mularcredit.com";
+            const cpanelPass = "5q{%i1B&C+=CgVfG";
+
+            console.log(`🔌 Attempting cPanel SMTP with user: '${cpanelUser}' and host: mail.mularcredit.com`);
+
+            const cpanelTransporter = nodemailer.createTransport({
+                host: "mail.mularcredit.com",
+                port: 465,
+                secure: true,
+                auth: {
+                    user: cpanelUser,
+                    pass: cpanelPass,
+                },
+            });
+
+            const info = await cpanelTransporter.sendMail(mailOptions);
+            console.log("✅ Email sent via cPanel SMTP: %s", info.messageId);
+            return res.json({ message: "Email sent successfully via cPanel", id: info.messageId });
+        }
+
+        // 3. Default/Fallback SMTP (Gmail or whatever is in .env)
+        const info = await transporter.sendMail(mailOptions);
 
         console.log("✅ Email sent via SMTP: %s", info.messageId);
         res.json({ message: "Email sent successfully", id: info.messageId });

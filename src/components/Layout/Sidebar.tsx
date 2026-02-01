@@ -120,25 +120,27 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
         initial="expanded"
         animate={isExpanded ? "expanded" : "collapsed"}
         variants={sidebarVariants}
-        className="relative flex flex-col h-full border-r border-dashed border-gray-200 overflow-hidden"
+        className="relative flex flex-col h-full border-r border-white/50 shadow-2xl overflow-hidden bg-white/60 backdrop-blur-2xl"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* Iridescent Rainbow Background */}
-        <div className="absolute inset-0 bg-white z-[-2]" />
-        <div className="absolute inset-0 opacity-[0.4] bg-[linear-gradient(135deg,_rgba(255,255,255,1)_0%,_rgba(236,253,243,1)_20%,_rgba(238,242,255,1)_40%,_rgba(255,241,242,1)_60%,_rgba(255,251,235,1)_80%,_rgba(236,254,255,1)_100%)] z-[-1]" />
-
+        {/* Glowy Background: Blue & Green */}
+        <div className="absolute inset-0 bg-white/70 z-[-2] backdrop-blur-2xl" />
+        <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] mix-blend-multiply pointer-events-none z-[-1]" />
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-green-500/10 rounded-full blur-[100px] mix-blend-multiply pointer-events-none z-[-1]" />
 
         {/* Brand Section */}
-        <div className={`relative z-10 px-6 pt-8 pb-8 flex items-center transition-all duration-300 ${isExpanded ? 'justify-between' : 'flex-col justify-center gap-6'}`}>
-          <div className="flex items-center gap-4">
+        {/* Brand Section */}
+        <div className={`relative z-10 px-5 pt-8 pb-6 flex items-center transition-all duration-300 ${isExpanded ? 'justify-between' : 'flex-col justify-center gap-6'}`}>
+          <div className="flex items-center gap-3">
             <motion.div
               layout
-              className="relative w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-indigo-200 group cursor-pointer"
-              whileHover={{ rotate: 10, scale: 1.05 }}
+              className="relative w-11 h-11 rounded-xl bg-gradient-to-br from-blue-600 to-[#03c04a] flex items-center justify-center shadow-[0_0_20px_-5px_rgba(3,192,74,0.5)] ring-2 ring-white/20 group cursor-pointer"
+              whileHover={{ rotate: 5, scale: 1.05 }}
               onClick={() => !isExpanded && onToggle(false)}
             >
-              <img src={solo} alt="Logo" className="w-5 h-5 object-contain brightness-0 invert" />
+              <div className="absolute inset-0 bg-white/20 rounded-xl blur-sm" />
+              <img src={solo} alt="Logo" className="relative w-6 h-6 object-contain brightness-0 invert drop-shadow-md" />
             </motion.div>
 
             <AnimatePresence>
@@ -149,11 +151,9 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                   exit={{ opacity: 0, x: -10 }}
                   className="flex flex-col"
                 >
-                  <div className="flex items-center gap-1">
-                    <h1 className="font-['Poppins'] font-bold text-2xl text-gray-900 tracking-tight">
-                      Zira<span className="text-primary">Pro</span>
-                    </h1>
-                  </div>
+                  <h1 className="font-['Poppins'] font-bold text-xl text-slate-800 tracking-tight flex items-center">
+                    Zira<span className="bg-gradient-to-r from-blue-600 to-[#03c04a] bg-clip-text text-transparent ml-0.5">Pro</span>
+                  </h1>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -162,17 +162,17 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
           {/* Hamburger Toggle */}
           <motion.button
             onClick={() => onToggle(!isCollapsed)}
-            className={`p-2 rounded-xl hover:bg-gray-50 transition-colors group ${!isExpanded ? 'bg-gray-50' : ''}`}
+            className={`p-2 rounded-xl hover:bg-white/60 transition-all duration-300 group border border-transparent hover:border-white/40 hover:shadow-sm ${!isExpanded ? 'bg-white/40' : ''}`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            <Menu className={`w-5 h-5 transition-colors ${isExpanded ? 'text-gray-400 group-hover:text-primary' : 'text-primary'}`} />
+            <Menu className={`w-4 h-4 transition-colors ${isExpanded ? 'text-slate-400 group-hover:text-[#03c04a]' : 'text-[#03c04a]'}`} />
           </motion.button>
         </div>
 
         {/* Scrollable Navigation */}
         <motion.div
-          className="relative z-10 flex-1 overflow-y-auto px-4 pb-4 sidebar-scroll hover:overflow-y-auto overflow-hidden"
+          className="relative z-10 flex-1 overflow-y-auto px-3 pb-4 sidebar-scroll hover:overflow-y-auto overflow-hidden"
           initial="hidden"
           animate="visible"
           variants={{
@@ -195,9 +195,9 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="px-4 mb-2"
+                      className="px-3 mb-2"
                     >
-                      <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider font-['Poppins']">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-['Poppins'] pl-1">
                         {group.title}
                       </span>
                     </motion.div>
@@ -210,7 +210,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                     const isActive = currentPath.startsWith(item.path);
 
                     if (permissionsLoading) {
-                      return <div key={item.id} className="h-11 mx-2 bg-gray-200 rounded-2xl animate-pulse mb-2" />;
+                      return <div key={item.id} className="h-9 mx-2 bg-slate-200/50 rounded-xl animate-pulse mb-2" />;
                     }
 
                     if (item.permission && !hasPermission(item.permission)) return null;
@@ -219,17 +219,19 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                       <motion.button
                         key={item.id}
                         onClick={() => navigate(item.path)}
-                        className={`relative w-full flex items-center px-4 py-3 rounded-2xl transition-all duration-200 group overflow-hidden ${!isExpanded && 'justify-center px-0'
-                          } ${isActive ? 'bg-primary text-white shadow-lg shadow-indigo-500/20' : 'text-gray-500 hover:bg-gray-50 hover:text-primary'}`}
+                        className={`relative w-full flex items-center px-3 py-2.5 rounded-xl transition-all duration-300 group overflow-hidden ${!isExpanded && 'justify-center px-0'
+                          } ${isActive
+                            ? 'bg-[#03c04a] text-white shadow-[0_0_20px_-5px_rgba(3,192,74,0.6)] ring-1 ring-[#03c04a]/50'
+                            : 'text-slate-600 hover:bg-white/60 hover:text-[#03c04a] hover:shadow-sm'}`}
                         whileTap={{ scale: 0.98 }}
                       >
 
                         {/* Icon */}
                         <div className="relative z-10 flex items-center justify-center">
                           <item.icon
-                            className={`w-5 h-5 transition-all duration-200 ${isActive
+                            className={`w-4 h-4 transition-all duration-300 ${isActive
                               ? 'text-white'
-                              : 'text-gray-400 group-hover:text-primary'
+                              : 'text-slate-500 group-hover:text-[#03c04a] group-hover:scale-110'
                               }`}
                             strokeWidth={isActive ? 2.5 : 2}
                           />
@@ -242,7 +244,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                               initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
                               exit={{ opacity: 0, x: -10 }}
-                              className={`ml-3 text-[13px] truncate font-['Poppins'] relative z-10 tracking-wide font-medium ${isActive ? 'text-white' : ''}`}
+                              className={`ml-3 text-xs truncate font-['Poppins'] relative z-10 tracking-wide font-medium ${isActive ? 'text-white' : ''}`}
                             >
                               {item.label}
                             </motion.span>
@@ -251,9 +253,9 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
 
                         {/* Tooltip (Collapsed) */}
                         {!isExpanded && !isHovered && (
-                          <div className="absolute left-full ml-6 px-3 py-2 bg-gray-900 text-white text-xs font-semibold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 whitespace-nowrap shadow-xl translate-x-2 group-hover:translate-x-0">
+                          <div className="absolute left-full ml-5 px-2.5 py-1.5 bg-slate-800 text-white text-[10px] font-semibold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 whitespace-nowrap shadow-xl translate-x-2 group-hover:translate-x-0">
                             {item.label}
-                            <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 w-2 h-2 bg-gray-900 rotate-45" />
+                            <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 w-2 h-2 bg-slate-800 rotate-45" />
                           </div>
                         )}
                       </motion.button>
@@ -266,18 +268,18 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
         </motion.div>
 
         {/* User Profile */}
-        <div className="relative z-10 p-4 mt-auto border-t border-gray-100">
+        <div className="relative z-10 p-3 mt-auto border-t border-white/20">
           <div
             className={`
-              relative overflow-hidden rounded-2xl bg-gray-50
-              hover:bg-white border border-transparent hover:border-gray-100
-              transition-all cursor-pointer group p-3
+              relative overflow-hidden rounded-xl bg-white/40
+              hover:bg-white/80 border border-white/40
+              transition-all duration-300 cursor-pointer group p-2.5 backdrop-blur-sm
             `}
           >
             <div className="flex items-center gap-3 relative z-10">
               <div className="relative">
-                <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-sm border border-gray-100">
-                  <span className="font-bold text-primary text-sm">{userInitial}</span>
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-100 to-green-100 flex items-center justify-center shadow-inner ring-1 ring-white">
+                  <span className="font-bold text-primary text-xs">{userInitial}</span>
                 </div>
               </div>
 
@@ -289,17 +291,17 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                     exit={{ opacity: 0, width: 0 }}
                     className="flex-1 overflow-hidden"
                   >
-                    <p className="text-xs font-bold text-gray-800 truncate font-['Poppins'] capitalize">
+                    <p className="text-xs font-bold text-slate-800 truncate font-['Poppins'] capitalize">
                       {userRole.toLowerCase()}
                     </p>
-                    <p className="text-[10px] text-gray-500 truncate">Admin Workspace</p>
+                    <p className="text-[10px] text-slate-500 truncate">Admin Workspace</p>
                   </motion.div>
                 )}
               </AnimatePresence>
 
               {/* Settings Icon */}
               {isExpanded && (
-                <Settings className="w-4 h-4 text-gray-400 group-hover:text-primary transition-colors" />
+                <Settings className="w-3.5 h-3.5 text-slate-400 group-hover:text-primary transition-colors" />
               )}
             </div>
           </div>
