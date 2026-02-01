@@ -11,6 +11,22 @@ interface MFAData {
   session: any;
 }
 
+// Utility for phone number formatting
+const formatPhoneNumberForSMS = (phone: string): string => {
+  if (!phone) return '';
+  let cleaned = phone.replace(/\D/g, '');
+  if (cleaned.startsWith('0') && cleaned.length === 10) {
+    cleaned = '254' + cleaned.substring(1);
+  } else if (cleaned.startsWith('7') && cleaned.length === 9) {
+    cleaned = '254' + cleaned;
+  } else if (cleaned.startsWith('254') && cleaned.length === 12) {
+    // Keep as is
+  } else if (cleaned.startsWith('+254') && cleaned.length === 13) {
+    cleaned = cleaned.substring(1);
+  }
+  return cleaned.length === 12 && cleaned.startsWith('254') ? cleaned : phone;
+};
+
 export default function MFAVerification() {
   const [codes, setCodes] = useState<string[]>(Array(6).fill(''));
   const [loading, setLoading] = useState(false);
@@ -143,16 +159,19 @@ export default function MFAVerification() {
 
       if (!hasSentInitial) {
         hasTriggeredInitialSend.current = true; // Mark as triggered immediately
-        console.log('🚀 Triggering initial MFA code send for:', email);
 
-        handleResendCode(true)
-          .then(() => {
-            sessionStorage.setItem(sentFlag, 'true');
-          })
-          .catch((err) => {
-            console.error('Failed initial send:', err);
-            hasTriggeredInitialSend.current = false; // Reset on failure to allow retry
-          });
+        // Add a small delay to ensure everything is stable before firing the first SMS
+        setTimeout(() => {
+          console.log('🚀 Triggering initial MFA code send for:', email);
+          handleResendCode(true)
+            .then(() => {
+              sessionStorage.setItem(sentFlag, 'true');
+            })
+            .catch((err) => {
+              console.error('Failed initial send:', err);
+              hasTriggeredInitialSend.current = false; // Reset on failure to allow retry
+            });
+        }, 1500);
       }
     }
   }, [userId, email]); // Only re-run if identity changes
@@ -309,6 +328,7 @@ export default function MFAVerification() {
       }
 
       const phoneNumber = numData.phone_number;
+      const formattedPhone = formatPhoneNumberForSMS(phoneNumber);
 
       // 2. Generate and store code
       const mfaCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -318,7 +338,7 @@ export default function MFAVerification() {
           user_id: userId,
           email: email,
           code: mfaCode,
-          phone_number: phoneNumber,
+          phone_number: formattedPhone, // Store formatted number
           expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
           used: false
         });
@@ -328,8 +348,9 @@ export default function MFAVerification() {
       // 3. Send SMS
       const message = `Your Mular Credit verification code is: ${mfaCode}. This code expires in 10 minutes.`;
       const encodedMessage = encodeURIComponent(message);
-      const url = `https://isms.celcomafrica.com/api/services/sendsms/?apikey=***REMOVED***&partnerID=928&message=${encodedMessage}&shortcode=MularCredit&mobile=${phoneNumber}`;
+      const url = `https://isms.celcomafrica.com/api/services/sendsms/?apikey=***REMOVED***&partnerID=928&message=${encodedMessage}&shortcode=MularCredit&mobile=${formattedPhone}`;
 
+      console.log(`📡 Sending SMS to ${formattedPhone}...`);
       await fetch(url, { method: 'GET', mode: 'no-cors' });
 
       setCountdown(30);
