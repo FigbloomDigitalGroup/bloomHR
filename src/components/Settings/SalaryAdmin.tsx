@@ -498,7 +498,7 @@ const ExportModal = ({ isOpen, onClose, onExport, isLoading, filterOptions }: {
           <button
             onClick={handleExport}
             disabled={isLoading}
-            className="px-4 py-2 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 text-xs font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isLoading ? (
               <>
@@ -644,7 +644,7 @@ const ImportModal = ({ isOpen, onClose, onImport, isLoading }: {
           <button
             onClick={handleImport}
             disabled={isLoading || !file}
-            className="px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 text-xs font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isLoading ? (
               <>
@@ -5366,7 +5366,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   const pendingCount = paymentRequests.filter(p => p.status === 'pending').length;
 
   return (
-    <div className="p-8 font-['Outfit']">
+    <div className="p-8 font-sans">
       {/* Tab Navigation - Modern Pill Style */}
       <div className="mb-8">
         <nav className="inline-flex bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 gap-2">
@@ -5664,31 +5664,31 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                   <table className="min-w-full divide-y divide-gray-100">
                     <thead className="bg-[#FAFAFB]">
                       <tr>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
                           Employee
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
                           Mobile Number
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
                           {isRegionalManager ? 'Region' : 'Branch'}
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
                           Amount
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
                           Reason
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
                           Approval Status
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
                           Notes
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
                           Date
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-['Outfit']">
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
                           Actions
                         </th>
                       </tr>

@@ -23,6 +23,7 @@ import {
   Smartphone,
   Mail,
   Shield,
+  Search,
 
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
@@ -95,6 +96,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
   const location = useLocation();
   const currentPath = location.pathname;
   const [isHovered, setIsHovered] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Use permissions hook for dynamic access control
   const { hasPermission, loading: permissionsLoading } = usePermissions();
@@ -120,27 +122,26 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
         initial="expanded"
         animate={isExpanded ? "expanded" : "collapsed"}
         variants={sidebarVariants}
-        className="relative flex flex-col h-full border-r border-white/50 shadow-2xl overflow-hidden bg-white/60 backdrop-blur-2xl"
+        className="relative flex flex-col h-full border-r border-white/5 shadow-2xl overflow-hidden bg-slate-900/95 backdrop-blur-2xl"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
         {/* Glowy Background: Blue & Green */}
-        <div className="absolute inset-0 bg-white/70 z-[-2] backdrop-blur-2xl" />
-        <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] mix-blend-multiply pointer-events-none z-[-1]" />
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-green-500/10 rounded-full blur-[100px] mix-blend-multiply pointer-events-none z-[-1]" />
+        <div className="absolute inset-0 bg-slate-900/50 z-[-2] backdrop-blur-2xl" />
+        <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] pointer-events-none z-[-1]" />
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-green-500/10 rounded-full blur-[100px] pointer-events-none z-[-1]" />
 
         {/* Brand Section */}
         {/* Brand Section */}
-        <div className={`relative z-10 px-5 pt-8 pb-6 flex items-center transition-all duration-300 ${isExpanded ? 'justify-between' : 'flex-col justify-center gap-6'}`}>
+        <div className={`relative z-10 px-5 pt-4 pb-6 flex items-center transition-all duration-300 ${isExpanded ? 'justify-between' : 'flex-col justify-center gap-6'}`}>
           <div className="flex items-center gap-3">
             <motion.div
               layout
-              className="relative w-11 h-11 rounded-xl bg-gradient-to-br from-blue-600 to-[#03c04a] flex items-center justify-center shadow-[0_0_20px_-5px_rgba(3,192,74,0.5)] ring-2 ring-white/20 group cursor-pointer"
+              className="relative flex items-center justify-center group cursor-pointer"
               whileHover={{ rotate: 5, scale: 1.05 }}
               onClick={() => !isExpanded && onToggle(false)}
             >
-              <div className="absolute inset-0 bg-white/20 rounded-xl blur-sm" />
-              <img src={solo} alt="Logo" className="relative w-6 h-6 object-contain brightness-0 invert drop-shadow-md" />
+              <img src={solo} alt="Logo" className="relative w-10 h-10 object-contain brightness-0 invert drop-shadow-md" />
             </motion.div>
 
             <AnimatePresence>
@@ -151,7 +152,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                   exit={{ opacity: 0, x: -10 }}
                   className="flex flex-col"
                 >
-                  <h1 className="font-['Poppins'] font-bold text-xl text-slate-800 tracking-tight flex items-center">
+                  <h1 className="font-sans font-bold text-xl text-white tracking-tight flex items-center">
                     Zira<span className="bg-gradient-to-r from-blue-600 to-[#03c04a] bg-clip-text text-transparent ml-0.5">Pro</span>
                   </h1>
                 </motion.div>
@@ -162,13 +163,36 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
           {/* Hamburger Toggle */}
           <motion.button
             onClick={() => onToggle(!isCollapsed)}
-            className={`p-2 rounded-xl hover:bg-white/60 transition-all duration-300 group border border-transparent hover:border-white/40 hover:shadow-sm ${!isExpanded ? 'bg-white/40' : ''}`}
+            className={`p-2 rounded-xl hover:bg-white/10 transition-all duration-300 group border border-transparent hover:border-white/10 hover:shadow-sm ${!isExpanded ? 'bg-white/5' : ''}`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
             <Menu className={`w-4 h-4 transition-colors ${isExpanded ? 'text-slate-400 group-hover:text-[#03c04a]' : 'text-[#03c04a]'}`} />
           </motion.button>
         </div>
+
+        {/* Search Bar */}
+        <AnimatePresence>
+          {isExpanded && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="px-5 mb-4 overflow-hidden"
+            >
+              <div className="relative group">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#03c04a] transition-colors" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-xl py-2 pl-9 pr-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#03c04a] focus:border-[#03c04a]/50 transition-all"
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Scrollable Navigation */}
         <motion.div
@@ -197,7 +221,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                       exit={{ opacity: 0 }}
                       className="px-3 mb-2"
                     >
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-['Poppins'] pl-1">
+                      <span className="text-[10px] font-normal text-slate-400 tracking-wider font-sans pl-1">
                         {group.title}
                       </span>
                     </motion.div>
@@ -206,11 +230,13 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
 
                 {/* Items */}
                 <div className="space-y-1">
-                  {group.items.map((item) => {
+                  {group.items.filter(item =>
+                    item.label.toLowerCase().includes(searchQuery.toLowerCase())
+                  ).map((item) => {
                     const isActive = currentPath.startsWith(item.path);
 
                     if (permissionsLoading) {
-                      return <div key={item.id} className="h-9 mx-2 bg-slate-200/50 rounded-xl animate-pulse mb-2" />;
+                      return null;
                     }
 
                     if (item.permission && !hasPermission(item.permission)) return null;
@@ -222,7 +248,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                         className={`relative w-full flex items-center px-3 py-2.5 rounded-xl transition-all duration-300 group overflow-hidden ${!isExpanded && 'justify-center px-0'
                           } ${isActive
                             ? 'bg-[#03c04a] text-white shadow-[0_0_20px_-5px_rgba(3,192,74,0.6)] ring-1 ring-[#03c04a]/50'
-                            : 'text-slate-600 hover:bg-white/60 hover:text-[#03c04a] hover:shadow-sm'}`}
+                            : 'text-white/80 hover:bg-white/5 hover:text-[#03c04a]'}`}
                         whileTap={{ scale: 0.98 }}
                       >
 
@@ -231,7 +257,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                           <item.icon
                             className={`w-4 h-4 transition-all duration-300 ${isActive
                               ? 'text-white'
-                              : 'text-slate-500 group-hover:text-[#03c04a] group-hover:scale-110'
+                              : 'text-white/80 group-hover:text-[#03c04a] group-hover:scale-110'
                               }`}
                             strokeWidth={isActive ? 2.5 : 2}
                           />
@@ -244,7 +270,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                               initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
                               exit={{ opacity: 0, x: -10 }}
-                              className={`ml-3 text-xs truncate font-['Poppins'] relative z-10 tracking-wide font-medium ${isActive ? 'text-white' : ''}`}
+                              className={`ml-3 text-xs truncate font-sans relative z-10 tracking-wide font-normal ${isActive ? 'text-white' : 'text-white/80'}`}
                             >
                               {item.label}
                             </motion.span>
@@ -268,11 +294,11 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
         </motion.div>
 
         {/* User Profile */}
-        <div className="relative z-10 p-3 mt-auto border-t border-white/20">
+        <div className="relative z-10 p-3 mt-auto border-t border-white/10">
           <div
             className={`
-              relative overflow-hidden rounded-xl bg-white/40
-              hover:bg-white/80 border border-white/40
+              relative overflow-hidden rounded-xl bg-white/5
+              hover:bg-white/10 border border-white/10
               transition-all duration-300 cursor-pointer group p-2.5 backdrop-blur-sm
             `}
           >
@@ -291,10 +317,10 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                     exit={{ opacity: 0, width: 0 }}
                     className="flex-1 overflow-hidden"
                   >
-                    <p className="text-xs font-bold text-slate-800 truncate font-['Poppins'] capitalize">
+                    <p className="text-xs font-bold text-slate-200 truncate font-sans capitalize">
                       {userRole.toLowerCase()}
                     </p>
-                    <p className="text-[10px] text-slate-500 truncate">Admin Workspace</p>
+                    <p className="text-[10px] text-slate-400 truncate">Admin Workspace</p>
                   </motion.div>
                 )}
               </AnimatePresence>

@@ -616,7 +616,7 @@ const AddEmployeePage = () => {
             repeat: Infinity,
             ease: "linear"
           }}
-          className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full"
+          className="w-16 h-16 border-4 border-gray-900 border-t-transparent rounded-full"
         />
       </div>
     );
@@ -649,18 +649,18 @@ const AddEmployeePage = () => {
         className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden"
       >
         {/* Form Header */}
-        <div className="bg-green-500 p-6 border-b border-gray-200">
+        <div className="bg-white p-6 border-b border-gray-200">
           <div className="flex items-center">
             <div className="mr-4">
               <img
                 src="/avatar.png"
                 alt="avatar"
-                className="w-16 h-16 rounded-full border-2 border-white shadow-sm"
+                className="w-16 h-16 rounded-full border-2 border-gray-100 shadow-sm"
               />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">Add New Employee</h1>
-              <p className="text-white mt-1">Fill in the details below to add a new employee</p>
+              <h1 className="text-2xl font-bold text-gray-900">Add New Employee</h1>
+              <p className="text-gray-600 mt-1">Fill in the details below to add a new employee</p>
             </div>
           </div>
         </div>
@@ -670,42 +670,42 @@ const AddEmployeePage = () => {
           <nav className="flex overflow-x-auto">
             <button
               onClick={() => setActiveTab('personal')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'personal' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'personal' ? 'text-gray-900 border-b-2 border-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <User className="w-4 h-4 mr-2" />
               Personal
             </button>
             <button
               onClick={() => setActiveTab('employment')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'employment' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'employment' ? 'text-gray-900 border-b-2 border-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <Briefcase className="w-4 h-4 mr-2" />
               Employment
             </button>
             <button
               onClick={() => setActiveTab('contact')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'contact' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'contact' ? 'text-gray-900 border-b-2 border-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <Phone className="w-4 h-4 mr-2" />
               Contact
             </button>
             <button
               onClick={() => setActiveTab('financial')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'financial' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'financial' ? 'text-gray-900 border-b-2 border-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <CreditCard className="w-4 h-4 mr-2" />
               Financial
             </button>
             <button
               onClick={() => setActiveTab('emergency')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'emergency' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'emergency' ? 'text-gray-900 border-b-2 border-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <AlertCircle className="w-4 h-4 mr-2" />
               Emergency
             </button>
             <button
               onClick={() => setActiveTab('dependents')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'dependents' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'dependents' ? 'text-gray-900 border-b-2 border-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <Users className="w-4 h-4 mr-2" />
               Dependents

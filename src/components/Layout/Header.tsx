@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Bell, LogOut, X, Trash2, CheckCircle, UserPlus, Calendar, Image, Upload } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Bell, LogOut, X, Trash2, CheckCircle, UserPlus, Calendar, Image, Upload, MapPin, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -39,6 +39,79 @@ interface CompanyProfile {
   company_name: string | null;
   company_tagline: string | null;
 }
+
+// Custom Premium Dropdown for Header - Defined outside to prevent re-creation and flickering
+const HeaderDropdown = ({ value, options, onChange, placeholder, icon: Icon }: {
+  value: string,
+  options: { label: string, value: string }[],
+  onChange: (val: string) => void,
+  placeholder: string,
+  icon?: any
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const selected = options.find(o => o.value === value);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all duration-200 hover:bg-white hover:shadow-sm ${isOpen ? 'bg-white shadow-sm' : 'bg-transparent'}`}
+      >
+        <div className="flex items-center gap-2 max-w-[120px]">
+          {Icon && <Icon className={`w-3.5 h-3.5 ${isOpen ? 'text-[#03c04a]' : 'text-gray-400'}`} />}
+          <span className={`text-xs font-bold truncate ${selected ? 'text-gray-900' : 'text-gray-400'}`}>
+            {selected ? selected.label : placeholder}
+          </span>
+        </div>
+        <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 8, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.95 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="absolute top-full left-0 mt-2 min-w-[160px] bg-white border border-gray-100 rounded-xl shadow-[0_15px_30px_-5px_rgba(0,0,0,0.1)] overflow-hidden z-[100] ring-1 ring-black/5"
+          >
+            <div className="py-1 max-h-60 overflow-y-auto thin-scrollbar">
+              {options.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-4 py-2 text-xs transition-colors hover:bg-green-50/50 hover:text-[#03c04a] flex items-center justify-between group ${value === opt.value ? 'bg-green-50 text-[#03c04a] font-bold underline' : 'text-gray-600'}`}
+                >
+                  <span>{opt.label}</span>
+                  {value === opt.value && <CheckCircle className="w-3.5 h-3.5 text-[#03c04a]" />}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 // ...
 export default function Header({ user, onLogout, selectedTown, onTownChange, selectedRegion, onRegionChange, towns, regions }: HeaderProps) {
   const [notifications, setNotifications] = useState<NotificationState>({
@@ -408,11 +481,12 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
 
   const totalNotifications = notifications.staff + notifications.leave;
   const unreadItems = notifications.items.filter(item => !item.isRead);
+
   return (
     <>
       {/* Floating Header with Premium Glassmorphism */}
       <motion.header
-        className="z-40 mx-6 mt-4 mb-6 relative font-['Inter']"
+        className="z-40 mx-6 mt-4 mb-6 relative font-sans"
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
@@ -435,7 +509,7 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
                   className="w-11 h-11 rounded-xl object-cover shadow-sm ring-2 ring-white/50 group-hover:ring-indigo-100 transition-all"
                 />
               ) : (
-                <div className="w-11 h-11 bg-gradient-to-br from-blue-600 to-[#03c04a] rounded-xl flex items-center justify-center shadow-lg ring-2 ring-white/50 text-white font-bold text-lg font-['Outfit']">
+                <div className="w-11 h-11 bg-gradient-to-br from-blue-600 to-[#03c04a] rounded-xl flex items-center justify-center shadow-lg ring-2 ring-white/50 text-white font-bold text-lg font-sans">
                   {companyProfile?.company_name?.[0] || 'Z'}
                 </div>
               )}
@@ -446,7 +520,7 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
             </div>
 
             <div className="flex flex-col">
-              <h1 className="text-sm font-bold text-gray-900 tracking-tight leading-tight group-hover:text-[#03c04a] transition-colors font-['Outfit']">
+              <h1 className="text-sm font-bold text-gray-900 tracking-tight leading-tight group-hover:text-[#03c04a] transition-colors font-sans">
                 {companyProfile?.company_name || 'ZiraPro'}
               </h1>
               <p className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">
@@ -459,25 +533,25 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
           <div className="flex items-center space-x-2 md:space-x-5">
             {/* Region/Town Selectors - Premium Style */}
             {(regions && onRegionChange) && (
-              <div className="hidden lg:flex items-center bg-gray-50/80 backdrop-blur-sm rounded-full p-1 border border-gray-200/60 shadow-inner">
-                <select
-                  value={selectedRegion}
-                  onChange={(e) => onRegionChange(e.target.value)}
-                  className="bg-transparent text-xs font-semibold text-gray-600 px-4 py-1.5 rounded-full hover:bg-white hover:shadow-sm focus:outline-none cursor-pointer transition-all appearance-none outline-none"
-                  style={{ backgroundImage: 'none' }}
-                >
-                  {regions.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
-                <div className="w-px h-4 bg-gray-300 mx-1"></div>
-                <select
+              <div className="hidden lg:flex items-center bg-white/50 backdrop-blur-md rounded-2xl p-1 border border-gray-200/50 shadow-sm gap-1">
+                <HeaderDropdown
+                  value={selectedRegion || ''}
+                  options={regions.map(r => ({ label: r, value: r }))}
+                  onChange={onRegionChange}
+                  placeholder="Region"
+                  icon={MapPin}
+                />
+                <div className="w-px h-6 bg-gray-200/80 mx-0.5"></div>
+                <HeaderDropdown
                   value={selectedTown || ''}
-                  onChange={(e) => onTownChange && onTownChange(e.target.value)}
-                  className="bg-transparent text-xs font-semibold text-gray-600 px-4 py-1.5 rounded-full hover:bg-white hover:shadow-sm focus:outline-none cursor-pointer transition-all appearance-none outline-none"
-                  style={{ backgroundImage: 'none' }}
-                >
-                  <option value="">All Towns</option>
-                  {towns?.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+                  options={[
+                    { label: 'All Towns', value: '' },
+                    ...(towns?.map(t => ({ label: t, value: t })) || [])
+                  ]}
+                  onChange={(val) => onTownChange && onTownChange(val)}
+                  placeholder="Town"
+                  icon={MapPin}
+                />
               </div>
             )}
 
@@ -505,7 +579,7 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
                 {user?.email?.[0].toUpperCase() || 'U'}
               </div>
               <div className="flex flex-col items-start">
-                <span className="text-xs font-bold text-gray-800 group-hover:text-[#03c04a] transition-colors font-['Outfit']">
+                <span className="text-xs font-bold text-gray-800 group-hover:text-[#03c04a] transition-colors font-sans">
                   {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase() : 'Admin'}
                 </span>
                 <div className="flex items-center gap-1">

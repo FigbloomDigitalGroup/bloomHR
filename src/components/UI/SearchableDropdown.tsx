@@ -97,45 +97,48 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        transition={{ duration: 0.1 }}
-                        className="absolute z-50 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] overflow-hidden ring-1 ring-black/5"
+                        transition={{ duration: 0.15, ease: "easeOut" }}
+                        className="absolute z-[100] w-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)] overflow-hidden ring-1 ring-black/5"
                     >
-                        <div className="p-2 border-b border-gray-50 bg-gray-50/30">
+                        <div className="p-3 border-b border-gray-100 bg-gray-50/50">
                             <div className="relative">
-                                <Search size={12} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                                <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                                 <input
                                     type="text"
-                                    placeholder="Search..."
+                                    placeholder="Search options..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full pl-8 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500/20"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-green-500 focus:ring-4 focus:ring-green-500/10 transition-all"
                                     autoFocus
                                 />
                             </div>
                         </div>
-                        <div className="max-h-60 overflow-y-auto custom-scrollbar p-1">
+                        <div className="max-h-64 overflow-y-auto custom-scrollbar p-1.5 thin-scrollbar">
                             <button
-                                className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors mb-0.5
-                    ${value === 'all' ? 'bg-green-50 text-green-700 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
+                                className={`w-full text-left px-4 py-2.5 text-xs rounded-xl transition-all mb-0.5 flex items-center justify-between
+                    ${value === 'all' ? 'bg-green-50 text-green-700 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}
                                 onClick={() => handleSelect('all')}
                             >
-                                {placeholder}
+                                <span>{placeholder}</span>
+                                {value === 'all' && <div className="w-1.5 h-1.5 rounded-full bg-green-600" />}
                             </button>
                             {filteredOptions.map((option) => (
                                 option.value !== 'all' && (
                                     <button
                                         key={option.value}
                                         onClick={() => handleSelect(option.value)}
-                                        className={`w-full text-left px-3 py-2 text-xs rounded-lg transition-colors mb-0.5
-                        ${value === option.value ? 'bg-green-50 text-green-700 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
+                                        className={`w-full text-left px-4 py-2.5 text-xs rounded-xl transition-all mb-0.5 flex items-center justify-between
+                        ${value === option.value ? 'bg-green-50 text-green-700 font-bold' : 'text-gray-700 hover:bg-gray-50 hover:text-green-600'}`}
                                     >
-                                        {option.label}
+                                        <span className="truncate">{option.label}</span>
+                                        {value === option.value && <div className="w-1.5 h-1.5 rounded-full bg-green-600" />}
                                     </button>
                                 )
                             ))}
                             {filteredOptions.length === 0 && (
-                                <div className="px-4 py-8 text-center text-gray-400 text-xs">
-                                    <p>No results found</p>
+                                <div className="px-4 py-10 text-center text-gray-400 text-xs italic">
+                                    <p>No matches found</p>
                                 </div>
                             )}
                         </div>

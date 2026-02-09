@@ -212,7 +212,7 @@ export default function RolePermissions() {
     }
 
     return (
-        <div className="min-h-screen bg-gray-50 font-['Inter',sans-serif] text-gray-900 p-8">
+        <div className="min-h-screen bg-gray-50 font-sans text-gray-900 p-8">
             <div className="max-w-[1600px] mx-auto space-y-8">
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">

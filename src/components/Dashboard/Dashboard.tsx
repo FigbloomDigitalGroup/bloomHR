@@ -664,25 +664,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
     }
   };
 
-  const handleSettingsClick = () => {
-    const hasAccess = checkUserAccess();
 
-    if (hasAccess) {
-      navigate("/settings");
-    } else {
-      setShowUnauthorizedPopup(true);
-      setTimeout(() => setShowUnauthorizedPopup(false), 3000);
-    }
-  };
-
-  const checkUserAccess = () => {
-    return false;
-  };
-
-  const handleSupportClick = () => {
-    setShowSupportPopup(true);
-    setTimeout(() => setShowSupportPopup(false), 5000);
-  };
 
   const handleRefresh = () => {
     fetchDashboardData();
@@ -780,7 +762,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Welcome Section - "Dark Mode Command Center" Style */}
         <motion.div
-          className="rounded-[32px] p-8 md:p-10 relative overflow-hidden bg-white/80 backdrop-blur-xl border border-white/50 shadow-xl shadow-gray-200/50"
+          className="rounded-[32px] p-8 md:p-10 relative overflow-hidden bg-white/80 backdrop-blur-xl border border-gray-200"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
@@ -808,7 +790,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
               </motion.div>
               <div>
                 <motion.h1
-                  className="text-3xl md:text-4xl font-bold tracking-tight mb-2 bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent font-['Outfit']"
+                  className="text-3xl md:text-4xl font-bold tracking-tight mb-2 bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent font-sans"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.2 }}
@@ -834,19 +816,9 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
             {/* Quick Actions - Premium Pills */}
             <div className="flex flex-wrap gap-3">
               <motion.button
-                onClick={handleSupportClick}
-                className="px-4 py-2 rounded-full text-xs font-semibold bg-white/60 border border-gray-200 hover:bg-white hover:border-gray-300 transition-all backdrop-blur-sm shadow-sm flex items-center gap-2 text-gray-700 hover:text-gray-900"
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <HelpCircle className="w-4 h-4" />
-                Support
-              </motion.button>
-
-              <motion.button
                 onClick={sendAllBirthdaySMS}
                 disabled={isSendingBirthdaySMS}
-                className="px-4 py-2 rounded-full text-xs font-semibold bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white shadow-lg shadow-pink-500/30 flex items-center gap-2"
+                className="px-4 py-2 rounded-full text-xs font-normal bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white shadow-lg shadow-pink-500/30 flex items-center gap-2"
                 whileHover={{ scale: 1.05, y: -2, boxShadow: "0 20px 40px -10px rgba(236, 72, 153, 0.4)" }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -861,22 +833,12 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
               <motion.button
                 onClick={handleRefresh}
                 disabled={isLoading}
-                className="px-4 py-2 rounded-full text-xs font-semibold bg-white/60 border border-gray-200 hover:bg-white hover:border-gray-300 transition-all backdrop-blur-sm shadow-sm flex items-center gap-2 text-gray-700 hover:text-gray-900"
+                className="px-4 py-2 rounded-full text-xs font-normal bg-white/60 border border-gray-200 hover:bg-white hover:border-gray-300 transition-all backdrop-blur-sm flex items-center gap-2 text-gray-700 hover:text-gray-900"
                 whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.95 }}
               >
                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                 Refresh
-              </motion.button>
-
-              <motion.button
-                onClick={handleSettingsClick}
-                className="px-4 py-2 rounded-full text-xs font-semibold bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-lg shadow-indigo-500/30 flex items-center gap-2"
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Settings className="w-4 h-4" />
-                Settings
               </motion.button>
             </div>
           </div>
@@ -887,7 +849,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
           <div className="flex gap-8">
             <button
               onClick={() => setActiveTab('overview')}
-              className={`pb-4 text-sm font-semibold relative transition-colors ${activeTab === 'overview' ? 'text-indigo-600' : 'text-gray-500 hover:text-gray-800'}`}
+              className={`pb-4 text-xs font-normal relative transition-colors ${activeTab === 'overview' ? 'text-indigo-600' : 'text-gray-500 hover:text-gray-800'}`}
             >
               Overview
               {activeTab === 'overview' && (
@@ -895,13 +857,13 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
               )}
             </button>
             <button
-              className="pb-4 text-sm font-semibold text-gray-400 hover:text-gray-600 cursor-not-allowed"
+              className="pb-4 text-xs font-normal text-gray-400 hover:text-gray-600 cursor-not-allowed"
               disabled
             >
               Analytics (Pro)
             </button>
           </div>
-          <div className="text-xs font-medium text-gray-400">
+          <div className="text-xs font-normal text-gray-400">
             Last updated: {new Date().toLocaleTimeString()}
           </div>
         </div>
@@ -955,11 +917,11 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
               ].map((stat, i) => (
                 <motion.div
                   key={i}
-                  className="bg-white/80 backdrop-blur-xl rounded-[24px] p-6 border border-white/60 shadow-lg shadow-gray-200/40 hover:shadow-xl hover:shadow-indigo-100/50 transition-all duration-300 group"
+                  className="bg-white/80 backdrop-blur-xl rounded-[24px] p-6 border border-gray-200 transition-all duration-300 group"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.1 }}
-                  whileHover={{ y: -4, scale: 1.02 }}
+                  whileHover={{ y: -4, borderColor: "rgba(99, 102, 241, 0.4)" }}
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div className={`w-12 h-12 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm border border-white/50`}>
@@ -968,7 +930,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
                     {getTrend(stat.value, stat.trend as any)}
                   </div>
                   <div>
-                    <h3 className="text-3xl font-bold text-gray-900 tracking-tight font-['Outfit']">{stat.value}</h3>
+                    <h3 className="text-3xl font-bold text-gray-900 tracking-tight font-sans">{stat.value}</h3>
                     <p className="text-sm font-medium text-gray-500 mt-1">{stat.label}</p>
                   </div>
                 </motion.div>
@@ -978,14 +940,14 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
             {/* Best Performers - Large Card */}
             <div className="col-span-12 lg:col-span-8">
               <motion.div
-                className="bg-white/80 backdrop-blur-xl rounded-[32px] p-8 border border-white/60 shadow-lg shadow-gray-200/40 h-full"
+                className="bg-white/60 backdrop-blur-xl p-6 rounded-3xl border border-gray-200 relative overflow-hidden group"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
               >
                 <div className="flex items-center justify-between mb-8">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 tracking-tight font-['Outfit']">Top Performers</h2>
+                    <h2 className="text-xl font-bold text-gray-900 tracking-tight font-sans">Top Performers</h2>
                     <p className="text-sm text-gray-500 font-medium mt-1">Employee performance rankings for this month</p>
                   </div>
                   <button className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 transition-colors bg-indigo-50 px-3 py-1.5 rounded-full hover:bg-indigo-100">
@@ -1004,12 +966,12 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
                         {index === 0 ? <Crown className="w-6 h-6 fill-amber-700" /> : `#${index + 1}`}
                       </div>
                       <div className="flex-1">
-                        <h3 className="font-bold text-gray-900 font-['Outfit']">{employee.name}</h3>
+                        <h3 className="font-bold text-gray-900 font-sans">{employee.name}</h3>
                         <p className="text-xs text-gray-500 font-medium">{employee.position} • {employee.branch}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="text-right">
-                          <span className="block text-sm font-bold text-gray-900 font-['Outfit']">{employee.performance}%</span>
+                          <span className="block text-sm font-bold text-gray-900 font-sans">{employee.performance}%</span>
                           <span className="block text-[10px] text-gray-400 font-medium tracking-wide">PERFORMANCE</span>
                         </div>
                         <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -1030,17 +992,15 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
             {/* Right Column - News & Quick Stats */}
             <div className="col-span-12 lg:col-span-4 space-y-8">
               {/* Company News */}
-              <motion.div
-                className="bg-white/80 backdrop-blur-xl rounded-[32px] p-6 border border-white/60 shadow-lg shadow-gray-200/40"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 }}
-              >
+              <div className="bg-white/60 backdrop-blur-xl rounded-3xl border border-gray-200 p-6 flex flex-col h-full">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-lg font-bold text-gray-900 tracking-tight font-['Outfit']">Company News</h2>
-                  <div className="p-2 rounded-full bg-gray-50 text-gray-400">
-                    <Send className="w-4 h-4" />
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Latest Updates</h3>
+                    <p className="text-xs text-gray-500 font-medium">What's happening today</p>
                   </div>
+                  <button className="p-2 rounded-full hover:bg-white/50 text-gray-400 hover:text-gray-600 transition-colors">
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
                 </div>
 
                 <div className="space-y-4">
@@ -1067,7 +1027,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
                           {getNewsIcon(news.type)}
                         </div>
                         <div>
-                          <h3 className="text-sm font-semibold text-gray-900 line-clamp-1 font-['Outfit']">{news.title}</h3>
+                          <h3 className="text-sm font-semibold text-gray-900 line-clamp-1 font-sans">{news.title}</h3>
                           <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">{news.description}</p>
                           <span className="text-[10px] font-medium text-gray-400 mt-1 inline-block bg-white/50 px-1.5 py-0.5 rounded-md border border-gray-100">{news.date}</span>
                         </div>
@@ -1075,29 +1035,9 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
                     ))
                   )}
                 </div>
-              </motion.div>
-
-              {/* Quick Overview Mini-Cards */}
-              <div className="grid grid-cols-2 gap-4">
-                <motion.div
-                  className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-[28px] p-5 text-white shadow-lg shadow-indigo-500/25 relative overflow-hidden group"
-                  whileHover={{ y: -4 }}
-                >
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10 blur-xl group-hover:bg-white/20 transition-colors"></div>
-                  <HelpCircle className="w-6 h-6 mb-3 text-indigo-100" />
-                  <h3 className="text-2xl font-bold mb-1 font-['Outfit']">98%</h3>
-                  <p className="text-xs text-indigo-100 font-medium">Customer Satisfaction</p>
-                </motion.div>
-
-                <motion.div
-                  className="bg-white/80 backdrop-blur-xl rounded-[28px] p-5 border border-white/60 shadow-lg shadow-gray-200/40 relative overflow-hidden group"
-                  whileHover={{ y: -4 }}
-                >
-                  <Settings className="w-6 h-6 mb-3 text-gray-400 group-hover:text-indigo-600 transition-colors" />
-                  <h3 className="text-2xl font-bold text-gray-900 mb-1 font-['Outfit']">24/7</h3>
-                  <p className="text-xs text-gray-500 font-medium">System Uptime</p>
-                </motion.div>
               </div>
+
+
             </div>
 
           </div>

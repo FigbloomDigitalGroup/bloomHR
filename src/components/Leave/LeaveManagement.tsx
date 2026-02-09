@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Calendar,
   Clock,
@@ -8,11 +8,8 @@ import {
   Trash2,
   Filter,
   X,
-  Check,
   User,
   ChevronDown,
-  ChevronUp,
-  Mail,
   Download,
   FileText,
   CheckCircle,
@@ -26,12 +23,13 @@ import {
   Gift,
   Eye,
   Save,
-  MessageSquare,
   ThumbsUp,
   MapPin,
   RefreshCw,
-  Loader2
+  Loader2,
+  Search as SearchIcon
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@supabase/supabase-js';
 import { TownProps } from '../../types/supabase';
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
@@ -95,16 +93,122 @@ type EmployeeLeaveBalance = {
   annual_accrual: number;
 };
 
+// Premium Dropdown Component - Defined outside to prevent re-creation and flickering
+const PremiumSearchableDropdown = ({
+  options,
+  value,
+  onChange,
+  placeholder,
+  label,
+  icon: Icon
+}: {
+  options: { label: string; value: string }[];
+  value: string;
+  onChange: (val: string) => void;
+  placeholder: string;
+  label: string;
+  icon?: any;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filtered = options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()));
+  const selected = options.find(o => o.value === value);
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <label className="block text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-1 ml-1">
+        {label}
+      </label>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(!isOpen);
+        }}
+        className={`w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm transition-all duration-200 hover:bg-white hover:border-indigo-300 focus:outline-none focus:ring-4 focus:ring-indigo-500/5 ${isOpen ? 'border-indigo-500 bg-white ring-4 ring-indigo-500/5' : ''}`}
+      >
+        <div className="flex items-center gap-2 truncate text-gray-700">
+          {Icon && <Icon className={`w-4 h-4 ${isOpen ? 'text-indigo-500' : 'text-gray-400'}`} />}
+          <span className={selected ? 'font-medium text-gray-900' : 'text-gray-400'}>
+            {selected ? selected.label : placeholder}
+          </span>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 8, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.95 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="absolute z-[100] left-0 right-0 mt-2 bg-white border border-gray-100 rounded-xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)] overflow-hidden ring-1 ring-black/5"
+          >
+            <div className="p-2 border-b border-gray-50 bg-gray-50/50" onClick={e => e.stopPropagation()}>
+              <div className="relative">
+                <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                <input
+                  autoFocus
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Type to search..."
+                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10"
+                />
+              </div>
+            </div>
+            <div className="max-h-60 overflow-y-auto p-1 thin-scrollbar">
+              {filtered.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                    setSearch('');
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors mb-0.5 flex items-center justify-between group ${value === opt.value ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-600 hover:bg-indigo-50/50 hover:text-indigo-600'}`}
+                >
+                  <span className="truncate">{opt.label}</span>
+                  {value === opt.value && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
+                  )}
+                </button>
+              ))}
+              {filtered.length === 0 && (
+                <div className="px-4 py-8 text-center bg-gray-50/30 rounded-lg m-1">
+                  <p className="text-xs text-gray-400 font-medium italic">No results found</p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 type Employee = {
   id: string;
-  employee_number: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  department: string;
-  position: string;
-  hire_date: string;
-  office: string;
+  "Employee Number": string;
+  "First Name": string;
+  "Last Name": string;
+  "Work Email"?: string;
+  Branch?: string;
+  Town?: string;
 };
 
 interface AreaTownMapping {
@@ -652,6 +756,511 @@ const StatsSkeletonLoader = () => {
   );
 };
 
+// Leave Type Form Modal
+const LeaveTypeFormModal = ({
+  isOpen,
+  onClose,
+  newLeaveType,
+  setNewLeaveType,
+  handleSaveLeaveType,
+  handleAddLeaveType
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  newLeaveType: any;
+  setNewLeaveType: React.Dispatch<React.SetStateAction<any>>;
+  handleSaveLeaveType: (type: LeaveType) => void;
+  handleAddLeaveType: () => void;
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-base text-gray-900">
+            {newLeaveType.id ? 'Edit Leave Type' : 'Add Leave Type'}
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Leave Type Name
+            </label>
+            <input
+              type="text"
+              value={newLeaveType.name}
+              onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, name: e.target.value }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+              placeholder="e.g., Annual Leave"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Description
+            </label>
+            <textarea
+              value={newLeaveType.description}
+              onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, description: e.target.value }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+              rows={3}
+              placeholder="Describe this leave type..."
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Maximum Days
+              </label>
+              <input
+                type="number"
+                value={newLeaveType.max_days || ''}
+                onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, max_days: e.target.value ? Number(e.target.value) : undefined }))}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                placeholder="Unlimited"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Icon
+              </label>
+              <select
+                value={newLeaveType.icon}
+                onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, icon: e.target.value }))}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+              >
+                <option value="Sun">Sun</option>
+                <option value="Heart">Heart</option>
+                <option value="Baby">Baby</option>
+                <option value="Activity">Activity</option>
+                <option value="Zap">Zap</option>
+                <option value="Gift">Gift</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                checked={newLeaveType.is_deductible}
+                onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, is_deductible: e.target.checked }))}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label className="ml-2 text-xs text-gray-700">Deductible from balance</label>
+            </div>
+
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                checked={newLeaveType.is_continuous}
+                onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, is_continuous: e.target.checked }))}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label className="ml-2 text-xs text-gray-700">Continuous leave</label>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-6">
+          <button
+            onClick={() => {
+              onClose();
+              setNewLeaveType({ name: '', description: '', is_deductible: true, is_continuous: true, icon: 'Sun' });
+            }}
+            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              if (newLeaveType.id) {
+                handleSaveLeaveType(newLeaveType as LeaveType);
+              } else {
+                handleAddLeaveType();
+              }
+            }}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs flex items-center gap-2"
+          >
+            <Save className="w-4 h-4" />
+            {newLeaveType.id ? 'Update' : 'Save'} Leave Type
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Holiday Form Modal
+const HolidayFormModal = ({
+  isOpen,
+  onClose,
+  newHoliday,
+  setNewHoliday,
+  handleSaveHoliday,
+  handleAddHoliday
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  newHoliday: any;
+  setNewHoliday: React.Dispatch<React.SetStateAction<any>>;
+  handleSaveHoliday: (holiday: Holiday) => void;
+  handleAddHoliday: () => void;
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-base text-gray-900">
+            {newHoliday.id ? 'Edit Holiday' : 'Add Holiday'}
+          </h3>
+          <button
+            onClick={() => {
+              onClose();
+              setNewHoliday({ name: '', date: new Date().toISOString().split('T')[0], recurring: true });
+            }}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Holiday Name
+            </label>
+            <input
+              type="text"
+              value={newHoliday.name}
+              onChange={(e) => setNewHoliday((prev: any) => ({ ...prev, name: e.target.value }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+              placeholder="e.g., New Year's Day"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Date
+            </label>
+            <input
+              type="date"
+              value={newHoliday.date}
+              onChange={(e) => setNewHoliday((prev: any) => ({ ...prev, date: e.target.value }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+            />
+          </div>
+
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              checked={newHoliday.recurring}
+              onChange={(e) => setNewHoliday((prev: any) => ({ ...prev, recurring: e.target.checked }))}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <label className="ml-2 text-xs text-gray-700">Recurring holiday (every year)</label>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-6">
+          <button
+            onClick={() => {
+              onClose();
+              setNewHoliday({ name: '', date: new Date().toISOString().split('T')[0], recurring: true });
+            }}
+            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              if (newHoliday.id) {
+                handleSaveHoliday(newHoliday as Holiday);
+              } else {
+                handleAddHoliday();
+              }
+            }}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs flex items-center gap-2"
+          >
+            <Save className="w-4 h-4" />
+            {newHoliday.id ? 'Update' : 'Save'} Holiday
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Accrual Settings Modal
+const AccrualSettingsModal = ({
+  isOpen,
+  onClose,
+  accrualSettings,
+  handleRunAccrual,
+  employees
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  accrualSettings: any;
+  handleRunAccrual: () => void;
+  employees: Employee[];
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-base text-gray-900">Run Leave Accrual</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
+              <div>
+                <p className="text-xs font-medium text-yellow-800">Important</p>
+                <p className="text-xs text-yellow-700 mt-1">
+                  This will add {accrualSettings.accrualAmount} days to all employees' leave balances
+                  for deductible leave types. This action cannot be undone.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs font-medium text-gray-700">Accrual Details:</p>
+              <ul className="text-xs text-gray-600 space-y-1 mt-2">
+                <li>• Amount: {accrualSettings.accrualAmount} days per employee</li>
+                <li>• Interval: {accrualSettings.accrualInterval}</li>
+                <li>• Next accrual: {formatDate(accrualSettings.nextAccrualDate)}</li>
+                <li>• Affected employees: {employees.length}</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-6">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleRunAccrual}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Run Accrual Now
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const LeaveApplicationFormModal = ({
+  isOpen,
+  onClose,
+  newLeaveApplication,
+  setNewLeaveApplication,
+  employees,
+  leaveTypes,
+  holidays,
+  handleApplyLeave
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  newLeaveApplication: any;
+  setNewLeaveApplication: React.Dispatch<React.SetStateAction<any>>;
+  employees: Employee[];
+  leaveTypes: LeaveType[];
+  holidays: Holiday[];
+  handleApplyLeave: () => void;
+}) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    const days = calculateWorkingDays(
+      newLeaveApplication["Start Date"],
+      newLeaveApplication["End Date"],
+      holidays
+    );
+    setNewLeaveApplication((prev: any) => ({ ...prev, "Days": days }));
+  }, [newLeaveApplication["Start Date"], newLeaveApplication["End Date"], holidays, isOpen, setNewLeaveApplication]);
+
+  const handleEmployeeChange = (employeeNumber: string) => {
+    const employee = employees.find((e) => e["Employee Number"] === employeeNumber);
+    if (employee) {
+      setNewLeaveApplication((prev: any) => ({
+        ...prev,
+        "Employee Number": employee["Employee Number"],
+        "Name": `${employee["First Name"]} ${employee["Last Name"]}`,
+        "Office Branch": employee.Branch || employee.Town || 'N/A'
+      }));
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto thin-scrollbar">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-bold text-gray-900">Assign Leave</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <PremiumSearchableDropdown
+              label="Select Employee"
+              placeholder="Find a staff member..."
+              icon={User}
+              options={employees.map(emp => ({
+                label: `${emp["First Name"]} ${emp["Last Name"]} (${emp["Employee Number"]})`,
+                value: emp["Employee Number"]
+              }))}
+              value={newLeaveApplication["Employee Number"]}
+              onChange={handleEmployeeChange}
+            />
+
+            <PremiumSearchableDropdown
+              label="Leave Type"
+              placeholder="Choose leave type..."
+              icon={FileText}
+              options={leaveTypes.map(type => ({
+                label: type.name,
+                value: type.name
+              }))}
+              value={newLeaveApplication["Leave Type"]}
+              onChange={(val) => setNewLeaveApplication((prev: any) => ({ ...prev, "Leave Type": val }))}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={newLeaveApplication["Start Date"]}
+                onChange={(e) => setNewLeaveApplication((prev: any) => ({ ...prev, "Start Date": e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                End Date
+              </label>
+              <input
+                type="date"
+                value={newLeaveApplication["End Date"]}
+                onChange={(e) => setNewLeaveApplication((prev: any) => ({ ...prev, "End Date": e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Working Days
+              </label>
+              <input
+                type="number"
+                value={newLeaveApplication["Days"]}
+                readOnly
+                className="w-full border border-gray-100 bg-gray-50 rounded-lg px-3 py-2 text-sm font-bold text-blue-600"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <PremiumSearchableDropdown
+              label="Leave Duration Type"
+              placeholder="Select duration..."
+              icon={Clock}
+              options={[
+                { label: "Full Day", value: "Full Day" },
+                { label: "Half Day", value: "Half Day" }
+              ]}
+              value={newLeaveApplication["Type"]}
+              onChange={(val) => setNewLeaveApplication((prev: any) => ({ ...prev, "Type": val }))}
+            />
+
+            <PremiumSearchableDropdown
+              label="Application Basis"
+              placeholder="Select basis..."
+              icon={Zap}
+              options={[
+                { label: "Normal", value: "Normal" },
+                { label: "Emergency", value: "Emergency" },
+                { label: "Retrospective", value: "Retrospective" }
+              ]}
+              value={newLeaveApplication["Application Type"]}
+              onChange={(val) => setNewLeaveApplication((prev: any) => ({ ...prev, "Application Type": val }))}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              Reason / Remarks
+            </label>
+            <textarea
+              value={newLeaveApplication["Reason"]}
+              onChange={(e) => setNewLeaveApplication((prev: any) => ({ ...prev, "Reason": e.target.value }))}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+              rows={3}
+              placeholder="Reason for granting this leave..."
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 pt-8">
+          <button
+            onClick={onClose}
+            className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-semibold transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleApplyLeave}
+            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/20 active:scale-[0.98] transition-all"
+          >
+            <Save className="w-4 h-4" />
+            Confirm Assignment
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Leave Management Dashboard
 export default function LeaveManagementSystem({ selectedTown, onTownChange, selectedRegion }: TownProps) {
   // State variables for town filtering
@@ -847,7 +1456,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
       deductibleLeaveTypes.forEach(leaveType => {
         const usedDays = applicationsData
           .filter(app =>
-            app["Employee Number"] === employee.employee_number &&
+            app["Employee Number"] === employee["Employee Number"] &&
             app["Leave Type"] === leaveType.name &&
             app.Status === 'approved'
           )
@@ -871,11 +1480,11 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
         const remainingDays = accruedDays - usedDays;
 
         balances.push({
-          id: `${employee.employee_number}-${leaveType.id}`,
-          employee_number: employee.employee_number,
-          first_name: employee.first_name,
-          last_name: employee.last_name,
-          office: employee.office,
+          id: `${employee["Employee Number"]}-${leaveType.id}`,
+          employee_number: employee["Employee Number"],
+          first_name: employee["First Name"],
+          last_name: employee["Last Name"],
+          office: employee.Branch || employee.Town || 'N/A',
           leave_type_id: leaveType.id,
           leave_type_name: leaveType.name,
           accrued_days: accruedDays,
@@ -973,7 +1582,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
         const { data, error } = await supabase
           .from('employees')
           .select('*')
-          .order('first_name');
+          .order('First Name');
 
         if (error) throw error;
         setEmployees(data || []);
@@ -1210,7 +1819,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
 
   const handleApplyLeave = async () => {
     const leaveType = leaveTypes.find(lt => lt.name === newLeaveApplication["Leave Type"]);
-    const employee = employees.find(e => e.employee_number === newLeaveApplication["Employee Number"]);
+    const employee = employees.find(e => e["Employee Number"] === newLeaveApplication["Employee Number"]);
 
     if (!leaveType || !employee) return;
 
@@ -1221,18 +1830,18 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
         holidays
       );
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('leave_application')
         .insert([{
           "Employee Number": newLeaveApplication["Employee Number"],
-          "Name": `${employee.first_name} ${employee.last_name}`,
+          "Name": `${employee["First Name"]} ${employee["Last Name"]}`,
           "Leave Type": newLeaveApplication["Leave Type"],
           "Start Date": newLeaveApplication["Start Date"],
           "End Date": newLeaveApplication["End Date"],
           "Days": days,
           "Type": newLeaveApplication["Type"],
           "Application Type": newLeaveApplication["Application Type"],
-          "Office Branch": employee.office,
+          "Office Branch": employee.Branch || employee.Town || 'N/A',
           "Reason": newLeaveApplication["Reason"],
           "Status": newLeaveApplication["Status"],
           "recstatus": newLeaveApplication["recstatus"],
@@ -1242,6 +1851,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
 
       if (error) throw error;
 
+      alert('Leave assigned successfully!');
       setShowLeaveApplicationForm(false);
       setNewLeaveApplication({
         "Employee Number": '',
@@ -1796,279 +2406,11 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
 
   // Add these modals before the return statement:
 
-  // Leave Type Form Modal
-  const LeaveTypeFormModal = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-base text-gray-900">
-            {newLeaveType.id ? 'Edit Leave Type' : 'Add Leave Type'}
-          </h3>
-          <button
-            onClick={() => {
-              setShowLeaveTypeForm(false);
-              setNewLeaveType({ name: '', description: '', is_deductible: true, is_continuous: true, icon: 'Sun' });
-            }}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+  // Add these modals before the return statement:
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Leave Type Name
-            </label>
-            <input
-              type="text"
-              value={newLeaveType.name}
-              onChange={(e) => setNewLeaveType(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-              placeholder="e.g., Annual Leave"
-            />
-          </div>
 
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Description
-            </label>
-            <textarea
-              value={newLeaveType.description}
-              onChange={(e) => setNewLeaveType(prev => ({ ...prev, description: e.target.value }))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-              rows={3}
-              placeholder="Describe this leave type..."
-            />
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Maximum Days
-              </label>
-              <input
-                type="number"
-                value={newLeaveType.max_days || ''}
-                onChange={(e) => setNewLeaveType(prev => ({ ...prev, max_days: e.target.value ? Number(e.target.value) : undefined }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                placeholder="Unlimited"
-              />
-            </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Icon
-              </label>
-              <select
-                value={newLeaveType.icon}
-                onChange={(e) => setNewLeaveType(prev => ({ ...prev, icon: e.target.value }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-              >
-                <option value="Sun">Sun</option>
-                <option value="Heart">Heart</option>
-                <option value="Baby">Baby</option>
-                <option value="Activity">Activity</option>
-                <option value="Zap">Zap</option>
-                <option value="Gift">Gift</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={newLeaveType.is_deductible}
-                onChange={(e) => setNewLeaveType(prev => ({ ...prev, is_deductible: e.target.checked }))}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <label className="ml-2 text-xs text-gray-700">Deductible from balance</label>
-            </div>
-
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={newLeaveType.is_continuous}
-                onChange={(e) => setNewLeaveType(prev => ({ ...prev, is_continuous: e.target.checked }))}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <label className="ml-2 text-xs text-gray-700">Continuous leave</label>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 pt-6">
-          <button
-            onClick={() => {
-              setShowLeaveTypeForm(false);
-              setNewLeaveType({ name: '', description: '', is_deductible: true, is_continuous: true, icon: 'Sun' });
-            }}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              if (newLeaveType.id) {
-                handleSaveLeaveType(newLeaveType as LeaveType);
-              } else {
-                handleAddLeaveType();
-              }
-            }}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs flex items-center gap-2"
-          >
-            <Save className="w-4 h-4" />
-            {newLeaveType.id ? 'Update' : 'Save'} Leave Type
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Holiday Form Modal
-  const HolidayFormModal = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-base text-gray-900">
-            {newHoliday.id ? 'Edit Holiday' : 'Add Holiday'}
-          </h3>
-          <button
-            onClick={() => {
-              setShowHolidayForm(false);
-              setNewHoliday({ name: '', date: new Date().toISOString().split('T')[0], recurring: true });
-            }}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Holiday Name
-            </label>
-            <input
-              type="text"
-              value={newHoliday.name}
-              onChange={(e) => setNewHoliday(prev => ({ ...prev, name: e.target.value }))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-              placeholder="e.g., New Year's Day"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Date
-            </label>
-            <input
-              type="date"
-              value={newHoliday.date}
-              onChange={(e) => setNewHoliday(prev => ({ ...prev, date: e.target.value }))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-            />
-          </div>
-
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              checked={newHoliday.recurring}
-              onChange={(e) => setNewHoliday(prev => ({ ...prev, recurring: e.target.checked }))}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <label className="ml-2 text-xs text-gray-700">Recurring holiday (every year)</label>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 pt-6">
-          <button
-            onClick={() => {
-              setShowHolidayForm(false);
-              setNewHoliday({ name: '', date: new Date().toISOString().split('T')[0], recurring: true });
-            }}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              if (newHoliday.id) {
-                handleSaveHoliday(newHoliday as Holiday);
-              } else {
-                handleAddHoliday();
-              }
-            }}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs flex items-center gap-2"
-          >
-            <Save className="w-4 h-4" />
-            {newHoliday.id ? 'Update' : 'Save'} Holiday
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Accrual Settings Modal
-  const AccrualSettingsModal = () => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-base text-gray-900">Run Leave Accrual</h3>
-          <button
-            onClick={() => setShowAccrualSettings(false)}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
-              <div>
-                <p className="text-xs font-medium text-yellow-800">Important</p>
-                <p className="text-xs text-yellow-700 mt-1">
-                  This will add {accrualSettings.accrualAmount} days to all employees' leave balances
-                  for deductible leave types. This action cannot be undone.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs font-medium text-gray-700">Accrual Details:</p>
-              <ul className="text-xs text-gray-600 space-y-1 mt-2">
-                <li>• Amount: {accrualSettings.accrualAmount} days per employee</li>
-                <li>• Interval: {accrualSettings.accrualInterval}</li>
-                <li>• Next accrual: {formatDate(accrualSettings.nextAccrualDate)}</li>
-                <li>• Affected employees: {employees.length}</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 pt-6">
-          <button
-            onClick={() => setShowAccrualSettings(false)}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleRunAccrual}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs flex items-center gap-2"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Run Accrual Now
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 
   return (
     <div className="p-4 space-y-6 bg-gray-50 min-h-screen max-w-screen-2xl mx-auto">
@@ -2223,7 +2565,22 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
 
       {/* Content based on selected tab */}
       {activeTab === 'scheduler' && (
-        <LeaveScheduler selectedTown={currentTown === 'ADMIN_ALL' ? undefined : currentTown} />
+        <LeaveScheduler
+          selectedTown={currentTown === 'ADMIN_ALL' ? undefined : currentTown}
+          onSelectDate={(employeeNumber, date) => {
+            const employee = employees.find(e => e["Employee Number"] === employeeNumber);
+            setNewLeaveApplication(prev => ({
+              ...prev,
+              "Employee Number": employeeNumber,
+              "Name": employee ? `${employee["First Name"]} ${employee["Last Name"]}` : '',
+              "Office Branch": employee ? (employee.Branch || employee.Town || 'N/A') : '',
+              "Start Date": date.toISOString().split('T')[0],
+              "End Date": date.toISOString().split('T')[0]
+            }));
+            setShowLeaveApplicationForm(true);
+          }}
+          onAssignLeave={() => setShowLeaveApplicationForm(true)}
+        />
       )}
 
       {activeTab === 'applications' && (
@@ -2235,6 +2592,13 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
                 <p className="text-gray-600 text-xs">{leaveApplications.length} applications found</p>
               </div>
               <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setShowLeaveApplicationForm(true)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium shadow-sm active:scale-95 transition-all"
+                >
+                  <Plus className="w-3 h-3" />
+                  Apply Leave
+                </button>
                 <button className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium border border-gray-300">
                   <Filter className="w-3 h-3" />
                   Filter
@@ -2410,9 +2774,47 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
       )}
 
       {/* Modals */}
-      {showLeaveTypeForm && <LeaveTypeFormModal />}
-      {showHolidayForm && <HolidayFormModal />}
-      {showAccrualSettings && <AccrualSettingsModal />}
+      {showLeaveApplicationForm && (
+        <LeaveApplicationFormModal
+          isOpen={showLeaveApplicationForm}
+          onClose={() => setShowLeaveApplicationForm(false)}
+          newLeaveApplication={newLeaveApplication}
+          setNewLeaveApplication={setNewLeaveApplication}
+          employees={employees}
+          leaveTypes={leaveTypes}
+          holidays={holidays}
+          handleApplyLeave={handleApplyLeave}
+        />
+      )}
+      {showLeaveTypeForm && (
+        <LeaveTypeFormModal
+          isOpen={showLeaveTypeForm}
+          onClose={() => setShowLeaveTypeForm(false)}
+          newLeaveType={newLeaveType}
+          setNewLeaveType={setNewLeaveType}
+          handleSaveLeaveType={handleSaveLeaveType}
+          handleAddLeaveType={handleAddLeaveType}
+        />
+      )}
+      {showHolidayForm && (
+        <HolidayFormModal
+          isOpen={showHolidayForm}
+          onClose={() => setShowHolidayForm(false)}
+          newHoliday={newHoliday}
+          setNewHoliday={setNewHoliday}
+          handleSaveHoliday={handleSaveHoliday}
+          handleAddHoliday={handleAddHoliday}
+        />
+      )}
+      {showAccrualSettings && (
+        <AccrualSettingsModal
+          isOpen={showAccrualSettings}
+          onClose={() => setShowAccrualSettings(false)}
+          accrualSettings={accrualSettings}
+          handleRunAccrual={handleRunAccrual}
+          employees={employees}
+        />
+      )}
 
       {/* Global Loading Overlay */}
       {loading && (

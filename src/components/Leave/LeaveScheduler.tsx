@@ -10,7 +10,9 @@ import {
     subMonths,
     isWeekend,
     differenceInDays,
-    parseISO
+    parseISO,
+    isBefore,
+    startOfDay
 } from 'date-fns';
 import {
     ChevronLeft,
@@ -19,13 +21,16 @@ import {
     Plus,
     Loader2,
     Search,
-    MoreHorizontal,
-    Download
+    Download,
+    X as CloseIcon
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 
 interface LeaveSchedulerProps {
     selectedTown?: string;
+    onSelectDate?: (employeeNumber: string, date: Date) => void;
+    onAssignLeave?: () => void;
 }
 
 // CORRECTED TYPE DEFINITION MATCHING 'EmployeeList.tsx'
@@ -62,7 +67,7 @@ const STATUS_STYLES = {
     DEFAULT: { bg: 'bg-blue-500', border: 'border-blue-600', text: 'text-white', shadow: 'shadow-blue-500/30' }
 };
 
-const LeaveScheduler = ({ selectedTown }: LeaveSchedulerProps) => {
+const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSchedulerProps) => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [leaves, setLeaves] = useState<LeaveApplication[]>([]);
@@ -248,55 +253,75 @@ const LeaveScheduler = ({ selectedTown }: LeaveSchedulerProps) => {
                         />
 
                         {/* Suggestion Dropdown */}
-                        {showSuggestions && (
-                            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-xl shadow-2xl z-50 max-h-80 overflow-auto py-2 custom-scrollbar ring-1 ring-black/5">
-                                {filteredEmployees.length > 0 ? (
-                                    <>
-                                        <div className="px-4 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50/50 sticky top-0 backdrop-blur-sm">
-                                            Suggested Staff
-                                        </div>
-                                        {filteredEmployees.map(emp => (
-                                            <div
-                                                key={emp.id}
-                                                onClick={() => handleSelectEmployee(emp)}
-                                                className="px-4 py-3 hover:bg-emerald-50 cursor-pointer flex items-center gap-3 transition-colors border-b border-gray-50 last:border-0 group"
-                                            >
-                                                <div className="w-10 h-10 flex-shrink-0 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500 overflow-hidden ring-2 ring-white shadow-sm group-hover:ring-emerald-200 transition-all">
-                                                    {emp.avatar_url ? (
-                                                        <img src={emp.avatar_url} alt="" className="w-full h-full object-cover" />
-                                                    ) : getInitials(emp["First Name"], emp["Last Name"])}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="text-sm font-semibold text-gray-900 truncate group-hover:text-emerald-700">
-                                                        {emp["First Name"]} {emp["Last Name"]}
-                                                    </div>
-                                                    <div className="text-xs text-gray-500 truncate flex items-center gap-1.5">
-                                                        <span className="inline-flex items-center rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">
-                                                            {emp["Employee Number"]}
-                                                        </span>
-                                                        <span>{emp["Job Title"] || emp["Employee Type"]}</span>
-                                                    </div>
-                                                </div>
+                        <AnimatePresence>
+                            {showSuggestions && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                                    transition={{ duration: 0.2, ease: "easeOut" }}
+                                    className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.2)] z-[100] max-h-80 overflow-hidden ring-1 ring-black/5 flex flex-col"
+                                >
+                                    {filteredEmployees.length > 0 ? (
+                                        <>
+                                            <div className="px-4 py-2.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50/80 sticky top-0 backdrop-blur-sm border-b border-gray-100 flex justify-between items-center">
+                                                <span>Suggested Staff</span>
+                                                <button
+                                                    onClick={() => setShowSuggestions(false)}
+                                                    className="p-1 hover:bg-gray-200 rounded-md transition-colors"
+                                                >
+                                                    <CloseIcon className="w-3 h-3" />
+                                                </button>
                                             </div>
-                                        ))}
-                                    </>
-                                ) : (
-                                    <div className="px-4 py-8 text-center">
-                                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 mb-3">
-                                            <Search className="w-6 h-6 text-gray-400" />
+                                            <div className="overflow-y-auto custom-scrollbar p-1">
+                                                {filteredEmployees.map(emp => (
+                                                    <div
+                                                        key={emp.id}
+                                                        onClick={() => handleSelectEmployee(emp)}
+                                                        className="px-3 py-2.5 hover:bg-emerald-50 cursor-pointer flex items-center gap-3 rounded-lg transition-all border-b border-gray-50 last:border-0 group"
+                                                    >
+                                                        <div className="w-10 h-10 flex-shrink-0 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-bold text-emerald-700 overflow-hidden ring-2 ring-white shadow-sm group-hover:ring-emerald-200 transition-all">
+                                                            {emp.avatar_url ? (
+                                                                <img src={emp.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                            ) : getInitials(emp["First Name"], emp["Last Name"])}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-sm font-bold text-gray-900 truncate group-hover:text-emerald-700">
+                                                                {emp["First Name"]} {emp["Last Name"]}
+                                                            </div>
+                                                            <div className="text-[10px] text-gray-500 truncate flex items-center gap-1.5 mt-0.5">
+                                                                <span className="font-mono bg-gray-100 px-1 rounded border border-gray-200">
+                                                                    {emp["Employee Number"]}
+                                                                </span>
+                                                                <span className="text-emerald-600 font-medium italic opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    Click to focus
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <ChevronRight className="w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 group-hover:text-emerald-400 transition-all -translate-x-2 group-hover:translate-x-0" />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="px-4 py-10 text-center bg-gray-50/30">
+                                            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 mb-3 text-gray-400">
+                                                <Search className="w-6 h-6" />
+                                            </div>
+                                            <p className="text-sm font-bold text-gray-900">No staff found</p>
+                                            <p className="text-xs text-gray-500 mt-1">We couldn't find anyone matching "{searchTerm}"</p>
                                         </div>
-                                        <p className="text-sm font-medium text-gray-900">No staff found</p>
-                                        <p className="text-xs text-gray-500 mt-1">We couldn't find anyone matching "{searchTerm}"</p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                                    )}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
 
                     <button
-                        className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-all shadow-md shadow-emerald-600/20 active:scale-95 whitespace-nowrap active:shadow-sm"
+                        onClick={onAssignLeave}
+                        className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-all active:scale-95 whitespace-nowrap text-xs"
                     >
-                        <Plus className="w-4 h-4" />
+                        <Plus className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline font-medium">Assign Leave</span>
                     </button>
 
@@ -373,23 +398,24 @@ const LeaveScheduler = ({ selectedTown }: LeaveSchedulerProps) => {
                                     {daysInMonth.map(day => {
                                         const isToday = isSameDay(day, new Date());
                                         const isWeekendDay = isWeekend(day);
+                                        const isPast = isBefore(day, startOfDay(new Date()));
 
                                         return (
                                             <div
                                                 key={day.toISOString()}
                                                 className={`flex-shrink-0 w-14 flex flex-col items-center justify-center border-r border-gray-100 relative group transition-colors duration-300
-                          ${isWeekendDay ? 'bg-gray-50/80' : 'bg-white'}
+                          ${isPast ? 'bg-gray-100/50 cursor-not-allowed opacity-60' : isWeekendDay ? 'bg-gray-50/80' : 'bg-white'}
                         `}
                                             >
                                                 {/* Today Marker Line */}
                                                 {isToday && <div className="absolute top-0 w-full h-1 bg-emerald-500 z-20 shadow-sm"></div>}
 
-                                                <span className={`text-[9px] uppercase font-bold mb-0.5 tracking-wider ${isToday ? 'text-emerald-600' : 'text-gray-400'}`}>
+                                                <span className={`text-[9px] uppercase font-bold mb-0.5 tracking-wider ${isToday ? 'text-emerald-600' : isPast ? 'text-gray-400' : 'text-gray-500'}`}>
                                                     {format(day, 'EEE')}
                                                 </span>
                                                 <div className={`
                           w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold transition-all duration-300
-                          ${isToday ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200 scale-110 ring-2 ring-emerald-50' : 'text-gray-700 group-hover:bg-gray-100'}
+                          ${isToday ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200 scale-110 ring-2 ring-emerald-50' : isPast ? 'text-gray-400' : 'text-gray-700 group-hover:bg-gray-100'}
                         `}>
                                                     {format(day, 'd')}
                                                 </div>
@@ -405,7 +431,7 @@ const LeaveScheduler = ({ selectedTown }: LeaveSchedulerProps) => {
                                         {daysInMonth.map((day, i) => (
                                             <div
                                                 key={`grid-${i}`}
-                                                className={`flex-shrink-0 w-14 border-r border-gray-100 h-full ${isWeekend(day) ? 'bg-gray-50/50' : ''}`}
+                                                className={`flex-shrink-0 w-14 border-r border-gray-100 h-full ${isBefore(day, startOfDay(new Date())) ? 'bg-gray-100/40 pattern-diagonal-lines pattern-gray-200 pattern-bg-transparent pattern-size-1 pattern-opacity-20' : isWeekend(day) ? 'bg-gray-50/50' : ''}`}
                                             />
                                         ))}
                                     </div>
@@ -455,16 +481,25 @@ const LeaveScheduler = ({ selectedTown }: LeaveSchedulerProps) => {
                                             </div>
 
                                             {/* Interactive Click Grid */}
-                                            {daysInMonth.map((day, i) => (
-                                                <div
-                                                    key={`cell-${i}`}
-                                                    className="flex-shrink-0 w-14 h-full z-0 hover:bg-emerald-500/5 hover:border-r hover:border-emerald-200 cursor-cell transition-colors duration-75 border-transparent border-r box-border"
-                                                    title={`Schedule leave for ${emp["First Name"]}`}
-                                                    onClick={() => {
-                                                        console.log(`Assign leave for ${emp["First Name"]} on ${format(day, 'yyyy-MM-dd')}`);
-                                                    }}
-                                                />
-                                            ))}
+                                            {daysInMonth.map((day, i) => {
+                                                const isPast = isBefore(day, startOfDay(new Date()));
+                                                return (
+                                                    <div
+                                                        key={`cell-${i}`}
+                                                        className={`flex-shrink-0 w-14 h-full z-0 border-transparent border-r box-border transition-colors duration-75 
+                                                            ${isPast
+                                                                ? 'cursor-not-allowed bg-gray-50/50'
+                                                                : 'hover:bg-emerald-500/5 hover:border-r hover:border-emerald-200 cursor-cell'
+                                                            }`}
+                                                        title={isPast ? "Cannot schedule in the past" : `Schedule leave for ${emp["First Name"]}`}
+                                                        onClick={() => {
+                                                            if (!isPast && onSelectDate) {
+                                                                onSelectDate(emp["Employee Number"], day);
+                                                            }
+                                                        }}
+                                                    />
+                                                );
+                                            })}
                                         </div>
                                     ))}
                                 </div>

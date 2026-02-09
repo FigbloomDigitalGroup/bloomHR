@@ -80,7 +80,7 @@ export default function StaffSignupRequests() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 font-['Inter',sans-serif] text-gray-900 p-8">
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-900 p-8">
       <div className="max-w-[1200px] mx-auto space-y-8">
 
         {/* Header */}

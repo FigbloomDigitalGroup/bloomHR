@@ -37,16 +37,16 @@ function SuccessPopup({ show, onClose, message }: SuccessPopupProps) {
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white/10 backdrop-blur-3xl border border-white/20 p-8 rounded-[2.5rem] shadow-2xl max-w-sm w-full text-center"
+        className="bg-white/10 backdrop-blur-3xl border border-white/20 p-8 rounded-lg shadow-2xl max-w-sm w-full text-center"
       >
-        <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-          <CheckCircle size={40} className="text-emerald-400" weight="fill" />
+        <div className="w-20 h-20 bg-gray-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
+          <CheckCircle size={40} className="text-gray-900" weight="fill" />
         </div>
         <h3 className="text-2xl font-bold text-white mb-2">Request Sent!</h3>
-        <p className="text-emerald-100/60 text-xs mb-8">{message}</p>
+        <p className="text-gray-200 text-xs mb-8">{message}</p>
         <button
           onClick={onClose}
-          className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-2xl shadow-lg transition-all"
+          className="w-full py-4 bg-gray-900 hover:bg-gray-800 text-white text-xs font-bold rounded-lg shadow-lg transition-all"
         >
           Got it
         </button>
@@ -301,27 +301,26 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   }));
 
   return (
-    <div className="flex min-h-screen bg-gray-50 font-['Plus_Jakarta_Sans',sans-serif] [&_h1]:font-['Plus_Jakarta_Sans',sans-serif] [&_h2]:font-['Plus_Jakarta_Sans',sans-serif] [&_h3]:font-['Plus_Jakarta_Sans',sans-serif] [&_h4]:font-['Plus_Jakarta_Sans',sans-serif] [&_button]:font-['Plus_Jakarta_Sans',sans-serif] [&_input]:font-['Plus_Jakarta_Sans',sans-serif] [&_label]:font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="flex min-h-screen bg-gray-50 font-sans [&_h1]:font-sans [&_h2]:font-sans [&_h3]:font-sans [&_h4]:font-sans [&_button]:font-sans [&_input]:font-sans [&_label]:font-sans">
       {/* Left side - Visual & Brand */}
-      <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden bg-emerald-950">
+      <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden bg-gray-900">
         {/* Animated Background Layers */}
         <div className="absolute inset-0 z-0">
-          <div className="absolute top-[-10%] left-[-10%] w-[70%] h-[70%] bg-emerald-600/20 rounded-full blur-[120px] mix-blend-screen" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[70%] h-[70%] bg-teal-600/20 rounded-full blur-[120px] mix-blend-screen" />
           <img
             src="/leaf.jpg"
             alt="Nature Background"
-            className="absolute inset-0 w-full h-full object-cover opacity-[0.1] mix-blend-overlay"
+            className="absolute inset-0 w-full h-full object-cover opacity-50"
           />
+          <div className="absolute inset-0 bg-black/40" />
         </div>
 
         {/* Content Overlay */}
         <div className="relative z-10 w-full flex flex-col justify-between p-16">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center shadow-lg shadow-black/20">
               <img src="/solo.png" alt="Company Logo" className="w-6 h-6 object-contain brightness-0 invert" />
             </div>
-            <span className="text-white font-bold text-2xl tracking-tight">Zira<span className="text-emerald-400">HR</span></span>
+            <span className="text-white font-bold text-2xl tracking-tight">Zira<span className="text-gray-400">HR</span></span>
           </div>
 
           <div className="space-y-6">
@@ -332,9 +331,9 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             >
               <h1 className="text-5xl font-extrabold text-white leading-tight">
                 Automate Your <br />
-                <span className="text-emerald-400">Payroll & HR Workflows</span>
+                <span className="text-gray-400">Payroll & HR Workflows</span>
               </h1>
-              <p className="mt-4 text-emerald-100/60 text-xs max-w-md">
+              <p className="mt-4 text-gray-400 text-xs max-w-md">
                 Manage staff records, automate compensation, and handle branch operations with a single, unified business dashboard.
               </p>
             </motion.div>
@@ -342,17 +341,17 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             <div className="flex gap-12 pt-8">
               <div className="flex flex-col">
                 <span className="text-white font-bold text-2xl">99.9%</span>
-                <span className="text-emerald-100/40 text-xs uppercase tracking-widest font-bold">Uptime</span>
+                <span className="text-gray-500 text-xs uppercase tracking-widest font-bold">Uptime</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-white font-bold text-2xl">24/7</span>
-                <span className="text-emerald-100/40 text-xs uppercase tracking-widest font-bold">Support</span>
+                <span className="text-gray-500 text-xs uppercase tracking-widest font-bold">Support</span>
               </div>
             </div>
           </div>
 
-          <div className="text-emerald-100/20 text-xs font-medium uppercase tracking-[0.2em]">
-            © 2026 Mular Credit · Business Edition
+          <div className="text-white text-xs font-light">
+            © 2026 Mular Credit · Business edition
           </div>
         </div>
       </div>
@@ -363,10 +362,10 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-10">
             <div className="inline-flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
                 <img src="/solo.png" alt="Logo" className="w-5 h-5 brightness-0 invert" />
               </div>
-              <span className="text-2xl font-bold text-gray-900 tracking-tight">Zira<span className="text-emerald-600">HR</span></span>
+              <span className="text-2xl font-bold text-gray-900 tracking-tight">Zira<span className="text-gray-500">HR</span></span>
             </div>
           </div>
 
@@ -395,12 +394,12 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                   <label className="text-xs font-bold text-gray-500 ml-1">Email address</label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <EnvelopeSimple size={20} className="text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                      <EnvelopeSimple size={20} className="text-gray-400 group-focus-within:text-gray-900 transition-colors" />
                     </div>
                     <input
                       type="email"
                       required
-                      className={`block w-full pl-11 pr-4 py-3 bg-gray-50/50 border border-gray-200 rounded-2xl text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all ${emailExists && isSignUp ? 'border-red-300 focus:border-red-500' : 'hover:border-gray-300'
+                      className={`block w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 transition-all ${emailExists && isSignUp ? 'border-red-300 focus:border-red-500' : 'hover:border-gray-300'
                         }`}
                       placeholder="name@company.com"
                       value={email}
@@ -408,7 +407,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                     />
                     {isCheckingEmail && (
                       <div className="absolute inset-y-0 right-4 flex items-center">
-                        <CircleNotch size={18} className="animate-spin text-emerald-500" />
+                        <CircleNotch size={18} className="animate-spin text-gray-900" />
                       </div>
                     )}
                   </div>
@@ -421,19 +420,19 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                       <button
                         type="button"
                         onClick={() => setShowForgotPassword(true)}
-                        className="text-xs font-medium text-gray-400 hover:text-emerald-600 transition-colors"
+                        className="text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors"
                       >
                         Forgot?
                       </button>
                     </div>
                     <div className="relative group">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <LockKey size={20} className="text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                        <LockKey size={20} className="text-gray-400 group-focus-within:text-gray-900 transition-colors" />
                       </div>
                       <input
                         type="password"
                         required
-                        className="block w-full pl-11 pr-4 py-3 bg-gray-50/50 border border-gray-200 rounded-2xl text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 hover:border-gray-300 transition-all"
+                        className="block w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 hover:border-gray-300 transition-all"
                         placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -447,20 +446,20 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                     <label className="text-xs font-bold text-gray-500 ml-1 flex items-center gap-2">
                       Town office
                       {isBranchAutoPopulated && (
-                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-emerald-600 text-[10px] font-bold border border-emerald-100 bg-emerald-50">
+                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-gray-900 text-[10px] font-bold border border-gray-200 bg-gray-100">
                           <CheckCircle size={10} weight="fill" /> AUTO
                         </span>
                       )}
                     </label>
                     <div className="relative group">
                       <div className="absolute z-10 top-[14px] left-4 pointer-events-none">
-                        <Buildings size={20} className="text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                        <Buildings size={20} className="text-gray-400 group-focus-within:text-gray-900 transition-colors" />
                       </div>
                       <div className="relative">
                         {isBranchAutoPopulated ? (
                           <input
                             type="text"
-                            className="block w-full pl-11 pr-4 py-3 bg-emerald-50/50 border border-emerald-200 rounded-2xl text-xs text-emerald-900 font-medium cursor-not-allowed"
+                            className="block w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-900 font-medium cursor-not-allowed"
                             value={selectedBranch}
                             readOnly
                           />
@@ -476,27 +475,27 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                               control: (base: any, state: any) => ({
                                 ...base,
                                 minHeight: '48px',
-                                backgroundColor: 'rgba(249, 250, 251, 0.5)',
-                                borderRadius: '1rem',
+                                backgroundColor: '#f9fafb',
+                                borderRadius: '0.5rem',
                                 paddingLeft: '32px',
                                 fontSize: '0.75rem',
-                                borderColor: state.isFocused ? '#10b981' : '#e5e7eb',
-                                boxShadow: state.isFocused ? '0 0 0 4px rgba(16, 185, 129, 0.1)' : 'none',
+                                borderColor: state.isFocused ? '#111827' : '#e5e7eb',
+                                boxShadow: 'none',
                                 '&:hover': {
-                                  borderColor: state.isFocused ? '#10b981' : '#d1d5db'
+                                  borderColor: state.isFocused ? '#111827' : '#d1d5db'
                                 }
                               }),
                               menu: (base: any) => ({
                                 ...base,
-                                borderRadius: '1rem',
+                                borderRadius: '0.5rem',
                                 boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
                                 padding: '0.5rem',
                                 fontSize: '0.75rem'
                               }),
                               option: (base: any, state: any) => ({
                                 ...base,
-                                borderRadius: '0.75rem',
-                                backgroundColor: state.isSelected ? '#10b981' : state.isFocused ? '#f0fdf4' : 'transparent',
+                                borderRadius: '0.25rem',
+                                backgroundColor: state.isSelected ? '#111827' : state.isFocused ? '#f3f4f6' : 'transparent',
                                 color: state.isSelected ? 'white' : '#374151'
                               })
                             }}
@@ -516,9 +515,9 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.98 }}
                     disabled={loading || isFetchingBranches || (isSignUp && emailExists)}
-                    className={`w-full flex justify-center items-center gap-2 py-4 px-4 rounded-2xl text-xs font-bold text-white shadow-lg transition-all ${loading || isFetchingBranches || (isSignUp && emailExists)
+                    className={`w-full flex justify-center items-center gap-2 py-4 px-4 rounded-lg text-xs font-bold text-white shadow-lg transition-all ${loading || isFetchingBranches || (isSignUp && emailExists)
                       ? 'bg-gray-300 cursor-not-allowed shadow-none'
-                      : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20'
+                      : 'bg-gray-900 hover:bg-gray-800 shadow-gray-900/20'
                       }`}
                   >
                     {loading ? (
@@ -540,10 +539,10 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                 <button
                   type="button"
                   onClick={() => setIsSignUp(!isSignUp)}
-                  className="text-gray-500 text-xs font-medium hover:text-emerald-600 transition-colors"
+                  className="text-gray-500 text-xs font-medium hover:text-gray-900 transition-colors"
                 >
                   {isSignUp ? 'Already have an account?' : 'Need an account?'}
-                  <span className="ml-1 text-emerald-600 font-bold underline decoration-emerald-200 underline-offset-4">
+                  <span className="ml-1 text-gray-900 font-bold underline decoration-gray-200 underline-offset-4">
                     {isSignUp ? 'Sign In' : 'Apply Now'}
                   </span>
                 </button>
@@ -567,7 +566,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full relative"
+            className="bg-white p-8 rounded-lg shadow-2xl max-w-md w-full relative"
           >
             <div className="flex justify-between items-start mb-6">
               <div className="space-y-1">
@@ -595,7 +594,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                   <input
                     type="email"
                     required
-                    className="block w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500 transition-all"
+                    className="block w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-900 transition-all"
                     placeholder="name@company.com"
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
@@ -610,14 +609,14 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                     setShowForgotPassword(false);
                     setResetEmail('');
                   }}
-                  className="flex-1 py-3 px-4 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-semibold rounded-2xl transition-colors"
+                  className="flex-1 py-3 px-4 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-semibold rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={resetLoading}
-                  className="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-2xl shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-50"
+                  className="flex-1 py-3 px-4 bg-gray-900 hover:bg-gray-800 text-white text-xs font-bold rounded-lg shadow-lg shadow-gray-900/25 transition-all disabled:opacity-50"
                 >
                   {resetLoading ? 'Sending...' : 'Send Link'}
                 </button>
