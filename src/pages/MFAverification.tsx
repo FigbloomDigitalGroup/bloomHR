@@ -102,17 +102,10 @@ export default function MFAVerification() {
       if (redirectEmail && redirectUserId) {
         setEmail(redirectEmail);
         setUserId(redirectUserId);
-
-        const fallbackData = localStorage.getItem(`mfa_${redirectUserId}`);
-        if (fallbackData) {
-          // Fallback data exists but we don't need role/branch for logic
-        }
       } else {
-        // Fallback: Check for active session
         const initFromSession = async () => {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
-            console.log('Using active session for MFA');
             setEmail(session.user.email || '');
             setUserId(session.user.id);
             return true;
@@ -120,12 +113,10 @@ export default function MFAVerification() {
           return false;
         };
 
-        // Try to initialize from session, if fails then show error
         initFromSession().then((foundSession) => {
           if (!foundSession && !hasShownSessionError.current) {
             hasShownSessionError.current = true;
             toast.dismiss();
-            // Force sign out to break the MFA loop
             supabase.auth.signOut().finally(() => {
               sessionStorage.removeItem('isMFAProcess');
               navigate('/login', { replace: true });
@@ -135,33 +126,20 @@ export default function MFAVerification() {
       }
     }
 
-    setCountdown(30);
-    const countdownInterval = setInterval(() => {
-      setCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(countdownInterval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(countdownInterval);
-  }, []); // Empty dependency array - only run once on mount
+    // REMOVED: Premature countdown set here. It should only start after a successful send.
+  }, []);
 
   // Initial code send effect
   useEffect(() => {
-    // Only attempt to send if we have all necessary user identity data
-    // and aren't already in the middle of a send/verify operation
     if (userId && email && !isVerified && !loading && !resendLoading && !hasTriggeredInitialSend.current) {
       const sentFlag = `mfa_sent_${userId}`;
       const hasSentInitial = sessionStorage.getItem(sentFlag);
 
       if (!hasSentInitial) {
-        hasTriggeredInitialSend.current = true; // Mark as triggered immediately
+        hasTriggeredInitialSend.current = true;
 
-        // Add a small delay to ensure everything is stable before firing the first SMS
-        setTimeout(() => {
+        // Reduced delay for better UX, but keep enough for session stability
+        const timeoutId = setTimeout(() => {
           console.log('🚀 Triggering initial MFA code send for:', email);
           handleResendCode(true)
             .then(() => {
@@ -169,12 +147,14 @@ export default function MFAVerification() {
             })
             .catch((err) => {
               console.error('Failed initial send:', err);
-              hasTriggeredInitialSend.current = false; // Reset on failure to allow retry
+              hasTriggeredInitialSend.current = false;
             });
-        }, 1500);
+        }, 800);
+
+        return () => clearTimeout(timeoutId);
       }
     }
-  }, [userId, email]); // Only re-run if identity changes
+  }, [userId, email]);
 
   // Handle lockout timer
   useEffect(() => {
@@ -246,43 +226,39 @@ export default function MFAVerification() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-mfa-code`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          userId,
-          code: fullCode
-        }),
-      });
+      const { data, error } = await supabase
+        .from('mfa_codes')
+        .select('*')
+        .eq('email', email)
+        .eq('code', fullCode)
+        .eq('used', false)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      const result = await response.json();
+      if (error) throw error;
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Verification failed');
-      }
+      if (data) {
+        await supabase
+          .from('mfa_codes')
+          .update({ used: true })
+          .eq('id', data.id);
 
-      if (result.success) {
-        // CRITICAL: Set verification flags
         setIsVerified(true);
         sessionStorage.setItem('mfaVerified', 'true');
-        sessionStorage.setItem('mfaCompleted', 'true'); // Flag to prevent dashboard flash
+        sessionStorage.setItem('mfaCompleted', 'true');
         sessionStorage.setItem('mfaVerifiedUserId', userId);
         sessionStorage.setItem('mfaVerifiedTime', Date.now().toString());
 
-        // Clear security data
         localStorage.removeItem('mfaAttemptCount');
         localStorage.removeItem('mfaLockUntil');
         sessionStorage.removeItem('mfaData');
-        sessionStorage.removeItem('isMFAProcess'); // Clear MFA process flag
+        sessionStorage.removeItem('isMFAProcess');
         localStorage.removeItem(`mfa_${userId}`);
-
 
         toast.success('Verification successful!');
 
-        // CRITICAL: Use replace navigation to prevent back button issues
         setTimeout(() => {
           navigate('/dashboard', { replace: true });
         }, 1000);
@@ -298,7 +274,7 @@ export default function MFAVerification() {
           localStorage.setItem('mfaLockUntil', lockUntil.toString());
           toast.error('Too many failed attempts. Please try again in 5 minutes.');
         } else {
-          throw new Error(`Invalid verification code. ${5 - newAttemptCount} attempts remaining`);
+          throw new Error(`Invalid verification code or code expired. ${5 - newAttemptCount} attempts remaining`);
         }
       }
     } catch (error: any) {

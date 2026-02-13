@@ -87,7 +87,8 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     'titus1admin@mularcredit.co.ke',
     'ian3admin@mularcredit.co.ke',
     'collins2admin@mularcredit.co.ke',
-    'zira@zira.io'
+    'zira@zira.io',
+    'admin@malicash.co'
   ];
 
   const isAdminEmail = (email: string) => ADMIN_EMAILS.includes(email.toLowerCase());
