@@ -877,12 +877,8 @@ function App() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate, location.pathname, location.search, location.hash, searchParams, branches, clearAllTimers]);
-
-  // Reset navigation flag when location changes
-  useEffect(() => {
-    navigationHandled.current = false;
-  }, [location.pathname]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
