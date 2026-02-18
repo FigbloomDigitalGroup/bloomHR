@@ -4513,6 +4513,9 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
       const MPESA_API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? '/api' : "http://localhost:3001/api");
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
       const response = await fetch(`${MPESA_API_BASE}/mpesa/b2c`, {
         method: 'POST',
         headers: {
@@ -4524,7 +4527,8 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
           employeeNumber: employeeNumber,
           fullName: fullName
         }),
-      });
+        signal: controller.signal
+      }).finally(() => clearTimeout(timeoutId));
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -4631,10 +4635,8 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
     }
 
     // ── Duplicate phone number guard ──────────────────────────────────────────
-    // Build a map of phone → first employee who owns it.
-    // Any subsequent employee sharing the same number is a duplicate and gets skipped.
     const seenPhones = new Map<string, string>(); // phone → full_name of first owner
-    const duplicates: { name: string; phone: string; original: string }[] = [];
+    const duplicates: { id: string; name: string; phone: string; original: string }[] = [];
     const deduplicatedData: any[] = [];
 
     for (const advance of advancesData) {
@@ -4643,13 +4645,12 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       const phone = formatPhoneNumber(rawPhone); // normalise to 254xxxxxxxxx
 
       if (!phone) {
-        // No valid phone — let processMpesaPayment handle the error naturally
-        deduplicatedData.push(advance);
+        deduplicatedData.push(advance); // let downstream validation handle missing phone
         continue;
       }
 
       if (seenPhones.has(phone)) {
-        duplicates.push({ name: advance.full_name, phone, original: seenPhones.get(phone)! });
+        duplicates.push({ id: advance.id, name: advance.full_name, phone, original: seenPhones.get(phone)! });
         console.warn(`⚠️ Duplicate phone ${phone}: skipping ${advance.full_name} (same number as ${seenPhones.get(phone)})`);
       } else {
         seenPhones.set(phone, advance.full_name);
@@ -4657,13 +4658,29 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       }
     }
 
+    // Handle duplicates: Check for them, warn user, and REVERT their status from 'processing' to 'approved'
     if (duplicates.length > 0) {
       const names = duplicates.map(d => `${d.name} (same as ${d.original})`).join(', ');
+
       toast.error(
-        `⚠️ ${duplicates.length} duplicate phone number${duplicates.length > 1 ? 's' : ''} detected and skipped: ${names}`,
+        `Skipped ${duplicates.length} duplicate phone number${duplicates.length > 1 ? 's' : ''}: ${names}`,
         { duration: 8000 }
       );
-      console.warn('Skipped duplicates:', duplicates);
+
+      // Revert duplicate items' status back to 'approved' immediately so they aren't stuck processing
+      const duplicateIds = duplicates.map(d => d.id);
+      setApplications(prev => prev.map(a => duplicateIds.includes(a.id) ? { ...a, status: 'approved' } : a));
+
+      // We should also sync this reversion to DB just in case
+      const client = supabaseAdmin || supabase;
+      try {
+        await client
+          .from('salary_advance')
+          .update({ status: 'approved', admin_notes: 'Skipped: Duplicate Phone Number' })
+          .in('id', duplicateIds);
+      } catch (e) {
+        console.error('Failed to revert duplicate statuses', e);
+      }
     }
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -4675,7 +4692,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       try {
         console.log(`💰 Processing payment for ${advance.full_name}, amount: ${advance.amount_requested}`);
 
-        // Set status to processing locally
+        // Set status to processing locally (redundant if handleBulkPayment did it, but safe)
         setApplications(prev => prev.map(a => (a.id === advance.id) ? { ...a, status: 'processing' } : a));
 
         const result = await processMpesaPayment(
@@ -4695,7 +4712,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         );
 
         if (!updateSuccess) {
-          throw new Error('Failed to update application status');
+          throw new Error('Failed to update application status to paid');
         }
 
         // Update local state immediately to 'paid'
@@ -4708,6 +4725,21 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
       } catch (error: any) {
         console.error(`❌ Failed to pay ${advance.full_name}:`, error);
+
+        // Critical: Update status to 'failed' so it doesn't stay stuck in 'processing'
+        const client = supabaseAdmin || supabase;
+        try {
+          await client.from('salary_advance').update({
+            status: 'failed',
+            last_updated: new Date().toISOString(),
+            admin_notes: `Payment Failed: ${error.message}`
+          }).eq('id', advance.id);
+
+          setApplications(prev => prev.map(a => a.id === advance.id ? { ...a, status: 'failed' } : a));
+        } catch (dbError) {
+          console.error('Failed to update status to failed', dbError);
+        }
+
         toast.error(`Failed to pay ${advance.full_name}: ${error.message}`);
         return { success: false, advance, error };
       }
