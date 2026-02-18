@@ -7,7 +7,7 @@ import {
   CheckSquare, Square, ChevronLeft, ChevronRight, UserCheck, ShieldCheck,
   Eye, AlertTriangle, Loader, CheckCircle, XCircle as XCircleIcon,
   User, UserCog, Settings, MapPin, Filter, X, Edit3, DollarSign,
-  Crown, Key, Building, Map, Award, Smartphone, RefreshCw,
+  Crown, Key, Building, Map as MapIcon, Award, Smartphone, RefreshCw,
   Download, Upload, Calendar, Activity, TrendingUp,
   Banknote, Zap, ToggleLeft, ToggleRight, ShieldAlert, Sparkles
 } from 'lucide-react';
@@ -1570,7 +1570,7 @@ const UserRoleDisplay = ({ userRole, userEmail, actualRole, userTown, userRegion
       case 'checker': return <UserCheck className="w-4 h-4" />;
       case 'credit_analyst_officer': return <Crown className="w-4 h-4" />;
       case 'branch_manager': return <Building className="w-4 h-4" />;
-      case 'regional_manager': return <Map className="w-4 h-4" />;
+      case 'regional_manager': return <MapIcon className="w-4 h-4" />;
       default: return <User className="w-4 h-4" />;
     }
   };
