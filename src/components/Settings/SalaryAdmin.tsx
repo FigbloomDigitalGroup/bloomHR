@@ -4637,7 +4637,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
     // ── Duplicate phone number guard (Monthly Scope) ─────────────────────────
     // Key format: "PHONE_YYYY-MM"
     // This allows same phone number in different months, but blocks duplicates within same month.
-    const seenKeys = new Map(); // key (phone_YYYY-MM) → full_name of first owner
+    const seenKeys: Record<string, string> = {}; // key (phone_YYYY-MM) → full_name of first owner
     const duplicates: { id: string; name: string; phone: string; original: string; date: string }[] = [];
     const deduplicatedData: any[] = [];
 
@@ -4655,7 +4655,6 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       if (advance.time_added) {
         try {
           const d = new Date(advance.time_added);
-          // Format: 2026-02
           monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         } catch (e) { console.error('Invalid date', e); }
       }
@@ -4663,17 +4662,17 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       // Unique Key: PHONE + MONTH
       const uniqueKey = `${phone}_${monthKey}`;
 
-      if (seenKeys.has(uniqueKey) && monthKey !== 'UNKNOWN') {
+      if (uniqueKey in seenKeys && monthKey !== 'UNKNOWN') {
         duplicates.push({
           id: advance.id,
           name: advance.full_name,
           phone,
-          original: seenKeys.get(uniqueKey)!,
+          original: seenKeys[uniqueKey],
           date: monthKey
         });
         console.warn(`⚠️ Duplicate phone ${phone} in month ${monthKey}: skipping ${advance.full_name}`);
       } else {
-        seenKeys.set(uniqueKey, advance.full_name);
+        seenKeys[uniqueKey] = advance.full_name;
         deduplicatedData.push(advance);
       }
     }
