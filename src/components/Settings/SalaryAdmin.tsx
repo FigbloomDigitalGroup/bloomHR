@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { motion, AnimatePresence } from 'framer-motion';
+import { supabase, supabaseAdmin } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import {
   CheckCircle2, XCircle, Clock, Search, ChevronDown, Send, Users,
@@ -8,7 +9,7 @@ import {
   User, UserCog, Settings, MapPin, Filter, X, Edit3, DollarSign,
   Crown, Key, Building, Map, Award, Smartphone, RefreshCw,
   Download, Upload, Calendar, Activity, TrendingUp,
-  Banknote
+  Banknote, Zap, ToggleLeft, ToggleRight, ShieldAlert, Sparkles
 } from 'lucide-react';
 import {
   AreaChart,
@@ -1291,7 +1292,8 @@ const RecommendationModal = ({
   onConfirm,
   application,
   actionType,
-  currentAmount
+  currentAmount,
+  adminBypassMode
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -1299,6 +1301,7 @@ const RecommendationModal = ({
   application: any;
   actionType: string;
   currentAmount: number | null;
+  adminBypassMode?: boolean;
 }) => {
   const [notes, setNotes] = useState('');
   const [adjustedAmount, setAdjustedAmount] = useState(currentAmount?.toString() || '');
@@ -1315,7 +1318,7 @@ const RecommendationModal = ({
   }, [actionType, currentAmount]);
 
   const handleConfirm = () => {
-    if (!notes.trim()) {
+    if (!notes.trim() && !adminBypassMode) {
       toast.error('Please provide notes for your recommendation');
       return;
     }
@@ -1417,7 +1420,7 @@ const RecommendationModal = ({
 
         <div className="mb-4">
           <label className="block text-xs font-medium text-gray-700 mb-2">
-            Recommendation Notes <span className="text-red-500">*</span>
+            Recommendation Notes {adminBypassMode ? '(Optional)' : <span className="text-red-500">*</span>}
           </label>
           <textarea
             value={notes}
@@ -1437,7 +1440,7 @@ const RecommendationModal = ({
           </button>
           <button
             onClick={handleConfirm}
-            disabled={!notes.trim() || (showAmountField && (!adjustedAmount || isNaN(Number(adjustedAmount))))}
+            disabled={(!adminBypassMode && !notes.trim()) || (showAmountField && (!adjustedAmount || isNaN(Number(adjustedAmount))))}
             className="px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Submit Recommendation
@@ -1445,6 +1448,95 @@ const RecommendationModal = ({
         </div>
       </div>
     </div>
+  );
+};
+
+// Custom Bypass Confirmation Modal
+const BypassConfirmModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  application,
+  isLoading
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  application: any;
+  isLoading: boolean;
+}) => {
+  if (!isOpen || !application) return null;
+
+  return (
+    <AnimatePresence>
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: 20 }}
+          className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden"
+        >
+          <div className="p-8">
+            <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mb-6 mx-auto">
+              <Zap className="w-8 h-8 text-green-600 fill-green-600" />
+            </div>
+
+            <h3 className="text-xl font-bold text-gray-900 text-center mb-2">
+              Bypass & Pay Now?
+            </h3>
+
+            <p className="text-gray-500 text-center text-sm mb-8">
+              You are about to bypass the standard approval workflow for
+              <span className="font-bold text-gray-900 ml-1">{application["Full Name"]}</span>.
+              The payment of <span className="font-bold text-green-700">KSh {Number(application["Amount Requested"]).toLocaleString()}</span> will be processed immediately.
+            </p>
+
+            <div className="bg-gray-50 rounded-2xl p-4 mb-8">
+              <div className="flex justify-between text-xs mb-2">
+                <span className="text-gray-500">Employee No:</span>
+                <span className="font-medium text-gray-900">{application["Employee Number"]}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500">Action:</span>
+                <span className="font-medium text-green-600">Auto-Approve & Pay</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={onConfirm}
+                disabled={isLoading}
+                className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-green-200 flex items-center justify-center gap-2 group disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <Loader className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <Banknote className="w-5 h-5" />
+                    Confirm & Send Payment
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={onClose}
+                disabled={isLoading}
+                className="w-full py-4 bg-white hover:bg-gray-50 text-gray-500 rounded-2xl font-bold transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-amber-50 px-8 py-3 flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-amber-600" />
+            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">
+              High Authority Action
+            </span>
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>
   );
 };
 
@@ -3213,7 +3305,8 @@ const BulkPaymentModal = ({
   isBranchManagerMap,
   justification,
   onJustificationChange,
-  userRole
+  userRole,
+  adminBypassMode
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -3229,6 +3322,7 @@ const BulkPaymentModal = ({
   justification: string;
   onJustificationChange: (justification: string) => void;
   userRole: string;
+  adminBypassMode?: boolean;
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
@@ -3255,9 +3349,12 @@ const BulkPaymentModal = ({
     return appDate.getMonth() === now.getMonth() && appDate.getFullYear() === now.getFullYear();
   };
 
-  const fullyApprovedApplications = applications.filter(app =>
-    app.status?.toLowerCase() === 'approved' && isCurrentMonth(app)
-  );
+  const fullyApprovedApplications = applications.filter(app => {
+    const status = app.status?.toLowerCase();
+    const isApproved = status === 'approved';
+    const isBonus = adminBypassMode && !['paid', 'rejected', 'processing'].includes(status);
+    return (isApproved || isBonus) && isCurrentMonth(app);
+  });
 
   const filteredApplications = fullyApprovedApplications.filter(app => {
     const matchesSearch =
@@ -3451,7 +3548,7 @@ const BulkPaymentModal = ({
           <button
             onClick={onProcess}
             className="px-4 py-2 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 flex items-center gap-2"
-            disabled={isLoading || getSelectedStaffCount() === 0 || !justification.trim()}
+            disabled={isLoading || getSelectedStaffCount() === 0 || (!adminBypassMode && !justification.trim())}
           >
             {isLoading ? (
               <>
@@ -3503,6 +3600,14 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   const [employeeMobileNumbers, setEmployeeMobileNumbers] = useState<Record<string, string>>({});
   const [selectedStaff, setSelectedStaff] = useState<Record<string, boolean>>({});
   const [justification, setJustification] = useState('');
+
+  // Custom Modal States
+  const [showBypassConfirmModal, setShowBypassConfirmModal] = useState(false);
+  const [selectedAppForBypass, setSelectedAppForBypass] = useState<any>(null);
+  const [isBypassLoading, setIsBypassLoading] = useState(false);
+
+  // Admin Bypass Mode
+  const [adminBypassMode, setAdminBypassMode] = useState(false);
 
 
   const [allTownsState, setAllTownsState] = useState<string[]>([]);
@@ -3613,7 +3718,8 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         updateData.admin_rejection_date = new Date().toISOString();
       }
 
-      const { error } = await supabase
+      const client = supabaseAdmin || supabase;
+      const { error } = await client
         .from('salary_advance')
         .update(updateData)
         .eq('id', applicationId);
@@ -4530,6 +4636,10 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       try {
         console.log(`💰 Processing payment for ${advance.full_name}, amount: ${advance.amount_requested}`);
 
+        // Set status to processing locally to hide all action buttons immediately
+        const targetId = advance.id;
+        setApplications(prev => prev.map(a => (a.id === targetId) ? { ...a, status: 'processing' } : a));
+
         const result = await processMpesaPayment(
           advance.employee_number,
           advance.amount_requested,
@@ -4551,6 +4661,9 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         if (!updateSuccess) {
           throw new Error('Failed to update application status');
         }
+
+        // Update local state immediately to prevent visual duplication
+        setApplications(prev => prev.map(a => a.id === advance.id ? { ...a, status: 'paid' } : a));
 
         console.log(`✅ Successfully updated ${advance.full_name} status to 'paid'`);
         toast.success(`Payment sent to ${advance.full_name} and status updated to Paid`);
@@ -4688,6 +4801,26 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       }
 
       toast.success('Payment request rejected');
+
+      // Restore application statuses from 'processing' back to their likely previous state 'approved'
+      // Since they were in a bulk payment flow, they were eligible for payment
+      try {
+        const advances = payment.advances_data || payment.advances || [];
+        const advanceIds = advances.map((a: any) => a.id).filter(Boolean);
+
+        if (advanceIds.length > 0) {
+          await supabase
+            .from('salary_advance')
+            .update({ status: 'approved', last_updated: new Date().toISOString() })
+            .in('id', advanceIds);
+
+          fetchApplications();
+        }
+      } catch (restoreError) {
+        console.error('Error restoring application statuses:', restoreError);
+      }
+
+      fetchPaymentRequests();
     } catch (error) {
       console.error('Payment rejection error:', error);
       toast.error('Failed to reject payment request');
@@ -4695,14 +4828,22 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   };
 
   const handleBulkPayment = async () => {
-    const selectedApps = getFullyApprovedApplications().filter((app: any) => selectedStaff[app.id]);
+    // Determine eligible apps based on bypass mode
+    const eligibleApps = applications.filter(app => {
+      const status = app.status?.toLowerCase();
+      const isApproved = status === 'approved';
+      const isBonus = adminBypassMode && !['paid', 'rejected', 'processing'].includes(status);
+      return (isApproved || isBonus) && isCurrentMonth(app);
+    });
+
+    const selectedApps = eligibleApps.filter((app: any) => selectedStaff[app.id]);
 
     if (selectedApps.length === 0) {
       toast.error('No staff members selected for payment');
       return;
     }
 
-    if (!justification.trim()) {
+    if (!justification.trim() && !adminBypassMode) {
       toast.error('Please provide justification for the payment request');
       return;
     }
@@ -4721,13 +4862,31 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
     if (userRole === 'maker') {
       try {
         await createPaymentRequest(advancesData, justification);
+
+        // Update all selected applications to 'processing' status to prevent double actions
+        const client = supabaseAdmin || supabase;
+        const updatePromises = selectedApps.map(async (app: any) => {
+          // Update DB
+          await client
+            .from('salary_advance')
+            .update({ status: 'processing', last_updated: new Date().toISOString(), admin_notes: justification || 'In Payment Flow' })
+            .eq('id', app.id);
+
+          return app.id;
+        });
+
+        await Promise.all(updatePromises);
+
+        // Update local state immediately
+        const selectedIds = selectedApps.map((a: any) => a.id);
+        setApplications(prev => prev.map(a => selectedIds.includes(a.id) ? { ...a, status: 'processing' } : a));
+
         toast.success('Payment request submitted for approval!');
 
         setSelectedStaff({});
         setJustification('');
         setShowBulkPaymentModal(false);
         fetchPaymentRequests();
-
       } catch (error: any) {
         console.error('Error creating payment request:', error);
         toast.error('Failed to submit payment request');
@@ -4735,7 +4894,36 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
     }
     else if (userRole === 'checker' || userRole === 'credit_analyst_officer') {
       setIsProcessingBulkPayment(true);
+
+      // Update local state AND DB for ALL selected applications immediately to 'processing'
+      // This locks the UI and prevents double actions while the loop runs
+      const selectedIds = selectedApps.map((a: any) => a.id);
+      setApplications(prev => prev.map(a => selectedIds.includes(a.id) ? { ...a, status: 'processing' } : a));
+
       try {
+        const client = supabaseAdmin || supabase;
+        // Sync 'processing' status to DB immediately
+        await client
+          .from('salary_advance')
+          .update({ status: 'processing', last_updated: new Date().toISOString() })
+          .in('id', selectedIds);
+
+        // Handle Auto-Approval for Bypass Mode
+        if (adminBypassMode) {
+          for (const app of selectedApps) {
+            if (app.status?.toLowerCase() !== 'approved') {
+              // Update status to approved first
+              await updateApplicationStatus(app.id, 'approved', {
+                admin_approval: true,
+                admin_approval_date: new Date().toISOString(),
+                approved_by: currentUser?.id,
+                approved_by_email: currentUser?.email,
+                admin_notes: justification || 'Admin Bypass Approval'
+              });
+            }
+          }
+        }
+
         const results = await processBulkMpesaPayment(advancesData);
 
         const successCount = results.filter((r: any) => r.success).length;
@@ -4767,6 +4955,75 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
     }
   };
 
+  const handleIndividualBypassPayment = async (app: any) => {
+    if (!isAdmin || !adminBypassMode) return;
+    setSelectedAppForBypass(app);
+    setShowBypassConfirmModal(true);
+  };
+
+  const executeIndividualBypassPayment = async () => {
+    const app = selectedAppForBypass;
+    if (!app) return;
+
+    // Set status to processing locally AND in DB to hide all action buttons immediately
+    const targetId = app.id;
+    console.log('⚡ Starting bypass payment for ID:', targetId);
+    setApplications(prev => prev.map(a => (a.id === targetId) ? { ...a, status: 'processing' } : a));
+
+    try {
+      const client = supabaseAdmin || supabase;
+      // Sync 'processing' status to DB immediately
+      await client
+        .from('salary_advance')
+        .update({ status: 'processing', last_updated: new Date().toISOString() })
+        .eq('id', targetId);
+
+      setIsBypassLoading(true);
+      // 1. Auto-approve if not already approved
+      if (app.status?.toLowerCase() !== 'approved') {
+        const approved = await updateApplicationStatus(app.id, 'approved', {
+          admin_approval: true,
+          admin_approval_date: new Date().toISOString(),
+          approved_by: currentUser?.id,
+          approved_by_email: currentUser?.email,
+          admin_notes: 'Individual Admin Bypass Approval & Payment'
+        });
+        if (!approved) throw new Error("Auto-approval failed");
+      }
+
+      // 2. Process Payment
+      const result = await processMpesaPayment(
+        app["Employee Number"],
+        Number(app["Amount Requested"]),
+        app["Full Name"]
+      );
+
+      if (result.success) {
+        // Update local state immediately to prevent visual duplication
+        setApplications(prev => prev.map(a => a.id === app.id ? { ...a, status: 'paid' } : a));
+
+        // 3. Update to Paid
+        await updateApplicationStatus(app.id, 'paid', {
+          mpesa_transaction_id: result.transactionId || `MPESA_${Date.now()}`,
+          mpesa_result_desc: result.message || 'Payment processed via Admin Bypass'
+        });
+        toast.success(`Payment to ${app["Full Name"]} successful!`);
+        setShowBypassConfirmModal(false);
+      } else {
+        throw new Error(result.message || "Payment failed");
+      }
+
+      await fetchApplications();
+    } catch (error: any) {
+      console.error('Bypass payment error:', error);
+      toast.error(`Bypass payment failed: ${error.message}`);
+      // Re-fetch to clear 'processing' status on error
+      await fetchApplications();
+    } finally {
+      setIsBypassLoading(false);
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'approved':
@@ -4788,6 +5045,10 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
     if (app.status?.toLowerCase() === 'rejected') {
       return 'Rejected';
+    }
+
+    if (app.status?.toLowerCase() === 'processing') {
+      return 'Processing Payment...';
     }
 
     if (app.status?.toLowerCase() === 'approved') {
@@ -4839,6 +5100,8 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
   const getApprovalBadgeColor = (status: string) => {
     switch (status) {
+      case 'Processing Payment...':
+        return 'bg-amber-100 text-amber-800 animate-pulse';
       case 'Fully Approved':
         return 'bg-green-100 text-green-800';
       case 'Pending Admin Approval':
@@ -4872,10 +5135,13 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   const canBranchManagerApprove = (app: any) => {
     if (!isBranchManager) return false;
 
+    // Lock actions if in terminal/processing/approved states, or if selected for payment, or if bypass mode is on
+    const status = app.status?.toLowerCase();
+    const isSelectedForPayment = selectedStaff[app.id];
+    if (['paid', 'rejected', 'processing', 'approved', 'fully approved'].includes(status) || isSelectedForPayment || adminBypassMode) return false;
+
     const isSelfApproval = checkIfSelfApproval(app);
-
     const isEmployeeBranchManager = isBranchManagerMap[app["Employee Number"]] || false;
-
     const hasBranchApproval = app.branch_manager_approval;
 
     return !isSelfApproval && !isEmployeeBranchManager && !hasBranchApproval;
@@ -4885,11 +5151,15 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   const canRegionalManagerApprove = (app: any) => {
     if (!isRegionalManager && !isAdmin) return false;
 
+    // Lock actions if in terminal/processing/approved states, or if selected for payment, or if bypass mode is on
+    const status = app.status?.toLowerCase();
+    const isSelectedForPayment = selectedStaff[app.id];
+    if (['paid', 'rejected', 'processing', 'approved', 'fully approved'].includes(status) || isSelectedForPayment || adminBypassMode) return false;
+
     const isEmployeeBranchManager = isBranchManagerMap[app["Employee Number"]] || false;
     const canApproveThisUser = isAdmin || isEmployeeBranchManager;
 
     const isSelfApproval = checkIfSelfApproval(app);
-
     const hasRegionalApproval = app.regional_manager_approval;
 
     return canApproveThisUser && !isSelfApproval && !hasRegionalApproval;
@@ -4899,6 +5169,11 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   const canRegionalManagerComment = (app: any) => {
     if (!isRegionalManager) return false;
 
+    // Lock actions if in terminal/processing/approved states, or if selected for payment, or if bypass mode is on
+    const status = app.status?.toLowerCase();
+    const isSelectedForPayment = selectedStaff[app.id];
+    if (['paid', 'rejected', 'processing', 'approved', 'fully approved'].includes(status) || isSelectedForPayment || adminBypassMode) return false;
+
     const isEmployeeBranchManager = isBranchManagerMap[app["Employee Number"]] || false;
     const hasBranchApproval = app.branch_manager_approval;
 
@@ -4906,8 +5181,14 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   };
 
   // Check if admin can approve this application
+  // Check if admin can approve this application
   const canAdminApprove = (app: any) => {
     if (!isAdmin) return false;
+
+    // Lock actions if in terminal/processing/approved states, or if selected for payment, or if bypass mode is on
+    const status = app.status?.toLowerCase();
+    const isSelectedForPayment = selectedStaff[app.id];
+    if (['paid', 'rejected', 'processing', 'approved', 'fully approved'].includes(status) || isSelectedForPayment || adminBypassMode) return false;
 
     return app.status === 'pending-admin';
   };
@@ -5461,6 +5742,52 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                   <img src='stats.png' className='w-5'></img>
                   Import
                 </button>
+
+                {/* Redesigned Admin Bypass Toggle */}
+                {isAdmin && (
+                  <div className="flex items-center gap-3 px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-1.5">
+                        <motion.div
+                          animate={{
+                            scale: adminBypassMode ? [1, 1.2, 1] : 1,
+                            rotate: adminBypassMode ? [0, 15, -15, 0] : 0
+                          }}
+                          transition={{ duration: 0.5, repeat: adminBypassMode ? Infinity : 0, repeatDelay: 3 }}
+                        >
+                          <ShieldAlert className={`w-4 h-4 ${adminBypassMode ? 'text-green-600' : 'text-gray-400'}`} />
+                        </motion.div>
+                        <span className={`text-xs font-bold whitespace-nowrap ${adminBypassMode ? 'text-green-700' : 'text-gray-600'}`}>
+                          Bypass System
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setAdminBypassMode(!adminBypassMode)}
+                      className="relative flex items-center group focus:outline-none"
+                    >
+                      <div className={`w-12 h-6 rounded-full transition-colors duration-300 shadow-inner ${adminBypassMode ? 'bg-green-600' : 'bg-gray-200'
+                        }`} />
+
+                      <motion.div
+                        className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-lg flex items-center justify-center"
+                        animate={{ x: adminBypassMode ? 24 : 0 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      >
+                        {adminBypassMode && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="w-2 h-2 bg-green-600 rounded-full"
+                          />
+                        )}
+                      </motion.div>
+
+                      {/* Sparkle effect removed */}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* User Role Display */}
@@ -5909,6 +6236,22 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                   </div>
                                 )}
 
+                                {/* Individual Bypass & Pay Action */}
+                                {isAdmin && adminBypassMode && !['paid', 'rejected', 'processing', 'approved', 'fully approved'].includes(app.status?.toLowerCase()) && !selectedStaff[app.id] && (
+                                  <motion.button
+                                    whileHover={{ scale: 1.05, x: 5 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    disabled={isLoading || isBypassLoading}
+                                    onClick={() => handleIndividualBypassPayment(app)}
+                                    className="group relative overflow-hidden text-green-700 text-[11px] border border-green-200 px-3 py-1.5 rounded-lg bg-gradient-to-r from-green-50 to-white flex items-center gap-2 mt-1 font-bold shadow-sm hover:shadow-green-100 hover:border-green-300 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    <div className="absolute inset-0 bg-green-600 opacity-0 group-hover:opacity-[0.03] transition-opacity duration-300" />
+                                    <Zap className="w-3.5 h-3.5 text-green-600 fill-green-200 group-hover:fill-green-600 transition-colors duration-300" />
+                                    <span className="relative">Bypass & Pay Now</span>
+                                    <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 -ml-1 group-hover:ml-0 transition-all duration-300" />
+                                  </motion.button>
+                                )}
+
                                 {/* Self-approval warning */}
                                 {checkIfSelfApproval(app) && !['paid', 'rejected'].includes(app.status?.toLowerCase()) && (
                                   <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200">
@@ -5922,6 +6265,13 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                   <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200 flex items-center gap-1">
                                     <CheckCircle className="w-3 h-3" />
                                     Payment Processed
+                                  </span>
+                                )}
+
+                                {app.status?.toLowerCase() === 'processing' && (
+                                  <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200 flex items-center gap-1 animate-pulse">
+                                    <Loader className="w-3 h-3 animate-spin" />
+                                    Processing Payment...
                                   </span>
                                 )}
 
@@ -6108,6 +6458,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
             justification={justification}
             onJustificationChange={setJustification}
             userRole={userRole}
+            adminBypassMode={adminBypassMode}
           />
 
           {/* Payment Details Modal */}
@@ -6145,6 +6496,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
             application={selectedApplication}
             actionType={recommendationAction}
             currentAmount={selectedApplication?.["Amount Requested"]}
+            adminBypassMode={adminBypassMode}
           />
 
           {/* Comment Modal */}
@@ -6170,6 +6522,14 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
             onClose={() => setShowImportModal(false)}
             onImport={handleImport}
             isLoading={isImporting}
+          />
+          {/* Custom Bypass Confirmation Modal */}
+          <BypassConfirmModal
+            isOpen={showBypassConfirmModal}
+            onClose={() => setShowBypassConfirmModal(false)}
+            onConfirm={executeIndividualBypassPayment}
+            application={selectedAppForBypass}
+            isLoading={isBypassLoading}
           />
         </div>
       ) : activeTab === 'callbacks' ? (
