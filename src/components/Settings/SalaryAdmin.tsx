@@ -4630,23 +4630,59 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       throw new Error('Makers are not authorized to process payments directly');
     }
 
-    const results = [];
+    // ── Duplicate phone number guard ──────────────────────────────────────────
+    // Build a map of phone → first employee who owns it.
+    // Any subsequent employee sharing the same number is a duplicate and gets skipped.
+    const seenPhones = new Map<string, string>(); // phone → full_name of first owner
+    const duplicates: { name: string; phone: string; original: string }[] = [];
+    const deduplicatedData: any[] = [];
 
     for (const advance of advancesData) {
+      // Resolve the formatted phone the same way processMpesaPayment would
+      const rawPhone = advance.mobile_number || (employeeMobileNumbers as any)[advance.employee_number] || '';
+      const phone = formatPhoneNumber(rawPhone); // normalise to 254xxxxxxxxx
+
+      if (!phone) {
+        // No valid phone — let processMpesaPayment handle the error naturally
+        deduplicatedData.push(advance);
+        continue;
+      }
+
+      if (seenPhones.has(phone)) {
+        duplicates.push({ name: advance.full_name, phone, original: seenPhones.get(phone)! });
+        console.warn(`⚠️ Duplicate phone ${phone}: skipping ${advance.full_name} (same number as ${seenPhones.get(phone)})`);
+      } else {
+        seenPhones.set(phone, advance.full_name);
+        deduplicatedData.push(advance);
+      }
+    }
+
+    if (duplicates.length > 0) {
+      const names = duplicates.map(d => `${d.name} (same as ${d.original})`).join(', ');
+      toast.error(
+        `⚠️ ${duplicates.length} duplicate phone number${duplicates.length > 1 ? 's' : ''} detected and skipped: ${names}`,
+        { duration: 8000 }
+      );
+      console.warn('Skipped duplicates:', duplicates);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const results: any[] = [];
+    const BATCH_SIZE = 5; // Process 5 payments concurrently to speed up bulk operations
+
+    // Helper to process a single payment
+    const processSinglePayment = async (advance: any) => {
       try {
         console.log(`💰 Processing payment for ${advance.full_name}, amount: ${advance.amount_requested}`);
 
-        // Set status to processing locally to hide all action buttons immediately
-        const targetId = advance.id;
-        setApplications(prev => prev.map(a => (a.id === targetId) ? { ...a, status: 'processing' } : a));
+        // Set status to processing locally
+        setApplications(prev => prev.map(a => (a.id === advance.id) ? { ...a, status: 'processing' } : a));
 
         const result = await processMpesaPayment(
           advance.employee_number,
           advance.amount_requested,
           advance.full_name
         );
-
-        results.push({ success: true, advance, result });
 
         // Use the enhanced status update function
         const updateSuccess = await updateApplicationStatus(
@@ -4662,23 +4698,39 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
           throw new Error('Failed to update application status');
         }
 
-        // Update local state immediately to prevent visual duplication
+        // Update local state immediately to 'paid'
         setApplications(prev => prev.map(a => a.id === advance.id ? { ...a, status: 'paid' } : a));
 
         console.log(`✅ Successfully updated ${advance.full_name} status to 'paid'`);
-        toast.success(`Payment sent to ${advance.full_name} and status updated to Paid`);
+        toast.success(`Payment sent to ${advance.full_name}`);
 
-      } catch (error) {
+        return { success: true, advance, result };
+
+      } catch (error: any) {
         console.error(`❌ Failed to pay ${advance.full_name}:`, error);
-        results.push({ success: false, advance, error });
         toast.error(`Failed to pay ${advance.full_name}: ${error.message}`);
+        return { success: false, advance, error };
       }
+    };
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
+    // Process deduplicated list in batches
+    for (let i = 0; i < deduplicatedData.length; i += BATCH_SIZE) {
+      const batch = deduplicatedData.slice(i, i + BATCH_SIZE);
+      console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(deduplicatedData.length / BATCH_SIZE)} (${batch.length} items)`);
+
+      const batchPromises = batch.map(advance => processSinglePayment(advance));
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+
+      // Small delay to yield to main thread (UI responsiveness) and avoid hitting rate limits too hard
+      if (i + BATCH_SIZE < deduplicatedData.length) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
     }
 
     return results;
   };
+
 
   // Approve payment request function
   const approvePayment = async (payment) => {

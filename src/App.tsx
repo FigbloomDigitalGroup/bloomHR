@@ -472,7 +472,7 @@ function App() {
 
     hasShownWelcomeToast.current = true;
 
-    // Check if MFA is enabled in system settings before triggering MFA flow
+    // For CHECKER and ADMIN, check if MFA is enabled in DB before triggering MFA flow
     if (role === 'CHECKER' || role === 'ADMIN') {
       try {
         const { data: settingsData } = await supabase
@@ -481,10 +481,7 @@ function App() {
           .eq('id', 1)
           .single();
 
-        const mfaEnabled = settingsData?.mfa_enabled ?? false;
-
-        if (mfaEnabled) {
-          // MFA is ON — redirect to verification page
+        if (settingsData?.mfa_enabled) {
           sessionStorage.setItem('isMFAProcess', 'true');
           const mfaData = {
             userId: userData.id,
@@ -496,7 +493,7 @@ function App() {
           navigate(`/mfa?email=${encodeURIComponent(userData.email)}&userId=${userData.id}&role=${role}`, { replace: true });
           return;
         }
-        // MFA is OFF — fall through to normal navigation
+        // MFA disabled — fall through to normal navigation
       } catch (e) {
         console.error('Failed to check MFA setting, skipping MFA:', e);
         // On error, skip MFA to avoid locking users out
@@ -508,8 +505,6 @@ function App() {
       navigate(targetPath, { replace: true });
     }, 100);
   }, [navigate, handleTownChange]);
-
-
 
   // Handle email confirmation redirect
   useEffect(() => {
@@ -812,42 +807,39 @@ function App() {
           const currentPath = location.pathname;
           const publicPaths = ['/login', '/update-password', '/mfa'];
 
-          // Check if MFA is required for this user AND enabled in settings
-          const roleRequiresMFA = userData.role === 'ADMIN' || userData.role === 'CHECKER';
+          // Check if MFA is required for this user
+          const requiresMFA = userData.role === 'ADMIN' || userData.role === 'CHECKER';
           const mfaCompleted = sessionStorage.getItem('mfaCompleted') === 'true';
 
-          if (roleRequiresMFA && !mfaCompleted) {
-            // Check DB setting before redirecting
-            try {
-              const { data: settingsData } = await supabase
-                .from('system_settings')
-                .select('mfa_enabled')
-                .eq('id', 1)
-                .single();
+          // If MFA is in progress, prevent welcome toast and ensure we are on MFA page
+          // Also handle race condition where isMFAProcess might not be set yet but role requires it
+          if (requiresMFA && !mfaCompleted) {
+            console.log('MFA required for', userData.role, '- redirecting to MFA');
 
-              const mfaEnabled = settingsData?.mfa_enabled ?? false;
-
-              if (mfaEnabled) {
-                console.log('MFA required for', userData.role, '- redirecting to MFA');
-                if (location.pathname !== '/mfa') {
-                  navigate('/mfa', { replace: true });
-                }
-                return; // Exit early — no welcome toast, no dashboard
-              }
-            } catch (e) {
-              console.error('Failed to check MFA setting in auth handler, skipping MFA:', e);
+            if (location.pathname !== '/mfa') {
+              navigate('/mfa', { replace: true });
             }
+            return; // Exit early, do not show welcome toast or navigate to dashboard
           }
+
 
           // Show welcome toast only if not in MFA process
           toast.success(`Welcome back, ${userData.email}!`);
 
           if (publicPaths.includes(currentPath)) {
-            const targetPath = userData.role === 'STAFF' ? '/staff' : '/dashboard';
-            navigate(targetPath, { replace: true });
+            // If MFA is required but not completed, stay on current page (should be /mfa)
+            if (requiresMFA && !mfaCompleted) {
+              console.log('MFA required but not completed, staying on MFA page');
+              if (currentPath !== '/mfa') {
+                navigate('/mfa', { replace: true });
+              }
+            } else {
+              // Normal navigation for non-MFA users or MFA-completed users
+              const targetPath = userData.role === 'STAFF' ? '/staff' : '/dashboard';
+              navigate(targetPath, { replace: true });
+            }
           }
         }
-
       } else {
         setUser(null);
         setSelectedTown('');
@@ -877,8 +869,12 @@ function App() {
     return () => {
       subscription.unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [navigate, location.pathname, location.search, location.hash, searchParams, branches, clearAllTimers]);
+
+  // Reset navigation flag when location changes
+  useEffect(() => {
+    navigationHandled.current = false;
+  }, [location.pathname]);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 

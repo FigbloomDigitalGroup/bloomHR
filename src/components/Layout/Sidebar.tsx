@@ -235,11 +235,9 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                   ).map((item) => {
                     const isActive = currentPath.startsWith(item.path);
 
-                    if (permissionsLoading) {
-                      return null;
-                    }
-
-                    if (item.permission && !hasPermission(item.permission)) return null;
+                    // While permissions are loading, show all items (avoid blank sidebar flash)
+                    // Once loaded, hide items the user doesn't have access to
+                    if (!permissionsLoading && item.permission && !hasPermission(item.permission)) return null;
 
                     return (
                       <motion.button
