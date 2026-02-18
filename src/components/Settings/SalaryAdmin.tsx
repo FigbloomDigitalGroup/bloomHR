@@ -4637,7 +4637,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
     // ── Duplicate phone number guard (Monthly Scope) ─────────────────────────
     // Key format: "PHONE_YYYY-MM"
     // This allows same phone number in different months, but blocks duplicates within same month.
-    const seenKeys = new Map<string, string>(); // key → full_name of first owner
+    const seenKeys = new Map(); // key (phone_YYYY-MM) → full_name of first owner
     const duplicates: { id: string; name: string; phone: string; original: string; date: string }[] = [];
     const deduplicatedData: any[] = [];
 
