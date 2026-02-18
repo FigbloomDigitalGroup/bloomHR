@@ -4634,36 +4634,56 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       throw new Error('Makers are not authorized to process payments directly');
     }
 
-    // ── Duplicate phone number guard ──────────────────────────────────────────
-    const seenPhones = new Map<string, string>(); // phone → full_name of first owner
-    const duplicates: { id: string; name: string; phone: string; original: string }[] = [];
+    // ── Duplicate phone number guard (Monthly Scope) ─────────────────────────
+    // Key format: "PHONE_YYYY-MM"
+    // This allows same phone number in different months, but blocks duplicates within same month.
+    const seenKeys = new Map<string, string>(); // key → full_name of first owner
+    const duplicates: { id: string; name: string; phone: string; original: string; date: string }[] = [];
     const deduplicatedData: any[] = [];
 
     for (const advance of advancesData) {
-      // Resolve the formatted phone the same way processMpesaPayment would
       const rawPhone = advance.mobile_number || (employeeMobileNumbers as any)[advance.employee_number] || '';
-      const phone = formatPhoneNumber(rawPhone); // normalise to 254xxxxxxxxx
+      const phone = formatPhoneNumber(rawPhone);
 
       if (!phone) {
-        deduplicatedData.push(advance); // let downstream validation handle missing phone
+        deduplicatedData.push(advance); // let downstream handle missing phone
         continue;
       }
 
-      if (seenPhones.has(phone)) {
-        duplicates.push({ id: advance.id, name: advance.full_name, phone, original: seenPhones.get(phone)! });
-        console.warn(`⚠️ Duplicate phone ${phone}: skipping ${advance.full_name} (same number as ${seenPhones.get(phone)})`);
+      // Extract YYYY-MM from time_added
+      let monthKey = 'UNKNOWN';
+      if (advance.time_added) {
+        try {
+          const d = new Date(advance.time_added);
+          // Format: 2026-02
+          monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        } catch (e) { console.error('Invalid date', e); }
+      }
+
+      // Unique Key: PHONE + MONTH
+      const uniqueKey = `${phone}_${monthKey}`;
+
+      if (seenKeys.has(uniqueKey) && monthKey !== 'UNKNOWN') {
+        duplicates.push({
+          id: advance.id,
+          name: advance.full_name,
+          phone,
+          original: seenKeys.get(uniqueKey)!,
+          date: monthKey
+        });
+        console.warn(`⚠️ Duplicate phone ${phone} in month ${monthKey}: skipping ${advance.full_name}`);
       } else {
-        seenPhones.set(phone, advance.full_name);
+        seenKeys.set(uniqueKey, advance.full_name);
         deduplicatedData.push(advance);
       }
     }
 
     // Handle duplicates: Check for them, warn user, and REVERT their status from 'processing' to 'approved'
     if (duplicates.length > 0) {
-      const names = duplicates.map(d => `${d.name} (same as ${d.original})`).join(', ');
+      const names = duplicates.map(d => `${d.name} (${d.date}: same as ${d.original})`).join(', ');
 
       toast.error(
-        `Skipped ${duplicates.length} duplicate phone number${duplicates.length > 1 ? 's' : ''}: ${names}`,
+        `Skipped ${duplicates.length} duplicate phone number${duplicates.length > 1 ? 's' : ''} (same month): ${names}`,
         { duration: 8000 }
       );
 
@@ -4940,7 +4960,8 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       amount_requested: Number(app["Amount Requested"]),
       branch_manager_approval: app.branch_manager_approval,
       regional_manager_approval: app.regional_manager_approval,
-      isBranchManager: (isBranchManagerMap as any)[app["Employee Number"]] || false
+      isBranchManager: (isBranchManagerMap as any)[app["Employee Number"]] || false,
+      time_added: app.time_added // Include date for month-based duplicate checking
     }));
 
     if (userRole === 'maker') {
