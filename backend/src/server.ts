@@ -188,6 +188,61 @@ app.get("/api/email/logs/:id", async (req, res) => {
   }
 });
 
+// SMS sending endpoint (proxies Celcom Africa to avoid no-cors issues)
+app.post("/api/sms/send", async (req, res) => {
+  try {
+    const { phone, message } = req.body;
+
+    if (!phone || !message) {
+      return res.status(400).json({ error: "phone and message are required" });
+    }
+
+    const apiKey = process.env.CELCOM_API_KEY || "***REMOVED***";
+    const partnerID = process.env.CELCOM_PARTNER_ID || "928";
+    const shortcode = process.env.CELCOM_SHORTCODE || "MularCredit";
+
+    const encodedMessage = encodeURIComponent(message);
+    const url = `https://isms.celcomafrica.com/api/services/sendsms/?apikey=${apiKey}&partnerID=${partnerID}&message=${encodedMessage}&shortcode=${shortcode}&mobile=${phone}`;
+
+    console.log(`📡 Sending SMS to ${phone} via Celcom Africa...`);
+
+    const response = await fetch(url, { method: "GET" });
+    const responseText = await response.text();
+
+    console.log(`📩 Celcom Africa response (${response.status}): ${responseText}`);
+
+    // Celcom Africa returns JSON with a "responses" array
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(responseText);
+    } catch {
+      // Not JSON — treat as raw text
+    }
+
+    // Check for known error patterns in the response
+    const responseStr = responseText.toLowerCase();
+    if (
+      !response.ok ||
+      responseStr.includes("error") ||
+      responseStr.includes("invalid") ||
+      responseStr.includes("failed") ||
+      responseStr.includes("unauthorized")
+    ) {
+      console.error("❌ SMS delivery failed:", responseText);
+      return res.status(502).json({
+        error: "SMS provider rejected the request",
+        details: parsed || responseText,
+      });
+    }
+
+    console.log(`✅ SMS sent successfully to ${phone}`);
+    res.json({ message: "SMS sent successfully", details: parsed || responseText });
+  } catch (error: any) {
+    console.error("❌ Error sending SMS:", error);
+    res.status(500).json({ error: error.message || "Failed to send SMS" });
+  }
+});
+
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({

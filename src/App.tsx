@@ -464,7 +464,7 @@ function App() {
     }
   }, [navigate, clearAllTimers]);
 
-  const handleLoginSuccess = useCallback((userData: any) => {
+  const handleLoginSuccess = useCallback(async (userData: any) => {
     const { town, role } = userData;
     if (town) {
       handleTownChange(town);
@@ -472,22 +472,35 @@ function App() {
 
     hasShownWelcomeToast.current = true;
 
-    // Set MFA process flag for CHECKER and ADMIN roles
+    // Check if MFA is enabled in system settings before triggering MFA flow
     if (role === 'CHECKER' || role === 'ADMIN') {
-      sessionStorage.setItem('isMFAProcess', 'true');
+      try {
+        const { data: settingsData } = await supabase
+          .from('system_settings')
+          .select('mfa_enabled')
+          .eq('id', 1)
+          .single();
 
-      // Store essential MFA data for the verification page
-      const mfaData = {
-        userId: userData.id,
-        email: userData.email,
-        userRole: role,
-        branch: userData.branch || userData.town || ''
-      };
-      sessionStorage.setItem('mfaData', JSON.stringify(mfaData));
+        const mfaEnabled = settingsData?.mfa_enabled ?? false;
 
-      // Navigate to MFA page with context parameters
-      navigate(`/mfa?email=${encodeURIComponent(userData.email)}&userId=${userData.id}&role=${role}`, { replace: true });
-      return; // Stop further navigation
+        if (mfaEnabled) {
+          // MFA is ON — redirect to verification page
+          sessionStorage.setItem('isMFAProcess', 'true');
+          const mfaData = {
+            userId: userData.id,
+            email: userData.email,
+            userRole: role,
+            branch: userData.branch || userData.town || ''
+          };
+          sessionStorage.setItem('mfaData', JSON.stringify(mfaData));
+          navigate(`/mfa?email=${encodeURIComponent(userData.email)}&userId=${userData.id}&role=${role}`, { replace: true });
+          return;
+        }
+        // MFA is OFF — fall through to normal navigation
+      } catch (e) {
+        console.error('Failed to check MFA setting, skipping MFA:', e);
+        // On error, skip MFA to avoid locking users out
+      }
     }
 
     setTimeout(() => {
@@ -495,6 +508,7 @@ function App() {
       navigate(targetPath, { replace: true });
     }, 100);
   }, [navigate, handleTownChange]);
+
 
 
   // Handle email confirmation redirect
@@ -798,39 +812,42 @@ function App() {
           const currentPath = location.pathname;
           const publicPaths = ['/login', '/update-password', '/mfa'];
 
-          // Check if MFA is required for this user
-          const requiresMFA = userData.role === 'ADMIN' || userData.role === 'CHECKER';
+          // Check if MFA is required for this user AND enabled in settings
+          const roleRequiresMFA = userData.role === 'ADMIN' || userData.role === 'CHECKER';
           const mfaCompleted = sessionStorage.getItem('mfaCompleted') === 'true';
 
-          // If MFA is in progress, prevent welcome toast and ensure we are on MFA page
-          // Also handle race condition where isMFAProcess might not be set yet but role requires it
-          if (requiresMFA && !mfaCompleted) {
-            console.log('MFA required for', userData.role, '- redirecting to MFA');
+          if (roleRequiresMFA && !mfaCompleted) {
+            // Check DB setting before redirecting
+            try {
+              const { data: settingsData } = await supabase
+                .from('system_settings')
+                .select('mfa_enabled')
+                .eq('id', 1)
+                .single();
 
-            if (location.pathname !== '/mfa') {
-              navigate('/mfa', { replace: true });
+              const mfaEnabled = settingsData?.mfa_enabled ?? false;
+
+              if (mfaEnabled) {
+                console.log('MFA required for', userData.role, '- redirecting to MFA');
+                if (location.pathname !== '/mfa') {
+                  navigate('/mfa', { replace: true });
+                }
+                return; // Exit early — no welcome toast, no dashboard
+              }
+            } catch (e) {
+              console.error('Failed to check MFA setting in auth handler, skipping MFA:', e);
             }
-            return; // Exit early, do not show welcome toast or navigate to dashboard
           }
-
 
           // Show welcome toast only if not in MFA process
           toast.success(`Welcome back, ${userData.email}!`);
 
           if (publicPaths.includes(currentPath)) {
-            // If MFA is required but not completed, stay on current page (should be /mfa)
-            if (requiresMFA && !mfaCompleted) {
-              console.log('MFA required but not completed, staying on MFA page');
-              if (currentPath !== '/mfa') {
-                navigate('/mfa', { replace: true });
-              }
-            } else {
-              // Normal navigation for non-MFA users or MFA-completed users
-              const targetPath = userData.role === 'STAFF' ? '/staff' : '/dashboard';
-              navigate(targetPath, { replace: true });
-            }
+            const targetPath = userData.role === 'STAFF' ? '/staff' : '/dashboard';
+            navigate(targetPath, { replace: true });
           }
         }
+
       } else {
         setUser(null);
         setSelectedTown('');

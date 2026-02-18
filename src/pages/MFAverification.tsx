@@ -308,26 +308,48 @@ export default function MFAVerification() {
 
       // 2. Generate and store code
       const mfaCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+      // Invalidate ALL previous unused codes for this email first
+      // This prevents the race condition where multiple codes exist and
+      // the SMS delivers an older code that no longer matches the DB
+      await supabase
+        .from('mfa_codes')
+        .update({ used: true })
+        .eq('email', email)
+        .eq('used', false);
+
+      // Now insert a fresh code as the single valid one
       const { error: storeError } = await supabase
         .from('mfa_codes')
-        .upsert({
+        .insert({
           user_id: userId,
           email: email,
           code: mfaCode,
-          phone_number: formattedPhone, // Store formatted number
+          phone_number: formattedPhone,
           expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
           used: false
         });
 
       if (storeError) throw storeError;
 
-      // 3. Send SMS
+      // 3. Send SMS via backend (avoids no-cors blind sends, gets real delivery status)
       const message = `Your Mular Credit verification code is: ${mfaCode}. This code expires in 10 minutes.`;
-      const encodedMessage = encodeURIComponent(message);
-      const url = `https://isms.celcomafrica.com/api/services/sendsms/?apikey=***REMOVED***&partnerID=928&message=${encodedMessage}&shortcode=MularCredit&mobile=${formattedPhone}`;
 
-      console.log(`📡 Sending SMS to ${formattedPhone}...`);
-      await fetch(url, { method: 'GET', mode: 'no-cors' });
+      console.log(`📡 Sending MFA SMS to ${formattedPhone}...`);
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      const smsResponse = await fetch(`${apiUrl}/sms/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: formattedPhone, message }),
+      });
+
+      if (!smsResponse.ok) {
+        const errData = await smsResponse.json().catch(() => ({}));
+        console.error('❌ SMS send failed:', errData);
+        throw new Error(errData.error || 'Failed to send verification SMS. Please try again.');
+      }
+
+      console.log(`✅ MFA SMS sent successfully to ${formattedPhone}`);
 
       setCountdown(30);
       const countdownInterval = setInterval(() => {
