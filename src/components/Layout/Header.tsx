@@ -210,6 +210,7 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
       const { data, error } = await supabase
         .from('company_logo')
         .select('*')
+        .order('id', { ascending: false })
         .limit(1)
         .single();
 

@@ -944,7 +944,7 @@ const PayslipViewer = () => {
       const { data, error } = await supabase
         .from('company_logo')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .limit(1)
         .single();
 

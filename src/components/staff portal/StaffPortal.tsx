@@ -3106,6 +3106,7 @@ const StaffPortal = () => {
       const { data, error } = await supabase
         .from('company_logo')
         .select('*')
+        .order('id', { ascending: false })
         .limit(1)
         .single();
 
