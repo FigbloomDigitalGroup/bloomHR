@@ -34,15 +34,15 @@ interface AppSidebarProps {
   users: User[];
 }
 
-export function AppSidebar({ 
-  channels = [], 
-  directMessages = [], 
-  activeChannel, 
-  onChannelSelect, 
+export function AppSidebar({
+  channels = [],
+  directMessages = [],
+  activeChannel,
+  onChannelSelect,
   onChannelCreate,
   onDMCreate,
   currentUser,
-  users = [] 
+  users = []
 }: AppSidebarProps) {
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showCreateDM, setShowCreateDM] = useState(false);
@@ -90,11 +90,11 @@ export function AppSidebar({
   // Separate DMs into active conversations and potential contacts
   const activeConversations = directMessages.filter(dm => dm.hasMessages);
   const potentialContacts = directMessages.filter(dm => !dm.hasMessages);
-  
+
   const filteredActiveConversations = activeConversations.filter(dm =>
     dm.name.toLowerCase().includes(dmSearch.toLowerCase())
   );
-  
+
   const filteredPotentialContacts = potentialContacts.filter(dm =>
     dm.name.toLowerCase().includes(dmSearch.toLowerCase())
   );
@@ -107,11 +107,11 @@ export function AppSidebar({
   // Format time for last message
   const formatTime = (timestamp?: string) => {
     if (!timestamp) return '';
-    
+
     const date = new Date(timestamp);
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-    
+
     if (diffInHours < 24) {
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } else if (diffInHours < 168) {
@@ -124,7 +124,7 @@ export function AppSidebar({
   // Generate avatar for channels
   const getChannelAvatar = (channel: Channel) => {
     const avatarUrl = `https://api.dicebear.com/7.x/identicon/svg?seed=${channel.id}&size=40`;
-    
+
     return (
       <Avatar className="h-6 w-6 ring-2 ring-white flex-shrink-0">
         <AvatarImage src={avatarUrl} />
@@ -163,16 +163,16 @@ export function AppSidebar({
                   {channels.length}
                 </Badge>
               </div>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-6 w-6 text-gray-500 hover:text-gray-700 hover:bg-gray-100" 
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
                 onClick={handleAddChannel}
               >
                 <Plus className="h-3.5 w-3.5" />
               </Button>
             </SidebarGroupLabel>
-            
+
             {/* Channel Search */}
             <div className="px-3 pb-2">
               <div className="relative">
@@ -199,7 +199,7 @@ export function AppSidebar({
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           {/* Channel Avatar */}
                           {getChannelAvatar(channel)}
-                          
+
                           <span className="flex-1 truncate font-medium text-xs">{channel.name}</span>
                           {channel.unread_count && channel.unread_count > 0 && (
                             <Badge variant="default" className="h-5 min-w-5 px-1.5 text-xs bg-blue-600">
@@ -233,16 +233,16 @@ export function AppSidebar({
                   {directMessages.length}
                 </Badge>
               </div>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-6 w-6 text-gray-500 hover:text-gray-700 hover:bg-gray-100" 
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
                 onClick={handleAddDM}
               >
                 <Plus className="h-3.5 w-3.5" />
               </Button>
             </SidebarGroupLabel>
-            
+
             {/* DM Search */}
             <div className="px-3 pb-2">
               <div className="relative">
@@ -272,7 +272,7 @@ export function AppSidebar({
                     </div>
                     {filteredActiveConversations.map((dm) => (
                       <SidebarMenuItem key={dm.id}>
-                        <EmployeeProfile 
+                        <EmployeeProfile
                           employee={{
                             id: dm.userId,
                             fullName: dm.name,
@@ -282,7 +282,7 @@ export function AppSidebar({
                             workEmail: '',
                             jobTitle: '',
                             department: ''
-                          } as any} 
+                          } as any}
                         >
                           <SidebarMenuButton
                             onClick={() => onChannelSelect(dm)}
@@ -297,11 +297,10 @@ export function AppSidebar({
                                     {dm.initials || 'U'}
                                   </AvatarFallback>
                                 </Avatar>
-                                <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 border-2 border-white rounded-full ${
-                                  dm.status === 'online' ? 'bg-green-500' :
+                                <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 border-2 border-white rounded-full ${dm.status === 'online' ? 'bg-green-500' :
                                   dm.status === 'away' ? 'bg-yellow-500' :
-                                  'bg-gray-400'
-                                }`}></span>
+                                    'bg-gray-400'
+                                  }`}></span>
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between">
@@ -345,7 +344,7 @@ export function AppSidebar({
                     </div>
                     {filteredPotentialContacts.map((dm) => (
                       <SidebarMenuItem key={dm.id}>
-                        <EmployeeProfile 
+                        <EmployeeProfile
                           employee={{
                             id: dm.userId,
                             fullName: dm.name,
@@ -355,7 +354,7 @@ export function AppSidebar({
                             workEmail: '',
                             jobTitle: '',
                             department: ''
-                          } as any} 
+                          } as any}
                         >
                           <SidebarMenuButton
                             onClick={() => onChannelSelect(dm)}
@@ -370,11 +369,10 @@ export function AppSidebar({
                                     {dm.initials || 'U'}
                                   </AvatarFallback>
                                 </Avatar>
-                                <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 border-2 border-white rounded-full ${
-                                  dm.status === 'online' ? 'bg-green-500' :
+                                <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 border-2 border-white rounded-full ${dm.status === 'online' ? 'bg-green-500' :
                                   dm.status === 'away' ? 'bg-yellow-500' :
-                                  'bg-gray-400'
-                                }`}></span>
+                                    'bg-gray-400'
+                                  }`}></span>
                               </div>
                               <span className="flex-1 truncate font-medium text-xs">{dm.name || 'Unknown User'}</span>
                               {dm.unread_count && dm.unread_count > 0 && (
@@ -417,11 +415,10 @@ export function AppSidebar({
                       {safeCurrentUser.initials || 'U'}
                     </AvatarFallback>
                   </Avatar>
-                  <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 border-2 border-white rounded-full ${
-                    safeCurrentUser.status === 'online' ? 'bg-green-500' :
+                  <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 border-2 border-white rounded-full ${safeCurrentUser.status === 'online' ? 'bg-green-500' :
                     safeCurrentUser.status === 'away' ? 'bg-yellow-500' :
-                    'bg-gray-400'
-                  }`}></span>
+                      'bg-gray-400'
+                    }`}></span>
                 </div>
               </EmployeeProfile>
               <div className="flex-1 min-w-0">
@@ -437,15 +434,15 @@ export function AppSidebar({
                   </div>
                 )}
                 <p className="text-xs text-gray-400 truncate">
-                  {safeCurrentUser.status === 'online' ? 'Online' : 
-                   safeCurrentUser.status === 'away' ? 'Away' : 'Offline'}
+                  {safeCurrentUser.status === 'online' ? 'Online' :
+                    safeCurrentUser.status === 'away' ? 'Away' : 'Offline'}
                 </p>
               </div>
             </div>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8 text-gray-500 hover:text-gray-700 hover:bg-gray-100" 
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
               onClick={handleSettings}
               disabled={!currentUser}
             >

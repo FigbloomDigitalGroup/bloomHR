@@ -1,30 +1,29 @@
 import { useState } from 'react';
 import {
-  Users,
-  Calendar,
-  BarChart3,
+  UsersRound,
+  CalendarRange,
+  Target,
   Settings,
-  Bot,
+  Wand2,
   Menu,
-  Siren,
-  LayoutDashboard,
-  Wallet,
-  Blocks,
-  MessageSquareMore,
-  Slack,
-  KeyRound,
-  Box,
-  PhoneCall,
-  UserPlus,
-  FileText,
-  HandCoins,
-  UserCog,
-  GraduationCap,
+  ShieldAlert,
+  LayoutGrid,
+  Landmark,
+  Kanban,
+  MessagesSquare,
+  Network,
+  ShieldEllipsis,
+  Package,
+  ClipboardCheck,
+  UserPlus2,
+  PieChart,
+  Receipt,
+  UserCheck,
+  Award,
   Smartphone,
-  Mail,
-  Shield,
+  Mails,
+  ShieldHalf,
   Search,
-
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -36,50 +35,50 @@ const menuGroups = [
   {
     title: "Overview",
     items: [
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', permission: 'dashboard' },
-      { id: 'ai-assistant', label: 'AI Assistant', icon: Bot, path: '/ai-assistant', permission: 'ai-assistant' },
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid, path: '/dashboard', permission: 'dashboard' },
+      { id: 'ai-assistant', label: 'AI Assistant', icon: Wand2, path: '/ai-assistant', permission: 'ai-assistant' },
     ]
   },
   {
     title: "Workspace",
     items: [
-      { id: 'task-manager', label: 'Task Manager', icon: Blocks, path: '/tasks', permission: 'task-manager' },
-      { id: 'teams', label: 'Teams', icon: Slack, path: '/teams', permission: 'teams' },
-      { id: 'messages', label: 'SMS Center', icon: MessageSquareMore, path: '/sms', permission: 'sms' },
-      { id: 'email-portal', label: 'Email Portal', icon: Mail, path: '/email-portal', permission: 'email-portal' },
+      { id: 'task-manager', label: 'Task Manager', icon: Kanban, path: '/tasks', permission: 'task-manager' },
+      { id: 'teams', label: 'Teams', icon: Network, path: '/teams', permission: 'teams' },
+      { id: 'messages', label: 'SMS Center', icon: MessagesSquare, path: '/sms', permission: 'sms' },
+      { id: 'email-portal', label: 'Email Portal', icon: Mails, path: '/email-portal', permission: 'email-portal' },
     ]
   },
   {
     title: "Team",
     items: [
-      { id: 'employees', label: 'Employees', icon: Users, path: '/employees', permission: 'employees' },
-      { id: 'recruitment', label: 'Recruitment', icon: UserPlus, path: '/recruitment', permission: 'recruitment' },
-      { id: 'leaves', label: 'Time Off', icon: Calendar, path: '/leaves', permission: 'leaves' },
-      { id: 'performance', label: 'Performance', icon: BarChart3, path: '/performance', permission: 'performance' },
-      { id: 'training', label: 'Training', icon: GraduationCap, path: '/training', permission: 'training' },
-      { id: 'assign-managers', label: 'Assign Managers', icon: UserCog, path: '/assign-managers', permission: 'assign-managers' },
-      { id: 'staffcheck', label: 'Disciplinary', icon: Siren, path: '/staffcheck', permission: 'staffcheck' },
+      { id: 'employees', label: 'Employees', icon: UsersRound, path: '/employees', permission: 'employees' },
+      { id: 'recruitment', label: 'Recruitment', icon: UserPlus2, path: '/recruitment', permission: 'recruitment' },
+      { id: 'leaves', label: 'Time Off', icon: CalendarRange, path: '/leaves', permission: 'leaves' },
+      { id: 'performance', label: 'Performance', icon: Target, path: '/performance', permission: 'performance' },
+      { id: 'training', label: 'Training', icon: Award, path: '/training', permission: 'training' },
+      { id: 'assign-managers', label: 'Assign Managers', icon: UserCheck, path: '/assign-managers', permission: 'assign-managers' },
+      { id: 'staffcheck', label: 'Disciplinary', icon: ShieldAlert, path: '/staffcheck', permission: 'staffcheck' },
     ]
   },
   {
     title: "Finance",
     items: [
-      { id: 'payroll', label: 'Payroll', icon: Wallet, path: '/payroll', permission: 'payroll' },
-      { id: 'expense', label: 'Expenses', icon: HandCoins, path: '/expenses', permission: 'expenses' },
-      { id: 'advanced', label: 'Salary Advance', icon: Wallet, path: '/salaryadmin', permission: 'salaryadmin' },
-      { id: 'asset', label: 'Assets', icon: Box, path: '/asset', permission: 'asset' },
+      { id: 'payroll', label: 'Payroll', icon: Landmark, path: '/payroll', permission: 'payroll' },
+      { id: 'expense', label: 'Expenses', icon: Receipt, path: '/expenses', permission: 'expenses' },
+      { id: 'advanced', label: 'Salary Advance', icon: Landmark, path: '/salaryadmin', permission: 'salaryadmin' },
+      { id: 'asset', label: 'Assets', icon: Package, path: '/asset', permission: 'asset' },
       { id: 'mpesa-zap', label: 'Mpesa Zap', icon: Smartphone, path: '/mpesa-zap', permission: 'mpesa-zap' },
     ]
   },
   {
     title: "System",
     items: [
-      { id: 'reports', label: 'Reports', icon: FileText, path: '/reports', permission: 'reports' },
-      { id: 'phone-approvals', label: 'Approvals', icon: PhoneCall, path: '/phone-approvals', permission: 'phone-approvals' },
-      { id: 'email admin', label: 'Email Admin', icon: KeyRound, path: '/adminconfirm', permission: 'adminconfirm' },
-      { id: 'incident-reports', label: 'Incidents', icon: Siren, path: '/incident-reports', permission: 'incident-reports' },
+      { id: 'reports', label: 'Reports', icon: PieChart, path: '/reports', permission: 'reports' },
+      { id: 'phone-approvals', label: 'Approvals', icon: ClipboardCheck, path: '/phone-approvals', permission: 'phone-approvals' },
+      { id: 'email admin', label: 'Email Admin', icon: ShieldEllipsis, path: '/adminconfirm', permission: 'adminconfirm' },
+      { id: 'incident-reports', label: 'Incidents', icon: ShieldAlert, path: '/incident-reports', permission: 'incident-reports' },
       { id: 'settings', label: 'Settings', icon: Settings, path: '/settings', permission: 'settings' },
-      { id: 'role-permissions', label: 'Role Permissions', icon: Shield, path: '/role-permissions', permission: 'role-permissions' },
+      { id: 'role-permissions', label: 'Role Permissions', icon: ShieldHalf, path: '/role-permissions', permission: 'role-permissions' },
     ]
   }
 ];
@@ -122,15 +121,10 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
         initial="expanded"
         animate={isExpanded ? "expanded" : "collapsed"}
         variants={sidebarVariants}
-        className="relative flex flex-col h-full border-r border-white/5 shadow-2xl overflow-hidden bg-slate-900/95 backdrop-blur-2xl"
+        className="relative flex flex-col h-full border-r border-white/5 shadow-2xl overflow-hidden bg-[#1C0770] font-lexend"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* Glowy Background: Blue & Green */}
-        <div className="absolute inset-0 bg-slate-900/50 z-[-2] backdrop-blur-2xl" />
-        <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] pointer-events-none z-[-1]" />
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-green-500/10 rounded-full blur-[100px] pointer-events-none z-[-1]" />
-
         {/* Brand Section */}
         {/* Brand Section */}
         <div className={`relative z-10 px-5 pt-4 pb-6 flex items-center transition-all duration-300 ${isExpanded ? 'justify-between' : 'flex-col justify-center gap-6'}`}>
@@ -152,8 +146,8 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                   exit={{ opacity: 0, x: -10 }}
                   className="flex flex-col"
                 >
-                  <h1 className="font-sans font-bold text-xl text-white tracking-tight flex items-center">
-                    Zira<span className="bg-gradient-to-r from-blue-600 to-[#03c04a] bg-clip-text text-transparent ml-0.5">Pro</span>
+                  <h1 className="font-lexend font-bold text-xl text-white tracking-tight flex items-center">
+                    Zira<span className="text-white font-light ml-0.5">Pro</span>
                   </h1>
                 </motion.div>
               )}
@@ -181,13 +175,13 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
               className="px-5 mb-4 overflow-hidden"
             >
               <div className="relative group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#03c04a] transition-colors" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-300/70 group-focus-within:text-lime-400 transition-colors" />
                 <input
                   type="text"
                   placeholder="Search..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-800/50 border border-slate-700 rounded-xl py-2 pl-9 pr-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#03c04a] focus:border-[#03c04a]/50 transition-all"
+                  className="w-full bg-white/10 border border-white/10 rounded-xl py-2 pl-9 pr-3 text-xs text-white placeholder-purple-300/50 focus:outline-none focus:ring-1 focus:ring-lime-400 focus:border-lime-400/50 transition-all"
                 />
               </div>
             </motion.div>
@@ -221,7 +215,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                       exit={{ opacity: 0 }}
                       className="px-3 mb-2"
                     >
-                      <span className="text-[10px] font-normal text-slate-400 tracking-wider font-sans pl-1">
+                      <span className="text-[10px] font-normal text-lime-400 tracking-wider font-lexend pl-1">
                         {group.title}
                       </span>
                     </motion.div>
@@ -268,7 +262,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                               initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
                               exit={{ opacity: 0, x: -10 }}
-                              className={`ml-3 text-xs truncate font-sans relative z-10 tracking-wide font-normal ${isActive ? 'text-white' : 'text-white/80'}`}
+                              className={`ml-3 text-xs truncate font-lexend relative z-10 tracking-wide font-normal ${isActive ? 'text-white' : 'text-white/80'}`}
                             >
                               {item.label}
                             </motion.span>
@@ -315,7 +309,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                     exit={{ opacity: 0, width: 0 }}
                     className="flex-1 overflow-hidden"
                   >
-                    <p className="text-xs font-bold text-slate-200 truncate font-sans capitalize">
+                    <p className="text-xs font-bold text-slate-200 truncate font-lexend capitalize">
                       {userRole.toLowerCase()}
                     </p>
                     <p className="text-[10px] text-slate-400 truncate">Admin Workspace</p>

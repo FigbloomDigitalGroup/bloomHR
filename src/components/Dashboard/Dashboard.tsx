@@ -767,9 +767,9 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
-          {/* Subtle decorative gradients */}
-          <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-gradient-to-br from-indigo-200/30 to-purple-200/30 rounded-full blur-[100px] -mr-32 -mt-32 pointer-events-none"></div>
-          <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-gradient-to-br from-blue-200/30 to-cyan-200/30 rounded-full blur-[100px] -ml-20 -mb-20 pointer-events-none"></div>
+          {/* Subtle decorative gradients matching the brand */}
+          <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-gradient-to-br from-[#03c04a]/10 to-green-300/10 rounded-full blur-[100px] -mr-32 -mt-32 pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-gradient-to-br from-lime-200/20 to-green-200/20 rounded-full blur-[100px] -ml-20 -mb-20 pointer-events-none"></div>
 
           <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
             <div className="flex items-center gap-5">
@@ -790,7 +790,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
               </motion.div>
               <div>
                 <motion.h1
-                  className="text-3xl md:text-4xl font-bold tracking-tight mb-2 bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent font-sans"
+                  className="text-3xl md:text-4xl font-bold tracking-tight mb-2 bg-gradient-to-r from-gray-900 via-green-900 to-[#03c04a] bg-clip-text text-transparent font-sans"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.2 }}
@@ -804,7 +804,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
                   transition={{ delay: 0.3 }}
                 >
                   <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/60 border border-gray-200 backdrop-blur-sm shadow-sm">
-                    <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                    <MapPin className="w-3.5 h-3.5 text-[#03c04a]" />
                     <span className="text-gray-900 font-semibold">{getDisplayName()}</span>
                   </span>
                   <span className="w-1 h-1 rounded-full bg-gray-400 hidden sm:block"></span>
@@ -816,24 +816,9 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
             {/* Quick Actions - Premium Pills */}
             <div className="flex flex-wrap gap-3">
               <motion.button
-                onClick={sendAllBirthdaySMS}
-                disabled={isSendingBirthdaySMS}
-                className="px-4 py-2 rounded-full text-xs font-normal bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white shadow-lg shadow-pink-500/30 flex items-center gap-2"
-                whileHover={{ scale: 1.05, y: -2, boxShadow: "0 20px 40px -10px rgba(236, 72, 153, 0.4)" }}
-                whileTap={{ scale: 0.95 }}
-              >
-                {isSendingBirthdaySMS ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Cake className="w-4 h-4" />
-                )}
-                {isSendingBirthdaySMS ? 'Sending...' : 'Birthday SMS'}
-              </motion.button>
-
-              <motion.button
                 onClick={handleRefresh}
                 disabled={isLoading}
-                className="px-4 py-2 rounded-full text-xs font-normal bg-white/60 border border-gray-200 hover:bg-white hover:border-gray-300 transition-all backdrop-blur-sm flex items-center gap-2 text-gray-700 hover:text-gray-900"
+                className="px-4 py-2 rounded-full text-xs font-normal bg-white/60 border border-gray-200 hover:bg-white hover:border-[#03c04a] transition-all backdrop-blur-sm flex items-center gap-2 text-gray-700 hover:text-[#03c04a]"
                 whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.95 }}
               >

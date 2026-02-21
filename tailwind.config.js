@@ -47,6 +47,7 @@ export default {
         sans: ["-apple-system", "BlinkMacSystemFont", "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Helvetica", "Arial", "sans-serif"],
         "san-pro": ["-apple-system", "BlinkMacSystemFont", "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Helvetica", "Arial", "sans-serif"],
         poppins: ["Poppins", "sans-serif"],
+        lexend: ["Lexend", "sans-serif"],
       },
     }
   },

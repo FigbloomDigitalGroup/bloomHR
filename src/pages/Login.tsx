@@ -352,7 +352,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           </div>
 
           <div className="text-white text-xs font-light">
-            © 2026 Mular Credit · Business edition
+            © 2026 ZiraHr · Business edition
           </div>
         </div>
       </div>
