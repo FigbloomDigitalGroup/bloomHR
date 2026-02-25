@@ -9,7 +9,7 @@ import {
   User, UserCog, Settings, MapPin, Filter, X, Edit3, DollarSign,
   Crown, Key, Building, Map as MapIcon, Award, Smartphone, RefreshCw,
   Download, Upload, Calendar, Activity, TrendingUp,
-  Banknote, Zap, ToggleLeft, ToggleRight, FastForward, Sparkles
+  Banknote, Zap, ToggleLeft, ToggleRight, Unlock, Sparkles
 } from 'lucide-react';
 import {
   AreaChart,
@@ -470,7 +470,7 @@ const ExportModal = ({ isOpen, onClose, onExport, isLoading, filterOptions }: {
             />
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-[10px] p-3">
+          <div className="bg-white border border-gray-200 rounded-[10px] p-3">
             <p className="text-xs text-blue-800">
               <strong>Exporting Columns:</strong>
             </p>
@@ -613,7 +613,7 @@ const ImportModal = ({ isOpen, onClose, onImport, isLoading }: {
             </div>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-[10px] p-3">
+          <div className="bg-white border border-gray-200 rounded-[10px] p-3">
             <p className="text-xs text-blue-800">
               <strong>Required Columns:</strong>
             </p>
@@ -737,12 +737,12 @@ const EnhancedFilter = ({
     <div className="relative">
       <button
         onClick={() => setShowFilter(!showFilter)}
-        className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50"
+        className="inline-flex items-center gap-2 px-3 py-2 bg-white text-gray-600 hover:text-gray-900 hover:bg-[#f3f4f6] rounded text-xs font-medium shadow transition-colors h-[38px]"
       >
-        <Filter className="w-4 h-4" />
+        <Filter className="w-3 h-3" />
         Filters
         {activeFilterCount > 0 && (
-          <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+          <span className="bg-green-100 text-green-800 text-xs px-1.5 py-0.5 rounded-full font-semibold">
             {activeFilterCount}
           </span>
         )}
@@ -994,7 +994,7 @@ const PaymentRequestCard = ({ request, onApprove, onReject, onViewDetails, userR
   const totalAmount = request.advances_data?.reduce((sum: number, advance: any) => sum + (advance.amount_requested || 0), 0) || 0;
 
   return (
-    <div className="bg-white rounded-[10px] border border-gray-200 p-4 hover:shadow-md transition-shadow">
+    <div className="bg-white rounded-[10px] p-4 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-orange-100 rounded-[10px]">
@@ -1091,7 +1091,7 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, us
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-[10px] shadow-lg w-full max-w-4xl max-h-[90vh] overflow-auto">
-        <div className="sticky top-0 bg-white p-6 border-b border-gray-200 flex justify-between items-center">
+        <div className="sticky top-0 bg-[#f3f4f6] p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-xl font-semibold text-gray-900">Salary Advance Payment Request Details</h2>
           <button
             onClick={onClose}
@@ -1134,7 +1134,7 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, us
             <h3 className="font-semibold text-gray-900 mb-3">Audit Trail</h3>
             <div className="space-y-2">
               <div className="flex items-center gap-3 text-xs">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <div className="w-2 h-2 bg-white0 rounded-full"></div>
                 <span>Payment request created by {payment.created_by_email}</span>
                 <span className="text-gray-500">{new Date(payment.created_at).toLocaleString()}</span>
               </div>
@@ -1506,7 +1506,7 @@ const BypassConfirmModal = ({
               <button
                 onClick={onConfirm}
                 disabled={isLoading}
-                className="text-xs w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-green-200 flex items-center justify-center gap-2 group disabled:opacity-50"
+                className="text-xs w-full py-4 bg-white text-green-600 hover:text-green-700 hover:bg-[#f3f4f6] rounded-2xl font-bold transition-all shadow-lg shadow-green-200 flex items-center justify-center gap-2 group disabled:opacity-50"
               >
                 {isLoading ? (
                   <Loader className="w-5 h-5 animate-spin" />
@@ -1528,9 +1528,9 @@ const BypassConfirmModal = ({
             </div>
           </div>
 
-          <div className="bg-amber-50 px-8 py-3 flex items-center gap-2">
-            <FastForward className="w-4 h-4 text-amber-600" />
-            <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">
+          <div className="bg-emerald-50 px-8 py-3 flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
               High Authority Action
             </span>
           </div>
@@ -1577,7 +1577,7 @@ const UserRoleDisplay = ({ userRole, userEmail, actualRole, userTown, userRegion
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'maker': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'maker': return 'bg-blue-100 text-blue-800 border-gray-200';
       case 'checker': return 'bg-orange-100 text-orange-800 border-orange-200';
       case 'credit_analyst_officer': return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'branch_manager': return 'bg-green-100 text-green-800 border-green-200';
@@ -1654,7 +1654,7 @@ const TownFilter = ({
           </div>
 
           {isManager && selectedTown && (
-            <div className="mb-3 p-2 bg-blue-50 rounded-[10px]">
+            <div className="mb-3 p-2 bg-white rounded-[10px]">
               <p className="text-xs text-blue-700">
                 {isRegionalManager
                   ? `Viewing applications for your region: ${selectedTown}`
@@ -2348,7 +2348,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
               </div>
             )}
 
-            <div className="bg-blue-50 border border-blue-200 rounded-[10px] p-3">
+            <div className="bg-white border border-gray-200 rounded-[10px] p-3">
               <p className="text-xs text-blue-800">
                 <strong>Exporting Columns:</strong>
               </p>
@@ -2681,7 +2681,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
   };
 
   return (
-    <div className="bg-white rounded-[10px] shadow-sm border border-gray-200 p-6">
+    <div className="bg-[#f3f4f6] rounded-[10px] shadow-sm border border-gray-200 p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -2768,7 +2768,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
         </div>
 
         {/* Card 2: Transaction Count */}
-        <div className="bg-white rounded-[10px] p-5 border border-gray-100 shadow-sm hover:border-blue-200 transition-all duration-300">
+        <div className="bg-white rounded-[10px] p-5 border border-gray-100 shadow-sm hover:border-gray-200 transition-all duration-300">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider">Transactions</p>
@@ -2781,7 +2781,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                 </span>
               </div>
             </div>
-            <div className="p-2 bg-blue-50 rounded-[10px]">
+            <div className="p-2 bg-white rounded-[10px]">
               <Activity className="w-6 h-6 text-blue-600" />
             </div>
           </div>
@@ -2861,7 +2861,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
       </div>
 
       {/* Branch Filter & Controls */}
-      <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center gap-4 mb-6 bg-gray-50 p-4 rounded-[10px] border border-gray-200">
+      <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center gap-4 mb-6 bg-gray-50 p-4 rounded-[10px]">
 
         <div className="w-full sm:w-auto">
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Filter by Branch</label>
@@ -2950,7 +2950,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-[#f3f4f6] divide-y divide-gray-200">
                 {currentItems.map((callback) => {
                   const transactionData = extractTransactionData(callback);
                   // Prioritize the amount we already fixed in processedData
@@ -3110,7 +3110,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                             <button
                               onClick={() => paginate(page)}
                               className={`relative inline-flex items-center px-4 py-2 text-xs font-medium ${currentPage === page
-                                ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                                ? 'z-10 bg-white border-blue-500 text-blue-600'
                                 : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
                                 } border`}
                             >
@@ -3140,7 +3140,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
       {showDetails && selectedCallback && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[10px] shadow-lg w-full max-w-4xl max-h-[90vh] overflow-auto">
-            <div className="sticky top-0 bg-white p-6 border-b border-gray-200 flex justify-between items-center">
+            <div className="sticky top-0 bg-[#f3f4f6] p-6 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900">Callback Details</h2>
               <button
                 onClick={() => setShowDetails(false)}
@@ -5751,48 +5751,12 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   const pendingCount = paymentRequests.filter(p => p.status === 'pending').length;
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
+    <div className="p-6 min-h-screen bg-white">
       <div className="max-w-7xl mx-auto">
 
-        {/* ── Report Header ─────────────────────────────── */}
-        <div className="mb-6 bg-white rounded-[10px] border border-gray-300 p-6 shadow-sm">
-          <div className="flex justify-between items-start flex-wrap gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">
-                Salary Advance Administration
-              </h1>
-              <p className="text-gray-600 text-sm">
-                Manage, approve and process employee salary advance applications
-              </p>
-              <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-gray-500">
-                <div className="flex items-center gap-1">
-                  <Calendar className="w-4 h-4" />
-                  <span>{new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Key className="w-4 h-4" />
-                  <span>Role: <strong>{userRole.replace(/_/g, ' ').toUpperCase()}</strong></span>
-                </div>
-                {userTown && (
-                  <div className="flex items-center gap-1">
-                    <MapPin className="w-4 h-4" />
-                    <span>{isRegionalManager ? 'Region' : 'Town'}: <strong>{userTown}</strong></span>
-                  </div>
-                )}
-                <span className="text-xs text-gray-400">({actualUserRole} · {userEmail})</span>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-gray-500 uppercase tracking-wide">Generated</div>
-              <div className="text-lg font-semibold text-gray-900">
-                {new Date().toLocaleDateString('en-KE', { day: '2-digit', month: 'long', year: 'numeric' })}
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* ── Action Bar ────────────────────────────────── */}
-        <div className="bg-white rounded-[10px] border border-gray-300 shadow-sm p-4 mb-6">
+        <div className="bg-[#f3f4f6] rounded-[10px] shadow-sm p-4 mb-6">
           <div className="flex flex-col gap-4">
             {/* Row 1: Tabs + key actions */}
             <div className="flex flex-wrap justify-between items-center gap-3">
@@ -5800,9 +5764,9 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setActiveTab('applications')}
-                  className={`inline-flex items-center gap-2 px-3 py-2 rounded text-xs font-medium shadow-sm transition-colors ${activeTab === 'applications'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                  className={`inline-flex items-center gap-2 px-3 py-2 rounded text-xs font-medium shadow transition-colors ${activeTab === 'applications'
+                    ? 'bg-green-100 text-green-800 border border-green-300'
+                    : 'bg-white text-gray-600 hover:bg-[#f3f4f6] hover:text-gray-900'
                     }`}
                 >
                   <Activity className="w-3 h-3" /> Applications
@@ -5811,18 +5775,18 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                 <RoleButtonWrapper allowedRoles={['ADMIN', 'CHECKER']}>
                   <button
                     onClick={() => setActiveTab('callbacks')}
-                    className={`inline-flex items-center gap-2 px-3 py-2 rounded text-xs font-medium shadow-sm transition-colors ${activeTab === 'callbacks'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                    className={`inline-flex items-center gap-2 px-3 py-2 rounded text-xs font-medium shadow transition-colors ${activeTab === 'callbacks'
+                      ? 'bg-green-100 text-green-800 border border-green-300'
+                      : 'bg-white text-gray-600 hover:bg-[#f3f4f6] hover:text-gray-900'
                       }`}
                   >
                     <Smartphone className="w-3 h-3" /> M-Pesa Results
                   </button>
                   <button
                     onClick={() => setActiveTab('transaction_status')}
-                    className={`inline-flex items-center gap-2 px-3 py-2 rounded text-xs font-medium shadow-sm transition-colors ${activeTab === 'transaction_status'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                    className={`inline-flex items-center gap-2 px-3 py-2 rounded text-xs font-medium shadow transition-colors ${activeTab === 'transaction_status'
+                      ? 'bg-green-100 text-green-800 border border-green-300'
+                      : 'bg-white text-gray-600 hover:bg-[#f3f4f6] hover:text-gray-900'
                       }`}
                   >
                     <RefreshCw className="w-3 h-3" /> Transaction Status
@@ -5832,9 +5796,9 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                 <RoleButtonWrapper allowedRoles={['ADMIN']}>
                   <button
                     onClick={() => setActiveTab('settings')}
-                    className={`inline-flex items-center gap-2 px-3 py-2 rounded text-xs font-medium shadow-sm transition-colors ${activeTab === 'settings'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
+                    className={`inline-flex items-center gap-2 px-3 py-2 rounded text-xs font-medium shadow transition-colors ${activeTab === 'settings'
+                      ? 'bg-green-100 text-green-800 border border-green-300'
+                      : 'bg-white text-gray-600 hover:bg-[#f3f4f6] hover:text-gray-900'
                       }`}
                   >
                     <Settings className="w-3 h-3" /> Settings
@@ -5843,51 +5807,56 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
               </div>
 
               {/* Right: action buttons */}
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-3">
+
                 {(isChecker || isAdmin) && pendingCount > 0 && (
                   <button
                     onClick={() => setShowApprovalQueue(true)}
-                    className="inline-flex items-center gap-2 px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-xs font-medium shadow-sm transition-colors"
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-white text-orange-600 hover:text-orange-700 hover:bg-[#f3f4f6] rounded text-xs font-medium shadow transition-colors"
                   >
-                    <AlertTriangle className="w-3 h-3" /> {pendingCount} Pending Approvals
+                    <AlertTriangle className="w-3 h-3 text-orange-600" /> {pendingCount} Pending Approvals
                   </button>
                 )}
 
                 {fullyApprovedApplications.length > 0 && (
                   <button
                     onClick={() => setShowBulkPaymentModal(true)}
-                    className="inline-flex items-center gap-2 px-3 py-2 bg-green-700 hover:bg-green-800 text-white rounded text-xs font-medium shadow-sm transition-colors"
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-white text-green-700 hover:text-green-800 hover:bg-[#f3f4f6] rounded text-xs font-medium shadow transition-colors"
                   >
-                    <img src="M-PESA_LOGO-01.svg.png" className="w-8 h-auto" alt="mpesa" />
+                    <img src="M-PESA_LOGO-01.svg.png" className="w-6 h-auto" alt="mpesa" />
                     {isMaker ? 'Create Payment Request' : `Process Payments (${getSelectedStaffCount()})`}
                   </button>
                 )}
 
+                {(fullyApprovedApplications.length > 0 || ((isChecker || isAdmin) && pendingCount > 0)) && (
+                  <div className="w-[1px] h-5 bg-[#d4e4ff] hidden sm:block"></div>
+                )}
+
                 <button
                   onClick={() => setShowExportModal(true)}
-                  className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium shadow-sm transition-colors"
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-white text-blue-600 hover:text-blue-700 hover:bg-[#f3f4f6] rounded text-xs font-medium shadow transition-colors"
                 >
-                  <Download className="w-3 h-3" /> Export
+                  <Download className="w-3 h-3 text-blue-600" /> Export
                 </button>
 
                 <button
                   onClick={() => setShowImportModal(true)}
-                  className="inline-flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-medium shadow-sm transition-colors"
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-white text-purple-600 hover:text-purple-700 hover:bg-[#f3f4f6] rounded text-xs font-medium shadow transition-colors"
                 >
-                  <Upload className="w-3 h-3" /> Import
+                  <Upload className="w-3 h-3 text-purple-600" /> Import
                 </button>
 
                 {/* Admin Bypass Toggle */}
                 {isAdmin && (
                   <div className={`flex items-center gap-2 px-3 py-2 rounded border text-xs font-medium transition-colors ${adminBypassMode
-                      ? 'bg-red-50 border-red-300 text-red-700'
-                      : 'bg-gray-50 border-gray-300 text-gray-600'
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                    : 'bg-gray-50 border-gray-300 text-gray-600'
                     }`}>
-                    <FastForward className={`w-3.5 h-3.5 ${adminBypassMode ? 'text-red-600' : 'text-gray-400'}`} />
+                    <ShieldCheck className={`w-3.5 h-3.5 ${adminBypassMode ? 'text-emerald-600' : 'text-gray-400'}`} />
                     <span>Bypass System</span>
                     <button
                       onClick={() => setAdminBypassMode(!adminBypassMode)}
-                      className={`text-xs relative w-10 h-5 rounded-full transition-colors duration-300 focus:outline-none ${adminBypassMode ? 'bg-red-500' : 'bg-gray-300'
+                      className={`text-xs relative w-10 h-5 rounded-full transition-colors duration-300 focus:outline-none ${adminBypassMode ? 'bg-emerald-500' : 'bg-gray-300'
                         }`}
                     >
                       <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-300 ${adminBypassMode ? 'translate-x-5' : 'translate-x-0'
@@ -5895,142 +5864,136 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                     </button>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
 
-                <div className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded-[10px] border border-gray-300">
-                  Total: <strong>{filteredApplications.length}</strong> records
+        {/* Bypass mode warning banner */}
+        {adminBypassMode && (
+          <div className="mb-6 p-3 bg-emerald-50 border border-emerald-300 rounded-[10px] flex items-center gap-2 text-xs text-emerald-700 font-medium shadow-sm">
+            <ShieldCheck className="w-4 h-4 shrink-0" />
+            <span><strong>Bypass Mode Active:</strong> Normal approval requirements are bypassed. Use with caution — all bypass payments are logged.</span>
+          </div>
+        )}
+
+        {/* Row 2: Search + filter — only for applications tab */}
+        {activeTab === 'applications' && (
+          <div className="mb-6 p-4 bg-[#f3f4f6] rounded-[10px] shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Search */}
+              <div className="lg:col-span-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by name or employee number..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 rounded text-xs focus:ring-2 focus:ring-blue-600 focus:border-blue-600 bg-white shadow h-[38px]"
+                  />
                 </div>
+              </div>
+
+              {/* Enhanced Filter */}
+              <div>
+                <EnhancedFilter
+                  selectedTown={selectedTown}
+                  onTownChange={handleTownChange}
+                  allTowns={propAllTowns}
+                  userRole={userRole}
+                  userTown={userTown}
+                  isRegionalManager={isRegionalManager}
+                  selectedStatus={selectedStatus}
+                  onStatusChange={setSelectedStatus}
+                  selectedMonth={selectedMonth}
+                  onMonthChange={setSelectedMonth}
+                  selectedDateRange={selectedDateRange}
+                  onDateRangeChange={setSelectedDateRange}
+                  customStartDate={customStartDate}
+                  onCustomStartDateChange={setCustomStartDate}
+                  customEndDate={customEndDate}
+                  onCustomEndDateChange={setCustomEndDate}
+                />
+              </div>
+
+              {/* Reset */}
+              <div className="flex items-end">
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setSelectedStatus('all');
+                    setSelectedMonth('all');
+                    setSelectedDateRange('all');
+                    handleTownChange('');
+                  }}
+                  className="w-full px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 rounded bg-white hover:bg-gray-50 shadow transition-colors h-[38px]"
+                >
+                  Reset All Filters
+                </button>
               </div>
             </div>
 
-            {/* Row 2: Search + filter — only for applications tab */}
-            {activeTab === 'applications' && (
-              <div className="p-4 bg-gray-50 rounded-[10px] border border-gray-300">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Search */}
-                  <div className="lg:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Search</label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Search by name or employee number..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 bg-white"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Enhanced Filter */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Filters</label>
-                    <EnhancedFilter
-                      selectedTown={selectedTown}
-                      onTownChange={handleTownChange}
-                      allTowns={propAllTowns}
-                      userRole={userRole}
-                      userTown={userTown}
-                      isRegionalManager={isRegionalManager}
-                      selectedStatus={selectedStatus}
-                      onStatusChange={setSelectedStatus}
-                      selectedMonth={selectedMonth}
-                      onMonthChange={setSelectedMonth}
-                      selectedDateRange={selectedDateRange}
-                      onDateRangeChange={setSelectedDateRange}
-                      customStartDate={customStartDate}
-                      onCustomStartDateChange={setCustomStartDate}
-                      customEndDate={customEndDate}
-                      onCustomEndDateChange={setCustomEndDate}
-                    />
-                  </div>
-
-                  {/* Reset */}
-                  <div className="flex items-end">
-                    <button
-                      onClick={() => {
-                        setSearchTerm('');
-                        setSelectedStatus('all');
-                        setSelectedMonth('all');
-                        setSelectedDateRange('all');
-                        handleTownChange('');
-                      }}
-                      className="w-full px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded bg-white hover:bg-gray-50 transition-colors"
-                    >
-                      Reset All Filters
-                    </button>
-                  </div>
-                </div>
-
-                {/* Custom date range */}
-                {selectedDateRange === 'custom' && (
-                  <div className="mt-3 flex items-center gap-4 p-3 bg-blue-50 rounded-[10px] border border-blue-200">
-                    <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
-                    <span className="text-xs font-medium text-blue-800">Custom Range:</span>
-                    <input
-                      type="date"
-                      value={customStartDate}
-                      onChange={(e) => setCustomStartDate(e.target.value)}
-                      className="border border-gray-300 rounded px-2 py-1 text-xs"
-                    />
-                    <span className="text-xs text-gray-500">to</span>
-                    <input
-                      type="date"
-                      value={customEndDate}
-                      onChange={(e) => setCustomEndDate(e.target.value)}
-                      className="border border-gray-300 rounded px-2 py-1 text-xs"
-                    />
-                  </div>
-                )}
-
-                {/* Active town filter badge */}
-                {!isBranchManager && !isRegionalManager && selectedTown && (
-                  <div className="mt-3 flex items-center gap-2">
-                    <span className="text-xs text-gray-600">Active filter:</span>
-                    <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                      <MapPin className="w-3 h-3" />
-                      Town/Region: {getDisplayName(selectedTown)}
-                      <button onClick={() => handleTownChange('')} className="text-xs text-blue-600 hover:text-blue-800 ml-1">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  </div>
-                )}
+            {/* Custom date range */}
+            {selectedDateRange === 'custom' && (
+              <div className="mt-3 flex items-center gap-4 p-3 bg-[#f3f4f6] rounded-[10px] shadow-sm">
+                <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
+                <span className="text-xs font-medium text-blue-800">Custom Range:</span>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="border border-[#9ab8e8] rounded px-2 py-1 text-xs bg-white"
+                />
+                <span className="text-xs text-gray-500">to</span>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="border border-[#9ab8e8] rounded px-2 py-1 text-xs bg-white"
+                />
               </div>
             )}
 
-            {/* Bypass mode warning banner */}
-            {adminBypassMode && (
-              <div className="p-3 bg-red-50 border border-red-300 rounded-[10px] flex items-center gap-2 text-xs text-red-700 font-medium">
-                <FastForward className="w-4 h-4 shrink-0" />
-                <span><strong>Bypass Mode Active:</strong> Normal approval requirements are bypassed. Use with caution — all bypass payments are logged.</span>
+            {/* Active town filter badge */}
+            {!isBranchManager && !isRegionalManager && selectedTown && (
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-xs text-gray-600">Active filter:</span>
+                <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                  <MapPin className="w-3 h-3" />
+                  Town/Region: {getDisplayName(selectedTown)}
+                  <button onClick={() => handleTownChange('')} className="text-xs text-blue-600 hover:text-blue-800 ml-1">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
               </div>
             )}
           </div>
-        </div>
+        )}
 
         {/* ── Summary Cards — applications tab only ─────── */}
         {activeTab === 'applications' && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
-            <div className="bg-white p-4 rounded-[10px] border border-gray-300 shadow-sm">
+            <div className="bg-[#f3f4f6] p-4 rounded-[10px] shadow-sm">
               <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Total Applications</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">{filteredApplications.length}</p>
               <p className="text-xs text-gray-500 mt-1">Across all locations</p>
             </div>
-            <div className="bg-white p-4 rounded-[10px] border border-gray-300 shadow-sm">
+            <div className="bg-[#f3f4f6] p-4 rounded-[10px] shadow-sm">
               <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Total Disbursed</p>
               <p className="text-xl font-bold text-green-700 mt-1">
                 {formatKES(filteredApplications.filter(a => ['paid'].includes(a.status?.toLowerCase())).reduce((s, a) => s + Number(a["Amount Requested"] || 0), 0))}
               </p>
               <p className="text-xs text-gray-500 mt-1">Amount paid out</p>
             </div>
-            <div className="bg-white p-4 rounded-[10px] border border-gray-300 shadow-sm">
+            <div className="bg-[#f3f4f6] p-4 rounded-[10px] shadow-sm">
               <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Pending Liability</p>
               <p className="text-xl font-bold text-amber-700 mt-1">
                 {formatKES(filteredApplications.filter(a => !['paid', 'rejected'].includes(a.status?.toLowerCase())).reduce((s, a) => s + Number(a["Amount Requested"] || 0), 0))}
               </p>
               <p className="text-xs text-gray-500 mt-1">{filteredApplications.filter(a => !['paid', 'rejected'].includes(a.status?.toLowerCase())).length} active</p>
             </div>
-            <div className="bg-white p-4 rounded-[10px] border border-gray-300 shadow-sm">
+            <div className="bg-[#f3f4f6] p-4 rounded-[10px] shadow-sm">
               <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Approval Queue</p>
               <p className="text-2xl font-bold text-blue-700 mt-1">{pendingCount}</p>
               {(isChecker || isAdmin) && pendingCount > 0 && (
@@ -6047,17 +6010,17 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
         {/* ── Main Content ──────────────────────────────── */}
         {activeTab === 'settings' ? (
-          <div className="bg-white rounded-[10px] border border-gray-300 shadow-sm p-6">
+          <div className="bg-[#f3f4f6] rounded-[10px] shadow-sm p-6">
             <AdvanceApplicationManager />
           </div>
 
         ) : activeTab === 'callbacks' ? (
-          <div className="bg-white rounded-[10px] border border-gray-300 shadow-sm overflow-hidden">
+          <div className="bg-[#f3f4f6] rounded-[10px] shadow-sm overflow-hidden">
             <MpesaCallbacks filterType="payments" />
           </div>
 
         ) : activeTab === 'transaction_status' ? (
-          <div className="bg-white rounded-[10px] border border-gray-300 shadow-sm overflow-hidden">
+          <div className="bg-[#f3f4f6] rounded-[10px] shadow-sm overflow-hidden">
             <TransactionStatusChecker />
           </div>
 
@@ -6067,7 +6030,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
             {/* Approval Queue panel */}
             {showApprovalQueue && (isChecker || isAdmin) && (
-              <div className="bg-white rounded-[10px] border border-gray-300 shadow-sm p-6">
+              <div className="bg-[#f3f4f6] rounded-[10px] shadow-sm p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                     <Clock className="w-5 h-5 text-orange-600" />
@@ -6099,7 +6062,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
             {/* Info banners */}
             {(isBranchManager || isRegionalManager) && selectedTown && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-[10px] flex items-center gap-2 text-xs text-blue-800">
+              <div className="p-3 bg-white border border-gray-200 rounded-[10px] flex items-center gap-2 text-xs text-blue-800">
                 <MapPin className="w-4 h-4 shrink-0" />
                 <span>
                   {isRegionalManager
@@ -6110,17 +6073,10 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
               </div>
             )}
 
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-[10px] flex items-center gap-2 text-xs text-amber-800">
-              <Calendar className="w-4 h-4 shrink-0" />
-              <span>
-                <strong>Payment Restriction:</strong> Only applications from{' '}
-                {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })} can be processed.
-                Previous-month applications are shown with reduced opacity.
-              </span>
-            </div>
+
 
             {/* Applications table */}
-            <div className="bg-white rounded-[10px] border border-gray-300 shadow-sm overflow-hidden">
+            <div className="bg-[#f3f4f6] rounded-[5px] shadow-sm overflow-hidden">
               {isLoading ? (
                 <div className="flex items-center justify-center py-16">
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600" />
@@ -6142,20 +6098,20 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                 <>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-300">
-                      <thead className="bg-gray-50 border-b border-gray-300">
+                      <thead className="bg-gray-600 border-b border-gray-700">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-300">Employee</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-300">Mobile</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-300">{isRegionalManager ? 'Region' : 'Branch'}</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-300">Amount</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-300">Reason</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-300">Approval Status</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-300">Notes</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-300">Date</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">Employee</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">Mobile</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">{isRegionalManager ? 'Region' : 'Branch'}</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">Amount</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">Reason</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">Approval status</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">Notes</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">Date</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
+                      <tbody className="bg-[#f3f4f6] divide-y divide-gray-200">
                         {currentItems.map((app) => {
                           const appDate = parseApplicationDate(app);
                           const now = new Date();
@@ -6280,7 +6236,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                         <CheckCircle className="w-3 h-3" /> Recommend
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'bm-recommend-adjusted')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-white hover:bg-blue-100 rounded border border-gray-200">
                                         <Edit3 className="w-3 h-3" /> Adjusted
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'bm-recommend-reject')}
@@ -6298,7 +6254,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                         <CheckCircle className="w-3 h-3" /> Recommend
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'rm-recommend-adjusted')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-white hover:bg-blue-100 rounded border border-gray-200">
                                         <Edit3 className="w-3 h-3" /> Adjusted
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'rm-recommend-reject')}
@@ -6311,7 +6267,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                   {/* RM comment */}
                                   {canRegionalManagerComment(app) && (
                                     <button onClick={() => openCommentModal(app)}
-                                      className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200">
+                                      className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-white hover:bg-blue-100 rounded border border-gray-200">
                                       <Smartphone className="w-3 h-3" /> Comment
                                     </button>
                                   )}
@@ -6324,7 +6280,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                         <CheckCircle className="w-3 h-3" /> Approve
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'admin-approve-adjusted')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-white hover:bg-blue-100 rounded border border-gray-200">
                                         <Edit3 className="w-3 h-3" /> Adjusted
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'admin-reject')}
@@ -6341,9 +6297,9 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                       <button
                                         disabled={isLoading || isBypassLoading}
                                         onClick={() => handleIndividualBypassPayment(app)}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded border border-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed"
                                       >
-                                        <FastForward className="w-3 h-3" /> Bypass & Pay Now
+                                        <ShieldCheck className="w-3 h-3" /> Bypass & Pay Now
                                       </button>
                                     )}
 
@@ -6362,7 +6318,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                     </span>
                                   )}
                                   {['approved', 'fully approved'].includes(app.status?.toLowerCase()) && (
-                                    <span className="inline-flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                                    <span className="inline-flex items-center gap-1 text-xs text-blue-700 bg-white px-2 py-1 rounded border border-gray-200">
                                       <Clock className="w-3 h-3" /> Ready for Payment
                                     </span>
                                   )}
@@ -6413,8 +6369,8 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                               key={page}
                               onClick={() => paginate(page)}
                               className={`min-w-[2rem] px-2 py-1 text-xs rounded border ${currentPage === page
-                                  ? 'bg-blue-600 text-white border-blue-600'
-                                  : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+                                ? 'bg-blue-600 text-white border-blue-600'
+                                : 'border-gray-300 text-gray-700 hover:bg-gray-100'
                                 }`}
                             >
                               {page}
