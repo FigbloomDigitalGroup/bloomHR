@@ -24,6 +24,7 @@ import {
   Mails,
   ShieldHalf,
   Search,
+  HeartHandshake,
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -58,6 +59,7 @@ const menuGroups = [
       { id: 'training', label: 'Training', icon: Award, path: '/training', permission: 'training' },
       { id: 'assign-managers', label: 'Assign Managers', icon: UserCheck, path: '/assign-managers', permission: 'assign-managers' },
       { id: 'staffcheck', label: 'Disciplinary', icon: ShieldAlert, path: '/staffcheck', permission: 'staffcheck' },
+      { id: 'hr-lifecycle', label: 'HR Lifecycle', icon: HeartHandshake, path: '/hr-lifecycle', permission: 'hr-lifecycle' },
     ]
   },
   {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, Copy, Trash2 } from 'lucide-react';
+import { Search, RefreshCw, CheckCircle, XCircle, Clock, Copy, Trash2, Zap, Database, Server, Info, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface TransactionResult {
@@ -19,18 +19,16 @@ const TransactionStatusChecker: React.FC = () => {
     const [isChecking, setIsChecking] = useState(false);
     const [activeTab, setActiveTab] = useState<'single' | 'bulk'>('single');
 
-    // Check single transaction status
     const checkSingleStatus = async () => {
         if (!singleCode.trim()) {
-            toast.error('Please enter a transaction code');
+            toast.error('Please enter a Transaction ID');
             return;
         }
 
         setIsChecking(true);
-        const toastId = toast.loading('Checking transaction status...');
+        const toastId = toast.loading('Checking M-Pesa transaction status...');
 
         try {
-            // Add to results as pending
             const newResult: TransactionResult = {
                 transactionID: singleCode.trim(),
                 status: 'checking'
@@ -44,17 +42,15 @@ const TransactionStatusChecker: React.FC = () => {
                 },
                 body: JSON.stringify({
                     transactionID: singleCode.trim(),
-                    remarks: 'Single status check from Transaction Status tab',
-                    occasion: 'SingleStatusCheck'
+                    remarks: 'Manual status check from ZiraPro',
+                    occasion: 'StatusCheck'
                 }),
             });
 
             const result = await response.json();
 
             if (result.success) {
-                toast.success('Status check initiated! Results will appear shortly.', { id: toastId });
-
-                // Update result
+                toast.success('Check Request Sent', { id: toastId });
                 setResults(prev => prev.map(r =>
                     r.transactionID === singleCode.trim()
                         ? {
@@ -65,14 +61,9 @@ const TransactionStatusChecker: React.FC = () => {
                         }
                         : r
                 ));
-
-                // Clear input
                 setSingleCode('');
-
-                // Poll for results after 10 seconds
-                setTimeout(() => pollForResult(singleCode.trim()), 10000);
             } else {
-                toast.error('Failed: ' + (result.message || 'Unknown error'), { id: toastId });
+                toast.error('Failed: ' + (result.message || 'M-Pesa API Unresponsive'), { id: toastId });
                 setResults(prev => prev.map(r =>
                     r.transactionID === singleCode.trim()
                         ? { ...r, status: 'failed', error: result.message }
@@ -80,11 +71,10 @@ const TransactionStatusChecker: React.FC = () => {
                 ));
             }
         } catch (error) {
-            console.error('Error checking status:', error);
-            toast.error('Error checking status', { id: toastId });
+            toast.error('Network Error: Could not connect to API', { id: toastId });
             setResults(prev => prev.map(r =>
                 r.transactionID === singleCode.trim()
-                    ? { ...r, status: 'failed', error: 'Network error' }
+                    ? { ...r, status: 'failed', error: 'Network Connection Failed' }
                     : r
             ));
         } finally {
@@ -92,7 +82,6 @@ const TransactionStatusChecker: React.FC = () => {
         }
     };
 
-    // Check bulk transaction statuses
     const checkBulkStatus = async () => {
         const codes = bulkCodes
             .split(/[\n,;]/)
@@ -100,20 +89,14 @@ const TransactionStatusChecker: React.FC = () => {
             .filter(code => code.length > 0);
 
         if (codes.length === 0) {
-            toast.error('Please enter at least one transaction code');
-            return;
-        }
-
-        if (codes.length > 50) {
-            toast.error('Maximum 50 transaction codes allowed at once');
+            toast.error('Please enter at least one Transaction ID');
             return;
         }
 
         setIsChecking(true);
-        const toastId = toast.loading(`Checking ${codes.length} transactions...`);
+        const toastId = toast.loading(`Checking bulk status: ${codes.length} transactions`);
 
         try {
-            // Add all to results as checking
             const newResults: TransactionResult[] = codes.map(code => ({
                 transactionID: code,
                 status: 'checking'
@@ -123,28 +106,23 @@ const TransactionStatusChecker: React.FC = () => {
             let successCount = 0;
             let failCount = 0;
 
-            // Process in batches of 5
             const batchSize = 5;
             for (let i = 0; i < codes.length; i += batchSize) {
                 const batch = codes.slice(i, i + batchSize);
-
                 await Promise.all(
                     batch.map(async (code) => {
                         try {
                             const response = await fetch('https://mpesa-22p0.onrender.com/api/mpesa/check-transaction-status', {
                                 method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
+                                headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     transactionID: code,
-                                    remarks: 'Bulk status check from Transaction Status tab',
+                                    remarks: 'Bulk automated status check',
                                     occasion: 'BulkStatusCheck'
                                 }),
                             });
 
                             const result = await response.json();
-
                             if (result.success) {
                                 successCount++;
                                 setResults(prev => prev.map(r =>
@@ -166,337 +144,243 @@ const TransactionStatusChecker: React.FC = () => {
                                 ));
                             }
                         } catch (error) {
-                            console.error(`Error checking ${code}:`, error);
                             failCount++;
                             setResults(prev => prev.map(r =>
                                 r.transactionID === code
-                                    ? { ...r, status: 'failed', error: 'Network error' }
+                                    ? { ...r, status: 'failed', error: 'Connection Error' }
                                     : r
                             ));
                         }
                     })
                 );
-
-                // Update progress
-                toast.loading(
-                    `Checking transactions... ${Math.min(i + batchSize, codes.length)}/${codes.length}`,
-                    { id: toastId }
-                );
-
-                // Small delay between batches
                 if (i + batchSize < codes.length) {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await new Promise(resolve => setTimeout(resolve, 800));
                 }
             }
 
-            // Show final result
-            if (failCount === 0) {
-                toast.success(
-                    `✅ Successfully initiated ${successCount} status checks. Results will update shortly.`,
-                    { id: toastId, duration: 5000 }
-                );
-            } else {
-                toast.success(
-                    `Completed: ${successCount} successful, ${failCount} failed`,
-                    { id: toastId, duration: 5000 }
-                );
-            }
-
-            // Clear input
+            toast.success(`Bulk Check Complete: ${successCount} Successful`, { id: toastId });
             setBulkCodes('');
-
-            // Poll for results after 10 seconds
-            setTimeout(() => {
-                codes.forEach(code => pollForResult(code));
-            }, 10000);
-
         } catch (error) {
-            console.error('Bulk check error:', error);
-            toast.error('Error during bulk check', { id: toastId });
+            toast.error('Bulk Check Interrupted', { id: toastId });
         } finally {
             setIsChecking(false);
         }
     };
 
-    // Poll for result from database
-    const pollForResult = async (transactionID: string) => {
-        // This would query your Supabase database for the updated status
-        // For now, we'll just mark it as pending
-        // You can implement actual polling logic here
-        console.log('Polling for result:', transactionID);
-    };
-
-    // Copy transaction ID
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
-        toast.success('Copied to clipboard');
+        toast.success('Copied to Clipboard');
     };
 
-    // Remove result
-    const removeResult = (transactionID: string) => {
-        setResults(prev => prev.filter(r => r.transactionID !== transactionID));
-    };
-
-    // Clear all results
-    const clearAllResults = () => {
-        setResults([]);
-        toast.success('All results cleared');
-    };
-
-    // Get status icon
-    const getStatusIcon = (status: string) => {
+    const getStatusStyles = (status: string) => {
         switch (status) {
-            case 'success':
-                return <CheckCircle className="w-5 h-5 text-green-600" />;
-            case 'failed':
-                return <XCircle className="w-5 h-5 text-red-600" />;
-            case 'pending':
-                return <Clock className="w-5 h-5 text-yellow-600 animate-pulse" />;
-            case 'checking':
-                return <RefreshCw className="w-5 h-5 text-blue-600 animate-spin" />;
-            default:
-                return <AlertCircle className="w-5 h-5 text-gray-600" />;
+            case 'success': return 'bg-green-50 text-green-700 border-green-200';
+            case 'failed': return 'bg-red-50 text-red-700 border-red-200';
+            case 'pending': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+            case 'checking': return 'bg-blue-50 text-blue-700 border-blue-200';
+            default: return 'bg-gray-50 text-gray-700 border-gray-200';
         }
     };
 
-    // Get status badge
-    const getStatusBadge = (status: string) => {
-        const config = {
-            success: { bg: 'bg-green-100', text: 'text-green-800', label: 'Success' },
-            failed: { bg: 'bg-red-100', text: 'text-red-800', label: 'Failed' },
-            pending: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pending' },
-            checking: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Checking...' }
-        };
-
-        const { bg, text, label } = config[status as keyof typeof config] || config.pending;
-
-        return (
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${bg} ${text}`}>
-                {label}
-            </span>
-        );
-    };
-
     return (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="p-6">
             {/* Header */}
-            <div className="mb-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                            <Search className="w-5 h-5 text-blue-600" />
-                            M-Pesa Transaction Status Checker
-                        </h2>
-                        <p className="text-sm text-gray-500 mt-1">
-                            Check the status of M-Pesa transactions by entering transaction codes
-                        </p>
-                    </div>
-                    {results.length > 0 && (
-                        <button
-                            onClick={clearAllResults}
-                            className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                            Clear All
-                        </button>
-                    )}
+            <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        <Server className="w-5 h-5 text-gray-500" />
+                        M-Pesa Transaction Status Checker
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                        Manually query Safaricom's B2C API for the final status of a transaction
+                    </p>
                 </div>
             </div>
 
-            {/* Tabs */}
-            <div className="border-b border-gray-200 mb-6">
-                <nav className="-mb-px flex space-x-8">
-                    <button
-                        onClick={() => setActiveTab('single')}
-                        className={`${activeTab === 'single'
-                                ? 'border-blue-500 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2`}
-                    >
-                        <Search className="w-4 h-4" />
-                        Single Check
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('bulk')}
-                        className={`${activeTab === 'bulk'
-                                ? 'border-blue-500 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2`}
-                    >
-                        <RefreshCw className="w-4 h-4" />
-                        Bulk Check
-                    </button>
-                </nav>
-            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-            {/* Single Check Tab */}
-            {activeTab === 'single' && (
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Enter M-Pesa Transaction Code
-                        </label>
-                        <div className="flex gap-3">
-                            <input
-                                type="text"
-                                value={singleCode}
-                                onChange={(e) => setSingleCode(e.target.value.toUpperCase())}
-                                onKeyPress={(e) => e.key === 'Enter' && checkSingleStatus()}
-                                placeholder="e.g., UAMC14MZPJ"
-                                className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-mono"
-                                disabled={isChecking}
-                            />
+                {/* Left Column: Input Panel */}
+                <div className="lg:col-span-5 space-y-6">
+                    <div className="bg-white rounded-[10px] border border-gray-300 shadow-sm overflow-hidden">
+
+                        {/* Tabs */}
+                        <div className="flex border-b border-gray-300 bg-gray-50">
                             <button
-                                onClick={checkSingleStatus}
-                                disabled={isChecking || !singleCode.trim()}
-                                className="flex items-center gap-2 px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={() => setActiveTab('single')}
+                                className={`flex-1 py-3 px-4 text-xs font-medium transition-colors ${activeTab === 'single'
+                                        ? 'bg-white text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                                    }`}
                             >
-                                {isChecking ? (
-                                    <>
-                                        <RefreshCw className="w-4 h-4 animate-spin" />
-                                        Checking...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Search className="w-4 h-4" />
-                                        Check Status
-                                    </>
-                                )}
+                                <div className="flex items-center justify-center gap-2">
+                                    <Zap className="w-4 h-4" /> Single Lookup
+                                </div>
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('bulk')}
+                                className={`flex-1 py-3 px-4 text-xs font-medium transition-colors ${activeTab === 'bulk'
+                                        ? 'bg-white text-blue-600 border-b-2 border-blue-600'
+                                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                                    }`}
+                            >
+                                <div className="flex items-center justify-center gap-2">
+                                    <Database className="w-4 h-4" /> Bulk Lookup
+                                </div>
                             </button>
                         </div>
-                        <p className="text-xs text-gray-500 mt-2">
-                            Enter a single M-Pesa transaction code (e.g., UAMC14MZPJ) and press Enter or click Check Status
-                        </p>
-                    </div>
-                </div>
-            )}
 
-            {/* Bulk Check Tab */}
-            {activeTab === 'bulk' && (
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Enter Multiple M-Pesa Transaction Codes
-                        </label>
-                        <textarea
-                            value={bulkCodes}
-                            onChange={(e) => setBulkCodes(e.target.value.toUpperCase())}
-                            placeholder="Enter transaction codes (one per line or comma-separated)&#10;Example:&#10;UAMC14MZPJ&#10;SGL31HA2UV&#10;RBK41JC3WX"
-                            rows={8}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-mono"
-                            disabled={isChecking}
-                        />
-                        <div className="flex items-center justify-between mt-2">
-                            <p className="text-xs text-gray-500">
-                                Separate codes by new line, comma, or semicolon. Maximum 50 codes at once.
-                            </p>
-                            <span className="text-xs text-gray-600 font-medium">
-                                {bulkCodes.split(/[\n,;]/).filter(c => c.trim()).length} codes
-                            </span>
-                        </div>
-                    </div>
-                    <button
-                        onClick={checkBulkStatus}
-                        disabled={isChecking || !bulkCodes.trim()}
-                        className="w-full flex items-center justify-center gap-2 px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {isChecking ? (
-                            <>
-                                <RefreshCw className="w-5 h-5 animate-spin" />
-                                Checking Transactions...
-                            </>
-                        ) : (
-                            <>
-                                <RefreshCw className="w-5 h-5" />
-                                Check All Statuses
-                            </>
-                        )}
-                    </button>
-                </div>
-            )}
-
-            {/* Results Section */}
-            {results.length > 0 && (
-                <div className="mt-8">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-semibold text-gray-900">
-                            Results ({results.length})
-                        </h3>
-                        <p className="text-xs text-gray-500">
-                            Results update automatically as M-Pesa responds (10-60 seconds)
-                        </p>
-                    </div>
-
-                    <div className="space-y-3">
-                        {results.map((result, index) => (
-                            <div
-                                key={`${result.transactionID}-${index}`}
-                                className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
-                            >
-                                <div className="flex items-start justify-between">
-                                    <div className="flex items-start gap-3 flex-1">
-                                        {getStatusIcon(result.status)}
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="font-mono text-sm font-semibold text-gray-900">
-                                                    {result.transactionID}
-                                                </span>
-                                                {getStatusBadge(result.status)}
-                                            </div>
-
-                                            {result.resultDesc && (
-                                                <p className="text-xs text-gray-600 mt-1">
-                                                    {result.resultDesc}
-                                                </p>
-                                            )}
-
-                                            {result.error && (
-                                                <p className="text-xs text-red-600 mt-1">
-                                                    Error: {result.error}
-                                                </p>
-                                            )}
-
-                                            {result.conversationID && (
-                                                <p className="text-xs text-gray-500 mt-1">
-                                                    Conversation ID: {result.conversationID}
-                                                </p>
-                                            )}
+                        {/* Input Area */}
+                        <div className="p-5">
+                            {activeTab === 'single' ? (
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Transaction ID (M-Pesa Receipt Number)
+                                        </label>
+                                        <div className="relative">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                            <input
+                                                type="text"
+                                                value={singleCode}
+                                                onChange={(e) => setSingleCode(e.target.value.toUpperCase())}
+                                                onKeyPress={(e) => e.key === 'Enter' && checkSingleStatus()}
+                                                placeholder="e.g. SAA0XXXXXX"
+                                                className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-[10px] focus:ring-2 focus:ring-blue-600 focus:border-blue-600 uppercase font-mono shadow-sm"
+                                                disabled={isChecking}
+                                            />
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={() => copyToClipboard(result.transactionID)}
-                                            className="p-1.5 text-gray-400 hover:text-gray-600 rounded"
-                                            title="Copy transaction ID"
-                                        >
-                                            <Copy className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={() => removeResult(result.transactionID)}
-                                            className="p-1.5 text-gray-400 hover:text-red-600 rounded"
-                                            title="Remove"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
+                                    <button
+                                        onClick={checkSingleStatus}
+                                        disabled={isChecking || !singleCode.trim()}
+                                        className="text-xs w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-[10px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
+                                    >
+                                        {isChecking ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                                        Check Status
+                                    </button>
                                 </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                            Multiple Transaction IDs (One per line)
+                                        </label>
+                                        <textarea
+                                            value={bulkCodes}
+                                            onChange={(e) => setBulkCodes(e.target.value.toUpperCase())}
+                                            placeholder="SAA0XXXXXX&#10;SAB1XXXXXX&#10;SAC2XXXXXX"
+                                            rows={6}
+                                            className="w-full p-3 bg-white border border-gray-300 rounded-[10px] focus:ring-2 focus:ring-blue-600 focus:border-blue-600 font-mono uppercase shadow-sm"
+                                            disabled={isChecking}
+                                        />
+                                    </div>
+
+                                    <button
+                                        onClick={checkBulkStatus}
+                                        disabled={isChecking || !bulkCodes.trim()}
+                                        className="text-xs w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-[10px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
+                                    >
+                                        {isChecking ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
+                                        Check {bulkCodes.split(/[\n,;]/).filter(c => c.trim()).length || 0} Transactions
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Info Callout */}
+                            <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-[10px] flex gap-3 text-blue-800">
+                                <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                                <p>
+                                    This tool sends a server-to-server request directly to Safaricom's B2C API to query the
+                                    Transaction Status. If the transaction was successful, Safaricom will queue a callback to the system within a few minutes.
+                                </p>
                             </div>
-                        ))}
+                        </div>
                     </div>
                 </div>
-            )}
 
-            {/* Empty State */}
-            {results.length === 0 && (
-                <div className="mt-8 text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                    <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-sm font-medium text-gray-900 mb-1">No results yet</h3>
-                    <p className="text-xs text-gray-500">
-                        Enter transaction codes above to check their status
-                    </p>
+                {/* Right Column: Results List */}
+                <div className="lg:col-span-7">
+                    <div className="bg-white rounded-[10px] border border-gray-300 shadow-sm h-full flex flex-col min-h-[500px]">
+                        <div className="px-5 py-4 border-b border-gray-300 bg-gray-50 flex items-center justify-between rounded-[10px]">
+                            <h3 className="font-semibold text-gray-700 flex items-center gap-2">
+                                <RefreshCw className="w-4 h-4 text-gray-500" /> Result History
+                            </h3>
+                            {results.length > 0 && (
+                                <button
+                                    onClick={() => setResults([])}
+                                    className="text-xs text-red-600 hover:text-red-800 font-medium flex items-center gap-1"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" /> Clear History
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-2 max-h-[600px]">
+                            {results.length > 0 ? (
+                                <ul className="divide-y divide-gray-200">
+                                    {results.map((result) => (
+                                        <li key={result.transactionID} className="p-3 hover:bg-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors">
+                                            <div className="flex items-center gap-4">
+                                                {/* Status Icon */}
+                                                <div className="shrink-0 bg-white shadow-sm border border-gray-200 w-10 h-10 rounded-full flex items-center justify-center">
+                                                    {result.status === 'checking' ? <RefreshCw className="w-5 h-5 text-blue-600 animate-spin" /> :
+                                                        result.status === 'success' ? <CheckCircle className="w-5 h-5 text-green-600" /> :
+                                                            result.status === 'failed' ? <XCircle className="w-5 h-5 text-red-600" /> :
+                                                                <Clock className="w-5 h-5 text-yellow-600" />}
+                                                </div>
+
+                                                {/* Details */}
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-bold text-gray-900 font-mono">
+                                                            {result.transactionID}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => copyToClipboard(result.transactionID)}
+                                                            className="text-xs text-gray-400 hover:text-blue-600"
+                                                            title="Copy ID"
+                                                        >
+                                                            <Copy className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                    <p className="text-gray-500 mt-0.5">
+                                                        Conv ID: {result.originatorConversationID || 'Waiting...'}
+                                                    </p>
+                                                    {result.error && (
+                                                        <p className="text-red-600 mt-1">{result.error}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Status Badge & Remove Action */}
+                                            <div className="flex items-center justify-between sm:justify-end gap-4 ml-14 sm:ml-0">
+                                                <span className={`px-2.5 py-1 inline-flex leading-5 font-semibold rounded-[10px] border uppercase ${getStatusStyles(result.status)}`}>
+                                                    {result.status}
+                                                </span>
+                                                <button
+                                                    onClick={() => setResults(prev => prev.filter(r => r.transactionID !== result.transactionID))}
+                                                    className="text-xs text-gray-400 hover:text-red-500"
+                                                    title="Remove from list"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center py-20 text-gray-400">
+                                    <Database className="w-12 h-12 mb-4 text-gray-300" />
+                                    <p className="font-medium text-gray-500">No recent status checks.</p>
+                                    <p className="mt-1 text-center">Enter a transaction ID on the left to query safaricom.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
-            )}
+
+            </div>
         </div>
     );
 };

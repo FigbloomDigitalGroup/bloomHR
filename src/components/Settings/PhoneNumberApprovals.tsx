@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     Phone,
     CheckCircle2,
@@ -10,7 +10,16 @@ import {
     AlertCircle,
     User,
     Calendar,
-    MessageSquare
+    MessageSquare,
+    ChevronLeft,
+    ChevronRight,
+    ArrowUpRight,
+    Building,
+    MapPin,
+    ShieldCheck,
+    X,
+    CheckCircle,
+    Zap
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
@@ -28,6 +37,7 @@ interface PhoneChangeRequest {
     admin_notes: string | null;
     employee_name?: string;
     employee_email?: string;
+    branch?: string;
 }
 
 const PhoneNumberApprovals = () => {
@@ -45,14 +55,23 @@ const PhoneNumberApprovals = () => {
     }, []);
 
     useEffect(() => {
-        filterRequests();
+        let filtered = requests;
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(req => req.status === statusFilter);
+        }
+        if (searchTerm) {
+            filtered = filtered.filter(req =>
+                req.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                req.employee_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                req.requested_phone.includes(searchTerm)
+            );
+        }
+        setFilteredRequests(filtered);
     }, [requests, searchTerm, statusFilter]);
 
     const fetchRequests = async () => {
         try {
             setIsLoading(true);
-
-            // Fetch requests with employee details
             const { data: requestsData, error: requestsError } = await supabase
                 .from('phone_number_change_requests')
                 .select('*')
@@ -60,12 +79,11 @@ const PhoneNumberApprovals = () => {
 
             if (requestsError) throw requestsError;
 
-            // Fetch employee details for each request
             const requestsWithEmployeeData = await Promise.all(
                 (requestsData || []).map(async (request) => {
                     const { data: employeeData } = await supabase
                         .from('employees')
-                        .select('"First Name", "Last Name", "Work Email"')
+                        .select('"First Name", "Last Name", "Work Email", "Branch"')
                         .eq('"Employee Number"', request.employee_number)
                         .single();
 
@@ -74,7 +92,8 @@ const PhoneNumberApprovals = () => {
                         employee_name: employeeData
                             ? `${employeeData['First Name']} ${employeeData['Last Name']}`
                             : 'Unknown',
-                        employee_email: employeeData?.['Work Email'] || ''
+                        employee_email: employeeData?.['Work Email'] || '',
+                        branch: employeeData?.Branch || 'Mular Central'
                     };
                 })
             );
@@ -88,33 +107,12 @@ const PhoneNumberApprovals = () => {
         }
     };
 
-    const filterRequests = () => {
-        let filtered = requests;
-
-        // Filter by status
-        if (statusFilter !== 'all') {
-            filtered = filtered.filter(req => req.status === statusFilter);
-        }
-
-        // Filter by search term
-        if (searchTerm) {
-            filtered = filtered.filter(req =>
-                req.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                req.employee_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                req.requested_phone.includes(searchTerm)
-            );
-        }
-
-        setFilteredRequests(filtered);
-    };
-
     const approveRequest = async (requestId: string) => {
         setIsProcessing(true);
         try {
             const request = requests.find(r => r.id === requestId);
             if (!request) return;
 
-            // Get current admin user
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('Not authenticated');
 
@@ -124,11 +122,8 @@ const PhoneNumberApprovals = () => {
                 .eq('"Work Email"', user.email)
                 .single();
 
-            const adminName = adminData
-                ? `${adminData['First Name']} ${adminData['Last Name']}`
-                : user.email;
+            const adminName = adminData ? `${adminData['First Name']} ${adminData['Last Name']}` : user.email;
 
-            // Update the employee's phone number
             const { error: updateError } = await supabase
                 .from('employees')
                 .update({ 'Mobile Number': request.requested_phone })
@@ -136,7 +131,6 @@ const PhoneNumberApprovals = () => {
 
             if (updateError) throw updateError;
 
-            // Update the request status
             const { error: requestError } = await supabase
                 .from('phone_number_change_requests')
                 .update({
@@ -149,7 +143,6 @@ const PhoneNumberApprovals = () => {
 
             if (requestError) throw requestError;
 
-            // Send notification to employee
             await notifyEmployee(
                 request.employee_number,
                 'approved',
@@ -161,7 +154,6 @@ const PhoneNumberApprovals = () => {
             setAdminNotes('');
             await fetchRequests();
         } catch (error) {
-            console.error('Error approving request:', error);
             toast.error('Failed to approve request');
         } finally {
             setIsProcessing(false);
@@ -179,7 +171,6 @@ const PhoneNumberApprovals = () => {
             const request = requests.find(r => r.id === requestId);
             if (!request) return;
 
-            // Get current admin user
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('Not authenticated');
 
@@ -189,11 +180,8 @@ const PhoneNumberApprovals = () => {
                 .eq('"Work Email"', user.email)
                 .single();
 
-            const adminName = adminData
-                ? `${adminData['First Name']} ${adminData['Last Name']}`
-                : user.email;
+            const adminName = adminData ? `${adminData['First Name']} ${adminData['Last Name']}` : user.email;
 
-            // Update the request status
             const { error: requestError } = await supabase
                 .from('phone_number_change_requests')
                 .update({
@@ -206,7 +194,6 @@ const PhoneNumberApprovals = () => {
 
             if (requestError) throw requestError;
 
-            // Send notification to employee
             await notifyEmployee(
                 request.employee_number,
                 'rejected',
@@ -218,7 +205,6 @@ const PhoneNumberApprovals = () => {
             setAdminNotes('');
             await fetchRequests();
         } catch (error) {
-            console.error('Error rejecting request:', error);
             toast.error('Failed to reject request');
         } finally {
             setIsProcessing(false);
@@ -227,265 +213,267 @@ const PhoneNumberApprovals = () => {
 
     const notifyEmployee = async (employeeNumber: string, status: string, message: string) => {
         try {
-            await supabase
-                .from('notifications')
-                .insert({
-                    employee_number: employeeNumber,
-                    type: `phone_change_${status}`,
-                    title: `Phone Number Change ${status === 'approved' ? 'Approved' : 'Rejected'}`,
-                    message,
-                    priority: 'high',
-                    is_read: false,
-                    created_at: new Date().toISOString()
-                });
+            await supabase.from('notifications').insert({
+                employee_number: employeeNumber,
+                type: `phone_change_${status}`,
+                title: `Phone Number Change ${status.toUpperCase()}`,
+                message,
+                priority: 'high',
+                is_read: false,
+                created_at: new Date().toISOString()
+            });
         } catch (error) {
             console.error('Error sending notification:', error);
         }
     };
 
-    const getStatusBadge = (status: string) => {
-        const styles = {
-            pending: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-            approved: 'bg-green-100 text-green-800 border-green-300',
-            rejected: 'bg-red-100 text-red-800 border-red-300'
-        };
-
-        const icons = {
-            pending: Clock,
-            approved: CheckCircle2,
-            rejected: XCircle
-        };
-
-        const Icon = icons[status as keyof typeof icons];
-
-        return (
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${styles[status as keyof typeof styles]}`}>
-                <Icon className="w-3 h-3 mr-1" />
-                {status.charAt(0).toUpperCase() + status.slice(1)}
-            </span>
-        );
+    const getStatusStyles = (status: string) => {
+        switch (status) {
+            case 'approved': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+            case 'rejected': return 'bg-red-50 text-red-700 border-red-100';
+            default: return 'bg-amber-50 text-amber-700 border-amber-100';
+        }
     };
 
-    if (isLoading) {
-        return (
-            <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-            </div>
-        );
-    }
-
     return (
-        <div className="p-6">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                {/* Header */}
-                <div className="p-6 border-b border-gray-200">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h2 className="text-xl font-semibold text-gray-900">Phone Number Change Requests</h2>
-                            <p className="text-sm text-gray-600 mt-1">Review and approve staff phone number updates</p>
+        <div className="space-y-8 pb-12">
+            {/* Premium Header Card */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="md:col-span-1 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2.5rem] p-8 text-white shadow-xl shadow-indigo-100 relative overflow-hidden group"
+                >
+                    <div className="relative z-10 space-y-6">
+                        <div className="space-y-1">
+                            <h2 className="text-2xl font-black tracking-tight italic uppercase">Identity Node</h2>
+                            <p className="text-indigo-100 text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Phone Authentication Registry</p>
                         </div>
-                        <div className="flex items-center space-x-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                            <AlertCircle className="h-3 w-3" />
-                            <span>{filteredRequests.filter(r => r.status === 'pending').length} Pending</span>
+
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
+                                <ShieldCheck className="w-5 h-5 text-indigo-300" />
+                            </div>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-100">Auth Gatekeeper</span>
+                        </div>
+
+                        <div className="flex flex-col gap-2 pt-4">
+                            <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest border-b border-white/10 pb-2">
+                                <span>Pending Requests</span>
+                                <span className="text-emerald-400">{requests.filter(r => r.status === 'pending').length}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-white/50 pt-2">
+                                <span>Total Audits</span>
+                                <span>{requests.length}</span>
+                            </div>
                         </div>
                     </div>
+                    <Phone className="absolute -bottom-10 -right-10 w-48 h-48 text-white/5" />
+                </motion.div>
 
-                    {/* Filters */}
-                    <div className="flex flex-col sm:flex-row gap-4">
-                        <div className="flex-1 relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Search by name, employee number, or phone..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                            />
+                {/* Sub Header Content */}
+                <div className="lg:col-span-3 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 flex flex-col justify-center">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+                        <div className="space-y-4 max-w-xl">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                                    <Zap className="w-4 h-4" />
+                                </div>
+                                <h3 className="text-lg font-black text-gray-900 uppercase italic">Verification Protocol</h3>
+                            </div>
+                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest leading-loose">
+                                Ensure all phone number changes are verified against physical employee records. Approved changes will immediately update the M-Pesa disbursement endpoint for the target node.
+                            </p>
                         </div>
-                        <div className="flex items-center space-x-2">
-                            <Filter className="h-4 w-4 text-gray-400" />
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value as any)}
-                                className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                            >
-                                <option value="all">All Status</option>
-                                <option value="pending">Pending</option>
-                                <option value="approved">Approved</option>
-                                <option value="rejected">Rejected</option>
-                            </select>
+
+                        <div className="flex items-center bg-gray-50 p-1.5 rounded-2xl border border-gray-100">
+                            {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
+                                <button
+                                    key={f}
+                                    onClick={() => setStatusFilter(f)}
+                                    className={`px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${statusFilter === f ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-gray-400 hover:text-indigo-600'
+                                        }`}
+                                >
+                                    {f}
+                                </button>
+                            ))}
                         </div>
                     </div>
                 </div>
+            </div>
 
-                {/* Requests List */}
-                <div className="divide-y divide-gray-200">
-                    {filteredRequests.length === 0 ? (
-                        <div className="p-12 text-center">
-                            <Phone className="mx-auto h-12 w-12 text-gray-400" />
-                            <h3 className="mt-2 text-sm font-medium text-gray-900">No requests found</h3>
-                            <p className="mt-1 text-sm text-gray-500">
-                                {statusFilter === 'pending'
-                                    ? 'There are no pending phone number change requests.'
-                                    : 'Try adjusting your filters.'}
-                            </p>
-                        </div>
-                    ) : (
-                        filteredRequests.map((request) => (
-                            <motion.div
-                                key={request.id}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className="p-6 hover:bg-gray-50 transition-colors"
-                            >
-                                <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                        <div className="flex items-center space-x-3 mb-2">
-                                            <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-                                                <User className="h-5 w-5 text-green-600" />
+            {/* Main Content Section */}
+            <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden min-h-[500px]">
+                <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+                    <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="SEARCH BY NODE PK..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-14 pr-6 py-4 bg-white border border-gray-100 rounded-[2rem] text-[10px] font-black uppercase tracking-widest focus:ring-4 focus:ring-indigo-100 transition-all font-mono shadow-sm"
+                        />
+                    </div>
+
+                    <button onClick={fetchRequests} className="p-4 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-indigo-600 transition-all shadow-sm">
+                        <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full">
+                        <thead>
+                            <tr className="bg-gray-50/80 text-left">
+                                <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Employee Context</th>
+                                <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Protocol Delta</th>
+                                <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Request Status</th>
+                                <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Audit Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {filteredRequests.map((request) => (
+                                <tr key={request.id} className="hover:bg-indigo-50/30 transition-all group">
+                                    <td className="px-10 py-8">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black shadow-lg shadow-indigo-100">
+                                                {request.employee_name?.split(' ').map(n => n[0]).join('')}
                                             </div>
-                                            <div>
-                                                <h3 className="text-sm font-medium text-gray-900">{request.employee_name}</h3>
-                                                <p className="text-xs text-gray-500">{request.employee_number}</p>
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-black text-gray-900 uppercase tracking-widest group-hover:text-indigo-600 transition-colors">
+                                                    {request.employee_name}
+                                                </span>
+                                                <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                                    <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600 font-mono">{request.employee_number}</span>
+                                                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {request.branch}</span>
+                                                </div>
                                             </div>
-                                            {getStatusBadge(request.status)}
                                         </div>
-
-                                        <div className="ml-13 space-y-2">
-                                            <div className="flex items-center text-sm">
-                                                <span className="text-gray-600 w-32">Current Phone:</span>
-                                                <span className="font-medium text-gray-900">{request.current_phone || 'Not set'}</span>
-                                            </div>
-                                            <div className="flex items-center text-sm">
-                                                <span className="text-gray-600 w-32">Requested Phone:</span>
-                                                <span className="font-medium text-green-600">{request.requested_phone}</span>
-                                            </div>
-                                            {request.reason && (
-                                                <div className="flex items-start text-sm">
-                                                    <span className="text-gray-600 w-32">Reason:</span>
-                                                    <span className="text-gray-900">{request.reason}</span>
-                                                </div>
-                                            )}
-                                            <div className="flex items-center text-xs text-gray-500">
-                                                <Calendar className="h-3 w-3 mr-1" />
-                                                Requested {new Date(request.requested_at).toLocaleString()}
-                                            </div>
-                                            {request.reviewed_at && (
-                                                <div className="flex items-start text-xs text-gray-500">
-                                                    <span className="w-32">Reviewed by {request.reviewed_by}</span>
-                                                    <span>{new Date(request.reviewed_at).toLocaleString()}</span>
-                                                </div>
-                                            )}
-                                            {request.admin_notes && (
-                                                <div className="flex items-start text-sm">
-                                                    <MessageSquare className="h-4 w-4 mr-2 text-gray-400 mt-0.5" />
-                                                    <span className="text-gray-600 italic">{request.admin_notes}</span>
-                                                </div>
-                                            )}
+                                    </td>
+                                    <td className="px-10 py-8">
+                                        <div className="flex items-center justify-center gap-4 text-xs font-black">
+                                            <span className="text-gray-400 line-through font-mono uppercase tracking-widest">{request.current_phone || 'NULL_NODE'}</span>
+                                            <ArrowUpRight className="w-4 h-4 text-indigo-400" />
+                                            <span className="text-emerald-600 font-mono uppercase tracking-widest">{request.requested_phone}</span>
                                         </div>
-                                    </div>
-
-                                    {request.status === 'pending' && (
-                                        <div className="ml-4 flex flex-col space-y-2">
-                                            <button
+                                    </td>
+                                    <td className="px-10 py-8">
+                                        <div className="flex flex-col items-start gap-2">
+                                            <span className={`inline-flex px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border border-transparent shadow-sm ${getStatusStyles(request.status)}`}>
+                                                {request.status}
+                                            </span>
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
+                                                {new Date(request.requested_at).toLocaleDateString()} NODE_INTAKE
+                                            </p>
+                                        </div>
+                                    </td>
+                                    <td className="px-10 py-8 text-right">
+                                        {request.status === 'pending' ? (
+                                            <motion.button
+                                                whileHover={{ scale: 1.05 }}
+                                                whileTap={{ scale: 0.95 }}
                                                 onClick={() => setSelectedRequest(request)}
-                                                className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                                                className="px-6 py-3 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 transition-all"
                                             >
-                                                Review
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            </motion.div>
-                        ))
+                                                Audit Req
+                                            </motion.button>
+                                        ) : (
+                                            <div className="flex flex-col items-end opacity-50">
+                                                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Reviewed By</span>
+                                                <span className="text-[10px] font-black text-gray-900 uppercase">{request.reviewed_by || 'SYSTEM_NODE'}</span>
+                                            </div>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {filteredRequests.length === 0 && (
+                        <div className="p-24 flex flex-col items-center justify-center space-y-4">
+                            <div className="w-20 h-20 bg-gray-50 rounded-[2rem] flex items-center justify-center border border-gray-100">
+                                <ShieldCheck className="w-10 h-10 text-gray-300" />
+                            </div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Registry Clear. No pending identities.</p>
+                        </div>
                     )}
                 </div>
             </div>
 
             {/* Review Modal */}
-            {selectedRequest && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6"
-                    >
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Review Phone Number Change</h3>
+            <AnimatePresence>
+                {selectedRequest && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 border border-white/20">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedRequest(null)} className="absolute inset-0 bg-gray-900/60 backdrop-blur-md" />
 
-                        <div className="space-y-4 mb-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
-                                <p className="text-sm text-gray-900">{selectedRequest.employee_name} ({selectedRequest.employee_number})</p>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Current Phone</label>
-                                <p className="text-sm text-gray-900">{selectedRequest.current_phone || 'Not set'}</p>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Requested Phone</label>
-                                <p className="text-sm font-medium text-green-600">{selectedRequest.requested_phone}</p>
-                            </div>
-                            {selectedRequest.reason && (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
-                                    <p className="text-sm text-gray-900">{selectedRequest.reason}</p>
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                            className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col relative z-10 border border-white/20"
+                        >
+                            <div className="p-10 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+                                <div className="space-y-1">
+                                    <h3 className="text-2xl font-black text-gray-900 tracking-tight uppercase italic">Audit Identities</h3>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Manual Identity Verification</p>
                                 </div>
-                            )}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Admin Notes (Optional)</label>
-                                <textarea
-                                    value={adminNotes}
-                                    onChange={(e) => setAdminNotes(e.target.value)}
-                                    rows={3}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                    placeholder="Add notes about this decision..."
-                                />
+                                <motion.button whileHover={{ rotate: 90 }} onClick={() => setSelectedRequest(null)} className="p-4 bg-white text-gray-400 hover:text-red-500 rounded-2xl shadow-sm border border-gray-100 transition-colors">
+                                    <X className="w-6 h-6" />
+                                </motion.button>
                             </div>
-                        </div>
 
-                        <div className="flex space-x-3">
-                            <button
-                                onClick={() => {
-                                    setSelectedRequest(null);
-                                    setAdminNotes('');
-                                }}
-                                disabled={isProcessing}
-                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={() => rejectRequest(selectedRequest.id)}
-                                disabled={isProcessing}
-                                className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center"
-                            >
-                                {isProcessing ? (
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                ) : (
-                                    <>
-                                        <XCircle className="h-4 w-4 mr-2" />
-                                        Reject
-                                    </>
-                                )}
-                            </button>
-                            <button
-                                onClick={() => approveRequest(selectedRequest.id)}
-                                disabled={isProcessing}
-                                className="flex-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center"
-                            >
-                                {isProcessing ? (
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                ) : (
-                                    <>
-                                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                                        Approve
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </motion.div>
-                </div>
-            )}
+                            <div className="p-10 space-y-8">
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="p-6 bg-gray-50 rounded-[2rem] border border-gray-100">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Origin Node</p>
+                                        <p className="text-sm font-black text-gray-900 uppercase font-mono">{selectedRequest.current_phone || 'NULL_NODE'}</p>
+                                    </div>
+                                    <div className="p-6 bg-emerald-50 rounded-[2rem] border border-emerald-100">
+                                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-3">Target Node</p>
+                                        <p className="text-sm font-black text-emerald-700 uppercase font-mono">{selectedRequest.requested_phone}</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Applicant Justification</label>
+                                    <div className="p-8 bg-gray-900 rounded-[2.5rem] text-indigo-100 text-[11px] font-bold uppercase tracking-widest leading-loose">
+                                        {selectedRequest.reason || 'NO_JUSTIFICATION_PROVIDED'}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Admin Auditor Remarks</label>
+                                    <textarea
+                                        value={adminNotes}
+                                        onChange={(e) => setAdminNotes(e.target.value)}
+                                        rows={3}
+                                        className="w-full p-8 bg-gray-50 border-none rounded-[2.5rem] text-sm font-bold tracking-tight focus:ring-4 focus:ring-indigo-100 transition-all resize-none shadow-inner"
+                                        placeholder="PROVIDE AUDIT RATIONALE..."
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="p-10 bg-gray-50 border-t border-gray-100 flex gap-4">
+                                <button
+                                    onClick={() => rejectRequest(selectedRequest.id)}
+                                    disabled={isProcessing}
+                                    className="flex-1 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-red-500 hover:text-red-700 bg-white border border-red-100 rounded-[2rem] transition-all flex items-center justify-center gap-2"
+                                >
+                                    {isProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                                    Revoke
+                                </button>
+                                <button
+                                    onClick={() => approveRequest(selectedRequest.id)}
+                                    disabled={isProcessing}
+                                    className="flex-[2] py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                                >
+                                    {isProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
+                                    Validate Node
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

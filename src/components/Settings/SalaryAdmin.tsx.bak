@@ -9,7 +9,7 @@ import {
   User, UserCog, Settings, MapPin, Filter, X, Edit3, DollarSign,
   Crown, Key, Building, Map as MapIcon, Award, Smartphone, RefreshCw,
   Download, Upload, Calendar, Activity, TrendingUp,
-  Banknote, Zap, ToggleLeft, ToggleRight, FastForward, Sparkles
+  Banknote, Zap, ToggleLeft, ToggleRight, ShieldAlert, Sparkles
 } from 'lucide-react';
 import {
   AreaChart,
@@ -362,7 +362,7 @@ const ExportModal = ({ isOpen, onClose, onExport, isLoading, filterOptions }: {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[10px] max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
           <Download className="h-5 w-5 text-green-600" />
           Export Salary Advances
@@ -470,7 +470,7 @@ const ExportModal = ({ isOpen, onClose, onExport, isLoading, filterOptions }: {
             />
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-[10px] p-3">
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
             <p className="text-xs text-blue-800">
               <strong>Exporting Columns:</strong>
             </p>
@@ -558,7 +558,7 @@ const ImportModal = ({ isOpen, onClose, onImport, isLoading }: {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[10px] max-w-md w-full p-6">
+      <div className="bg-white rounded-lg max-w-md w-full p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
           <Upload className="h-5 w-5 text-blue-600" />
           Import Salary Advance Data
@@ -590,7 +590,7 @@ const ImportModal = ({ isOpen, onClose, onImport, isLoading }: {
             <label className="block text-xs font-medium text-gray-700 mb-2">
               Select File
             </label>
-            <div className="border-2 border-dashed border-gray-300 rounded-[10px] p-4 text-center">
+            <div className="border-2 border-dashed border-gray-300 rounded-md p-4 text-center">
               <input
                 type="file"
                 accept=".csv,.xlsx,.xls"
@@ -613,7 +613,7 @@ const ImportModal = ({ isOpen, onClose, onImport, isLoading }: {
             </div>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-[10px] p-3">
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
             <p className="text-xs text-blue-800">
               <strong>Required Columns:</strong>
             </p>
@@ -626,7 +626,7 @@ const ImportModal = ({ isOpen, onClose, onImport, isLoading }: {
             </ul>
           </div>
 
-          <div className="bg-yellow-50 border border-yellow-200 rounded-[10px] p-3">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
             <p className="text-xs text-yellow-800">
               <strong>Note:</strong> For updates, include Employee Number to match existing records.
               For new applications, Employee Number will be auto-generated if not provided.
@@ -749,14 +749,14 @@ const EnhancedFilter = ({
       </button>
 
       {showFilter && (
-        <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-[10px] shadow-lg border border-gray-200 z-50 p-4">
+        <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 p-4">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-sm font-medium text-gray-900">
               Filter Applications
             </h3>
             <button
               onClick={() => setShowFilter(false)}
-              className="text-xs text-gray-400 hover:text-gray-600"
+              className="text-gray-400 hover:text-gray-600"
             >
               <X className="w-4 h-4" />
             </button>
@@ -929,7 +929,7 @@ const CommentModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[10px] max-w-md w-full p-6">
+      <div className="bg-white rounded-lg max-w-md w-full p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-2 flex items-center gap-2">
           <Smartphone className="h-5 w-5 text-blue-600" />
           Add Comment
@@ -940,7 +940,7 @@ const CommentModal = ({
         </p>
 
         {application && (
-          <div className="bg-gray-50 rounded-[10px] p-3 mb-4">
+          <div className="bg-gray-50 rounded-lg p-3 mb-4">
             <div className="text-xs text-gray-700">
               <div className="font-medium">{application["Full Name"]}</div>
               <div>Employee: {application["Employee Number"]}</div>
@@ -994,10 +994,10 @@ const PaymentRequestCard = ({ request, onApprove, onReject, onViewDetails, userR
   const totalAmount = request.advances_data?.reduce((sum: number, advance: any) => sum + (advance.amount_requested || 0), 0) || 0;
 
   return (
-    <div className="bg-white rounded-[10px] border border-gray-200 p-4 hover:shadow-md transition-shadow">
+    <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-orange-100 rounded-[10px]">
+          <div className="p-2 bg-orange-100 rounded-lg">
             <Users className="w-5 h-5 text-orange-600" />
           </div>
           <div>
@@ -1090,19 +1090,19 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, us
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[10px] shadow-lg w-full max-w-4xl max-h-[90vh] overflow-auto">
+      <div className="bg-white rounded-xl shadow-lg w-full max-w-4xl max-h-[90vh] overflow-auto">
         <div className="sticky top-0 bg-white p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-xl font-semibold text-gray-900">Salary Advance Payment Request Details</h2>
           <button
             onClick={onClose}
-            className="text-xs text-gray-400 hover:text-gray-600"
+            className="text-gray-400 hover:text-gray-600"
           >
             <XCircleIcon className="w-6 h-6" />
           </button>
         </div>
 
         <div className="p-6">
-          <div className="bg-gray-50 rounded-[10px] p-4 mb-6">
+          <div className="bg-gray-50 rounded-lg p-4 mb-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <p className="text-xs text-gray-600">Payment Type</p>
@@ -1125,7 +1125,7 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, us
 
           <div className="mb-6">
             <h3 className="font-semibold text-gray-900 mb-2">Justification</h3>
-            <div className="bg-gray-50 rounded-[10px] p-4">
+            <div className="bg-gray-50 rounded-lg p-4">
               <p className="text-gray-700">{payment.justification}</p>
             </div>
           </div>
@@ -1246,7 +1246,7 @@ const RejectionModal = ({ isOpen, onClose, onConfirm }: {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[10px] max-w-md w-full p-6">
+      <div className="bg-white rounded-lg max-w-md w-full p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
           <XCircleIcon className="h-5 w-5 text-red-600" />
           Reject Payment Request
@@ -1372,7 +1372,7 @@ const RecommendationModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[10px] max-w-md w-full p-6">
+      <div className="bg-white rounded-lg max-w-md w-full p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-2 flex items-center gap-2">
           <CheckCircle className="h-5 w-5 text-blue-600" />
           {getActionTitle()}
@@ -1383,7 +1383,7 @@ const RecommendationModal = ({
         </p>
 
         {application && (
-          <div className="bg-gray-50 rounded-[10px] p-3 mb-4">
+          <div className="bg-gray-50 rounded-lg p-3 mb-4">
             <div className="text-xs text-gray-700">
               <div className="font-medium">{application["Full Name"]}</div>
               <div>Employee: {application["Employee Number"]}</div>
@@ -1477,7 +1477,7 @@ const BypassConfirmModal = ({
           className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden"
         >
           <div className="p-8">
-            <div className="w-16 h-16 bg-green-100 rounded-[10px] flex items-center justify-center mb-6 mx-auto">
+            <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mb-6 mx-auto">
               <Zap className="w-8 h-8 text-green-600 fill-green-600" />
             </div>
 
@@ -1491,7 +1491,7 @@ const BypassConfirmModal = ({
               The payment of <span className="font-bold text-green-700">KSh {Number(application["Amount Requested"]).toLocaleString()}</span> will be processed immediately.
             </p>
 
-            <div className="bg-gray-50 rounded-[10px] p-4 mb-8">
+            <div className="bg-gray-50 rounded-2xl p-4 mb-8">
               <div className="flex justify-between text-xs mb-2">
                 <span className="text-gray-500">Employee No:</span>
                 <span className="font-medium text-gray-900">{application["Employee Number"]}</span>
@@ -1506,7 +1506,7 @@ const BypassConfirmModal = ({
               <button
                 onClick={onConfirm}
                 disabled={isLoading}
-                className="text-xs w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-green-200 flex items-center justify-center gap-2 group disabled:opacity-50"
+                className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-green-200 flex items-center justify-center gap-2 group disabled:opacity-50"
               >
                 {isLoading ? (
                   <Loader className="w-5 h-5 animate-spin" />
@@ -1521,7 +1521,7 @@ const BypassConfirmModal = ({
               <button
                 onClick={onClose}
                 disabled={isLoading}
-                className="text-xs w-full py-4 bg-white hover:bg-gray-50 text-gray-500 rounded-2xl font-bold transition-all"
+                className="w-full py-4 bg-white hover:bg-gray-50 text-gray-500 rounded-2xl font-bold transition-all"
               >
                 Cancel
               </button>
@@ -1529,7 +1529,7 @@ const BypassConfirmModal = ({
           </div>
 
           <div className="bg-amber-50 px-8 py-3 flex items-center gap-2">
-            <FastForward className="w-4 h-4 text-amber-600" />
+            <ShieldAlert className="w-4 h-4 text-amber-600" />
             <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">
               High Authority Action
             </span>
@@ -1640,21 +1640,21 @@ const TownFilter = ({
       </button>
 
       {showFilter && (
-        <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-[10px] shadow-lg border border-gray-200 z-50 p-4">
+        <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50 p-4">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-sm font-medium text-gray-900">
               {isRegionalManager ? 'Filter by Region' : 'Filter by Town'}
             </h3>
             <button
               onClick={() => setShowFilter(false)}
-              className="text-xs text-gray-400 hover:text-gray-600"
+              className="text-gray-400 hover:text-gray-600"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
           {isManager && selectedTown && (
-            <div className="mb-3 p-2 bg-blue-50 rounded-[10px]">
+            <div className="mb-3 p-2 bg-blue-50 rounded-md">
               <p className="text-xs text-blue-700">
                 {isRegionalManager
                   ? `Viewing applications for your region: ${selectedTown}`
@@ -2281,7 +2281,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-[10px] max-w-md w-full p-6">
+        <div className="bg-white rounded-lg max-w-md w-full p-6">
           <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
             <Download className="h-5 w-5 text-green-600" />
             Export M-Pesa Statements
@@ -2348,7 +2348,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
               </div>
             )}
 
-            <div className="bg-blue-50 border border-blue-200 rounded-[10px] p-3">
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
               <p className="text-xs text-blue-800">
                 <strong>Exporting Columns:</strong>
               </p>
@@ -2681,7 +2681,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
   };
 
   return (
-    <div className="bg-white rounded-[10px] shadow-sm border border-gray-200 p-6">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -2740,7 +2740,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
 
         {/* Card 1: Total Paid (This Month) */}
-        <div className="bg-white rounded-[10px] p-5 border border-gray-100 shadow-sm relative overflow-hidden group hover:border-emerald-200 transition-all duration-300">
+        <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm relative overflow-hidden group hover:border-emerald-200 transition-all duration-300">
           <div className="flex justify-between items-start z-10 relative">
             <div>
               <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider">Total Paid (All-Time)</p>
@@ -2753,7 +2753,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                 {Math.abs(stats.totalPaidChange).toFixed(1)}% vs last month
               </div>
             </div>
-            <div className="p-2 bg-emerald-50 rounded-[10px]">
+            <div className="p-2 bg-emerald-50 rounded-lg">
               <Banknote className="w-6 h-6 text-emerald-600" />
             </div>
           </div>
@@ -2768,7 +2768,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
         </div>
 
         {/* Card 2: Transaction Count */}
-        <div className="bg-white rounded-[10px] p-5 border border-gray-100 shadow-sm hover:border-blue-200 transition-all duration-300">
+        <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm hover:border-blue-200 transition-all duration-300">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider">Transactions</p>
@@ -2781,7 +2781,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                 </span>
               </div>
             </div>
-            <div className="p-2 bg-blue-50 rounded-[10px]">
+            <div className="p-2 bg-blue-50 rounded-lg">
               <Activity className="w-6 h-6 text-blue-600" />
             </div>
           </div>
@@ -2795,7 +2795,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
         </div>
 
         {/* Card 3: Pending & Failed */}
-        <div className="bg-white rounded-[10px] p-5 border border-gray-100 shadow-sm hover:border-amber-200 transition-all duration-300">
+        <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm hover:border-amber-200 transition-all duration-300">
           <div className="flex justify-between items-center mb-4">
             <p className="text-gray-500 text-xs font-semibold uppercase tracking-wider">Action Needed</p>
             <AlertTriangle className="w-5 h-5 text-amber-500" />
@@ -2818,7 +2818,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
         </div>
 
         {/* Card 4: Utility Balance */}
-        <div className="bg-gradient-to-br from-[#43B02A] to-[#257C1F] rounded-[10px] p-5 text-white shadow-md relative overflow-hidden group border border-[#43B02A]/30">
+        <div className="bg-gradient-to-br from-[#43B02A] to-[#257C1F] rounded-xl p-5 text-white shadow-md relative overflow-hidden group border border-[#43B02A]/30">
           {/* Background decoration */}
           <div className="absolute top-0 right-0 w-40 h-40 bg-white opacity-10 rounded-full blur-3xl -mr-10 -mt-10"></div>
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 opacity-20 rounded-full blur-2xl -ml-5 -mb-5"></div>
@@ -2838,7 +2838,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                   <span className="text-[10px] text-white/90 font-medium">Live Balance</span>
                 </div>
               </div>
-              <div className="bg-white p-1.5 rounded-[10px] shadow-sm">
+              <div className="bg-white p-1.5 rounded-lg shadow-sm">
                 <img
                   src="/M-PESA_LOGO-01.svg.png"
                   alt="M-Pesa"
@@ -2861,7 +2861,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
       </div>
 
       {/* Branch Filter & Controls */}
-      <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center gap-4 mb-6 bg-gray-50 p-4 rounded-[10px] border border-gray-200">
+      <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center gap-4 mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
 
         <div className="w-full sm:w-auto">
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Filter by Branch</label>
@@ -3025,7 +3025,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                         <div className="flex flex-col gap-1">
                           <button
                             onClick={() => viewCallbackDetails(callback)}
-                            className="text-xs text-blue-600 hover:text-blue-900 font-medium text-left"
+                            className="text-blue-600 hover:text-blue-900 font-medium text-left"
                           >
                             View Details
                           </button>
@@ -3033,7 +3033,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                             <button
                               onClick={() => checkTransactionStatus(callback.transaction_id)}
                               disabled={isCheckingStatus}
-                              className="text-xs text-green-600 hover:text-green-900 font-medium text-left flex items-center gap-1"
+                              className="text-green-600 hover:text-green-900 font-medium text-left flex items-center gap-1"
                               title="Query M-Pesa for live status"
                             >
                               <RefreshCw className={`w-3 h-3 ${isCheckingStatus ? 'animate-spin' : ''}`} />
@@ -3056,14 +3056,14 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                 <button
                   onClick={() => paginate(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="relative inline-flex items-center px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                  className="relative inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
                 >
                   Previous
                 </button>
                 <button
                   onClick={() => paginate(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="relative inline-flex items-center px-4 py-2 ml-3 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                  className="relative inline-flex items-center px-4 py-2 ml-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
                 >
                   Next
                 </button>
@@ -3079,11 +3079,11 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                   </p>
                 </div>
                 <div>
-                  <nav className="inline-flex -space-x-px rounded-[10px] shadow-sm" aria-label="Pagination">
+                  <nav className="inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
                     <button
                       onClick={() => paginate(currentPage - 1)}
                       disabled={currentPage === 1}
-                      className="relative inline-flex items-center px-2 py-2 text-xs font-medium text-gray-500 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 disabled:opacity-50"
+                      className="relative inline-flex items-center px-2 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 disabled:opacity-50"
                     >
                       <span className="sr-only">Previous</span>
                       <ChevronLeft className="h-5 w-5" />
@@ -3109,7 +3109,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                             )}
                             <button
                               onClick={() => paginate(page)}
-                              className={`relative inline-flex items-center px-4 py-2 text-xs font-medium ${currentPage === page
+                              className={`relative inline-flex items-center px-4 py-2 text-sm font-medium ${currentPage === page
                                 ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
                                 : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
                                 } border`}
@@ -3123,7 +3123,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                     <button
                       onClick={() => paginate(currentPage + 1)}
                       disabled={currentPage === totalPages}
-                      className="relative inline-flex items-center px-2 py-2 text-xs font-medium text-gray-500 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 disabled:opacity-50"
+                      className="relative inline-flex items-center px-2 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 disabled:opacity-50"
                     >
                       <span className="sr-only">Next</span>
                       <ChevronRight className="h-5 w-5" />
@@ -3139,12 +3139,12 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
       {/* Enhanced Callback Details Modal */}
       {showDetails && selectedCallback && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[10px] shadow-lg w-full max-w-4xl max-h-[90vh] overflow-auto">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-4xl max-h-[90vh] overflow-auto">
             <div className="sticky top-0 bg-white p-6 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900">Callback Details</h2>
               <button
                 onClick={() => setShowDetails(false)}
-                className="text-xs text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -3184,7 +3184,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
               {/* Enhanced Employee Information Section */}
               <div className="mb-6">
                 <h3 className="font-semibold text-gray-900 mb-3">Employee Information</h3>
-                <div className="bg-gray-50 rounded-[10px] p-4">
+                <div className="bg-gray-50 rounded-lg p-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs text-gray-600">Employee Name</p>
@@ -3225,7 +3225,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                   };
 
                   return (
-                    <div className="bg-gray-50 rounded-[10px] p-4">
+                    <div className="bg-gray-50 rounded-lg p-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {Object.entries(importantFields).map(([key, label]) => {
                           if (transactionData[key] !== undefined) {
@@ -3392,13 +3392,13 @@ const BulkPaymentModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[10px] max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
           <Users className="h-5 w-5 text-green-600" />
           {isMaker ? 'Create Payment Request' : 'Process M-Pesa Bulk Payment'}
         </h3>
 
-        <div className="mb-4 p-3 bg-gray-50 rounded-[10px]">
+        <div className="mb-4 p-3 bg-gray-50 rounded-md">
           <p className="text-xs text-gray-600">
             {isMaker
               ? `You are creating a payment request for ${getSelectedStaffCount()} selected staff members. This will require approval before processing.`
@@ -3429,7 +3429,7 @@ const BulkPaymentModal = ({
           </div>
 
           {/* Current Month Notice */}
-          <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-[10px]">
+          <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded">
             <p className="text-xs text-amber-800">
               <strong>Note:</strong> Only applications from {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })} are shown and can be processed.
             </p>
@@ -3503,7 +3503,7 @@ const BulkPaymentModal = ({
                   <div className="flex items-center">
                     <button
                       onClick={() => onToggleStaff(app.id)}
-                      className="text-xs mr-2 text-green-600 hover:text-green-800"
+                      className="mr-2 text-green-600 hover:text-green-800"
                       disabled={!isFromCurrentMonth}
                     >
                       {selectedStaff[app.id] ? (
@@ -5751,760 +5751,898 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   const pendingCount = paymentRequests.filter(p => p.status === 'pending').length;
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <div className="max-w-7xl mx-auto">
+    <div className="p-8 font-sans">
+      {/* Tab Navigation - Modern Pill Style */}
+      <div className="mb-8">
+        <nav className="inline-flex bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 gap-2">
+          <button
+            onClick={() => setActiveTab('applications')}
+            className={`py-2.5 px-5 rounded-xl font-medium text-sm transition-all duration-200 ${activeTab === 'applications'
+              ? 'bg-primary text-white shadow-md shadow-indigo-500/20'
+              : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+          >
+            Salary Advance
+          </button>
 
-        {/* ── Report Header ─────────────────────────────── */}
-        <div className="mb-6 bg-white rounded-[10px] border border-gray-300 p-6 shadow-sm">
-          <div className="flex justify-between items-start flex-wrap gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">
-                Salary Advance Administration
-              </h1>
-              <p className="text-gray-600 text-sm">
-                Manage, approve and process employee salary advance applications
-              </p>
-              <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-gray-500">
-                <div className="flex items-center gap-1">
-                  <Calendar className="w-4 h-4" />
-                  <span>{new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Key className="w-4 h-4" />
-                  <span>Role: <strong>{userRole.replace(/_/g, ' ').toUpperCase()}</strong></span>
-                </div>
-                {userTown && (
-                  <div className="flex items-center gap-1">
-                    <MapPin className="w-4 h-4" />
-                    <span>{isRegionalManager ? 'Region' : 'Town'}: <strong>{userTown}</strong></span>
-                  </div>
-                )}
-                <span className="text-xs text-gray-400">({actualUserRole} · {userEmail})</span>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-gray-500 uppercase tracking-wide">Generated</div>
-              <div className="text-lg font-semibold text-gray-900">
-                {new Date().toLocaleDateString('en-KE', { day: '2-digit', month: 'long', year: 'numeric' })}
-              </div>
-            </div>
-          </div>
-        </div>
+          <RoleButtonWrapper allowedRoles={['ADMIN', 'CHECKER']}>
+            <button
+              onClick={() => setActiveTab('callbacks')}
+              className={`py-2.5 px-5 rounded-xl font-medium text-sm flex items-center gap-2 transition-all duration-200 ${activeTab === 'callbacks'
+                ? 'bg-primary text-white shadow-md shadow-indigo-500/20'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+            >
+              <Smartphone className="w-4 h-4" /> M-Pesa Results
+            </button>
+            <button
+              onClick={() => setActiveTab('transaction_status')}
+              className={`py-2.5 px-5 rounded-xl font-medium text-sm flex items-center gap-2 transition-all duration-200 ${activeTab === 'transaction_status'
+                ? 'bg-primary text-white shadow-md shadow-indigo-500/20'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+            >
+              <RefreshCw className="w-4 h-4" /> Transaction Status
+            </button>
+          </RoleButtonWrapper>
 
-        {/* ── Action Bar ────────────────────────────────── */}
-        <div className="bg-white rounded-[10px] border border-gray-300 shadow-sm p-4 mb-6">
-          <div className="flex flex-col gap-4">
-            {/* Row 1: Tabs + key actions */}
-            <div className="flex flex-wrap justify-between items-center gap-3">
-              {/* Tab buttons */}
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setActiveTab('applications')}
-                  className={`inline-flex items-center gap-2 px-3 py-2 rounded text-xs font-medium shadow-sm transition-colors ${activeTab === 'applications'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
-                    }`}
-                >
-                  <Activity className="w-3 h-3" /> Applications
-                </button>
+          <RoleButtonWrapper allowedRoles={['ADMIN']}>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`py-2.5 px-5 rounded-xl font-medium text-sm flex items-center gap-2 transition-all duration-200 ${activeTab === 'settings'
+                ? 'bg-primary text-white shadow-md shadow-indigo-500/20'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+            >
+              <Settings className="w-4 h-4" />
+              Settings
+            </button>
+          </RoleButtonWrapper>
+        </nav>
+      </div>
 
-                <RoleButtonWrapper allowedRoles={['ADMIN', 'CHECKER']}>
-                  <button
-                    onClick={() => setActiveTab('callbacks')}
-                    className={`inline-flex items-center gap-2 px-3 py-2 rounded text-xs font-medium shadow-sm transition-colors ${activeTab === 'callbacks'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
-                      }`}
-                  >
-                    <Smartphone className="w-3 h-3" /> M-Pesa Results
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('transaction_status')}
-                    className={`inline-flex items-center gap-2 px-3 py-2 rounded text-xs font-medium shadow-sm transition-colors ${activeTab === 'transaction_status'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
-                      }`}
-                  >
-                    <RefreshCw className="w-3 h-3" /> Transaction Status
-                  </button>
-                </RoleButtonWrapper>
+      {activeTab === 'settings' ? (
+        <AdvanceApplicationManager />
+      ) : activeTab === 'applications' ? (
+        <div>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
 
-                <RoleButtonWrapper allowedRoles={['ADMIN']}>
-                  <button
-                    onClick={() => setActiveTab('settings')}
-                    className={`inline-flex items-center gap-2 px-3 py-2 rounded text-xs font-medium shadow-sm transition-colors ${activeTab === 'settings'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
-                      }`}
-                  >
-                    <Settings className="w-3 h-3" /> Settings
-                  </button>
-                </RoleButtonWrapper>
-              </div>
 
-              {/* Right: action buttons */}
-              <div className="flex flex-wrap items-center gap-2">
-                {(isChecker || isAdmin) && pendingCount > 0 && (
-                  <button
-                    onClick={() => setShowApprovalQueue(true)}
-                    className="inline-flex items-center gap-2 px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded text-xs font-medium shadow-sm transition-colors"
-                  >
-                    <AlertTriangle className="w-3 h-3" /> {pendingCount} Pending Approvals
-                  </button>
-                )}
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Enhanced Filter Component */}
+              <EnhancedFilter
+                selectedTown={selectedTown}
+                onTownChange={handleTownChange}
+                allTowns={propAllTowns}
+                userRole={userRole}
+                userTown={userTown}
+                isRegionalManager={isRegionalManager}
+                selectedStatus={selectedStatus}
+                onStatusChange={setSelectedStatus}
+                selectedMonth={selectedMonth}
+                onMonthChange={setSelectedMonth}
+                selectedDateRange={selectedDateRange}
+                onDateRangeChange={setSelectedDateRange}
+                customStartDate={customStartDate}
+                onCustomStartDateChange={setCustomStartDate}
+                customEndDate={customEndDate}
+                onCustomEndDateChange={setCustomEndDate}
+              />
 
-                {fullyApprovedApplications.length > 0 && (
-                  <button
-                    onClick={() => setShowBulkPaymentModal(true)}
-                    className="inline-flex items-center gap-2 px-3 py-2 bg-green-700 hover:bg-green-800 text-white rounded text-xs font-medium shadow-sm transition-colors"
-                  >
-                    <img src="M-PESA_LOGO-01.svg.png" className="w-8 h-auto" alt="mpesa" />
-                    {isMaker ? 'Create Payment Request' : `Process Payments (${getSelectedStaffCount()})`}
-                  </button>
-                )}
-
+              {/* Export/Import Buttons */}
+              <div className="flex gap-2">
                 <button
                   onClick={() => setShowExportModal(true)}
-                  className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium shadow-sm transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50"
                 >
-                  <Download className="w-3 h-3" /> Export
+                  <img src='logo (2).png' className='w-5'></img>
+                  Export
                 </button>
-
                 <button
                   onClick={() => setShowImportModal(true)}
-                  className="inline-flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-medium shadow-sm transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50"
                 >
-                  <Upload className="w-3 h-3" /> Import
+
+                  <img src='stats.png' className='w-5'></img>
+                  Import
                 </button>
 
-                {/* Admin Bypass Toggle */}
+                {/* Redesigned Admin Bypass Toggle */}
                 {isAdmin && (
-                  <div className={`flex items-center gap-2 px-3 py-2 rounded border text-xs font-medium transition-colors ${adminBypassMode
-                      ? 'bg-red-50 border-red-300 text-red-700'
-                      : 'bg-gray-50 border-gray-300 text-gray-600'
-                    }`}>
-                    <FastForward className={`w-3.5 h-3.5 ${adminBypassMode ? 'text-red-600' : 'text-gray-400'}`} />
-                    <span>Bypass System</span>
+                  <div className="flex items-center gap-3 px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300">
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-1.5">
+                        <motion.div
+                          animate={{
+                            scale: adminBypassMode ? [1, 1.2, 1] : 1,
+                            rotate: adminBypassMode ? [0, 15, -15, 0] : 0
+                          }}
+                          transition={{ duration: 0.5, repeat: adminBypassMode ? Infinity : 0, repeatDelay: 3 }}
+                        >
+                          <ShieldAlert className={`w-4 h-4 ${adminBypassMode ? 'text-green-600' : 'text-gray-400'}`} />
+                        </motion.div>
+                        <span className={`text-xs font-bold whitespace-nowrap ${adminBypassMode ? 'text-green-700' : 'text-gray-600'}`}>
+                          Bypass System
+                        </span>
+                      </div>
+                    </div>
+
                     <button
                       onClick={() => setAdminBypassMode(!adminBypassMode)}
-                      className={`text-xs relative w-10 h-5 rounded-full transition-colors duration-300 focus:outline-none ${adminBypassMode ? 'bg-red-500' : 'bg-gray-300'
-                        }`}
+                      className="relative flex items-center group focus:outline-none"
                     >
-                      <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-300 ${adminBypassMode ? 'translate-x-5' : 'translate-x-0'
+                      <div className={`w-12 h-6 rounded-full transition-colors duration-300 shadow-inner ${adminBypassMode ? 'bg-green-600' : 'bg-gray-200'
                         }`} />
+
+                      <motion.div
+                        className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-lg flex items-center justify-center"
+                        animate={{ x: adminBypassMode ? 24 : 0 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      >
+                        {adminBypassMode && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="w-2 h-2 bg-green-600 rounded-full"
+                          />
+                        )}
+                      </motion.div>
+
+                      {/* Sparkle effect removed */}
                     </button>
                   </div>
                 )}
-
-                <div className="text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded-[10px] border border-gray-300">
-                  Total: <strong>{filteredApplications.length}</strong> records
-                </div>
               </div>
-            </div>
 
-            {/* Row 2: Search + filter — only for applications tab */}
-            {activeTab === 'applications' && (
-              <div className="p-4 bg-gray-50 rounded-[10px] border border-gray-300">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Search */}
-                  <div className="lg:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Search</label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Search by name or employee number..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 bg-white"
-                      />
-                    </div>
-                  </div>
+              {/* User Role Display */}
+              <UserRoleDisplay
+                userRole={userRole}
+                userEmail={userEmail}
+                actualRole={actualUserRole}
+                userTown={userTown}
+                userRegion={userRegion}
+                isRegionalManager={isRegionalManager}
+              />
 
-                  {/* Enhanced Filter */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Filters</label>
-                    <EnhancedFilter
-                      selectedTown={selectedTown}
-                      onTownChange={handleTownChange}
-                      allTowns={propAllTowns}
-                      userRole={userRole}
-                      userTown={userTown}
-                      isRegionalManager={isRegionalManager}
-                      selectedStatus={selectedStatus}
-                      onStatusChange={setSelectedStatus}
-                      selectedMonth={selectedMonth}
-                      onMonthChange={setSelectedMonth}
-                      selectedDateRange={selectedDateRange}
-                      onDateRangeChange={setSelectedDateRange}
-                      customStartDate={customStartDate}
-                      onCustomStartDateChange={setCustomStartDate}
-                      customEndDate={customEndDate}
-                      onCustomEndDateChange={setCustomEndDate}
-                    />
-                  </div>
-
-                  {/* Reset */}
-                  <div className="flex items-end">
-                    <button
-                      onClick={() => {
-                        setSearchTerm('');
-                        setSelectedStatus('all');
-                        setSelectedMonth('all');
-                        setSelectedDateRange('all');
-                        handleTownChange('');
-                      }}
-                      className="w-full px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded bg-white hover:bg-gray-50 transition-colors"
-                    >
-                      Reset All Filters
-                    </button>
-                  </div>
-                </div>
-
-                {/* Custom date range */}
-                {selectedDateRange === 'custom' && (
-                  <div className="mt-3 flex items-center gap-4 p-3 bg-blue-50 rounded-[10px] border border-blue-200">
-                    <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
-                    <span className="text-xs font-medium text-blue-800">Custom Range:</span>
-                    <input
-                      type="date"
-                      value={customStartDate}
-                      onChange={(e) => setCustomStartDate(e.target.value)}
-                      className="border border-gray-300 rounded px-2 py-1 text-xs"
-                    />
-                    <span className="text-xs text-gray-500">to</span>
-                    <input
-                      type="date"
-                      value={customEndDate}
-                      onChange={(e) => setCustomEndDate(e.target.value)}
-                      className="border border-gray-300 rounded px-2 py-1 text-xs"
-                    />
-                  </div>
-                )}
-
-                {/* Active town filter badge */}
-                {!isBranchManager && !isRegionalManager && selectedTown && (
-                  <div className="mt-3 flex items-center gap-2">
-                    <span className="text-xs text-gray-600">Active filter:</span>
-                    <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                      <MapPin className="w-3 h-3" />
-                      Town/Region: {getDisplayName(selectedTown)}
-                      <button onClick={() => handleTownChange('')} className="text-xs text-blue-600 hover:text-blue-800 ml-1">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Bypass mode warning banner */}
-            {adminBypassMode && (
-              <div className="p-3 bg-red-50 border border-red-300 rounded-[10px] flex items-center gap-2 text-xs text-red-700 font-medium">
-                <FastForward className="w-4 h-4 shrink-0" />
-                <span><strong>Bypass Mode Active:</strong> Normal approval requirements are bypassed. Use with caution — all bypass payments are logged.</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── Summary Cards — applications tab only ─────── */}
-        {activeTab === 'applications' && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
-            <div className="bg-white p-4 rounded-[10px] border border-gray-300 shadow-sm">
-              <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Total Applications</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{filteredApplications.length}</p>
-              <p className="text-xs text-gray-500 mt-1">Across all locations</p>
-            </div>
-            <div className="bg-white p-4 rounded-[10px] border border-gray-300 shadow-sm">
-              <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Total Disbursed</p>
-              <p className="text-xl font-bold text-green-700 mt-1">
-                {formatKES(filteredApplications.filter(a => ['paid'].includes(a.status?.toLowerCase())).reduce((s, a) => s + Number(a["Amount Requested"] || 0), 0))}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">Amount paid out</p>
-            </div>
-            <div className="bg-white p-4 rounded-[10px] border border-gray-300 shadow-sm">
-              <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Pending Liability</p>
-              <p className="text-xl font-bold text-amber-700 mt-1">
-                {formatKES(filteredApplications.filter(a => !['paid', 'rejected'].includes(a.status?.toLowerCase())).reduce((s, a) => s + Number(a["Amount Requested"] || 0), 0))}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">{filteredApplications.filter(a => !['paid', 'rejected'].includes(a.status?.toLowerCase())).length} active</p>
-            </div>
-            <div className="bg-white p-4 rounded-[10px] border border-gray-300 shadow-sm">
-              <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Approval Queue</p>
-              <p className="text-2xl font-bold text-blue-700 mt-1">{pendingCount}</p>
+              {/* Approval Queue Button for Checkers */}
               {(isChecker || isAdmin) && pendingCount > 0 && (
                 <button
-                  onClick={() => setShowApprovalQueue(!showApprovalQueue)}
-                  className="text-xs text-blue-600 hover:text-blue-800 font-medium mt-1 flex items-center gap-1"
+                  onClick={() => setShowApprovalQueue(true)}
+                  className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 px-3 py-1"
                 >
-                  {showApprovalQueue ? 'Hide' : 'View'} queue <ChevronRight className="w-3 h-3" />
+                  <AlertTriangle className="w-4 h-4 text-orange-600" />
+                  <span className="text-xs font-medium text-orange-700">
+                    {pendingCount} Pending Approvals
+                  </span>
                 </button>
               )}
+
+              {fullyApprovedApplications.length > 0 && (
+                <button
+                  onClick={() => setShowBulkPaymentModal(true)}
+                  className="flex items-center gap-2 bg-green-800 hover:bg-green-900 text-white px-4 py-2 rounded-md text-xs font-medium"
+                >
+                  <img src='M-PESA_LOGO-01.svg.png' className='w-12'></img>
+                  {isMaker ? 'Create Payment Request' : 'Process Payments'} ({getSelectedStaffCount()})
+                </button>
+              )}
+
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search applications..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                />
+              </div>
             </div>
           </div>
-        )}
 
-        {/* ── Main Content ──────────────────────────────── */}
-        {activeTab === 'settings' ? (
-          <div className="bg-white rounded-[10px] border border-gray-300 shadow-sm p-6">
-            <AdvanceApplicationManager />
+          {/* Role-based Information Panel */}
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2 text-xs text-blue-800">
+              <Key className="w-4 h-4" />
+              <span>
+                <strong>Role:</strong> {userRole.replace(/_/g, ' ').toUpperCase()} |
+                <strong> Actual Role:</strong> {actualUserRole} |
+                <strong> Email:</strong> {userEmail}
+                {userTown && ` | ${isRegionalManager ? 'Region' : 'Town'}: ${userTown}`}
+              </span>
+            </div>
           </div>
 
-        ) : activeTab === 'callbacks' ? (
-          <div className="bg-white rounded-[10px] border border-gray-300 shadow-sm overflow-hidden">
-            <MpesaCallbacks filterType="payments" />
-          </div>
-
-        ) : activeTab === 'transaction_status' ? (
-          <div className="bg-white rounded-[10px] border border-gray-300 shadow-sm overflow-hidden">
-            <TransactionStatusChecker />
-          </div>
-
-        ) : (
-          /* ── Applications view ── */
-          <div className="space-y-4">
-
-            {/* Approval Queue panel */}
-            {showApprovalQueue && (isChecker || isAdmin) && (
-              <div className="bg-white rounded-[10px] border border-gray-300 shadow-sm p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-orange-600" />
-                    Payment Approval Queue
-                    {isLoadingRequests && <Loader className="w-4 h-4 animate-spin text-gray-400" />}
-                  </h2>
-                  <button onClick={() => setShowApprovalQueue(false)} className="text-xs text-gray-400 hover:text-gray-600">
-                    <XCircle className="w-5 h-5" />
-                  </button>
+          {/* Custom Date Range Inputs */}
+          {selectedDateRange === 'custom' && (
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-gray-600" />
+                  <span className="text-xs font-medium text-gray-700">Custom Date Range:</span>
                 </div>
-                {paymentRequests.length > 0 ? (
-                  <div className="grid gap-4">
-                    {paymentRequests.filter(p => p.status === 'pending').map((payment) => (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="border border-gray-300 rounded px-2 py-1 text-xs"
+                  />
+                  <span className="text-xs text-gray-500">to</span>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="border border-gray-300 rounded px-2 py-1 text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* BORROWED FROM LEAVE MANAGEMENT: Auto-filter Notice for Managers */}
+          {(isBranchManager || isRegionalManager) && selectedTown && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 text-xs text-blue-800">
+                <MapPin className="w-4 h-4" />
+                <span>
+                  {isRegionalManager
+                    ? `Viewing applications for your region: ${selectedRegion || selectedTown}`
+                    : `Viewing applications for your town: ${selectedTown}`
+                  }
+                  <span className="text-blue-600 ml-2">(Auto-filtered)</span>
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* BORROWED FROM LEAVE MANAGEMENT: Manual Filter Display */}
+          {!isBranchManager && !isRegionalManager && selectedTown && (
+            <div className="mb-4 flex items-center gap-2">
+              <span className="text-xs text-gray-600">Active filter:</span>
+              <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                <MapPin className="w-3 h-3" />
+                Town/Region: {getDisplayName(selectedTown)}
+                <button
+                  onClick={() => handleTownChange('')}
+                  className="text-blue-600 hover:text-blue-800 ml-1"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            </div>
+          )}
+
+          {/* Payment Restriction Notice */}
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center gap-2 text-xs text-amber-800">
+              <Calendar className="w-4 h-4" />
+              <span>
+                <strong>Payment Restriction:</strong> Only salary advance applications from the current month ({new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}) can be processed for payment. Applications from previous months are disabled and shown with reduced opacity.
+              </span>
+            </div>
+          </div>
+
+
+          {/* Payment Approval Queue */}
+          {showApprovalQueue && (isChecker || isAdmin) && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-orange-600" />
+                  Payment Approval Queue
+                  {isLoadingRequests && (
+                    <Loader className="w-4 h-4 animate-spin text-gray-400" />
+                  )}
+                </h2>
+                <button
+                  onClick={() => setShowApprovalQueue(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XCircle className="w-5 h-5" />
+                </button>
+              </div>
+
+              {paymentRequests.length > 0 ? (
+                <div className="grid gap-4">
+                  {paymentRequests
+                    .filter(payment => payment.status === 'pending')
+                    .map((payment) => (
                       <PaymentRequestCard
                         key={payment.id}
                         request={payment}
                         userRole={userRole}
                         onApprove={() => approvePayment(payment)}
-                        onReject={() => { setPaymentToReject(payment); setShowRejectionModal(true); }}
-                        onViewDetails={() => { setSelectedPaymentForDetails(payment); setShowPaymentDetails(true); }}
+                        onReject={() => {
+                          setPaymentToReject(payment);
+                          setShowRejectionModal(true);
+                        }}
+                        onViewDetails={() => {
+                          setSelectedPaymentForDetails(payment);
+                          setShowPaymentDetails(true);
+                        }}
                       />
                     ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-sm text-gray-500">All payment requests have been processed.</div>
-                )}
-              </div>
-            )}
-
-            {/* Info banners */}
-            {(isBranchManager || isRegionalManager) && selectedTown && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-[10px] flex items-center gap-2 text-xs text-blue-800">
-                <MapPin className="w-4 h-4 shrink-0" />
-                <span>
-                  {isRegionalManager
-                    ? `Viewing applications for your region: ${selectedRegion || selectedTown}`
-                    : `Viewing applications for your town: ${selectedTown}`}
-                  <span className="text-blue-600 ml-2">(Auto-filtered)</span>
-                </span>
-              </div>
-            )}
-
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-[10px] flex items-center gap-2 text-xs text-amber-800">
-              <Calendar className="w-4 h-4 shrink-0" />
-              <span>
-                <strong>Payment Restriction:</strong> Only applications from{' '}
-                {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })} can be processed.
-                Previous-month applications are shown with reduced opacity.
-              </span>
-            </div>
-
-            {/* Applications table */}
-            <div className="bg-white rounded-[10px] border border-gray-300 shadow-sm overflow-hidden">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600" />
-                </div>
-              ) : filteredApplications.length === 0 ? (
-                <div className="text-center py-16">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-                    <Search className="w-8 h-8 text-gray-400" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Records Found</h3>
-                  <p className="text-gray-600 text-sm">No applications match your current filters.</p>
-                  {selectedTown && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      No applications found for {isRegionalManager ? 'region' : 'town'} "{getDisplayName(selectedTown)}".
-                    </p>
-                  )}
                 </div>
               ) : (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-300">
-                      <thead className="bg-gray-50 border-b border-gray-300">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-300">Employee</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-300">Mobile</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-300">{isRegionalManager ? 'Region' : 'Branch'}</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-300">Amount</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-300">Reason</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-300">Approval Status</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-300">Notes</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-300">Date</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {currentItems.map((app) => {
-                          const appDate = parseApplicationDate(app);
-                          const now = new Date();
-                          const isCurrentMonth = appDate.getMonth() === now.getMonth() && appDate.getFullYear() === now.getFullYear();
-                          const approvalStatus = getApprovalStatus(app);
+                <div className="text-center py-12">
+                  <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No pending payments</h3>
+                  <p className="text-gray-600">All payment requests have been processed.</p>
+                </div>
+              )}
+            </div>
+          )}
 
-                          return (
-                            <tr
-                              key={app.id}
-                              className={`hover:bg-gray-50 transition-colors ${!isCurrentMonth ? 'opacity-60 grayscale pointer-events-none' : ''}`}
-                            >
-                              {/* Employee */}
-                              <td className="px-4 py-3 border-r border-gray-300">
-                                <div className="text-sm font-semibold text-gray-900">{app["Full Name"]}</div>
-                                <div className="text-xs text-gray-500 font-mono">{app["Employee Number"]}</div>
+          {/* Rest of your existing applications JSX */}
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-600"></div>
+            </div>
+          ) : filteredApplications.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No salary advance requests found.
+              {selectedTown && (
+                <p className="text-xs mt-2">
+                  No applications found for {isRegionalManager ? 'region' : 'town'} "{getDisplayName(selectedTown)}". Try changing your filter or search term.
+                </p>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="card-premium overflow-hidden border border-gray-100/50">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-100">
+                    <thead className="bg-[#FAFAFB]">
+                      <tr>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
+                          Employee
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
+                          Mobile Number
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
+                          {isRegionalManager ? 'Region' : 'Branch'}
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
+                          Amount
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
+                          Reason
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
+                          Approval Status
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
+                          Notes
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
+                          Date
+                        </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider font-sans">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {currentItems.map((app) => {
+                        const appDate = parseApplicationDate(app);
+                        const now = new Date();
+                        const isCurrentMonth = appDate.getMonth() === now.getMonth() && appDate.getFullYear() === now.getFullYear();
+
+                        return (
+                          <tr key={app.id} className={!isCurrentMonth ? "bg-gray-50 opacity-60 grayscale pointer-events-none" : ""}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <div>
+                                  <div className="text-xs font-medium text-gray-900">{app["Full Name"]}</div>
+                                  <div className="text-xs text-gray-500">{app["Employee Number"]}</div>
+                                </div>
                                 <ManagerBadge
                                   isBranchManager={isBranchManagerMap[app["Employee Number"]] || false}
                                   isRegionalManager={false}
                                 />
-                              </td>
-
-                              {/* Mobile */}
-                              <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-600">
-                                {employeeMobileNumbers[app["Employee Number"]] || 'N/A'}
-                              </td>
-
-                              {/* Branch */}
-                              <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-600">
-                                {app['Office Branch'] || app.Office_Branch || app.office_branch || 'N/A'}
-                              </td>
-
-                              {/* Amount */}
-                              <td className="px-4 py-3 border-r border-gray-300">
-                                {editingId === app.id ? (
-                                  <div className="flex items-center gap-1">
-                                    <input
-                                      type="text"
-                                      value={editedAmount}
-                                      onChange={(e) => setEditedAmount(e.target.value)}
-                                      className="w-20 px-1 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-blue-600"
-                                    />
-                                    <button onClick={() => handleAmountSave(app.id)} className="text-xs bg-green-600 text-white px-1.5 py-1 rounded hover:bg-green-700">Save</button>
-                                    <button onClick={() => setEditingId(null)} className="text-xs bg-gray-400 text-white px-1.5 py-1 rounded hover:bg-gray-500">✕</button>
-                                  </div>
-                                ) : (
-                                  <div
-                                    className="text-sm font-bold text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
-                                    onClick={() => handleAmountEdit(app.id, app["Amount Requested"])}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
+                              {employeeMobileNumbers[app["Employee Number"]] || 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
+                              {app['Office Branch'] || app.Office_Branch || app.office_branch || 'N/A'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {editingId === app.id ? (
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    value={editedAmount}
+                                    onChange={(e) => setEditedAmount(e.target.value)}
+                                    className="w-24 p-1 border rounded text-xs"
+                                  />
+                                  <button
+                                    onClick={() => handleAmountSave(app.id)}
+                                    className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
                                   >
-                                    {formatKES(Number(app["Amount Requested"]))}
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingId(null)}
+                                    className="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <div
+                                  className="text-xs font-medium text-gray-900 cursor-pointer hover:underline"
+                                  onClick={() => handleAmountEdit(app.id, app["Amount Requested"])}
+                                >
+                                  {formatKES(Number(app["Amount Requested"]))}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-xs text-gray-500 max-w-xs truncate">
+                              {app["Reason for Advance"]}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex flex-col gap-1">
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getApprovalBadgeColor(getApprovalStatus(app))}`}>
+                                  {getApprovalStatus(app)}
+                                </span>
+                                <div className="flex items-center gap-2 text-xs text-gray-500">
+                                  <UserCheck className="h-3 w-3" />
+                                  <span>BM: {app.branch_manager_approval ? '✓' : (app.branch_manager_recommendation ? 'Recommended' : 'Pending')}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-gray-500">
+                                  <ShieldCheck className="h-3 w-3" />
+                                  <span>RM: {app.regional_manager_approval ? '✓' : (app.regional_manager_recommendation ? 'Recommended' : 'Pending')}</span>
+                                </div>
+                                {app.regional_manager_comment && (
+                                  <div className="flex items-center gap-2 text-xs text-blue-600">
+                                    <Smartphone className="h-3 w-3" />
+                                    <span>RM Comment: {app.regional_manager_comment}</span>
                                   </div>
                                 )}
-                              </td>
-
-                              {/* Reason */}
-                              <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-500 max-w-[160px] truncate">
-                                {app["Reason for Advance"] || '—'}
-                              </td>
-
-                              {/* Approval Status */}
-                              <td className="px-4 py-3 border-r border-gray-300">
-                                <div className="space-y-1">
-                                  <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium border ${getApprovalBadgeColor(approvalStatus)}`}>
-                                    {approvalStatus}
-                                  </span>
-                                  <div className="flex items-center gap-1 text-xs text-gray-500">
-                                    <UserCheck className="h-3 w-3" />
-                                    BM: {app.branch_manager_approval ? '✓' : (app.branch_manager_recommendation ? 'Rec.' : 'Pending')}
-                                  </div>
-                                  <div className="flex items-center gap-1 text-xs text-gray-500">
-                                    <ShieldCheck className="h-3 w-3" />
-                                    RM: {app.regional_manager_approval ? '✓' : (app.regional_manager_recommendation ? 'Rec.' : 'Pending')}
-                                  </div>
-                                  {app.regional_manager_comment && (
-                                    <div className="flex items-center gap-1 text-xs text-blue-600">
-                                      <Smartphone className="h-3 w-3" />
-                                      <span className="truncate max-w-[100px]">{app.regional_manager_comment}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-
-                              {/* Notes */}
-                              <td className="px-4 py-3 border-r border-gray-300 relative">
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap relative">
+                              <div className="flex items-center">
                                 <button
                                   onClick={() => setShowNotesDropdown(showNotesDropdown === app.id ? null : app.id)}
-                                  className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 px-2 py-1 rounded bg-white"
+                                  className="flex items-center text-xs text-gray-500 hover:text-gray-700"
                                 >
-                                  Notes <ChevronDown className="h-3 w-3" />
+                                  Notes <ChevronDown className="h-4 w-4 ml-1" />
                                 </button>
-                                {showNotesDropdown === app.id && (
-                                  <div className="absolute z-10 mt-1 w-64 bg-white shadow-lg rounded-[10px] p-3 border border-gray-200">
-                                    <textarea
-                                      value={notes[app.id] || ''}
-                                      onChange={(e) => handleNoteChange(app.id, e.target.value)}
-                                      placeholder="Add admin notes..."
-                                      className="w-full p-2 border border-gray-300 rounded text-xs mb-2"
-                                      rows={3}
-                                    />
-                                    <div className="flex justify-end gap-2">
-                                      <button onClick={() => setShowNotesDropdown(null)} className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded hover:bg-gray-300">Cancel</button>
-                                      <button onClick={() => saveNotes(app.id)} className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">Save</button>
-                                    </div>
+                              </div>
+                              {showNotesDropdown === app.id && (
+                                <div className="absolute z-10 mt-2 w-64 bg-white shadow-lg rounded-md p-2 border border-gray-200">
+                                  <textarea
+                                    value={notes[app.id] || ''}
+                                    onChange={(e) => handleNoteChange(app.id, e.target.value)}
+                                    placeholder="Add admin notes..."
+                                    className="w-full p-2 border rounded text-xs mb-2"
+                                    rows={3}
+                                  />
+                                  <div className="flex justify-end space-x-2">
+                                    <button
+                                      onClick={() => setShowNotesDropdown(null)}
+                                      className="text-xs bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      onClick={() => saveNotes(app.id)}
+                                      className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
+                                    >
+                                      Save
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
+                              <div className="flex flex-col">
+                                <span className="text-gray-900 font-medium">{parseApplicationDate(app).toLocaleDateString()}</span>
+                                <span className="text-xs text-gray-500">{parseApplicationDate(app).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-xs font-medium">
+                              <div className="flex flex-col gap-1">
+                                {/* Branch Manager Actions */}
+                                {canBranchManagerApprove(app) && (
+                                  <div className="flex flex-col gap-1">
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'bm-recommend-current')}
+                                      className="text-green-600 hover:text-green-900 text-xs border border-green-200 px-2 py-1 rounded bg-green-50 flex items-center gap-1"
+                                    >
+                                      <CheckCircle className="w-3 h-3" />
+                                      Recommend Current
+                                    </button>
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'bm-recommend-adjusted')}
+                                      className="text-blue-600 hover:text-blue-900 text-xs border border-blue-200 px-2 py-1 rounded bg-blue-50 flex items-center gap-1"
+                                    >
+                                      <Edit3 className="w-3 h-3" />
+                                      Recommend Adjusted
+                                    </button>
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'bm-recommend-reject')}
+                                      className="text-red-600 hover:text-red-900 text-xs border border-red-200 px-2 py-1 rounded bg-red-50 flex items-center gap-1"
+                                    >
+                                      <XCircleIcon className="w-3 h-3" />
+                                      Recommend Reject
+                                    </button>
                                   </div>
                                 )}
-                              </td>
 
-                              {/* Date */}
-                              <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-600">
-                                <div className="font-medium text-gray-900">{appDate.toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
-                                <div>{appDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                              </td>
-
-                              {/* Actions */}
-                              <td className="px-4 py-3">
-                                <div className="flex flex-col gap-1.5">
-                                  {/* BM actions */}
-                                  {canBranchManagerApprove(app) && (
-                                    <>
-                                      <button onClick={() => openRecommendationModal(app, 'bm-recommend-current')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded border border-green-200">
-                                        <CheckCircle className="w-3 h-3" /> Recommend
-                                      </button>
-                                      <button onClick={() => openRecommendationModal(app, 'bm-recommend-adjusted')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200">
-                                        <Edit3 className="w-3 h-3" /> Adjusted
-                                      </button>
-                                      <button onClick={() => openRecommendationModal(app, 'bm-recommend-reject')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded border border-red-200">
-                                        <XCircleIcon className="w-3 h-3" /> Reject
-                                      </button>
-                                    </>
-                                  )}
-
-                                  {/* RM actions */}
-                                  {canRegionalManagerApprove(app) && (
-                                    <>
-                                      <button onClick={() => openRecommendationModal(app, 'rm-recommend-current')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded border border-green-200">
-                                        <CheckCircle className="w-3 h-3" /> Recommend
-                                      </button>
-                                      <button onClick={() => openRecommendationModal(app, 'rm-recommend-adjusted')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200">
-                                        <Edit3 className="w-3 h-3" /> Adjusted
-                                      </button>
-                                      <button onClick={() => openRecommendationModal(app, 'rm-recommend-reject')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded border border-red-200">
-                                        <XCircleIcon className="w-3 h-3" /> Reject
-                                      </button>
-                                    </>
-                                  )}
-
-                                  {/* RM comment */}
-                                  {canRegionalManagerComment(app) && (
-                                    <button onClick={() => openCommentModal(app)}
-                                      className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200">
-                                      <Smartphone className="w-3 h-3" /> Comment
+                                {/* Regional Manager Actions */}
+                                {canRegionalManagerApprove(app) && (
+                                  <div className="flex flex-col gap-1">
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'rm-recommend-current')}
+                                      className="text-green-600 hover:text-green-900 text-xs border border-green-200 px-2 py-1 rounded bg-green-50 flex items-center gap-1"
+                                    >
+                                      <CheckCircle className="w-3 h-3" />
+                                      Recommend Current
                                     </button>
-                                  )}
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'rm-recommend-adjusted')}
+                                      className="text-blue-600 hover:text-blue-900 text-xs border border-blue-200 px-2 py-1 rounded bg-blue-50 flex items-center gap-1"
+                                    >
+                                      <Edit3 className="w-3 h-3" />
+                                      Recommend Adjusted
+                                    </button>
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'rm-recommend-reject')}
+                                      className="text-red-600 hover:text-red-900 text-xs border border-red-200 px-2 py-1 rounded bg-red-50 flex items-center gap-1"
+                                    >
+                                      <XCircleIcon className="w-3 h-3" />
+                                      Recommend Reject
+                                    </button>
+                                  </div>
+                                )}
 
-                                  {/* Admin final approval */}
-                                  {canAdminApprove(app) && (
-                                    <>
-                                      <button onClick={() => openRecommendationModal(app, 'admin-approve-current')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded border border-green-200">
-                                        <CheckCircle className="w-3 h-3" /> Approve
-                                      </button>
-                                      <button onClick={() => openRecommendationModal(app, 'admin-approve-adjusted')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200">
-                                        <Edit3 className="w-3 h-3" /> Adjusted
-                                      </button>
-                                      <button onClick={() => openRecommendationModal(app, 'admin-reject')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded border border-red-200">
-                                        <XCircleIcon className="w-3 h-3" /> Reject
-                                      </button>
-                                    </>
-                                  )}
+                                {/* Regional Manager Comment Action */}
+                                {canRegionalManagerComment(app) && (
+                                  <button
+                                    onClick={() => openCommentModal(app)}
+                                    className="text-blue-600 hover:text-blue-900 text-xs border border-blue-200 px-2 py-1 rounded bg-blue-50 flex items-center gap-1"
+                                  >
+                                    <Smartphone className="w-3 h-3" />
+                                    Add Comment
+                                  </button>
+                                )}
 
-                                  {/* ── Bypass & Pay Now ── */}
-                                  {isAdmin && adminBypassMode &&
-                                    !['paid', 'rejected', 'processing', 'approved', 'fully approved'].includes(app.status?.toLowerCase()) &&
-                                    !selectedStaff[app.id] && (
-                                      <button
-                                        disabled={isLoading || isBypassLoading}
-                                        onClick={() => handleIndividualBypassPayment(app)}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded border border-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                                      >
-                                        <FastForward className="w-3 h-3" /> Bypass & Pay Now
-                                      </button>
-                                    )}
+                                {/* Admin Final Approval Action */}
+                                {canAdminApprove(app) && (
+                                  <div className="flex flex-col gap-1">
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'admin-approve-current')}
+                                      className="text-green-600 hover:text-green-900 text-xs border border-green-200 px-2 py-1 rounded bg-green-50 flex items-center gap-1"
+                                    >
+                                      <CheckCircle className="w-3 h-3" />
+                                      Approve Current
+                                    </button>
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'admin-approve-adjusted')}
+                                      className="text-blue-600 hover:text-blue-900 text-xs border border-blue-200 px-2 py-1 rounded bg-blue-50 flex items-center gap-1"
+                                    >
+                                      <Edit3 className="w-3 h-3" />
+                                      Approve Adjusted
+                                    </button>
+                                    <button
+                                      onClick={() => openRecommendationModal(app, 'admin-reject')}
+                                      className="text-red-600 hover:text-red-900 text-xs border border-red-200 px-2 py-1 rounded bg-red-50 flex items-center gap-1"
+                                    >
+                                      <XCircleIcon className="w-3 h-3" />
+                                      Reject
+                                    </button>
+                                  </div>
+                                )}
 
-                                  {/* Status badges */}
-                                  {checkIfSelfApproval(app) && !['paid', 'rejected'].includes(app.status?.toLowerCase()) && (
-                                    <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200">Cannot self-approve</span>
-                                  )}
-                                  {app.status?.toLowerCase() === 'paid' && (
-                                    <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-1 rounded border border-green-200">
-                                      <CheckCircle className="w-3 h-3" /> Paid
+                                {/* Individual Bypass & Pay Action */}
+                                {isAdmin && adminBypassMode && !['paid', 'rejected', 'processing', 'approved', 'fully approved'].includes(app.status?.toLowerCase()) && !selectedStaff[app.id] && (
+                                  <motion.button
+                                    whileHover={{ scale: 1.05, x: 5 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    disabled={isLoading || isBypassLoading}
+                                    onClick={() => handleIndividualBypassPayment(app)}
+                                    className="group relative overflow-hidden text-green-700 text-[11px] border border-green-200 px-3 py-1.5 rounded-lg bg-gradient-to-r from-green-50 to-white flex items-center gap-2 mt-1 font-bold shadow-sm hover:shadow-green-100 hover:border-green-300 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    <div className="absolute inset-0 bg-green-600 opacity-0 group-hover:opacity-[0.03] transition-opacity duration-300" />
+                                    <Zap className="w-3.5 h-3.5 text-green-600 fill-green-200 group-hover:fill-green-600 transition-colors duration-300" />
+                                    <span className="relative">Bypass & Pay Now</span>
+                                    <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-100 -ml-1 group-hover:ml-0 transition-all duration-300" />
+                                  </motion.button>
+                                )}
+
+                                {/* Self-approval warning */}
+                                {checkIfSelfApproval(app) && !['paid', 'rejected'].includes(app.status?.toLowerCase()) && (
+                                  <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200">
+                                    Cannot approve own request
+                                  </span>
+                                )}
+
+                                {/* No actions available message */}
+                                {/* Terminal Statuses or Ready for Payment */}
+                                {app.status?.toLowerCase() === 'paid' && (
+                                  <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200 flex items-center gap-1">
+                                    <CheckCircle className="w-3 h-3" />
+                                    Payment Processed
+                                  </span>
+                                )}
+
+                                {app.status?.toLowerCase() === 'processing' && (
+                                  <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200 flex items-center gap-1 animate-pulse">
+                                    <Loader className="w-3 h-3 animate-spin" />
+                                    Processing Payment...
+                                  </span>
+                                )}
+
+                                {['approved', 'fully approved'].includes(app.status?.toLowerCase()) && (
+                                  <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200 flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    Ready for Payment
+                                  </span>
+                                )}
+
+                                {app.status?.toLowerCase() === 'rejected' && (
+                                  <span className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded border border-red-200 flex items-center gap-1">
+                                    <XCircleIcon className="w-3 h-3" />
+                                    Request Rejected
+                                  </span>
+                                )}
+
+                                {/* No actions available message (Only for true pending states) */}
+                                {!canBranchManagerApprove(app) && !canRegionalManagerApprove(app) && !canRegionalManagerComment(app) && !canAdminApprove(app) &&
+                                  !['paid', 'approved', 'fully approved', 'rejected'].includes(app.status?.toLowerCase()) && !checkIfSelfApproval(app) && (
+                                    <span className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded border border-gray-200 flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      Awaiting approval
                                     </span>
                                   )}
-                                  {app.status?.toLowerCase() === 'processing' && (
-                                    <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200 animate-pulse">
-                                      <Loader className="w-3 h-3 animate-spin" /> Processing...
-                                    </span>
-                                  )}
-                                  {['approved', 'fully approved'].includes(app.status?.toLowerCase()) && (
-                                    <span className="inline-flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-200">
-                                      <Clock className="w-3 h-3" /> Ready for Payment
-                                    </span>
-                                  )}
-                                  {app.status?.toLowerCase() === 'rejected' && (
-                                    <span className="inline-flex items-center gap-1 text-xs text-red-700 bg-red-50 px-2 py-1 rounded border border-red-200">
-                                      <XCircleIcon className="w-3 h-3" /> Rejected
-                                    </span>
-                                  )}
-                                  {!canBranchManagerApprove(app) && !canRegionalManagerApprove(app) && !canRegionalManagerComment(app) && !canAdminApprove(app) &&
-                                    !['paid', 'approved', 'fully approved', 'rejected', 'processing'].includes(app.status?.toLowerCase()) &&
-                                    !checkIfSelfApproval(app) && !(isAdmin && adminBypassMode) && (
-                                      <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded border border-gray-200">
-                                        <Clock className="w-3 h-3" /> Awaiting approval
-                                      </span>
-                                    )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
 
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-3 border-t border-gray-300 bg-gray-50">
-                      <div className="text-sm text-gray-700 mb-3 sm:mb-0">
-                        Showing <strong>{indexOfFirstItem + 1}</strong> to{' '}
-                        <strong>{Math.min(indexOfLastItem, filteredApplications.length)}</strong> of{' '}
-                        <strong>{filteredApplications.length}</strong> entries
-                      </div>
-                      <div className="flex items-center space-x-1">
+                {/* Pagination Controls */}
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center mt-6 px-4 py-4">
+                    {/* Mobile pagination */}
+                    <div className="flex items-center justify-between w-full sm:hidden">
+                      <button
+                        onClick={() => paginate(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="relative inline-flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <ChevronLeft className="h-4 w-4 mr-1" />
+                        Previous
+                      </button>
+                      <span className="text-xs text-gray-700">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <button
+                        onClick={() => paginate(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="relative inline-flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </button>
+                    </div>
+
+                    {/* Desktop pagination */}
+                    <div className="hidden sm:flex sm:flex-col sm:items-center sm:gap-3">
+                      <p className="text-xs text-gray-700">
+                        Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
+                        <span className="font-medium">
+                          {Math.min(indexOfLastItem, filteredApplications.length)}
+                        </span>{' '}
+                        of <span className="font-medium">{filteredApplications.length}</span> results
+                      </p>
+                      <nav className="inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
                         <button
                           onClick={() => paginate(currentPage - 1)}
                           disabled={currentPage === 1}
-                          className="text-xs p-1 rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                          className="relative inline-flex items-center px-2 py-2 text-xs font-medium text-gray-500 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <ChevronLeft className="w-4 h-4" />
+                          <span className="sr-only">Previous</span>
+                          <ChevronLeft className="h-4 w-4" />
                         </button>
+
+                        {/* Page numbers - show limited set for better layout */}
                         {(() => {
                           const maxVisible = 5;
                           let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
                           let endPage = Math.min(totalPages, startPage + maxVisible - 1);
-                          if (endPage - startPage < maxVisible - 1) startPage = Math.max(1, endPage - maxVisible + 1);
-                          return Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i).map(page => (
-                            <button
-                              key={page}
-                              onClick={() => paginate(page)}
-                              className={`min-w-[2rem] px-2 py-1 text-xs rounded border ${currentPage === page
-                                  ? 'bg-blue-600 text-white border-blue-600'
-                                  : 'border-gray-300 text-gray-700 hover:bg-gray-100'
-                                }`}
-                            >
-                              {page}
-                            </button>
-                          ));
+
+                          if (endPage - startPage < maxVisible - 1) {
+                            startPage = Math.max(1, endPage - maxVisible + 1);
+                          }
+
+                          const pages = [];
+
+                          // First page
+                          if (startPage > 1) {
+                            pages.push(
+                              <button
+                                key={1}
+                                onClick={() => paginate(1)}
+                                className="relative inline-flex items-center px-3 py-2 text-xs font-medium bg-white border-gray-300 text-gray-500 hover:bg-gray-50 border"
+                              >
+                                1
+                              </button>
+                            );
+                            if (startPage > 2) {
+                              pages.push(
+                                <span key="dots1" className="relative inline-flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300">
+                                  ...
+                                </span>
+                              );
+                            }
+                          }
+
+                          // Visible pages
+                          for (let i = startPage; i <= endPage; i++) {
+                            pages.push(
+                              <button
+                                key={i}
+                                onClick={() => paginate(i)}
+                                className={`relative inline-flex items-center px-3 py-2 text-xs font-medium ${currentPage === i
+                                  ? 'z-10 bg-green-50 border-green-500 text-green-600'
+                                  : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                  } border`}
+                              >
+                                {i}
+                              </button>
+                            );
+                          }
+
+                          // Last page
+                          if (endPage < totalPages) {
+                            if (endPage < totalPages - 1) {
+                              pages.push(
+                                <span key="dots2" className="relative inline-flex items-center px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300">
+                                  ...
+                                </span>
+                              );
+                            }
+                            pages.push(
+                              <button
+                                key={totalPages}
+                                onClick={() => paginate(totalPages)}
+                                className="relative inline-flex items-center px-3 py-2 text-xs font-medium bg-white border-gray-300 text-gray-500 hover:bg-gray-50 border"
+                              >
+                                {totalPages}
+                              </button>
+                            );
+                          }
+
+                          return pages;
                         })()}
+
                         <button
                           onClick={() => paginate(currentPage + 1)}
                           disabled={currentPage === totalPages}
-                          className="text-xs p-1 rounded border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+                          className="relative inline-flex items-center px-2 py-2 text-xs font-medium text-gray-500 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <ChevronRight className="w-4 h-4" />
+                          <span className="sr-only">Next</span>
+                          <ChevronRight className="h-4 w-4" />
                         </button>
-                      </div>
+                      </nav>
                     </div>
-                  )}
-                </>
-              )}
-            </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
-            {/* ── Modals ── */}
-            <BulkPaymentModal
-              isOpen={showBulkPaymentModal}
-              onClose={() => { setShowBulkPaymentModal(false); setJustification(''); }}
-              onProcess={handleBulkPayment}
-              isLoading={isProcessingBulkPayment}
-              applications={applications}
-              selectedStaff={selectedStaff}
-              onToggleStaff={toggleStaffSelection}
-              onSelectAll={selectAllStaff}
-              onDeselectAll={deselectAllStaff}
-              employeeMobileNumbers={employeeMobileNumbers}
-              isBranchManagerMap={isBranchManagerMap}
-              justification={justification}
-              onJustificationChange={setJustification}
-              userRole={userRole}
-              adminBypassMode={adminBypassMode}
-            />
-            <PaymentDetailsModal
-              payment={selectedPaymentForDetails}
-              isOpen={showPaymentDetails}
-              onClose={() => setShowPaymentDetails(false)}
-              onApprove={() => { approvePayment(selectedPaymentForDetails); setShowPaymentDetails(false); }}
-              onReject={() => { setPaymentToReject(selectedPaymentForDetails); setShowRejectionModal(true); setShowPaymentDetails(false); }}
-              userRole={userRole}
-            />
-            <RejectionModal
-              isOpen={showRejectionModal}
-              onClose={() => setShowRejectionModal(false)}
-              onConfirm={(reason) => { rejectPayment(paymentToReject, reason); setPaymentToReject(null); }}
-            />
-            <RecommendationModal
-              isOpen={showRecommendationModal}
-              onClose={() => setShowRecommendationModal(false)}
-              onConfirm={handleRecommendation}
-              application={selectedApplication}
-              actionType={recommendationAction}
-              currentAmount={selectedApplication?.["Amount Requested"]}
-              adminBypassMode={adminBypassMode}
-            />
-            <CommentModal
-              isOpen={showCommentModal}
-              onClose={() => setShowCommentModal(false)}
-              onConfirm={handleComment}
-              application={selectedApplication}
-            />
-            <ExportModal
-              isOpen={showExportModal}
-              onClose={() => setShowExportModal(false)}
-              onExport={handleExport}
-              isLoading={isExporting}
-              filterOptions={{ allTowns: propAllTowns }}
-            />
-            <ImportModal
-              isOpen={showImportModal}
-              onClose={() => setShowImportModal(false)}
-              onImport={handleImport}
-              isLoading={isImporting}
-            />
-            <BypassConfirmModal
-              isOpen={showBypassConfirmModal}
-              onClose={() => setShowBypassConfirmModal(false)}
-              onConfirm={executeIndividualBypassPayment}
-              application={selectedAppForBypass}
-              isLoading={isBypassLoading}
-            />
-          </div>
-        )}
+          {/* Enhanced Bulk Payment Modal with Search */}
+          <BulkPaymentModal
+            isOpen={showBulkPaymentModal}
+            onClose={() => {
+              setShowBulkPaymentModal(false);
+              setJustification('');
+            }}
+            onProcess={handleBulkPayment}
+            isLoading={isProcessingBulkPayment}
+            applications={applications}
+            selectedStaff={selectedStaff}
+            onToggleStaff={toggleStaffSelection}
+            onSelectAll={selectAllStaff}
+            onDeselectAll={deselectAllStaff}
+            employeeMobileNumbers={employeeMobileNumbers}
+            isBranchManagerMap={isBranchManagerMap}
+            justification={justification}
+            onJustificationChange={setJustification}
+            userRole={userRole}
+            adminBypassMode={adminBypassMode}
+          />
 
-      </div>
+          {/* Payment Details Modal */}
+          <PaymentDetailsModal
+            payment={selectedPaymentForDetails}
+            isOpen={showPaymentDetails}
+            onClose={() => setShowPaymentDetails(false)}
+            onApprove={() => {
+              approvePayment(selectedPaymentForDetails);
+              setShowPaymentDetails(false);
+            }}
+            onReject={() => {
+              setPaymentToReject(selectedPaymentForDetails);
+              setShowRejectionModal(true);
+              setShowPaymentDetails(false);
+            }}
+            userRole={userRole}
+          />
+
+          {/* Rejection Modal */}
+          <RejectionModal
+            isOpen={showRejectionModal}
+            onClose={() => setShowRejectionModal(false)}
+            onConfirm={(reason) => {
+              rejectPayment(paymentToReject, reason);
+              setPaymentToReject(null);
+            }}
+          />
+
+          {/* Recommendation Modal */}
+          <RecommendationModal
+            isOpen={showRecommendationModal}
+            onClose={() => setShowRecommendationModal(false)}
+            onConfirm={handleRecommendation}
+            application={selectedApplication}
+            actionType={recommendationAction}
+            currentAmount={selectedApplication?.["Amount Requested"]}
+            adminBypassMode={adminBypassMode}
+          />
+
+          {/* Comment Modal */}
+          <CommentModal
+            isOpen={showCommentModal}
+            onClose={() => setShowCommentModal(false)}
+            onConfirm={handleComment}
+            application={selectedApplication}
+          />
+
+          {/* Export Modal */}
+          <ExportModal
+            isOpen={showExportModal}
+            onClose={() => setShowExportModal(false)}
+            onExport={handleExport}
+            isLoading={isExporting}
+            filterOptions={{ allTowns: propAllTowns }}
+          />
+
+          {/* Import Modal */}
+          <ImportModal
+            isOpen={showImportModal}
+            onClose={() => setShowImportModal(false)}
+            onImport={handleImport}
+            isLoading={isImporting}
+          />
+          {/* Custom Bypass Confirmation Modal */}
+          <BypassConfirmModal
+            isOpen={showBypassConfirmModal}
+            onClose={() => setShowBypassConfirmModal(false)}
+            onConfirm={executeIndividualBypassPayment}
+            application={selectedAppForBypass}
+            isLoading={isBypassLoading}
+          />
+        </div>
+      ) : activeTab === 'callbacks' ? (
+        <MpesaCallbacks filterType="payments" />
+      ) : activeTab === 'transaction_status' ? (
+        <TransactionStatusChecker />
+      ) : (
+        <MpesaCallbacks filterType="all" />
+      )}
     </div>
   );
 };

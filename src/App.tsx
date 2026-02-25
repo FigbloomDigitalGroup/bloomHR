@@ -53,6 +53,7 @@ import QRScanner from './components/Asset/scan';
 import MpesaZapPortal from './components/Settings/MpesaZapPortal';
 import RolePermissions from './components/Settings/RolePermissions';
 import EmailPortal from './components/Email/EmailPortal';
+import HRLifecycleDashboard from './components/HR/HRLifecycleDashboard';
 
 interface User {
   email: string;
@@ -1088,6 +1089,15 @@ function App() {
                                 } />
 
                                 <Route path="/role-permissions" element={<RolePermissions />} />
+
+                                <Route
+                                  path="/hr-lifecycle"
+                                  element={
+                                    <AuthRoute allowedRoles={['ADMIN', 'HR', 'CHECKER', 'MANAGER']}>
+                                      <HRLifecycleDashboard />
+                                    </AuthRoute>
+                                  }
+                                />
 
                                 <Route path="*" element={<NotFound />} />
                               </Routes>
