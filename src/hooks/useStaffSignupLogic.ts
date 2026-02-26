@@ -472,7 +472,7 @@ export function useStaffSignupLogic() {
 
         try {
             const htmlContent = isResend ? `
-        <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <div style="font-family: 'Avenir Next', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
           <h2 style="color: #2563eb; text-align: center;">Your Zira HR Login Credentials</h2>
           <p style="font-size: 16px;">Your login credentials have been resent as requested.</p>
           
@@ -490,7 +490,7 @@ export function useStaffSignupLogic() {
           </div>
         </div>
       ` : `
-        <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <div style="font-family: 'Avenir Next', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
           <h2 style="color: #2563eb; text-align: center;">Welcome to Zira HR!</h2>
           <p style="font-size: 16px;">Your staff account has been approved by the administrator.</p>
           

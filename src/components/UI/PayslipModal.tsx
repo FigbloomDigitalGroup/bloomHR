@@ -1,6 +1,6 @@
 import React from 'react';
 import { Download, Printer, Share2, X, ArrowLeft, ArrowRight, Shield, Award, Building2 } from 'lucide-react';
-import  GlowButton  from '../UI/GlowButton';
+import GlowButton from '../UI/GlowButton';
 
 interface PayslipModalProps {
   record: any;
@@ -18,12 +18,12 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, onClose, onPrevious
           <head>
             <title>Payslip - ${record.employee_name}</title>
             <style>
-              @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+              
               
               * { margin: 0; padding: 0; box-sizing: border-box; }
               
               body { 
-                font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+                font-family: 'Avenir Next', -apple-system, BlinkMacSystemFont, sans-serif; 
                 line-height: 1.5;
                 color: #1f2937; 
                 background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
@@ -436,7 +436,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, onClose, onPrevious
                 transform: rotate(-30deg); 
                 z-index: 1; 
                 pointer-events: none;
-                font-family: 'Inter', sans-serif;
+                font-family: 'Avenir Next', sans-serif;
                 letter-spacing: -4px;
               }
               
@@ -518,7 +518,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, onClose, onPrevious
       const htmlContent = document.getElementById('payslip-content')?.innerHTML;
       const blob = new Blob([htmlContent || ''], { type: 'text/html' });
       const file = new File([blob], `payslip_${record.employee_id}.html`, { type: 'text/html' });
-      
+
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({
           title: `Payslip - ${record.employee_name}`,
@@ -532,7 +532,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, onClose, onPrevious
           `Gross Pay: KSh ${record.gross_pay.toLocaleString()}\n` +
           `Net Pay: KSh ${record.net_pay.toLocaleString()}\n\n` +
           `View full payslip in the payroll system.`;
-        
+
         if (navigator.clipboard) {
           await navigator.clipboard.writeText(text);
           alert('Payslip information copied to clipboard');
@@ -561,37 +561,37 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, onClose, onPrevious
             </div>
           </div>
           <div className="flex gap-2">
-            <GlowButton 
-              variant="ghost" 
-              icon={Download} 
-              size="sm" 
+            <GlowButton
+              variant="ghost"
+              icon={Download}
+              size="sm"
               onClick={handleDownload}
               className="text-white hover:bg-white/10 border border-white/20"
             >
               Download
             </GlowButton>
-            <GlowButton 
-              variant="ghost" 
-              icon={Printer} 
-              size="sm" 
+            <GlowButton
+              variant="ghost"
+              icon={Printer}
+              size="sm"
               onClick={handlePrint}
               className="text-white hover:bg-white/10 border border-white/20"
             >
               Print
             </GlowButton>
-            <GlowButton 
-              variant="ghost" 
-              icon={Share2} 
-              size="sm" 
+            <GlowButton
+              variant="ghost"
+              icon={Share2}
+              size="sm"
               onClick={handleShare}
               className="text-white hover:bg-white/10 border border-white/20"
             >
               Share
             </GlowButton>
-            <GlowButton 
-              variant="ghost" 
-              icon={X} 
-              size="sm" 
+            <GlowButton
+              variant="ghost"
+              icon={X}
+              size="sm"
               onClick={onClose}
               className="text-white hover:bg-white/10 border border-white/20"
             >
@@ -616,7 +616,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, onClose, onPrevious
 
               {/* Watermark */}
               <div className="watermark" style={{ top: '300px', left: '150px' }}>OFFICIAL</div>
-              
+
               {/* Header */}
               <div className="header">
                 <div className="company-logo">
@@ -645,7 +645,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, onClose, onPrevious
                       <div className="card-value">{record.position}</div>
                     </div>
                   </div>
-                  
+
                   <div className="employee-card">
                     <div className="card-icon">
                       <Award className="w-6 h-6 text-purple-600" />
@@ -665,7 +665,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, onClose, onPrevious
                       <div className="card-value">Pay Date: {new Date().toLocaleDateString()}</div>
                     </div>
                   </div>
-                  
+
                   <div className="employee-card">
                     <div className="card-icon">
                       <Shield className="w-6 h-6 text-green-600" />
@@ -693,7 +693,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, onClose, onPrevious
                   <thead>
                     <tr>
                       <th>Description</th>
-                      <th style={{textAlign: 'right'}}>Amount (KSh)</th>
+                      <th style={{ textAlign: 'right' }}>Amount (KSh)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -749,7 +749,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, onClose, onPrevious
                   <thead>
                     <tr>
                       <th>Description</th>
-                      <th style={{textAlign: 'right'}}>Amount (KSh)</th>
+                      <th style={{ textAlign: 'right' }}>Amount (KSh)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -818,22 +818,22 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, onClose, onPrevious
                     This is a computer-generated payslip and does not require a physical signature
                   </div>
                   <div style={{ marginBottom: '8px' }}>
-                    Generated on {new Date().toLocaleDateString('en-US', { 
-                      weekday: 'long', 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    })} at {new Date().toLocaleTimeString('en-US', { 
-                      hour: '2-digit', 
-                      minute: '2-digit' 
+                    Generated on {new Date().toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })} at {new Date().toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit'
                     })}
                   </div>
                   <div style={{ marginBottom: '16px' }}>
                     Document ID: PAY-{record.employee_id}-{record.pay_period}-{Date.now().toString().slice(-6)}
                   </div>
                   <div style={{ fontSize: '12px', opacity: '0.8' }}>
-                    © 2024 Corporate Enterprises Ltd. All rights reserved. | 
-                    Confidential and Proprietary Information | 
+                    © 2024 Corporate Enterprises Ltd. All rights reserved. |
+                    Confidential and Proprietary Information |
                     For authorized personnel only
                   </div>
                 </div>
@@ -846,21 +846,21 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, onClose, onPrevious
         {(onPrevious || onNext) && (
           <div className="sticky bottom-0 bg-gradient-to-r from-slate-50 to-blue-50 p-6 border-t border-gray-200 flex justify-between items-center">
             {onPrevious ? (
-              <GlowButton 
-                variant="outline" 
-                icon={ArrowLeft} 
+              <GlowButton
+                variant="outline"
+                icon={ArrowLeft}
                 onClick={onPrevious}
                 className="border-blue-600 text-blue-600 hover:bg-blue-50 shadow-lg"
               >
                 Previous Employee
               </GlowButton>
             ) : <div></div>}
-            
+
             {onNext && (
-              <GlowButton 
-                variant="outline" 
-                icon={ArrowRight} 
-                onClick={onNext} 
+              <GlowButton
+                variant="outline"
+                icon={ArrowRight}
+                onClick={onNext}
                 className="border-blue-600 text-blue-600 hover:bg-blue-50 shadow-lg"
               >
                 Next Employee

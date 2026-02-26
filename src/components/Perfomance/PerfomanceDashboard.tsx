@@ -804,7 +804,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Performance Report</title>
       </head>
-      <body style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px;">
+      <body style="font-family: 'Avenir Next', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px;">
         <div style="max-width: 680px; margin: 0 auto;">
           <!-- Header -->
           <div style="${cardStyle} text-align: center; background: linear-gradient(120deg, ${colors.primary}, ${colors.secondary}); color: ${colors.white};">
@@ -939,7 +939,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Branch Performance Report</title>
       </head>
-      <body style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px;">
+      <body style="font-family: 'Avenir Next', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px;">
         <div style="max-width: 680px; margin: 0 auto;">
           <!-- Header -->
           <div style="${cardStyle} text-align: center; background: linear-gradient(120deg, ${colors.primary}, ${colors.secondary}); color: ${colors.white};">
@@ -1925,8 +1925,8 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
                   <button
                     onClick={() => setViewMode("summary")}
                     className={`px-4 py-2 rounded-full text-xs font-medium transition-all duration-200 ${viewMode === "summary"
-                        ? "bg-white text-green-600 shadow-sm"
-                        : "text-gray-600 hover:text-gray-800"
+                      ? "bg-white text-green-600 shadow-sm"
+                      : "text-gray-600 hover:text-gray-800"
                       }`}
                   >
                     Summary
@@ -1934,8 +1934,8 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
                   <button
                     onClick={() => setViewMode("detailed")}
                     className={`px-4 py-2 rounded-full text-xs font-medium transition-all duration-200 ${viewMode === "detailed"
-                        ? "bg-white text-green-600 shadow-sm"
-                        : "text-gray-600 hover:text-gray-800"
+                      ? "bg-white text-green-600 shadow-sm"
+                      : "text-gray-600 hover:text-gray-800"
                       }`}
                   >
                     Detailed

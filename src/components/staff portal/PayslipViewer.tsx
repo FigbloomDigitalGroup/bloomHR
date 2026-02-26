@@ -395,7 +395,7 @@ const PayslipModal = ({
             <style>
               * { margin: 0; padding: 0; box-sizing: border-box; }
               body { 
-                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+                font-family: 'Avenir Next', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
                 line-height: 1.6; 
                 color: #1f2937; 
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

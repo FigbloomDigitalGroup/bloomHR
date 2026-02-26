@@ -169,7 +169,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
         <head>
           <title>Transaction Report - ${employeeName}</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
+            body { font-family: 'Avenir Next', sans-serif; margin: 20px; }
             .header { text-align: center; margin-bottom: 30px; }
             .summary { background: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
             table { width: 100%; border-collapse: collapse; }
@@ -381,12 +381,12 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${transaction.status === 'Approved' || transaction.status === 'Disbursed' || transaction.status === 'paid'
-                            ? 'bg-green-100 text-green-800'
-                            : transaction.status === 'Pending'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : transaction.status === 'Rejected'
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-gray-100 text-gray-800'
+                          ? 'bg-green-100 text-green-800'
+                          : transaction.status === 'Pending'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : transaction.status === 'Rejected'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-gray-100 text-gray-800'
                           }`}>
                           {transaction.status || 'Unknown'}
                         </span>
@@ -903,8 +903,8 @@ const Pagination: React.FC<PaginationProps> = ({
             onClick={() => typeof page === 'number' && onPageChange(page)}
             disabled={page === '...'}
             className={`min-w-[2rem] px-2 py-1 text-sm rounded border ${currentPage === page
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'border-gray-300 text-gray-700 hover:bg-gray-100'
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'border-gray-300 text-gray-700 hover:bg-gray-100'
               } disabled:bg-transparent disabled:cursor-default`}
           >
             {page}

@@ -1,18 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Users, Clock, FileText, History, DollarSign, ShieldOff,
-    XCircle, BarChart2, AlertTriangle, CheckCircle, TrendingUp,
-    RefreshCw, Download, ChevronRight, Calendar, Search, Filter,
-    UserMinus, Loader2
+    Users, Clock, FileText, ShieldOff,
+    XCircle, BarChart2, AlertTriangle, CheckCircle,
+    RefreshCw, ChevronRight, UserMinus, Loader2, History
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import EmploymentStatusModule from './EmploymentStatusModule';
-import LeaveScheduleAssigner from './LeaveScheduleAssigner';
 import LifecycleHistoryModule from './LifecycleHistoryModule';
-import PayrollHistoryModule from './PayrollHistoryModule';
-import AdvanceDeductionModule from './AdvanceDeductionModule';
 import SuspensionModule from './SuspensionModule';
 import TerminationModule from './TerminationModule';
 import HRReportsDashboard from './HRReportsDashboard';
@@ -20,7 +16,6 @@ import HRReportsDashboard from './HRReportsDashboard';
 interface DashboardStats {
     on_probation: number;
     contracts_expiring: number;
-    leave_starting_soon: number;
     suspended: number;
     terminated: number;
     missing_joining_date: number;
@@ -31,10 +26,7 @@ interface DashboardStats {
 const tabs = [
     { id: 'overview', label: 'Overview', icon: BarChart2 },
     { id: 'status', label: 'Employment Status', icon: Users },
-    { id: 'leave', label: 'Leave Schedule', icon: Calendar },
     { id: 'history', label: 'Lifecycle History', icon: History },
-    { id: 'payroll', label: 'Payroll History', icon: DollarSign },
-    { id: 'advance', label: 'Advance Deduction', icon: TrendingUp },
     { id: 'suspension', label: 'Suspension', icon: ShieldOff },
     { id: 'termination', label: 'Termination', icon: XCircle },
     { id: 'reports', label: 'Reports', icon: FileText },
@@ -43,7 +35,7 @@ const tabs = [
 export default function HRLifecycleDashboard() {
     const [activeTab, setActiveTab] = useState('overview');
     const [stats, setStats] = useState<DashboardStats>({
-        on_probation: 0, contracts_expiring: 0, leave_starting_soon: 0,
+        on_probation: 0, contracts_expiring: 0,
         suspended: 0, terminated: 0, missing_joining_date: 0,
         pending_confirmations: 0, pending_interview: 0,
     });
@@ -53,28 +45,21 @@ export default function HRLifecycleDashboard() {
         setLoading(true);
         try {
             const today = new Date();
-            const in7Days = new Date(today); in7Days.setDate(today.getDate() + 7);
-            const in30Days = new Date(today); in30Days.setDate(today.getDate() + 30);
-            const in5Days = new Date(today); in5Days.setDate(today.getDate() + 5);
-
             const todayStr = today.toISOString().split('T')[0];
-            const in7Str = in7Days.toISOString().split('T')[0];
+            const in30Days = new Date(today); in30Days.setDate(today.getDate() + 30);
             const in30Str = in30Days.toISOString().split('T')[0];
-            const in5Str = in5Days.toISOString().split('T')[0];
 
-            const [empStatus, suspensions, terminations, interviews, leaveSchedules] = await Promise.all([
+            const [empStatus, suspensions, terminations, interviews] = await Promise.all([
                 supabase.from('hr_employment_status').select('*'),
                 supabase.from('hr_suspensions').select('*').eq('is_active', true),
                 supabase.from('hr_terminations').select('*').gte('created_at', new Date(Date.now() - 90 * 86400000).toISOString()),
-                supabase.from('hr_termination_interviews').select('*').eq('is_completed', false),
-                supabase.from('hr_leave_schedules').select('*').eq('status', 'Scheduled')
+                supabase.from('hr_termination_interviews').select('*').eq('is_completed', false)
             ]);
 
             const empData = empStatus.data || [];
             const suspData = suspensions.data || [];
             const termData = terminations.data || [];
             const intData = interviews.data || [];
-            const leaveData = leaveSchedules.data || [];
 
             const onProbation = empData.filter(e => e.employment_type === 'Probation' && !e.is_confirmed &&
                 e.probation_end_date && e.probation_end_date > todayStr).length;
@@ -88,13 +73,9 @@ export default function HRLifecycleDashboard() {
             const pendingConfirmations = empData.filter(e => e.employment_type === 'Probation' &&
                 !e.is_confirmed && e.probation_end_date && e.probation_end_date <= todayStr).length;
 
-            const leaveStartingSoon = leaveData.filter(l =>
-                l.leave_start_date >= todayStr && l.leave_start_date <= in5Str).length;
-
             setStats({
                 on_probation: onProbation,
                 contracts_expiring: contractsExpiring,
-                leave_starting_soon: leaveStartingSoon,
                 suspended: suspData.length,
                 terminated: termData.length,
                 missing_joining_date: missingDates,
@@ -116,7 +97,6 @@ export default function HRLifecycleDashboard() {
     const statCards = [
         { label: 'On Probation', value: stats.on_probation, icon: Clock, color: 'from-amber-500 to-orange-500', bg: 'bg-amber-50', text: 'text-amber-700', tab: 'status' },
         { label: 'Contracts Expiring', value: stats.contracts_expiring, icon: AlertTriangle, color: 'from-red-500 to-rose-500', bg: 'bg-red-50', text: 'text-red-700', tab: 'status' },
-        { label: 'Leave Starting Soon', value: stats.leave_starting_soon, icon: Calendar, color: 'from-blue-500 to-cyan-500', bg: 'bg-blue-50', text: 'text-blue-700', tab: 'leave' },
         { label: 'Suspended', value: stats.suspended, icon: ShieldOff, color: 'from-purple-500 to-violet-500', bg: 'bg-purple-50', text: 'text-purple-700', tab: 'suspension' },
         { label: 'Recently Terminated', value: stats.terminated, icon: UserMinus, color: 'from-gray-600 to-gray-800', bg: 'bg-gray-100', text: 'text-gray-700', tab: 'termination' },
         { label: 'Missing Joining Date', value: stats.missing_joining_date, icon: AlertTriangle, color: 'from-orange-500 to-red-500', bg: 'bg-orange-50', text: 'text-orange-700', tab: 'status' },
@@ -214,7 +194,6 @@ export default function HRLifecycleDashboard() {
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                     {[
                                         { label: 'Manage Employment Status', tab: 'status', icon: Users, desc: 'Probation, Contract, Permanent' },
-                                        { label: 'Assign Leave Schedule', tab: 'leave', icon: Calendar, desc: 'Schedule & track leave' },
                                         { label: 'Record Suspension', tab: 'suspension', icon: ShieldOff, desc: 'Suspend or reactivate staff' },
                                         { label: 'Process Termination', tab: 'termination', icon: XCircle, desc: 'Voluntary, Dismissal, etc.' },
                                     ].map(action => {
@@ -264,10 +243,7 @@ export default function HRLifecycleDashboard() {
                     )}
 
                     {activeTab === 'status' && <EmploymentStatusModule onRefresh={fetchDashboardStats} />}
-                    {activeTab === 'leave' && <LeaveScheduleAssigner onRefresh={fetchDashboardStats} />}
                     {activeTab === 'history' && <LifecycleHistoryModule />}
-                    {activeTab === 'payroll' && <PayrollHistoryModule />}
-                    {activeTab === 'advance' && <AdvanceDeductionModule onRefresh={fetchDashboardStats} />}
                     {activeTab === 'suspension' && <SuspensionModule onRefresh={fetchDashboardStats} />}
                     {activeTab === 'termination' && <TerminationModule onRefresh={fetchDashboardStats} />}
                     {activeTab === 'reports' && <HRReportsDashboard stats={stats} />}

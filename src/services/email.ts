@@ -48,7 +48,7 @@ export const sendScheduleEmail = async (to: string, data: {
   details: string;
 }) => {
   const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+    <div style="font-family: 'Avenir Next', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
       <h2 style="color: #2563eb;">Interview Scheduled</h2>
       <p>Hello ${data.name},</p>
       <p>Your interview for <strong>${data.position}</strong> has been scheduled.</p>

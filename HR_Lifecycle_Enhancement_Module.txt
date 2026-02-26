@@ -1,0 +1,130 @@
+HR LIFECYCLE ENHANCEMENT MODULE (FULL SPECIFICATION)
+
+This document outlines the additional HR modules to be integrated into
+the existing application. These modules must integrate with the current
+employee database and payroll system but function independently from
+onboarding.
+
+  ----------------------------------------
+  1. EMPLOYMENT STATUS MANAGEMENT MODULE
+  ----------------------------------------
+
+Purpose: Manage employees under the following categories: - Attachment -
+Probation - Contract - Permanent
+
+Employee Filtering: - Filter by Job Title - Filter by Department -
+Filter by Branch - Filter by Employment Type - Support bulk selection
+and bulk updates
+
+Probation Logic: - Default probation: 3 months - Allow custom probation
+duration per employee - Probation End Date = Joining Date + Probation
+Duration - Display: - Employees on probation - Probation ending in 7
+days - Overdue confirmations - HR Actions: - Confirm probation - Extend
+probation - Terminate during probation
+
+Contract Logic: - Allow global default contract duration - Allow custom
+contract duration per employee - Contract End Date = Joining Date +
+Contract Duration - Display: - Days remaining - Contracts expiring in 30
+days - Expired contracts - HR Actions: - Renew contract - Convert to
+permanent - Terminate contract
+
+Missing Joining Date Validation: If employee is marked as Contract or
+Probation and has no Joining Date: - Display dashboard alert - Provide
+clickable list of affected employees - Block duration calculations until
+Joining Date is updated
+
+  -----------------------------------
+  2. LEAVE SCHEDULE ASSIGNER MODULE
+  -----------------------------------
+
+Features: - Assign leave schedules - Use leave templates - Bulk assign
+leave
+
+Notifications: - 5 days before leave start date - 1 day before leave
+start date - Optional SMS/Email notifications
+
+Tracking: - Leave history - Leave approvals - Leave balance
+
+  -----------------------------------
+  3. STAFF LIFECYCLE HISTORY MODULE
+  -----------------------------------
+
+Track and log: - Branch transfers - Promotions - Position changes -
+Salary revisions - Employment status changes
+
+Requirements: - Timestamp every action - Maintain audit log - Display
+full employee timeline
+
+  ---------------------------
+  4. PAYROLL HISTORY MODULE
+  ---------------------------
+
+For each employee: - Full payroll history - Salary revision timeline -
+Allowances - Deductions - Downloadable payroll reports
+
+  -----------------------------
+  5. ADVANCE DEDUCTION MODULE
+  -----------------------------
+
+Features: - Record salary advance - Define repayment schedule -
+Auto-deduct from payroll - Track: - Total advance - Remaining balance -
+Completed repayments
+
+  ----------------------
+  6. SUSPENSION MODULE
+  ----------------------
+
+HR can: - Suspend employee - Enter suspension reason - Set suspension
+duration (optional) - Enable auto-reactivation - Maintain suspension
+history
+
+Optional Rule: - Suspended employees may be excluded from payroll
+processing
+
+  ----------------------------------
+  7. TERMINATION MODULE (ENHANCED)
+  ----------------------------------
+
+Termination Process: - Enter termination date - Select termination
+type: - Voluntary - Dismissal - Contract End - Redundancy - Enter
+reason - Attach supporting documents (optional)
+
+Termination Interview: - Schedule termination interview - Record
+interview date - Record interview notes - Upload interview documents -
+Mark interview as completed - Store interview data in employee history
+
+Dismissal Email Generation: If termination type is Dismissal: - Generate
+dismissal email template - Allow HR to edit before sending -
+Auto-fill: - Employee Name - Position - Termination Date - Reason
+(optional visibility) - Send via Email - Store email copy in employee
+record
+
+Post-Termination Actions: - Archive employee profile - Move to
+Termination History - Record final payroll status - Record clearance
+status - Mark employee as inactive in all modules
+
+  --------------------------
+  8. REPORTS AND DASHBOARD
+  --------------------------
+
+Dashboard Widgets: - Employees on Probation - Contracts Expiring - Leave
+Starting Soon - Suspended Employees - Terminated Employees - Missing
+Joining Dates - Pending Confirmations - Pending Termination Interviews
+
+Downloadable Reports: - Payroll history report - Probation report -
+Contract report - Leave report - Staff movement report - Termination
+report - Termination interview report
+
+  ------------------------
+  9. SYSTEM REQUIREMENTS
+  ------------------------
+
+-   Role-based access (HR only)
+-   Full audit logs
+-   Real-time date recalculation
+-   Bulk editing capability
+-   Clean dashboard UI
+-   Must not disrupt existing onboarding module
+-   Seamless integration with existing employee and payroll tables
+
+END OF DOCUMENT

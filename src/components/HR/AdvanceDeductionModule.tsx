@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Search, X, Loader2, CheckCircle,
-    DollarSign, Calendar, Building, Eye, TrendingUp, RefreshCw, Briefcase,
-    AlertTriangle, Clock, Download, FileText, ChevronLeft, ChevronRight,
-    Filter, Zap, ArrowUpRight, Plus, MapPin, Landmark
+    Eye, TrendingUp, RefreshCw, Briefcase,
+    Download, ChevronLeft, ChevronRight,
+    ArrowUpRight, Plus, MapPin
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
@@ -166,205 +166,183 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
     };
 
     return (
-        <div className="space-y-8 pb-12">
-            {/* Premium Header Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="md:col-span-1 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2.5rem] p-8 text-white shadow-xl shadow-indigo-100 relative overflow-hidden group"
-                >
-                    <div className="relative z-10 space-y-6">
-                        <div className="space-y-1">
-                            <h2 className="text-2xl font-black tracking-tight italic uppercase">Advance Ledger</h2>
-                            <p className="text-indigo-100 text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Cycle-based Recovery Orchestration</p>
-                        </div>
+        <div className="space-y-6 pb-12">
+            {/* Header Section */}
+            <div className="bg-white border text-gray-900 border-gray-200 rounded-lg p-6 flex flex-col md:flex-row justify-between items-center shadow-sm">
+                <div>
+                    <h1 className="text-xl font-semibold text-gray-900 font-sans tracking-tight">Advance Ledger</h1>
+                    <p className="text-xs text-gray-500 mt-1">Salary Recovery and Disbursement Management</p>
+                </div>
+                <div className="flex items-center gap-4 mt-4 md:mt-0">
+                    <button className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 rounded-md text-xs font-medium text-gray-700 transition-colors shadow-sm focus:outline-none flex items-center gap-2">
+                        <Download className="w-4 h-4 text-gray-500" />
+                        Export
+                    </button>
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-md text-sm font-medium text-white transition-colors shadow-sm focus:outline-none flex items-center gap-2"
+                    >
+                        <Plus className="w-4 h-4" />
+                        New Advance
+                    </button>
+                </div>
+            </div>
 
-                        <div className="flex items-center gap-3">
-                            <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
-                                <Zap className="w-5 h-5 text-indigo-300" />
-                            </div>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-100">Live Recovery Stream</span>
-                        </div>
-
-                        <div className="flex flex-col gap-2">
-                            <motion.button
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                onClick={() => setShowModal(true)}
-                                className="w-full py-4 bg-white text-indigo-600 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-900/20 transition-all flex items-center justify-center gap-2"
-                            >
-                                <Plus className="w-4 h-4" />
-                                Record New Entry
-                            </motion.button>
-                            <button className="w-full py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl text-[9px] font-black uppercase tracking-[0.2em] transition-all">
-                                Export Full Ledger
-                            </button>
-                        </div>
+            {/* Stat Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-xs font-medium text-gray-500">Total Recovered</p>
+                        <p className="text-2xl font-semibold text-gray-900 mt-1">{formatKES(stats.recovered)}</p>
+                        <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                            <ArrowUpRight className="w-3 h-3" /> Based on {stats.total} total
+                        </p>
                     </div>
-                    <Landmark className="absolute -bottom-10 -right-10 w-48 h-48 text-white/5" />
-                </motion.div>
+                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
+                        <CheckCircle className="w-5 h-5" />
+                    </div>
+                </div>
 
-                {/* Stat Cards */}
-                <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-                        className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm flex flex-col justify-between group">
-                        <div className="flex items-center justify-between mb-4">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Total Recovered</p>
-                            <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl group-hover:bg-emerald-600 group-hover:text-white transition-all">
-                                <CheckCircle className="w-5 h-5" />
-                            </div>
-                        </div>
-                        <div className="space-y-1">
-                            <div className="text-3xl font-black text-gray-900 tracking-tighter">
-                                {formatKES(stats.recovered)}
-                            </div>
-                            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1">
-                                <ArrowUpRight className="w-3 h-3" /> Based on {stats.total} total
-                            </p>
-                        </div>
-                    </motion.div>
+                <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-xs font-medium text-gray-500">Current Exposure</p>
+                        <p className="text-2xl font-semibold text-gray-900 mt-1">{formatKES(stats.outstanding)}</p>
+                        <p className="text-xs text-indigo-600 mt-1 flex items-center gap-1">
+                            Awaiting recovery
+                        </p>
+                    </div>
+                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg">
+                        <TrendingUp className="w-5 h-5" />
+                    </div>
+                </div>
 
-                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-                        className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm flex flex-col justify-between group">
-                        <div className="flex items-center justify-between mb-4">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Current Exposure</p>
-                            <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                                <TrendingUp className="w-5 h-5" />
-                            </div>
-                        </div>
-                        <div className="space-y-1">
-                            <div className="text-3xl font-black text-gray-900 tracking-tighter">
-                                {formatKES(stats.outstanding)}
-                            </div>
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Awaiting scheduled recovery</p>
-                        </div>
-                    </motion.div>
-
-                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-                        className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm flex flex-col justify-between group overflow-hidden relative">
-                        <div className="flex items-center justify-between mb-4">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Recovery Velocity</p>
-                            <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-all">
-                                <RefreshCw className="w-5 h-5" />
-                            </div>
-                        </div>
-                        <div className="space-y-1 pr-12">
-                            <div className="text-4xl font-black text-gray-900 tracking-tighter">
-                                {Math.round((stats.recovered / stats.disbursed) * 100 || 0)}%
-                            </div>
-                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Global Amortization</p>
-                        </div>
-                        <Activity className="absolute bottom-[-10%] right-[-10%] w-24 h-24 text-blue-50" />
-                    </motion.div>
+                <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm flex items-center justify-between relative overflow-hidden">
+                    <div>
+                        <p className="text-xs font-medium text-gray-500">Recovery Progress</p>
+                        <p className="text-2xl font-semibold text-gray-900 mt-1">{Math.round((stats.recovered / stats.disbursed) * 100 || 0)}%</p>
+                        <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
+                            Global Amortization
+                        </p>
+                    </div>
+                    <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
+                        <RefreshCw className="w-5 h-5" />
+                    </div>
                 </div>
             </div>
 
             {/* Table Section */}
-            <div className="bg-white border border-gray-100 rounded-[2.5rem] shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-white border border-gray-200 rounded-lg shadow-sm flex flex-col">
                 {/* Search & Toolbar */}
-                <div className="p-8 border-b border-gray-50 flex flex-wrap items-center justify-between gap-6 bg-gray-50/50">
-                    <div className="relative flex-1 min-w-[300px]">
-                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <div className="p-5 border-b border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="relative w-full sm:w-80">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <input
                             type="text"
-                            placeholder="Search employee history node..."
+                            placeholder="Search employee..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
-                            className="w-full pl-14 pr-6 py-4 bg-white border border-gray-100 rounded-[2rem] text-[11px] font-black uppercase tracking-wider focus:outline-none focus:ring-4 focus:ring-indigo-50 shadow-sm transition-all"
+                            className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                         />
                     </div>
 
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center bg-white border border-gray-100 rounded-[1.5rem] p-1.5 shadow-sm">
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                        <div className="flex p-0.5 bg-gray-100 rounded-md border border-gray-200 w-full sm:w-auto">
                             {(['all', 'active', 'completed'] as const).map(f => (
                                 <button
                                     key={f}
                                     onClick={() => setFilter(f)}
-                                    className={`px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${filter === f ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-gray-400 hover:text-indigo-600'
+                                    className={`flex-1 sm:flex-none px-4 py-1.5 rounded text-xs font-medium capitalize transition-colors ${filter === f
+                                        ? 'bg-white text-gray-900 shadow-sm border border-gray-200/50'
+                                        : 'text-gray-500 hover:text-gray-900'
                                         }`}
                                 >
                                     {f}
                                 </button>
                             ))}
                         </div>
-                        <button onClick={fetchData} className="p-4 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-indigo-600">
+                        <button onClick={fetchData} className="p-2 border border-gray-300 rounded-md text-gray-500 hover:bg-gray-50 transition-colors bg-white shadow-sm flex-shrink-0">
                             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                         </button>
                     </div>
                 </div>
 
                 {/* Ledger Table */}
-                <div className="overflow-x-auto">
-                    <table className="w-full">
+                <div className="overflow-x-auto min-h-[400px]">
+                    <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-gray-50/80 text-left">
-                                <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Employee Node</th>
-                                <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
-                                <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Financial Matrix</th>
-                                <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ledger Actions</th>
+                            <tr className="bg-gray-50 border-b border-gray-200">
+                                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+                                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-center">Status</th>
+                                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Recovery Progress</th>
+                                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {currentItems.map((a) => {
+                        <tbody className="divide-y divide-gray-200 bg-white">
+                            {currentItems.length === 0 ? (
+                                <tr>
+                                    <td colSpan={4} className="px-6 py-12 text-center text-gray-500 text-sm">
+                                        No advance records found.
+                                    </td>
+                                </tr>
+                            ) : currentItems.map((a) => {
                                 const progress = (a.total_repaid / a.advance_amount) * 100;
                                 return (
-                                    <tr key={a.id} className="hover:bg-indigo-50/30 transition-all group">
-                                        <td className="px-10 py-8">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black shadow-lg shadow-indigo-100">
-                                                    {a.employee_name?.split(' ').map(n => n[0]).join('')}
+                                    <tr key={a.id} className="hover:bg-gray-50 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-semibold text-sm">
+                                                    {a.employee_name?.split(' ').map(n => n[0]).join('') || '?'}
                                                 </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-black text-gray-900 uppercase tracking-tight group-hover:text-indigo-600 transition-colors">
+                                                <div>
+                                                    <div className="text-sm font-medium text-gray-900">
                                                         {a.employee_name}
-                                                    </span>
-                                                    <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400">
-                                                        <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{a['Employee Number']}</span>
-                                                        <MapPin className="w-3 h-3" /> {a.branch}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                                                        <span>{a['Employee Number']}</span>
+                                                        <span className="text-gray-300">•</span>
+                                                        <span className="flex items-center gap-1">
+                                                            <MapPin className="w-3 h-3" /> {a.branch}
+                                                        </span>
                                                     </div>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-10 py-8 text-center">
-                                            <span className={`inline-flex px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border shadow-sm ${a.is_completed ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'
+                                        <td className="px-6 py-4 text-center">
+                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${a.is_completed
+                                                ? 'bg-emerald-100 text-emerald-800'
+                                                : 'bg-indigo-100 text-indigo-800'
                                                 }`}>
-                                                {a.is_completed ? 'Fully Recovered' : 'Recovery Active'}
+                                                {a.is_completed ? 'Recovered' : 'Active'}
                                             </span>
                                         </td>
-                                        <td className="px-10 py-8">
-                                            <div className="w-48 space-y-2">
-                                                <div className="flex justify-between items-end">
-                                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Progress</span>
-                                                    <span className="text-[11px] font-black text-gray-900">{Math.round(progress)}%</span>
+                                        <td className="px-6 py-4">
+                                            <div className="w-full max-w-xs">
+                                                <div className="flex justify-between items-end mb-1">
+                                                    <span className="text-xs font-medium text-gray-700">{Math.round(progress)}%</span>
                                                 </div>
-                                                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden border border-gray-50">
-                                                    <motion.div
-                                                        initial={{ width: 0 }}
-                                                        animate={{ width: `${progress}%` }}
+                                                <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                                                    <div
+                                                        style={{ width: `${progress}%` }}
                                                         className={`h-full ${a.is_completed ? 'bg-emerald-500' : 'bg-indigo-600'}`}
                                                     />
                                                 </div>
-                                                <div className="flex justify-between text-[9px] font-black uppercase">
-                                                    <span className="text-emerald-600">{formatKES(a.total_repaid)}</span>
-                                                    <span className="text-red-500">{formatKES(a.remaining_balance)}</span>
+                                                <div className="flex justify-between text-xs mt-1">
+                                                    <span className="text-gray-500">Paid: <span className="text-gray-900 font-medium">{formatKES(a.total_repaid)}</span></span>
+                                                    <span className="text-gray-500">Left: <span className="text-gray-900 font-medium">{formatKES(a.remaining_balance)}</span></span>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-10 py-8 text-right">
-                                            <div className="flex items-center justify-end gap-2">
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex items-center justify-end gap-3">
                                                 {!a.is_completed && (
-                                                    <motion.button
-                                                        whileHover={{ scale: 1.05 }}
-                                                        whileTap={{ scale: 0.95 }}
+                                                    <button
                                                         onClick={() => handleRecordRepayment(a)}
-                                                        className="p-3 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm border border-indigo-100"
-                                                        title="Deduct Installment"
+                                                        className="text-xs font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded transition-colors"
                                                     >
-                                                        <RefreshCw className="w-4 h-4" />
-                                                    </motion.button>
+                                                        Deduct Monthly
+                                                    </button>
                                                 )}
-                                                <button className="p-3 bg-gray-50 text-gray-400 hover:text-indigo-600 rounded-xl transition-all border border-gray-100">
+                                                <button className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 hover:bg-gray-100 rounded">
                                                     <Eye className="w-4 h-4" />
                                                 </button>
                                             </div>
@@ -377,129 +355,127 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
                 </div>
 
                 {/* Pagination */}
-                <div className="p-10 border-t border-gray-50 flex items-center justify-between bg-gray-50/30">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
-                        Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filtered.length)} of {filtered.length} nodes
+                <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-white rounded-b-lg">
+                    <p className="text-xs text-gray-500">
+                        Showing <span className="font-medium text-gray-900">{((currentPage - 1) * itemsPerPage) + 1}</span> to <span className="font-medium text-gray-900">{Math.min(currentPage * itemsPerPage, filtered.length)}</span> of <span className="font-medium text-gray-900">{filtered.length}</span> records
                     </p>
-                    <div className="flex items-center gap-2">
-                        <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-3 bg-white border border-gray-100 rounded-2xl disabled:opacity-30">
+                    <div className="flex items-center gap-1">
+                        <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 border border-gray-300 rounded-md bg-white text-gray-500 disabled:opacity-50 hover:bg-gray-50 transition-colors">
                             <ChevronLeft className="w-4 h-4" />
                         </button>
-                        <div className="flex items-center gap-1 mx-4">
+                        <div className="flex items-center gap-1 mx-2">
                             {Array.from({ length: totalPages }, (_, i) => (
-                                <button key={i} onClick={() => setCurrentPage(i + 1)} className={`w-10 h-10 rounded-xl text-[10px] font-black transition-all ${currentPage === i + 1 ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100' : 'text-gray-400 hover:text-indigo-600'}`}>
+                                <button key={i} onClick={() => setCurrentPage(i + 1)} className={`w-8 h-8 rounded-md text-sm font-medium transition-colors ${currentPage === i + 1 ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}>
                                     {i + 1}
                                 </button>
                             ))}
                         </div>
-                        <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-3 bg-white border border-gray-100 rounded-2xl disabled:opacity-30">
+                        <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-2 border border-gray-300 rounded-md bg-white text-gray-500 disabled:opacity-50 hover:bg-gray-50 transition-colors">
                             <ChevronRight className="w-4 h-4" />
                         </button>
                     </div>
                 </div>
             </div>
 
-            {/* Premium Create Modal */}
+            {/* New Advance Modal */}
             <AnimatePresence>
                 {showModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-12">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)} className="absolute inset-0 bg-gray-900/60 backdrop-blur-md" />
-
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-gray-900/50 backdrop-blur-sm">
                         <motion.div
-                            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                            className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col relative z-10 border border-white/20"
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden flex flex-col relative z-10"
                         >
-                            <div className="p-10 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
-                                <div className="space-y-1">
-                                    <h3 className="text-2xl font-black text-gray-900 tracking-tight uppercase italic">Ledger Node Entry</h3>
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Authorized Liability Recognition</p>
+                            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-white">
+                                <div>
+                                    <h3 className="text-lg font-semibold text-gray-900">Record New Advance</h3>
+                                    <p className="text-sm text-gray-500 mt-1">Provide disbursement and recovery details</p>
                                 </div>
-                                <motion.button whileHover={{ rotate: 90 }} onClick={() => setShowModal(false)} className="p-4 bg-white text-gray-400 hover:text-red-500 rounded-2xl shadow-sm border border-gray-100 transition-colors">
-                                    <X className="w-6 h-6" />
-                                </motion.button>
+                                <button onClick={() => setShowModal(false)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-md transition-colors">
+                                    <X className="w-5 h-5" />
+                                </button>
                             </div>
 
-                            <div className="p-10 space-y-8 max-h-[70vh] overflow-y-auto">
-                                <div className="space-y-4">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Personnel Selection</label>
+                            <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
                                     <div className="relative">
-                                        <Briefcase className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                        <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                         <select
                                             value={form.employeeNumber}
                                             onChange={e => setForm(f => ({ ...f, employeeNumber: e.target.value }))}
-                                            className="w-full pl-16 pr-6 py-5 bg-gray-50 border-none rounded-[2rem] text-sm font-black tracking-widest focus:ring-4 focus:ring-indigo-100 transition-all appearance-none"
+                                            className="w-full pl-9 pr-8 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors appearance-none"
                                         >
-                                            <option value="">SCAN OR SELECT EMPLOYEE...</option>
+                                            <option value="">Select Employee...</option>
                                             {employees.map(e => (
                                                 <option key={e['Employee Number']} value={e['Employee Number']}>
-                                                    {e['Employee Number']} — {e['First Name']} {e['Last Name']}
+                                                    {e['Employee Number']} - {e['First Name']} {e['Last Name']}
                                                 </option>
                                             ))}
                                         </select>
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div className="space-y-4">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Disbursement Date</label>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Disbursement Date</label>
                                         <input
                                             type="date"
                                             value={form.advance_date}
                                             onChange={e => setForm(f => ({ ...f, advance_date: e.target.value }))}
-                                            className="w-full px-8 py-5 bg-gray-50 border-none rounded-[2rem] text-sm font-black tracking-widest focus:ring-4 focus:ring-indigo-100 transition-all"
+                                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                                         />
                                     </div>
-                                    <div className="space-y-4">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Gross Principal (KES)</label>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Total Amount (KES)</label>
                                         <input
                                             type="number"
                                             value={form.advance_amount || ''}
                                             onChange={e => setForm(f => ({ ...f, advance_amount: Number(e.target.value) }))}
-                                            className="w-full px-8 py-5 bg-indigo-50 border-none rounded-[2rem] text-sm font-black tracking-widest focus:ring-4 focus:ring-indigo-100 transition-all font-mono"
+                                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                                             placeholder="0"
                                         />
                                     </div>
                                 </div>
 
-                                <div className="space-y-4">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Monthly Installment</label>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Deduction (KES)</label>
                                     <input
                                         type="number"
                                         value={form.monthly_deduction || ''}
                                         onChange={e => setForm(f => ({ ...f, monthly_deduction: Number(e.target.value) }))}
-                                        className="w-full px-8 py-5 bg-emerald-50 border-none rounded-[2rem] text-sm font-black tracking-widest focus:ring-4 focus:ring-emerald-100 transition-all font-mono"
+                                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
                                         placeholder="0"
                                     />
                                 </div>
 
-                                <div className="space-y-4">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Ledger Narrative</label>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
                                     <textarea
                                         rows={3}
                                         value={form.notes}
                                         onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                                        className="w-full p-8 bg-gray-50 border-none rounded-[2.5rem] text-sm font-bold tracking-tight focus:ring-4 focus:ring-indigo-100 transition-all resize-none shadow-inner"
-                                        placeholder="PROVIDE TRANSACTION JUSTIFICATION..."
+                                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors resize-none"
+                                        placeholder="Add any additional details..."
                                     />
                                 </div>
                             </div>
 
-                            <div className="p-10 bg-gray-50 border-t border-gray-100 flex gap-4">
+                            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex gap-3 justify-end">
                                 <button
                                     onClick={() => setShowModal(false)}
-                                    className="flex-1 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-gray-600 bg-white border border-gray-200 rounded-[2rem] transition-all"
+                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
                                 >
-                                    Abort
+                                    Cancel
                                 </button>
                                 <button
                                     onClick={handleSave}
                                     disabled={saving}
-                                    className="flex-[2] py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                                 >
-                                    {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Landmark className="w-5 h-5" />}
-                                    Authorize Liability
+                                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                    Save Record
                                 </button>
                             </div>
                         </motion.div>

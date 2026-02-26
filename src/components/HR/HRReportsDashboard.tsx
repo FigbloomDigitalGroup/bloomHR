@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
     FileText, Download, Clock, Users, ShieldOff,
-    XCircle, Calendar, TrendingUp, AlertTriangle
+    XCircle, TrendingUp, AlertTriangle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
@@ -10,7 +10,6 @@ import { supabase } from '../../lib/supabase';
 interface DashboardStats {
     on_probation: number;
     contracts_expiring: number;
-    leave_starting_soon: number;
     suspended: number;
     terminated: number;
     missing_joining_date: number;
@@ -38,16 +37,6 @@ const REPORTS = [
         table: 'hr_employment_status',
         filter: { employment_type: 'Contract' },
         columns: ['Employee Number', 'employment_type', 'joining_date', 'contract_end_date']
-    },
-    {
-        id: 'leave',
-        title: 'Leave Report',
-        description: 'Scheduled and approved leave schedules with status tracking',
-        icon: Calendar,
-        color: 'bg-blue-100 text-blue-700',
-        table: 'hr_leave_schedules',
-        filter: {},
-        columns: ['Employee Number', 'leave_type', 'leave_start_date', 'leave_end_date', 'leave_days', 'status']
     },
     {
         id: 'movement',
@@ -89,16 +78,6 @@ const REPORTS = [
         filter: {},
         columns: ['Employee Number', 'suspension_date', 'suspension_reason', 'duration_days', 'is_active']
     },
-    {
-        id: 'advance',
-        title: 'Salary Advance Report',
-        description: 'Active and completed salary advances with balances',
-        icon: TrendingUp,
-        color: 'bg-teal-100 text-teal-700',
-        table: 'hr_salary_advances',
-        filter: {},
-        columns: ['Employee Number', 'advance_date', 'advance_amount', 'monthly_deduction', 'total_repaid', 'remaining_balance', 'is_completed']
-    }
 ];
 
 export default function HRReportsDashboard({ stats }: { stats: DashboardStats }) {
@@ -153,7 +132,6 @@ export default function HRReportsDashboard({ stats }: { stats: DashboardStats })
         { label: 'Contracts Expiring', value: stats.contracts_expiring, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50' },
         { label: 'Suspended', value: stats.suspended, icon: ShieldOff, color: 'text-purple-600', bg: 'bg-purple-50' },
         { label: 'Terminated (90d)', value: stats.terminated, icon: XCircle, color: 'text-gray-600', bg: 'bg-gray-100' },
-        { label: 'Leave Soon', value: stats.leave_starting_soon, icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50' },
         { label: 'Missing Dates', value: stats.missing_joining_date, icon: AlertTriangle, color: 'text-orange-600', bg: 'bg-orange-50' },
         { label: 'Pending Confirmations', value: stats.pending_confirmations, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50' },
         { label: 'Pending Interviews', value: stats.pending_interview, icon: FileText, color: 'text-sky-600', bg: 'bg-sky-50' },

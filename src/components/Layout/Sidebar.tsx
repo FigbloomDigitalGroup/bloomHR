@@ -241,7 +241,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                         onClick={() => navigate(item.path)}
                         className={`relative w-full flex items-center px-3 py-2.5 rounded-xl transition-all duration-300 group overflow-hidden ${!isExpanded && 'justify-center px-0'
                           } ${isActive
-                            ? 'bg-[#03c04a] text-white shadow-[0_0_20px_-5px_rgba(3,192,74,0.6)] ring-1 ring-[#03c04a]/50'
+                            ? 'bg-[#03c04a] text-white border border-white/20 ring-1 ring-white/10'
                             : 'text-white/80 hover:bg-white/5 hover:text-[#03c04a]'}`}
                         whileTap={{ scale: 0.98 }}
                       >

@@ -36,7 +36,7 @@ const Footer = () => {
             <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4 mb-4 md:mb-0">
               <motion.span
                 className="text-gray-900 text-xs font-medium"
-                style={{ fontFamily: "'Geist', sans-serif" }}
+                style={{ fontFamily: "'Avenir Next', sans-serif" }}
                 whileHover={{ scale: 1.05 }}
               >
                 © {currentYear} Figbud Global
@@ -44,7 +44,7 @@ const Footer = () => {
               <div className="hidden sm:block h-4 w-px bg-gray-900/30"></div>
               <motion.span
                 className="text-gray-900 font-semibold text-xs"
-                style={{ fontFamily: "'Geist', sans-serif" }}
+                style={{ fontFamily: "'Avenir Next', sans-serif" }}
                 whileHover={{ scale: 1.05 }}
               >
                 Automation Moraans
@@ -55,7 +55,7 @@ const Footer = () => {
               <motion.a
                 href="#"
                 className="text-gray-900 hover:text-gray-700 transition-colors duration-200 text-xs font-medium"
-                style={{ fontFamily: "'Geist', sans-serif" }}
+                style={{ fontFamily: "'Avenir Next', sans-serif" }}
                 whileHover={{
                   scale: 1.05,
                   y: -1
@@ -67,7 +67,7 @@ const Footer = () => {
               <motion.a
                 href="#"
                 className="text-gray-900 hover:text-gray-700 transition-colors duration-200 text-xs font-medium"
-                style={{ fontFamily: "'Geist', sans-serif" }}
+                style={{ fontFamily: "'Avenir Next', sans-serif" }}
                 whileHover={{
                   scale: 1.05,
                   y: -1

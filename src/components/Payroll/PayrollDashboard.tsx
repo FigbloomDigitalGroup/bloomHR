@@ -1,27 +1,71 @@
-import React, { useState, useEffect } from 'react';
-import { DollarSign, Calculator, FileText, Download, Calendar, TrendingUp, Plus, Edit, Trash2, Users, Upload, X, ChevronDown, ChevronUp, Printer, Share2, ArrowLeft, ArrowRight, Search, Filter, Smartphone, TabletSmartphone, Send, FileSpreadsheet, FileImage, Loader, Box, CircleDot, Tally1, Clock, CheckCircle, XCircle, Eye, AlertTriangle, Settings, RefreshCw, Info, ToggleLeft, ToggleRight, MessageSquare, MapPin, Briefcase, CreditCard } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
-import toast from 'react-hot-toast';
-import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-import html2pdf from 'html2pdf.js';
-import GlowButton from '../UI/GlowButton';
+import React, { useState, useEffect } from "react";
+import {
+  DollarSign,
+  Calculator,
+  FileText,
+  Download,
+  Calendar,
+  TrendingUp,
+  Plus,
+  Edit,
+  Trash2,
+  Users,
+  Upload,
+  X,
+  ChevronDown,
+  ChevronUp,
+  Printer,
+  Share2,
+  ArrowLeft,
+  ArrowRight,
+  Search,
+  Filter,
+  Smartphone,
+  TabletSmartphone,
+  Send,
+  FileSpreadsheet,
+  FileImage,
+  Loader,
+  Box,
+  CircleDot,
+  Tally1,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Eye,
+  AlertTriangle,
+  Settings,
+  RefreshCw,
+  Info,
+  ToggleLeft,
+  ToggleRight,
+  MessageSquare,
+  MapPin,
+  Briefcase,
+  CreditCard,
+} from "lucide-react";
+import { supabase } from "../../lib/supabase";
+import toast from "react-hot-toast";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+import html2pdf from "html2pdf.js";
+import GlowButton from "../UI/GlowButton";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
-import SearchableDropdown from '../UI/SearchableDropdown';
-import MPesaSpreadsheetFullPage from './MpesaSpreadSheet';
-import useStatutorySettings from '../../hooks/useStatutorySettings';
-import StatutorySettingsModal from './statutorySettingsModule';
+import RoleButtonWrapper from "../ProtectedRoutes/RoleButton";
+import SearchableDropdown from "../UI/SearchableDropdown";
+import MPesaSpreadsheetFullPage from "./MpesaSpreadSheet";
+import useStatutorySettings from "../../hooks/useStatutorySettings";
+import StatutorySettingsModal from "./statutorySettingsModule";
 
 // SMS Service Configuration for SMS Leopard
 const SMS_LEOPARD_CONFIG = {
-  baseUrl: 'https://api.smsleopard.com/v1',
-  username: 'yxFXqkhbsdbm2cCeXOju',
-  password: '***REMOVED***',
-  source: 'sms_Leopard'
+  baseUrl: "https://api.smsleopard.com/v1",
+  username: "yxFXqkhbsdbm2cCeXOju",
+  password: "***REMOVED***",
+  source: "sms_Leopard",
 };
 
 // Utility function to add query parameters
@@ -29,10 +73,12 @@ const addQueryParams = (url, params) => {
   const queryString = Object.entries(params)
     .flatMap(([key, value]) =>
       Array.isArray(value)
-        ? value.map(val => `${encodeURIComponent(key)}=${encodeURIComponent(val)}`)
-        : `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+        ? value.map(
+          (val) => `${encodeURIComponent(key)}=${encodeURIComponent(val)}`,
+        )
+        : `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
     )
-    .join('&');
+    .join("&");
 
   return `${url}?${queryString}`;
 };
@@ -43,7 +89,7 @@ const sendSMSLeopard = async (phoneNumber, message) => {
     const formattedPhone = formatPhoneNumber(phoneNumber);
 
     if (!formattedPhone || !message) {
-      throw new Error('Phone number and message are required');
+      throw new Error("Phone number and message are required");
     }
 
     const endpoint = addQueryParams(`${SMS_LEOPARD_CONFIG.baseUrl}/sms/send`, {
@@ -51,16 +97,18 @@ const sendSMSLeopard = async (phoneNumber, message) => {
       password: SMS_LEOPARD_CONFIG.password,
       message: message,
       destination: formattedPhone,
-      source: SMS_LEOPARD_CONFIG.source
+      source: SMS_LEOPARD_CONFIG.source,
     });
 
-    const credentials = btoa(`${SMS_LEOPARD_CONFIG.username}:${SMS_LEOPARD_CONFIG.password}`);
+    const credentials = btoa(
+      `${SMS_LEOPARD_CONFIG.username}:${SMS_LEOPARD_CONFIG.password}`,
+    );
 
     const response = await fetch(endpoint, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Basic ${credentials}`,
-        'Content-Type': 'application/json',
+        Authorization: `Basic ${credentials}`,
+        "Content-Type": "application/json",
       },
     });
 
@@ -71,31 +119,30 @@ const sendSMSLeopard = async (phoneNumber, message) => {
 
     const result = await response.json();
 
-    if (result.status === 'success' || response.ok) {
+    if (result.status === "success" || response.ok) {
       return {
         success: true,
-        message: 'SMS sent successfully',
+        message: "SMS sent successfully",
         timestamp: new Date().toISOString(),
-        rawResponse: result
+        rawResponse: result,
       };
     } else {
-      throw new Error(result.message || 'Failed to send SMS');
+      throw new Error(result.message || "Failed to send SMS");
     }
-
   } catch (error) {
-    console.error('SMS sending error:', error);
+    console.error("SMS sending error:", error);
 
-    console.log('SMS would have been sent:', {
+    console.log("SMS would have been sent:", {
       to: formatPhoneNumber(phoneNumber),
       message: message,
-      provider: 'SMS Leopard'
+      provider: "SMS Leopard",
     });
 
     return {
       success: false,
       error: error.message,
       fallback: true,
-      message: 'SMS queued for retry'
+      message: "SMS queued for retry",
     };
   }
 };
@@ -103,13 +150,15 @@ const sendSMSLeopard = async (phoneNumber, message) => {
 const checkSMSBalance = async () => {
   try {
     const endpoint = `${SMS_LEOPARD_CONFIG.baseUrl}/balance`;
-    const credentials = btoa(`${SMS_LEOPARD_CONFIG.username}:${SMS_LEOPARD_CONFIG.password}`);
+    const credentials = btoa(
+      `${SMS_LEOPARD_CONFIG.username}:${SMS_LEOPARD_CONFIG.password}`,
+    );
 
     const response = await fetch(endpoint, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Authorization': `Basic ${credentials}`,
-        'Content-Type': 'application/json',
+        Authorization: `Basic ${credentials}`,
+        "Content-Type": "application/json",
       },
     });
 
@@ -124,34 +173,33 @@ const checkSMSBalance = async () => {
     } else if (result.data && result.data.balance !== undefined) {
       return `KSh ${result.data.balance}`;
     } else {
-      return 'Balance information not available';
+      return "Balance information not available";
     }
-
   } catch (error) {
-    console.error('SMS balance check error:', error);
-    return 'Service unavailable';
+    console.error("SMS balance check error:", error);
+    return "Service unavailable";
   }
 };
 
 // Enhanced phone number formatting for SMS Leopard
 const formatPhoneNumber = (phone) => {
-  if (!phone) return '';
+  if (!phone) return "";
 
-  let cleaned = phone.replace(/\D/g, '');
+  let cleaned = phone.replace(/\D/g, "");
 
-  if (cleaned.startsWith('0')) {
-    cleaned = '254' + cleaned.substring(1);
-  } else if (cleaned.startsWith('7')) {
-    cleaned = '254' + cleaned;
-  } else if (cleaned.startsWith('+254')) {
+  if (cleaned.startsWith("0")) {
+    cleaned = "254" + cleaned.substring(1);
+  } else if (cleaned.startsWith("7")) {
+    cleaned = "254" + cleaned;
+  } else if (cleaned.startsWith("+254")) {
     cleaned = cleaned.substring(1);
   }
 
-  if (cleaned.length === 12 && cleaned.startsWith('254')) {
+  if (cleaned.length === 12 && cleaned.startsWith("254")) {
     return cleaned;
   }
 
-  console.warn('Invalid phone number format:', phone, 'cleaned:', cleaned);
+  console.warn("Invalid phone number format:", phone, "cleaned:", cleaned);
   return cleaned;
 };
 
@@ -169,7 +217,7 @@ const sendSMSWithRetry = async (phoneNumber, message, maxRetries = 3) => {
         return result;
       }
 
-      lastError = new Error(result.message || 'SMS sending failed');
+      lastError = new Error(result.message || "SMS sending failed");
     } catch (error) {
       lastError = error;
       console.warn(`SMS attempt ${attempt} failed:`, error);
@@ -177,7 +225,7 @@ const sendSMSWithRetry = async (phoneNumber, message, maxRetries = 3) => {
       if (attempt < maxRetries) {
         const delay = 1000 * attempt;
         console.log(`Waiting ${delay}ms before retry...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
   }
@@ -201,7 +249,7 @@ const smsTemplates = {
     `Dear ${employeeName}, KSh ${amount.toLocaleString()} has been sent to your M-PESA account. Reference: ${reference}.`,
 
   mpesaFailed: (employeeName, reference) =>
-    `Dear ${employeeName}, M-PESA payment failed for reference ${reference}. Please contact HR.`
+    `Dear ${employeeName}, M-PESA payment failed for reference ${reference}. Please contact HR.`,
 };
 
 // Comment Modal Component
@@ -210,17 +258,17 @@ const CommentModal = ({
   onClose,
   onSubmit,
   title = "Add Comment",
-  submitText = "Submit"
+  submitText = "Submit",
 }) => {
-  const [comment, setComment] = useState('');
+  const [comment, setComment] = useState("");
 
   const handleSubmit = () => {
     if (comment.trim()) {
       onSubmit(comment);
-      setComment('');
+      setComment("");
       onClose();
     } else {
-      toast.error('Please enter a comment');
+      toast.error("Please enter a comment");
     }
   };
 
@@ -245,7 +293,9 @@ const CommentModal = ({
             rows={4}
             className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
-          <p className="text-xs text-gray-500 mt-1">This comment will be recorded in the audit trail.</p>
+          <p className="text-xs text-gray-500 mt-1">
+            This comment will be recorded in the audit trail.
+          </p>
         </div>
 
         <div className="flex justify-end gap-3">
@@ -271,48 +321,50 @@ const CommentModal = ({
 const StatusBadge = ({ status }) => {
   const statusConfig = {
     pending: {
-      bg: 'bg-yellow-100',
-      text: 'text-yellow-800',
+      bg: "bg-yellow-100",
+      text: "text-yellow-800",
       icon: Clock,
-      label: 'Pending Approval'
+      label: "Pending Approval",
     },
     approved: {
-      bg: 'bg-green-100',
-      text: 'text-green-800',
+      bg: "bg-green-100",
+      text: "text-green-800",
       icon: CheckCircle,
-      label: 'Approved'
+      label: "Approved",
     },
     rejected: {
-      bg: 'bg-red-100',
-      text: 'text-red-800',
+      bg: "bg-red-100",
+      text: "text-red-800",
       icon: XCircle,
-      label: 'Rejected'
+      label: "Rejected",
     },
     processing: {
-      bg: 'bg-blue-100',
-      text: 'text-blue-800',
+      bg: "bg-blue-100",
+      text: "text-blue-800",
       icon: Loader,
-      label: 'Processing'
+      label: "Processing",
     },
     completed: {
-      bg: 'bg-emerald-100',
-      text: 'text-emerald-800',
+      bg: "bg-emerald-100",
+      text: "text-emerald-800",
       icon: CheckCircle,
-      label: 'Completed'
+      label: "Completed",
     },
     failed: {
-      bg: 'bg-red-100',
-      text: 'text-red-800',
+      bg: "bg-red-100",
+      text: "text-red-800",
       icon: XCircle,
-      label: 'Failed'
-    }
+      label: "Failed",
+    },
   };
 
   const config = statusConfig[status] || statusConfig.pending;
   const Icon = config.icon;
 
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${config.bg} ${config.text}`}>
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${config.bg} ${config.text}`}
+    >
       <Icon className="w-3 h-3" />
       {config.label}
     </span>
@@ -320,14 +372,29 @@ const StatusBadge = ({ status }) => {
 };
 
 // Pending Payment Card Component
-const PendingPaymentCard = ({ payment, onApprove, onReject, onViewDetails, userRole, isSelected, onSelect }) => {
-  const isChecker = userRole === 'checker' || userRole === 'credit_analyst_officer';
-  const totalAmount = payment.type === 'bulk'
-    ? payment.employees_data?.reduce((sum, emp) => sum + (emp.net_pay || 0), 0) || 0
-    : payment.employee_data?.net_pay || 0;
+const PendingPaymentCard = ({
+  payment,
+  onApprove,
+  onReject,
+  onViewDetails,
+  userRole,
+  isSelected,
+  onSelect,
+}) => {
+  const isChecker =
+    userRole === "checker" || userRole === "credit_analyst_officer";
+  const totalAmount =
+    payment.type === "bulk"
+      ? payment.employees_data?.reduce(
+        (sum, emp) => sum + (emp.net_pay || 0),
+        0,
+      ) || 0
+      : payment.employee_data?.net_pay || 0;
 
   return (
-    <div className={`bg-white rounded-lg border ${isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'} p-4 hover:shadow-md transition-shadow`}>
+    <div
+      className={`bg-white rounded-lg border ${isSelected ? "border-blue-500 ring-2 ring-blue-200" : "border-gray-200"} p-4 hover:shadow-md transition-shadow`}
+    >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
           {onSelect && (
@@ -342,7 +409,7 @@ const PendingPaymentCard = ({ payment, onApprove, onReject, onViewDetails, userR
             />
           )}
           <div className="p-2 bg-orange-100 rounded-lg">
-            {payment.type === 'bulk' ? (
+            {payment.type === "bulk" ? (
               <Users className="w-5 h-5 text-orange-600" />
             ) : (
               <Smartphone className="w-5 h-5 text-orange-600" />
@@ -350,13 +417,13 @@ const PendingPaymentCard = ({ payment, onApprove, onReject, onViewDetails, userR
           </div>
           <div>
             <h3 className="font-semibold text-gray-900">
-              {payment.type === 'bulk'
+              {payment.type === "bulk"
                 ? `Bulk Payment (${payment.employees_data?.length || 0} employees)`
-                : `Payment to ${payment.employee_data?.employee_name || 'Unknown'}`
-              }
+                : `Payment to ${payment.employee_data?.employee_name || "Unknown"}`}
             </h3>
             <p className="text-xs text-gray-600">
-              Initiated by {payment.created_by_email} • {new Date(payment.created_at).toLocaleString()}
+              Initiated by {payment.created_by_email} •{" "}
+              {new Date(payment.created_at).toLocaleString()}
             </p>
           </div>
         </div>
@@ -366,7 +433,9 @@ const PendingPaymentCard = ({ payment, onApprove, onReject, onViewDetails, userR
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
           <p className="text-xs text-gray-600">Total Amount</p>
-          <p className="font-bold text-lg text-green-600">KSh {totalAmount.toLocaleString()}</p>
+          <p className="font-bold text-lg text-green-600">
+            KSh {totalAmount.toLocaleString()}
+          </p>
         </div>
         <div>
           <p className="text-xs text-gray-600">Payment Method</p>
@@ -374,7 +443,7 @@ const PendingPaymentCard = ({ payment, onApprove, onReject, onViewDetails, userR
         </div>
       </div>
 
-      {payment.type === 'bulk' && payment.employees_data && (
+      {payment.type === "bulk" && payment.employees_data && (
         <div className="mb-4">
           <p className="text-xs text-gray-600 mb-2">Employees:</p>
           <div className="max-h-20 overflow-y-auto text-xs">
@@ -402,7 +471,7 @@ const PendingPaymentCard = ({ payment, onApprove, onReject, onViewDetails, userR
           View Details
         </button>
 
-        {isChecker && payment.status === 'pending' && (
+        {isChecker && payment.status === "pending" && (
           <>
             <button
               onClick={() => onApprove(payment)}
@@ -426,19 +495,33 @@ const PendingPaymentCard = ({ payment, onApprove, onReject, onViewDetails, userR
 };
 
 // Payment Details Modal Component
-const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, userRole }) => {
+const PaymentDetailsModal = ({
+  payment,
+  isOpen,
+  onClose,
+  onApprove,
+  onReject,
+  userRole,
+}) => {
   if (!isOpen || !payment) return null;
 
-  const isChecker = userRole === 'checker' || userRole === 'credit_analyst_officer';
-  const totalAmount = payment.type === 'bulk'
-    ? payment.employees_data?.reduce((sum, emp) => sum + (emp.net_pay || 0), 0) || 0
-    : payment.employee_data?.net_pay || 0;
+  const isChecker =
+    userRole === "checker" || userRole === "credit_analyst_officer";
+  const totalAmount =
+    payment.type === "bulk"
+      ? payment.employees_data?.reduce(
+        (sum, emp) => sum + (emp.net_pay || 0),
+        0,
+      ) || 0
+      : payment.employee_data?.net_pay || 0;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-lg w-full max-w-4xl max-h-[90vh] overflow-auto">
         <div className="sticky top-0 bg-white p-6 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-gray-900">Payment Request Details</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Payment Request Details
+          </h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
@@ -452,11 +535,15 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, us
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <p className="text-xs text-gray-600">Payment Type</p>
-                <p className="font-semibold">{payment.type === 'bulk' ? 'Bulk Payment' : 'Single Payment'}</p>
+                <p className="font-semibold">
+                  {payment.type === "bulk" ? "Bulk Payment" : "Single Payment"}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-gray-600">Total Amount</p>
-                <p className="font-semibold text-green-600">KSh {totalAmount.toLocaleString()}</p>
+                <p className="font-semibold text-green-600">
+                  KSh {totalAmount.toLocaleString()}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-gray-600">Status</p>
@@ -464,7 +551,9 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, us
               </div>
               <div>
                 <p className="text-xs text-gray-600">Created</p>
-                <p className="font-semibold">{new Date(payment.created_at).toLocaleString()}</p>
+                <p className="font-semibold">
+                  {new Date(payment.created_at).toLocaleString()}
+                </p>
               </div>
             </div>
           </div>
@@ -481,16 +570,24 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, us
             <div className="space-y-2">
               <div className="flex items-center gap-3 text-xs">
                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span>Payment request created by {payment.created_by_email}</span>
-                <span className="text-gray-500">{new Date(payment.created_at).toLocaleString()}</span>
+                <span>
+                  Payment request created by {payment.created_by_email}
+                </span>
+                <span className="text-gray-500">
+                  {new Date(payment.created_at).toLocaleString()}
+                </span>
               </div>
               {payment.approved_by_email && (
                 <div className="flex items-center gap-3 text-xs">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <span>Approved by {payment.approved_by_email}</span>
-                  <span className="text-gray-500">{new Date(payment.approved_at).toLocaleString()}</span>
+                  <span className="text-gray-500">
+                    {new Date(payment.approved_at).toLocaleString()}
+                  </span>
                   {payment.approval_comment && (
-                    <span className="text-green-600">- {payment.approval_comment}</span>
+                    <span className="text-green-600">
+                      - {payment.approval_comment}
+                    </span>
                   )}
                 </div>
               )}
@@ -498,9 +595,13 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, us
                 <div className="flex items-center gap-3 text-xs">
                   <div className="w-2 h-2 bg-red-500 rounded-full"></div>
                   <span>Rejected by {payment.rejected_by_email}</span>
-                  <span className="text-gray-500">{new Date(payment.rejected_at).toLocaleString()}</span>
+                  <span className="text-gray-500">
+                    {new Date(payment.rejected_at).toLocaleString()}
+                  </span>
                   {payment.rejection_reason && (
-                    <span className="text-red-600">- {payment.rejection_reason}</span>
+                    <span className="text-red-600">
+                      - {payment.rejection_reason}
+                    </span>
                   )}
                 </div>
               )}
@@ -509,10 +610,12 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, us
 
           <div className="mb-6">
             <h3 className="font-semibold text-gray-900 mb-3">
-              {payment.type === 'bulk' ? 'Employees to be Paid' : 'Employee Details'}
+              {payment.type === "bulk"
+                ? "Employees to be Paid"
+                : "Employee Details"}
             </h3>
 
-            {payment.type === 'bulk' && payment.employees_data ? (
+            {payment.type === "bulk" && payment.employees_data ? (
               <div className="max-h-60 overflow-y-auto">
                 <table className="w-full text-xs">
                   <thead className="bg-gray-50">
@@ -528,41 +631,57 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, us
                         <td className="px-3 py-2">
                           <div>
                             <p className="font-medium">{emp.employee_name}</p>
-                            <p className="text-gray-500 text-xs">{emp.employee_id}</p>
+                            <p className="text-gray-500 text-xs">
+                              {emp.employee_id}
+                            </p>
                           </div>
                         </td>
-                        <td className="px-3 py-2 text-right">{emp.employeeNu}</td>
-                        <td className="px-3 py-2 text-right font-medium">KSh {emp.net_pay?.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right">
+                          {emp.employeeNu}
+                        </td>
+                        <td className="px-3 py-2 text-right font-medium">
+                          KSh {emp.net_pay?.toLocaleString()}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            ) : payment.employee_data && (
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-600">Employee Name</p>
-                    <p className="font-medium">{payment.employee_data.employee_name}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Employee ID</p>
-                    <p className="font-medium">{payment.employee_data.employee_id}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Phone Number</p>
-                    <p className="font-medium">{payment.employee_data.employeeNu}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600">Department</p>
-                    <p className="font-medium">{payment.employee_data.department}</p>
+            ) : (
+              payment.employee_data && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-600">Employee Name</p>
+                      <p className="font-medium">
+                        {payment.employee_data.employee_name}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Employee ID</p>
+                      <p className="font-medium">
+                        {payment.employee_data.employee_id}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Phone Number</p>
+                      <p className="font-medium">
+                        {payment.employee_data.employeeNu}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Department</p>
+                      <p className="font-medium">
+                        {payment.employee_data.department}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )
             )}
           </div>
 
-          {isChecker && payment.status === 'pending' && (
+          {isChecker && payment.status === "pending" && (
             <div className="flex gap-3 pt-4 border-t border-gray-200">
               <button
                 onClick={() => onApprove(payment)}
@@ -588,15 +707,15 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, us
 
 // Rejection Modal Component
 const RejectionModal = ({ isOpen, onClose, onConfirm }) => {
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState("");
 
   const handleConfirm = () => {
     if (reason.trim()) {
       onConfirm(reason);
-      setReason('');
+      setReason("");
       onClose();
     } else {
-      toast.error('Please enter a reason for rejection');
+      toast.error("Please enter a reason for rejection");
     }
   };
 
@@ -649,14 +768,14 @@ const MpesaSinglePaymentModal = ({
   onClose,
   employee,
   onConfirm,
-  userRole = 'maker'
+  userRole = "maker",
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [justification, setJustification] = useState('');
+  const [justification, setJustification] = useState("");
 
   const handlePayment = async () => {
-    if (userRole === 'maker' && !justification.trim()) {
-      toast.error('Please provide a justification for this payment request');
+    if (userRole === "maker" && !justification.trim()) {
+      toast.error("Please provide a justification for this payment request");
       return;
     }
 
@@ -665,7 +784,7 @@ const MpesaSinglePaymentModal = ({
       await onConfirm(justification);
       onClose();
     } catch (error) {
-      console.error('Payment error:', error);
+      console.error("Payment error:", error);
     } finally {
       setIsProcessing(false);
     }
@@ -678,21 +797,22 @@ const MpesaSinglePaymentModal = ({
       <div className="bg-white rounded-lg max-w-md w-full p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
           <Smartphone className="h-5 w-5 text-green-600" />
-          {userRole === 'maker' ? 'Create Payment Request' : 'Confirm M-PESA Payment'}
+          {userRole === "maker"
+            ? "Create Payment Request"
+            : "Confirm M-PESA Payment"}
         </h3>
 
         <div className="mb-4 p-3 bg-gray-50 rounded-md">
           <p className="text-xs text-gray-600 mb-2">
-            {userRole === 'maker'
-              ? 'You are creating a payment request for:'
-              : 'You are about to send an M-PESA payment to:'
-            }
+            {userRole === "maker"
+              ? "You are creating a payment request for:"
+              : "You are about to send an M-PESA payment to:"}
           </p>
           <div className="space-y-1">
             <p className="font-medium">{employee.employee_name}</p>
             <p className="text-xs text-gray-600">ID: {employee.employee_id}</p>
             <p className="text-xs text-gray-600">
-              Phone: {employee.employeeNu || 'No phone number available'}
+              Phone: {employee.employeeNu || "No phone number available"}
             </p>
             <p className="text-xs text-gray-600">
               Amount: KSh {employee.net_pay?.toLocaleString()}
@@ -700,7 +820,7 @@ const MpesaSinglePaymentModal = ({
           </div>
         </div>
 
-        {userRole === 'maker' && (
+        {userRole === "maker" && (
           <div className="mb-4">
             <label className="block text-xs font-medium text-gray-700 mb-2">
               Justification <span className="text-red-500">*</span>
@@ -715,13 +835,15 @@ const MpesaSinglePaymentModal = ({
           </div>
         )}
 
-        {userRole === 'maker' && (
+        {userRole === "maker" && (
           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
             <div className="flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-yellow-600 mt-0.5" />
               <div className="text-xs text-yellow-800">
                 <p className="font-medium">Maker-Checker Process</p>
-                <p>This payment will be submitted for approval before processing.</p>
+                <p>
+                  This payment will be submitted for approval before processing.
+                </p>
               </div>
             </div>
           </div>
@@ -738,7 +860,9 @@ const MpesaSinglePaymentModal = ({
           <button
             onClick={handlePayment}
             className="px-4 py-2 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 flex items-center gap-2"
-            disabled={isProcessing || (userRole === 'maker' && !justification.trim())}
+            disabled={
+              isProcessing || (userRole === "maker" && !justification.trim())
+            }
           >
             {isProcessing ? (
               <>
@@ -748,7 +872,7 @@ const MpesaSinglePaymentModal = ({
             ) : (
               <>
                 <Send size={16} />
-                {userRole === 'maker' ? 'Submit Request' : 'Confirm Payment'}
+                {userRole === "maker" ? "Submit Request" : "Confirm Payment"}
               </>
             )}
           </button>
@@ -764,24 +888,25 @@ const MpesaBulkPaymentModal = ({
   onClose,
   employees,
   onConfirm,
-  userRole = 'maker'
+  userRole = "maker",
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState({});
-  const [searchTerm, setSearchTerm] = useState('');
-  const [justification, setJustification] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [justification, setJustification] = useState("");
 
   useEffect(() => {
     const initialSelected = {};
-    employees.forEach(emp => {
+    employees.forEach((emp) => {
       initialSelected[emp.employee_id] = true;
     });
     setSelectedStaff(initialSelected);
   }, [employees]);
 
-  const filteredEmployees = employees.filter(emp =>
-    emp.employee_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.employee_id.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredEmployees = employees.filter(
+    (emp) =>
+      emp.employee_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.employee_id.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const calculateTotalAmount = () => {
@@ -794,19 +919,19 @@ const MpesaBulkPaymentModal = ({
   };
 
   const getSelectedStaffCount = () => {
-    return Object.values(selectedStaff).filter(selected => selected).length;
+    return Object.values(selectedStaff).filter((selected) => selected).length;
   };
 
   const toggleStaffSelection = (id) => {
-    setSelectedStaff(prev => ({
+    setSelectedStaff((prev) => ({
       ...prev,
-      [id]: !prev[id]
+      [id]: !prev[id],
     }));
   };
 
   const selectAllStaff = () => {
     const newSelection = {};
-    employees.forEach(emp => {
+    employees.forEach((emp) => {
       newSelection[emp.employee_id] = true;
     });
     setSelectedStaff(newSelection);
@@ -817,18 +942,22 @@ const MpesaBulkPaymentModal = ({
   };
 
   const handleBulkPayment = async () => {
-    if (userRole === 'maker' && !justification.trim()) {
-      toast.error('Please provide a justification for this bulk payment request');
+    if (userRole === "maker" && !justification.trim()) {
+      toast.error(
+        "Please provide a justification for this bulk payment request",
+      );
       return;
     }
 
     setIsProcessing(true);
     try {
-      const selectedEmployees = employees.filter(emp => selectedStaff[emp.employee_id]);
+      const selectedEmployees = employees.filter(
+        (emp) => selectedStaff[emp.employee_id],
+      );
       await onConfirm(selectedEmployees, justification);
       onClose();
     } catch (error) {
-      console.error('Bulk payment error:', error);
+      console.error("Bulk payment error:", error);
     } finally {
       setIsProcessing(false);
     }
@@ -841,15 +970,16 @@ const MpesaBulkPaymentModal = ({
       <div className="bg-white rounded-lg max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
           <Users className="h-5 w-5 text-green-600" />
-          {userRole === 'maker' ? 'Create Bulk Payment Request' : 'Confirm M-PESA Bulk Payment'}
+          {userRole === "maker"
+            ? "Create Bulk Payment Request"
+            : "Confirm M-PESA Bulk Payment"}
         </h3>
 
         <div className="mb-4 p-3 bg-gray-50 rounded-md">
           <p className="text-xs text-gray-600">
-            {userRole === 'maker'
+            {userRole === "maker"
               ? `You are creating a bulk payment request for ${getSelectedStaffCount()} selected staff members.`
-              : `You are about to process M-PESA B2C payments for ${getSelectedStaffCount()} selected staff members.`
-            }
+              : `You are about to process M-PESA B2C payments for ${getSelectedStaffCount()} selected staff members.`}
           </p>
 
           <div className="mt-3 flex gap-2">
@@ -877,7 +1007,7 @@ const MpesaBulkPaymentModal = ({
           </div>
         </div>
 
-        {userRole === 'maker' && (
+        {userRole === "maker" && (
           <div className="mb-4">
             <label className="block text-xs font-medium text-gray-700 mb-2">
               Justification <span className="text-red-500">*</span>
@@ -892,13 +1022,16 @@ const MpesaBulkPaymentModal = ({
           </div>
         )}
 
-        {userRole === 'maker' && (
+        {userRole === "maker" && (
           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
             <div className="flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-yellow-600 mt-0.5" />
               <div className="text-xs text-yellow-800">
                 <p className="font-medium">Maker-Checker Process</p>
-                <p>This bulk payment will be submitted for approval before processing.</p>
+                <p>
+                  This bulk payment will be submitted for approval before
+                  processing.
+                </p>
               </div>
             </div>
           </div>
@@ -918,8 +1051,11 @@ const MpesaBulkPaymentModal = ({
         <div className="mb-4 max-h-60 overflow-y-auto">
           <p className="text-xs font-medium mb-2">Staff to be paid:</p>
           <ul className="text-xs divide-y divide-gray-200">
-            {filteredEmployees.map(emp => (
-              <li key={emp.employee_id} className="py-2 flex items-center justify-between">
+            {filteredEmployees.map((emp) => (
+              <li
+                key={emp.employee_id}
+                className="py-2 flex items-center justify-between"
+              >
                 <div className="flex items-center">
                   <input
                     type="checkbox"
@@ -928,15 +1064,27 @@ const MpesaBulkPaymentModal = ({
                     className="mr-2 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
                   />
                   <div>
-                    <div className={selectedStaff[emp.employee_id] ? "font-medium" : "text-gray-500"}>
+                    <div
+                      className={
+                        selectedStaff[emp.employee_id]
+                          ? "font-medium"
+                          : "text-gray-500"
+                      }
+                    >
                       {emp.employee_name}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {emp.employeeNu || 'No phone number'} • {emp.employee_id}
+                      {emp.employeeNu || "No phone number"} • {emp.employee_id}
                     </div>
                   </div>
                 </div>
-                <span className={selectedStaff[emp.employee_id] ? "font-medium" : "text-gray-500"}>
+                <span
+                  className={
+                    selectedStaff[emp.employee_id]
+                      ? "font-medium"
+                      : "text-gray-500"
+                  }
+                >
                   KSh {emp.net_pay?.toLocaleString()}
                 </span>
               </li>
@@ -955,7 +1103,11 @@ const MpesaBulkPaymentModal = ({
           <button
             onClick={handleBulkPayment}
             className="px-4 py-2 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 flex items-center gap-2"
-            disabled={isProcessing || getSelectedStaffCount() === 0 || (userRole === 'maker' && !justification.trim())}
+            disabled={
+              isProcessing ||
+              getSelectedStaffCount() === 0 ||
+              (userRole === "maker" && !justification.trim())
+            }
           >
             {isProcessing ? (
               <>
@@ -965,10 +1117,9 @@ const MpesaBulkPaymentModal = ({
             ) : (
               <>
                 <Send size={16} />
-                {userRole === 'maker'
+                {userRole === "maker"
                   ? `Submit Request (${getSelectedStaffCount()})`
-                  : `Confirm M-Pesa Payment (${getSelectedStaffCount()})`
-                }
+                  : `Confirm M-Pesa Payment (${getSelectedStaffCount()})`}
               </>
             )}
           </button>
@@ -980,24 +1131,39 @@ const MpesaBulkPaymentModal = ({
 
 // P9 Form Generator Component
 const P9FormGenerator = ({ isOpen, onClose, records, companyInfo }) => {
-  const [selectedEmployee, setSelectedEmployee] = useState('');
+  const [selectedEmployee, setSelectedEmployee] = useState("");
   const [taxYear, setTaxYear] = useState(new Date().getFullYear().toString());
   const [isGenerating, setIsGenerating] = useState(false);
 
   const generateP9Form = async (employeeData) => {
     setIsGenerating(true);
     try {
-      const employeeRecords = records.filter(r => r.employee_id === employeeData.employee_id);
+      const employeeRecords = records.filter(
+        (r) => r.employee_id === employeeData.employee_id,
+      );
 
       const annualTotals = {
-        basicSalary: employeeRecords.reduce((sum, r) => sum + r.basic_salary, 0) * 12,
-        benefits: employeeRecords.reduce((sum, r) => sum + r.house_allowance + r.transport_allowance + r.medical_allowance + r.other_allowances, 0) * 12,
+        basicSalary:
+          employeeRecords.reduce((sum, r) => sum + r.basic_salary, 0) * 12,
+        benefits:
+          employeeRecords.reduce(
+            (sum, r) =>
+              sum +
+              r.house_allowance +
+              r.transport_allowance +
+              r.medical_allowance +
+              r.other_allowances,
+            0,
+          ) * 12,
         grossPay: employeeRecords.reduce((sum, r) => sum + r.gross_pay, 0) * 12,
         paye: employeeRecords.reduce((sum, r) => sum + r.paye_tax, 0) * 12,
-        nhif: employeeRecords.reduce((sum, r) => sum + r.nhif_deduction, 0) * 12,
-        nssf: employeeRecords.reduce((sum, r) => sum + r.nssf_deduction, 0) * 12,
-        housingLevy: employeeRecords.reduce((sum, r) => sum + r.housing_levy, 0) * 12,
-        netPay: employeeRecords.reduce((sum, r) => sum + r.net_pay, 0) * 12
+        nhif:
+          employeeRecords.reduce((sum, r) => sum + r.nhif_deduction, 0) * 12,
+        nssf:
+          employeeRecords.reduce((sum, r) => sum + r.nssf_deduction, 0) * 12,
+        housingLevy:
+          employeeRecords.reduce((sum, r) => sum + r.housing_levy, 0) * 12,
+        netPay: employeeRecords.reduce((sum, r) => sum + r.net_pay, 0) * 12,
       };
 
       const p9Content = `
@@ -1006,7 +1172,7 @@ const P9FormGenerator = ({ isOpen, onClose, records, companyInfo }) => {
         <head>
           <title>P9 Form - ${employeeData.employee_name} - ${taxYear}</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
+            body { font-family: 'Avenir Next', sans-serif; margin: 20px; font-size: 12px; }
             .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 20px; }
             .company-logo { max-height: 60px; margin-bottom: 10px; }
             .form-title { font-size: 18px; font-weight: bold; margin: 20px 0; }
@@ -1026,9 +1192,9 @@ const P9FormGenerator = ({ isOpen, onClose, records, companyInfo }) => {
         </head>
         <body>
           <div class="header">
-            ${companyInfo?.image_url ? `<img src="${companyInfo.image_url}" alt="Company Logo" class="company-logo">` : ''}
-            <h1>${companyInfo?.company_name || 'Company Name'}</h1>
-            <p>${companyInfo?.company_tagline || ''}</p>
+            ${companyInfo?.image_url ? `<img src="${companyInfo.image_url}" alt="Company Logo" class="company-logo">` : ""}
+            <h1>${companyInfo?.company_name || "Company Name"}</h1>
+            <p>${companyInfo?.company_tagline || ""}</p>
             <div class="form-title">INCOME TAX DEDUCTION CARD - P9A</div>
             <div>Year: ${taxYear}</div>
           </div>
@@ -1036,7 +1202,7 @@ const P9FormGenerator = ({ isOpen, onClose, records, companyInfo }) => {
           <div class="form-info">
             <div class="info-box">
               Employer Details:<br>
-              Name: ${companyInfo?.company_name || 'Company Name'}<br>
+              Name: ${companyInfo?.company_name || "Company Name"}<br>
               PIN: _________________<br>
               Employer Code: _________
             </div>
@@ -1067,8 +1233,20 @@ const P9FormGenerator = ({ isOpen, onClose, records, companyInfo }) => {
               </thead>
               <tbody>
                 ${Array.from({ length: 12 }, (_, i) => {
-        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-          'July', 'August', 'September', 'October', 'November', 'December'];
+        const monthNames = [
+          "January",
+          "February",
+          "March",
+          "April",
+          "May",
+          "June",
+          "July",
+          "August",
+          "September",
+          "October",
+          "November",
+          "December",
+        ];
         const monthData = employeeRecords[0] || employeeData;
         return `
                     <tr>
@@ -1083,7 +1261,7 @@ const P9FormGenerator = ({ isOpen, onClose, records, companyInfo }) => {
                       <td class="number">${Math.round(monthData.net_pay).toLocaleString()}</td>
                     </tr>
                   `;
-      }).join('')}
+      }).join("")}
                 <tr class="total-row">
                   <td>TOTAL</td>
                   <td class="number">${annualTotals.basicSalary.toLocaleString()}</td>
@@ -1137,7 +1315,7 @@ const P9FormGenerator = ({ isOpen, onClose, records, companyInfo }) => {
           </div>
 
           <div style="text-align: center; margin-top: 30px; font-size: 10px; color: #666;">
-            Generated on ${new Date().toLocaleDateString()} by ${companyInfo?.company_name || 'Payroll System'}
+            Generated on ${new Date().toLocaleDateString()} by ${companyInfo?.company_name || "Payroll System"}
           </div>
         </body>
         </html>
@@ -1146,16 +1324,16 @@ const P9FormGenerator = ({ isOpen, onClose, records, companyInfo }) => {
       const opt = {
         margin: 0.5,
         filename: `P9_${employeeData.employee_id}_${taxYear}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
+        image: { type: "jpeg", quality: 0.98 },
         html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+        jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
       };
 
       html2pdf().from(p9Content).set(opt).save();
-      toast.success('P9 Form generated successfully!');
+      toast.success("P9 Form generated successfully!");
     } catch (error) {
-      console.error('Error generating P9 form:', error);
-      toast.error('Failed to generate P9 form');
+      console.error("Error generating P9 form:", error);
+      toast.error("Failed to generate P9 form");
     } finally {
       setIsGenerating(false);
     }
@@ -1173,9 +1351,11 @@ const P9FormGenerator = ({ isOpen, onClose, records, companyInfo }) => {
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Tax Year</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Tax Year
+            </label>
             <SearchableDropdown
-              options={['2024', '2023', '2022']}
+              options={["2024", "2023", "2022"]}
               value={taxYear}
               onChange={setTaxYear}
               placeholder="Select Year"
@@ -1184,11 +1364,13 @@ const P9FormGenerator = ({ isOpen, onClose, records, companyInfo }) => {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Select Employee</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Select Employee
+            </label>
             <SearchableDropdown
-              options={records.map(r => ({
+              options={records.map((r) => ({
                 label: `${r.employee_name} (${r.employee_id})`,
-                value: r.employee_id
+                value: r.employee_id,
               }))}
               value={selectedEmployee}
               onChange={setSelectedEmployee}
@@ -1208,7 +1390,9 @@ const P9FormGenerator = ({ isOpen, onClose, records, companyInfo }) => {
           </button>
           <button
             onClick={() => {
-              const employee = records.find(r => r.employee_id === selectedEmployee);
+              const employee = records.find(
+                (r) => r.employee_id === selectedEmployee,
+              );
               if (employee) generateP9Form(employee);
             }}
             className="px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 flex items-center gap-2"
@@ -1234,43 +1418,47 @@ const P9FormGenerator = ({ isOpen, onClose, records, companyInfo }) => {
 
 // Export Modal Component
 const ExportModal = ({ isOpen, onClose, records }) => {
-  const [exportFormat, setExportFormat] = useState('excel');
+  const [exportFormat, setExportFormat] = useState("excel");
   const [isExporting, setIsExporting] = useState(false);
 
   const exportToExcel = () => {
     setIsExporting(true);
     try {
-      const ws = XLSX.utils.json_to_sheet(records.map(record => ({
-        'Employee ID': record.employee_id,
-        'Employee Name': record.employee_name,
-        'Department': record.department,
-        'Position': record.position,
-        'Basic Salary': record.basic_salary,
-        'House Allowance': record.house_allowance,
-        'Transport Allowance': record.transport_allowance,
-        'Medical Allowance': record.medical_allowance,
-        'Overtime Hours': record.overtime_hours,
-        'Overtime Pay': record.overtime_hours * record.overtime_rate,
-        'Gross Pay': record.gross_pay,
-        'PAYE Tax': Math.round(record.paye_tax),
-        'NHIF': record.nhif_deduction,
-        'NSSF': record.nssf_deduction,
-        'Housing Levy': record.housing_levy,
-        'Total Deductions': record.total_deductions,
-        'Net Pay': Math.round(record.net_pay),
-        'Pay Period': record.pay_period
-      })));
+      const ws = XLSX.utils.json_to_sheet(
+        records.map((record) => ({
+          "Employee ID": record.employee_id,
+          "Employee Name": record.employee_name,
+          Department: record.department,
+          Position: record.position,
+          "Basic Salary": record.basic_salary,
+          "House Allowance": record.house_allowance,
+          "Transport Allowance": record.transport_allowance,
+          "Medical Allowance": record.medical_allowance,
+          "Overtime Hours": record.overtime_hours,
+          "Overtime Pay": record.overtime_hours * record.overtime_rate,
+          "Gross Pay": record.gross_pay,
+          "PAYE Tax": Math.round(record.paye_tax),
+          NHIF: record.nhif_deduction,
+          NSSF: record.nssf_deduction,
+          "Housing Levy": record.housing_levy,
+          "Total Deductions": record.total_deductions,
+          "Net Pay": Math.round(record.net_pay),
+          "Pay Period": record.pay_period,
+        })),
+      );
 
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Payroll');
+      XLSX.utils.book_append_sheet(wb, ws, "Payroll");
 
-      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const data = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      const data = new Blob([excelBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
       saveAs(data, `payroll_${new Date().toISOString().slice(0, 10)}.xlsx`);
 
-      toast.success('Excel file exported successfully!');
+      toast.success("Excel file exported successfully!");
     } catch (error) {
-      toast.error('Failed to export Excel file');
+      toast.error("Failed to export Excel file");
     } finally {
       setIsExporting(false);
     }
@@ -1279,34 +1467,36 @@ const ExportModal = ({ isOpen, onClose, records }) => {
   const exportToCSV = () => {
     setIsExporting(true);
     try {
-      const ws = XLSX.utils.json_to_sheet(records.map(record => ({
-        'Employee ID': record.employee_id,
-        'Employee Name': record.employee_name,
-        'Department': record.department,
-        'Position': record.position,
-        'Basic Salary': record.basic_salary,
-        'House Allowance': record.house_allowance,
-        'Transport Allowance': record.transport_allowance,
-        'Medical Allowance': record.medical_allowance,
-        'Overtime Hours': record.overtime_hours,
-        'Overtime Pay': record.overtime_hours * record.overtime_rate,
-        'Gross Pay': record.gross_pay,
-        'PAYE Tax': Math.round(record.paye_tax),
-        'NHIF': record.nhif_deduction,
-        'NSSF': record.nssf_deduction,
-        'Housing Levy': record.housing_levy,
-        'Total Deductions': record.total_deductions,
-        'Net Pay': Math.round(record.net_pay),
-        'Pay Period': record.pay_period
-      })));
+      const ws = XLSX.utils.json_to_sheet(
+        records.map((record) => ({
+          "Employee ID": record.employee_id,
+          "Employee Name": record.employee_name,
+          Department: record.department,
+          Position: record.position,
+          "Basic Salary": record.basic_salary,
+          "House Allowance": record.house_allowance,
+          "Transport Allowance": record.transport_allowance,
+          "Medical Allowance": record.medical_allowance,
+          "Overtime Hours": record.overtime_hours,
+          "Overtime Pay": record.overtime_hours * record.overtime_rate,
+          "Gross Pay": record.gross_pay,
+          "PAYE Tax": Math.round(record.paye_tax),
+          NHIF: record.nhif_deduction,
+          NSSF: record.nssf_deduction,
+          "Housing Levy": record.housing_levy,
+          "Total Deductions": record.total_deductions,
+          "Net Pay": Math.round(record.net_pay),
+          "Pay Period": record.pay_period,
+        })),
+      );
 
       const csv = XLSX.utils.sheet_to_csv(ws);
-      const data = new Blob([csv], { type: 'text/csv' });
+      const data = new Blob([csv], { type: "text/csv" });
       saveAs(data, `payroll_${new Date().toISOString().slice(0, 10)}.csv`);
 
-      toast.success('CSV file exported successfully!');
+      toast.success("CSV file exported successfully!");
     } catch (error) {
-      toast.error('Failed to export CSV file');
+      toast.error("Failed to export CSV file");
     } finally {
       setIsExporting(false);
     }
@@ -1318,32 +1508,42 @@ const ExportModal = ({ isOpen, onClose, records }) => {
       const doc = new jsPDF();
 
       doc.setFontSize(16);
-      doc.text('Payroll Report', 14, 22);
+      doc.text("Payroll Report", 14, 22);
       doc.setFontSize(12);
       doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 32);
 
-      const tableData = records.map(record => [
+      const tableData = records.map((record) => [
         record.employee_id,
         record.employee_name,
         record.department,
         `KSh ${record.gross_pay.toLocaleString()}`,
         `KSh ${Math.round(record.paye_tax).toLocaleString()}`,
         `KSh ${record.total_deductions.toLocaleString()}`,
-        `KSh ${Math.round(record.net_pay).toLocaleString()}`
+        `KSh ${Math.round(record.net_pay).toLocaleString()}`,
       ]);
 
       doc.autoTable({
-        head: [['ID', 'Name', 'Department', 'Gross Pay', 'PAYE', 'Total Deductions', 'Net Pay']],
+        head: [
+          [
+            "ID",
+            "Name",
+            "Department",
+            "Gross Pay",
+            "PAYE",
+            "Total Deductions",
+            "Net Pay",
+          ],
+        ],
         body: tableData,
         startY: 40,
         styles: { fontSize: 8 },
-        headStyles: { fillColor: [34, 197, 94] }
+        headStyles: { fillColor: [34, 197, 94] },
       });
 
       doc.save(`payroll_${new Date().toISOString().slice(0, 10)}.pdf`);
-      toast.success('PDF file exported successfully!');
+      toast.success("PDF file exported successfully!");
     } catch (error) {
-      toast.error('Failed to export PDF file');
+      toast.error("Failed to export PDF file");
     } finally {
       setIsExporting(false);
     }
@@ -1351,13 +1551,13 @@ const ExportModal = ({ isOpen, onClose, records }) => {
 
   const handleExport = () => {
     switch (exportFormat) {
-      case 'excel':
+      case "excel":
         exportToExcel();
         break;
-      case 'csv':
+      case "csv":
         exportToCSV();
         break;
-      case 'pdf':
+      case "pdf":
         exportToPDF();
         break;
       default:
@@ -1378,13 +1578,15 @@ const ExportModal = ({ isOpen, onClose, records }) => {
 
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-2">Export Format</label>
+            <label className="block text-xs font-medium text-gray-700 mb-2">
+              Export Format
+            </label>
             <div className="grid grid-cols-3 gap-3">
               <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
                 <input
                   type="radio"
                   value="excel"
-                  checked={exportFormat === 'excel'}
+                  checked={exportFormat === "excel"}
                   onChange={(e) => setExportFormat(e.target.value)}
                   className="mr-2"
                 />
@@ -1395,7 +1597,7 @@ const ExportModal = ({ isOpen, onClose, records }) => {
                 <input
                   type="radio"
                   value="csv"
-                  checked={exportFormat === 'csv'}
+                  checked={exportFormat === "csv"}
                   onChange={(e) => setExportFormat(e.target.value)}
                   className="mr-2"
                 />
@@ -1406,7 +1608,7 @@ const ExportModal = ({ isOpen, onClose, records }) => {
                 <input
                   type="radio"
                   value="pdf"
-                  checked={exportFormat === 'pdf'}
+                  checked={exportFormat === "pdf"}
                   onChange={(e) => setExportFormat(e.target.value)}
                   className="mr-2"
                 />
@@ -1454,27 +1656,31 @@ const ExportModal = ({ isOpen, onClose, records }) => {
 
 const GlowButtonss = ({
   children,
-  variant = 'primary',
+  variant = "primary",
   icon: Icon,
-  size = 'md',
+  size = "md",
   onClick,
-  disabled = false
+  disabled = false,
 }) => {
-  const baseClasses = "inline-flex items-center gap-2 rounded-lg font-medium transition-all duration-300 border";
+  const baseClasses =
+    "inline-flex items-center gap-2 rounded-lg font-medium transition-all duration-300 border";
   const sizeClasses = {
     sm: "px-3 py-1.5 text-xs",
     md: "px-4 py-2 text-xs",
-    lg: "px-6 py-3 text-base"
+    lg: "px-6 py-3 text-base",
   };
   const variantClasses = {
-    primary: "bg-green-50 border-green-500 text-green-600 hover:bg-green-100 hover:border-green-600 hover:text-green-700 hover:shadow-[0_0_20px_rgba(34,197,94,0.5)] focus:shadow-[0_0_25px_rgba(34,197,94,0.6)]",
-    secondary: "bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-300 hover:border-gray-400",
-    danger: "bg-red-50 border-red-500 text-red-600 hover:bg-red-100 hover:border-red-600 hover:text-red-700 hover:shadow-[0_0_20px_rgba(239,68,68,0.5)]"
+    primary:
+      "bg-green-50 border-green-500 text-green-600 hover:bg-green-100 hover:border-green-600 hover:text-green-700 transition-all duration-300",
+    secondary:
+      "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-300",
+    danger:
+      "bg-red-50 border-red-500 text-red-600 hover:bg-red-100 hover:border-red-600 hover:text-red-700 transition-all duration-300",
   };
 
   return (
     <button
-      className={`${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      className={`${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
       onClick={onClick}
       disabled={disabled}
     >
@@ -1484,19 +1690,13 @@ const GlowButtonss = ({
   );
 };
 
-const SummaryCard = ({
-  label,
-  value,
-  icon: Icon,
-  color,
-  isCount = false,
-}) => {
+const SummaryCard = ({ label, value, icon: Icon, color, isCount = false }) => {
   const colorClasses = {
-    emerald: 'bg-emerald-100 text-xs text-emerald-600',
-    red: 'bg-red-100 text-xs text-red-600',
-    blue: 'bg-blue-100 text-xs text-blue-600',
-    purple: 'bg-purple-100 text-xs text-purple-600',
-    yellow: 'bg-yellow-100 text-xs text-yellow-600'
+    emerald: "bg-emerald-100 text-xs text-emerald-600",
+    red: "bg-red-100 text-xs text-red-600",
+    blue: "bg-blue-100 text-xs text-blue-600",
+    purple: "bg-purple-100 text-xs text-purple-600",
+    yellow: "bg-yellow-100 text-xs text-yellow-600",
   };
 
   return (
@@ -1507,28 +1707,28 @@ const SummaryCard = ({
         </div>
       </div>
       <div className="space-y-1">
-        <p className="text-gray-600 text-xs font-semibold uppercase tracking-wide">{label}</p>
+        <p className="text-gray-600 text-xs font-semibold uppercase tracking-wide">
+          {label}
+        </p>
         <p className="text-gray-900 text-lg font-normal">
-          {isCount ? value : (typeof value === 'number' ? `KSh ${value.toLocaleString()}` : value)}
+          {isCount
+            ? value
+            : typeof value === "number"
+              ? `KSh ${value.toLocaleString()}`
+              : value}
         </p>
       </div>
     </div>
   );
 };
 
-const StatutoryCard = ({
-  label,
-  value,
-  icon: Icon,
-  color,
-  rate
-}) => {
+const StatutoryCard = ({ label, value, icon: Icon, color, rate }) => {
   const colorClasses = {
-    red: 'bg-red-100 text-red-600',
-    blue: 'bg-blue-100 text-blue-600',
-    green: 'bg-green-100 text-green-600',
-    yellow: 'bg-yellow-100 text-yellow-600',
-    purple: 'bg-purple-100 text-purple-600'
+    red: "bg-red-100 text-red-600",
+    blue: "bg-blue-100 text-blue-600",
+    green: "bg-green-100 text-green-600",
+    yellow: "bg-yellow-100 text-yellow-600",
+    purple: "bg-purple-100 text-purple-600",
   };
 
   return (
@@ -1543,22 +1743,18 @@ const StatutoryCard = ({
       </div>
       <div className="space-y-1">
         <p className="text-gray-900 text-lg font-bold">
-          {typeof value === 'number' ? `KSh ${Math.round(value).toLocaleString()}` : value}
+          {typeof value === "number"
+            ? `KSh ${Math.round(value).toLocaleString()}`
+            : value}
         </p>
       </div>
     </div>
   );
 };
 
-const PayslipModal = ({
-  record,
-  onClose,
-  onPrevious,
-  onNext,
-  companyInfo
-}) => {
+const PayslipModal = ({ record, onClose, onPrevious, onNext, companyInfo }) => {
   const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
+    const printWindow = window.open("", "_blank");
     if (printWindow) {
       printWindow.document.write(`
         <html>
@@ -1567,7 +1763,7 @@ const PayslipModal = ({
             <style>
               * { margin: 0; padding: 0; box-sizing: border-box; }
               body { 
-                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+                font-family: 'Avenir Next', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
                 line-height: 1.6; 
                 color: #1f2937; 
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -1832,7 +2028,7 @@ const PayslipModal = ({
             </style>
           </head>
           <body>
-            ${document.getElementById('payslip-content')?.innerHTML}
+            ${document.getElementById("payslip-content")?.innerHTML}
           </body>
         </html>
       `);
@@ -1846,13 +2042,13 @@ const PayslipModal = ({
   };
 
   const handleDownloadPDF = () => {
-    const element = document.getElementById('payslip-content');
+    const element = document.getElementById("payslip-content");
     const opt = {
       margin: 0.5,
       filename: `payslip_${record.employee_id}_${record.pay_period}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
+      image: { type: "jpeg", quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+      jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
     };
 
     html2pdf().from(element).set(opt).save();
@@ -1862,7 +2058,9 @@ const PayslipModal = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-lg w-full max-w-6xl max-h-[90vh] overflow-auto">
         <div className="sticky top-0 bg-white p-4 border-b border-gray-200 flex justify-between items-center z-10">
-          <h2 className="text-xl font-semibold text-gray-900">Modern Payslip</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Modern Payslip
+          </h2>
           <div className="flex gap-2">
             <GlowButtonss
               variant="secondary"
@@ -1872,34 +2070,42 @@ const PayslipModal = ({
             >
               Download PDF
             </GlowButtonss>
-            <GlowButtonss
-              variant="danger"
-              icon={X}
-              size="sm"
-              onClick={onClose}
-            >
+            <GlowButtonss variant="danger" icon={X} size="sm" onClick={onClose}>
               Close
             </GlowButtonss>
           </div>
         </div>
 
         <div className="p-2 bg-gray-50 payslip-container print:p-0 print:w-[210mm] print:h-[297mm]">
-          <div id="payslip-content" className="bg-white rounded-lg shadow-lg overflow-hidden text-xs leading-tight">
+          <div
+            id="payslip-content"
+            className="bg-white rounded-lg shadow-lg overflow-hidden text-xs leading-tight"
+          >
             <div className="bg-gray-800 text-white p-4 flex justify-between items-center">
               <div className="flex items-center">
                 {companyInfo?.image_url && (
-                  <img src={companyInfo.image_url} alt="Company Logo" className="h-12 w-12 mr-3 bg-white p-1 rounded" />
+                  <img
+                    src={companyInfo.image_url}
+                    alt="Company Logo"
+                    className="h-12 w-12 mr-3 bg-white p-1 rounded"
+                  />
                 )}
                 <div>
-                  <h1 className="text-lg font-bold">{companyInfo?.company_name || 'Your Company Name'}</h1>
-                  <div className="text-gray-300 text-xs">{companyInfo?.company_tagline || 'Excellence in Service'}</div>
+                  <h1 className="text-lg font-bold">
+                    {companyInfo?.company_name || "Your Company Name"}
+                  </h1>
+                  <div className="text-gray-300 text-xs">
+                    {companyInfo?.company_tagline || "Excellence in Service"}
+                  </div>
                 </div>
               </div>
               <div className="text-right">
                 <h2 className="text-xl font-bold">PAYSLIP</h2>
                 <div className="text-gray-300 text-xs">
-                  {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-
+                  {new Date().toLocaleDateString("en-US", {
+                    month: "long",
+                    year: "numeric",
+                  })}
                 </div>
               </div>
             </div>
@@ -1907,31 +2113,64 @@ const PayslipModal = ({
             <div className="p-4">
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div className="border p-3 rounded">
-                  <h3 className="font-semibold border-b mb-2">EMPLOYEE INFORMATION</h3>
+                  <h3 className="font-semibold border-b mb-2">
+                    EMPLOYEE INFORMATION
+                  </h3>
                   <div className="space-y-1">
-                    <div className="flex justify-between"><span>Full Name:</span><span>{record.employee_name}</span></div>
-                    <div className="flex justify-between"><span>Employee No:</span><span>{record.employee_id}</span></div>
-                    <div className="flex justify-between"><span>Position:</span><span>{record.department}</span></div>
-                    <div className="flex justify-between"><span>Dept:</span><span>Operations</span></div>
-                    <div className="flex justify-between"><span>Region:</span><span>{record.branch}</span></div>
+                    <div className="flex justify-between">
+                      <span>Full Name:</span>
+                      <span>{record.employee_name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Employee No:</span>
+                      <span>{record.employee_id}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Position:</span>
+                      <span>{record.department}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Dept:</span>
+                      <span>Operations</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Region:</span>
+                      <span>{record.branch}</span>
+                    </div>
                   </div>
                 </div>
 
                 <div className="border p-3 rounded">
-                  <h3 className="font-semibold border-b mb-2">PAYMENT DETAILS</h3>
+                  <h3 className="font-semibold border-b mb-2">
+                    PAYMENT DETAILS
+                  </h3>
                   <div className="space-y-1">
-                    <div className="flex justify-between"><span>Method:</span><span>{record.payment_method}</span></div>
-                    {record.payment_method === 'Bank Transfer' && (
+                    <div className="flex justify-between">
+                      <span>Method:</span>
+                      <span>{record.payment_method}</span>
+                    </div>
+                    {record.payment_method === "Bank Transfer" && (
                       <>
-                        <div className="flex justify-between"><span>Bank:</span><span>{record.bank_name}</span></div>
-                        <div className="flex justify-between"><span>Account:</span><span>{record.account_number}</span></div>
+                        <div className="flex justify-between">
+                          <span>Bank:</span>
+                          <span>{record.bank_name}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Account:</span>
+                          <span>{record.account_number}</span>
+                        </div>
                       </>
                     )}
-                    {record.payment_method === 'M-Pesa' && (
-                      <div className="flex justify-between"><span>M-Pesa No:</span><span>{record.employeeNu}</span></div>
+                    {record.payment_method === "M-Pesa" && (
+                      <div className="flex justify-between">
+                        <span>M-Pesa No:</span>
+                        <span>{record.employeeNu}</span>
+                      </div>
                     )}
-                    <div className="flex justify-between"><span>Job Group:</span><span>{record.jobGroup}</span></div>
-
+                    <div className="flex justify-between">
+                      <span>Job Group:</span>
+                      <span>{record.jobGroup}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1940,48 +2179,146 @@ const PayslipModal = ({
                 <div className="border rounded">
                   <div className="bg-gray-200 font-semibold p-2">EARNINGS</div>
                   <div className="p-2 space-y-1">
-                    <div className="flex justify-between"><span>Basic</span><span>KSh {record.basic_salary.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>House</span><span>KSh {record.house_allowance.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Transport</span><span>KSh {record.transport_allowance.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Medical</span><span>KSh {record.medical_allowance.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Other</span><span>KSh {record.other_allowances.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Overtime</span><span>KSh {(record.overtime_hours * record.overtime_rate).toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Commission</span><span>KSh {record.commission.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Bonus</span><span>KSh {record.bonus.toLocaleString()}</span></div>
-                    <div className="flex justify-between bg-yellow-50 p-1"><span>Per Diem</span><span>KSh {record.per_diem?.toLocaleString() || '0'}</span></div>
+                    <div className="flex justify-between">
+                      <span>Basic</span>
+                      <span>KSh {record.basic_salary.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>House</span>
+                      <span>KSh {record.house_allowance.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Transport</span>
+                      <span>
+                        KSh {record.transport_allowance.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Medical</span>
+                      <span>
+                        KSh {record.medical_allowance.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Other</span>
+                      <span>
+                        KSh {record.other_allowances.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Overtime</span>
+                      <span>
+                        KSh{" "}
+                        {(
+                          record.overtime_hours * record.overtime_rate
+                        ).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Commission</span>
+                      <span>KSh {record.commission.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Bonus</span>
+                      <span>KSh {record.bonus.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between bg-yellow-50 p-1">
+                      <span>Per Diem</span>
+                      <span>
+                        KSh {record.per_diem?.toLocaleString() || "0"}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 <div className="border rounded">
-                  <div className="bg-gray-200 font-semibold p-2">DEDUCTIONS</div>
+                  <div className="bg-gray-200 font-semibold p-2">
+                    DEDUCTIONS
+                  </div>
                   <div className="p-2 space-y-1">
-                    <div className="flex justify-between"><span>PAYE</span><span>KSh {Math.round(record.paye_tax).toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>SHA</span><span>KSh {record.nhif_deduction.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>NSSF</span><span>KSh {record.nssf_deduction.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>AHL</span><span>KSh {record.housing_levy.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Loan</span><span>KSh {record.loan_deduction.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Advance</span><span>KSh {record.advance_deduction.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Welfare</span><span>KSh {record.welfare_deduction.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Other</span><span>KSh {record.other_deductions.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Tax Relief:</span><span>KSh -2400</span></div>
+                    <div className="flex justify-between">
+                      <span>PAYE</span>
+                      <span>
+                        KSh {Math.round(record.paye_tax).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>SHA</span>
+                      <span>KSh {record.nhif_deduction.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>NSSF</span>
+                      <span>KSh {record.nssf_deduction.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>AHL</span>
+                      <span>KSh {record.housing_levy.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Loan</span>
+                      <span>KSh {record.loan_deduction.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Advance</span>
+                      <span>
+                        KSh {record.advance_deduction.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Welfare</span>
+                      <span>
+                        KSh {record.welfare_deduction.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Other</span>
+                      <span>
+                        KSh {record.other_deductions.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Tax Relief:</span>
+                      <span>KSh -2400</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div className="border p-3 rounded mb-4">
-                <div className="flex justify-between border-b pb-1"><span>Gross Pay</span><span>KSh {record.gross_pay.toLocaleString()}</span></div>
-                <div className="flex justify-between border-b pb-1"><span>Total Deductions</span><span className="text-red-600">KSh {record.total_deductions.toLocaleString()}</span></div>
+                <div className="flex justify-between border-b pb-1">
+                  <span>Gross Pay</span>
+                  <span>KSh {record.gross_pay.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between border-b pb-1">
+                  <span>Total Deductions</span>
+                  <span className="text-red-600">
+                    KSh {record.total_deductions.toLocaleString()}
+                  </span>
+                </div>
 
-                <div className="flex justify-between font-bold text-green-700"><span>NET PAY</span><span>KSh {Math.round(record.net_pay).toLocaleString()}</span></div>
+                <div className="flex justify-between font-bold text-green-700">
+                  <span>NET PAY</span>
+                  <span>KSh {Math.round(record.net_pay).toLocaleString()}</span>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-4 text-center text-xs">
-                <div className="border border-dashed p-2">Employee Signature<br />Date: __________</div>
-                <div className="border border-dashed p-2">Authorized Signatory<br />Date: __________</div>
+                <div className="border border-dashed p-2">
+                  Employee Signature
+                  <br />
+                  Date: __________
+                </div>
+                <div className="border border-dashed p-2">
+                  Authorized Signatory
+                  <br />
+                  Date: __________
+                </div>
               </div>
 
               <div className="text-center text-gray-500 text-xs">
-                Generated on {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()} • {companyInfo?.company_name || 'Company'} • Confidential
+                Generated on {new Date().toLocaleDateString()}{" "}
+                {new Date().toLocaleTimeString()} •{" "}
+                {companyInfo?.company_name || "Company"} • Confidential
               </div>
             </div>
           </div>
@@ -1995,7 +2332,11 @@ const PayslipModal = ({
               </GlowButtonss>
             )}
             {onNext && (
-              <GlowButtonss icon={ArrowRight} onClick={onNext} className="ml-auto">
+              <GlowButtonss
+                icon={ArrowRight}
+                onClick={onNext}
+                className="ml-auto"
+              >
                 Next
               </GlowButtonss>
             )}
@@ -2007,7 +2348,14 @@ const PayslipModal = ({
 };
 
 // Pagination Component
-const Pagination = ({ currentPage, totalPages, onPageChange, totalItems, itemsPerPage, currentItemsCount }) => {
+const Pagination = ({
+  currentPage,
+  totalPages,
+  onPageChange,
+  totalItems,
+  itemsPerPage,
+  currentItemsCount,
+}) => {
   const pages = [];
   const maxVisiblePages = 5;
 
@@ -2046,13 +2394,16 @@ const Pagination = ({ currentPage, totalPages, onPageChange, totalItems, itemsPe
       <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
         <div>
           <p className="text-xs text-gray-700">
-            Showing <span className="font-medium">{startItem}</span> to{' '}
-            <span className="font-medium">{endItem}</span> of{' '}
+            Showing <span className="font-medium">{startItem}</span> to{" "}
+            <span className="font-medium">{endItem}</span> of{" "}
             <span className="font-medium">{totalItems}</span> results
           </p>
         </div>
         <div>
-          <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+          <nav
+            className="isolate inline-flex -space-x-px rounded-md shadow-sm"
+            aria-label="Pagination"
+          >
             <button
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage === 1}
@@ -2067,8 +2418,8 @@ const Pagination = ({ currentPage, totalPages, onPageChange, totalItems, itemsPe
                 key={page}
                 onClick={() => onPageChange(page)}
                 className={`relative inline-flex items-center px-4 py-2 text-xs font-semibold ${currentPage === page
-                  ? 'z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
-                  : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0'
+                  ? "z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
+                  : "text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0"
                   }`}
               >
                 {page}
@@ -2091,65 +2442,89 @@ const Pagination = ({ currentPage, totalPages, onPageChange, totalItems, itemsPe
 };
 
 // P10 Form Generator Component
-const P10FormGenerator = ({ isOpen, onClose, calculatePAYE, calculateNSSF, calculateNHIF, calculateHousingLevy }) => {
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+const P10FormGenerator = ({
+  isOpen,
+  onClose,
+  calculatePAYE,
+  calculateNSSF,
+  calculateNHIF,
+  calculateHousingLevy,
+}) => {
+  const [selectedYear, setSelectedYear] = useState(
+    new Date().getFullYear().toString(),
+  );
   const [isLoading, setIsLoading] = useState(false);
 
   const generateP10Form = async () => {
     setIsLoading(true);
     try {
       const { data: employees, error } = await supabase
-        .from('employees')
-        .select('*');
+        .from("employees")
+        .select("*");
 
       if (error) {
-        console.error('Supabase error:', error);
-        toast.error('Error fetching employee data: ' + error.message);
+        console.error("Supabase error:", error);
+        toast.error("Error fetching employee data: " + error.message);
         return;
       }
 
       if (!employees || employees.length === 0) {
-        toast.error('No employee data found in the system');
+        toast.error("No employee data found in the system");
         return;
       }
 
-      console.log('Fetched employees:', employees.length);
+      console.log("Fetched employees:", employees.length);
 
-      const p10Data = employees.map(employee => {
-        const taxPin = employee['Tax PIN'] || employee.tax_pin || 'PENDING';
-        const employeeName = `${employee['First Name'] || ''} ${employee['Middle Name'] || ''} ${employee['Last Name'] || ''}`.trim() || employee.employee_name || 'N/A';
-        const basicSalary = parseFloat(employee['Basic Salary'] || employee.basic_salary || 0);
+      const p10Data = employees.map((employee) => {
+        const taxPin = employee["Tax PIN"] || employee.tax_pin || "PENDING";
+        const employeeName =
+          `${employee["First Name"] || ""} ${employee["Middle Name"] || ""} ${employee["Last Name"] || ""}`.trim() ||
+          employee.employee_name ||
+          "N/A";
+        const basicSalary = parseFloat(
+          employee["Basic Salary"] || employee.basic_salary || 0,
+        );
 
         const houseAllowance = parseFloat(employee.house_allowance || 0);
         const transportAllowance = parseFloat(employee.travel_allowance || 0);
         const medicalAllowance = parseFloat(employee.medical_allowance || 0);
         const otherAllowances = parseFloat(employee.other_allowances || 0);
 
-        const totalGrossPay = basicSalary + houseAllowance + transportAllowance + medicalAllowance + otherAllowances;
+        const totalGrossPay =
+          basicSalary +
+          houseAllowance +
+          transportAllowance +
+          medicalAllowance +
+          otherAllowances;
 
-        const nhifNumber = employee['NHIF Number'] || employee['SHIF Number'] || '';
-        const nssfNumber = employee['NSSF Number'] || '';
+        const nhifNumber =
+          employee["NHIF Number"] || employee["SHIF Number"] || "";
+        const nssfNumber = employee["NSSF Number"] || "";
 
         const nhifDeduction = nhifNumber ? calculateNHIF(totalGrossPay) : 0;
         const nssfDeduction = nssfNumber ? calculateNSSF(totalGrossPay) : 0;
-        const housingLevy = taxPin !== 'PENDING' ? calculateHousingLevy(totalGrossPay, true) : 0;
+        const housingLevy =
+          taxPin !== "PENDING" ? calculateHousingLevy(totalGrossPay, true) : 0;
 
         const taxablePay = totalGrossPay - nssfDeduction - housingLevy;
 
         const payeAmount = calculatePAYE(taxablePay);
 
         return [
-          'A00000000001',
+          "A00000000001",
           employeeName,
-          'Resident',
-          'Primary Employee',
-          'No',
-          '',
+          "Resident",
+          "Primary Employee",
+          "No",
+          "",
           basicSalary,
           0,
           0,
-          houseAllowance + transportAllowance + medicalAllowance + otherAllowances,
-          'Benefit not given',
+          houseAllowance +
+          transportAllowance +
+          medicalAllowance +
+          otherAllowances,
+          "Benefit not given",
           houseAllowance,
           transportAllowance + medicalAllowance + otherAllowances,
           totalGrossPay,
@@ -2162,44 +2537,44 @@ const P10FormGenerator = ({ isOpen, onClose, calculatePAYE, calculateNSSF, calcu
           taxablePay,
           2400,
           0,
-          '',
-          payeAmount
+          "",
+          payeAmount,
         ];
       });
 
-      console.log('P10 data prepared for', p10Data.length, 'employees');
+      console.log("P10 data prepared for", p10Data.length, "employees");
 
       const headers = [
-        'Employer Pin',
-        'Employee Name',
-        'Resident Status',
-        'Service Status',
-        'Disability Status',
-        'Exemption Certificate Number',
-        'Total Emoluments - Cash Pay',
-        'Value of Car Benefit',
-        'Value of Meals',
-        'Non Cash Benefits',
-        'Type of Housing',
-        'Housing Benefit',
-        'Other Benefits',
-        'Total Gross Pay',
-        'SHIF',
-        'NSSF Contribution',
-        'Other Pension Contribution',
-        'Post Retirement Medical Fund',
-        'Mortgage Interest',
-        'Affordable Housing Levy',
-        'Taxable Pay',
-        'Monthly Personal Relief',
-        'Amount of Insurance Relief',
-        'PAYE Tax',
-        'Self Assessed PAYE Tax'
+        "Employer Pin",
+        "Employee Name",
+        "Resident Status",
+        "Service Status",
+        "Disability Status",
+        "Exemption Certificate Number",
+        "Total Emoluments - Cash Pay",
+        "Value of Car Benefit",
+        "Value of Meals",
+        "Non Cash Benefits",
+        "Type of Housing",
+        "Housing Benefit",
+        "Other Benefits",
+        "Total Gross Pay",
+        "SHIF",
+        "NSSF Contribution",
+        "Other Pension Contribution",
+        "Post Retirement Medical Fund",
+        "Mortgage Interest",
+        "Affordable Housing Levy",
+        "Taxable Pay",
+        "Monthly Personal Relief",
+        "Amount of Insurance Relief",
+        "PAYE Tax",
+        "Self Assessed PAYE Tax",
       ];
 
       const ws = XLSX.utils.aoa_to_sheet([headers, ...p10Data]);
 
-      const range = XLSX.utils.decode_range(ws['!ref']);
+      const range = XLSX.utils.decode_range(ws["!ref"]);
       for (let R = 0; R <= range.e.r; ++R) {
         for (let C = 0; C <= range.e.c; ++C) {
           const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
@@ -2208,20 +2583,20 @@ const P10FormGenerator = ({ isOpen, onClose, calculatePAYE, calculateNSSF, calcu
           if (R === 0) {
             ws[cellAddress].s = {
               font: { bold: true },
-              fill: { fgColor: { rgb: "CCCCCC" } }
+              fill: { fgColor: { rgb: "CCCCCC" } },
             };
           }
 
           if (R > 0 && C >= 6 && C !== 10) {
-            if (typeof ws[cellAddress].v === 'number') {
-              ws[cellAddress].t = 'n';
-              ws[cellAddress].z = '#,##0.00';
+            if (typeof ws[cellAddress].v === "number") {
+              ws[cellAddress].t = "n";
+              ws[cellAddress].z = "#,##0.00";
             }
           }
         }
       }
 
-      ws['!cols'] = [
+      ws["!cols"] = [
         { wch: 12 },
         { wch: 25 },
         { wch: 10 },
@@ -2246,24 +2621,26 @@ const P10FormGenerator = ({ isOpen, onClose, calculatePAYE, calculateNSSF, calcu
         { wch: 15 },
         { wch: 15 },
         { wch: 12 },
-        { wch: 15 }
+        { wch: 15 },
       ];
 
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'P10 EMPLOYER RETURN');
+      XLSX.utils.book_append_sheet(wb, ws, "P10 EMPLOYER RETURN");
 
-      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       const data = new Blob([excelBuffer], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
 
       saveAs(data, `P10_Employer_Return_${selectedYear}.xlsx`);
 
-      toast.success(`P10 Form generated successfully for ${p10Data.length} employees!`);
+      toast.success(
+        `P10 Form generated successfully for ${p10Data.length} employees!`,
+      );
       onClose();
     } catch (error) {
-      console.error('Error generating P10 form:', error);
-      toast.error('Failed to generate P10 form: ' + error.message);
+      console.error("Error generating P10 form:", error);
+      toast.error("Failed to generate P10 form: " + error.message);
     } finally {
       setIsLoading(false);
     }
@@ -2276,7 +2653,7 @@ const P10FormGenerator = ({ isOpen, onClose, calculatePAYE, calculateNSSF, calcu
       <div className="bg-white rounded-lg max-w-md w-full p-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
-            <img src='kra.png' className='w-5'></img>
+            <img src="kra.png" className="w-5"></img>
             Generate P10 Form (Employer Return)
           </h3>
           <button
@@ -2297,7 +2674,8 @@ const P10FormGenerator = ({ isOpen, onClose, calculatePAYE, calculateNSSF, calcu
               </span>
             </div>
             <p className="text-xs text-blue-700">
-              This will generate the P10 form with all employee tax information for KRA submission.
+              This will generate the P10 form with all employee tax information
+              for KRA submission.
             </p>
           </div>
         </div>
@@ -2340,27 +2718,20 @@ const StatutoryOverrideToggle = ({ isEnabled, onToggle }) => {
       <div className="flex items-center gap-2">
         <button
           onClick={onToggle}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isEnabled ? 'bg-green-500' : 'bg-gray-300'
-            }`}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isEnabled ? "bg-green-500" : "bg-gray-300"}`}
         >
           <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isEnabled ? 'translate-x-6' : 'translate-x-1'
-              }`}
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isEnabled ? "translate-x-6" : "translate-x-1"}`}
           />
         </button>
-        {isEnabled ? (
-          <ToggleRight className="w-5 h-5 text-green-600" />
-        ) : (
-          <ToggleLeft className="w-5 h-5 text-gray-500" />
-        )}
-        <span className={`text-sm font-medium ${isEnabled ? 'text-green-700' : 'text-gray-700'}`}> Statutory Override
+        <span className={`text-sm font-medium ${isEnabled ? "text-green-700" : "text-gray-700"}`}>
+          Statutory Override
         </span>
       </div>
       <div className="text-xs text-yellow-700">
         {isEnabled
-          ? 'All statutory deductions will be applied regardless of PIN status'
-          : 'Statutory deductions require valid PIN numbers'
-        }
+          ? "All statutory deductions will be applied regardless of PIN status"
+          : "Statutory deductions require valid PIN numbers"}
       </div>
     </div>
   );
@@ -2368,19 +2739,21 @@ const StatutoryOverrideToggle = ({ isEnabled, onToggle }) => {
 
 export default function PayrollDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState(null);
-  const [selectedDepartment, setSelectedDepartment] = useState('all');
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('all');
+  const [selectedDepartment, setSelectedDepartment] = useState("all");
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("all");
   const [showQuickActions, setShowQuickActions] = useState(false);
-  const [selectedBranch, setSelectedBranch] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBranch, setSelectedBranch] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
   const [isSendingPayslips, setIsSendingPayslips] = useState(false);
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [currentRecordIndex, setCurrentRecordIndex] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [departments, setDepartments] = useState(['all']);
-  const [branches, setBranches] = useState([{ value: 'all', label: 'All Branches' }]);
+  const [departments, setDepartments] = useState(["all"]);
+  const [branches, setBranches] = useState([
+    { value: "all", label: "All Branches" },
+  ]);
   const [payrollRecords, setPayrollRecords] = useState([]);
   const [filteredRecords, setFilteredRecords] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -2389,7 +2762,8 @@ export default function PayrollDashboard() {
 
   const [showSingleMpesaModal, setShowSingleMpesaModal] = useState(false);
   const [showBulkMpesaModal, setShowBulkMpesaModal] = useState(false);
-  const [selectedEmployeeForMpesa, setSelectedEmployeeForMpesa] = useState(null);
+  const [selectedEmployeeForMpesa, setSelectedEmployeeForMpesa] =
+    useState(null);
 
   const [showP9Modal, setShowP9Modal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -2397,11 +2771,15 @@ export default function PayrollDashboard() {
   const [showStatutorySettings, setShowStatutorySettings] = useState(false);
 
   const [paymentRequests, setPaymentRequests] = useState([]);
-  const [userRole, setUserRole] = useState('maker');
-  const isAdmin = userRole && (userRole.toLowerCase() === 'admin' || userRole.toLowerCase() === 'credit_analyst_officer');
+  const [userRole, setUserRole] = useState("maker");
+  const isAdmin =
+    userRole &&
+    (userRole.toLowerCase() === "admin" ||
+      userRole.toLowerCase() === "credit_analyst_officer");
   const [currentUser, setCurrentUser] = useState(null);
   const [showApprovalQueue, setShowApprovalQueue] = useState(false);
-  const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState(null);
+  const [selectedPaymentForDetails, setSelectedPaymentForDetails] =
+    useState(null);
   const [showPaymentDetails, setShowPaymentDetails] = useState(false);
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [paymentToReject, setPaymentToReject] = useState(null);
@@ -2411,9 +2789,9 @@ export default function PayrollDashboard() {
   const [selectedPayments, setSelectedPayments] = useState(new Set());
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [commentModalConfig, setCommentModalConfig] = useState({
-    title: '',
-    submitText: '',
-    onSubmit: null
+    title: "",
+    submitText: "",
+    onSubmit: null,
   });
   const [showClearQueueModal, setShowClearQueueModal] = useState(false);
 
@@ -2423,7 +2801,7 @@ export default function PayrollDashboard() {
   const [smsSendingStatus, setSmsSendingStatus] = useState({});
   // Add this with your other state declarations
   const [salaryAdvances, setSalaryAdvances] = useState([]);
-  const [currentView, setCurrentView] = useState('dashboard');
+  const [currentView, setCurrentView] = useState("dashboard");
 
   // Statutory override state
   const [overrideStatutoryChecks, setOverrideStatutoryChecks] = useState(true);
@@ -2437,33 +2815,34 @@ export default function PayrollDashboard() {
     calculateNSSF,
     calculateNHIF,
     calculateHousingLevy,
-    reloadSettings
+    reloadSettings,
   } = useStatutorySettings();
 
   // Add this useEffect - fetches salary advances once when component loads
   useEffect(() => {
     const fetchAllSalaryAdvances = async () => {
       try {
-        console.log('Fetching ALL salary advances...');
+        console.log("Fetching ALL salary advances...");
 
         const { data, error } = await supabase
-          .from('salary_advance')
-          .select('"Employee Number", "Amount Requested", payment_processed, status, time_added')
-          .eq('payment_processed', 'true')
-          .eq('status', 'paid')
-          .order('time_added', { ascending: false });
+          .from("salary_advance")
+          .select(
+            '"Employee Number", "Amount Requested", payment_processed, status, time_added',
+          )
+          .eq("payment_processed", "true")
+          .eq("status", "paid")
+          .order("time_added", { ascending: false });
 
         if (error) {
-          console.warn('Salary advances fetch error:', error.message);
+          console.warn("Salary advances fetch error:", error.message);
           setSalaryAdvances([]);
           return;
         }
 
         console.log(`Loaded ${data?.length || 0} salary advances for payroll`);
         setSalaryAdvances(data || []);
-
       } catch (error) {
-        console.warn('Failed to load salary advances:', error.message);
+        console.warn("Failed to load salary advances:", error.message);
         setSalaryAdvances([]);
       }
     };
@@ -2480,7 +2859,7 @@ export default function PayrollDashboard() {
     }
 
     // Find ALL advances for this employee matching the period
-    const employeeAdvances = salaryAdvances.filter(adv => {
+    const employeeAdvances = salaryAdvances.filter((adv) => {
       const advanceEmpNumber = adv["Employee Number"];
       const advanceDate = adv.time_added; // Assuming ISO string like 2024-01-26T...
 
@@ -2493,20 +2872,20 @@ export default function PayrollDashboard() {
         if (!advanceDate) return false; // Strict: must have a date to match period
 
         // Handle various date formats safely
-        let advancePeriod = '';
+        let advancePeriod = "";
         try {
           // Try substring first for ISO strings
-          if (typeof advanceDate === 'string' && advanceDate.length >= 7) {
+          if (typeof advanceDate === "string" && advanceDate.length >= 7) {
             advancePeriod = advanceDate.substring(0, 7);
           } else {
             // Fallback for Date objects or other formats
             const d = new Date(advanceDate);
             if (!isNaN(d.getTime())) {
-              advancePeriod = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+              advancePeriod = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
             }
           }
         } catch (e) {
-          console.warn('Error parsing advance date:', advanceDate);
+          console.warn("Error parsing advance date:", advanceDate);
           return false;
         }
 
@@ -2532,20 +2911,23 @@ export default function PayrollDashboard() {
   const sendPayslipNotification = async (employee) => {
     if (!employee.employeeNu) {
       console.warn(`No phone number for employee ${employee.employee_name}`);
-      return { success: false, error: 'No phone number available' };
+      return { success: false, error: "No phone number available" };
     }
 
     const message = smsTemplates.payslipNotification(
       employee.employee_name,
       employee.net_pay,
-      employee.pay_period
+      employee.pay_period,
     );
 
     try {
       const result = await sendSMSWithRetry(employee.employeeNu, message);
       return result;
     } catch (error) {
-      console.error(`Failed to send payslip SMS to ${employee.employee_name}:`, error);
+      console.error(
+        `Failed to send payslip SMS to ${employee.employee_name}:`,
+        error,
+      );
       return { success: false, error: error.message };
     }
   };
@@ -2553,19 +2935,22 @@ export default function PayrollDashboard() {
   const sendPaymentConfirmation = async (employee) => {
     if (!employee.employeeNu) {
       console.warn(`No phone number for employee ${employee.employee_name}`);
-      return { success: false, error: 'No phone number available' };
+      return { success: false, error: "No phone number available" };
     }
 
     const message = smsTemplates.paymentConfirmation(
       employee.employee_name,
-      employee.net_pay
+      employee.net_pay,
     );
 
     try {
       const result = await sendSMSWithRetry(employee.employeeNu, message);
       return result;
     } catch (error) {
-      console.error(`Failed to send payment confirmation to ${employee.employee_name}:`, error);
+      console.error(
+        `Failed to send payment confirmation to ${employee.employee_name}:`,
+        error,
+      );
       return { success: false, error: error.message };
     }
   };
@@ -2573,10 +2958,12 @@ export default function PayrollDashboard() {
   const sendBulkPayslipNotifications = async () => {
     setIsSendingPayslips(true);
     const results = [];
-    const employeesWithPhones = finalFilteredRecords.filter(emp => emp.employeeNu);
+    const employeesWithPhones = finalFilteredRecords.filter(
+      (emp) => emp.employeeNu,
+    );
 
     if (employeesWithPhones.length === 0) {
-      toast.error('No employees with phone numbers found');
+      toast.error("No employees with phone numbers found");
       setIsSendingPayslips(false);
       return [];
     }
@@ -2585,42 +2972,53 @@ export default function PayrollDashboard() {
 
     for (const [index, employee] of employeesWithPhones.entries()) {
       if (employee.employeeNu) {
-        setSmsSendingStatus(prev => ({ ...prev, [employee.employee_id]: 'sending' }));
+        setSmsSendingStatus((prev) => ({
+          ...prev,
+          [employee.employee_id]: "sending",
+        }));
 
         const result = await sendPayslipNotification(employee);
         results.push({
           employee: employee.employee_id,
           employeeName: employee.employee_name,
           success: result.success,
-          error: result.error
+          error: result.error,
         });
 
-        setSmsSendingStatus(prev => ({
+        setSmsSendingStatus((prev) => ({
           ...prev,
-          [employee.employee_id]: result.success ? 'success' : 'failed'
+          [employee.employee_id]: result.success ? "success" : "failed",
         }));
 
         if (index < employeesWithPhones.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         }
       }
     }
 
-    const successCount = results.filter(r => r.success).length;
+    const successCount = results.filter((r) => r.success).length;
     const totalCount = results.length;
 
     if (successCount === totalCount) {
-      toast.success(`All ${totalCount} payslip notifications sent successfully!`);
+      toast.success(
+        `All ${totalCount} payslip notifications sent successfully!`,
+      );
     } else if (successCount > 0) {
-      toast.success(`${successCount} of ${totalCount} payslip notifications sent successfully`);
+      toast.success(
+        `${successCount} of ${totalCount} payslip notifications sent successfully`,
+      );
 
-      const failed = results.filter(r => !r.success);
+      const failed = results.filter((r) => !r.success);
       if (failed.length > 0) {
-        console.log('Failed SMS deliveries:', failed);
-        toast.error(`${failed.length} messages failed. Check console for details.`);
+        console.log("Failed SMS deliveries:", failed);
+        toast.error(
+          `${failed.length} messages failed. Check console for details.`,
+        );
       }
     } else {
-      toast.error('All SMS notifications failed. Please check your SMS configuration.');
+      toast.error(
+        "All SMS notifications failed. Please check your SMS configuration.",
+      );
     }
 
     setIsSendingPayslips(false);
@@ -2638,34 +3036,38 @@ export default function PayrollDashboard() {
       setIsLoadingRequests(true);
 
       // Filter only pending payments that can be cleared
-      const pendingPayments = paymentRequests.filter(p => p.status === 'pending');
+      const pendingPayments = paymentRequests.filter(
+        (p) => p.status === "pending",
+      );
 
       if (pendingPayments.length === 0) {
-        toast.info('No pending payments to clear');
+        toast.info("No pending payments to clear");
         return;
       }
 
       // Delete pending payments from the database
-      const paymentIds = pendingPayments.map(p => p.id);
+      const paymentIds = pendingPayments.map((p) => p.id);
 
       const { error } = await supabase
-        .from('payment_flows')
+        .from("payment_flows")
         .delete()
-        .in('id', paymentIds);
+        .in("id", paymentIds);
 
       if (error) {
         throw error;
       }
 
       // Update local state
-      setPaymentRequests(prev => prev.filter(p => p.status !== 'pending'));
+      setPaymentRequests((prev) => prev.filter((p) => p.status !== "pending"));
       setSelectedPayments(new Set());
 
-      toast.success(`Successfully cleared ${pendingPayments.length} pending payments from the queue`);
+      toast.success(
+        `Successfully cleared ${pendingPayments.length} pending payments from the queue`,
+      );
       setShowClearQueueModal(false);
     } catch (error) {
-      console.error('Error clearing payment queue:', error);
-      toast.error('Failed to clear payment queue');
+      console.error("Error clearing payment queue:", error);
+      toast.error("Failed to clear payment queue");
     } finally {
       setIsLoadingRequests(false);
     }
@@ -2674,7 +3076,7 @@ export default function PayrollDashboard() {
   // NEW: Bulk approve payments function
   const bulkApprovePayments = async (comment) => {
     if (selectedPayments.size === 0) {
-      toast.error('No payments selected for approval');
+      toast.error("No payments selected for approval");
       return;
     }
 
@@ -2683,8 +3085,8 @@ export default function PayrollDashboard() {
     const selectedPaymentIds = Array.from(selectedPayments);
 
     for (const paymentId of selectedPaymentIds) {
-      const payment = paymentRequests.find(p => p.id === paymentId);
-      if (payment && payment.status === 'pending') {
+      const payment = paymentRequests.find((p) => p.id === paymentId);
+      if (payment && payment.status === "pending") {
         try {
           // Approve with comment
           await approvePayment(payment, comment);
@@ -2695,21 +3097,25 @@ export default function PayrollDashboard() {
       }
     }
 
-    const successCount = results.filter(r => r.success).length;
+    const successCount = results.filter((r) => r.success).length;
     const totalCount = results.length;
 
     if (successCount === totalCount) {
       toast.success(`All ${totalCount} payments approved successfully!`);
     } else if (successCount > 0) {
-      toast.success(`${successCount} of ${totalCount} payments approved successfully`);
+      toast.success(
+        `${successCount} of ${totalCount} payments approved successfully`,
+      );
 
-      const failed = results.filter(r => !r.success);
+      const failed = results.filter((r) => !r.success);
       if (failed.length > 0) {
-        console.log('Failed approvals:', failed);
-        toast.error(`${failed.length} approvals failed. Check console for details.`);
+        console.log("Failed approvals:", failed);
+        toast.error(
+          `${failed.length} approvals failed. Check console for details.`,
+        );
       }
     } else {
-      toast.error('All approvals failed');
+      toast.error("All approvals failed");
     }
 
     setSelectedPayments(new Set());
@@ -2724,8 +3130,8 @@ export default function PayrollDashboard() {
     } else {
       // Select all pending payments
       const allPendingIds = paymentRequests
-        .filter(p => p.status === 'pending')
-        .map(p => p.id);
+        .filter((p) => p.status === "pending")
+        .map((p) => p.id);
       setSelectedPayments(new Set(allPendingIds));
     }
   };
@@ -2743,15 +3149,15 @@ export default function PayrollDashboard() {
 
   const getCurrentPeriod = () => {
     const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   };
 
   const getPeriodString = (period) => {
-    if (!period || period === 'current') {
+    if (!period || period === "current") {
       return getCurrentPeriod();
     }
     if (period instanceof Date) {
-      return `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, '0')}`;
+      return `${period.getFullYear()}-${String(period.getMonth() + 1).padStart(2, "0")}`;
     }
     return period;
   };
@@ -2761,30 +3167,33 @@ export default function PayrollDashboard() {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
 
         if (userError || !user) {
-          console.warn('User not authenticated');
+          console.warn("User not authenticated");
           return;
         }
 
         setCurrentUser(user);
 
         const { data: profile, error: profileError } = await supabase
-          .from('user_profiles')
-          .select('role')
-          .eq('user_id', user.id)
+          .from("user_profiles")
+          .select("role")
+          .eq("user_id", user.id)
           .single();
 
         if (profileError) {
-          console.warn('No user profile found, defaulting to maker role');
-          setUserRole('maker');
+          console.warn("No user profile found, defaulting to maker role");
+          setUserRole("maker");
         } else {
-          setUserRole(profile.role || 'maker');
+          setUserRole(profile.role || "maker");
         }
       } catch (error) {
-        console.error('Error fetching user profile:', error);
-        setUserRole('maker');
+        console.error("Error fetching user profile:", error);
+        setUserRole("maker");
       }
     };
 
@@ -2795,20 +3204,20 @@ export default function PayrollDashboard() {
     try {
       setIsLoadingRequests(true);
       const { data, error } = await supabase
-        .from('payment_flows')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .from("payment_flows")
+        .select("*")
+        .order("created_at", { ascending: false });
 
       if (error) {
-        console.error('Error fetching payment requests:', error);
-        toast.error('Failed to load payment requests');
+        console.error("Error fetching payment requests:", error);
+        toast.error("Failed to load payment requests");
         return;
       }
 
       setPaymentRequests(data || []);
     } catch (error) {
-      console.error('Error fetching payment requests:', error);
-      toast.error('Failed to load payment requests');
+      console.error("Error fetching payment requests:", error);
+      toast.error("Failed to load payment requests");
     } finally {
       setIsLoadingRequests(false);
     }
@@ -2824,18 +3233,18 @@ export default function PayrollDashboard() {
     if (!currentUser) return;
 
     const subscription = supabase
-      .channel('payment_flows_channel')
+      .channel("payment_flows_channel")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'payment_flows'
+          event: "*",
+          schema: "public",
+          table: "payment_flows",
         },
         (payload) => {
-          console.log('Payment request change:', payload);
+          console.log("Payment request change:", payload);
           fetchPaymentRequests();
-        }
+        },
       )
       .subscribe();
 
@@ -2848,14 +3257,14 @@ export default function PayrollDashboard() {
     const fetchCompanyInfo = async () => {
       try {
         const { data, error } = await supabase
-          .from('company_logo')
-          .select('*')
-          .order('created_at', { ascending: false })
+          .from("company_logo")
+          .select("*")
+          .order("created_at", { ascending: false })
           .limit(1)
           .single();
 
-        if (error && error.code !== 'PGRST116') {
-          console.error('Error fetching company info:', error);
+        if (error && error.code !== "PGRST116") {
+          console.error("Error fetching company info:", error);
           return;
         }
 
@@ -2863,7 +3272,7 @@ export default function PayrollDashboard() {
           setCompanyInfo(data);
         }
       } catch (err) {
-        console.error('Error:', err);
+        console.error("Error:", err);
       }
     };
 
@@ -2879,19 +3288,26 @@ export default function PayrollDashboard() {
     loadSMSBalance();
   }, []);
 
-  const createPaymentRequest = async (employee, type, justification, employees = null) => {
-    const { data: { user } } = await supabase.auth.getUser();
+  const createPaymentRequest = async (
+    employee,
+    type,
+    justification,
+    employees = null,
+  ) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     const requestData = {
       type: type,
-      employee_data: type === 'single' ? employee : null,
-      employees_data: type === 'bulk' ? employees : null,
+      employee_data: type === "single" ? employee : null,
+      employees_data: type === "bulk" ? employees : null,
       justification: justification,
-      created_by: user.id
+      created_by: user.id,
     };
 
     const { data, error } = await supabase
-      .from('payment_flows')
+      .from("payment_flows")
       .insert([requestData])
       .select()
       .single();
@@ -2899,40 +3315,45 @@ export default function PayrollDashboard() {
     if (error) throw error;
 
     // Show success message
-    toast.success('Payment request submitted successfully! Please wait for approval.');
+    toast.success(
+      "Payment request submitted successfully! Please wait for approval.",
+    );
 
     return { ...data, created_by_email: user.email };
   };
 
   // UPDATED: Approve payment with comment
-  const approvePayment = async (payment, comment = '') => {
+  const approvePayment = async (payment, comment = "") => {
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
       if (userError || !user) {
-        toast.error('User not authenticated');
+        toast.error("User not authenticated");
         return;
       }
 
-      setPaymentRequests(prev =>
-        prev.map(req =>
+      setPaymentRequests((prev) =>
+        prev.map((req) =>
           req.id === payment.id
             ? {
               ...req,
-              status: 'approved',
+              status: "approved",
               approved_by: user.id,
               approved_at: new Date().toISOString(),
               approved_by_email: user.email,
-              approval_comment: comment
+              approval_comment: comment,
             }
-            : req
-        )
+            : req,
+        ),
       );
 
       const updateData = {
-        status: 'approved',
+        status: "approved",
         approved_by: user.id,
-        approved_at: new Date().toISOString()
+        approved_at: new Date().toISOString(),
       };
 
       // Add comment if provided
@@ -2941,68 +3362,72 @@ export default function PayrollDashboard() {
       }
 
       const { data, error } = await supabase
-        .from('payment_flows')
+        .from("payment_flows")
         .update(updateData)
-        .eq('id', payment.id)
-        .select('*')
+        .eq("id", payment.id)
+        .select("*")
         .single();
 
       if (error) {
-        console.error('Error approving payment request:', error);
-        toast.error('Failed to approve payment request');
+        console.error("Error approving payment request:", error);
+        toast.error("Failed to approve payment request");
         fetchPaymentRequests();
         return;
       }
 
       try {
-        if (payment.type === 'single') {
+        if (payment.type === "single") {
           await processSingleMpesaPayment(payment.employee_data);
         } else {
           await processBulkMpesaPayment(payment.employees_data);
         }
 
         await supabase
-          .from('payment_flows')
+          .from("payment_flows")
           .update({
-            status: 'completed',
-            processed_at: new Date().toISOString()
+            status: "completed",
+            processed_at: new Date().toISOString(),
           })
-          .eq('id', payment.id);
+          .eq("id", payment.id);
 
-        setPaymentRequests(prev =>
-          prev.map(req => req.id === payment.id ? { ...req, status: 'completed' } : req)
+        setPaymentRequests((prev) =>
+          prev.map((req) =>
+            req.id === payment.id ? { ...req, status: "completed" } : req,
+          ),
         );
 
-        toast.success('Payment approved and processed successfully!');
+        toast.success("Payment approved and processed successfully!");
       } catch (error) {
         await supabase
-          .from('payment_flows')
+          .from("payment_flows")
           .update({
-            status: 'failed',
+            status: "failed",
             processed_at: new Date().toISOString(),
-            metadata: { error: error.message }
+            metadata: { error: error.message },
           })
-          .eq('id', payment.id);
+          .eq("id", payment.id);
 
-        setPaymentRequests(prev =>
-          prev.map(req => req.id === payment.id ? { ...req, status: 'failed' } : req)
+        setPaymentRequests((prev) =>
+          prev.map((req) =>
+            req.id === payment.id ? { ...req, status: "failed" } : req,
+          ),
         );
 
-        console.error('Payment processing error:', error);
-        toast.error('Payment approved but failed to process');
+        console.error("Payment processing error:", error);
+        toast.error("Payment approved but failed to process");
       }
     } catch (error) {
-      console.error('Payment approval error:', error);
-      toast.error('Failed to approve payment request');
+      console.error("Payment approval error:", error);
+      toast.error("Failed to approve payment request");
     }
   };
 
   // UPDATED: Single approval with comment prompt
   const handleSingleApprove = (payment) => {
     setCommentModalConfig({
-      title: 'Approve Payment Request',
-      submitText: 'Approve',
-      onSubmit: (comment) => approvePayment(payment, comment)
+      title: "Approve Payment Request",
+      submitText: "Approve",
+      onSubmit: (comment) => approvePayment(payment, comment),
     });
     setShowCommentModal(true);
   };
@@ -3010,65 +3435,68 @@ export default function PayrollDashboard() {
   // NEW: Bulk approve handler
   const handleBulkApprove = () => {
     if (selectedPayments.size === 0) {
-      toast.error('Please select at least one payment to approve');
+      toast.error("Please select at least one payment to approve");
       return;
     }
 
     setCommentModalConfig({
       title: `Approve ${selectedPayments.size} Selected Payments`,
-      submitText: 'Approve All',
-      onSubmit: (comment) => bulkApprovePayments(comment)
+      submitText: "Approve All",
+      onSubmit: (comment) => bulkApprovePayments(comment),
     });
     setShowCommentModal(true);
   };
 
   const rejectPayment = async (payment, reason) => {
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
       if (userError || !user) {
-        toast.error('User not authenticated');
+        toast.error("User not authenticated");
         return;
       }
 
-      setPaymentRequests(prev =>
-        prev.map(req =>
+      setPaymentRequests((prev) =>
+        prev.map((req) =>
           req.id === payment.id
             ? {
               ...req,
-              status: 'rejected',
+              status: "rejected",
               rejected_by: user.id,
               rejected_at: new Date().toISOString(),
               rejection_reason: reason,
-              rejected_by_email: user.email
+              rejected_by_email: user.email,
             }
-            : req
-        )
+            : req,
+        ),
       );
 
       const { data, error } = await supabase
-        .from('payment_flows')
+        .from("payment_flows")
         .update({
-          status: 'rejected',
+          status: "rejected",
           rejected_by: user.id,
           rejected_at: new Date().toISOString(),
-          rejection_reason: reason
+          rejection_reason: reason,
         })
-        .eq('id', payment.id)
-        .select('*')
+        .eq("id", payment.id)
+        .select("*")
         .single();
 
       if (error) {
-        console.error('Error rejecting payment request:', error);
-        toast.error('Failed to reject payment request');
+        console.error("Error rejecting payment request:", error);
+        toast.error("Failed to reject payment request");
         fetchPaymentRequests();
         return;
       }
 
-      toast.success('Payment request rejected');
+      toast.success("Payment request rejected");
     } catch (error) {
-      console.error('Payment rejection error:', error);
-      toast.error('Failed to reject payment request');
+      console.error("Payment rejection error:", error);
+      toast.error("Failed to reject payment request");
     }
   };
 
@@ -3076,27 +3504,32 @@ export default function PayrollDashboard() {
     try {
       const phoneNumber = employee.employeeNu;
       if (!phoneNumber) {
-        throw new Error(`Phone number not found for employee ${employee.employee_id}`);
+        throw new Error(
+          `Phone number not found for employee ${employee.employee_id}`,
+        );
       }
 
       const formattedPhone = formatPhoneNumber(phoneNumber);
 
-      const response = await fetch('https://mpesa-22p0.onrender.com/api/mpesa/b2c', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        "https://mpesa-22p0.onrender.com/api/mpesa/b2c",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            phoneNumber: formattedPhone,
+            amount: employee.net_pay,
+            employeeNumber: employee.employee_id,
+            fullName: employee.employee_name,
+          }),
         },
-        body: JSON.stringify({
-          phoneNumber: formattedPhone,
-          amount: employee.net_pay,
-          employeeNumber: employee.employee_id,
-          fullName: employee.employee_name
-        }),
-      });
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to process payment');
+        throw new Error(errorData.message || "Failed to process payment");
       }
 
       const result = await response.json();
@@ -3108,7 +3541,7 @@ export default function PayrollDashboard() {
       toast.success(`Payment sent to ${employee.employee_name}`);
       return result;
     } catch (error) {
-      console.error('M-Pesa payment error:', error);
+      console.error("M-Pesa payment error:", error);
       toast.error(`Failed to pay ${employee.employee_name}: ${error.message}`);
       throw error;
     }
@@ -3122,21 +3555,23 @@ export default function PayrollDashboard() {
         const result = await processSingleMpesaPayment(employee);
         results.push({ success: true, employee, result });
 
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       } catch (error) {
         results.push({ success: false, employee, error });
       }
     }
 
-    const successCount = results.filter(r => r.success).length;
+    const successCount = results.filter((r) => r.success).length;
     const totalCount = selectedEmployees.length;
 
     if (successCount === totalCount) {
       toast.success(`All ${totalCount} payments processed successfully!`);
     } else if (successCount > 0) {
-      toast.success(`${successCount} of ${totalCount} payments processed successfully`);
+      toast.success(
+        `${successCount} of ${totalCount} payments processed successfully`,
+      );
     } else {
-      toast.error('All payments failed. Please check your settings.');
+      toast.error("All payments failed. Please check your settings.");
     }
 
     return results;
@@ -3152,28 +3587,37 @@ export default function PayrollDashboard() {
   };
 
   const handleConfirmSinglePayment = async (justification) => {
-    if (userRole === 'credit_analyst_officer') {
+    if (userRole === "credit_analyst_officer") {
       try {
         await processSingleMpesaPayment(selectedEmployeeForMpesa);
-        toast.success('Payment sent successfully!');
+        toast.success("Payment sent successfully!");
       } catch (error) {
-        console.error('Payment error:', error);
+        console.error("Payment error:", error);
       }
     } else {
-      await createPaymentRequest(selectedEmployeeForMpesa, 'single', justification);
+      await createPaymentRequest(
+        selectedEmployeeForMpesa,
+        "single",
+        justification,
+      );
     }
   };
 
   const handleConfirmBulkPayment = async (selectedEmployees, justification) => {
-    if (userRole === 'credit_analyst_officer') {
+    if (userRole === "credit_analyst_officer") {
       try {
         await processBulkMpesaPayment(selectedEmployees);
-        toast.success('Bulk payment processed successfully!');
+        toast.success("Bulk payment processed successfully!");
       } catch (error) {
-        console.error('Bulk payment error:', error);
+        console.error("Bulk payment error:", error);
       }
     } else {
-      await createPaymentRequest(null, 'bulk', justification, selectedEmployees);
+      await createPaymentRequest(
+        null,
+        "bulk",
+        justification,
+        selectedEmployees,
+      );
     }
   };
 
@@ -3182,12 +3626,10 @@ export default function PayrollDashboard() {
     const fetchEmployees = async () => {
       try {
         setIsLoading(true);
-        const { data, error } = await supabase
-          .from('employees')
-          .select('*');
+        const { data, error } = await supabase.from("employees").select("*");
 
         if (error) {
-          console.error('Error fetching employees:', error);
+          console.error("Error fetching employees:", error);
           return;
         }
 
@@ -3195,178 +3637,213 @@ export default function PayrollDashboard() {
           setEmployees(data);
 
           // Extract departments and branches
-          const uniqueDepartments = [...new Set(data.map(emp => emp.Department || emp['Job Level']))].filter(Boolean);
-          const uniqueBranches = [...new Set(data.map(emp => emp.branch || emp.Office))].filter(Boolean);
+          const uniqueDepartments = [
+            ...new Set(data.map((emp) => emp.Department || emp["Job Level"])),
+          ].filter(Boolean);
+          const uniqueBranches = [
+            ...new Set(data.map((emp) => emp.branch || emp.Office)),
+          ].filter(Boolean);
 
-          setDepartments(['all', ...uniqueDepartments]);
+          setDepartments(["all", ...uniqueDepartments]);
           setBranches([
-            { value: 'all', label: 'All Branches' },
-            ...uniqueBranches.map(branch => ({ value: branch, label: branch }))
+            { value: "all", label: "All Branches" },
+            ...uniqueBranches.map((branch) => ({
+              value: branch,
+              label: branch,
+            })),
           ]);
 
           // Process each employee with salary advance deduction
-          const payrollData = await Promise.all(data.map(async (employee) => {
-            const basicSalary = employee['Basic Salary'] || 0;
-            const employeeId = employee['Employee Number'] || '';
-            const jobGroup = employee['Job Group'] || '';
-            const employeeNat = employee['ID Number'] || '';
-            const employeeNu = employee['Mobile Number'] || '';
-            const firstName = employee['First Name'] || '';
-            const middleName = employee['Middle Name'] || '';
-            const branch = employee.Office || employee.branch || '';
-            const lastName = employee['Last Name'] || '';
-            const department = employee.Department || employee['Job Level'] || '';
-            const position = employee['Job Title'] || '';
+          const payrollData = await Promise.all(
+            data.map(async (employee) => {
+              const basicSalary = employee["Basic Salary"] || 0;
+              const employeeId = employee["Employee Number"] || "";
+              const jobGroup = employee["Job Group"] || "";
+              const employeeNat = employee["ID Number"] || "";
+              const employeeNu = employee["Mobile Number"] || "";
+              const firstName = employee["First Name"] || "";
+              const middleName = employee["Middle Name"] || "";
+              const branch = employee.Office || employee.branch || "";
+              const lastName = employee["Last Name"] || "";
+              const department =
+                employee.Department || employee["Job Level"] || "";
+              const position = employee["Job Title"] || "";
 
-            const houseAllowance = employee.house_allowance || 0;
-            const transportAllowance = employee.travel_allowance || 0;
-            const overtimeHours = employee.overtime || 0;
-            const overtimeRate = employee['Overtime Rate'] || 0;
+              const houseAllowance = employee.house_allowance || 0;
+              const transportAllowance = employee.travel_allowance || 0;
+              const overtimeHours = employee.overtime || 0;
+              const overtimeRate = employee["Overtime Rate"] || 0;
 
-            const nhifNumber = employee['NHIF Number'] || employee['SHIF Number'] || '';
-            const nssfNumber = employee['NSSF Number'] || '';
-            const taxPin = employee['Tax PIN'] || '';
+              const nhifNumber =
+                employee["NHIF Number"] || employee["SHIF Number"] || "";
+              const nssfNumber = employee["NSSF Number"] || "";
+              const taxPin = employee["Tax PIN"] || "";
 
+              const medicalAllowance = employee.medical_allowance || 0;
+              const otherAllowances = 0;
+              const commission = 0;
+              const bonus = 0;
 
-            const medicalAllowance = employee.medical_allowance || 0;
-            const otherAllowances = 0;
-            const commission = 0;
-            const bonus = 0;
+              // Per diem is PART of basic salary (33%), not extra payment
+              const perDiem = basicSalary * 0.33;
 
-            // Per diem is PART of basic salary (33%), not extra payment
-            const perDiem = basicSalary * 0.33;
+              const overtimePay = overtimeHours * overtimeRate;
 
-            const overtimePay = overtimeHours * overtimeRate;
+              // Gross pay (basic salary already includes per diem)
+              const grossPay =
+                basicSalary +
+                houseAllowance +
+                transportAllowance +
+                medicalAllowance +
+                otherAllowances +
+                overtimePay +
+                commission +
+                bonus;
 
-            // Gross pay (basic salary already includes per diem)
-            const grossPay = basicSalary + houseAllowance + transportAllowance +
-              medicalAllowance + otherAllowances + overtimePay +
-              commission + bonus;
+              // Taxable amount EXCLUDES the per diem portion
+              const taxableGross = grossPay - perDiem;
 
-            // Taxable amount EXCLUDES the per diem portion
-            const taxableGross = grossPay - perDiem;
+              let nhifDeduction = 0;
+              let nssfDeduction = 0;
+              let housingLevy = 0;
 
-            let nhifDeduction = 0;
-            let nssfDeduction = 0;
-            let housingLevy = 0;
+              // Apply statutory deductions based on override setting
+              if (overrideStatutoryChecks || nhifNumber) {
+                nhifDeduction = calculateNHIF(taxableGross);
+              }
 
-            // Apply statutory deductions based on override setting
-            if (overrideStatutoryChecks || nhifNumber) {
-              nhifDeduction = calculateNHIF(taxableGross);
-            }
+              if (overrideStatutoryChecks || nssfNumber) {
+                nssfDeduction = calculateNSSF(taxableGross);
+              }
 
-            if (overrideStatutoryChecks || nssfNumber) {
-              nssfDeduction = calculateNSSF(taxableGross);
-            }
+              if (overrideStatutoryChecks || taxPin) {
+                housingLevy = calculateHousingLevy(taxableGross, true);
+              }
 
-            if (overrideStatutoryChecks || taxPin) {
-              housingLevy = calculateHousingLevy(taxableGross, true);
-            }
+              // Calculate taxable income for PAYE AFTER deducting NSSF and Housing Levy
+              const taxableIncomeForPAYE =
+                taxableGross - nhifDeduction - nssfDeduction - housingLevy;
 
-            // Calculate taxable income for PAYE AFTER deducting NSSF and Housing Levy
-            const taxableIncomeForPAYE = taxableGross - nhifDeduction - nssfDeduction - housingLevy;
+              let payeTax = 0;
+              let taxRelief = 0;
 
-            let payeTax = 0;
-            let taxRelief = 0;
+              if (overrideStatutoryChecks || taxPin) {
+                payeTax = calculatePAYE(taxableIncomeForPAYE);
+                taxRelief = Math.min(payeTax, 2400);
+              }
 
-            if (overrideStatutoryChecks || taxPin) {
-              payeTax = calculatePAYE(taxableIncomeForPAYE);
-              taxRelief = Math.min(payeTax, 2400);
-            }
+              // Calculate salary advance deduction
+              // Calculate salary advance deduction
+              const advanceDeduction = calculateAdvanceDeduction(
+                employeeId,
+                actualPeriod,
+              );
 
-            // Calculate salary advance deduction
-            // Calculate salary advance deduction
-            const advanceDeduction = calculateAdvanceDeduction(employeeId, actualPeriod);
+              // REMOVED VOLUNTARY DEDUCTIONS - set all to 0 except advance
+              const loanDeduction = 0;
+              const welfareDeduction = 300;
+              const otherDeductions = 0;
 
-            // REMOVED VOLUNTARY DEDUCTIONS - set all to 0 except advance
-            const loanDeduction = 0;
-            const welfareDeduction = 300;
-            const otherDeductions = 0;
+              // Total deductions include statutory and advance deduction
+              const totalDeductions =
+                payeTax +
+                nhifDeduction +
+                nssfDeduction +
+                housingLevy +
+                loanDeduction +
+                advanceDeduction +
+                welfareDeduction +
+                otherDeductions;
 
-            // Total deductions include statutory and advance deduction
-            const totalDeductions = payeTax +
-              nhifDeduction +
-              nssfDeduction +
-              housingLevy +
-              loanDeduction +
-              advanceDeduction +
-              welfareDeduction +
-              otherDeductions;
+              const netPay = grossPay - totalDeductions;
 
-            const netPay = grossPay - totalDeductions;
-
-            return {
-              id: employee.id || '',
-              employee_id: employeeId,
-              employeeNat: employeeNat,
-              employeeNu: employeeNu,
-              jobGroup: jobGroup,
-              employee_name: `${firstName} ${middleName} ${lastName}`.trim(),
-              branch: branch,
-              department: department,
-              position: position,
-              basic_salary: basicSalary,
-              house_allowance: houseAllowance,
-              transport_allowance: transportAllowance,
-              medical_allowance: medicalAllowance,
-              other_allowances: otherAllowances,
-              overtime_hours: overtimeHours,
-              overtime_rate: overtimeRate,
-              commission: commission,
-              bonus: bonus,
-              per_diem: perDiem,
-              gross_pay: grossPay,
-              paye_tax: payeTax,
-              nhif_deduction: nhifDeduction,
-              nssf_deduction: nssfDeduction,
-              housing_levy: housingLevy,
-              tax_relief: taxRelief,
-              loan_deduction: loanDeduction,
-              advance_deduction: advanceDeduction,
-              welfare_deduction: 300,
-              other_deductions: otherDeductions,
-              total_deductions: totalDeductions,
-              net_pay: netPay,
-              pay_period: actualPeriod,
-              payment_method: 'MPESA',
-              bank_name: '',
-              account_number: ''
-            };
-          }));
+              return {
+                id: employee.id || "",
+                employee_id: employeeId,
+                employeeNat: employeeNat,
+                employeeNu: employeeNu,
+                jobGroup: jobGroup,
+                employee_name: `${firstName} ${middleName} ${lastName}`.trim(),
+                branch: branch,
+                department: department,
+                position: position,
+                basic_salary: basicSalary,
+                house_allowance: houseAllowance,
+                transport_allowance: transportAllowance,
+                medical_allowance: medicalAllowance,
+                other_allowances: otherAllowances,
+                overtime_hours: overtimeHours,
+                overtime_rate: overtimeRate,
+                commission: commission,
+                bonus: bonus,
+                per_diem: perDiem,
+                gross_pay: grossPay,
+                paye_tax: payeTax,
+                nhif_deduction: nhifDeduction,
+                nssf_deduction: nssfDeduction,
+                housing_levy: housingLevy,
+                tax_relief: taxRelief,
+                loan_deduction: loanDeduction,
+                advance_deduction: advanceDeduction,
+                welfare_deduction: 300,
+                other_deductions: otherDeductions,
+                total_deductions: totalDeductions,
+                net_pay: netPay,
+                pay_period: actualPeriod,
+                payment_method: "MPESA",
+                bank_name: "",
+                account_number: "",
+              };
+            }),
+          );
 
           setPayrollRecords(payrollData);
           setFilteredRecords(payrollData);
         }
       } catch (err) {
-        console.error('Error:', err);
+        console.error("Error:", err);
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (settings) { // Only fetch when settings are loaded
+    if (settings) {
+      // Only fetch when settings are loaded
       fetchEmployees();
     }
   }, [actualPeriod, settings, overrideStatutoryChecks, salaryAdvances]);
 
   const applyAdditionalFilters = (records) => {
-    return records.filter(record => {
+    return records.filter((record) => {
       const searchLower = searchTerm.toLowerCase().trim();
 
-      const matchesSearch = !searchTerm.trim() ||
-        (record.employee_name || '').toLowerCase().includes(searchLower) ||
-        (record.employee_id || '').toLowerCase().includes(searchLower) ||
-        (record.department || '').toLowerCase().includes(searchLower) ||
-        (record.position || '').toLowerCase().includes(searchLower) ||
-        searchLower.split(' ').every(term =>
-          (record.employee_name || '').toLowerCase().includes(term)
-        );
+      const matchesSearch =
+        !searchTerm.trim() ||
+        (record.employee_name || "").toLowerCase().includes(searchLower) ||
+        (record.employee_id || "").toLowerCase().includes(searchLower) ||
+        (record.department || "").toLowerCase().includes(searchLower) ||
+        (record.position || "").toLowerCase().includes(searchLower) ||
+        searchLower
+          .split(" ")
+          .every((term) =>
+            (record.employee_name || "").toLowerCase().includes(term),
+          );
 
-      const matchesDepartment = selectedDepartment === 'all' || record.department === selectedDepartment;
-      const matchesPaymentMethod = selectedPaymentMethod === 'all' || record.payment_method === selectedPaymentMethod;
-      const matchesBranch = selectedBranch === 'all' || record.branch === selectedBranch;
+      const matchesDepartment =
+        selectedDepartment === "all" ||
+        record.department === selectedDepartment;
+      const matchesPaymentMethod =
+        selectedPaymentMethod === "all" ||
+        record.payment_method === selectedPaymentMethod;
+      const matchesBranch =
+        selectedBranch === "all" || record.branch === selectedBranch;
 
-      return matchesSearch && matchesDepartment && matchesPaymentMethod && matchesBranch;
+      return (
+        matchesSearch &&
+        matchesDepartment &&
+        matchesPaymentMethod &&
+        matchesBranch
+      );
     });
   };
 
@@ -3374,7 +3851,10 @@ export default function PayrollDashboard() {
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = finalFilteredRecords.slice(indexOfFirstItem, indexOfLastItem);
+  const currentItems = finalFilteredRecords.slice(
+    indexOfFirstItem,
+    indexOfLastItem,
+  );
   const totalPages = Math.ceil(finalFilteredRecords.length / itemsPerPage);
 
   const handleViewPayslip = (record, index) => {
@@ -3385,7 +3865,8 @@ export default function PayrollDashboard() {
   const handleNavigatePayslip = (direction) => {
     if (currentRecordIndex === null || !selectedRecord) return;
 
-    const newIndex = direction === 'prev' ? currentRecordIndex - 1 : currentRecordIndex + 1;
+    const newIndex =
+      direction === "prev" ? currentRecordIndex - 1 : currentRecordIndex + 1;
 
     if (newIndex >= 0 && newIndex < finalFilteredRecords.length) {
       setSelectedRecord(finalFilteredRecords[newIndex]);
@@ -3400,7 +3881,7 @@ export default function PayrollDashboard() {
 
   const toggleRowExpand = (id, e) => {
     e.stopPropagation();
-    setExpandedRows(prev => {
+    setExpandedRows((prev) => {
       const newExpanded = new Set(prev);
       if (newExpanded.has(id)) {
         newExpanded.delete(id);
@@ -3411,49 +3892,91 @@ export default function PayrollDashboard() {
     });
   };
 
-  const totalGrossPay = finalFilteredRecords.reduce((sum, record) => sum + record.gross_pay, 0);
-  const totalDeductions = finalFilteredRecords.reduce((sum, record) => sum + record.total_deductions, 0);
-  const totalNetPay = finalFilteredRecords.reduce((sum, record) => sum + record.net_pay, 0);
-  const totalPAYE = finalFilteredRecords.reduce((sum, record) => sum + record.paye_tax, 0);
-  const totalNHIF = finalFilteredRecords.reduce((sum, record) => sum + record.nhif_deduction, 0);
-  const totalNSSF = finalFilteredRecords.reduce((sum, record) => sum + record.nssf_deduction, 0);
-  const totalHousingLevy = finalFilteredRecords.reduce((sum, record) => sum + record.housing_levy, 0);
-  const totalPerDiem = finalFilteredRecords.reduce((sum, record) => sum + (record.per_diem || 0), 0);
-  const totalAdvanceDeductions = finalFilteredRecords.reduce((sum, record) => sum + (record.advance_deduction || 0), 0);
+  const totalGrossPay = finalFilteredRecords.reduce(
+    (sum, record) => sum + record.gross_pay,
+    0,
+  );
+  const totalDeductions = finalFilteredRecords.reduce(
+    (sum, record) => sum + record.total_deductions,
+    0,
+  );
+  const totalNetPay = finalFilteredRecords.reduce(
+    (sum, record) => sum + record.net_pay,
+    0,
+  );
+  const totalPAYE = finalFilteredRecords.reduce(
+    (sum, record) => sum + record.paye_tax,
+    0,
+  );
+  const totalNHIF = finalFilteredRecords.reduce(
+    (sum, record) => sum + record.nhif_deduction,
+    0,
+  );
+  const totalNSSF = finalFilteredRecords.reduce(
+    (sum, record) => sum + record.nssf_deduction,
+    0,
+  );
+  const totalHousingLevy = finalFilteredRecords.reduce(
+    (sum, record) => sum + record.housing_levy,
+    0,
+  );
+  const totalPerDiem = finalFilteredRecords.reduce(
+    (sum, record) => sum + (record.per_diem || 0),
+    0,
+  );
+  const totalAdvanceDeductions = finalFilteredRecords.reduce(
+    (sum, record) => sum + (record.advance_deduction || 0),
+    0,
+  );
 
-  const pendingCount = paymentRequests.filter(p => p.status === 'pending').length;
-  const approvedCount = paymentRequests.filter(p => p.status === 'approved').length;
-  const rejectedCount = paymentRequests.filter(p => p.status === 'rejected').length;
-  const pendingPayments = paymentRequests.filter(p => p.status === 'pending');
+  const pendingCount = paymentRequests.filter(
+    (p) => p.status === "pending",
+  ).length;
+  const approvedCount = paymentRequests.filter(
+    (p) => p.status === "approved",
+  ).length;
+  const rejectedCount = paymentRequests.filter(
+    (p) => p.status === "rejected",
+  ).length;
+  const pendingPayments = paymentRequests.filter((p) => p.status === "pending");
 
-  const paymentMethods = ['all', 'Bank Transfer', 'M-Pesa', 'Airtel Money', 'Cash'];
+  const paymentMethods = [
+    "all",
+    "Bank Transfer",
+    "M-Pesa",
+    "Airtel Money",
+    "Cash",
+  ];
   const payPeriods = [
-    { value: 'current', label: 'Current Month' },
-    { value: '2024-12', label: 'December 2024' },
-    { value: '2024-11', label: 'November 2024' },
-    { value: '2024-10', label: 'October 2024' },
-    { value: '2024-09', label: 'September 2024' }
+    { value: "current", label: "Current Month" },
+    { value: "2024-12", label: "December 2024" },
+    { value: "2024-11", label: "November 2024" },
+    { value: "2024-10", label: "October 2024" },
+    { value: "2024-09", label: "September 2024" },
   ];
 
   const formatPeriodDisplay = (period) => {
-    if (period === 'current') {
+    if (period === "current") {
       const currentDate = new Date();
-      return `${currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+      return `${currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
     }
-    return new Date(period + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    return new Date(period + "-01").toLocaleDateString("en-US", {
+      month: "long",
+      year: "numeric",
+    });
   };
 
   const handleSendPayslips = async (method) => {
-    if (method === 'sms') {
+    if (method === "sms") {
       await sendBulkPayslipNotifications();
     } else {
       setIsSendingPayslips(true);
       try {
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise((resolve) => setTimeout(resolve, 1500));
         toast.success(`Payslips sent successfully via ${method}`);
       } catch (error) {
-        console.error('Error sending payslips:', error);
-        toast.error('Failed to send payslips');
+        console.error("Error sending payslips:", error);
+        toast.error("Failed to send payslips");
       } finally {
         setIsSendingPayslips(false);
       }
@@ -3462,7 +3985,7 @@ export default function PayrollDashboard() {
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   // NEW: Toggle statutory override
@@ -3470,8 +3993,8 @@ export default function PayrollDashboard() {
     setOverrideStatutoryChecks(!overrideStatutoryChecks);
     toast.success(
       overrideStatutoryChecks
-        ? 'Statutory PIN checks enabled'
-        : 'Statutory override enabled - all deductions will be applied'
+        ? "Statutory PIN checks enabled"
+        : "Statutory override enabled - all deductions will be applied",
     );
   };
 
@@ -3486,27 +4009,25 @@ export default function PayrollDashboard() {
       setSmsBalance(balance);
 
       // Refresh employees and payroll data
-      const { data } = await supabase
-        .from('employees')
-        .select('*');
+      const { data } = await supabase.from("employees").select("*");
 
       if (data) {
         setEmployees(data);
       }
 
-      toast.success('Dashboard refreshed successfully!');
+      toast.success("Dashboard refreshed successfully!");
     } catch (error) {
-      console.error('Error refreshing:', error);
-      toast.error('Failed to refresh data');
+      console.error("Error refreshing:", error);
+      toast.error("Failed to refresh data");
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (currentView === 'mpesa-spreadsheet') {
+  if (currentView === "mpesa-spreadsheet") {
     return (
       <MPesaSpreadsheetFullPage
-        onBack={() => setCurrentView('dashboard')}
+        onBack={() => setCurrentView("dashboard")}
         userRole={userRole}
       />
     );
@@ -3518,7 +4039,9 @@ export default function PayrollDashboard() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">
-            {settingsLoading ? 'Loading statutory settings...' : 'Loading employee data...'}
+            {settingsLoading
+              ? "Loading statutory settings..."
+              : "Loading employee data..."}
           </p>
         </div>
       </div>
@@ -3526,276 +4049,188 @@ export default function PayrollDashboard() {
   }
 
   return (
-    <div className="p-4 space-y-6 bg-gray-50 min-h-screen max-w-screen-2xl mx-auto">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Payroll Management</h1>
-            <p className="text-gray-600 text-xs">Complete payroll processing with Maker-Checker M-Pesa payment workflow</p>
-          </div>
-          <div className="flex flex-wrap gap-2 w-full md:w-auto">
-            {smsBalance !== null && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-green-50 border border-green-200 rounded-lg">
-                <DollarSign className="w-4 h-4 text-green-600" />
-                <span className="text-xs font-medium text-green-700">
-                  SMS Balance: {smsBalance}
-                </span>
-                <button
-                  onClick={async () => {
-                    const balance = await checkSMSBalance();
-                    setSmsBalance(balance);
-                  }}
-                  className="p-1 hover:bg-green-100 rounded"
-                  title="Refresh balance"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                </button>
-              </div>
-            )}
+    <div className="p-4 space-y-4 bg-[#f3f4f6] min-h-screen max-w-screen-2xl mx-auto">
 
-            <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <span className="text-xs font-medium text-blue-700 capitalize">
-                {userRole} Role
-              </span>
-            </div>
 
-            {(userRole === 'checker' || userRole === 'credit_analyst_officer') && pendingCount > 0 && (
-              <button
-                onClick={() => setShowApprovalQueue(true)}
-                className="flex items-center gap-2 px-3 py-1 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100"
-              >
-                <AlertTriangle className="w-4 h-4 text-orange-600" />
-                <span className="text-xs font-medium text-orange-700">
-                  {pendingCount} Pending Approvals
-                </span>
-              </button>
-            )}
 
-            <div className="relative group">
-              {!isSendingPayslips && (
-                <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10 hidden group-hover:block">
-                  <div className="py-1">
-                    <button
-                      onClick={() => handleSendPayslips('whatsapp')}
-                      className="flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 w-full text-left"
-                    >
-                      <svg className="w-5 h-5 mr-2 text-green-500" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.150-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.040 1.016-1.040 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0.16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                      </svg>
-                      WhatsApp
-                    </button>
-                    <button
-                      onClick={() => handleSendPayslips('email')}
-                      className="flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 w-full text-left"
-                    >
-                      <svg className="w-5 h-5 mr-2 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" />
-                      </svg>
-                      Email
-                    </button>
-                    <button
-                      onClick={() => handleSendPayslips('sms')}
-                      className="flex items-center px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 w-full text-left"
-                    >
-                      <Send className="w-5 h-5 mr-2 text-green-500" />
-                      SMS
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            <GlowButtonss
-              icon={Plus}
-              size="sm"
-              onClick={() => setShowQuickActions(true)}
-            >
-              Quick Actions
-            </GlowButtonss>
-
-            {/* NEW: Refresh Button */}
-            <GlowButtonss
-              icon={RefreshCw}
-              size="sm"
-              onClick={handleRefresh}
-              disabled={isLoading}
-            >
-              Refresh
-            </GlowButtonss>
-
-            <RoleButtonWrapper allowedRoles={['CHECKER']}>
-              <div className="w-32">
-                <SearchableDropdown
-                  options={[
-                    { label: 'Maker', value: 'maker' },
-                    { label: 'Checker', value: 'checker' },
-                    { label: 'Admin', value: 'credit_analyst_officer' }
-                  ]}
-                  value={userRole}
-                  onChange={setUserRole}
-                  placeholder="Select Role"
-                />
-              </div>
-            </RoleButtonWrapper>
-          </div>
-        </div>
-      </div>
-
-      {/* Statutory Override Toggle */}
-      <StatutoryOverrideToggle
-        isEnabled={overrideStatutoryChecks}
-        onToggle={toggleStatutoryOverride}
-      />
 
       {/* WALLET UI REMOVED - Commented out as requested */}
 
-      {showApprovalQueue && (userRole === 'checker' || userRole === 'credit_analyst_officer') && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-orange-600" />
-              Payment Approval Queue
-              {isLoadingRequests && (
-                <Loader className="w-4 h-4 animate-spin text-gray-400" />
-              )}
-            </h2>
-            <div className="flex gap-2">
-              {/* NEW: Bulk Action Buttons */}
-              {selectedPayments.size > 0 && (
-                <>
-                  <button
-                    onClick={handleBulkApprove}
-                    className="px-3 py-1 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 flex items-center gap-2"
-                    disabled={isLoadingRequests}
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    Approve Selected ({selectedPayments.size})
-                  </button>
-                  <button
-                    onClick={() => setSelectedPayments(new Set())}
-                    className="px-3 py-1 text-xs font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
-                    disabled={isLoadingRequests}
-                  >
-                    Clear Selection
-                  </button>
-                </>
-              )}
+      {showApprovalQueue &&
+        (userRole === "checker" || userRole === "credit_analyst_officer") && (
+          <div className="bg-gradient-to-r from-blue-100 to-indigo-100 border border-indigo-200 rounded-[10px] p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-orange-600" />
+                Payment Approval Queue
+                {isLoadingRequests && (
+                  <Loader className="w-4 h-4 animate-spin text-gray-400" />
+                )}
+              </h2>
+              <div className="flex gap-2">
+                {/* NEW: Bulk Action Buttons */}
+                {selectedPayments.size > 0 && (
+                  <>
+                    <button
+                      onClick={handleBulkApprove}
+                      className="px-4 py-1.5 text-xs font-medium text-white bg-green-600 rounded-[25px] hover:bg-green-700 flex items-center gap-2 transition-colors"
+                      disabled={isLoadingRequests}
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Approve Selected ({selectedPayments.size})
+                    </button>
+                    <button
+                      onClick={() => setSelectedPayments(new Set())}
+                      className="px-4 py-1.5 text-xs font-medium text-gray-700 bg-white border border-indigo-100 rounded-[25px] hover:bg-violet-50 hover:text-violet-700 transition-colors"
+                      disabled={isLoadingRequests}
+                    >
+                      Clear Selection
+                    </button>
+                  </>
+                )}
 
-              {/* NEW: Clear Queue Button */}
-              <button
-                onClick={() => setShowClearQueueModal(true)}
-                className="px-3 py-1 text-xs font-medium text-white bg-red-600 rounded-md hover:bg-red-700 flex items-center gap-2"
-                disabled={isLoadingRequests || pendingCount === 0}
-              >
-                <Trash2 className="w-4 h-4" />
-                Clear Queue ({pendingCount})
-              </button>
+                {/* NEW: Clear Queue Button */}
+                <button
+                  onClick={() => setShowClearQueueModal(true)}
+                  className="px-4 py-1.5 text-xs font-medium text-white bg-red-600 rounded-[25px] hover:bg-red-700 flex items-center gap-2 transition-colors"
+                  disabled={isLoadingRequests || pendingCount === 0}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Clear Queue ({pendingCount})
+                </button>
 
-              <button
-                onClick={() => setShowApprovalQueue(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
+                <button
+                  onClick={() => setShowApprovalQueue(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-          </div>
 
-          {/* NEW: Bulk Selection Controls */}
-          {pendingCount > 0 && (
-            <div className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedPayments.size === pendingPayments.length && pendingPayments.length > 0}
-                    onChange={toggleSelectAllPayments}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <span className="text-xs font-medium text-blue-800">
-                    {selectedPayments.size} of {pendingPayments.length} payments selected
+            {/* NEW: Bulk Selection Controls */}
+            {pendingCount > 0 && (
+              <div className="mb-6 p-3 bg-white border border-indigo-100 rounded-[10px]">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={
+                        selectedPayments.size === pendingPayments.length &&
+                        pendingPayments.length > 0
+                      }
+                      onChange={toggleSelectAllPayments}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="text-xs font-medium text-blue-800">
+                      {selectedPayments.size} of {pendingPayments.length}{" "}
+                      payments selected
+                    </span>
+                  </div>
+                  <div className="text-xs text-blue-600">
+                    Select payments for bulk approval
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6">
+              <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="w-4 h-4 text-orange-600" />
+                  <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                    Pending
                   </span>
                 </div>
-                <div className="text-xs text-blue-600">
-                  Select payments for bulk approval
+                <p className="text-2xl font-bold text-amber-600">
+                  {pendingCount}
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                    Approved
+                  </span>
                 </div>
+                <p className="text-2xl font-bold text-emerald-600">
+                  {approvedCount}
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  <XCircle className="w-4 h-4 text-red-600" />
+                  <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                    Rejected
+                  </span>
+                </div>
+                <p className="text-2xl font-bold text-red-600">
+                  {rejectedCount}
+                </p>
+              </div>
+              <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  <DollarSign className="w-4 h-4 text-blue-600" />
+                  <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">
+                    Total Value
+                  </span>
+                </div>
+                <p className="text-lg font-bold text-blue-600">
+                  KSh{" "}
+                  {paymentRequests
+                    .filter((p) => p.status === "pending")
+                    .reduce((sum, p) => sum + (p.total_amount || 0), 0)
+                    .toLocaleString()}
+                </p>
               </div>
             </div>
-          )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-            <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
-              <div className="flex items-center gap-2 mb-2">
-                <Clock className="w-4 h-4 text-orange-600" />
-                <span className="text-xs font-medium text-orange-800">Pending</span>
+            {paymentRequests.length > 0 ? (
+              <div className="grid gap-4">
+                {paymentRequests
+                  .filter((payment) => payment.status !== "completed")
+                  .map((payment) => (
+                    <PendingPaymentCard
+                      key={payment.id}
+                      payment={payment}
+                      userRole={userRole}
+                      isSelected={selectedPayments.has(payment.id)}
+                      onSelect={(paymentId, isSelected) =>
+                        togglePaymentSelection(paymentId, isSelected)
+                      }
+                      onApprove={() => handleSingleApprove(payment)}
+                      onReject={() => {
+                        setPaymentToReject(payment);
+                        setShowRejectionModal(true);
+                      }}
+                      onViewDetails={() => {
+                        setSelectedPaymentForDetails(payment);
+                        setShowPaymentDetails(true);
+                      }}
+                    />
+                  ))}
               </div>
-              <p className="text-2xl font-bold text-orange-700">{pendingCount}</p>
-            </div>
-            <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-              <div className="flex items-center gap-2 mb-2">
-                <CheckCircle className="w-4 h-4 text-green-600" />
-                <span className="text-xs font-medium text-green-800">Approved</span>
+            ) : (
+              <div className="text-center py-12">
+                <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  No pending payments
+                </h3>
+                <p className="text-gray-600">
+                  All payment requests have been processed.
+                </p>
               </div>
-              <p className="text-2xl font-bold text-green-700">{approvedCount}</p>
-            </div>
-            <div className="bg-red-50 rounded-lg p-4 border border-red-200">
-              <div className="flex items-center gap-2 mb-2">
-                <XCircle className="w-4 h-4 text-red-600" />
-                <span className="text-xs font-medium text-red-800">Rejected</span>
-              </div>
-              <p className="text-2xl font-bold text-red-700">{rejectedCount}</p>
-            </div>
-            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="w-4 h-4 text-blue-600" />
-                <span className="text-xs font-medium text-blue-800">Total Value</span>
-              </div>
-              <p className="text-lg font-bold text-blue-700">
-                KSh {paymentRequests
-                  .filter(p => p.status === 'pending')
-                  .reduce((sum, p) => sum + (p.total_amount || 0), 0)
-                  .toLocaleString()}
-              </p>
-            </div>
+            )}
           </div>
-
-          {paymentRequests.length > 0 ? (
-            <div className="grid gap-4">
-              {paymentRequests
-                .filter(payment => payment.status !== 'completed')
-                .map((payment) => (
-                  <PendingPaymentCard
-                    key={payment.id}
-                    payment={payment}
-                    userRole={userRole}
-                    isSelected={selectedPayments.has(payment.id)}
-                    onSelect={(paymentId, isSelected) => togglePaymentSelection(paymentId, isSelected)}
-                    onApprove={() => handleSingleApprove(payment)}
-                    onReject={() => {
-                      setPaymentToReject(payment);
-                      setShowRejectionModal(true);
-                    }}
-                    onViewDetails={() => {
-                      setSelectedPaymentForDetails(payment);
-                      setShowPaymentDetails(true);
-                    }}
-                  />
-                ))}
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No pending payments</h3>
-              <p className="text-gray-600">All payment requests have been processed.</p>
-            </div>
-          )}
-        </div>
-      )}
+        )}
 
       {showQuickActions && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Quick Actions</h3>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Quick Actions
+              </h3>
               <button
                 onClick={() => setShowQuickActions(false)}
                 className="text-gray-500 hover:text-gray-700"
@@ -3804,85 +4239,115 @@ export default function PayrollDashboard() {
               </button>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <GlowButtonss icon={Calculator} size="sm" onClick={() => {
-                alert("Bulk Calculate initiated");
-                setShowQuickActions(false);
-              }}>
+              <GlowButtonss
+                icon={Calculator}
+                size="sm"
+                onClick={() => {
+                  alert("Bulk Calculate initiated");
+                  setShowQuickActions(false);
+                }}
+              >
                 Bulk Calculate
               </GlowButtonss>
-              <GlowButtonss variant="secondary" icon={FileText} size="sm" onClick={() => {
-                setShowP9Modal(true);
-                setShowQuickActions(false);
-              }}>
+              <GlowButtonss
+                variant="secondary"
+                icon={FileText}
+                size="sm"
+                onClick={() => {
+                  setShowP9Modal(true);
+                  setShowQuickActions(false);
+                }}
+              >
                 Generate P9A Forms
               </GlowButtonss>
-              <GlowButtonss variant="secondary" icon={Download} size="sm" onClick={() => {
-                setShowExportModal(true);
-                setShowQuickActions(false);
-              }}>
+              <GlowButtonss
+                variant="secondary"
+                icon={Download}
+                size="sm"
+                onClick={() => {
+                  setShowExportModal(true);
+                  setShowQuickActions(false);
+                }}
+              >
                 Export Data
               </GlowButtonss>
-              <GlowButtonss variant="secondary" icon={FileText} size="sm" onClick={() => {
-                alert("Batch payslip generation started");
-                setShowQuickActions(false);
-              }}>
+              <GlowButtonss
+                variant="secondary"
+                icon={FileText}
+                size="sm"
+                onClick={() => {
+                  alert("Batch payslip generation started");
+                  setShowQuickActions(false);
+                }}
+              >
                 Payslip Batch
               </GlowButtonss>
-              <GlowButtonss variant="secondary" icon={TrendingUp} size="sm" onClick={() => {
-                alert("Tax certificates being prepared");
-                setShowQuickActions(false);
-              }}>
+              <GlowButtonss
+                variant="secondary"
+                icon={TrendingUp}
+                size="sm"
+                onClick={() => {
+                  alert("Tax certificates being prepared");
+                  setShowQuickActions(false);
+                }}
+              >
                 Tax Certificates
               </GlowButtonss>
-              <GlowButtonss variant="secondary" icon={Calendar} size="sm" onClick={() => {
-                alert("Payment scheduling opened");
-                setShowQuickActions(false);
-              }}>
+              <GlowButtonss
+                variant="secondary"
+                icon={Calendar}
+                size="sm"
+                onClick={() => {
+                  alert("Payment scheduling opened");
+                  setShowQuickActions(false);
+                }}
+              >
                 Schedule Payments
               </GlowButtonss>
-              <GlowButtonss variant="secondary" icon={Settings} size="sm" onClick={() => {
-                setShowStatutorySettings(true);
-                setShowQuickActions(false);
-              }}>
+              <GlowButtonss
+                variant="secondary"
+                icon={Settings}
+                size="sm"
+                onClick={() => {
+                  setShowStatutorySettings(true);
+                  setShowQuickActions(false);
+                }}
+              >
                 Statutory Settings
               </GlowButtonss>
-              {(userRole === 'checker' || userRole === 'credit_analyst_officer') && (
-                <GlowButtonss
-                  variant="secondary"
-                  icon={Clock}
-                  size="sm"
-                  onClick={() => {
-                    setShowApprovalQueue(true);
-                    setShowQuickActions(false);
-                  }}
-                >
-                  Approval Queue ({pendingCount})
-                </GlowButtonss>
-              )}
+              {(userRole === "checker" ||
+                userRole === "credit_analyst_officer") && (
+                  <GlowButtonss
+                    variant="secondary"
+                    icon={Clock}
+                    size="sm"
+                    onClick={() => {
+                      setShowApprovalQueue(true);
+                      setShowQuickActions(false);
+                    }}
+                  >
+                    Approval Queue ({pendingCount})
+                  </GlowButtonss>
+                )}
             </div>
           </div>
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Payroll Controls</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-          <div className="space-y-1">
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">
-              Pay Period
-            </label>
-            <DatePicker
-              selected={selectedPeriod ?? null}
-              onChange={(date) => setSelectedPeriod(date)}
-              dateFormat="MMMM yyyy"
-              showMonthYearPicker
-              className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-green-100 focus:border-green-500"
-              placeholderText="Select Month"
-            />
-          </div>
+      <div className="bg-white border border-indigo-100 rounded-[10px] px-4 py-2.5">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Pay Period */}
+          <DatePicker
+            selected={selectedPeriod ?? null}
+            onChange={(date) => setSelectedPeriod(date)}
+            dateFormat="MMMM yyyy"
+            showMonthYearPicker
+            className="bg-gray-50 border border-gray-200 rounded-[25px] px-3 py-1.5 text-xs focus:ring-2 focus:ring-violet-300 focus:outline-none w-36"
+            placeholderText="Pay Period"
+          />
 
-          <div className="space-y-1">
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Region (Branch)</label>
+          {/* Branch */}
+          <div className="w-36">
             <SearchableDropdown
               options={branches}
               value={selectedBranch}
@@ -3892,12 +4357,12 @@ export default function PayrollDashboard() {
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Department</label>
+          {/* Department */}
+          <div className="w-40">
             <SearchableDropdown
-              options={departments.map(dept => ({
-                label: dept === 'all' ? 'All Departments' : dept,
-                value: dept
+              options={departments.map((dept) => ({
+                label: dept === "all" ? "All Departments" : dept,
+                value: dept,
               }))}
               value={selectedDepartment}
               onChange={setSelectedDepartment}
@@ -3906,12 +4371,12 @@ export default function PayrollDashboard() {
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Payment Method</label>
+          {/* Payment Method */}
+          <div className="w-36">
             <SearchableDropdown
-              options={paymentMethods.map(method => ({
-                label: method === 'all' ? 'All Methods' : method,
-                value: method
+              options={paymentMethods.map((method) => ({
+                label: method === "all" ? "All Methods" : method,
+                value: method,
               }))}
               value={selectedPaymentMethod}
               onChange={setSelectedPaymentMethod}
@@ -3920,319 +4385,464 @@ export default function PayrollDashboard() {
             />
           </div>
 
-          <div className="flex gap-2">
-            <GlowButton
-              icon={TabletSmartphone}
-              size="md"
-              onClick={handleBulkMpesaPayment}
-              disabled={finalFilteredRecords.length === 0}
-            >
-              {userRole === 'credit_analyst_officer' ? 'M-PESA Bulk Pay' : 'Make Bulk Pay'}
-            </GlowButton>
-          </div>
+          {/* Make Bulk Pay */}
+          <button
+            onClick={handleBulkMpesaPayment}
+            disabled={finalFilteredRecords.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white hover:bg-green-700 rounded-[25px] text-xs font-medium transition-colors disabled:opacity-50"
+          >
+            <TabletSmartphone className="w-3 h-3" />
+            {userRole === "credit_analyst_officer" ? "M-PESA Bulk Pay" : "Make Bulk Pay"}
+          </button>
         </div>
       </div>
 
-      <div className="flex justify-center space-x-4">
-        <GlowButtonss
-          icon={showSummary ? ChevronUp : ChevronDown}
-          size="sm"
-          onClick={() => setShowSummary(!showSummary)}
-        >
-          {showSummary ? 'Hide Summary' : 'Show Summary'}
-        </GlowButtonss>
+      {/* ── TOOLBAR: Summary + Report actions + Search ──────── */}
+      <div className="bg-white border border-indigo-100 rounded-[10px] px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap">
+        {/* Left side: Show Summary + action buttons */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={() => setShowSummary(!showSummary)}
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 text-gray-600 hover:text-violet-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors border border-gray-200"
+          >
+            {showSummary ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            {showSummary ? "Hide Summary" : "Show Summary"}
+          </button>
 
-        <div className="space-y-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="name or employee ID"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-xs placeholder-gray-500 focus:ring-2 focus:ring-green-100 focus:border-green-500"
-            />
-          </div>
+          {/* Divider */}
+          <div className="w-px h-4 bg-gray-200 mx-1" />
+
+          {/* Statutory Override inline toggle */}
+          <button
+            onClick={toggleStatutoryOverride}
+            className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-[25px] text-xs font-medium transition-colors border ${overrideStatutoryChecks
+                ? "bg-green-50 text-green-700 border-green-200"
+                : "bg-white text-gray-600 border-gray-200 hover:text-violet-700 hover:bg-violet-50"
+              }`}
+          >
+            <span className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${overrideStatutoryChecks ? "bg-green-500" : "bg-gray-300"
+              }`}>
+              <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${overrideStatutoryChecks ? "translate-x-3.5" : "translate-x-0.5"
+                }`} />
+            </span>
+            Statutory Override
+          </button>
+
+          {/* Divider */}
+
+          <button
+            onClick={() => setCurrentView("mpesa-spreadsheet")}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-gray-600 hover:text-violet-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors border border-gray-200"
+          >
+            <FileSpreadsheet className="w-3 h-3" />
+            M-PESA Spreadsheet
+          </button>
+          <button
+            onClick={() => setShowP9Modal(true)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-gray-600 hover:text-violet-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors border border-gray-200"
+          >
+            <FileText className="w-3 h-3" />
+            P9
+          </button>
+          <button
+            onClick={() => setShowP10Modal(true)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-gray-600 hover:text-violet-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors border border-gray-200"
+          >
+            <FileSpreadsheet className="w-3 h-3" />
+            P10
+          </button>
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-gray-600 hover:text-violet-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors border border-gray-200"
+          >
+            <Download className="w-3 h-3" />
+            Export
+          </button>
+          <button
+            onClick={() => setShowStatutorySettings(true)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-gray-600 hover:text-violet-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors border border-gray-200"
+          >
+            <Settings className="w-3 h-3" />
+            Statutory
+          </button>
+          {(userRole === "checker" || userRole === "credit_analyst_officer") && (
+            <button
+              onClick={() => setShowApprovalQueue(true)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-gray-600 hover:text-violet-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors border border-gray-200"
+            >
+              <Clock className="w-3 h-3" />
+              Approvals ({pendingCount})
+            </button>
+          )}
+        </div>
+
+        {/* Right side: search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
+          <input
+            type="text"
+            placeholder="Search by name or employee ID"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="bg-gray-50 border border-gray-200 rounded-[25px] pl-8 pr-4 py-1.5 text-xs placeholder-gray-400 focus:ring-2 focus:ring-violet-300 focus:outline-none w-64"
+          />
         </div>
       </div>
 
       {showSummary && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Statutory Deductions</h2>
+        <div className="bg-gradient-to-r from-blue-100 to-indigo-100 border border-indigo-200 rounded-[10px] p-6">
+          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">
+            Statutory Deductions
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatutoryCard label="Total PAYE Tax" value={totalPAYE} icon={FileText} color="red" rate="Progressive rates" />
-            <StatutoryCard label="Total NSSF" value={totalNSSF} icon={Calculator} color="blue" rate="6% (Tiered)" />
-            <StatutoryCard label="Total SHIF" value={totalNHIF} icon={TrendingUp} color="purple" rate="Tiered" />
-            <StatutoryCard label="Housing Levy" value={totalHousingLevy} icon={DollarSign} color="yellow" rate="1.5%" />
+            <StatutoryCard
+              label="Total PAYE Tax"
+              value={totalPAYE}
+              icon={FileText}
+              color="red"
+              rate="Progressive rates"
+            />
+            <StatutoryCard
+              label="Total NSSF"
+              value={totalNSSF}
+              icon={Calculator}
+              color="blue"
+              rate="6% (Tiered)"
+            />
+            <StatutoryCard
+              label="Total SHIF"
+              value={totalNHIF}
+              icon={TrendingUp}
+              color="purple"
+              rate="Tiered"
+            />
+            <StatutoryCard
+              label="Housing Levy"
+              value={totalHousingLevy}
+              icon={DollarSign}
+              color="yellow"
+              rate="1.5%"
+            />
           </div>
         </div>
       )}
 
-
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-4 md:p-6 border-b border-gray-200">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Payroll Report</h2>
-              <p className="text-gray-600 text-xs">{finalFilteredRecords.length} records found</p>
-              {/* NEW: Show total advance deductions */}
-              {totalAdvanceDeductions > 0 && (
-                <p className="text-xs text-orange-600">
-                  Total Salary Advance Deductions: KSh {totalAdvanceDeductions.toLocaleString()}
-                </p>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <GlowButtonss
-                variant="secondary"
-                icon={FileSpreadsheet}
-                size="sm"
-                onClick={() => setCurrentView('mpesa-spreadsheet')}
-              >
-                M-PESA Spreadsheet
-              </GlowButtonss>
-              <GlowButtonss variant="secondary" icon={FileText} size="sm" onClick={() => setShowP9Modal(true)}>
-                P9 Forms
-              </GlowButtonss>
-              <GlowButtonss
-                variant="secondary"
-                icon={FileSpreadsheet}
-                size="sm"
-                onClick={() => setShowP10Modal(true)}
-              >
-                P10 Form
-              </GlowButtonss>
-              <GlowButtonss variant="secondary" icon={Download} size="sm" onClick={() => setShowExportModal(true)}>
-                Export
-              </GlowButtonss>
-              <GlowButtonss variant="secondary" icon={Settings} size="sm" onClick={() => setShowStatutorySettings(true)}>
-                Statutory Settings
-              </GlowButtonss>
-
-              {(userRole === 'checker' || userRole === 'credit_analyst_officer') && (
-                <GlowButtonss
-                  variant="secondary"
-                  icon={Clock}
-                  size="sm"
-                  onClick={() => setShowApprovalQueue(true)}
-                >
-                  Approvals ({pendingCount})
-                </GlowButtonss>
-              )}
-            </div>
-          </div>
+      {/* ── PAYROLL REPORT ──────────────────────────────────── */}
+      <div>
+        {/* Report title row — clean, no buttons */}
+        <div className="flex items-center gap-3 mb-2">
+          <h2 className="text-sm font-semibold text-gray-800">Payroll Report</h2>
+          <span className="text-[11px] text-gray-400">{finalFilteredRecords.length} records</span>
+          {totalAdvanceDeductions > 0 && (
+            <span className="text-[11px] text-orange-500">
+              Advance Deductions: KSh {totalAdvanceDeductions.toLocaleString()}
+            </span>
+          )}
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left text-gray-700 font-semibold">Employee</th>
-                <th className="px-4 py-3 text-right text-gray-700 font-semibold">Region</th>
-                <th className="px-4 py-3 text-right text-gray-700 font-semibold">Gross Pay</th>
-                <th className="px-4 py-3 text-right text-gray-700 font-semibold">Per Diem</th>
-                <th className="px-4 py-3 text-right text-gray-700 font-semibold">PAYE</th>
-                <th className="px-4 py-3 text-right text-gray-700 font-semibold">SHIF</th>
-                <th className="px-4 py-3 text-right text-gray-700 font-semibold">NSSF</th>
-                <th className="px-4 py-3 text-right text-gray-700 font-semibold">AHL</th>
-                <th className="px-4 py-3 text-right text-gray-700 font-semibold">Advance</th>
-                <th className="px-4 py-3 text-right text-gray-700 font-semibold">Total Deductions</th>
-                <th className="px-4 py-3 text-right text-gray-700 font-semibold">Net Pay</th>
-                <th className="sticky right-0 z-10 bg-gray-50 px-4 py-3 text-center text-gray-700 font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentItems.map((record, index) => {
-                const isExpanded = expandedRows.has(record.id);
-                const voluntaryDeductions = record.loan_deduction + record.advance_deduction + record.welfare_deduction;
-                const smsStatus = smsSendingStatus[record.employee_id];
+        <div className="bg-[#f3f4f6] rounded-[5px] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-300 text-xs">
+              <thead className="bg-gray-600 border-b border-gray-700">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                    Employee
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                    Region
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                    Gross Pay
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                    Per Diem
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                    PAYE
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                    SHIF
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                    NSSF
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                    AHL
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                    Advance
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                    Total Deductions
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                    Net Pay
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-normal text-white">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-[#f3f4f6] divide-y divide-gray-200">
+                {currentItems.map((record, index) => {
+                  const isExpanded = expandedRows.has(record.id);
+                  const voluntaryDeductions =
+                    record.loan_deduction +
+                    record.advance_deduction +
+                    record.welfare_deduction;
+                  const smsStatus = smsSendingStatus[record.employee_id];
 
-                return (
-                  <React.Fragment key={record.id}>
-                    <tr className="border-b border-gray-300 hover:bg-gray-50">
-                      <td className="sticky left-0 z-10 bg-white px-4 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <button
-                            onClick={(e) => toggleRowExpand(record.id, e)}
-                            className="mr-2 text-gray-500 hover:text-gray-700"
-                          >
-                            {isExpanded ? (
-                              <ChevronUp className="w-4 h-4" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4" />
-                            )}
-                          </button>
-                          <div>
-                            <p className="font-semibold text-gray-900">{record.employee_name}</p>
-                            <p className="text-gray-500 text-xs">{record.employee_id}</p>
-                            <p className="text-gray-500 text-xs">{record.employeeNu}</p>
-                            <p className="text-gray-500 text-xs">{record.department} • {record.position}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-right text-gray-600">
-                        {record.branch}
-                      </td>
-                      <td className="px-4 py-4 text-right font-bold text-green-600">
-                        KSh {record.gross_pay.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-4 text-right font-bold text-yellow-600">
-                        KSh {record.per_diem?.toLocaleString() || '0'}
-                      </td>
-                      <td className="px-4 py-4 text-right text-red-600">
-                        KSh {Math.round(record.paye_tax).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-4 text-right text-purple-600">
-                        KSh {record.nhif_deduction.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-4 text-right text-blue-600">
-                        KSh {record.nssf_deduction.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-4 text-right text-yellow-600">
-                        KSh {record.housing_levy.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-4 text-right text-orange-600">
-                        KSh {record.advance_deduction?.toLocaleString() || '0'}
-                      </td>
-                      <td className="px-4 py-4 text-right font-bold text-red-600">
-                        KSh {record.total_deductions.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-4 text-right font-bold text-green-700">
-                        KSh {Math.round(record.net_pay).toLocaleString()}
-                      </td>
-                      <td className="sticky right-0 z-10 bg-white px-4 py-4">
-                        <div className="flex justify-center gap-1">
-                          <GlowButton
-                            variant="primary"
-                            icon={Smartphone}
-                            size="sm"
-                            onClick={() => handleSingleMpesaPayment(record)}
-                          >
-                            {userRole === 'credit_analyst_officer' ? 'M-Pesa' : 'pay'}
-                          </GlowButton>
-                          <GlowButtonss
-                            variant="secondary"
-                            icon={FileText}
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewPayslip(record, index);
-                            }}
-                          >
-                            Payslip
-                          </GlowButtonss>
-                          {record.employeeNu && (
+                  return (
+                    <React.Fragment key={record.id}>
+                      <tr className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 border-r border-gray-300">
+                          <div className="flex items-start">
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                sendPayslipNotification(record);
-                              }}
-                              disabled={sendingSMS || smsStatus === 'sending'}
-                              className={`px-2 py-1 text-xs rounded flex items-center gap-1 ${smsStatus === 'success'
-                                ? 'bg-green-50 text-green-600'
-                                : smsStatus === 'failed'
-                                  ? 'bg-red-50 text-red-600'
-                                  : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                                } disabled:opacity-50`}
+                              onClick={(e) => toggleRowExpand(record.id, e)}
+                              className="mr-2 mt-0.5 text-gray-500 hover:text-gray-700 shrink-0"
                             >
-                              {smsStatus === 'sending' ? (
-                                <Loader className="w-3 h-3 animate-spin" />
-                              ) : smsStatus === 'success' ? (
-                                <CheckCircle className="w-3 h-3" />
-                              ) : smsStatus === 'failed' ? (
-                                <XCircle className="w-3 h-3" />
+                              {isExpanded ? (
+                                <ChevronUp className="w-4 h-4" />
                               ) : (
-                                <Send className="w-3 h-3" />
+                                <ChevronDown className="w-4 h-4" />
                               )}
-                              {smsStatus === 'sending' ? 'Sending' :
-                                smsStatus === 'success' ? 'Sent' :
-                                  smsStatus === 'failed' ? 'Failed' : 'SMS'}
                             </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-
-                    {isExpanded && (
-                      <tr className="bg-gray-50">
-                        <td colSpan={12} className="px-4 py-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
-                            <div className="space-y-2">
-                              <h4 className="font-medium text-gray-900">Earnings</h4>
-                              <div className="flex justify-between">
-                                <span>Total Basic Salary:</span>
-                                <span>KSh {record.basic_salary.toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>House Allowance:</span>
-                                <span>KSh {record.house_allowance.toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Transport Allowance:</span>
-                                <span>KSh {record.transport_allowance.toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Overtime:</span>
-                                <span>KSh {(record.overtime_hours * record.overtime_rate).toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between font-bold bg-yellow-50 p-1">
-                                <span>Per Diem:</span>
-                                <span>KSh {record.per_diem?.toLocaleString() || '0'}</span>
-                              </div>
-                            </div>
-
-                            <div className="space-y-2">
-                              <h4 className="font-medium text-gray-900">Statutory Deductions</h4>
-                              <div className="flex justify-between">
-                                <span>PAYE:</span>
-                                <span className="text-red-600">KSh {record.paye_tax.toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>SHIF:</span>
-                                <span className="text-red-600">KSh {record.nhif_deduction.toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>NSSF:</span>
-                                <span className="text-red-600">KSh {record.nssf_deduction.toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Housing Levy:</span>
-                                <span className="text-red-600">KSh {record.housing_levy.toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between text-green-600">
-                                <span>Tax Relief:</span>
-                                <span>KSh {record.tax_relief?.toLocaleString() || '0'}</span>
-                              </div>
-                            </div>
-
-                            <div className="space-y-2">
-                              <h4 className="font-medium text-gray-900">Other Deductions</h4>
-                              <div className="flex justify-between">
-                                <span>Loans:</span>
-                                <span className="text-red-600">KSh {record.loan_deduction.toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Advances:</span>
-                                <span className="text-red-600">KSh {record.advance_deduction.toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span>Welfare:</span>
-                                <span className="text-red-600">KSh {record.welfare_deduction.toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between font-medium">
-                                <span>Total Deductions:</span>
-                                <span className="text-red-600">KSh {record.total_deductions.toLocaleString()}</span>
-                              </div>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-semibold text-gray-900 leading-tight uppercase">
+                                {record.employee_name}
+                              </span>
+                              <span className="text-xs text-gray-500 font-mono mt-0.5">
+                                {record.employee_id}
+                              </span>
+                              <span className="text-xs text-gray-500 font-mono">
+                                {record.employeeNu}
+                              </span>
+                              <span className="text-xs text-gray-400 mt-1 uppercase">
+                                {record.position} •{" "}
+                                {record.department === "Branch Staff"
+                                  ? record.branch
+                                  : record.department}
+                              </span>
                             </div>
                           </div>
                         </td>
+                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 truncate max-w-[80px]">
+                          {record.branch}
+                        </td>
+                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 whitespace-nowrap">
+                          KSh {record.gross_pay.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 whitespace-nowrap">
+                          KSh {record.per_diem?.toLocaleString() || "0"}
+                        </td>
+                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 whitespace-nowrap">
+                          KSh {Math.round(record.paye_tax).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 whitespace-nowrap">
+                          KSh {record.nhif_deduction.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 whitespace-nowrap">
+                          KSh {record.nssf_deduction.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 whitespace-nowrap">
+                          KSh {record.housing_levy.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 whitespace-nowrap">
+                          KSh{" "}
+                          {record.advance_deduction?.toLocaleString() || "0"}
+                        </td>
+                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 font-medium whitespace-nowrap">
+                          KSh {record.total_deductions.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 border-r border-gray-300 text-sm font-bold text-green-700 whitespace-nowrap bg-green-50/30">
+                          KSh {Math.round(record.net_pay).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-1.5">
+                            <button
+                              onClick={() => handleSingleMpesaPayment(record)}
+                              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-[25px] transition-colors"
+                            >
+                              <Smartphone className="w-3 h-3" />
+                              {userRole === "credit_analyst_officer"
+                                ? "M-Pesa"
+                                : "pay"}
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewPayslip(record, index);
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-white hover:bg-blue-100 rounded-[25px] transition-colors border border-gray-200"
+                            >
+                              <FileText className="w-3 h-3" />
+                              Payslip
+                            </button>
+                            {record.employeeNu && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  sendPayslipNotification(record);
+                                }}
+                                disabled={sendingSMS || smsStatus === "sending"}
+                                className={`inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-[25px] transition-colors ${smsStatus === "success"
+                                  ? "bg-green-50 text-green-700"
+                                  : smsStatus === "failed"
+                                    ? "bg-red-50 text-red-700"
+                                    : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                                  } disabled:opacity-50`}
+                              >
+                                {smsStatus === "sending" ? (
+                                  <Loader className="w-3 h-3 animate-spin" />
+                                ) : smsStatus === "success" ? (
+                                  <CheckCircle className="w-3 h-3" />
+                                ) : smsStatus === "failed" ? (
+                                  <XCircle className="w-3 h-3" />
+                                ) : (
+                                  <Send className="w-3 h-3" />
+                                )}
+                                {smsStatus === "sending"
+                                  ? "Sending"
+                                  : smsStatus === "success"
+                                    ? "Sent"
+                                    : smsStatus === "failed"
+                                      ? "Failed"
+                                      : "SMS"}
+                              </button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+
+                      {isExpanded && (
+                        <tr className="bg-[#f3f4f6]">
+                          <td
+                            colSpan={12}
+                            className="px-4 py-4 border-t border-gray-200"
+                          >
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                              <div className="space-y-2">
+                                <h4 className="font-medium text-gray-900">
+                                  Earnings
+                                </h4>
+                                <div className="flex justify-between">
+                                  <span>Total Basic Salary:</span>
+                                  <span>
+                                    KSh {record.basic_salary.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>House Allowance:</span>
+                                  <span>
+                                    KSh{" "}
+                                    {record.house_allowance.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Transport Allowance:</span>
+                                  <span>
+                                    KSh{" "}
+                                    {record.transport_allowance.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Overtime:</span>
+                                  <span>
+                                    KSh{" "}
+                                    {(
+                                      record.overtime_hours *
+                                      record.overtime_rate
+                                    ).toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between font-bold bg-yellow-50 p-1">
+                                  <span>Per Diem:</span>
+                                  <span>
+                                    KSh{" "}
+                                    {record.per_diem?.toLocaleString() || "0"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <h4 className="font-medium text-gray-900">
+                                  Statutory Deductions
+                                </h4>
+                                <div className="flex justify-between">
+                                  <span>PAYE:</span>
+                                  <span className="text-red-600">
+                                    KSh {record.paye_tax.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>SHIF:</span>
+                                  <span className="text-red-600">
+                                    KSh {record.nhif_deduction.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>NSSF:</span>
+                                  <span className="text-red-600">
+                                    KSh {record.nssf_deduction.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Housing Levy:</span>
+                                  <span className="text-red-600">
+                                    KSh {record.housing_levy.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-green-600">
+                                  <span>Tax Relief:</span>
+                                  <span>
+                                    KSh{" "}
+                                    {record.tax_relief?.toLocaleString() || "0"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <h4 className="font-medium text-gray-900">
+                                  Other Deductions
+                                </h4>
+                                <div className="flex justify-between">
+                                  <span>Loans:</span>
+                                  <span className="text-red-600">
+                                    KSh {record.loan_deduction.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Advances:</span>
+                                  <span className="text-red-600">
+                                    KSh{" "}
+                                    {record.advance_deduction.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Welfare:</span>
+                                  <span className="text-red-600">
+                                    KSh{" "}
+                                    {record.welfare_deduction.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between font-medium">
+                                  <span>Total Deductions:</span>
+                                  <span className="text-red-600">
+                                    KSh{" "}
+                                    {record.total_deductions.toLocaleString()}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <Pagination
@@ -4249,10 +4859,17 @@ export default function PayrollDashboard() {
         <PayslipModal
           record={selectedRecord}
           onClose={() => setSelectedRecord(null)}
-          onPrevious={currentRecordIndex !== null && currentRecordIndex > 0 ?
-            () => handleNavigatePayslip('prev') : undefined}
-          onNext={currentRecordIndex !== null && currentRecordIndex < finalFilteredRecords.length - 1 ?
-            () => handleNavigatePayslip('next') : undefined}
+          onPrevious={
+            currentRecordIndex !== null && currentRecordIndex > 0
+              ? () => handleNavigatePayslip("prev")
+              : undefined
+          }
+          onNext={
+            currentRecordIndex !== null &&
+              currentRecordIndex < finalFilteredRecords.length - 1
+              ? () => handleNavigatePayslip("next")
+              : undefined
+          }
           companyInfo={companyInfo}
         />
       )}
@@ -4319,10 +4936,13 @@ export default function PayrollDashboard() {
               <div className="flex items-start gap-2 text-red-800">
                 <AlertTriangle className="w-4 h-4 mt-0.5" />
                 <div>
-                  <p className="font-medium text-sm">Warning: This action cannot be undone</p>
+                  <p className="font-medium text-sm">
+                    Warning: This action cannot be undone
+                  </p>
                   <p className="text-xs mt-1">
-                    You are about to clear {pendingCount} pending payments from the queue.
-                    This will permanently delete all pending payment requests.
+                    You are about to clear {pendingCount} pending payments from
+                    the queue. This will permanently delete all pending payment
+                    requests.
                   </p>
                 </div>
               </div>
@@ -4342,7 +4962,7 @@ export default function PayrollDashboard() {
                 disabled={isLoadingRequests}
               >
                 <Trash2 className="w-4 h-4" />
-                {isLoadingRequests ? 'Clearing...' : 'Clear Queue'}
+                {isLoadingRequests ? "Clearing..." : "Clear Queue"}
               </button>
             </div>
           </div>
