@@ -5,8 +5,10 @@ import {
   Lock,
   AlertCircle,
   CheckCircle2,
+  Calendar,
   Clock,
   Settings,
+  Bell,
   CalendarClock as Schedule // Using CalendarClock as Schedule replacement
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -226,7 +228,7 @@ const AdvanceApplicationManager = ({ onStatusChange }: AdvanceApplicationManager
   const scheduleStatus = getScheduleStatus();
 
   return (
-    <div className="bg-gradient-to-r from-blue-100 to-indigo-100 border border-indigo-200 rounded-[10px] p-6">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-800">Salary Advance Management</h3>
@@ -258,7 +260,7 @@ const AdvanceApplicationManager = ({ onStatusChange }: AdvanceApplicationManager
 
       <div className="space-y-4">
         {/* Current Status */}
-        <div className="bg-gray-50 p-4 rounded-[10px]">
+        <div className="bg-gray-50 p-4 rounded-lg">
           <div className="flex items-start space-x-3">
             <AlertCircle className="h-5 w-5 text-blue-500 mt-0.5" />
             <div className="flex-1">
@@ -282,13 +284,13 @@ const AdvanceApplicationManager = ({ onStatusChange }: AdvanceApplicationManager
         <div className="flex space-x-3">
           {isOpen ? (
             <button
-              className="text-xs flex-1 bg-red-50 text-red-600 hover:bg-red-100 py-2 px-4 rounded-[25px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               onClick={closeAdvanceApplications}
               disabled={isClosing}
+              className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {isClosing ? (
                 <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
@@ -303,13 +305,13 @@ const AdvanceApplicationManager = ({ onStatusChange }: AdvanceApplicationManager
             </button>
           ) : (
             <button
-              className="text-xs flex-1 bg-white text-green-600 hover:bg-gray-100 py-2 px-4 rounded-[25px] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               onClick={reopenAdvanceApplications}
               disabled={isClosing}
+              className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {isClosing ? (
                 <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
@@ -325,8 +327,8 @@ const AdvanceApplicationManager = ({ onStatusChange }: AdvanceApplicationManager
           )}
 
           <button
-            className="text-xs px-4 py-2 text-gray-700 bg-white rounded-[25px] hover:bg-violet-50 hover:text-violet-700 font-medium flex items-center transition-colors"
             onClick={() => setShowSchedulePanel(!showSchedulePanel)}
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center"
           >
             <Settings className="h-4 w-4 mr-2" />
             Schedule
@@ -338,7 +340,7 @@ const AdvanceApplicationManager = ({ onStatusChange }: AdvanceApplicationManager
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            className="bg-white/60 border border-indigo-200 rounded-[15px] p-5"
+            className="bg-blue-50 border border-blue-200 rounded-lg p-4"
           >
             <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
               <Schedule className="h-4 w-4 mr-2" />
@@ -389,7 +391,7 @@ const AdvanceApplicationManager = ({ onStatusChange }: AdvanceApplicationManager
                         type="datetime-local"
                         value={scheduleSettings.scheduled_close || ''}
                         onChange={(e) => setScheduleSettings(prev => ({ ...prev, scheduled_close: e.target.value }))}
-                        className="w-full px-4 py-2.5 border-none bg-white rounded-[25px] text-xs focus:outline-none focus:ring-2 focus:ring-violet-400"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         min={new Date().toISOString().slice(0, 16)}
                       />
                     </div>
@@ -401,7 +403,7 @@ const AdvanceApplicationManager = ({ onStatusChange }: AdvanceApplicationManager
                         type="datetime-local"
                         value={scheduleSettings.scheduled_open || ''}
                         onChange={(e) => setScheduleSettings(prev => ({ ...prev, scheduled_open: e.target.value }))}
-                        className="w-full px-4 py-2.5 border-none bg-white rounded-[25px] text-xs focus:outline-none focus:ring-2 focus:ring-violet-400"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         min={new Date().toISOString().slice(0, 16)}
                       />
                     </div>
@@ -415,7 +417,7 @@ const AdvanceApplicationManager = ({ onStatusChange }: AdvanceApplicationManager
                       value={scheduleSettings.custom_message || ''}
                       onChange={(e) => setScheduleSettings(prev => ({ ...prev, custom_message: e.target.value }))}
                       rows={3}
-                      className="w-full px-4 py-3 border-none bg-white rounded-[15px] text-xs focus:outline-none focus:ring-2 focus:ring-violet-400 resize-none"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="Enter a custom message to display to staff when applications are closed..."
                     />
                     <p className="text-xs text-gray-500 mt-1">
@@ -428,15 +430,15 @@ const AdvanceApplicationManager = ({ onStatusChange }: AdvanceApplicationManager
               {/* Action Buttons */}
               <div className="flex space-x-3 pt-2">
                 <button
-                  className="text-xs px-4 py-2 bg-blue-600 text-white font-medium rounded-[25px] hover:bg-blue-700 flex items-center transition-colors"
                   onClick={saveScheduleSettings}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 flex items-center"
                 >
                   <CheckCircle2 className="h-4 w-4 mr-2" />
                   Save Schedule
                 </button>
                 <button
-                  className="text-xs px-4 py-2 text-gray-700 bg-white font-medium rounded-[25px] hover:bg-red-50 hover:text-red-700 transition-colors"
                   onClick={() => setShowSchedulePanel(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
                 >
                   Cancel
                 </button>
