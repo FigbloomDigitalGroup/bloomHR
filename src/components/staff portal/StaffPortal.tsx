@@ -42,7 +42,18 @@ import {
   PartyPopper,
   Lock,
   CheckCircle2,
-  Search
+  Search,
+  WalletCards,
+  HandCoins,
+  ReceiptText,
+  MessageSquarePlus,
+  CalendarClock,
+  History,
+  FileSignature,
+  Fingerprint,
+  FolderClosed,
+  ShieldAlert,
+  BriefcaseBusiness
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
@@ -221,7 +232,7 @@ function PortalCard({ icon, title, description, onClick, color = 'green', active
       onClick={onClick}
     >
       {/* Header */}
-      <div className="relative h-14 px-4 flex items-center bg-white">
+      <div className="relative h-14 px-4 flex items-center bg-gradient-to-r from-[#1B185D]/10 to-white">
         <div className="flex items-center space-x-3 w-full">
           {/* Avatar-style icon circle */}
           <div className="relative">
@@ -271,95 +282,20 @@ function PortalCard({ icon, title, description, onClick, color = 'green', active
   );
 }
 
-// GeolocationWarningModal Component
-function GeolocationWarningModal({
-  isOpen,
-  onConfirm
-}: {
-  isOpen: boolean,
-  onConfirm: () => void
-}) {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
-      >
-        <div className="flex justify-center mb-4">
-          <MapPin className="h-12 w-12 text-green-500" />
-        </div>
-
-        <h3 className="text-lg font-medium text-gray-900 text-center mb-2">
-          Enable Location Services
-        </h3>
-
-        <p className="text-xs text-gray-600 text-center mb-6">
-          To track your attendance and working hours, we need access to your location.
-          This helps verify your presence and ensures accurate time logging.
-        </p>
-
-        <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg mb-4">
-          <div className="flex">
-            <div className="ml-3">
-              <p className="text-xs text-green-700">
-                <strong>Note:</strong> Enabling location services will automatically log you in and start tracking your work hours.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex justify-center">
-          <button
-            onClick={onConfirm}
-            className="px-6 py-2.5 border border-transparent rounded-xl text-xs font-bold text-white bg-green-600 hover:bg-green-700 shadow-lg shadow-green-200 transition-all"
-          >
-            Enable Location Services
-          </button>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-// Header Status Component with Geolocation Toggle
+// Header Status Component
 function HeaderStatus({
   isLoggedIn,
   lastLogin,
-  geolocationStatus,
   userName,
-  onGeolocationToggle
 }: {
   isLoggedIn: boolean;
   lastLogin: string | null;
-  geolocationStatus: 'granted' | 'denied' | 'prompt';
   userName: string;
-  onGeolocationToggle: () => void;
 }) {
   const navigate = useNavigate();
 
   return (
     <div className="flex items-center space-x-4">
-      {/* Geolocation Status with Toggle */}
-      <div className="flex items-center text-xs">
-        <button
-          onClick={onGeolocationToggle}
-          className="flex items-center space-x-1 px-2 py-1 rounded-lg hover:bg-gray-50 transition-colors group"
-          title={geolocationStatus === 'granted' ? 'Location enabled - Click to refresh' : 'Click to enable location tracking'}
-        >
-          {geolocationStatus === 'granted' ? (
-            <MapPin className="h-4 w-4 text-green-500 mr-1 group-hover:scale-110 transition-transform" />
-          ) : (
-            <MapPinOff className="h-4 w-4 text-gray-400 mr-1 group-hover:scale-110 transition-transform" />
-          )}
-          <span className={geolocationStatus === 'granted' ? 'text-green-600 font-medium' : 'text-gray-500 font-medium'}>
-            {geolocationStatus === 'granted' ? 'Location Enabled' : 'Location Optional'}
-          </span>
-        </button>
-      </div>
-
       {/* Login Status */}
       <div className="flex items-center text-xs">
         <PhClock className="h-4 w-4 text-gray-500 mr-1" weight="duotone" />
@@ -375,52 +311,15 @@ function HeaderStatus({
   );
 }
 
-// Geolocation and Time Tracking Functions
-function getCurrentPosition(): Promise<GeolocationPosition> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('Geolocation is not supported by this browser'));
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          timestamp: position.timestamp
-        });
-      },
-      (error) => {
-        reject(error);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      }
-    );
-  });
-}
-
+// Time Tracking Functions
 async function logLoginTime(employeeNumber: string): Promise<boolean> {
   try {
-    let position: GeolocationPosition | null = null;
-
-    try {
-      position = await getCurrentPosition();
-    } catch (error) {
-      console.warn('Could not get geolocation:', error);
-    }
-
     const { data, error } = await supabase
       .from('attendance_logs')
       .insert([{
         employee_number: employeeNumber,
         login_time: new Date().toISOString(),
         logout_time: null,
-        geolocation: position,
         status: 'logged_in'
       }])
       .select()
@@ -2808,161 +2707,138 @@ const DashboardHome = ({ setActiveTab, userName }: { setActiveTab: (tab: string)
   const greeting = currentHour < 12 ? "Good Morning" : currentHour < 17 ? "Good Afternoon" : "Good Evening";
 
   return (
-    <div className="p-3 md:p-8 space-y-8 md:space-y-10">
-      {/* Premium Welcome Banner */}
+    <div className="px-3 py-2 md:p-6 space-y-5 md:space-y-8">
       {/* Clean Welcome Banner */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden bg-white rounded-[24px] p-8 md:p-10 border border-gray-200 min-h-[160px] flex items-center"
+        className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-3 pt-2 pb-1"
       >
-        <div className="relative z-10 w-full flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex-1 space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-100 rounded text-[9px] font-bold tracking-[0.2em] text-emerald-600 uppercase">
-                System Active
-              </span>
-              <div className="h-px w-8 bg-gray-200" />
-              <span className="text-[9px] font-medium text-gray-400 lowercase tracking-wider">
-                {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-              </span>
-            </div>
-
-            <div className="flex flex-col gap-0.5">
-              <h2 className="text-2xl md:text-3xl font-light tracking-tight text-gray-900">
-                {greeting}, <span className="font-bold text-gray-900 tracking-normal">{userName.split(' ')[0]}</span><span className="text-emerald-500">.</span>
-              </h2>
-              <p className="text-gray-500 text-xs font-medium max-w-md">
-                Your workspace is optimized and ready for deployment.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3 pt-1">
-              <motion.button
-                whileHover={{ scale: 1.02, y: -1 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setActiveTab('details')}
-                className="flex items-center gap-2 px-4 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-medium hover:bg-gray-800 transition-all"
-              >
-                <PhUserCircle size={14} weight="bold" />
-                Profile
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.02, y: -1 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setActiveTab('VideoConf')}
-                className="flex items-center gap-2 px-4 py-1.5 bg-white border border-gray-200 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-50 transition-all"
-              >
-                <PhChatCircleDots size={14} weight="bold" />
-                Hub
-              </motion.button>
-            </div>
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="px-1.5 py-0.5 bg-emerald-50 border border-emerald-100 rounded text-[9px] font-bold tracking-[0.2em] text-emerald-600 uppercase">
+              System Active
+            </span>
+            <div className="h-px w-6 bg-gray-300" />
+            <span className="text-[9px] font-medium text-gray-500 lowercase tracking-wider">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+            </span>
           </div>
 
-          <div className="hidden lg:flex items-end h-full">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
-              className="relative h-[160px] w-[160px] -mb-8 pointer-events-none"
-            >
-              <div className="absolute inset-0 bg-emerald-400/10 blur-3xl rounded-full scale-125 translate-y-8" />
-              <img
-                src={bannerAvatar}
-                alt="Representative"
-                className="relative z-10 w-full h-full object-contain"
-                style={{
-                  maskImage: 'linear-gradient(to bottom, black 80%, transparent 100%)',
-                  WebkitMaskImage: 'linear-gradient(to bottom, black 80%, transparent 100%)'
-                }}
-              />
-            </motion.div>
+          <div className="flex flex-col gap-0 shadow-sm leading-tight text-shadow-sm">
+            <h2 className="text-xl md:text-2xl font-light tracking-tight text-gray-900 leading-none pb-1">
+              {greeting}, <span className="font-bold text-gray-900 tracking-normal">{userName.split(' ')[0]}</span><span className="text-emerald-500">.</span>
+            </h2>
+            <p className="text-gray-500 text-[11px] md:text-xs font-medium max-w-md pt-0.5">
+              Your workspace is optimized and ready for deployment.
+            </p>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2 pt-2 md:pt-0 w-full md:w-auto">
+          <motion.button
+            whileHover={{ scale: 1.02, y: -1 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setActiveTab('details')}
+            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-medium hover:bg-gray-800 transition-all shadow-sm"
+          >
+            <PhUserCircle size={14} weight="bold" />
+            Profile
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.02, y: -1 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setActiveTab('VideoConf')}
+            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-all shadow-sm"
+          >
+            <PhChatCircleDots size={14} weight="bold" />
+            Hub
+          </motion.button>
         </div>
       </motion.div>
 
       {/* Services Grid */}
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex items-center justify-between px-2">
           <div>
-            <h3 className="text-lg font-bold text-gray-900">Quick Services</h3>
-            <p className="text-xs text-gray-500 font-medium tracking-tight">Access your employee tools and resources</p>
+            <h3 className="text-base md:text-lg font-bold text-gray-900">Quick Services</h3>
+            <p className="text-[10px] md:text-xs text-gray-500 font-medium tracking-tight">Access your employee tools and resources</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
           <PortalCard
-            icon={<PhCreditCard className="w-6 h-6" weight="duotone" />}
+            icon={<WalletCards className="w-5 h-5" strokeWidth={1.5} />}
             title="Salary Advance"
             description="Emergency financial support"
             onClick={() => setActiveTab('salary-advance')}
             color="green"
           />
           <PortalCard
-            icon={<PhCoins className="w-6 h-6" weight="duotone" />}
+            icon={<HandCoins className="w-5 h-5" strokeWidth={1.5} />}
             title="Loan Request"
             description="Affordable staff credit facilities"
             onClick={() => setActiveTab('loan')}
             color="green"
           />
           <PortalCard
-            icon={<PhReceipt className="w-6 h-6" weight="duotone" />}
+            icon={<ReceiptText className="w-5 h-5" strokeWidth={1.5} />}
             title="Payslips"
             description="Download salary breakdowns"
             onClick={() => setActiveTab('payslips')}
             color="green"
           />
           <PortalCard
-            icon={<PhChatCircleDots className="w-6 h-6" weight="duotone" />}
+            icon={<MessageSquarePlus className="w-5 h-5" strokeWidth={1.5} />}
             title="Comm Hub"
             description="Collaborate with your team"
             onClick={() => setActiveTab('VideoConf')}
             color="green"
           />
           <PortalCard
-            icon={<PhCalendarBlank className="w-6 h-6" weight="duotone" />}
+            icon={<CalendarClock className="w-5 h-5" strokeWidth={1.5} />}
             title="Leave Request"
             description="Plan your time off"
             onClick={() => setActiveTab('leave')}
             color="green"
           />
           <PortalCard
-            icon={<PhClockCounterClockwise className="w-6 h-6" weight="duotone" />}
+            icon={<History className="w-5 h-5" strokeWidth={1.5} />}
             title="Leave History"
             description="Review previous applications"
             onClick={() => setActiveTab('leave-history')}
             color="green"
           />
           <PortalCard
-            icon={<PhFile className="w-6 h-6" weight="duotone" />}
+            icon={<FileSignature className="w-5 h-5" strokeWidth={1.5} />}
             title="Contracts"
             description="Review employment documents"
             onClick={() => setActiveTab('contract')}
             color="green"
           />
           <PortalCard
-            icon={<PhFingerprint className="w-6 h-6" weight="duotone" />}
+            icon={<Fingerprint className="w-5 h-5" strokeWidth={1.5} />}
             title="My Profile"
             description="Manage your personal info"
             onClick={() => setActiveTab('details')}
             color="green"
           />
           <PortalCard
-            icon={<PhFolderOpen className="w-6 h-6" weight="duotone" />}
+            icon={<FolderClosed className="w-5 h-5" strokeWidth={1.5} />}
             title="Documents"
             description="Secure file storage"
             onClick={() => setActiveTab('documents')}
             color="green"
           />
           <PortalCard
-            icon={<PhLifebuoy className="w-6 h-6" weight="duotone" />}
+            icon={<ShieldAlert className="w-5 h-5" strokeWidth={1.5} />}
             title="Report Incident"
             description="Whistleblower protection"
             onClick={() => setActiveTab('incident-report')}
             color="green"
           />
           <PortalCard
-            icon={<PhBriefcase className="w-6 h-6" weight="duotone" />}
+            icon={<BriefcaseBusiness className="w-5 h-5" strokeWidth={1.5} />}
             title="Opportunities"
             description="Career growth paths"
             onClick={() => setActiveTab('job-applications')}
@@ -3086,12 +2962,11 @@ const staffMenuGroups: MenuGroup[] = [
   }
 ];
 
-// Main StaffPortal Component with Geolocation and Time Tracking
+// Main StaffPortal Component with Time Tracking
 const StaffPortal = () => {
   const [activeTab, setActiveTab] = useState('home');
   const [showResetModal, setShowResetModal] = useState(false);
-  const [showGeolocationWarning, setShowGeolocationWarning] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true); // For mobile
+  const [sidebarOpen, setSidebarOpen] = useState(false); // For mobile
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   // New Sidebar States
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -3114,7 +2989,6 @@ const StaffPortal = () => {
     isLoggedIn: false,
     lastLogin: null as string | null
   });
-  const [geolocationStatus, setGeolocationStatus] = useState<'granted' | 'denied' | 'prompt'>('prompt');
   const [userName, setUserName] = useState('Staff Member');
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile | null>(null);
   const [notifications, setNotifications] = useState<NotificationState>({
@@ -3220,57 +3094,12 @@ const StaffPortal = () => {
     };
   }, [employeeNumber]);
 
-  // Check geolocation status on component mount
+  // Check login status and fetch data on component mount
   useEffect(() => {
-    checkGeolocationPermission();
     checkLoginStatus();
     fetchUserData();
     fetchCompanyProfile();
   }, []);
-
-  // Auto-create login session when geolocation is granted
-  useEffect(() => {
-    const createLoginSession = async () => {
-      if (geolocationStatus === 'granted' && !loginStatus.isLoggedIn) {
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user?.email) return;
-
-          const { data: employeeData } = await supabase
-            .from('employees')
-            .select('"Employee Number"')
-            .eq('"Work Email"', user.email)
-            .single();
-
-          if (employeeData) {
-            // Check if there's already an active session
-            const hasActiveSession = await checkExistingLogin(employeeData["Employee Number"]);
-
-            if (!hasActiveSession) {
-              const loggedIn = await logLoginTime(employeeData["Employee Number"]);
-              if (loggedIn) {
-                setLoginStatus({
-                  isLoggedIn: true,
-                  lastLogin: new Date().toISOString()
-                });
-                toast.success('Logged in successfully with location services');
-              }
-            } else {
-              // Update the UI to reflect the existing session
-              setLoginStatus({
-                isLoggedIn: true,
-                lastLogin: new Date().toISOString()
-              });
-            }
-          }
-        } catch (error) {
-          console.error('Error creating login session:', error);
-        }
-      }
-    };
-
-    createLoginSession();
-  }, [geolocationStatus]);
 
   const fetchUserData = async () => {
     try {
@@ -3328,66 +3157,6 @@ const StaffPortal = () => {
 
   const unreadNotifications = notifications.items.filter(item => !item.isRead);
 
-  const checkGeolocationPermission = async () => {
-    if (!navigator.geolocation) {
-      setGeolocationStatus('denied');
-      // Don't show warning - geolocation is optional
-      return;
-    }
-
-    try {
-      // First, try to actually get the position to verify real access
-      // This is more reliable than just checking permissions API
-      try {
-        await getCurrentPosition();
-        // If we successfully got position, geolocation is definitely granted
-        setGeolocationStatus('granted');
-        return;
-      } catch (positionError: any) {
-        // If position failed, check the error code
-        if (positionError.code === 1) {
-          // PERMISSION_DENIED
-          setGeolocationStatus('denied');
-          // Don't show warning - geolocation is optional
-          return;
-        }
-        // For other errors (timeout, unavailable), still check permissions API
-      }
-
-      // Fallback to permissions API if position check was inconclusive
-      const result = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
-
-      if (result.state === 'granted') {
-        setGeolocationStatus('granted');
-      } else if (result.state === 'denied') {
-        setGeolocationStatus('denied');
-        // Don't show warning - geolocation is optional
-      } else {
-        setGeolocationStatus('prompt');
-        // Don't show warning - geolocation is optional
-      }
-
-      // Listen for changes in permission state
-      result.onchange = () => {
-        setGeolocationStatus(result.state as 'granted' | 'denied');
-        if (result.state === 'granted') {
-          // Re-check login status when permission is granted
-          checkLoginStatus();
-        }
-      };
-    } catch (error) {
-      console.error('Error checking geolocation permission:', error);
-      // If permissions API fails, try one more time to get position
-      try {
-        await getCurrentPosition();
-        setGeolocationStatus('granted');
-      } catch {
-        setGeolocationStatus('denied');
-        // Don't show warning - geolocation is optional
-      }
-    }
-  };
-
   const checkLoginStatus = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -3417,8 +3186,8 @@ const StaffPortal = () => {
         lastLogin: activeLog?.login_time || null
       });
 
-      // If no active login session, create one
-      if (!activeLog && geolocationStatus === 'granted') {
+      // If no active login session, create one automatically
+      if (!activeLog) {
         const loggedIn = await logLoginTime(employeeData["Employee Number"]);
         if (loggedIn) {
           setLoginStatus({
@@ -3432,53 +3201,6 @@ const StaffPortal = () => {
     }
   };
 
-  const handleGeolocationConfirm = async () => {
-    setShowGeolocationWarning(false);
-
-    try {
-      // Try to get current position to trigger permission prompt
-      await getCurrentPosition();
-      setGeolocationStatus('granted');
-
-      // Log login time after permission is granted
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        const { data: employeeData } = await supabase
-          .from('employees')
-          .select('"Employee Number"')
-          .eq('"Work Email"', user.email)
-          .single();
-
-        if (employeeData) {
-          const loggedIn = await logLoginTime(employeeData["Employee Number"]);
-          if (loggedIn) {
-            setLoginStatus({
-              isLoggedIn: true,
-              lastLogin: new Date().toISOString()
-            });
-            toast.success('Successfully logged in with geolocation');
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error getting geolocation:', error);
-      setGeolocationStatus('denied');
-      toast.error('Geolocation is required to log in. Please enable it in your browser settings.');
-    }
-  };
-
-  const handleGeolocationToggle = async () => {
-    if (geolocationStatus === 'granted') {
-      // Force a complete re-check to verify geolocation is still working
-      toast('Refreshing location status...');
-      await checkGeolocationPermission();
-      toast.success('Location status refreshed');
-    } else {
-      // If not granted, trigger the permission request
-      setShowGeolocationWarning(true);
-    }
-  };
-
   const toggleMenu = (menu: string) => {
     if (expandedMenu === menu) {
       setExpandedMenu(null);
@@ -3488,18 +3210,13 @@ const StaffPortal = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50/50 relative flex font-sans text-gray-900 transition-colors duration-300 overflow-hidden">
+    <div className="min-h-screen bg-slate-100 relative flex font-sans text-gray-900 transition-colors duration-300 overflow-hidden">
       {/* Dynamic Background Blobs */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full bg-gray-200/30 blur-[130px] animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] rounded-full bg-gray-200/30 blur-[130px] animate-pulse" />
         <div className="absolute top-[20%] right-[-5%] w-[40%] h-[40%] rounded-full bg-gray-100/20 blur-[110px]" />
       </div>
-
-      <GeolocationWarningModal
-        isOpen={showGeolocationWarning}
-        onConfirm={handleGeolocationConfirm}
-      />
 
       {/* Mobile Sidebar Backdrop */}
       {sidebarOpen && (
@@ -3807,9 +3524,7 @@ const StaffPortal = () => {
               <HeaderStatus
                 isLoggedIn={loginStatus.isLoggedIn}
                 lastLogin={loginStatus.lastLogin}
-                geolocationStatus={geolocationStatus}
                 userName={userName}
-                onGeolocationToggle={handleGeolocationToggle}
               />
 
               <div className="w-px h-6 bg-gray-200 mx-2"></div>
@@ -3839,14 +3554,7 @@ const StaffPortal = () => {
         <main className="flex-1 overflow-y-auto bg-transparent p-4 pt-0 md:p-6 md:pt-0 scrollbar-hide">
           <div className="max-w-7xl mx-auto pb-10">
             {/* Warnings */}
-            {!loginStatus.isLoggedIn && (
-              <div className="mb-6 bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-lg shadow-sm">
-                <div className="flex items-center">
-                  <PhWarning className="h-5 w-5 text-amber-500 mr-3" weight="duotone" />
-                  <div className=""><p className="text-xs text-amber-700 font-medium"><strong>Attendance Status:</strong> Please enable geolocation and log in to record your attendance.</p></div>
-                </div>
-              </div>
-            )}
+
 
             {/* Content */}
             <motion.div
