@@ -2757,7 +2757,7 @@ export default function PayrollDashboard() {
   const [payrollRecords, setPayrollRecords] = useState([]);
   const [filteredRecords, setFilteredRecords] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [showSummary, setShowSummary] = useState(false);
+  const [showSummary, setShowSummary] = useState(true);
   const [companyInfo, setCompanyInfo] = useState(null);
 
   const [showSingleMpesaModal, setShowSingleMpesaModal] = useState(false);
@@ -4134,56 +4134,88 @@ export default function PayrollDashboard() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6">
-              <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm">
-                <div className="flex items-center gap-2 mb-2">
-                  <Clock className="w-4 h-4 text-orange-600" />
-                  <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">
-                    Pending
-                  </span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
+              {/* Employees */}
+              <div className="bg-white p-4 rounded-[10px] border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <Users className="w-3.5 h-3.5 text-gray-500" />
+                  <span className="text-xs font-medium text-gray-500">Employees</span>
                 </div>
-                <p className="text-2xl font-bold text-amber-600">
-                  {pendingCount}
-                </p>
+                <p className="text-xl font-bold text-gray-900">{finalFilteredRecords.length}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">On payroll</p>
               </div>
-              <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm">
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="w-4 h-4 text-green-600" />
-                  <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">
-                    Approved
-                  </span>
+
+              {/* Gross Pay */}
+              <div className="bg-white p-4 rounded-[10px] border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <TrendingUp className="w-3.5 h-3.5 text-blue-500" />
+                  <span className="text-xs font-medium text-gray-500">Gross pay</span>
                 </div>
-                <p className="text-2xl font-bold text-emerald-600">
-                  {approvedCount}
-                </p>
+                <p className="text-sm font-bold text-blue-700">KSh {totalGrossPay.toLocaleString()}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Before deductions</p>
               </div>
-              <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm">
-                <div className="flex items-center gap-2 mb-2">
-                  <XCircle className="w-4 h-4 text-red-600" />
-                  <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">
-                    Rejected
-                  </span>
+
+              {/* Net Pay */}
+              <div className="bg-white p-4 rounded-[10px] border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <DollarSign className="w-3.5 h-3.5 text-green-500" />
+                  <span className="text-xs font-medium text-gray-500">Net pay</span>
                 </div>
-                <p className="text-2xl font-bold text-red-600">
-                  {rejectedCount}
-                </p>
+                <p className="text-sm font-bold text-green-700">KSh {totalNetPay.toLocaleString()}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Take-home</p>
               </div>
-              <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm">
-                <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className="w-4 h-4 text-blue-600" />
-                  <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">
-                    Total Value
-                  </span>
+
+              {/* Total Deductions */}
+              <div className="bg-white p-4 rounded-[10px] border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <Calculator className="w-3.5 h-3.5 text-red-400" />
+                  <span className="text-xs font-medium text-gray-500">Deductions</span>
                 </div>
-                <p className="text-lg font-bold text-blue-600">
-                  KSh{" "}
-                  {paymentRequests
-                    .filter((p) => p.status === "pending")
-                    .reduce((sum, p) => sum + (p.total_amount || 0), 0)
-                    .toLocaleString()}
-                </p>
+                <p className="text-sm font-bold text-red-600">KSh {totalDeductions.toLocaleString()}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Statutory + others</p>
+              </div>
+
+              {/* PAYE */}
+              <div className="bg-white p-4 rounded-[10px] border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <FileText className="w-3.5 h-3.5 text-orange-400" />
+                  <span className="text-xs font-medium text-gray-500">PAYE</span>
+                </div>
+                <p className="text-sm font-bold text-orange-600">KSh {totalPAYE.toLocaleString()}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Income tax</p>
+              </div>
+
+              {/* SHIF (NHIF) */}
+              <div className="bg-white p-4 rounded-[10px] border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <TrendingUp className="w-3.5 h-3.5 text-purple-400" />
+                  <span className="text-xs font-medium text-gray-500">SHIF</span>
+                </div>
+                <p className="text-sm font-bold text-purple-600">KSh {totalNHIF.toLocaleString()}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Health fund</p>
+              </div>
+
+              {/* NSSF */}
+              <div className="bg-white p-4 rounded-[10px] border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <Calculator className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="text-xs font-medium text-gray-500">NSSF</span>
+                </div>
+                <p className="text-sm font-bold text-indigo-600">KSh {totalNSSF.toLocaleString()}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Social security</p>
+              </div>
+
+              {/* Housing Levy */}
+              <div className="bg-white p-4 rounded-[10px] border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <DollarSign className="w-3.5 h-3.5 text-yellow-500" />
+                  <span className="text-xs font-medium text-gray-500">Housing levy</span>
+                </div>
+                <p className="text-sm font-bold text-yellow-600">KSh {totalHousingLevy.toLocaleString()}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">1.5% of gross</p>
               </div>
             </div>
+
 
             {paymentRequests.length > 0 ? (
               <div className="grid gap-4">
@@ -4416,8 +4448,8 @@ export default function PayrollDashboard() {
           <button
             onClick={toggleStatutoryOverride}
             className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-[25px] text-xs font-medium transition-colors border ${overrideStatutoryChecks
-                ? "bg-green-50 text-green-700 border-green-200"
-                : "bg-white text-gray-600 border-gray-200 hover:text-violet-700 hover:bg-violet-50"
+              ? "bg-green-50 text-green-700 border-green-200"
+              : "bg-white text-gray-600 border-gray-200 hover:text-violet-700 hover:bg-violet-50"
               }`}
           >
             <span className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${overrideStatutoryChecks ? "bg-green-500" : "bg-gray-300"
@@ -4489,96 +4521,119 @@ export default function PayrollDashboard() {
         </div>
       </div>
 
-      {showSummary && (
-        <div className="bg-gradient-to-r from-blue-100 to-indigo-100 border border-indigo-200 rounded-[10px] p-6">
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">
-            Statutory Deductions
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatutoryCard
-              label="Total PAYE Tax"
-              value={totalPAYE}
-              icon={FileText}
-              color="red"
-              rate="Progressive rates"
-            />
-            <StatutoryCard
-              label="Total NSSF"
-              value={totalNSSF}
-              icon={Calculator}
-              color="blue"
-              rate="6% (Tiered)"
-            />
-            <StatutoryCard
-              label="Total SHIF"
-              value={totalNHIF}
-              icon={TrendingUp}
-              color="purple"
-              rate="Tiered"
-            />
-            <StatutoryCard
-              label="Housing Levy"
-              value={totalHousingLevy}
-              icon={DollarSign}
-              color="yellow"
-              rate="1.5%"
-            />
-          </div>
-        </div>
-      )}
+
 
       {/* ── PAYROLL REPORT ──────────────────────────────────── */}
       <div>
-        {/* Report title row — clean, no buttons */}
-        <div className="flex items-center gap-3 mb-2">
-          <h2 className="text-sm font-semibold text-gray-800">Payroll Report</h2>
-          <span className="text-[11px] text-gray-400">{finalFilteredRecords.length} records</span>
-          {totalAdvanceDeductions > 0 && (
-            <span className="text-[11px] text-orange-500">
-              Advance Deductions: KSh {totalAdvanceDeductions.toLocaleString()}
-            </span>
-          )}
+        {/* Stats cards - always visible */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-4">
+          <div className="bg-white p-3 rounded-[10px] border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Users className="w-3 h-3 text-gray-400" />
+              <span className="text-[10px] font-medium text-gray-500">Employees</span>
+            </div>
+            <p className="text-lg font-bold text-gray-900">{finalFilteredRecords.length}</p>
+            <p className="text-[10px] text-gray-400">On payroll</p>
+          </div>
+          <div className="bg-white p-3 rounded-[10px] border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-1.5 mb-1">
+              <TrendingUp className="w-3 h-3 text-blue-400" />
+              <span className="text-[10px] font-medium text-gray-500">Gross pay</span>
+            </div>
+            <p className="text-xs font-bold text-blue-700">KSh {totalGrossPay.toLocaleString()}</p>
+            <p className="text-[10px] text-gray-400">Before deductions</p>
+          </div>
+          <div className="bg-white p-3 rounded-[10px] border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-1.5 mb-1">
+              <DollarSign className="w-3 h-3 text-green-400" />
+              <span className="text-[10px] font-medium text-gray-500">Net pay</span>
+            </div>
+            <p className="text-xs font-bold text-green-700">KSh {totalNetPay.toLocaleString()}</p>
+            <p className="text-[10px] text-gray-400">Take-home</p>
+          </div>
+          <div className="bg-white p-3 rounded-[10px] border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Calculator className="w-3 h-3 text-red-400" />
+              <span className="text-[10px] font-medium text-gray-500">Deductions</span>
+            </div>
+            <p className="text-xs font-bold text-red-600">KSh {totalDeductions.toLocaleString()}</p>
+            <p className="text-[10px] text-gray-400">Statutory + others</p>
+          </div>
+          <div className="bg-white p-3 rounded-[10px] border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-1.5 mb-1">
+              <FileText className="w-3 h-3 text-orange-400" />
+              <span className="text-[10px] font-medium text-gray-500">PAYE</span>
+            </div>
+            <p className="text-xs font-bold text-orange-600">KSh {totalPAYE.toLocaleString()}</p>
+            <p className="text-[10px] text-gray-400">Income tax</p>
+          </div>
+          <div className="bg-white p-3 rounded-[10px] border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-1.5 mb-1">
+              <TrendingUp className="w-3 h-3 text-purple-400" />
+              <span className="text-[10px] font-medium text-gray-500">SHIF</span>
+            </div>
+            <p className="text-xs font-bold text-purple-600">KSh {totalNHIF.toLocaleString()}</p>
+            <p className="text-[10px] text-gray-400">Health fund</p>
+          </div>
+          <div className="bg-white p-3 rounded-[10px] border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Calculator className="w-3 h-3 text-indigo-400" />
+              <span className="text-[10px] font-medium text-gray-500">NSSF</span>
+            </div>
+            <p className="text-xs font-bold text-indigo-600">KSh {totalNSSF.toLocaleString()}</p>
+            <p className="text-[10px] text-gray-400">Social security</p>
+          </div>
+          <div className="bg-white p-3 rounded-[10px] border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-1.5 mb-1">
+              <DollarSign className="w-3 h-3 text-yellow-500" />
+              <span className="text-[10px] font-medium text-gray-500">Housing levy</span>
+            </div>
+            <p className="text-xs font-bold text-yellow-600">KSh {totalHousingLevy.toLocaleString()}</p>
+            <p className="text-[10px] text-gray-400">1.5% of gross</p>
+          </div>
         </div>
+
+
 
         <div className="bg-[#f3f4f6] rounded-[5px] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-300 text-xs">
-              <thead className="bg-gray-600 border-b border-gray-700">
+              <thead className="bg-gray-200 border-b border-gray-300">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
                     Employee
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
                     Region
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
-                    Gross Pay
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
+                    Gross pay
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
-                    Per Diem
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
+                    Per diem
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
                     PAYE
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
                     SHIF
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
                     NSSF
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
                     AHL
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
                     Advance
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
-                    Total Deductions
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
+                    Total deductions
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">
-                    Net Pay
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
+                    Net pay
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-normal text-white">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">
                     Actions
                   </th>
                 </tr>

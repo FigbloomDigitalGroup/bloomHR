@@ -296,11 +296,11 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white/80 text-xs backdrop-blur-sm border border-gray-200 rounded-lg p-6 relative z-20">
-        <div className="grid grid-cols-1 md:grid-cols-5 lg:grid-cols-7 gap-4 items-center">
+      <div className="bg-white/80 text-xs backdrop-blur-sm border border-gray-200 rounded-lg p-3 relative z-20">
+        <div className="grid grid-cols-1 md:grid-cols-5 lg:grid-cols-7 gap-2 items-center">
           {/* Search Input */}
           <div className="relative md:col-span-2 lg:col-span-2">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
+            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
             <input
               type="text"
               placeholder="Search by name, ID, email, or phone..."
@@ -309,7 +309,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full pl-8 pr-3 py-1.5 text-[11px] border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
             />
           </div>
 
@@ -349,15 +349,15 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
             icon={Building2}
           />
 
-          {/* Buttons - moved to a new row on smaller screens */}
-          <div className="flex space-x-2 h-[42px] md:col-span-5 lg:col-span-2">
-            <div className="flex space-x-2 h-full w-full justify-end">
+          {/* Buttons */}
+          <div className="flex space-x-2 h-[32px] md:col-span-5 lg:col-span-2">
+            <div className="flex space-x-1.5 h-full w-full justify-end">
               {isSelectionMode ? (
                 <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
                   <GlowButton
                     variant="secondary"
                     size="sm"
-                    className="h-full bg-red-50 text-red-600 border-red-100 hover:bg-red-100"
+                    className="h-full !text-[11px] bg-red-50 text-red-600 border-red-100 hover:bg-red-100"
                     onClick={() => {
                       setIsSelectionMode(false);
                       setSelectedIds([]);
@@ -369,14 +369,13 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                   <GlowButton
                     variant="primary"
                     size="sm"
-                    className="h-full"
+                    className="h-full !text-[11px]"
                     disabled={selectedIds.length === 0}
                     onClick={() => setShowBulkEditModal(true)}
                     icon={Save}
                   >
                     Update ({selectedIds.length})
                   </GlowButton>
-                  {/* Select All on Page helper */}
                   <button
                     className="text-[10px] text-gray-500 hover:text-emerald-600 underline ml-1"
                     onClick={handleSelectAllOnPage}
@@ -391,7 +390,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                       variant="secondary"
                       icon={Copy}
                       size="sm"
-                      className="h-full"
+                      className="h-full !text-[11px]"
                       onClick={() => setShowDuplicateModal(true)}
                     >
                       Duplicates
@@ -403,7 +402,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                       variant="primary"
                       icon={Edit3Icon}
                       size="sm"
-                      className="h-full"
+                      className="h-full !text-[11px]"
                       onClick={() => navigate('/fogs')}
                     >
                       Bulk Edit
@@ -415,7 +414,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                       variant="secondary"
                       icon={Building2}
                       size="sm"
-                      className="h-full"
+                      className="h-full !text-[11px]"
                       onClick={() => setIsSelectionMode(true)}
                     >
                       Relocate
@@ -460,44 +459,38 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
               )}
 
               {/* Header Section */}
-              <div className={`relative px-5 py-5 pb-4 bg-gradient-to-br transition-colors ${isSelected ? 'from-emerald-50 via-white to-emerald-50' : 'from-white via-white to-gray-50/50'}`}>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-4">
-                    {/* Avatar */}
-                    <div className="relative">
-                      <div className="w-14 h-14 bg-gradient-to-br from-gray-100 to-gray-50 rounded-2xl flex items-center justify-center text-gray-700 font-bold text-lg border border-gray-100 shadow-sm group-hover:from-green-50 group-hover:to-emerald-50 group-hover:text-green-700 transition-colors duration-300">
-                        {getInitials(employee['First Name'], employee['Middle Name'], employee['Last Name'])}
-                      </div>
-                      <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border-[3px] border-white flex items-center justify-center ${employee['Termination Date'] ? 'bg-red-500' : 'bg-emerald-500'
-                        }`}>
-                      </div>
+              <div className="relative h-14 px-4 flex items-center bg-gradient-to-r from-green-200/70 to-white">
+                <div className="flex items-center space-x-3 w-full">
+                  {/* Avatar */}
+                  <div className="relative">
+                    <div className="w-10 h-10 bg-gradient-to-br from-green-600 to-emerald-700 rounded-full flex items-center justify-center text-white font-bold text-sm border border-green-500/30 shadow-sm transition-colors duration-300">
+                      {getInitials(employee['First Name'], employee['Middle Name'], employee['Last Name'])}
                     </div>
+                    <div className={`absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${employee['Termination Date'] ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                  </div>
 
-                    {/* Name & ID */}
-                    <div className="space-y-1">
-                      <h3 className="text-gray-900 font-bold text-[15px] leading-tight group-hover:text-green-700 transition-colors">
-                        {employee['First Name']} {employee['Last Name']}
-                      </h3>
-                      <div className="flex items-center space-x-2">
-                        <span className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-500 text-[10px] font-medium tracking-wide border border-gray-200/50">
-                          {employee['Employee Number']}
-                        </span>
-                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${employee['Termination Date']
-                          ? 'bg-red-50 text-red-600 border border-red-100'
-                          : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                          }`}>
-                          {employee['Termination Date'] ? 'Inactive' : 'Active'}
-                        </span>
-                      </div>
+                  {/* Name & ID */}
+                  <div className="space-y-0.5 min-w-0">
+                    <h3 className="text-gray-900 font-bold text-[13px] leading-tight group-hover:text-green-700 transition-colors truncate">
+                      {employee['First Name']} {employee['Last Name']}
+                    </h3>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="px-1.5 py-0.5 rounded-md bg-white/70 text-gray-500 text-[9px] font-medium tracking-wide border border-gray-200/50">
+                        {employee['Employee Number']}
+                      </span>
+                      <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${employee['Termination Date']
+                        ? 'bg-red-50 text-red-600 border border-red-100'
+                        : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                        }`}>
+                        {employee['Termination Date'] ? 'Inactive' : 'Active'}
+                      </span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Slick Line Seperator */}
-              <div className="relative h-px w-full">
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-gray-200 to-transparent"></div>
-              </div>
+              {/* Slick Line Separator */}
+              <div className="h-px w-full bg-gray-300" />
 
               {/* Body Content */}
               <div className="px-5 py-5 space-y-4 flex-grow bg-white">
@@ -543,14 +536,17 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                 </div>
               </div>
 
+              {/* Separator */}
+              <div className="h-px w-full bg-gray-200" />
+
               {/* Footer Actions - DISABLED IN SELECTION MODE */}
-              <div className={`px-5 py-4 bg-gray-50/50 border-t border-gray-100 mt-auto transition-opacity ${isSelectionMode ? 'opacity-40 pointer-events-none' : ''}`}>
-                <div className="flex items-center gap-3">
+              <div className={`h-14 px-4 flex items-center bg-white border-t-0 mt-auto transition-opacity ${isSelectionMode ? 'opacity-40 pointer-events-none' : ''}`}>
+                <div className="flex items-center gap-2 w-full">
                   <RoleButtonWrapper allowedRoles={['ADMIN', 'HR', 'MANAGER', 'REGIONAL']}>
                     <GlowButton
                       variant="secondary"
                       size="sm"
-                      className="flex-1 bg-white border-gray-200 text-gray-600 hover:text-green-700 hover:border-green-200 hover:bg-green-50/30 shadow-sm h-9"
+                      className="flex-1 bg-white border-gray-200 text-gray-600 hover:text-green-700 hover:border-green-200 hover:bg-green-50/30 shadow-sm !h-7 !text-[11px] !py-0"
                       icon={Settings}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -563,15 +559,16 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
 
                   <RoleButtonWrapper allowedRoles={['ADMIN', 'HR', 'MANAGER', 'REGIONAL']}>
                     <GlowButton
-                      variant="danger"
+                      variant="secondary"
                       size="sm"
-                      className="flex-shrink-0 w-9 h-9 !p-0 flex items-center justify-center !bg-white border-red-100 !text-red-500 hover:!bg-red-50 hover:border-red-200 shadow-sm"
+                      className="flex-1 bg-white border-gray-200 text-gray-600 hover:text-emerald-700 hover:border-emerald-200 hover:bg-emerald-50/30 shadow-sm !h-7 !text-[11px] !py-0"
+                      icon={UserRoundCog}
                       onClick={(e) => {
                         e.stopPropagation();
                         navigate(`/view-employee/${employee['Employee Number']}`)
                       }}
                     >
-                      <UserRoundCog className="w-4 h-4" />
+                      Terminate
                     </GlowButton>
                   </RoleButtonWrapper>
                 </div>

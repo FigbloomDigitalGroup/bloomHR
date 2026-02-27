@@ -73,10 +73,10 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
             <button
                 onClick={() => !disabled && setIsOpen(!isOpen)}
                 disabled={disabled}
-                className={`w-full h-[42px] bg-gray-50/50 border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:border-green-500 focus:shadow-[0_0_15px_rgba(34,197,94,0.1)] hover:bg-white transition-all duration-200 flex items-center justify-between text-left group ${disabled ? 'opacity-50 cursor-not-allowed bg-gray-100' : ''}`}
+                className={`w-full h-[32px] bg-gray-50/50 border border-gray-300 rounded-md px-2.5 py-1.5 text-gray-900 focus:outline-none focus:border-green-500 focus:shadow-[0_0_15px_rgba(34,197,94,0.1)] hover:bg-white transition-all duration-200 flex items-center justify-between text-left group ${disabled ? 'opacity-50 cursor-not-allowed bg-gray-100' : ''}`}
             >
                 <div className="flex items-center gap-2 truncate flex-1">
-                    {Icon && <Icon size={15} className={`text-gray-400 ${!disabled && 'group-hover:text-green-600'} transition-colors`} />}
+                    {Icon && <Icon size={13} className={`text-gray-400 flex-shrink-0 ${!disabled && 'group-hover:text-green-600'} transition-colors`} />}
                     <span className={`truncate text-xs ${value === 'all' ? 'text-gray-500' : 'text-gray-900 font-medium'}`}>
                         {currentLabel}
                     </span>

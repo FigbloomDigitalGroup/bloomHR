@@ -1,4 +1,3 @@
-// SalaryAdmin - UI Refresh: white containers, compact inputs & buttons
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, supabaseAdmin } from '../../lib/supabase';
@@ -415,7 +414,7 @@ const ExportModal = ({ isOpen, onClose, onExport, isLoading, filterOptions }: {
                   type="date"
                   value={customStartDate}
                   onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
                 />
               </div>
               <div>
@@ -426,7 +425,7 @@ const ExportModal = ({ isOpen, onClose, onExport, isLoading, filterOptions }: {
                   type="date"
                   value={customEndDate}
                   onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
                 />
               </div>
             </div>
@@ -492,7 +491,7 @@ const ExportModal = ({ isOpen, onClose, onExport, isLoading, filterOptions }: {
         <div className="flex justify-end gap-3 mt-6">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-[25px] hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-200 rounded-[25px] hover:bg-gray-300 transition-colors"
             disabled={isLoading}
           >
             Cancel
@@ -500,7 +499,7 @@ const ExportModal = ({ isOpen, onClose, onExport, isLoading, filterOptions }: {
           <button
             onClick={handleExport}
             disabled={isLoading}
-            className="px-4 py-2 text-xs font-medium text-white bg-gray-900 rounded-[25px] border border-gray-700 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+            className="px-4 py-2 text-xs font-medium text-white bg-gray-900 rounded-[25px] hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
           >
             {isLoading ? (
               <>
@@ -638,7 +637,7 @@ const ImportModal = ({ isOpen, onClose, onImport, isLoading }: {
         <div className="flex justify-end gap-3 mt-6">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-[25px] hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-200 rounded-[25px] hover:bg-gray-300 transition-colors"
             disabled={isLoading}
           >
             Cancel
@@ -646,7 +645,7 @@ const ImportModal = ({ isOpen, onClose, onImport, isLoading }: {
           <button
             onClick={handleFileUpload}
             disabled={isLoading || !file}
-            className="px-4 py-2 text-xs font-medium text-white bg-gray-900 rounded-[25px] border border-gray-700 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+            className="px-4 py-2 text-xs font-medium text-white bg-gray-900 rounded-[25px] hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
           >
             {isLoading ? (
               <>
@@ -814,7 +813,7 @@ const EnhancedFilter = ({
                     type="date"
                     value={customStartDate}
                     onChange={(e) => onCustomStartDateChange(e.target.value)}
-                    className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-1 focus:ring-green-500 focus:border-green-500"
                   />
                 </div>
                 <div>
@@ -825,7 +824,7 @@ const EnhancedFilter = ({
                     type="date"
                     value={customEndDate}
                     onChange={(e) => onCustomEndDateChange(e.target.value)}
-                    className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-1 focus:ring-green-500 focus:border-green-500"
                   />
                 </div>
               </div>
@@ -841,7 +840,7 @@ const EnhancedFilter = ({
                 value={selectedTown || ''}
                 onChange={(e) => onTownChange(e.target.value)}
                 disabled={isManager}
-                className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-green-500 focus:border-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-1 focus:ring-green-500 focus:border-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="">All {isRegionalManager ? 'Regions' : 'Towns'}</option>
                 {allTowns.map(town => (
@@ -941,7 +940,7 @@ const CommentModal = ({
         </p>
 
         {application && (
-          <div className="bg-white rounded-[10px] p-3 mb-4">
+          <div className="bg-gray-50 rounded-[10px] p-3 mb-4">
             <div className="text-xs text-gray-700">
               <div className="font-medium">{application["Full Name"]}</div>
               <div>Employee: {application["Employee Number"]}</div>
@@ -959,21 +958,21 @@ const CommentModal = ({
             onChange={(e) => setComment(e.target.value)}
             placeholder="Provide your advisory comments..."
             rows={4}
-            className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
 
         <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50"
+            className="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
             disabled={!comment.trim()}
-            className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md border border-blue-700 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Submit Comment
           </button>
@@ -1046,7 +1045,7 @@ const PaymentRequestCard = ({ request, onApprove, onReject, onViewDetails, userR
       <div className="flex gap-2">
         <button
           onClick={() => onViewDetails(request)}
-          className="flex-1 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-[25px] hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors"
+          className="flex-1 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 rounded-[25px] hover:bg-gray-200 flex items-center justify-center gap-2 transition-colors"
         >
           <Eye className="w-4 h-4" />
           View Details
@@ -1056,14 +1055,14 @@ const PaymentRequestCard = ({ request, onApprove, onReject, onViewDetails, userR
           <>
             <button
               onClick={() => onApprove(request)}
-              className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-[25px] border border-green-700 hover:bg-green-700 flex items-center justify-center gap-2 transition-colors"
+              className="flex-1 px-3 py-2 text-xs font-medium text-white bg-green-600 rounded-[25px] hover:bg-green-700 flex items-center justify-center gap-2 transition-colors"
             >
               <CheckCircle className="w-4 h-4" />
               Approve
             </button>
             <button
               onClick={() => onReject(request)}
-              className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded-[25px] border border-red-700 hover:bg-red-700 flex items-center justify-center gap-2 transition-colors"
+              className="flex-1 px-3 py-2 text-xs font-medium text-white bg-red-600 rounded-[25px] hover:bg-red-700 flex items-center justify-center gap-2 transition-colors"
             >
               <XCircleIcon className="w-4 h-4" />
               Reject
@@ -1103,7 +1102,7 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, us
         </div>
 
         <div className="p-6">
-          <div className="bg-white rounded-[10px] p-4 mb-6">
+          <div className="bg-gray-50 rounded-[10px] p-4 mb-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <p className="text-xs text-gray-600">Payment Type</p>
@@ -1126,7 +1125,7 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, us
 
           <div className="mb-6">
             <h3 className="font-semibold text-gray-900 mb-2">Justification</h3>
-            <div className="bg-white rounded-[10px] p-4">
+            <div className="bg-gray-50 rounded-[10px] p-4">
               <p className="text-gray-700">{payment.justification}</p>
             </div>
           </div>
@@ -1207,14 +1206,14 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, us
             <div className="flex gap-3 pt-4 border-t border-gray-200">
               <button
                 onClick={() => onApprove(payment)}
-                className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-[25px] border border-green-700 hover:bg-green-700 flex items-center justify-center gap-2 transition-colors"
+                className="flex-1 px-4 py-3 text-xs font-medium text-white bg-green-600 rounded-[25px] hover:bg-green-700 flex items-center justify-center gap-2 transition-colors"
               >
                 <CheckCircle className="w-4 h-4" />
                 Approve Payment
               </button>
               <button
                 onClick={() => onReject(payment)}
-                className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded-[25px] border border-red-700 hover:bg-red-700 flex items-center justify-center gap-2 transition-colors"
+                className="flex-1 px-4 py-3 text-xs font-medium text-white bg-red-600 rounded-[25px] hover:bg-red-700 flex items-center justify-center gap-2 transition-colors"
               >
                 <XCircleIcon className="w-4 h-4" />
                 Reject Payment
@@ -1262,21 +1261,21 @@ const RejectionModal = ({ isOpen, onClose, onConfirm }: {
             onChange={(e) => setReason(e.target.value)}
             placeholder="Please provide a reason for rejecting this payment request..."
             rows={4}
-            className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500"
           />
         </div>
 
         <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-[25px] hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-200 rounded-[25px] hover:bg-gray-300 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
             disabled={!reason.trim()}
-            className="px-4 py-2 text-xs font-medium text-white bg-red-600 rounded-[25px] border border-red-700 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 text-xs font-medium text-white bg-red-600 rounded-[25px] hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Confirm Rejection
           </button>
@@ -1384,7 +1383,7 @@ const RecommendationModal = ({
         </p>
 
         {application && (
-          <div className="bg-white rounded-[10px] p-3 mb-4">
+          <div className="bg-gray-50 rounded-[10px] p-3 mb-4">
             <div className="text-xs text-gray-700">
               <div className="font-medium">{application["Full Name"]}</div>
               <div>Employee: {application["Employee Number"]}</div>
@@ -1428,21 +1427,21 @@ const RecommendationModal = ({
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Please provide detailed notes for your recommendation..."
             rows={4}
-            className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
 
         <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-[25px] hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-200 rounded-[25px] hover:bg-gray-300 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
             disabled={(!adminBypassMode && !notes.trim()) || (showAmountField && (!adjustedAmount || isNaN(Number(adjustedAmount))))}
-            className="px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-[25px] border border-blue-700 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-[25px] hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Submit Recommendation
           </button>
@@ -1492,7 +1491,7 @@ const BypassConfirmModal = ({
               The payment of <span className="font-bold text-green-700">KSh {Number(application["Amount Requested"]).toLocaleString()}</span> will be processed immediately.
             </p>
 
-            <div className="bg-white rounded-[10px] p-4 mb-8">
+            <div className="bg-gray-50 rounded-[10px] p-4 mb-8">
               <div className="flex justify-between text-xs mb-2">
                 <span className="text-gray-500">Employee No:</span>
                 <span className="font-medium text-gray-900">{application["Employee Number"]}</span>
@@ -1582,7 +1581,7 @@ const UserRoleDisplay = ({ userRole, userEmail, actualRole, userTown, userRegion
       case 'checker': return 'bg-orange-100 text-orange-800 border-orange-200';
       case 'credit_analyst_officer': return 'bg-purple-100 text-purple-800 border-purple-200';
       case 'branch_manager': return 'bg-green-100 text-green-800 border-green-200';
-      case 'regional_manager': return 'bg-indigo-100 text-indigo-800 border-gray-200';
+      case 'regional_manager': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
@@ -1675,7 +1674,7 @@ const TownFilter = ({
                 value={selectedTown || ''}
                 onChange={(e) => onTownChange(e.target.value)}
                 disabled={isManager}
-                className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-green-500 focus:border-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-1 focus:ring-green-500 focus:border-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="">All {isRegionalManager ? 'Regions' : 'Towns'}</option>
                 {allTowns.map(town => (
@@ -2296,7 +2295,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
               <select
                 value={format}
                 onChange={(e) => setFormat(e.target.value)}
-                className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
               >
                 <option value="csv">CSV (.csv)</option>
                 <option value="excel">Excel (.xlsx)</option>
@@ -2310,7 +2309,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
               <select
                 value={dateRange}
                 onChange={(e) => setDateRange(e.target.value)}
-                className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
               >
                 <option value="all">All Time</option>
                 <option value="today">Today</option>
@@ -2332,7 +2331,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                     type="date"
                     value={customStartDate}
                     onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
                   />
                 </div>
                 <div>
@@ -2343,7 +2342,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                     type="date"
                     value={customEndDate}
                     onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
                   />
                 </div>
               </div>
@@ -2369,7 +2368,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
           <div className="flex justify-end gap-3 mt-6">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50"
+              className="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
               disabled={isLoading}
             >
               Cancel
@@ -2377,7 +2376,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
             <button
               onClick={handleExport}
               disabled={isLoading}
-              className="px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-md border border-green-700 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isLoading ? (
                 <>
@@ -2682,7 +2681,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-[10px] p-6">
+    <div className="bg-gradient-to-r from-blue-100 to-indigo-100 border border-indigo-200 rounded-[10px] p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -2741,8 +2740,8 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
 
         {/* Card 1: Total Paid (This Month) */}
-        <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-gray-200">
-          <p className="text-xs font-medium text-gray-600">Total Paid</p>
+        <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-indigo-200">
+          <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Total Paid</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">
             KES {stats.totalPaid?.toLocaleString('en-KE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
           </p>
@@ -2755,8 +2754,8 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
         </div>
 
         {/* Card 2: Transaction Count */}
-        <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-gray-200">
-          <p className="text-xs font-medium text-gray-600">Transactions</p>
+        <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-indigo-200">
+          <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Transactions</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">
             {stats.successful} <span className="text-sm font-normal text-gray-400">/ {stats.successful + stats.failed + stats.pending}</span>
           </p>
@@ -2768,8 +2767,8 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
         </div>
 
         {/* Card 3: Pending & Failed */}
-        <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-gray-200">
-          <p className="text-xs font-medium text-gray-600">Action Needed</p>
+        <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-indigo-200">
+          <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Action Needed</p>
           <div className="flex gap-4 mt-2">
             <div>
               <p className="text-xl font-bold text-amber-600">{stats.pending}</p>
@@ -2783,10 +2782,10 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
         </div>
 
         {/* Card 4: Utility Balance */}
-        <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-gray-200">
+        <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-indigo-200">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs font-medium text-gray-600">Utility Balance</p>
+              <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Utility Balance</p>
               <p className="text-xl font-bold text-gray-900 mt-1">
                 KES {utilityBalance.toLocaleString('en-KE', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
               </p>
@@ -2809,7 +2808,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
       </div>
 
       {/* Branch Filter & Controls */}
-      <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center gap-4 mb-6 bg-white p-4 rounded-[10px] border border-gray-200">
+      <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center gap-4 mb-6 bg-gradient-to-r from-blue-100 to-indigo-100 p-4 rounded-[10px] border border-indigo-200">
 
         <div className="w-full sm:w-auto">
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Filter by Branch</label>
@@ -3132,7 +3131,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
               {/* Enhanced Employee Information Section */}
               <div className="mb-6">
                 <h3 className="font-semibold text-gray-900 mb-3">Employee Information</h3>
-                <div className="bg-white rounded-[10px] p-4">
+                <div className="bg-gray-50 rounded-[10px] p-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs text-gray-600">Employee Name</p>
@@ -3173,7 +3172,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                   };
 
                   return (
-                    <div className="bg-white rounded-[10px] p-4">
+                    <div className="bg-gray-50 rounded-[10px] p-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {Object.entries(importantFields).map(([key, label]) => {
                           if (transactionData[key] !== undefined) {
@@ -3202,7 +3201,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
 
               <div className="mb-4">
                 <h3 className="font-semibold text-gray-900 mb-2">Raw Response Data</h3>
-                <pre className="bg-white rounded-lg p-4 text-xs overflow-auto max-h-60">
+                <pre className="bg-gray-50 rounded-lg p-4 text-xs overflow-auto max-h-60">
                   {JSON.stringify(selectedCallback.raw_response, null, 2)}
                 </pre>
               </div>
@@ -3211,13 +3210,13 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                 <button
                   onClick={() => checkTransactionStatus(selectedCallback.transaction_id)}
                   disabled={isCheckingStatus}
-                  className="mr-3 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md border border-blue-700 hover:bg-blue-700 disabled:opacity-50"
+                  className="mr-3 px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
                 >
                   {isCheckingStatus ? 'Checking...' : 'Check Live Status'}
                 </button>
                 <button
                   onClick={() => setShowDetails(false)}
-                  className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50"
+                  className="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
                 >
                   Close
                 </button>
@@ -3346,7 +3345,7 @@ const BulkPaymentModal = ({
           {isMaker ? 'Create Payment Request' : 'Process M-Pesa Bulk Payment'}
         </h3>
 
-        <div className="mb-4 p-3 bg-white rounded-[10px]">
+        <div className="mb-4 p-3 bg-gray-50 rounded-[10px]">
           <p className="text-xs text-gray-600">
             {isMaker
               ? `You are creating a payment request for ${getSelectedStaffCount()} selected staff members. This will require approval before processing.`
@@ -3488,14 +3487,14 @@ const BulkPaymentModal = ({
         <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-[25px] hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-200 rounded-[25px] hover:bg-gray-300 transition-colors"
             disabled={isLoading}
           >
             Cancel
           </button>
           <button
             onClick={onProcess}
-            className="px-4 py-2 text-xs font-medium text-white bg-green-600 rounded-[25px] border border-green-700 hover:bg-green-700 flex items-center gap-2 transition-colors"
+            className="px-4 py-2 text-xs font-medium text-white bg-green-600 rounded-[25px] hover:bg-green-700 flex items-center gap-2 transition-colors"
             disabled={isLoading || getSelectedStaffCount() === 0 || (!adminBypassMode && !justification.trim())}
           >
             {isLoading ? (
@@ -5704,7 +5703,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
 
         {/* ── Action Bar ────────────────────────────────── */}
-        <div className="bg-white border border-gray-200 rounded-[10px] p-4 mb-6">
+        <div className="bg-gradient-to-r from-blue-100 to-indigo-100 border border-indigo-200 rounded-[10px] p-4 mb-6">
           <div className="flex flex-col gap-4">
             {/* Row 1: Tabs + key actions */}
             <div className="flex flex-wrap justify-between items-center gap-3">
@@ -5712,9 +5711,9 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setActiveTab('applications')}
-                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-[25px] text-xs font-medium transition-colors border ${activeTab === 'applications'
-                    ? 'bg-green-100 text-green-800 border-green-200'
-                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-800'
+                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-[25px] text-xs font-medium transition-colors ${activeTab === 'applications'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-white text-gray-600 hover:bg-violet-50 hover:text-violet-700'
                     }`}
                 >
                   <Activity className="w-3 h-3" /> Applications
@@ -5723,18 +5722,18 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                 <RoleButtonWrapper allowedRoles={['ADMIN', 'CHECKER']}>
                   <button
                     onClick={() => setActiveTab('callbacks')}
-                    className={`inline-flex items-center gap-2 px-3 py-2 rounded-[25px] text-xs font-medium transition-colors border ${activeTab === 'callbacks'
-                      ? 'bg-green-100 text-green-800 border-green-200'
-                      : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-800'
+                    className={`inline-flex items-center gap-2 px-3 py-2 rounded-[25px] text-xs font-medium transition-colors ${activeTab === 'callbacks'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-white text-gray-600 hover:bg-violet-50 hover:text-violet-700'
                       }`}
                   >
                     <Smartphone className="w-3 h-3" /> M-Pesa Results
                   </button>
                   <button
                     onClick={() => setActiveTab('transaction_status')}
-                    className={`inline-flex items-center gap-2 px-3 py-2 rounded-[25px] text-xs font-medium transition-colors border ${activeTab === 'transaction_status'
-                      ? 'bg-green-100 text-green-800 border-green-200'
-                      : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-800'
+                    className={`inline-flex items-center gap-2 px-3 py-2 rounded-[25px] text-xs font-medium transition-colors ${activeTab === 'transaction_status'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-white text-gray-600 hover:bg-violet-50 hover:text-violet-700'
                       }`}
                   >
                     <RefreshCw className="w-3 h-3" /> Transaction Status
@@ -5744,9 +5743,9 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                 <RoleButtonWrapper allowedRoles={['ADMIN']}>
                   <button
                     onClick={() => setActiveTab('settings')}
-                    className={`inline-flex items-center gap-2 px-3 py-2 rounded-[25px] text-xs font-medium transition-colors border ${activeTab === 'settings'
-                      ? 'bg-green-100 text-green-800 border-green-200'
-                      : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-800'
+                    className={`inline-flex items-center gap-2 px-3 py-2 rounded-[25px] text-xs font-medium transition-colors ${activeTab === 'settings'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-white text-gray-600 hover:bg-violet-50 hover:text-violet-700'
                       }`}
                   >
                     <Settings className="w-3 h-3" /> Settings
@@ -5760,7 +5759,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                 {(isChecker || isAdmin) && pendingCount > 0 && (
                   <button
                     onClick={() => setShowApprovalQueue(true)}
-                    className="inline-flex items-center gap-2 px-3 py-2 bg-white text-orange-600 border border-orange-200 hover:bg-orange-50 rounded-[25px] text-xs font-medium transition-colors"
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-white text-orange-600 hover:text-orange-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors"
                   >
                     <AlertTriangle className="w-3 h-3 text-orange-600" /> {pendingCount} Pending Approvals
                   </button>
@@ -5769,7 +5768,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                 {fullyApprovedApplications.length > 0 && (
                   <button
                     onClick={() => setShowBulkPaymentModal(true)}
-                    className="inline-flex items-center gap-2 px-3 py-2 bg-white text-green-700 border border-green-200 hover:bg-green-50 rounded-[25px] text-xs font-medium transition-colors"
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-white text-green-700 hover:text-green-800 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors"
                   >
                     <img src="M-PESA_LOGO-01.svg.png" className="w-6 h-auto" alt="mpesa" />
                     {isMaker ? 'Create Payment Request' : `Process Payments (${getSelectedStaffCount()})`}
@@ -5782,14 +5781,14 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
                 <button
                   onClick={() => setShowExportModal(true)}
-                  className="inline-flex items-center gap-2 px-3 py-2 bg-white text-blue-600 border border-blue-200 hover:bg-blue-50 rounded-[25px] text-xs font-medium transition-colors"
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-white text-blue-600 hover:text-blue-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors"
                 >
                   <Download className="w-3 h-3 text-blue-600" /> Export
                 </button>
 
                 <button
                   onClick={() => setShowImportModal(true)}
-                  className="inline-flex items-center gap-2 px-3 py-2 bg-white text-purple-600 border border-purple-200 hover:bg-purple-50 rounded-[25px] text-xs font-medium transition-colors"
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-white text-purple-600 hover:text-purple-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors"
                 >
                   <Upload className="w-3 h-3 text-purple-600" /> Import
                 </button>
@@ -5797,8 +5796,8 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                 {/* Admin Bypass Toggle */}
                 {isAdmin && (
                   <div className={`flex items-center gap-2 px-3 py-2 rounded-[25px] text-xs font-medium transition-colors ${adminBypassMode
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : 'bg-white text-gray-600 border border-gray-200'
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-gray-50 text-gray-600'
                     }`}>
                     <ShieldCheck className={`w-3.5 h-3.5 ${adminBypassMode ? 'text-emerald-600' : 'text-gray-400'}`} />
                     <span>Bypass System</span>
@@ -5827,7 +5826,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
         {/* Row 2: Search + filter — only for applications tab */}
         {activeTab === 'applications' && (
-          <div className="mb-6 p-4 bg-white border border-gray-200 rounded-[10px]">
+          <div className="mb-6 p-4 bg-gradient-to-r from-blue-100 to-indigo-100 border border-indigo-200 rounded-[10px]">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Search */}
               <div className="lg:col-span-2">
@@ -5875,7 +5874,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                     setSelectedDateRange('all');
                     handleTownChange('');
                   }}
-                  className="w-full px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 rounded-[25px] bg-white border border-gray-200 hover:bg-gray-50 transition-colors h-[38px]"
+                  className="w-full px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 rounded-[25px] bg-white hover:bg-gray-50 transition-colors h-[38px]"
                 >
                   Reset All Filters
                 </button>
@@ -5922,27 +5921,27 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         {/* ── Summary Cards — applications tab only ─────── */}
         {activeTab === 'applications' && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
-            <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-gray-200">
-              <p className="text-xs font-medium text-gray-600">Total Applications</p>
+            <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-indigo-200">
+              <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Total Applications</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">{filteredApplications.length}</p>
               <p className="text-xs text-gray-500 mt-1">Across all locations</p>
             </div>
-            <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-gray-200">
-              <p className="text-xs font-medium text-gray-600">Total Disbursed</p>
+            <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-indigo-200">
+              <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Total Disbursed</p>
               <p className="text-xl font-bold text-green-700 mt-1">
                 {formatKES(filteredApplications.filter(a => ['paid'].includes(a.status?.toLowerCase())).reduce((s, a) => s + Number(a["Amount Requested"] || 0), 0))}
               </p>
               <p className="text-xs text-gray-500 mt-1">Amount paid out</p>
             </div>
-            <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-gray-200">
-              <p className="text-xs font-medium text-gray-600">Pending Liability</p>
+            <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-indigo-200">
+              <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Pending Liability</p>
               <p className="text-xl font-bold text-amber-700 mt-1">
                 {formatKES(filteredApplications.filter(a => !['paid', 'rejected'].includes(a.status?.toLowerCase())).reduce((s, a) => s + Number(a["Amount Requested"] || 0), 0))}
               </p>
               <p className="text-xs text-gray-500 mt-1">{filteredApplications.filter(a => !['paid', 'rejected'].includes(a.status?.toLowerCase())).length} active</p>
             </div>
-            <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-gray-200">
-              <p className="text-xs font-medium text-gray-600">Approval Queue</p>
+            <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-indigo-200">
+              <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Approval Queue</p>
               <p className="text-2xl font-bold text-blue-700 mt-1">{pendingCount}</p>
               {(isChecker || isAdmin) && pendingCount > 0 && (
                 <button
@@ -6037,20 +6036,20 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                 <>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-300">
-                      <thead className="bg-gray-200 border-b border-gray-300">
+                      <thead className="bg-gray-600 border-b border-gray-700">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">Employee</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">Mobile</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">{isRegionalManager ? 'Region' : 'Branch'}</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">Amount</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">Reason</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">Approval status</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">Notes</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">Date</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Actions</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">Employee</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">Mobile</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">{isRegionalManager ? 'Region' : 'Branch'}</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">Amount</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">Reason</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">Approval status</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">Notes</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white border-r border-gray-500">Date</th>
+                          <th className="px-4 py-3 text-left text-xs font-normal text-white">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
+                      <tbody className="bg-[#f3f4f6] divide-y divide-gray-200">
                         {currentItems.map((app) => {
                           const appDate = parseApplicationDate(app);
                           const now = new Date();
@@ -6064,7 +6063,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                             >
                               {/* Employee */}
                               <td className="px-4 py-3 border-r border-gray-300">
-                                <div className="text-xs font-semibold text-gray-900">{app["Full Name"]}</div>
+                                <div className="text-sm font-semibold text-gray-900">{app["Full Name"]}</div>
                                 <div className="text-xs text-gray-500 font-mono">{app["Employee Number"]}</div>
                                 <ManagerBadge
                                   isBranchManager={isBranchManagerMap[app["Employee Number"]] || false}
@@ -6092,12 +6091,12 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                       onChange={(e) => setEditedAmount(e.target.value)}
                                       className="w-20 px-1 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-blue-600"
                                     />
-                                    <button onClick={() => handleAmountSave(app.id)} className="text-xs bg-green-600 text-white px-2 py-1 rounded-[25px] border border-green-700 hover:bg-green-700 transition-colors">Save</button>
-                                    <button onClick={() => setEditingId(null)} className="text-xs bg-white text-gray-600 px-2 py-1 rounded-[25px] border border-gray-300 hover:bg-gray-50 transition-colors">✕</button>
+                                    <button onClick={() => handleAmountSave(app.id)} className="text-xs bg-green-600 text-white px-2 py-1 rounded-[25px] hover:bg-green-700 transition-colors">Save</button>
+                                    <button onClick={() => setEditingId(null)} className="text-xs bg-gray-400 text-white px-2 py-1 rounded-[25px] hover:bg-gray-500 transition-colors">✕</button>
                                   </div>
                                 ) : (
                                   <div
-                                    className="text-xs font-bold text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
+                                    className="text-sm font-bold text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
                                     onClick={() => handleAmountEdit(app.id, app["Amount Requested"])}
                                   >
                                     {formatKES(Number(app["Amount Requested"]))}
@@ -6137,7 +6136,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                               <td className="px-4 py-3 border-r border-gray-300 relative">
                                 <button
                                   onClick={() => setShowNotesDropdown(showNotesDropdown === app.id ? null : app.id)}
-                                  className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded-[25px] bg-white border border-gray-200 transition-colors"
+                                  className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded-[25px] bg-white transition-colors"
                                 >
                                   Notes <ChevronDown className="h-3 w-3" />
                                 </button>
@@ -6151,8 +6150,8 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                       rows={3}
                                     />
                                     <div className="flex justify-end gap-2">
-                                      <button onClick={() => setShowNotesDropdown(null)} className="text-xs bg-white text-gray-700 px-2 py-1 rounded-[25px] border border-gray-200 hover:bg-gray-50 transition-colors">Cancel</button>
-                                      <button onClick={() => saveNotes(app.id)} className="text-xs bg-blue-600 text-white px-2 py-1 rounded-[25px] border border-blue-700 hover:bg-blue-700 transition-colors">Save</button>
+                                      <button onClick={() => setShowNotesDropdown(null)} className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-[25px] hover:bg-gray-300 transition-colors">Cancel</button>
+                                      <button onClick={() => saveNotes(app.id)} className="text-xs bg-blue-600 text-white px-2 py-1 rounded-[25px] hover:bg-blue-700 transition-colors">Save</button>
                                     </div>
                                   </div>
                                 )}
@@ -6160,8 +6159,8 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
                               {/* Date */}
                               <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-600">
-                                <div className="text-xs font-medium text-gray-900">{appDate.toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
-                                <div className="text-xs text-gray-500">{appDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                <div className="font-medium text-gray-900">{appDate.toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                                <div>{appDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                               </td>
 
                               {/* Actions */}
@@ -6171,15 +6170,15 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                   {canBranchManagerApprove(app) && (
                                     <>
                                       <button onClick={() => openRecommendationModal(app, 'bm-recommend-current')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 hover:bg-green-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-[25px] transition-colors">
                                         <CheckCircle className="w-3 h-3" /> Recommend
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'bm-recommend-adjusted')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-200 hover:bg-blue-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-white hover:bg-blue-100 rounded-[25px] transition-colors">
                                         <Edit3 className="w-3 h-3" /> Adjusted
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'bm-recommend-reject')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 hover:bg-red-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-[25px] transition-colors">
                                         <XCircleIcon className="w-3 h-3" /> Reject
                                       </button>
                                     </>
@@ -6189,15 +6188,15 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                   {canRegionalManagerApprove(app) && (
                                     <>
                                       <button onClick={() => openRecommendationModal(app, 'rm-recommend-current')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 hover:bg-green-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-[25px] transition-colors">
                                         <CheckCircle className="w-3 h-3" /> Recommend
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'rm-recommend-adjusted')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-200 hover:bg-blue-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-white hover:bg-blue-100 rounded-[25px] transition-colors">
                                         <Edit3 className="w-3 h-3" /> Adjusted
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'rm-recommend-reject')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 hover:bg-red-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-[25px] transition-colors">
                                         <XCircleIcon className="w-3 h-3" /> Reject
                                       </button>
                                     </>
@@ -6215,15 +6214,15 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                   {canAdminApprove(app) && (
                                     <>
                                       <button onClick={() => openRecommendationModal(app, 'admin-approve-current')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 hover:bg-green-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-[25px] transition-colors">
                                         <CheckCircle className="w-3 h-3" /> Approve
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'admin-approve-adjusted')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-200 hover:bg-blue-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-white hover:bg-blue-100 rounded-[25px] transition-colors">
                                         <Edit3 className="w-3 h-3" /> Adjusted
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'admin-reject')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 hover:bg-red-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-[25px] transition-colors">
                                         <XCircleIcon className="w-3 h-3" /> Reject
                                       </button>
                                     </>

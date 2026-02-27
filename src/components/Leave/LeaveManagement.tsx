@@ -24,6 +24,7 @@ import {
   Eye,
   Save,
   ThumbsUp,
+  ThumbsDown,
   MapPin,
   RefreshCw,
   Loader2,
@@ -245,6 +246,14 @@ const SAMPLE_HOLIDAYS: Holiday[] = [
 ];
 
 // Helper functions
+const getInitials = (name: string) => {
+  if (!name) return '??';
+  const parts = name.split(' ');
+  const f = parts[0] || '';
+  const l = parts.length > 1 ? parts[parts.length - 1] : '';
+  return `${f.charAt(0)}${l.charAt(0)}`.toUpperCase();
+};
+
 const getIconComponent = (iconName: string) => {
   switch (iconName) {
     case 'Sun': return Sun;
@@ -306,7 +315,7 @@ const StatusBadge = ({ status }: { status: string }) => {
     'approved': CheckCircle,
     'rejected': XCircle,
     'recommended': ThumbsUp,
-    'not_recommended': XCircle,
+    'not_recommended': ThumbsDown,
   };
 
   const Icon = statusIcons[status as keyof typeof statusIcons] || PendingIcon;
@@ -337,7 +346,7 @@ const RecStatusBadge = ({ recstatus }: { recstatus: string | null }) => {
 
   const statusIcons = {
     'recommended': ThumbsUp,
-    'not_recommended': XCircle,
+    'not_recommended': ThumbsDown,
   };
 
   const Icon = statusIcons[recstatus as keyof typeof statusIcons] || Clock;
@@ -547,7 +556,7 @@ const StatusUpdateModal = ({
       case 'approve': return CheckCircle;
       case 'reject': return XCircle;
       case 'recommend': return ThumbsUp;
-      case 'not_recommend': return XCircle;
+      case 'not_recommend': return ThumbsDown;
       default: return CheckCircle;
     }
   };
@@ -2484,7 +2493,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
           <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <div className="p-2 rounded-lg bg-orange-100 text-orange-600">
-                <XCircle className="w-5 h-5" />
+                <ThumbsDown className="w-5 h-5" />
               </div>
             </div>
             <div className="space-y-1">
@@ -2609,21 +2618,30 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
                 </button>
               </div>
             </div>
+            {/* Actions & Status Legend */}
+            <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-4 text-[10px] text-gray-500 font-medium bg-gray-50/50 p-2 rounded-xl">
+              <span className="uppercase tracking-widest font-bold text-gray-400">Icon Guide:</span>
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><Eye className="w-3 h-3 text-blue-600" /> View</div>
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><CheckCircle className="w-3 h-3 text-emerald-600" /> Approve</div>
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><XCircle className="w-3 h-3 text-rose-600" /> Reject</div>
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><ThumbsUp className="w-3 h-3 text-blue-600" /> Recommend</div>
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><ThumbsDown className="w-3 h-3 text-orange-600" /> Not Recommend</div>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-gray-50 border-b border-gray-200">
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-xs whitespace-nowrap">
+              <thead className="bg-gray-50/80 border-b border-gray-100 backdrop-blur-sm sticky top-0 z-10">
                 <tr>
-                  <th className="text-left py-3 px-4 text-gray-700 font-base">Employee</th>
-                  <th className="text-left py-3 px-4 text-gray-700 font-base">Leave Type</th>
-                  <th className="text-left py-3 px-4 text-gray-700 font-base">Dates</th>
-                  <th className="text-left py-3 px-4 text-gray-700 font-base">Days</th>
-                  <th className="text-left py-3 px-4 text-gray-700 font-base">Office Branch</th>
-                  <th className="text-left py-3 px-4 text-gray-700 font-base">Status</th>
-                  <th className="text-left py-3 px-4 text-gray-700 font-base">Recommendation</th>
-                  <th className="text-left py-3 px-4 text-gray-700 font-base">Applied On</th>
-                  <th className="text-center py-3 px-4 text-gray-700 font-base">Actions</th>
+                  <th className="text-left py-3.5 px-6 text-gray-500 font-bold uppercase tracking-wider text-[10px]">Employee</th>
+                  <th className="text-left py-3.5 px-6 text-gray-500 font-bold uppercase tracking-wider text-[10px]">Leave Type</th>
+                  <th className="text-left py-3.5 px-6 text-gray-500 font-bold uppercase tracking-wider text-[10px]">Dates</th>
+                  <th className="text-left py-3.5 px-6 text-gray-500 font-bold uppercase tracking-wider text-[10px]">Duration</th>
+                  <th className="text-left py-3.5 px-6 text-gray-500 font-bold uppercase tracking-wider text-[10px]">Branch</th>
+                  <th className="text-left py-3.5 px-6 text-gray-500 font-bold uppercase tracking-wider text-[10px]">Status</th>
+                  <th className="text-left py-3.5 px-6 text-gray-500 font-bold uppercase tracking-wider text-[10px]">Recommendation</th>
+                  <th className="text-left py-3.5 px-6 text-gray-500 font-bold uppercase tracking-wider text-[10px]">Applied</th>
+                  <th className="text-center py-3.5 px-6 text-gray-500 font-bold uppercase tracking-wider text-[10px]">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -2631,80 +2649,90 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
                   <TableSkeletonLoader rows={5} columns={9} />
                 ) : (
                   paginatedApplications.map((application) => (
-                    <tr key={application.id} className="border-b border-gray-300 hover:bg-gray-50">
-                      <td className="py-4 px-4">
-                        <div className="space-y-1">
-                          <p className="text-gray-900 font-base">{application.Name}</p>
-                          <p className="text-gray-500 text-xs">{application["Employee Number"]}</p>
+                    <tr key={application.id} className="border-b border-gray-50 hover:bg-emerald-50/40 transition-colors group">
+                      <td className="py-3 px-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 flex-shrink-0 rounded-full bg-gradient-to-br from-emerald-100 to-emerald-200 flex items-center justify-center text-emerald-700 font-bold shadow-sm ring-2 ring-white">
+                            {getInitials(application.Name)}
+                          </div>
+                          <div>
+                            <p className="text-gray-900 font-bold text-sm group-hover:text-emerald-700 transition-colors">{application.Name}</p>
+                            <span className="font-mono text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-500 border border-gray-200">{application["Employee Number"]}</span>
+                          </div>
                         </div>
                       </td>
-                      <td className="py-4 px-4">
-                        <p className="text-gray-700">{application["Leave Type"]}</p>
+                      <td className="py-3 px-6">
+                        <span className="font-medium text-gray-700 bg-gray-50 px-2 py-1 rounded-md border border-gray-100">{application["Leave Type"]}</span>
                       </td>
-                      <td className="py-4 px-4">
-                        <p className="text-gray-700">
-                          {formatDate(application["Start Date"])}
-                          {application["End Date"] !== application["Start Date"] && ` - ${formatDate(application["End Date"])}`}
-                          {application["Type"] === 'Half Day' && ' (Half day)'}
-                        </p>
+                      <td className="py-3 px-6">
+                        <div className="flex flex-col">
+                          <span className="text-gray-900 font-medium">{formatDate(application["Start Date"])}</span>
+                          {application["End Date"] !== application["Start Date"] && (
+                            <span className="text-gray-500 text-[10px]">to {formatDate(application["End Date"])}</span>
+                          )}
+                          {application["Type"] === 'Half Day' && <span className="text-amber-600 text-[10px] font-medium">Half day</span>}
+                        </div>
                       </td>
-                      <td className="py-4 px-4">
-                        <p className="text-gray-700">{application.Days}</p>
+                      <td className="py-3 px-6">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-6 h-6 rounded bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">{application.Days}</div>
+                          <span className="text-gray-500 text-[10px]">days</span>
+                        </div>
                       </td>
-                      <td className="py-4 px-4">
-                        <p className="text-gray-700">{application["Office Branch"]}</p>
+                      <td className="py-3 px-6 text-gray-600">
+                        {application["Office Branch"]}
                       </td>
-                      <td className="py-4 px-4">
+                      <td className="py-3 px-6">
                         <StatusBadge status={application.Status} />
                       </td>
-                      <td className="py-4 px-4">
+                      <td className="py-3 px-6">
                         <RecStatusBadge recstatus={application.recstatus} />
                       </td>
-                      <td className="py-4 px-4">
-                        <p className="text-gray-700">{formatDate(application.time_added)}</p>
+                      <td className="py-3 px-6 text-gray-500 text-[11px]">
+                        {formatDate(application.time_added)}
                       </td>
-                      <td className="py-4 px-4">
-                        <div className="flex justify-center gap-1">
+                      <td className="py-3 px-6">
+                        <div className="flex justify-center gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => setSelectedApplication(application)}
-                            className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs"
+                            className="p-1.5 bg-gray-50 hover:bg-blue-50 text-blue-600 rounded-md transition-colors shadow-sm ring-1 ring-gray-200 hover:ring-blue-200"
+                            title="View Details"
                           >
-                            <Eye className="w-3 h-3" />
-                            View
+                            <Eye className="w-4 h-4" />
                           </button>
                           {application.Status === 'pending' && (
                             <>
                               <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
                                 <button
                                   onClick={() => openStatusModal(application.id, 'approve')}
-                                  className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded text-xs"
+                                  className="p-1.5 bg-gray-50 hover:bg-emerald-50 text-emerald-600 rounded-md transition-colors shadow-sm ring-1 ring-gray-200 hover:ring-emerald-200"
+                                  title="Approve"
                                 >
-                                  <CheckCircle className="w-3 h-3" />
-                                  Approve
+                                  <CheckCircle className="w-4 h-4" />
                                 </button>
                               </RoleButtonWrapper>
                               <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
                                 <button
                                   onClick={() => openStatusModal(application.id, 'reject')}
-                                  className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs"
+                                  className="p-1.5 bg-gray-50 hover:bg-rose-50 text-rose-600 rounded-md transition-colors shadow-sm ring-1 ring-gray-200 hover:ring-rose-200"
+                                  title="Reject"
                                 >
-                                  <XCircle className="w-3 h-3" />
-                                  Reject
+                                  <XCircle className="w-4 h-4" />
                                 </button>
                               </RoleButtonWrapper>
                               <button
                                 onClick={() => openStatusModal(application.id, 'recommend')}
-                                className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs"
+                                className="p-1.5 bg-gray-50 hover:bg-blue-50 text-blue-600 rounded-md transition-colors shadow-sm ring-1 ring-gray-200 hover:ring-blue-200"
+                                title="Recommend"
                               >
-                                <ThumbsUp className="w-3 h-3" />
-                                Recommend
+                                <ThumbsUp className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => openStatusModal(application.id, 'not_recommend')}
-                                className="inline-flex items-center gap-1 px-2 py-1 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded text-xs"
+                                className="p-1.5 bg-gray-50 hover:bg-orange-50 text-orange-600 rounded-md transition-colors shadow-sm ring-1 ring-gray-200 hover:ring-orange-200"
+                                title="Not Recommend"
                               >
-                                <XCircle className="w-3 h-3" />
-                                Not Recommend
+                                <ThumbsDown className="w-4 h-4" />
                               </button>
                             </>
                           )}

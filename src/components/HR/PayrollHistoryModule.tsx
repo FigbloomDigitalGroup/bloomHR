@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import { DollarSign, Search, Download, Loader2, TrendingUp, TrendingDown, ChevronDown, ChevronUp } from 'lucide-react';
+import { DollarSign, Search, Download, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 

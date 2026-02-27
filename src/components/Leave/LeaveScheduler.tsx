@@ -200,7 +200,7 @@ const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSche
                 isPartialStart: startDate < monthStart,
                 isPartialEnd: endDate > monthEnd
             };
-        }).filter(Boolean);
+        }).filter((bar): bar is NonNullable<typeof bar> => Boolean(bar));
     };
 
     const getInitials = (first: string, last: string) => {
@@ -210,10 +210,10 @@ const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSche
     };
 
     return (
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col h-[calc(100vh-180px)] overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col h-[calc(100vh-180px)] overflow-hidden">
 
             {/* 1. Header Toolbar */}
-            <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-center bg-white gap-4 z-20 shadow-sm relative">
+            <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center bg-white/80 backdrop-blur-md gap-4 z-20 sticky top-0">
 
                 {/* Date Navigation */}
                 <div className="flex items-center gap-4 bg-gray-50 p-1.5 rounded-lg border border-gray-200 shadow-sm">
@@ -249,7 +249,7 @@ const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSche
                             value={searchTerm}
                             onChange={handleSearchChange}
                             onFocus={() => setShowSuggestions(true)}
-                            className="pl-9 pr-4 py-2 w-full sm:w-72 border border-gray-200 bg-gray-50 rounded-lg text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm"
+                            className="pl-9 pr-4 py-2 w-full sm:w-72 border border-gray-200 bg-gray-50/50 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-sm shadow-gray-100/50"
                         />
 
                         {/* Suggestion Dropdown */}
@@ -342,11 +342,11 @@ const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSche
                 ) : (
                     <>
                         {/* 1. Sticky Sidebar: Employees */}
-                        <div className="flex flex-col border-r border-gray-200 bg-white z-20 shadow-[4px_0_24px_-2px_rgba(0,0,0,0.05)] w-[280px] min-w-[280px]">
+                        <div className="flex flex-col border-r border-gray-100 bg-white z-20 shadow-[4px_0_24px_-2px_rgba(0,0,0,0.03)] w-[280px] min-w-[280px]">
                             {/* Sidebar Header */}
-                            <div className="h-14 border-b border-gray-200 bg-gray-50/80 flex items-center px-6 font-bold text-gray-600 text-xs uppercase tracking-wider backdrop-blur-sm justify-between">
+                            <div className="h-14 border-b border-gray-100 bg-gray-50/50 flex items-center px-6 font-bold text-gray-400 text-[10px] uppercase tracking-widest justify-between">
                                 <span>Staff Member</span>
-                                <span className="bg-gray-100 px-2 py-0.5 rounded-full text-[10px] text-gray-600 font-bold border border-gray-200 shadow-sm">{filteredEmployees.length}</span>
+                                <span className="bg-white px-2 py-0.5 rounded-md shadow-sm border border-gray-100 text-[10px] text-gray-500">{filteredEmployees.length}</span>
                             </div>
 
                             {/* Employee List */}
@@ -355,7 +355,7 @@ const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSche
                                     filteredEmployees.map((emp, idx) => (
                                         <div
                                             key={emp.id}
-                                            className={`h-16 border-b border-gray-50 flex items-center px-4 transition-all group cursor-pointer 
+                                            className={`h-16 border-b border-gray-50/50 flex items-center px-4 transition-all group cursor-pointer 
                           ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'} 
                           hover:bg-emerald-50/40 border-l-4 border-l-transparent hover:border-l-emerald-500`}
                                         >
@@ -438,13 +438,13 @@ const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSche
 
                                     {/* Employee Rows */}
                                     {filteredEmployees.map((emp, idx) => (
-                                        <div key={emp.id} className={`h-16 border-b border-gray-50 relative flex items-center group
+                                        <div key={emp.id} className={`h-16 border-b border-gray-50/50 relative flex items-center group
                         ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/20'}`}
                                         >
                                             {/* Render Leave Bars (Gantt Style) */}
                                             <div className="absolute inset-0 w-full h-full pointer-events-none z-10">
                                                 <div className="relative w-full h-full">
-                                                    {getLeaveBars(emp["Employee Number"]).map((bar: any) => {
+                                                    {getLeaveBars(emp["Employee Number"]).map((bar) => {
                                                         const style = STATUS_STYLES[bar.Status as keyof typeof STATUS_STYLES] || STATUS_STYLES.DEFAULT;
                                                         const leftPos = bar.startOffset * 3.5; // 3.5rem = w-14
                                                         const width = bar.duration * 3.5;

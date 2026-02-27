@@ -3,15 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Users, Clock, FileText, ShieldOff,
     XCircle, BarChart2, AlertTriangle, CheckCircle,
-    RefreshCw, ChevronRight, UserMinus, Loader2, History
+    RefreshCw, ChevronRight, Loader2, History, Bell
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import EmploymentStatusModule from './EmploymentStatusModule';
 import LifecycleHistoryModule from './LifecycleHistoryModule';
 import SuspensionModule from './SuspensionModule';
-import TerminationModule from './TerminationModule';
 import HRReportsDashboard from './HRReportsDashboard';
+import { useHRNotifications, fetchAdminHRNotifications, markAdminNotificationRead, type HRNotification } from '../../hooks/useHRNotifications';
 
 interface DashboardStats {
     on_probation: number;
@@ -28,7 +28,6 @@ const tabs = [
     { id: 'status', label: 'Employment Status', icon: Users },
     { id: 'history', label: 'Lifecycle History', icon: History },
     { id: 'suspension', label: 'Suspension', icon: ShieldOff },
-    { id: 'termination', label: 'Termination', icon: XCircle },
     { id: 'reports', label: 'Reports', icon: FileText },
 ];
 
@@ -40,6 +39,8 @@ export default function HRLifecycleDashboard() {
         pending_confirmations: 0, pending_interview: 0,
     });
     const [loading, setLoading] = useState(true);
+    const [hrNotifications, setHrNotifications] = useState<HRNotification[]>([]);
+    const { checkAndNotify } = useHRNotifications();
 
     const fetchDashboardStats = useCallback(async () => {
         setLoading(true);
@@ -90,18 +91,28 @@ export default function HRLifecycleDashboard() {
         }
     }, []);
 
+    const loadHRNotifications = useCallback(async () => {
+        const notifs = await fetchAdminHRNotifications();
+        setHrNotifications(notifs);
+    }, []);
+
+    const dismissNotification = async (id: number) => {
+        await markAdminNotificationRead(id);
+        setHrNotifications(prev => prev.filter(n => n.id !== id));
+    };
+
     useEffect(() => {
         fetchDashboardStats();
-    }, [fetchDashboardStats]);
+        loadHRNotifications();
+        checkAndNotify().then(() => loadHRNotifications());
+    }, [fetchDashboardStats, loadHRNotifications, checkAndNotify]);
 
     const statCards = [
         { label: 'On Probation', value: stats.on_probation, icon: Clock, color: 'from-amber-500 to-orange-500', bg: 'bg-amber-50', text: 'text-amber-700', tab: 'status' },
         { label: 'Contracts Expiring', value: stats.contracts_expiring, icon: AlertTriangle, color: 'from-red-500 to-rose-500', bg: 'bg-red-50', text: 'text-red-700', tab: 'status' },
         { label: 'Suspended', value: stats.suspended, icon: ShieldOff, color: 'from-purple-500 to-violet-500', bg: 'bg-purple-50', text: 'text-purple-700', tab: 'suspension' },
-        { label: 'Recently Terminated', value: stats.terminated, icon: UserMinus, color: 'from-gray-600 to-gray-800', bg: 'bg-gray-100', text: 'text-gray-700', tab: 'termination' },
         { label: 'Missing Joining Date', value: stats.missing_joining_date, icon: AlertTriangle, color: 'from-orange-500 to-red-500', bg: 'bg-orange-50', text: 'text-orange-700', tab: 'status' },
         { label: 'Pending Confirmations', value: stats.pending_confirmations, icon: CheckCircle, color: 'from-emerald-500 to-green-600', bg: 'bg-emerald-50', text: 'text-emerald-700', tab: 'status' },
-        { label: 'Pending Interviews', value: stats.pending_interview, icon: Users, color: 'from-sky-500 to-blue-600', bg: 'bg-sky-50', text: 'text-sky-700', tab: 'termination' },
     ];
 
     return (
@@ -161,6 +172,49 @@ export default function HRLifecycleDashboard() {
                 >
                     {activeTab === 'overview' && (
                         <div className="space-y-6">
+
+                            {/* HR Notifications Banner */}
+                            {hrNotifications.length > 0 && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: -10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="bg-amber-50 border border-amber-200 rounded-xl p-4"
+                                >
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <Bell className="w-4 h-4 text-amber-600" />
+                                        <h3 className="text-sm font-semibold text-amber-800">
+                                            {hrNotifications.length} Upcoming Expiry Alert{hrNotifications.length !== 1 ? 's' : ''}
+                                        </h3>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {hrNotifications.map(n => (
+                                            <div key={n.id} className="flex items-center justify-between bg-white border border-amber-100 rounded-lg px-3 py-2">
+                                                <div className="flex items-center gap-2">
+                                                    <Clock className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+                                                    <div>
+                                                        <p className="text-xs font-medium text-gray-800">{n.title}</p>
+                                                        <p className="text-[10px] text-gray-500">{n.message}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 ml-3">
+                                                    <button
+                                                        onClick={() => setActiveTab('status')}
+                                                        className="text-[10px] font-medium text-amber-700 bg-amber-100 px-2 py-1 rounded-lg hover:bg-amber-200 transition-colors whitespace-nowrap"
+                                                    >
+                                                        View →
+                                                    </button>
+                                                    <button
+                                                        onClick={() => dismissNotification(n.id)}
+                                                        className="text-gray-400 hover:text-gray-600"
+                                                    >
+                                                        <XCircle className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </motion.div>
+                            )}
                             {/* Stats Grid */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                                 {statCards.map((card) => {
@@ -194,8 +248,8 @@ export default function HRLifecycleDashboard() {
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                     {[
                                         { label: 'Manage Employment Status', tab: 'status', icon: Users, desc: 'Probation, Contract, Permanent' },
+                                        { label: 'Lifecycle History', tab: 'history', icon: History, desc: 'View complete employee timelines' },
                                         { label: 'Record Suspension', tab: 'suspension', icon: ShieldOff, desc: 'Suspend or reactivate staff' },
-                                        { label: 'Process Termination', tab: 'termination', icon: XCircle, desc: 'Voluntary, Dismissal, etc.' },
                                     ].map(action => {
                                         const Icon = action.icon;
                                         return (
@@ -245,7 +299,6 @@ export default function HRLifecycleDashboard() {
                     {activeTab === 'status' && <EmploymentStatusModule onRefresh={fetchDashboardStats} />}
                     {activeTab === 'history' && <LifecycleHistoryModule />}
                     {activeTab === 'suspension' && <SuspensionModule onRefresh={fetchDashboardStats} />}
-                    {activeTab === 'termination' && <TerminationModule onRefresh={fetchDashboardStats} />}
                     {activeTab === 'reports' && <HRReportsDashboard stats={stats} />}
                 </motion.div>
             </AnimatePresence>

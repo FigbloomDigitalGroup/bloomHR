@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Bell, LogOut, X, Trash2, CheckCircle, UserPlus, Calendar, Image, Upload, MapPin, ChevronDown } from 'lucide-react';
+import { Bell, LogOut, X, Trash2, CheckCircle, UserPlus, Calendar, Image, Upload, MapPin, ChevronDown, AlertTriangle, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
+import { useHRNotifications, fetchAdminHRNotifications, markAdminNotificationRead, type HRNotification } from '../../hooks/useHRNotifications';
 
 interface HeaderProps {
   user?: { email: string; role: string };
@@ -19,16 +20,18 @@ interface HeaderProps {
 
 interface NotificationItem {
   id: string;
-  type: 'staff' | 'leave';
+  type: 'staff' | 'leave' | 'hr';
   title: string;
   message: string;
   timestamp: Date;
   isRead: boolean;
+  hrId?: number;
 }
 
 interface NotificationState {
   staff: number;
   leave: number;
+  hr: number;
   lastUpdated: Date | null;
   items: NotificationItem[];
 }
@@ -117,9 +120,11 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
   const [notifications, setNotifications] = useState<NotificationState>({
     staff: 0,
     leave: 0,
+    hr: 0,
     lastUpdated: null,
     items: []
   });
+  const { checkAndNotify } = useHRNotifications();
   const [showNotificationDot, setShowNotificationDot] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -181,7 +186,19 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
       const staffItems = (staffData || []).map(item => createNotificationItem('staff', item));
       const leaveItems = (leaveData || []).map(item => createNotificationItem('leave', item));
 
-      const allItems = [...staffItems, ...leaveItems].sort((a, b) =>
+      // Fetch HR lifecycle notifications
+      const hrNotifs = await fetchAdminHRNotifications();
+      const hrItems: NotificationItem[] = hrNotifs.map((n: HRNotification) => ({
+        id: `hr-${n.id}`,
+        type: 'hr' as const,
+        title: n.title,
+        message: n.message,
+        timestamp: new Date(n.created_at),
+        isRead: false,
+        hrId: n.id,
+      }));
+
+      const allItems = [...staffItems, ...leaveItems, ...hrItems].sort((a, b) =>
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       );
 
@@ -189,11 +206,12 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
         const newCounts = {
           staff: staffCount || 0,
           leave: leaveCount || 0,
+          hr: hrNotifs.length,
           lastUpdated: new Date(),
           items: allItems
         };
 
-        if ((staffCount || 0) > prev.staff || (leaveCount || 0) > prev.leave) {
+        if ((staffCount || 0) > prev.staff || (leaveCount || 0) > prev.leave || hrNotifs.length > prev.hr) {
           setShowNotificationDot(true);
         }
 
@@ -404,6 +422,7 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
     // Initial fetches
     fetchCompanyProfile();
     fetchNotificationCounts();
+    checkAndNotify(); // Check for expiring contracts/probations
 
     // Setup polling as fallback (every 5 minutes)
     const interval = setInterval(fetchNotificationCounts, 300000);
@@ -417,7 +436,7 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
         URL.revokeObjectURL(logoPreview);
       }
     };
-  }, []);
+  }, [checkAndNotify]);
 
   // Clean up preview URLs when component unmounts
   useEffect(() => {
@@ -449,6 +468,10 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
     } else if (notification.type === 'leave') {
       navigate('/leaves');
       setNotifications(prev => ({ ...prev, leave: Math.max(0, prev.leave - 1) }));
+    } else if (notification.type === 'hr') {
+      if (notification.hrId) markAdminNotificationRead(notification.hrId);
+      navigate('/hr-lifecycle');
+      setNotifications(prev => ({ ...prev, hr: Math.max(0, prev.hr - 1) }));
     }
 
     setSidebarOpen(false);
@@ -459,6 +482,7 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
       ...prev,
       staff: 0,
       leave: 0,
+      hr: 0,
       items: []
     }));
     toast.success('All notifications cleared');
@@ -480,7 +504,7 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
     });
   };
 
-  const totalNotifications = notifications.staff + notifications.leave;
+  const totalNotifications = notifications.staff + notifications.leave + notifications.hr;
   const unreadItems = notifications.items.filter(item => !item.isRead);
 
   return (
@@ -846,7 +870,11 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
                         key={notification.id}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors relative ${!notification.isRead ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+                        className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors relative ${!notification.isRead
+                            ? notification.type === 'hr'
+                              ? 'bg-amber-50 border-l-4 border-l-amber-500'
+                              : 'bg-blue-50 border-l-4 border-l-blue-500'
+                            : ''
                           }`}
                         onClick={() => handleNotificationClick(notification)}
                       >
@@ -862,11 +890,15 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
 
                         <div className="flex items-start space-x-3">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${notification.type === 'staff'
-                            ? 'bg-green-100 text-green-600'
-                            : 'bg-blue-100 text-blue-600'
+                              ? 'bg-green-100 text-green-600'
+                              : notification.type === 'hr'
+                                ? 'bg-amber-100 text-amber-600'
+                                : 'bg-blue-100 text-blue-600'
                             }`}>
                             {notification.type === 'staff' ? (
                               <UserPlus className="w-4 h-4" />
+                            ) : notification.type === 'hr' ? (
+                              <Clock className="w-4 h-4" />
                             ) : (
                               <Calendar className="w-4 h-4" />
                             )}
@@ -879,13 +911,18 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
                             <p className="text-xs text-gray-600 mt-1 line-clamp-2" style={{ fontFamily: "'Poppins', sans-serif" }}>
                               {notification.message}
                             </p>
-                            <p className="text-xs text-gray-500 mt-2" style={{ fontFamily: "'Poppins', sans-serif" }}>
+                            {notification.type === 'hr' && (
+                              <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                                <AlertTriangle className="w-2.5 h-2.5" /> HR Lifecycle
+                              </span>
+                            )}
+                            <p className="text-xs text-gray-500 mt-1" style={{ fontFamily: "'Poppins', sans-serif" }}>
                               {notification.timestamp.toLocaleDateString()} {notification.timestamp.toLocaleTimeString()}
                             </p>
                           </div>
 
                           {!notification.isRead && (
-                            <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-2"></div>
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-2 ${notification.type === 'hr' ? 'bg-amber-500' : 'bg-blue-500'}`}></div>
                           )}
                         </div>
                       </motion.div>

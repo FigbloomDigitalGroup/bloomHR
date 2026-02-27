@@ -75,11 +75,13 @@ const ROLES = {
 // Valid roles for Mular Credit emails
 const MULAR_CREDIT_ROLES = ['MANAGER', 'REGIONAL'];
 
-const StatusBadge = ({ active }: { active: boolean }) => {
+const StatusBadge = ({ status }: { status: string }) => {
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
+      status === 'SUSPENDED' ? 'bg-orange-100 text-orange-800' :
+        'bg-red-100 text-red-800'
       }`}>
-      {active ? 'Active' : 'Inactive'}
+      {status === 'ACTIVE' ? 'Active' : status === 'SUSPENDED' ? 'Suspended' : 'Deactivated'}
     </span>
   );
 };
@@ -89,12 +91,12 @@ const RoleBadge = ({ role }: { role: keyof typeof ROLES }) => {
 
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${role === 'ADMIN' ? 'bg-purple-100 text-purple-800' :
-        role === 'REGIONAL' ? 'bg-violet-100 text-violet-800' :
-          role === 'MANAGER' ? 'bg-blue-100 text-blue-800' :
-            role === 'CHECKER' ? 'bg-orange-100 text-orange-800' :
-              role === 'OPERATIONS' ? 'bg-indigo-100 text-indigo-800' :
-                role === 'STAFF' ? 'bg-green-100 text-green-800' :
-                  'bg-gray-100 text-gray-800'
+      role === 'REGIONAL' ? 'bg-violet-100 text-violet-800' :
+        role === 'MANAGER' ? 'bg-blue-100 text-blue-800' :
+          role === 'CHECKER' ? 'bg-orange-100 text-orange-800' :
+            role === 'OPERATIONS' ? 'bg-indigo-100 text-indigo-800' :
+              role === 'STAFF' ? 'bg-green-100 text-green-800' :
+                'bg-gray-100 text-gray-800'
       }`}>
       {roleInfo.icon}
       {roleInfo.label}
@@ -193,7 +195,7 @@ const UserCard = ({
       <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-2 gap-3">
         <div>
           <p className="text-xs text-gray-500 mb-1">Status</p>
-          <StatusBadge active={user.active} />
+          <StatusBadge status={user.account_status} />
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">Role</p>
@@ -285,8 +287,8 @@ const Pagination = ({
                 key={page}
                 onClick={() => onPageChange(page)}
                 className={`relative inline-flex items-center px-3 py-1.5 text-xs font-semibold ${currentPage === page
-                    ? 'bg-green-600 text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
-                    : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'
+                  ? 'bg-green-600 text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
+                  : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'
                   }`}
               >
                 {page}
@@ -323,12 +325,12 @@ const RoleToggle = ({
     <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
       <div className="flex items-center gap-3">
         <div className={`p-2 rounded-lg ${role === 'ADMIN' ? 'bg-purple-100 text-purple-600' :
-            role === 'REGIONAL' ? 'bg-violet-100 text-violet-600' :
-              role === 'MANAGER' ? 'bg-blue-100 text-blue-600' :
-                role === 'CHECKER' ? 'bg-orange-100 text-orange-600' :
-                  role === 'OPERATIONS' ? 'bg-indigo-100 text-indigo-600' :
-                    role === 'STAFF' ? 'bg-green-100 text-green-600' :
-                      'bg-gray-100 text-gray-600'
+          role === 'REGIONAL' ? 'bg-violet-100 text-violet-600' :
+            role === 'MANAGER' ? 'bg-blue-100 text-blue-600' :
+              role === 'CHECKER' ? 'bg-orange-100 text-orange-600' :
+                role === 'OPERATIONS' ? 'bg-indigo-100 text-indigo-600' :
+                  role === 'STAFF' ? 'bg-green-100 text-green-600' :
+                    'bg-gray-100 text-gray-600'
           }`}>
           {roleInfo.icon}
         </div>
@@ -351,21 +353,35 @@ const RoleToggle = ({
   );
 };
 
+interface UserData {
+  email: string;
+  role: string;
+  password?: string;
+  confirmPassword?: string;
+  location: string | null;
+  account_status: string;
+}
+
 const UserEditModal = ({
   user,
   onClose,
   onSave
 }: {
-  user: any | null;
+  user: UserData | null;
   onClose: () => void;
-  onSave: (user: any) => void
+  onSave: (user: UserData) => void
 }) => {
-  const [editedUser, setEditedUser] = useState<any>(user || {
-    email: '',
-    role: 'STAFF',
-    active: true,
+  const [editedUser, setEditedUser] = useState<UserData>(user ? {
+    ...user,
     password: '',
     confirmPassword: ''
+  } : {
+    email: '',
+    role: 'STAFF',
+    password: '',
+    confirmPassword: '',
+    location: null,
+    account_status: 'ACTIVE'
   });
   const [showPassword, setShowPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
@@ -521,14 +537,14 @@ const UserEditModal = ({
                     onClick={() => handleRoleChange(role)}
                     disabled={!isAllowedForMular}
                     className={`p-2 border rounded-lg text-xs font-medium ${editedUser.role === role ?
-                        (role === 'ADMIN' ? 'border-purple-500 bg-purple-50 text-purple-700' :
-                          role === 'REGIONAL' ? 'border-violet-500 bg-violet-50 text-violet-700' :
-                            role === 'MANAGER' ? 'border-blue-500 bg-blue-50 text-blue-700' :
-                              role === 'CHECKER' ? 'border-orange-500 bg-orange-50 text-orange-700' :
-                                role === 'OPERATIONS' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' :
-                                  role === 'STAFF' ? 'border-green-500 bg-green-50 text-green-700' :
-                                    'border-gray-500 bg-gray-50 text-gray-700') :
-                        'border-gray-200 hover:bg-gray-50'
+                      (role === 'ADMIN' ? 'border-purple-500 bg-purple-50 text-purple-700' :
+                        role === 'REGIONAL' ? 'border-violet-500 bg-violet-50 text-violet-700' :
+                          role === 'MANAGER' ? 'border-blue-500 bg-blue-50 text-blue-700' :
+                            role === 'CHECKER' ? 'border-orange-500 bg-orange-50 text-orange-700' :
+                              role === 'OPERATIONS' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' :
+                                role === 'STAFF' ? 'border-green-500 bg-green-50 text-green-700' :
+                                  'border-gray-500 bg-gray-50 text-gray-700') :
+                      'border-gray-200 hover:bg-gray-50'
                       } ${!isAllowedForMular ? 'opacity-50 cursor-not-allowed' : ''}`}
                     title={!isAllowedForMular ? 'Mular Credit emails must be Manager or Regional Manager' : ''}
                   >
@@ -544,22 +560,33 @@ const UserEditModal = ({
             )}
           </div>
 
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div>
-              <p className="text-xs font-medium text-gray-900">Account Status</p>
-              <p className="text-xs text-gray-500">
-                {editedUser.active ? 'User can sign in' : 'User cannot sign in'}
-              </p>
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <label className="block text-xs font-medium text-gray-900 mb-2">Account Status</label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => setEditedUser({ ...editedUser, account_status: 'ACTIVE' })}
+                className={`p-2 border rounded-lg text-xs font-medium transition-colors ${editedUser.account_status === 'ACTIVE' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 hover:bg-gray-50 text-gray-700'}`}
+              >
+                Active
+              </button>
+              <button
+                onClick={() => setEditedUser({ ...editedUser, account_status: 'SUSPENDED' })}
+                className={`p-2 border rounded-lg text-xs font-medium transition-colors ${editedUser.account_status === 'SUSPENDED' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 hover:bg-gray-50 text-gray-700'}`}
+              >
+                Suspended
+              </button>
+              <button
+                onClick={() => setEditedUser({ ...editedUser, account_status: 'DEACTIVATED' })}
+                className={`p-2 border rounded-lg text-xs font-medium transition-colors ${editedUser.account_status === 'DEACTIVATED' ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 hover:bg-gray-50 text-gray-700'}`}
+              >
+                Deactivated
+              </button>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={editedUser.active}
-                onChange={(e) => handleStatusChange(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600"></div>
-            </label>
+            <p className="text-xs text-gray-500 mt-2">
+              {editedUser.account_status === 'ACTIVE' ? 'User can sign in normally.' :
+                editedUser.account_status === 'SUSPENDED' ? 'User is temporarily suspended and cannot sign in.' :
+                  'User is permanently deactivated and cannot sign in.'}
+            </p>
           </div>
         </div>
 
@@ -574,8 +601,8 @@ const UserEditModal = ({
             onClick={handleSave}
             disabled={isMularCreditEmail && !currentRoleIsValidForMular}
             className={`px-4 py-2 rounded-lg text-xs flex items-center gap-2 ${isMularCreditEmail && !currentRoleIsValidForMular
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-green-600 hover:bg-green-700 text-white'
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-green-600 hover:bg-green-700 text-white'
               }`}
           >
             <Check className="w-4 h-4" />
@@ -1006,7 +1033,7 @@ export default function UserRolesSettings() {
           id: user.id,
           email: user.email,
           role: user.user_metadata?.role || 'STAFF',
-          active: !user.banned_at && user.email_confirmed_at !== null,
+          account_status: user.user_metadata?.account_status || (!user.banned_at && user.email_confirmed_at !== null ? 'ACTIVE' : 'DEACTIVATED'),
           last_sign_in_at: user.last_sign_in_at,
           created_at: user.created_at,
           location: user.user_metadata?.location || null,
@@ -1029,9 +1056,7 @@ export default function UserRolesSettings() {
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = selectedRole === 'ALL' || user.role === selectedRole;
-    const matchesStatus = selectedStatus === 'ALL' ||
-      (selectedStatus === 'ACTIVE' && user.active) ||
-      (selectedStatus === 'INACTIVE' && !user.active);
+    const matchesStatus = selectedStatus === 'ALL' || user.account_status === selectedStatus;
 
     return matchesSearch && matchesRole && matchesStatus;
   });
@@ -1125,11 +1150,12 @@ export default function UserRolesSettings() {
             user_metadata: {
               ...editingUser.user_metadata,
               role: finalUserData.role,
+              account_status: finalUserData.account_status,
               ...(ROLES[finalUserData.role as keyof typeof ROLES]?.requiresLocation ? {
                 location: finalUserData.location || null
               } : { location: null })
             },
-            ban_duration: finalUserData.active ? 'none' : 'permanent'
+            ban_duration: finalUserData.account_status === 'ACTIVE' ? 'none' : (finalUserData.account_status === 'SUSPENDED' ? '876000h' : 'permanent')
           }
         );
 
@@ -1139,7 +1165,7 @@ export default function UserRolesSettings() {
           ...u,
           email: finalUserData.email,
           role: finalUserData.role,
-          active: finalUserData.active,
+          account_status: finalUserData.account_status,
           location: finalUserData.location || null
         } : u));
         setEditingUser(null);
@@ -1152,6 +1178,7 @@ export default function UserRolesSettings() {
           email_confirm: true, // Mark email as confirmed
           user_metadata: {
             role: finalUserData.role,
+            account_status: finalUserData.account_status,
             ...(ROLES[finalUserData.role as keyof typeof ROLES]?.requiresLocation ? {
               location: finalUserData.location || null
             } : {})
@@ -1164,7 +1191,7 @@ export default function UserRolesSettings() {
           id: data.user.id,
           email: finalUserData.email,
           role: finalUserData.role,
-          active: true,
+          account_status: finalUserData.account_status || 'ACTIVE',
           last_sign_in_at: null,
           created_at: new Date().toISOString(),
           location: finalUserData.location || null
@@ -1252,8 +1279,8 @@ export default function UserRolesSettings() {
                     Disable temporarily if you are experiencing SMS delivery issues.
                   </p>
                   <div className={`mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${mfaEnabled
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-gray-100 text-gray-500'
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-gray-100 text-gray-500'
                     }`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${mfaEnabled ? 'bg-green-500' : 'bg-gray-400'
                       }`} />
@@ -1408,7 +1435,8 @@ export default function UserRolesSettings() {
                 >
                   <option value="ALL">All Statuses</option>
                   <option value="ACTIVE">Active</option>
-                  <option value="INACTIVE">Inactive</option>
+                  <option value="SUSPENDED">Suspended</option>
+                  <option value="DEACTIVATED">Deactivated</option>
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
                   <ChevronDown className="w-4 h-4" />
@@ -1436,7 +1464,7 @@ export default function UserRolesSettings() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Active Users</p>
-                <p className="text-xl font-bold text-gray-900">{users.filter(u => u.active).length}</p>
+                <p className="text-xl font-bold text-gray-900">{users.filter(u => u.account_status === 'ACTIVE').length}</p>
               </div>
               <div className="p-2 rounded-lg bg-green-100 text-green-600">
                 <Eye className="w-5 h-5" />
