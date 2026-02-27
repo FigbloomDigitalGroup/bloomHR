@@ -446,67 +446,71 @@ export default function SuspensionModule({ onRefresh }: { onRefresh?: () => void
             {showModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 overflow-y-auto max-h-[90vh]">
-                        <div className="flex items-center justify-between mb-5">
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh] overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
                             <div>
                                 <h3 className="text-sm font-bold text-gray-900">Suspend Employee</h3>
                                 <p className="text-[11px] text-gray-500 mt-0.5">Record a suspension with reason and duration</p>
                             </div>
-                            <button onClick={() => setShowModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
+                            <button onClick={() => setShowModal(false)} className="p-1.5 hover:bg-gray-100 rounded-xl transition-colors">
                                 <X className="w-4 h-4 text-gray-500" />
                             </button>
                         </div>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-xs font-semibold text-gray-700 block mb-1.5">Employee *</label>
-                                <PremiumSelect value={form.employeeNumber}
-                                    onChange={v => setForm(f => ({ ...f, employeeNumber: v }))}
-                                    options={empOptions} placeholder="Select employee..." icon={Users} />
-                            </div>
-                            <div>
-                                <label className="text-xs font-semibold text-gray-700 block mb-1.5">Suspension Date *</label>
-                                <PremiumDatePicker value={form.suspension_date}
-                                    onChange={v => setForm(f => ({ ...f, suspension_date: v }))} />
-                            </div>
-                            <div>
-                                <label className="text-xs font-semibold text-gray-700 block mb-1.5">Suspension Reason *</label>
-                                <textarea rows={3} value={form.suspension_reason}
-                                    onChange={e => setForm(f => ({ ...f, suspension_reason: e.target.value }))}
-                                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
-                                    placeholder="State the reason for suspension..." />
-                            </div>
-                            <div>
-                                <label className="text-xs font-semibold text-gray-700 block mb-1.5">Duration (days, optional)</label>
-                                <input type="number" min={1} value={form.duration_days}
-                                    onChange={e => setForm(f => ({ ...f, duration_days: e.target.value }))}
-                                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-red-400"
-                                    placeholder="Leave blank for indefinite" />
-                            </div>
-                            <div className="flex flex-col gap-2.5">
-                                <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
-                                    <input type="checkbox" checked={form.auto_reactivate}
-                                        onChange={e => setForm(f => ({ ...f, auto_reactivate: e.target.checked }))}
-                                        className="w-3.5 h-3.5 accent-violet-600" />
-                                    Auto-reactivate after duration
-                                </label>
-                                <label className="flex items-center gap-2 text-xs text-red-700 cursor-pointer">
-                                    <input type="checkbox" checked={form.exclude_from_payroll}
-                                        onChange={e => setForm(f => ({ ...f, exclude_from_payroll: e.target.checked }))}
-                                        className="w-3.5 h-3.5 accent-red-600" />
-                                    Exclude from payroll
-                                </label>
-                            </div>
-                            <div>
-                                <label className="text-xs font-semibold text-gray-700 block mb-1.5">Additional Notes</label>
-                                <textarea rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-red-400 resize-none" />
+
+                        <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-semibold text-gray-700 block mb-1.5">Employee *</label>
+                                    <PremiumSelect value={form.employeeNumber}
+                                        onChange={v => setForm(f => ({ ...f, employeeNumber: v }))}
+                                        options={empOptions} placeholder="Select employee..." icon={Users} />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-gray-700 block mb-1.5">Suspension Date *</label>
+                                    <PremiumDatePicker value={form.suspension_date}
+                                        onChange={v => setForm(f => ({ ...f, suspension_date: v }))} />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-gray-700 block mb-1.5">Suspension Reason *</label>
+                                    <textarea rows={3} value={form.suspension_reason}
+                                        onChange={e => setForm(f => ({ ...f, suspension_reason: e.target.value }))}
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
+                                        placeholder="State the reason for suspension..." />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-gray-700 block mb-1.5">Duration (days, optional)</label>
+                                    <input type="number" min={1} value={form.duration_days}
+                                        onChange={e => setForm(f => ({ ...f, duration_days: e.target.value }))}
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-red-400"
+                                        placeholder="Leave blank for indefinite" />
+                                </div>
+                                <div className="flex flex-col gap-2.5">
+                                    <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                                        <input type="checkbox" checked={form.auto_reactivate}
+                                            onChange={e => setForm(f => ({ ...f, auto_reactivate: e.target.checked }))}
+                                            className="w-3.5 h-3.5 accent-violet-600" />
+                                        Auto-reactivate after duration
+                                    </label>
+                                    <label className="flex items-center gap-2 text-xs text-red-700 cursor-pointer">
+                                        <input type="checkbox" checked={form.exclude_from_payroll}
+                                            onChange={e => setForm(f => ({ ...f, exclude_from_payroll: e.target.checked }))}
+                                            className="w-3.5 h-3.5 accent-red-600" />
+                                        Exclude from payroll
+                                    </label>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-gray-700 block mb-1.5">Additional Notes</label>
+                                    <textarea rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-red-400 resize-none" />
+                                </div>
                             </div>
                         </div>
-                        <div className="flex gap-2 mt-5">
+
+                        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0 bg-gray-50/50">
                             <button onClick={() => setShowModal(false)}
-                                className="flex-1 py-2.5 text-xs border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600">Cancel</button>
+                                className="flex-1 py-2.5 text-xs font-semibold border border-gray-200 rounded-xl hover:bg-gray-100 text-gray-600 transition-colors">Cancel</button>
                             <button onClick={handleSave} disabled={saving}
-                                className="flex-1 py-2.5 text-xs bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-1">
+                                className="flex-1 py-2.5 text-xs font-semibold bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-1.5 transition-colors">
                                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldOff className="w-3.5 h-3.5" />}
                                 Confirm Suspension
                             </button>
