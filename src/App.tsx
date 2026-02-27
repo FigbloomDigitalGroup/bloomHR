@@ -909,6 +909,8 @@ function App() {
               element={
                 !session || !user ? (
                   <Login onLoginSuccess={handleLoginSuccess} />
+                ) : user.role === 'STAFF' ? (
+                  <StaffPortalLanding />
                 ) : (
                   <div className="flex flex-col min-h-screen bg-gray-50/50">
                     <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-200/40 via-purple-100/20 to-transparent pointer-events-none"></div>
