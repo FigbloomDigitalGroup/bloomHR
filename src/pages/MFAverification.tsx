@@ -310,8 +310,6 @@ export default function MFAVerification() {
       const mfaCode = Math.floor(100000 + Math.random() * 900000).toString();
 
       // Invalidate ALL previous unused codes for this email first
-      // This prevents the race condition where multiple codes exist and
-      // the SMS delivers an older code that no longer matches the DB
       await supabase
         .from('mfa_codes')
         .update({ used: true })
@@ -390,11 +388,11 @@ export default function MFAVerification() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-cyan-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style={{ background: 'linear-gradient(135deg, #022c22 0%, #065f46 50%, #4ade80 100%)' }}>
       <div className="max-w-md w-full space-y-8">
         <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
           <div className="flex justify-center mb-6">
-            <div className="bg-green-900 p-4 rounded-full">
+            <div className="p-4 rounded-full" style={{ background: 'linear-gradient(135deg, #022c22 0%, #4ade80 100%)' }}>
               <img
                 src="/logo.png"
                 alt="Company Logo"
@@ -488,7 +486,7 @@ export default function MFAVerification() {
           </form>
         </div>
 
-        <div className="text-center text-xs text-gray-500">
+        <div className="text-center text-xs text-white/70">
           <p>Having trouble receiving the code?</p>
           <p className="mt-1">Check your phone connection or contact support</p>
         </div>

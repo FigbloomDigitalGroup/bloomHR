@@ -192,7 +192,7 @@ function SidebarNavItem({
   );
 }
 
-// Elevated PortalCard Component
+// Elevated PortalCard Component — matches Employee card design
 function PortalCard({ icon, title, description, onClick, color = 'green', active = false }: {
   icon: React.ReactNode,
   title: string,
@@ -202,43 +202,68 @@ function PortalCard({ icon, title, description, onClick, color = 'green', active
   active?: boolean
 }) {
   const themes = {
-    green: { bg: 'bg-emerald-50', icon: 'text-emerald-600', shadow: 'shadow-emerald-200/60', glow: 'group-hover:shadow-emerald-400/50', groupHover: 'group-hover:bg-emerald-600', groupText: 'group-hover:text-white', border: 'hover:border-emerald-200' },
-    blue: { bg: 'bg-blue-50', icon: 'text-blue-600', shadow: 'shadow-blue-200/60', glow: 'group-hover:shadow-blue-400/50', groupHover: 'group-hover:bg-blue-600', groupText: 'group-hover:text-white', border: 'hover:border-blue-200' },
-    purple: { bg: 'bg-purple-50', icon: 'text-purple-600', shadow: 'shadow-purple-200/60', glow: 'group-hover:shadow-purple-400/50', groupHover: 'group-hover:bg-purple-600', groupText: 'group-hover:text-white', border: 'hover:border-purple-200' },
-    amber: { bg: 'bg-amber-50', icon: 'text-amber-600', shadow: 'shadow-amber-200/60', glow: 'group-hover:shadow-amber-400/50', groupHover: 'group-hover:bg-amber-600', groupText: 'group-hover:text-white', border: 'hover:border-amber-200' },
-    rose: { bg: 'bg-rose-50', icon: 'text-rose-600', shadow: 'shadow-rose-200/60', glow: 'group-hover:shadow-rose-400/50', groupHover: 'group-hover:bg-rose-600', groupText: 'group-hover:text-white', border: 'hover:border-rose-200' },
-    indigo: { bg: 'bg-indigo-50', icon: 'text-indigo-600', shadow: 'shadow-indigo-200/60', glow: 'group-hover:shadow-indigo-400/50', groupHover: 'group-hover:bg-indigo-600', groupText: 'group-hover:text-white', border: 'hover:border-indigo-200' },
-    cyan: { bg: 'bg-cyan-50', icon: 'text-cyan-600', shadow: 'shadow-cyan-200/60', glow: 'group-hover:shadow-cyan-400/50', groupHover: 'group-hover:bg-cyan-600', groupText: 'group-hover:text-white', border: 'hover:border-cyan-200' },
+    green: { avatarBg: 'bg-gradient-to-br from-green-600 to-emerald-700', headerBg: 'bg-gradient-to-r from-green-600/80 to-green-500/80', iconText: 'text-green-600', rowHover: 'group-hover:border-green-100 group-hover:bg-green-50/10', dot: 'bg-emerald-500' },
+    blue: { avatarBg: 'bg-gradient-to-br from-blue-600 to-blue-700', headerBg: 'bg-gradient-to-r from-blue-600/80 to-blue-500/80', iconText: 'text-blue-600', rowHover: 'group-hover:border-blue-100 group-hover:bg-blue-50/10', dot: 'bg-blue-500' },
+    purple: { avatarBg: 'bg-gradient-to-br from-purple-600 to-purple-700', headerBg: 'bg-gradient-to-r from-purple-600/80 to-purple-500/80', iconText: 'text-purple-600', rowHover: 'group-hover:border-purple-100 group-hover:bg-purple-50/10', dot: 'bg-purple-500' },
+    amber: { avatarBg: 'bg-gradient-to-br from-amber-500 to-amber-700', headerBg: 'bg-gradient-to-r from-amber-600/80 to-amber-500/80', iconText: 'text-amber-600', rowHover: 'group-hover:border-amber-100 group-hover:bg-amber-50/10', dot: 'bg-amber-500' },
+    rose: { avatarBg: 'bg-gradient-to-br from-rose-500 to-rose-700', headerBg: 'bg-gradient-to-r from-rose-600/80 to-rose-500/80', iconText: 'text-rose-600', rowHover: 'group-hover:border-rose-100 group-hover:bg-rose-50/10', dot: 'bg-rose-500' },
+    indigo: { avatarBg: 'bg-gradient-to-br from-indigo-600 to-indigo-700', headerBg: 'bg-gradient-to-r from-indigo-600/80 to-indigo-500/80', iconText: 'text-indigo-600', rowHover: 'group-hover:border-indigo-100 group-hover:bg-indigo-50/10', dot: 'bg-indigo-500' },
+    cyan: { avatarBg: 'bg-gradient-to-br from-cyan-500 to-cyan-700', headerBg: 'bg-gradient-to-r from-cyan-600/80 to-cyan-500/80', iconText: 'text-cyan-600', rowHover: 'group-hover:border-cyan-100 group-hover:bg-cyan-50/10', dot: 'bg-cyan-500' },
   };
 
   const theme = themes[color];
 
   return (
     <motion.div
-      whileHover={{ y: -4, scale: 1.01 }}
+      whileHover={{ y: -4 }}
       whileTap={{ scale: 0.98 }}
-      className={`group relative bg-white border border-gray-200 rounded-[24px] p-6 cursor-pointer transition-all duration-300 hover:border-gray-300 overflow-hidden text-left`}
+      className="group flex flex-col bg-white rounded-2xl border border-gray-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:border-green-500/20 transition-all duration-300 overflow-hidden cursor-pointer"
       onClick={onClick}
     >
-      <div className="relative z-10 flex flex-col h-full justify-between">
-        <div>
-          <div className={`w-14 h-14 ${theme.bg} rounded-2xl flex items-center justify-center mb-5 transition-all duration-500 group-hover:scale-110 ${theme.icon}`}>
-            <div className={`text-2xl transition-colors duration-500`}>
-              {icon}
+      {/* Header */}
+      <div className="relative h-14 px-4 flex items-center bg-white">
+        <div className="flex items-center space-x-3 w-full">
+          {/* Avatar-style icon circle */}
+          <div className="relative">
+            <div className="w-8 h-8 bg-transparent rounded-full flex items-center justify-center text-black border border-black/20">
+              <div className="[&_svg]:w-[18px] [&_svg]:h-[18px]">{icon}</div>
             </div>
+            <div className={`absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${theme.dot}`} />
           </div>
-          <h3 className="text-lg font-bold text-gray-900 mb-2 tracking-tight">
-            {title}
-          </h3>
-          <p className="text-xs text-gray-500 leading-relaxed font-medium">
-            {description}
-          </p>
+          {/* Title & label */}
+          <div className="space-y-0.5 min-w-0">
+            <h3 className="text-gray-900 font-normal text-[13px] leading-tight group-hover:text-green-700 transition-colors truncate">
+              {title}
+            </h3>
+            <span className="px-1.5 py-0.5 rounded-md bg-gray-50 text-gray-500 text-[9px] font-medium tracking-wide border border-gray-200">
+              Staff Portal
+            </span>
+          </div>
         </div>
+      </div>
 
-        <div className="mt-6 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0">
-          <span className="text-[10px] font-bold text-gray-900 px-3 py-1 bg-gray-50 border border-gray-100 rounded-full">Open</span>
-          <div className={`w-8 h-8 rounded-full ${theme.bg} flex items-center justify-center ${theme.icon}`}>
-            <ChevronRight className="w-4 h-4" />
+      {/* Slick Separator */}
+      <div className="h-px w-full bg-gray-200" />
+
+      {/* Body */}
+      <div className="px-4 py-4 flex-grow bg-white">
+        <div className={`flex items-center p-2 rounded-lg bg-gray-50/50 border border-gray-100 ${theme.rowHover} transition-colors`}>
+          <div className="ml-1 min-w-0">
+            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Description</p>
+            <p className="text-xs font-medium text-gray-700 truncate">{description}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Separator */}
+      <div className="h-px w-full bg-gray-200" />
+
+      {/* Footer */}
+      <div className="h-11 px-4 flex items-center bg-white">
+        <div className="flex items-center justify-between w-full">
+          <span className="text-[10px] font-bold text-gray-500 group-hover:text-green-600 transition-colors">Open</span>
+          <div className={`w-6 h-6 rounded-full bg-gray-100 group-hover:bg-green-100 flex items-center justify-center ${theme.iconText} transition-colors`}>
+            <ChevronRight className="w-3.5 h-3.5" />
           </div>
         </div>
       </div>
@@ -2853,7 +2878,6 @@ const DashboardHome = ({ setActiveTab, userName }: { setActiveTab: (tab: string)
               />
             </motion.div>
           </div>
-
         </div>
       </motion.div>
 
@@ -2861,7 +2885,7 @@ const DashboardHome = ({ setActiveTab, userName }: { setActiveTab: (tab: string)
       <div className="space-y-6">
         <div className="flex items-center justify-between px-2">
           <div>
-            <h3 className="text-lg font-bold text-gray-900 italic">Quick Services</h3>
+            <h3 className="text-lg font-bold text-gray-900">Quick Services</h3>
             <p className="text-xs text-gray-500 font-medium tracking-tight">Access your employee tools and resources</p>
           </div>
         </div>
@@ -2879,42 +2903,42 @@ const DashboardHome = ({ setActiveTab, userName }: { setActiveTab: (tab: string)
             title="Loan Request"
             description="Affordable staff credit facilities"
             onClick={() => setActiveTab('loan')}
-            color="blue"
+            color="green"
           />
           <PortalCard
             icon={<PhReceipt className="w-6 h-6" weight="duotone" />}
             title="Payslips"
             description="Download salary breakdowns"
             onClick={() => setActiveTab('payslips')}
-            color="amber"
+            color="green"
           />
           <PortalCard
             icon={<PhChatCircleDots className="w-6 h-6" weight="duotone" />}
             title="Comm Hub"
             description="Collaborate with your team"
             onClick={() => setActiveTab('VideoConf')}
-            color="purple"
+            color="green"
           />
           <PortalCard
             icon={<PhCalendarBlank className="w-6 h-6" weight="duotone" />}
             title="Leave Request"
             description="Plan your time off"
             onClick={() => setActiveTab('leave')}
-            color="cyan"
+            color="green"
           />
           <PortalCard
             icon={<PhClockCounterClockwise className="w-6 h-6" weight="duotone" />}
             title="Leave History"
             description="Review previous applications"
             onClick={() => setActiveTab('leave-history')}
-            color="indigo"
+            color="green"
           />
           <PortalCard
             icon={<PhFile className="w-6 h-6" weight="duotone" />}
             title="Contracts"
             description="Review employment documents"
             onClick={() => setActiveTab('contract')}
-            color="rose"
+            color="green"
           />
           <PortalCard
             icon={<PhFingerprint className="w-6 h-6" weight="duotone" />}
@@ -2928,21 +2952,21 @@ const DashboardHome = ({ setActiveTab, userName }: { setActiveTab: (tab: string)
             title="Documents"
             description="Secure file storage"
             onClick={() => setActiveTab('documents')}
-            color="blue"
+            color="green"
           />
           <PortalCard
             icon={<PhLifebuoy className="w-6 h-6" weight="duotone" />}
             title="Report Incident"
             description="Whistleblower protection"
             onClick={() => setActiveTab('incident-report')}
-            color="rose"
+            color="green"
           />
           <PortalCard
-            icon={<PhSparkle className="w-6 h-6" weight="duotone" />}
+            icon={<PhBriefcase className="w-6 h-6" weight="duotone" />}
             title="Opportunities"
             description="Career growth paths"
             onClick={() => setActiveTab('job-applications')}
-            color="amber"
+            color="green"
           />
         </div>
       </div>
@@ -3493,7 +3517,8 @@ const StaffPortal = () => {
             initial="expanded"
             animate={isExpanded ? "expanded" : "collapsed"}
             variants={sidebarVariants}
-            className="relative flex flex-col h-full border-r border-white/5 shadow-2xl overflow-hidden bg-emerald-950/95 backdrop-blur-2xl"
+            className="relative flex flex-col h-full border-r border-white/5 shadow-2xl overflow-hidden font-lexend"
+            style={{ background: '#0f1c5e' }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
           >
@@ -3524,8 +3549,8 @@ const StaffPortal = () => {
                       exit={{ opacity: 0, x: -10 }}
                       className="flex flex-col"
                     >
-                      <h1 className="font-sans font-bold text-xl text-white tracking-tight flex items-center">
-                        Zira<span className="bg-gradient-to-r from-blue-600 to-[#03c04a] bg-clip-text text-transparent ml-0.5">Pro</span>
+                      <h1 className="font-lexend font-bold text-xl text-white tracking-tight flex items-center">
+                        Zira<span className="text-white font-light ml-0.5">Pro</span>
                       </h1>
                     </motion.div>
                   )}
@@ -3589,7 +3614,7 @@ const StaffPortal = () => {
                             exit={{ opacity: 0 }}
                             className="px-3 mb-2"
                           >
-                            <span className="text-[10px] font-normal text-slate-400 tracking-wider font-sans pl-1">
+                            <span className="text-[10px] font-normal text-cyan-400 tracking-wider font-sans pl-1">
                               {group.title}
                             </span>
                           </motion.div>

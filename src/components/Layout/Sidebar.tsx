@@ -14,7 +14,6 @@ import {
   Network,
   ShieldEllipsis,
   Package,
-  ClipboardCheck,
   UserPlus2,
   PieChart,
   Receipt,
@@ -76,7 +75,6 @@ const menuGroups = [
     title: "System",
     items: [
       { id: 'reports', label: 'Reports', icon: PieChart, path: '/reports', permission: 'reports' },
-      { id: 'phone-approvals', label: 'Approvals', icon: ClipboardCheck, path: '/phone-approvals', permission: 'phone-approvals' },
       { id: 'email admin', label: 'Email Admin', icon: ShieldEllipsis, path: '/adminconfirm', permission: 'adminconfirm' },
       { id: 'incident-reports', label: 'Incidents', icon: ShieldAlert, path: '/incident-reports', permission: 'incident-reports' },
       { id: 'settings', label: 'Settings', icon: Settings, path: '/settings', permission: 'settings' },
@@ -217,7 +215,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                       exit={{ opacity: 0 }}
                       className="px-3 mb-2"
                     >
-                      <span className="text-[10px] font-normal text-lime-400 tracking-wider font-lexend pl-1">
+                      <span className="text-[10px] font-normal text-cyan-400 tracking-wider font-lexend pl-1">
                         {group.title}
                       </span>
                     </motion.div>

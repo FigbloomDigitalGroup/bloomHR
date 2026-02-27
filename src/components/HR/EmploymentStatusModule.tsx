@@ -736,105 +736,109 @@ export default function EmploymentStatusModule({ onRefresh }: { onRefresh?: () =
             {showAddModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 overflow-y-auto max-h-[90vh]">
-                        <div className="flex items-center justify-between mb-5">
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh] overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
                             <div>
                                 <h3 className="text-sm font-bold text-gray-900">Assign Employment Status</h3>
                                 <p className="text-[11px] text-gray-500 mt-0.5">Set type, duration and joining date</p>
                             </div>
-                            <button onClick={() => setShowAddModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
+                            <button onClick={() => setShowAddModal(false)} className="p-1.5 hover:bg-gray-100 rounded-xl transition-colors">
                                 <X className="w-4 h-4 text-gray-500" />
                             </button>
                         </div>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-xs font-semibold text-gray-700 block mb-1.5">Employee *</label>
-                                <PremiumSelect
-                                    value={addForm.employeeNumber}
-                                    onChange={v => {
-                                        setAddForm(f => ({ ...f, employeeNumber: v }));
-                                        // Auto-fill form from existing record if active
-                                        const existing = statusList.find(s => s['Employee Number'] === v && s.id > 0);
-                                        if (existing) {
-                                            setAddForm(f => ({
-                                                ...f,
-                                                employment_type: existing.employment_type,
-                                                joining_date: existing.joining_date || '',
-                                                notes: existing.notes || ''
-                                            }));
-                                        }
-                                    }}
-                                    options={empOptions}
-                                    placeholder="Select employee..."
-                                    icon={Users}
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-semibold text-gray-700 block mb-1.5">Employment Type</label>
-                                <PremiumSelect
-                                    value={addForm.employment_type}
-                                    onChange={v => setAddForm(f => ({ ...f, employment_type: v as EmploymentType }))}
-                                    options={[
-                                        { label: '🔵 Attachment', value: 'Attachment' },
-                                        { label: '🟡 Probation', value: 'Probation' },
-                                        { label: '🟣 Contract', value: 'Contract' },
-                                        { label: '🟢 Permanent', value: 'Permanent' },
-                                    ]}
-                                    placeholder="Select type..."
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-semibold text-gray-700 block mb-1.5">Joining Date</label>
-                                <PremiumDatePicker
-                                    value={addForm.joining_date}
-                                    onChange={v => setAddForm(f => ({ ...f, joining_date: v }))}
-                                    label="Select joining date"
-                                />
-                            </div>
-                            {addForm.employment_type === 'Probation' && (
+
+                        <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+                            <div className="space-y-4">
                                 <div>
-                                    <label className="text-xs font-semibold text-gray-700 block mb-1.5">Probation Duration</label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="number" min={1} max={addForm.probation_unit === 'weeks' ? 52 : 12}
-                                            value={addForm.probation_value}
-                                            onChange={e => setAddForm(f => ({ ...f, probation_value: Number(e.target.value) }))}
-                                            className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500"
-                                        />
-                                        <div className="w-32">
-                                            <PremiumSelect
-                                                value={addForm.probation_unit}
-                                                onChange={v => setAddForm(f => ({ ...f, probation_unit: v as DurationUnit }))}
-                                                options={[{ label: 'Months', value: 'months' }, { label: 'Weeks', value: 'weeks' }]}
-                                                placeholder="Unit"
-                                            />
-                                        </div>
-                                    </div>
-                                    <p className="text-[10px] text-gray-400 mt-1">= {probationMonths} month(s)</p>
-                                </div>
-                            )}
-                            {addForm.employment_type === 'Contract' && (
-                                <div>
-                                    <label className="text-xs font-semibold text-gray-700 block mb-1.5">Contract Duration (months)</label>
-                                    <input
-                                        type="number" min={1} max={60} value={addForm.contract_duration_months}
-                                        onChange={e => setAddForm(f => ({ ...f, contract_duration_months: Number(e.target.value) }))}
-                                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                    <label className="text-xs font-semibold text-gray-700 block mb-1.5">Employee *</label>
+                                    <PremiumSelect
+                                        value={addForm.employeeNumber}
+                                        onChange={v => {
+                                            setAddForm(f => ({ ...f, employeeNumber: v }));
+                                            // Auto-fill form from existing record if active
+                                            const existing = statusList.find(s => s['Employee Number'] === v && s.id > 0);
+                                            if (existing) {
+                                                setAddForm(f => ({
+                                                    ...f,
+                                                    employment_type: existing.employment_type,
+                                                    joining_date: existing.joining_date || '',
+                                                    notes: existing.notes || ''
+                                                }));
+                                            }
+                                        }}
+                                        options={empOptions}
+                                        placeholder="Select employee..."
+                                        icon={Users}
                                     />
                                 </div>
-                            )}
-                            <div>
-                                <label className="text-xs font-semibold text-gray-700 block mb-1.5">Notes</label>
-                                <textarea rows={2} value={addForm.notes} onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))}
-                                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
-                                    placeholder="Optional notes..." />
+                                <div>
+                                    <label className="text-xs font-semibold text-gray-700 block mb-1.5">Employment Type</label>
+                                    <PremiumSelect
+                                        value={addForm.employment_type}
+                                        onChange={v => setAddForm(f => ({ ...f, employment_type: v as EmploymentType }))}
+                                        options={[
+                                            { label: '🔵 Attachment', value: 'Attachment' },
+                                            { label: '🟡 Probation', value: 'Probation' },
+                                            { label: '🟣 Contract', value: 'Contract' },
+                                            { label: '🟢 Permanent', value: 'Permanent' },
+                                        ]}
+                                        placeholder="Select type..."
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-gray-700 block mb-1.5">Joining Date</label>
+                                    <PremiumDatePicker
+                                        value={addForm.joining_date}
+                                        onChange={v => setAddForm(f => ({ ...f, joining_date: v }))}
+                                        label="Select joining date"
+                                    />
+                                </div>
+                                {addForm.employment_type === 'Probation' && (
+                                    <div>
+                                        <label className="text-xs font-semibold text-gray-700 block mb-1.5">Probation Duration</label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="number" min={1} max={addForm.probation_unit === 'weeks' ? 52 : 12}
+                                                value={addForm.probation_value}
+                                                onChange={e => setAddForm(f => ({ ...f, probation_value: Number(e.target.value) }))}
+                                                className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            />
+                                            <div className="w-32">
+                                                <PremiumSelect
+                                                    value={addForm.probation_unit}
+                                                    onChange={v => setAddForm(f => ({ ...f, probation_unit: v as DurationUnit }))}
+                                                    options={[{ label: 'Months', value: 'months' }, { label: 'Weeks', value: 'weeks' }]}
+                                                    placeholder="Unit"
+                                                />
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-gray-400 mt-1">= {probationMonths} month(s)</p>
+                                    </div>
+                                )}
+                                {addForm.employment_type === 'Contract' && (
+                                    <div>
+                                        <label className="text-xs font-semibold text-gray-700 block mb-1.5">Contract Duration (months)</label>
+                                        <input
+                                            type="number" min={1} max={60} value={addForm.contract_duration_months}
+                                            onChange={e => setAddForm(f => ({ ...f, contract_duration_months: Number(e.target.value) }))}
+                                            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                        />
+                                    </div>
+                                )}
+                                <div>
+                                    <label className="text-xs font-semibold text-gray-700 block mb-1.5">Notes</label>
+                                    <textarea rows={2} value={addForm.notes} onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))}
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none"
+                                        placeholder="Optional notes..." />
+                                </div>
                             </div>
                         </div>
-                        <div className="flex gap-2 mt-5">
+
+                        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0 bg-gray-50/50">
                             <button onClick={() => setShowAddModal(false)}
-                                className="flex-1 py-2.5 text-xs border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600">Cancel</button>
+                                className="flex-1 py-2.5 text-xs font-semibold border border-gray-200 rounded-xl hover:bg-gray-100 text-gray-600 transition-colors">Cancel</button>
                             <button onClick={handleAddStatus} disabled={saving}
-                                className="flex-1 py-2.5 text-xs bg-violet-600 text-white rounded-xl hover:bg-violet-700 disabled:opacity-50 flex items-center justify-center gap-1">
+                                className="flex-1 py-2.5 text-xs font-semibold bg-violet-600 text-white rounded-xl hover:bg-violet-700 disabled:opacity-50 flex items-center justify-center gap-1.5 transition-colors">
                                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                                 Save
                             </button>

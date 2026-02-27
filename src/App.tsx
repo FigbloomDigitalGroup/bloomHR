@@ -36,7 +36,6 @@ import UpdatePasswordPage from './pages/UpdatePassword';
 import AuthCallback from './pages/AuthCallback';
 import SalaryAdvanceAdmin from './components/Settings/SalaryAdmin';
 import IncidentReportsManagement from './components/Settings/IncidentReportsManagement';
-import PhoneNumberApprovals from './components/Settings/PhoneNumberApprovals';
 import WarningModule from './components/Warning/StaffCheck'
 import React from 'react';
 import { UserProvider } from '../src/components/ProtectedRoutes/UserContext';
@@ -1050,14 +1049,6 @@ function App() {
                                   element={
                                     <AuthRoute allowedRoles={['ADMIN', 'OPERATIONS', 'CHECKER', 'HR']}>
                                       <StaffSignupRequests />
-                                    </AuthRoute>
-                                  }
-                                />
-                                <Route
-                                  path="/phone-approvals"
-                                  element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'CHECKER', 'HR']}>
-                                      <PhoneNumberApprovals />
                                     </AuthRoute>
                                   }
                                 />
