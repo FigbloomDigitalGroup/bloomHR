@@ -71,14 +71,17 @@ export function usePermissions(): UsePermissionsReturn {
     };
 
     const hasPermission = (permission: string): boolean => {
+        if (userRole === 'ADMIN') return true;
         return permissions.includes(permission);
     };
 
     const hasAnyPermission = (requiredPermissions: string[]): boolean => {
+        if (userRole === 'ADMIN') return true;
         return requiredPermissions.some(perm => permissions.includes(perm));
     };
 
     const hasAllPermissions = (requiredPermissions: string[]): boolean => {
+        if (userRole === 'ADMIN') return true;
         return requiredPermissions.every(perm => permissions.includes(perm));
     };
 
