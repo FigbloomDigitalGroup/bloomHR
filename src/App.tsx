@@ -466,8 +466,10 @@ function App() {
 
   const handleLoginSuccess = useCallback(async (userData: any) => {
     const { town, role } = userData;
-    if (town) {
+    if (town && role !== 'HR') {
       handleTownChange(town);
+    } else if (role === 'HR') {
+      handleTownChange(''); // Default HR to All Towns
     }
 
     hasShownWelcomeToast.current = true;
@@ -583,7 +585,7 @@ function App() {
               branch: session.user.user_metadata?.branch || ''
             });
 
-            if (userTown) {
+            if (userTown && userRole !== 'HR') {
               setSelectedTown(userTown);
               localStorage.setItem('selectedTown', userTown);
 
@@ -601,6 +603,9 @@ function App() {
               } catch (error) {
                 console.error('Error finding region for town:', error);
               }
+            } else if (userRole === 'HR') {
+              setSelectedTown('');
+              localStorage.setItem('selectedTown', '');
             }
 
             const newUrl = window.location.pathname;
@@ -666,7 +671,10 @@ function App() {
           // ... rest of the branch detection and normal navigation logic ...
           const savedTown = localStorage.getItem('selectedTown') ||
             session.user.user_metadata?.town || '';
-          if (savedTown && branches.length > 0 && branches.includes(savedTown)) {
+
+          if (userData.role === 'HR') {
+            setSelectedTown('');
+          } else if (savedTown && branches.length > 0 && branches.includes(savedTown)) {
             setSelectedTown(savedTown);
           }
 
@@ -781,7 +789,11 @@ function App() {
         }
 
         // Normal auth flow for regular logins (keep your existing code)...
-        if (userData.town && branches.length > 0 && branches.includes(userData.town)) {
+        if (userData.role === 'HR') {
+          setSelectedTown('');
+          localStorage.setItem('selectedTown', '');
+          setSelectedRegion('All Regions');
+        } else if (userData.town && branches.length > 0 && branches.includes(userData.town)) {
           setSelectedTown(userData.town);
           localStorage.setItem('selectedTown', userData.town);
 

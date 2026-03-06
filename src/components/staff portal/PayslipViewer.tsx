@@ -33,10 +33,10 @@ const statutorySettings = {
     { threshold: 999999999, rate: 0.35 }
   ],
   personalRelief: 2400,
-  nssfLowerLimit: 8000,
-  nssfUpperLimit: 72000,
+  nssfLowerLimit: 9000,
+  nssfUpperLimit: 108000,
   nssfRate: 0.06,
-  nssfMaximum: 4320,
+  nssfMaximum: 6480,
   nhifRate: 0.0275, // Flat rate system - 2.75%
   housingLevyRate: 0.015,
   currency: 'KSh',
@@ -885,47 +885,61 @@ const PayslipViewer = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.email) return;
 
-      const { data: employeeData } = await supabase
+      const { data: employeeData, error: empError } = await supabase
         .from('employees')
         .select('"Employee Number"')
         .eq('"Work Email"', user.email)
         .single();
 
-      if (!employeeData) return;
+      if (empError || !employeeData) {
+        throw new Error("Could not find employee record.");
+      }
 
-      // Try to get data from the current view first
-      const { data: currentData, error: currentError } = await supabase
-        .from('payroll_records_current')
+      const empId = employeeData["Employee Number"];
+
+      // 1. Fetch from the new Salary History table
+      const { data: historyData, error: historyError } = await supabase
+        .from('salary_history')
         .select('*')
-        .eq('"Employee ID"', employeeData["Employee Number"])
-        .order('"Pay Period"', { ascending: false });
+        .eq('employee_id', empId)
+        .order('pay_period', { ascending: false });
+
+      if (historyError) {
+        console.error("Salary history fetch error:", historyError);
+      }
 
       let data = [];
 
-      if (!currentError && currentData) {
-        data = currentData;
+      if (historyData && historyData.length > 0) {
+        // Map history to the format expected by the frontend
+        data = historyData.map(h => ({
+          ...h,
+          "Employee ID": h.employee_id,
+          "Employee Name": h.employee_name,
+          "Pay Period": h.pay_period,
+          "Basic Salary": h.basic_salary,
+          "Net Pay": h.net_pay,
+          "Total Deductions": h.total_deductions
+        }));
       } else {
-        // Fallback to payroll_records table
-        const { data: recordsData, error: recordsError } = await supabase
-          .from('payroll_records')
+        // Fallbacks for users who haven't saved to history yet
+        const { data: currentData } = await supabase
+          .from('payroll_records_current')
           .select('*')
-          .eq('"Employee ID"', employeeData["Employee Number"])
+          .eq('"Employee ID"', empId)
           .order('"Pay Period"', { ascending: false });
 
-        if (!recordsError && recordsData) {
-          data = recordsData;
+        if (currentData && currentData.length > 0) {
+          data = currentData;
         } else {
-          // Final fallback to payroll_data table
-          const { data: payrollData, error: payrollError } = await supabase
-            .from('payroll_data')
+          const { data: recordsData } = await supabase
+            .from('payroll_records')
             .select('*')
-            .eq('employee_id', employeeData["Employee Number"])
-            .order('pay_period', { ascending: false });
+            .eq('"Employee ID"', empId)
+            .order('"Pay Period"', { ascending: false });
 
-          if (!payrollError && payrollData) {
-            data = payrollData;
-          } else {
-            throw currentError || recordsError || payrollError;
+          if (recordsData && recordsData.length > 0) {
+            data = recordsData;
           }
         }
       }

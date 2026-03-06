@@ -6,39 +6,27 @@ import {
   Download,
   Calendar,
   TrendingUp,
-  Plus,
-  Edit,
   Trash2,
-  Users,
   Upload,
-  X,
   ChevronDown,
   ChevronUp,
-  Printer,
-  Share2,
   ArrowLeft,
   ArrowRight,
   Search,
-  Filter,
   Smartphone,
   TabletSmartphone,
   Send,
   FileSpreadsheet,
-  FileImage,
   Loader,
   Box,
-  CircleDot,
-  Tally1,
-  Clock,
   CheckCircle,
   XCircle,
+  X,
+  Clock,
+  Users,
   Eye,
-  AlertTriangle,
   Settings,
-  RefreshCw,
-  Info,
-  ToggleLeft,
-  ToggleRight,
+  AlertTriangle,
   MessageSquare,
   MapPin,
   Briefcase,
@@ -51,14 +39,14 @@ import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import html2pdf from "html2pdf.js";
-import GlowButton from "../UI/GlowButton";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import RoleButtonWrapper from "../ProtectedRoutes/RoleButton";
 import SearchableDropdown from "../UI/SearchableDropdown";
 import MPesaSpreadsheetFullPage from "./MpesaSpreadSheet";
 import useStatutorySettings from "../../hooks/useStatutorySettings";
 import StatutorySettingsModal from "./statutorySettingsModule";
+import { saveSalaryHistoryBatch } from "../../lib/salaryHistory";
+import BulkSalaryHistoryUpload from "./BulkSalaryHistoryUpload";
 
 // SMS Service Configuration for SMS Leopard
 const SMS_LEOPARD_CONFIG = {
@@ -69,7 +57,7 @@ const SMS_LEOPARD_CONFIG = {
 };
 
 // Utility function to add query parameters
-const addQueryParams = (url, params) => {
+const addQueryParams = (url: string, params: Record<string, string | number | boolean | (string | number | boolean)[]>) => {
   const queryString = Object.entries(params)
     .flatMap(([key, value]) =>
       Array.isArray(value)
@@ -84,7 +72,7 @@ const addQueryParams = (url, params) => {
 };
 
 // SMS Service Functions for SMS Leopard
-const sendSMSLeopard = async (phoneNumber, message) => {
+const sendSMSLeopard = async (phoneNumber: string, message: string) => {
   try {
     const formattedPhone = formatPhoneNumber(phoneNumber);
 
@@ -140,7 +128,7 @@ const sendSMSLeopard = async (phoneNumber, message) => {
 
     return {
       success: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : "Unknown error",
       fallback: true,
       message: "SMS queued for retry",
     };
@@ -182,10 +170,10 @@ const checkSMSBalance = async () => {
 };
 
 // Enhanced phone number formatting for SMS Leopard
-const formatPhoneNumber = (phone) => {
+const formatPhoneNumber = (phone: string | number | null | undefined): string => {
   if (!phone) return "";
 
-  let cleaned = phone.replace(/\D/g, "");
+  let cleaned = String(phone).replace(/\D/g, "");
 
   if (cleaned.startsWith("0")) {
     cleaned = "254" + cleaned.substring(1);
@@ -204,8 +192,8 @@ const formatPhoneNumber = (phone) => {
 };
 
 // Enhanced SMS sending with retry logic
-const sendSMSWithRetry = async (phoneNumber, message, maxRetries = 3) => {
-  let lastError;
+const sendSMSWithRetry = async (phoneNumber: string, message: string, maxRetries = 3) => {
+  let lastError: any;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -236,19 +224,19 @@ const sendSMSWithRetry = async (phoneNumber, message, maxRetries = 3) => {
 
 // SMS Templates
 const smsTemplates = {
-  payslipNotification: (employeeName, netPay, payPeriod) =>
+  payslipNotification: (employeeName: string, netPay: number, payPeriod: string) =>
     `Dear ${employeeName}, your payslip for ${payPeriod} is ready. Net Pay: KSh ${netPay.toLocaleString()}. Login to view details.`,
 
-  paymentConfirmation: (employeeName, amount) =>
+  paymentConfirmation: (employeeName: string, amount: number) =>
     `Dear ${employeeName}, payment of KSh ${amount.toLocaleString()} has been processed successfully via M-PESA. Thank you.`,
 
-  paymentFailed: (employeeName) =>
+  paymentFailed: (employeeName: string) =>
     `Dear ${employeeName}, we encountered an issue processing your payment. Please contact HR for assistance.`,
 
-  mpesaSuccess: (employeeName, amount, reference) =>
+  mpesaSuccess: (employeeName: string, amount: number, reference: string) =>
     `Dear ${employeeName}, KSh ${amount.toLocaleString()} has been sent to your M-PESA account. Reference: ${reference}.`,
 
-  mpesaFailed: (employeeName, reference) =>
+  mpesaFailed: (employeeName: string, reference: string) =>
     `Dear ${employeeName}, M-PESA payment failed for reference ${reference}. Please contact HR.`,
 };
 
@@ -259,6 +247,12 @@ const CommentModal = ({
   onSubmit,
   title = "Add Comment",
   submitText = "Submit",
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (comment: string) => void;
+  title?: string;
+  submitText?: string;
 }) => {
   const [comment, setComment] = useState("");
 
@@ -318,7 +312,7 @@ const CommentModal = ({
 };
 
 // Maker-Checker Status Badge Component
-const StatusBadge = ({ status }) => {
+const StatusBadge = ({ status }: { status: string }) => {
   const statusConfig = {
     pending: {
       bg: "bg-yellow-100",
@@ -358,7 +352,8 @@ const StatusBadge = ({ status }) => {
     },
   };
 
-  const config = statusConfig[status] || statusConfig.pending;
+  const config =
+    statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
   const Icon = config.icon;
 
   return (
@@ -380,13 +375,21 @@ const PendingPaymentCard = ({
   userRole,
   isSelected,
   onSelect,
+}: {
+  payment: any;
+  onApprove: (payment: any) => void;
+  onReject: (payment: any) => void;
+  onViewDetails: (payment: any) => void;
+  userRole: string;
+  isSelected?: boolean;
+  onSelect?: (id: string, checked: boolean) => void;
 }) => {
   const isChecker =
     userRole === "checker" || userRole === "credit_analyst_officer";
   const totalAmount =
     payment.type === "bulk"
       ? payment.employees_data?.reduce(
-        (sum, emp) => sum + (emp.net_pay || 0),
+        (sum: number, emp: any) => sum + (emp.net_pay || 0),
         0,
       ) || 0
       : payment.employee_data?.net_pay || 0;
@@ -447,7 +450,7 @@ const PendingPaymentCard = ({
         <div className="mb-4">
           <p className="text-xs text-gray-600 mb-2">Employees:</p>
           <div className="max-h-20 overflow-y-auto text-xs">
-            {payment.employees_data.slice(0, 3).map((emp, index) => (
+            {payment.employees_data.slice(0, 3).map((emp: any, index: number) => (
               <div key={index} className="flex justify-between py-1">
                 <span>{emp.employee_name}</span>
                 <span>KSh {emp.net_pay?.toLocaleString()}</span>
@@ -502,6 +505,13 @@ const PaymentDetailsModal = ({
   onApprove,
   onReject,
   userRole,
+}: {
+  payment: any;
+  isOpen: boolean;
+  onClose: () => void;
+  onApprove: (payment: any) => void;
+  onReject: (payment: any) => void;
+  userRole: string;
 }) => {
   if (!isOpen || !payment) return null;
 
@@ -510,7 +520,7 @@ const PaymentDetailsModal = ({
   const totalAmount =
     payment.type === "bulk"
       ? payment.employees_data?.reduce(
-        (sum, emp) => sum + (emp.net_pay || 0),
+        (sum: number, emp: any) => sum + (emp.net_pay || 0),
         0,
       ) || 0
       : payment.employee_data?.net_pay || 0;
@@ -626,7 +636,7 @@ const PaymentDetailsModal = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {payment.employees_data.map((emp, index) => (
+                    {payment.employees_data.map((emp: any, index: number) => (
                       <tr key={index} className="border-t">
                         <td className="px-3 py-2">
                           <div>
@@ -706,7 +716,15 @@ const PaymentDetailsModal = ({
 };
 
 // Rejection Modal Component
-const RejectionModal = ({ isOpen, onClose, onConfirm }) => {
+const RejectionModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+}) => {
   const [reason, setReason] = useState("");
 
   const handleConfirm = () => {
@@ -769,6 +787,12 @@ const MpesaSinglePaymentModal = ({
   employee,
   onConfirm,
   userRole = "maker",
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  employee: any;
+  onConfirm: (justification: string) => Promise<void>;
+  userRole?: string;
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [justification, setJustification] = useState("");
@@ -889,16 +913,22 @@ const MpesaBulkPaymentModal = ({
   employees,
   onConfirm,
   userRole = "maker",
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  employees: any[];
+  onConfirm: (selectedEmployees: any[], justification: string) => Promise<void>;
+  userRole?: string;
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedStaff, setSelectedStaff] = useState({});
+  const [selectedStaff, setSelectedStaff] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [justification, setJustification] = useState("");
 
   useEffect(() => {
     const initialSelected = {};
     employees.forEach((emp) => {
-      initialSelected[emp.employee_id] = true;
+      (initialSelected as Record<string, boolean>)[emp.employee_id] = true;
     });
     setSelectedStaff(initialSelected);
   }, [employees]);
@@ -910,7 +940,7 @@ const MpesaBulkPaymentModal = ({
   );
 
   const calculateTotalAmount = () => {
-    return employees.reduce((total, emp) => {
+    return employees.reduce((total: number, emp: any) => {
       if (selectedStaff[emp.employee_id]) {
         return total + (emp.net_pay || 0);
       }
@@ -922,7 +952,7 @@ const MpesaBulkPaymentModal = ({
     return Object.values(selectedStaff).filter((selected) => selected).length;
   };
 
-  const toggleStaffSelection = (id) => {
+  const toggleStaffSelection = (id: string) => {
     setSelectedStaff((prev) => ({
       ...prev,
       [id]: !prev[id],
@@ -930,8 +960,8 @@ const MpesaBulkPaymentModal = ({
   };
 
   const selectAllStaff = () => {
-    const newSelection = {};
-    employees.forEach((emp) => {
+    const newSelection: Record<string, boolean> = {};
+    employees.forEach((emp: any) => {
       newSelection[emp.employee_id] = true;
     });
     setSelectedStaff(newSelection);
@@ -1051,7 +1081,7 @@ const MpesaBulkPaymentModal = ({
         <div className="mb-4 max-h-60 overflow-y-auto">
           <p className="text-xs font-medium mb-2">Staff to be paid:</p>
           <ul className="text-xs divide-y divide-gray-200">
-            {filteredEmployees.map((emp) => (
+            {filteredEmployees.map((emp: any) => (
               <li
                 key={emp.employee_id}
                 className="py-2 flex items-center justify-between"
@@ -1130,24 +1160,34 @@ const MpesaBulkPaymentModal = ({
 };
 
 // P9 Form Generator Component
-const P9FormGenerator = ({ isOpen, onClose, records, companyInfo }) => {
+const P9FormGenerator = ({
+  isOpen,
+  onClose,
+  records,
+  companyInfo,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  records: any[];
+  companyInfo: any;
+}) => {
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [taxYear, setTaxYear] = useState(new Date().getFullYear().toString());
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const generateP9Form = async (employeeData) => {
+  const generateP9Form = async (employeeData: any) => {
     setIsGenerating(true);
     try {
       const employeeRecords = records.filter(
-        (r) => r.employee_id === employeeData.employee_id,
+        (r: any) => r.employee_id === employeeData.employee_id,
       );
 
       const annualTotals = {
         basicSalary:
-          employeeRecords.reduce((sum, r) => sum + r.basic_salary, 0) * 12,
+          employeeRecords.reduce((sum: number, r: any) => sum + r.basic_salary, 0) * 12,
         benefits:
           employeeRecords.reduce(
-            (sum, r) =>
+            (sum: number, r: any) =>
               sum +
               r.house_allowance +
               r.transport_allowance +
@@ -1155,15 +1195,15 @@ const P9FormGenerator = ({ isOpen, onClose, records, companyInfo }) => {
               r.other_allowances,
             0,
           ) * 12,
-        grossPay: employeeRecords.reduce((sum, r) => sum + r.gross_pay, 0) * 12,
-        paye: employeeRecords.reduce((sum, r) => sum + r.paye_tax, 0) * 12,
+        grossPay: employeeRecords.reduce((sum: number, r: any) => sum + r.gross_pay, 0) * 12,
+        paye: employeeRecords.reduce((sum: number, r: any) => sum + r.paye_tax, 0) * 12,
         nhif:
-          employeeRecords.reduce((sum, r) => sum + r.nhif_deduction, 0) * 12,
+          employeeRecords.reduce((sum: number, r: any) => sum + r.nhif_deduction, 0) * 12,
         nssf:
-          employeeRecords.reduce((sum, r) => sum + r.nssf_deduction, 0) * 12,
+          employeeRecords.reduce((sum: number, r: any) => sum + r.nssf_deduction, 0) * 12,
         housingLevy:
-          employeeRecords.reduce((sum, r) => sum + r.housing_levy, 0) * 12,
-        netPay: employeeRecords.reduce((sum, r) => sum + r.net_pay, 0) * 12,
+          employeeRecords.reduce((sum: number, r: any) => sum + r.housing_levy, 0) * 12,
+        netPay: employeeRecords.reduce((sum: number, r: any) => sum + r.net_pay, 0) * 12,
       };
 
       const p9Content = `
@@ -1331,9 +1371,8 @@ const P9FormGenerator = ({ isOpen, onClose, records, companyInfo }) => {
 
       html2pdf().from(p9Content).set(opt).save();
       toast.success("P9 Form generated successfully!");
-    } catch (error) {
-      console.error("Error generating P9 form:", error);
-      toast.error("Failed to generate P9 form");
+    } catch (error: any) {
+      toast.error(`P10 form generation failed: ${error.message}`);
     } finally {
       setIsGenerating(false);
     }
@@ -1391,7 +1430,7 @@ const P9FormGenerator = ({ isOpen, onClose, records, companyInfo }) => {
           <button
             onClick={() => {
               const employee = records.find(
-                (r) => r.employee_id === selectedEmployee,
+                (r: any) => r.employee_id === selectedEmployee,
               );
               if (employee) generateP9Form(employee);
             }}
@@ -1417,7 +1456,15 @@ const P9FormGenerator = ({ isOpen, onClose, records, companyInfo }) => {
 };
 
 // Export Modal Component
-const ExportModal = ({ isOpen, onClose, records }) => {
+const ExportModal = ({
+  isOpen,
+  onClose,
+  records,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  records: any[];
+}) => {
   const [exportFormat, setExportFormat] = useState("excel");
   const [isExporting, setIsExporting] = useState(false);
 
@@ -1425,7 +1472,7 @@ const ExportModal = ({ isOpen, onClose, records }) => {
     setIsExporting(true);
     try {
       const ws = XLSX.utils.json_to_sheet(
-        records.map((record) => ({
+        records.map((record: any) => ({
           "Employee ID": record.employee_id,
           "Employee Name": record.employee_name,
           Department: record.department,
@@ -1468,7 +1515,7 @@ const ExportModal = ({ isOpen, onClose, records }) => {
     setIsExporting(true);
     try {
       const ws = XLSX.utils.json_to_sheet(
-        records.map((record) => ({
+        records.map((record: any) => ({
           "Employee ID": record.employee_id,
           "Employee Name": record.employee_name,
           Department: record.department,
@@ -1512,7 +1559,7 @@ const ExportModal = ({ isOpen, onClose, records }) => {
       doc.setFontSize(12);
       doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 32);
 
-      const tableData = records.map((record) => [
+      const tableData = records.map((record: any) => [
         record.employee_id,
         record.employee_name,
         record.department,
@@ -1522,7 +1569,7 @@ const ExportModal = ({ isOpen, onClose, records }) => {
         `KSh ${Math.round(record.net_pay).toLocaleString()}`,
       ]);
 
-      doc.autoTable({
+      (doc as any).autoTable({
         head: [
           [
             "ID",
@@ -1661,6 +1708,15 @@ const GlowButtonss = ({
   size = "md",
   onClick,
   disabled = false,
+  className,
+}: {
+  children: React.ReactNode;
+  variant?: "primary" | "secondary" | "danger";
+  icon?: any;
+  size?: "sm" | "md" | "lg";
+  onClick?: () => void;
+  disabled?: boolean;
+  className?: string;
 }) => {
   const baseClasses =
     "inline-flex items-center gap-2 rounded-lg font-medium transition-all duration-300 border";
@@ -1680,7 +1736,7 @@ const GlowButtonss = ({
 
   return (
     <button
-      className={`${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+      className={`${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${className || ""}`}
       onClick={onClick}
       disabled={disabled}
     >
@@ -1690,7 +1746,20 @@ const GlowButtonss = ({
   );
 };
 
-const SummaryCard = ({ label, value, icon: Icon, color, isCount = false }) => {
+
+const SummaryCard = ({
+  label,
+  value,
+  icon: Icon,
+  color,
+  isCount = false,
+}: {
+  label: string;
+  value: string | number;
+  icon: any;
+  color: "emerald" | "red" | "blue" | "purple" | "yellow";
+  isCount?: boolean;
+}) => {
   const colorClasses = {
     emerald: "bg-emerald-100 text-xs text-emerald-600",
     red: "bg-red-100 text-xs text-red-600",
@@ -1722,7 +1791,19 @@ const SummaryCard = ({ label, value, icon: Icon, color, isCount = false }) => {
   );
 };
 
-const StatutoryCard = ({ label, value, icon: Icon, color, rate }) => {
+const StatutoryCard = ({
+  label,
+  value,
+  icon: Icon,
+  color,
+  rate,
+}: {
+  label: string;
+  value: string | number;
+  icon: any;
+  color: "red" | "blue" | "green" | "yellow" | "purple";
+  rate: string;
+}) => {
   const colorClasses = {
     red: "bg-red-100 text-red-600",
     blue: "bg-blue-100 text-blue-600",
@@ -1752,7 +1833,19 @@ const StatutoryCard = ({ label, value, icon: Icon, color, rate }) => {
   );
 };
 
-const PayslipModal = ({ record, onClose, onPrevious, onNext, companyInfo }) => {
+const PayslipModal = ({
+  record,
+  onClose,
+  onPrevious,
+  onNext,
+  companyInfo,
+}: {
+  record: any;
+  onClose: () => void;
+  onPrevious?: () => void;
+  onNext?: () => void;
+  companyInfo: any;
+}) => {
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
     if (printWindow) {
@@ -2051,7 +2144,7 @@ const PayslipModal = ({ record, onClose, onPrevious, onNext, companyInfo }) => {
       jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
     };
 
-    html2pdf().from(element).set(opt).save();
+    html2pdf().from(element!).set(opt).save();
   };
 
   return (
@@ -2324,7 +2417,7 @@ const PayslipModal = ({ record, onClose, onPrevious, onNext, companyInfo }) => {
           </div>
         </div>
 
-        {(onPrevious || onNext) && (
+        {(!!onPrevious || !!onNext) && (
           <div className="sticky bottom-0 bg-white p-4 border-t border-gray-200 flex justify-between">
             {onPrevious && (
               <GlowButtonss icon={ArrowLeft} onClick={onPrevious}>
@@ -2355,6 +2448,13 @@ const Pagination = ({
   totalItems,
   itemsPerPage,
   currentItemsCount,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  totalItems: number;
+  itemsPerPage: number;
+  currentItemsCount: number;
 }) => {
   const pages = [];
   const maxVisiblePages = 5;
@@ -2449,6 +2549,13 @@ const P10FormGenerator = ({
   calculateNSSF,
   calculateNHIF,
   calculateHousingLevy,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  calculatePAYE: (grossSalary: number, hasTaxPIN: boolean) => number;
+  calculateNSSF: (grossSalary: number) => number;
+  calculateNHIF: (grossSalary: number) => number;
+  calculateHousingLevy: (grossSalary: number, hasTaxPIN: boolean) => number;
 }) => {
   const [selectedYear, setSelectedYear] = useState(
     new Date().getFullYear().toString(),
@@ -2508,7 +2615,7 @@ const P10FormGenerator = ({
 
         const taxablePay = totalGrossPay - nssfDeduction - housingLevy;
 
-        const payeAmount = calculatePAYE(taxablePay);
+        const payeAmount = calculatePAYE(taxablePay, true);
 
         return [
           "A00000000001",
@@ -2574,7 +2681,7 @@ const P10FormGenerator = ({
 
       const ws = XLSX.utils.aoa_to_sheet([headers, ...p10Data]);
 
-      const range = XLSX.utils.decode_range(ws["!ref"]);
+      const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
       for (let R = 0; R <= range.e.r; ++R) {
         for (let C = 0; C <= range.e.c; ++C) {
           const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
@@ -2640,7 +2747,7 @@ const P10FormGenerator = ({
       onClose();
     } catch (error) {
       console.error("Error generating P10 form:", error);
-      toast.error("Failed to generate P10 form: " + error.message);
+      toast.error("Failed to generate P10 form: " + (error as any).message);
     } finally {
       setIsLoading(false);
     }
@@ -2712,7 +2819,13 @@ const P10FormGenerator = ({
 };
 
 // Statutory Override Toggle Component
-const StatutoryOverrideToggle = ({ isEnabled, onToggle }) => {
+const StatutoryOverrideToggle = ({
+  isEnabled,
+  onToggle,
+}: {
+  isEnabled: boolean;
+  onToggle: () => void;
+}) => {
   return (
     <div className="flex items-center gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
       <div className="flex items-center gap-2">
@@ -2738,7 +2851,7 @@ const StatutoryOverrideToggle = ({ isEnabled, onToggle }) => {
 };
 
 export default function PayrollDashboard() {
-  const [selectedPeriod, setSelectedPeriod] = useState(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<Date | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("all");
   const [showQuickActions, setShowQuickActions] = useState(false);
@@ -2746,49 +2859,55 @@ export default function PayrollDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSendingPayslips, setIsSendingPayslips] = useState(false);
   const [expandedRows, setExpandedRows] = useState(new Set());
-  const [selectedRecord, setSelectedRecord] = useState(null);
-  const [currentRecordIndex, setCurrentRecordIndex] = useState(null);
-  const [employees, setEmployees] = useState([]);
+  const [selectedRecord, setSelectedRecord] = useState<any>(null);
+  const [currentRecordIndex, setCurrentRecordIndex] = useState<number | null>(null);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [departments, setDepartments] = useState(["all"]);
   const [branches, setBranches] = useState([
     { value: "all", label: "All Branches" },
   ]);
-  const [payrollRecords, setPayrollRecords] = useState([]);
-  const [filteredRecords, setFilteredRecords] = useState([]);
+  const [payrollRecords, setPayrollRecords] = useState<any[]>([]);
+  const [filteredRecords, setFilteredRecords] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [showSummary, setShowSummary] = useState(true);
-  const [companyInfo, setCompanyInfo] = useState(null);
+  const [companyInfo, setCompanyInfo] = useState<any>(null);
 
   const [showSingleMpesaModal, setShowSingleMpesaModal] = useState(false);
   const [showBulkMpesaModal, setShowBulkMpesaModal] = useState(false);
   const [selectedEmployeeForMpesa, setSelectedEmployeeForMpesa] =
-    useState(null);
+    useState<any>(null);
 
   const [showP9Modal, setShowP9Modal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showP10Modal, setShowP10Modal] = useState(false);
   const [showStatutorySettings, setShowStatutorySettings] = useState(false);
+  const [isSavingHistory, setIsSavingHistory] = useState(false);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
 
-  const [paymentRequests, setPaymentRequests] = useState([]);
+  const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
   const [userRole, setUserRole] = useState("maker");
   const isAdmin =
     userRole &&
     (userRole.toLowerCase() === "admin" ||
       userRole.toLowerCase() === "credit_analyst_officer");
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [showApprovalQueue, setShowApprovalQueue] = useState(false);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] =
-    useState(null);
+    useState<any>(null);
   const [showPaymentDetails, setShowPaymentDetails] = useState(false);
   const [showRejectionModal, setShowRejectionModal] = useState(false);
-  const [paymentToReject, setPaymentToReject] = useState(null);
+  const [paymentToReject, setPaymentToReject] = useState<any>(null);
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
 
   // NEW: Bulk approval states
   const [selectedPayments, setSelectedPayments] = useState(new Set());
   const [showCommentModal, setShowCommentModal] = useState(false);
-  const [commentModalConfig, setCommentModalConfig] = useState({
+  const [commentModalConfig, setCommentModalConfig] = useState<{
+    title: string;
+    submitText: string;
+    onSubmit: ((comment: string) => void) | null;
+  }>({
     title: "",
     submitText: "",
     onSubmit: null,
@@ -2796,11 +2915,11 @@ export default function PayrollDashboard() {
   const [showClearQueueModal, setShowClearQueueModal] = useState(false);
 
   // SMS balance state
-  const [smsBalance, setSmsBalance] = useState(null);
+  const [smsBalance, setSmsBalance] = useState<any>(null);
   const [sendingSMS, setSendingSMS] = useState(false);
   const [smsSendingStatus, setSmsSendingStatus] = useState({});
   // Add this with your other state declarations
-  const [salaryAdvances, setSalaryAdvances] = useState([]);
+  const [salaryAdvances, setSalaryAdvances] = useState<any[]>([]);
   const [currentView, setCurrentView] = useState("dashboard");
 
   // Statutory override state
@@ -2841,7 +2960,7 @@ export default function PayrollDashboard() {
 
         console.log(`Loaded ${data?.length || 0} salary advances for payroll`);
         setSalaryAdvances(data || []);
-      } catch (error) {
+      } catch (error: any) {
         console.warn("Failed to load salary advances:", error.message);
         setSalaryAdvances([]);
       }
@@ -2851,7 +2970,7 @@ export default function PayrollDashboard() {
   }, []); // Empty dependency array = runs once when component mounts
 
   // Updated: Just searches in already-loaded data (NO database call)
-  const calculateAdvanceDeduction = (employeeNumber, period) => {
+  const calculateAdvanceDeduction = (employeeNumber: any, period: any) => {
     // console.log('=== DEBUG: Looking for advance for employee:', employeeNumber, 'Period:', period);
 
     if (!employeeNumber) {
@@ -2908,7 +3027,7 @@ export default function PayrollDashboard() {
     return totalAmount;
   };
   // Enhanced SMS notification functions
-  const sendPayslipNotification = async (employee) => {
+  const sendPayslipNotification = async (employee: any) => {
     if (!employee.employeeNu) {
       console.warn(`No phone number for employee ${employee.employee_name}`);
       return { success: false, error: "No phone number available" };
@@ -2923,7 +3042,7 @@ export default function PayrollDashboard() {
     try {
       const result = await sendSMSWithRetry(employee.employeeNu, message);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       console.error(
         `Failed to send payslip SMS to ${employee.employee_name}:`,
         error,
@@ -2932,7 +3051,7 @@ export default function PayrollDashboard() {
     }
   };
 
-  const sendPaymentConfirmation = async (employee) => {
+  const sendPaymentConfirmation = async (employee: any) => {
     if (!employee.employeeNu) {
       console.warn(`No phone number for employee ${employee.employee_name}`);
       return { success: false, error: "No phone number available" };
@@ -2946,7 +3065,7 @@ export default function PayrollDashboard() {
     try {
       const result = await sendSMSWithRetry(employee.employeeNu, message);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       console.error(
         `Failed to send payment confirmation to ${employee.employee_name}:`,
         error,
@@ -2959,7 +3078,7 @@ export default function PayrollDashboard() {
     setIsSendingPayslips(true);
     const results = [];
     const employeesWithPhones = finalFilteredRecords.filter(
-      (emp) => emp.employeeNu,
+      (emp: any) => emp.employeeNu,
     );
 
     if (employeesWithPhones.length === 0) {
@@ -2968,7 +3087,7 @@ export default function PayrollDashboard() {
       return [];
     }
 
-    toast.info(`Sending ${employeesWithPhones.length} SMS notifications...`);
+    toast(`Sending ${employeesWithPhones.length} SMS notifications...`, { icon: 'ℹ️' });
 
     for (const [index, employee] of employeesWithPhones.entries()) {
       if (employee.employeeNu) {
@@ -3041,7 +3160,7 @@ export default function PayrollDashboard() {
       );
 
       if (pendingPayments.length === 0) {
-        toast.info("No pending payments to clear");
+        toast("No pending payments to clear", { icon: 'ℹ️' });
         return;
       }
 
@@ -3074,7 +3193,7 @@ export default function PayrollDashboard() {
   };
 
   // NEW: Bulk approve payments function
-  const bulkApprovePayments = async (comment) => {
+  const bulkApprovePayments = async (comment: string) => {
     if (selectedPayments.size === 0) {
       toast.error("No payments selected for approval");
       return;
@@ -3091,7 +3210,7 @@ export default function PayrollDashboard() {
           // Approve with comment
           await approvePayment(payment, comment);
           results.push({ paymentId, success: true });
-        } catch (error) {
+        } catch (error: any) {
           results.push({ paymentId, success: false, error: error.message });
         }
       }
@@ -3137,7 +3256,7 @@ export default function PayrollDashboard() {
   };
 
   // NEW: Toggle selection for a single payment
-  const togglePaymentSelection = (paymentId, isSelected) => {
+  const togglePaymentSelection = (paymentId: any, isSelected: boolean) => {
     const newSelected = new Set(selectedPayments);
     if (isSelected) {
       newSelected.add(paymentId);
@@ -3152,7 +3271,7 @@ export default function PayrollDashboard() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   };
 
-  const getPeriodString = (period) => {
+  const getPeriodString = (period: any) => {
     if (!period || period === "current") {
       return getCurrentPeriod();
     }
@@ -3289,10 +3408,10 @@ export default function PayrollDashboard() {
   }, []);
 
   const createPaymentRequest = async (
-    employee,
-    type,
-    justification,
-    employees = null,
+    employee: any,
+    type: any,
+    justification: any,
+    employees: any = null,
   ) => {
     const {
       data: { user },
@@ -3303,7 +3422,7 @@ export default function PayrollDashboard() {
       employee_data: type === "single" ? employee : null,
       employees_data: type === "bulk" ? employees : null,
       justification: justification,
-      created_by: user.id,
+      created_by: user?.id,
     };
 
     const { data, error } = await supabase
@@ -3319,11 +3438,11 @@ export default function PayrollDashboard() {
       "Payment request submitted successfully! Please wait for approval.",
     );
 
-    return { ...data, created_by_email: user.email };
+    return { ...data, created_by_email: user?.email };
   };
 
   // UPDATED: Approve payment with comment
-  const approvePayment = async (payment, comment = "") => {
+  const approvePayment = async (payment: any, comment = "") => {
     try {
       const {
         data: { user },
@@ -3358,10 +3477,10 @@ export default function PayrollDashboard() {
 
       // Add comment if provided
       if (comment) {
-        updateData.approval_comment = comment;
+        (updateData as any).approval_comment = comment;
       }
 
-      const { data, error } = await supabase
+      const { data: _data, error } = await supabase
         .from("payment_flows")
         .update(updateData)
         .eq("id", payment.id)
@@ -3403,7 +3522,7 @@ export default function PayrollDashboard() {
           .update({
             status: "failed",
             processed_at: new Date().toISOString(),
-            metadata: { error: error.message },
+            metadata: { error: (error as any).message },
           })
           .eq("id", payment.id);
 
@@ -3416,14 +3535,14 @@ export default function PayrollDashboard() {
         console.error("Payment processing error:", error);
         toast.error("Payment approved but failed to process");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Payment approval error:", error);
       toast.error("Failed to approve payment request");
     }
   };
 
   // UPDATED: Single approval with comment prompt
-  const handleSingleApprove = (payment) => {
+  const handleSingleApprove = (payment: any) => {
     setCommentModalConfig({
       title: "Approve Payment Request",
       submitText: "Approve",
@@ -3447,7 +3566,7 @@ export default function PayrollDashboard() {
     setShowCommentModal(true);
   };
 
-  const rejectPayment = async (payment, reason) => {
+  const rejectPayment = async (payment: any, reason: any) => {
     try {
       const {
         data: { user },
@@ -3474,7 +3593,7 @@ export default function PayrollDashboard() {
         ),
       );
 
-      const { data, error } = await supabase
+      const { data: _data2, error } = await supabase
         .from("payment_flows")
         .update({
           status: "rejected",
@@ -3500,7 +3619,7 @@ export default function PayrollDashboard() {
     }
   };
 
-  const processSingleMpesaPayment = async (employee) => {
+  const processSingleMpesaPayment = async (employee: any) => {
     try {
       const phoneNumber = employee.employeeNu;
       if (!phoneNumber) {
@@ -3540,14 +3659,14 @@ export default function PayrollDashboard() {
 
       toast.success(`Payment sent to ${employee.employee_name}`);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       console.error("M-Pesa payment error:", error);
       toast.error(`Failed to pay ${employee.employee_name}: ${error.message}`);
       throw error;
     }
   };
 
-  const processBulkMpesaPayment = async (selectedEmployees) => {
+  const processBulkMpesaPayment = async (selectedEmployees: any) => {
     const results = [];
 
     for (const employee of selectedEmployees) {
@@ -3577,7 +3696,7 @@ export default function PayrollDashboard() {
     return results;
   };
 
-  const handleSingleMpesaPayment = (employee) => {
+  const handleSingleMpesaPayment = (employee: any) => {
     setSelectedEmployeeForMpesa(employee);
     setShowSingleMpesaModal(true);
   };
@@ -3586,7 +3705,7 @@ export default function PayrollDashboard() {
     setShowBulkMpesaModal(true);
   };
 
-  const handleConfirmSinglePayment = async (justification) => {
+  const handleConfirmSinglePayment = async (justification: any) => {
     if (userRole === "credit_analyst_officer") {
       try {
         await processSingleMpesaPayment(selectedEmployeeForMpesa);
@@ -3603,7 +3722,7 @@ export default function PayrollDashboard() {
     }
   };
 
-  const handleConfirmBulkPayment = async (selectedEmployees, justification) => {
+  const handleConfirmBulkPayment = async (selectedEmployees: any, justification: any) => {
     if (userRole === "credit_analyst_officer") {
       try {
         await processBulkMpesaPayment(selectedEmployees);
@@ -3813,8 +3932,8 @@ export default function PayrollDashboard() {
     }
   }, [actualPeriod, settings, overrideStatutoryChecks, salaryAdvances]);
 
-  const applyAdditionalFilters = (records) => {
-    return records.filter((record) => {
+  const applyAdditionalFilters = (records: any[]) => {
+    return records.filter((record: any) => {
       const searchLower = searchTerm.toLowerCase().trim();
 
       const matchesSearch =
@@ -3857,12 +3976,12 @@ export default function PayrollDashboard() {
   );
   const totalPages = Math.ceil(finalFilteredRecords.length / itemsPerPage);
 
-  const handleViewPayslip = (record, index) => {
+  const handleViewPayslip = (record: any, index: number) => {
     setSelectedRecord(record);
     setCurrentRecordIndex(indexOfFirstItem + index);
   };
 
-  const handleNavigatePayslip = (direction) => {
+  const handleNavigatePayslip = (direction: string) => {
     if (currentRecordIndex === null || !selectedRecord) return;
 
     const newIndex =
@@ -3879,7 +3998,7 @@ export default function PayrollDashboard() {
     }
   };
 
-  const toggleRowExpand = (id, e) => {
+  const toggleRowExpand = (id: any, e: React.MouseEvent) => {
     e.stopPropagation();
     setExpandedRows((prev) => {
       const newExpanded = new Set(prev);
@@ -3893,39 +4012,39 @@ export default function PayrollDashboard() {
   };
 
   const totalGrossPay = finalFilteredRecords.reduce(
-    (sum, record) => sum + record.gross_pay,
+    (sum: number, record: any) => sum + record.gross_pay,
     0,
   );
   const totalDeductions = finalFilteredRecords.reduce(
-    (sum, record) => sum + record.total_deductions,
+    (sum: number, record: any) => sum + record.total_deductions,
     0,
   );
   const totalNetPay = finalFilteredRecords.reduce(
-    (sum, record) => sum + record.net_pay,
+    (sum: number, record: any) => sum + record.net_pay,
     0,
   );
   const totalPAYE = finalFilteredRecords.reduce(
-    (sum, record) => sum + record.paye_tax,
+    (sum: number, record: any) => sum + record.paye_tax,
     0,
   );
   const totalNHIF = finalFilteredRecords.reduce(
-    (sum, record) => sum + record.nhif_deduction,
+    (sum: number, record: any) => sum + record.nhif_deduction,
     0,
   );
   const totalNSSF = finalFilteredRecords.reduce(
-    (sum, record) => sum + record.nssf_deduction,
+    (sum: number, record: any) => sum + record.nssf_deduction,
     0,
   );
   const totalHousingLevy = finalFilteredRecords.reduce(
-    (sum, record) => sum + record.housing_levy,
+    (sum: number, record: any) => sum + record.housing_levy,
     0,
   );
   const totalPerDiem = finalFilteredRecords.reduce(
-    (sum, record) => sum + (record.per_diem || 0),
+    (sum: number, record: any) => sum + (record.per_diem || 0),
     0,
   );
   const totalAdvanceDeductions = finalFilteredRecords.reduce(
-    (sum, record) => sum + (record.advance_deduction || 0),
+    (sum: number, record: any) => sum + (record.advance_deduction || 0),
     0,
   );
 
@@ -3955,7 +4074,7 @@ export default function PayrollDashboard() {
     { value: "2024-09", label: "September 2024" },
   ];
 
-  const formatPeriodDisplay = (period) => {
+  const formatPeriodDisplay = (period: string) => {
     if (period === "current") {
       const currentDate = new Date();
       return `${currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
@@ -3966,7 +4085,7 @@ export default function PayrollDashboard() {
     });
   };
 
-  const handleSendPayslips = async (method) => {
+  const handleSendPayslips = async (method: string) => {
     if (method === "sms") {
       await sendBulkPayslipNotifications();
     } else {
@@ -3983,7 +4102,7 @@ export default function PayrollDashboard() {
     }
   };
 
-  const handlePageChange = (page) => {
+  const handlePageChange = (page: number) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -3996,6 +4115,55 @@ export default function PayrollDashboard() {
         ? "Statutory PIN checks enabled"
         : "Statutory override enabled - all deductions will be applied",
     );
+  };
+
+  // NEW: Save current payroll to Salary History
+  const handleSaveToHistory = async () => {
+    if (finalFilteredRecords.length === 0) {
+      toast.error("No records to save.");
+      return;
+    }
+
+    setIsSavingHistory(true);
+    try {
+      const historyRecords = finalFilteredRecords.map((record: any) => ({
+        employee_id: record.employee_id,
+        employee_name: record.employee_name,
+        pay_period: actualPeriod,
+        basic_salary: record.basic_salary || 0,
+        gross_pay: record.gross_pay || 0,
+        net_pay: record.net_pay || 0,
+        total_deductions: record.total_deductions || 0,
+        nssf_deduction: record.nssf_deduction || 0,
+        nhif_deduction: record.nhif_deduction || 0,
+        paye_tax: record.paye_tax || 0,
+        housing_levy: record.housing_levy || 0,
+        house_allowance: record.house_allowance || 0,
+        transport_allowance: record.transport_allowance || 0,
+        medical_allowance: record.medical_allowance || 0,
+        other_allowances: record.other_allowances || 0,
+        overtime_hours: record.overtime_hours || 0,
+        overtime_rate: record.overtime_rate || 0,
+        commission: record.commission || 0,
+        bonus: record.bonus || 0,
+        per_diem: record.per_diem || 0,
+        tax_relief: record.tax_relief || 0,
+        loan_deduction: record.loan_deduction || 0,
+        advance_deduction: record.advance_deduction || 0,
+        welfare_deduction: record.welfare_deduction || 0,
+        other_deductions: record.other_deductions || 0,
+        payment_method: record.payment_method || "",
+        bank_name: record.bank_name || "",
+        account_number: record.account_number || "",
+      }));
+
+      await saveSalaryHistoryBatch(historyRecords);
+      toast.success(`Successfully saved ${historyRecords.length} records to history for ${actualPeriod}.`);
+    } catch (error) {
+      toast.error("Failed to save history.");
+    } finally {
+      setIsSavingHistory(false);
+    }
   };
 
   // NEW: Refresh button handler
@@ -4023,6 +4191,16 @@ export default function PayrollDashboard() {
       setIsLoading(false);
     }
   };
+
+  // NEW: Automated End-of-Month Save Trigger
+  useEffect(() => {
+    // If it's the end of the month (e.g. 27th or later) and we have filtered records ready
+    const today = new Date();
+    if (today.getDate() >= 27 && finalFilteredRecords.length > 0 && !isSavingHistory) {
+      // Auto-trigger the save to history function
+      handleSaveToHistory();
+    }
+  }, [finalFilteredRecords.length]); // Only run when records are loaded/ready
 
   if (currentView === "mpesa-spreadsheet") {
     return (
@@ -4361,6 +4539,31 @@ export default function PayrollDashboard() {
                     Approval Queue ({pendingCount})
                   </GlowButtonss>
                 )}
+              {/* NEW: Save to History Button */}
+              <GlowButtonss
+                variant="secondary"
+                icon={Box}
+                size="sm"
+                onClick={() => {
+                  handleSaveToHistory();
+                  setShowQuickActions(false);
+                }}
+                disabled={isSavingHistory}
+              >
+                {isSavingHistory ? "Saving..." : "Save to History"}
+              </GlowButtonss>
+              {/* NEW: Bulk Upload History Button */}
+              <GlowButtonss
+                variant="secondary"
+                icon={Upload}
+                size="sm"
+                onClick={() => {
+                  setShowBulkUploadModal(true);
+                  setShowQuickActions(false);
+                }}
+              >
+                Upload History
+              </GlowButtonss>
             </div>
           </div>
         </div>
@@ -4496,6 +4699,21 @@ export default function PayrollDashboard() {
           >
             <Settings className="w-3 h-3" />
             Statutory
+          </button>
+          <button
+            onClick={handleSaveToHistory}
+            disabled={isSavingHistory || finalFilteredRecords.length === 0}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-violet-50 text-violet-700 hover:bg-violet-100 rounded-[25px] text-xs font-medium transition-colors border border-violet-200 disabled:opacity-50"
+          >
+            {isSavingHistory ? <Loader className="w-3 h-3 animate-spin" /> : <Box className="w-3 h-3" />}
+            Save History
+          </button>
+          <button
+            onClick={() => setShowBulkUploadModal(true)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-gray-600 hover:text-violet-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors border border-gray-200"
+          >
+            <Upload className="w-3 h-3" />
+            Upload History
           </button>
           {(userRole === "checker" || userRole === "credit_analyst_officer") && (
             <button
@@ -4645,7 +4863,7 @@ export default function PayrollDashboard() {
                     record.loan_deduction +
                     record.advance_deduction +
                     record.welfare_deduction;
-                  const smsStatus = smsSendingStatus[record.employee_id];
+                  const smsStatus = (smsSendingStatus as Record<string, any>)[record.employee_id];
 
                   return (
                     <React.Fragment key={record.id}>
@@ -4975,7 +5193,7 @@ export default function PayrollDashboard() {
         onClose={() => setShowCommentModal(false)}
         title={commentModalConfig.title}
         submitText={commentModalConfig.submitText}
-        onSubmit={commentModalConfig.onSubmit}
+        onSubmit={commentModalConfig.onSubmit ?? (() => { })}
       />
 
       {/* NEW: Clear Queue Confirmation Modal */}
@@ -5053,6 +5271,16 @@ export default function PayrollDashboard() {
         onClose={() => setShowStatutorySettings(false)}
         reloadSettings={reloadSettings}
       />
+
+      {/* NEW: Render Bulk Upload Modal */}
+      {showBulkUploadModal && (
+        <BulkSalaryHistoryUpload
+          onClose={() => setShowBulkUploadModal(false)}
+          onSuccess={() => {
+            handleRefresh();
+          }}
+        />
+      )}
     </div>
   );
 }

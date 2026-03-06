@@ -50,13 +50,18 @@ export default function PayrollHistoryModule() {
 
             if (empErr) throw empErr;
 
-            // Build grouped structure from employee data (payroll records from PayrollDashboard)
+            const { data: hist } = await supabase
+                .from('salary_history')
+                .select('*')
+                .order('pay_period', { ascending: false });
+
+            // Build grouped structure from employee data
             const grouped: GroupedEmployee[] = (emps || []).map(e => ({
                 "Employee Number": e['Employee Number'],
                 name: `${e['First Name'] || ''} ${e['Last Name'] || ''}`.trim(),
                 jobTitle: e['Job Title'] || '—',
                 branch: e['Branch'] || '—',
-                records: [],
+                records: (hist || []).filter((h: any) => h.employee_id === e['Employee Number']),
                 currentSalary: e['Basic Salary'],
                 expanded: false,
             }));
@@ -181,9 +186,47 @@ export default function PayrollHistoryModule() {
                                                         <p className="text-sm font-bold text-gray-900">{emp.jobTitle}</p>
                                                     </div>
                                                 </div>
-                                                <p className="text-[10px] text-gray-400 mt-2 text-center">
-                                                    Full payroll breakdown available in the Payroll module
-                                                </p>
+                                                {emp.records && emp.records.length > 0 ? (
+                                                    <div className="mt-4">
+                                                        <h4 className="text-xs font-semibold text-gray-700 mb-2">Detailed Payslip History</h4>
+                                                        <div className="overflow-x-auto border border-gray-100 rounded-lg">
+                                                            <table className="min-w-full text-left text-xs bg-white hidden-scrollbar">
+                                                                <thead className="bg-gray-50 border-b border-gray-100">
+                                                                    <tr>
+                                                                        <th className="px-3 py-2 text-gray-600 font-medium">Period</th>
+                                                                        <th className="px-3 py-2 text-gray-600 font-medium text-right">Gross Pay</th>
+                                                                        <th className="px-3 py-2 text-gray-600 font-medium text-right">PAYE</th>
+                                                                        <th className="px-3 py-2 text-gray-600 font-medium text-right">NSSF</th>
+                                                                        <th className="px-3 py-2 text-gray-600 font-medium text-right">SHIF</th>
+                                                                        <th className="px-3 py-2 text-gray-600 font-medium text-right">Levy</th>
+                                                                        <th className="px-3 py-2 text-gray-600 font-medium text-right">Advances</th>
+                                                                        <th className="px-3 py-2 text-gray-600 font-medium text-right">Deductions</th>
+                                                                        <th className="px-3 py-2 text-gray-600 font-medium text-right">Net Pay</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-gray-50">
+                                                                    {emp.records.map((rec: any, i) => (
+                                                                        <tr key={i} className="hover:bg-gray-50">
+                                                                            <td className="px-3 py-2 font-medium text-gray-900 border-r border-gray-50">{rec.pay_period}</td>
+                                                                            <td className="px-3 py-2 text-gray-700 text-right">{(rec.gross_pay || 0).toLocaleString()}</td>
+                                                                            <td className="px-3 py-2 text-orange-600 text-right">{(rec.paye_tax || 0).toLocaleString()}</td>
+                                                                            <td className="px-3 py-2 text-indigo-600 text-right">{(rec.nssf_deduction || 0).toLocaleString()}</td>
+                                                                            <td className="px-3 py-2 text-purple-600 text-right">{(rec.nhif_deduction || 0).toLocaleString()}</td>
+                                                                            <td className="px-3 py-2 text-yellow-600 text-right">{(rec.housing_levy || 0).toLocaleString()}</td>
+                                                                            <td className="px-3 py-2 text-rose-600 text-right">{(rec.advance_deduction || 0).toLocaleString()}</td>
+                                                                            <td className="px-3 py-2 text-red-600 text-right font-medium">{(rec.total_deductions || 0).toLocaleString()}</td>
+                                                                            <td className="px-3 py-2 font-bold text-emerald-600 text-right bg-emerald-50/30">{(rec.net_pay || 0).toLocaleString()}</td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-[10px] text-gray-400 mt-3 text-center p-4 border border-dashed border-gray-200 rounded-lg">
+                                                        No historical payroll records found for this employee.
+                                                    </p>
+                                                )}
                                             </td>
                                         </tr>
                                     )}

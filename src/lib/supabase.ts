@@ -20,13 +20,13 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
 });
 
 // Only create admin client if service role key exists
-export const supabaseAdmin = supabaseServiceRoleKey 
+export const supabaseAdmin = supabaseServiceRoleKey
   ? createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true
-      }
-    })
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true
+    }
+  })
   : null;
 
 // ... rest of your tax calculation code remains the same ...
@@ -45,11 +45,11 @@ const PERSONAL_RELIEF = 2400;
 // Improved PAYE calculation
 export const calculatePAYE = (grossPay: number): number => {
   if (grossPay <= 0) return 0;
-  
+
   const bracket = TAX_BRACKETS.find(b => grossPay <= b.limit) || TAX_BRACKETS[TAX_BRACKETS.length - 1];
   const taxableAmount = grossPay - (bracket.limit === Infinity ? 800000 : 0);
   const tax = bracket.deduction + (taxableAmount * bracket.rate);
-  
+
   return Math.max(0, tax - PERSONAL_RELIEF);
 };
 
@@ -75,14 +75,23 @@ const NHIF_RATES = [
 
 export const calculateNHIF = (grossPay: number): number => {
   if (grossPay <= 0) return 0;
-  
+
   const rate = NHIF_RATES.find(([min, max]) => grossPay >= min && grossPay <= max);
   return rate ? rate[2] : 1700; // Default to maximum rate if not found
 };
 
-// NSSF calculation remains the same but with validation
+// NSSF calculation - new tiered rates (2024)
+// Tier I: first KES 9,000 @ 6% (max KES 540)
+// Tier II: KES 9,001–108,000 @ 6% (max KES 5,940)
+// Total max employee contribution: KES 6,480
 export const calculateNSSF = (grossPay: number): number => {
   if (grossPay <= 0) return 0;
-  const pensionablePay = Math.min(Math.max(0, grossPay), 18000);
-  return parseFloat((pensionablePay * 0.06).toFixed(2));
+  const TIER1_LIMIT = 9000;
+  const TIER2_LIMIT = 108000;
+  const RATE = 0.06;
+  const tier1 = Math.min(grossPay, TIER1_LIMIT) * RATE;
+  const tier2 = grossPay > TIER1_LIMIT
+    ? Math.min(grossPay - TIER1_LIMIT, TIER2_LIMIT - TIER1_LIMIT) * RATE
+    : 0;
+  return parseFloat((tier1 + tier2).toFixed(2));
 };
