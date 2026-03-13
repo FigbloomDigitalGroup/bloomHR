@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import DuplicateCheckModal from './DuplicateCheckModal';
 import BulkEditModal from './BulkEditModal';
+import BulkTerminateModal from './BulkTerminateModal';
 import SearchableDropdown from '../UI/SearchableDropdown';
 import { motion } from 'framer-motion';
 import { TownProps } from '../../types/supabase';
@@ -57,9 +58,10 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
   // Bulk Edit State
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectionAction, setSelectionAction] = useState<'relocate' | 'terminate' | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+  const [showBulkTerminateModal, setShowBulkTerminateModal] = useState(false);
 
   // Load area-town mapping and set current town
   useEffect(() => {
@@ -352,14 +354,14 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
           {/* Buttons */}
           <div className="flex space-x-2 h-[32px] md:col-span-5 lg:col-span-2">
             <div className="flex space-x-1.5 h-full w-full justify-end">
-              {isSelectionMode ? (
+              {selectionAction ? (
                 <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
                   <GlowButton
                     variant="secondary"
                     size="sm"
                     className="h-full !text-[11px] bg-red-50 text-red-600 border-red-100 hover:bg-red-100"
                     onClick={() => {
-                      setIsSelectionMode(false);
+                      setSelectionAction(null);
                       setSelectedIds([]);
                     }}
                     icon={X}
@@ -371,7 +373,10 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                     size="sm"
                     className="h-full !text-[11px]"
                     disabled={selectedIds.length === 0}
-                    onClick={() => setShowBulkEditModal(true)}
+                    onClick={() => {
+                      if (selectionAction === 'relocate') setShowBulkEditModal(true);
+                      if (selectionAction === 'terminate') setShowBulkTerminateModal(true);
+                    }}
                     icon={Save}
                   >
                     Update ({selectedIds.length})
@@ -415,9 +420,21 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                       icon={Building2}
                       size="sm"
                       className="h-full !text-[11px]"
-                      onClick={() => setIsSelectionMode(true)}
+                      onClick={() => setSelectionAction('relocate')}
                     >
                       Relocate
+                    </GlowButton>
+                  </RoleButtonWrapper>
+
+                  <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+                    <GlowButton
+                      variant="secondary"
+                      icon={UserRoundCog}
+                      size="sm"
+                      className="h-full !text-[11px] hover:text-red-700 hover:border-red-200 hover:bg-red-50"
+                      onClick={() => setSelectionAction('terminate')}
+                    >
+                      Terminate
                     </GlowButton>
                   </RoleButtonWrapper>
                 </>
@@ -435,7 +452,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
             <motion.div
               key={employee["Employee Number"]}
               onClick={() => {
-                if (isSelectionMode) toggleEmployeeSelection(employee["Employee Number"]);
+                if (selectionAction) toggleEmployeeSelection(employee["Employee Number"]);
               }}
               className={`group flex flex-col bg-white rounded-2xl border shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all duration-300 overflow-hidden relative cursor-pointer
                 ${isSelected
@@ -445,10 +462,10 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              whileHover={{ y: isSelectionMode ? 0 : -4 }}
+              whileHover={{ y: selectionAction ? 0 : -4 }}
             >
               {/* CHECKBOX OVERLAY */}
-              {isSelectionMode && (
+              {selectionAction && (
                 <div className="absolute top-3 right-3 z-20">
                   <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors
                         ${isSelected ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-gray-300 group-hover:border-emerald-400'}
@@ -540,7 +557,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
               <div className="h-px w-full bg-gray-200" />
 
               {/* Footer Actions - DISABLED IN SELECTION MODE */}
-              <div className={`h-14 px-4 flex items-center bg-white border-t-0 mt-auto transition-opacity ${isSelectionMode ? 'opacity-40 pointer-events-none' : ''}`}>
+              <div className={`h-14 px-4 flex items-center bg-white border-t-0 mt-auto transition-opacity ${selectionAction ? 'opacity-40 pointer-events-none' : ''}`}>
                 <div className="flex items-center gap-2 w-full">
                   <RoleButtonWrapper allowedRoles={['ADMIN', 'HR', 'MANAGER', 'REGIONAL']}>
                     <GlowButton
@@ -675,7 +692,6 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
         onRefresh={fetchEmployees}
       />
 
-      {/* NEW: Bulk Edit Modal */}
       <BulkEditModal
         isOpen={showBulkEditModal}
         onClose={() => setShowBulkEditModal(false)}
@@ -685,7 +701,19 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
         onSuccess={() => {
           fetchEmployees();
           setSelectedIds([]);
-          setIsSelectionMode(false);
+          setSelectionAction(null);
+        }}
+      />
+
+      {/* NEW: Bulk Terminate Modal */}
+      <BulkTerminateModal
+        isOpen={showBulkTerminateModal}
+        onClose={() => setShowBulkTerminateModal(false)}
+        selectedIds={selectedIds}
+        onSuccess={() => {
+          fetchEmployees();
+          setSelectedIds([]);
+          setSelectionAction(null);
         }}
       />
     </div>

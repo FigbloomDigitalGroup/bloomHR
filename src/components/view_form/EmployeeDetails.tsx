@@ -167,10 +167,10 @@ const ViewEmployeePage = () => {
   const requiresApproval = () => {
     if (!employee) return false;
 
-    // If user is admin, no approval needed
-    if (userRole?.toUpperCase() === 'ADMIN') return false;
+    // If user is admin or HR, no approval needed
+    if (userRole?.toUpperCase() === 'ADMIN' || userRole?.toUpperCase() === 'HR') return false;
 
-    // Managers require admin approval
+    // Managers require admin approval for managers/directors
     const isManager = employee['Employee Type']?.toLowerCase().includes('manager') ||
       employee['Job Title']?.toLowerCase().includes('manager') ||
       employee['Employee Type']?.toLowerCase().includes('director') ||
@@ -187,7 +187,7 @@ const ViewEmployeePage = () => {
   // Check if user can terminate employees
   const canTerminateEmployees = () => {
     const role = userRole?.toUpperCase();
-    return role === 'ADMIN' || role === 'MANAGER';
+    return role === 'ADMIN' || role === 'HR' || role === 'MANAGER';
   };
 
   // Submit termination request for approval
