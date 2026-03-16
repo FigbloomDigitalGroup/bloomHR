@@ -316,9 +316,8 @@ const ExportModal = ({ isOpen, onClose, onExport, isLoading, filterOptions }: {
   const [dateRange, setDateRange] = useState('all');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
-  const [exportStatus, setExportStatus] = useState('all');
-  const [exportTown, setExportTown] = useState('all');
-  const [exportMonth, setExportMonth] = useState('all');
+  const [exportStatus, setExportStatus] = useState('');
+  const [exportTown, setExportTown] = useState('');
 
   if (!isOpen) return null;
 
@@ -329,13 +328,12 @@ const ExportModal = ({ isOpen, onClose, onExport, isLoading, filterOptions }: {
       customStartDate,
       customEndDate,
       status: exportStatus,
-      town: exportTown,
-      month: exportMonth
+      town: exportTown
     });
   };
 
   const statusOptions = [
-    { value: 'all', label: 'All Statuses' },
+    { value: '', label: 'All Statuses' },
     { value: 'pending', label: 'Pending' },
     { value: 'approved', label: 'Approved' },
     { value: 'rejected', label: 'Rejected' },
@@ -450,24 +448,12 @@ const ExportModal = ({ isOpen, onClose, onExport, isLoading, filterOptions }: {
             </label>
             <SearchableDropdown
               options={[
-                { value: 'all', label: 'All Towns/Regions' },
+                { value: '', label: 'All Towns/Regions' },
                 ...(filterOptions?.allTowns?.map(town => ({ value: town, label: town })) || [])
               ]}
               value={exportTown}
               onChange={(town: string) => setExportTown(town)}
               placeholder="Select Town"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-2">
-              Month Filter
-            </label>
-            <SearchableDropdown
-              options={monthOptions}
-              value={exportMonth}
-              onChange={setExportMonth}
-              placeholder="Select Month"
             />
           </div>
 
@@ -5256,7 +5242,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         .order('time_added', { ascending: false });
 
       // Apply date range filter for export
-      if (exportConfig.dateRange !== 'all') {
+      if (exportConfig.dateRange && exportConfig.dateRange !== 'all') {
         const today = new Date();
         let startDate = new Date();
 
@@ -5295,47 +5281,54 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         }
       }
 
-      // Apply status filter
-      if (exportConfig.status !== 'all') {
-        query = query.eq('status', exportConfig.status);
-      }
-
       // Apply town filter
-      if (exportConfig.town !== 'all') {
+      if (exportConfig.town && exportConfig.town !== 'all') {
         query = query.ilike('"Office Branch"', `%${exportConfig.town}%`);
-      }
-
-      // Apply month filter
-      if (exportConfig.month !== 'all') {
-        const month = parseInt(exportConfig.month);
-        const year = new Date().getFullYear();
-        const startDate = new Date(year, month, 1);
-        const endDate = new Date(year, month + 1, 0);
-        endDate.setHours(23, 59, 59, 999);
-
-        query = query.gte('time_added', startDate.toISOString())
-          .lte('time_added', endDate.toISOString());
       }
 
       const { data, error } = await query;
 
       if (error) throw error;
 
-      // Prepare data for export
-      const exportData = data.map(app => ({
-        'Employee Name': app['Full Name'],
-        'Employee Number': app['Employee Number'],
-        'Mobile Number': employeeMobileNumbers[app["Employee Number"]] || 'N/A',
-        'Branch': app['Office Branch'] || app.Office_Branch || app.office_branch || 'N/A',
-        'Amount Requested': app['Amount Requested'],
-        'Status': app.status || 'pending',
-        'Request Date': parseApplicationDate(app).toLocaleDateString(),
-        'Reason': app['Reason for Advance'] || '',
-        'Branch Manager Approval': app.branch_manager_approval ? 'Approved' : 'Pending',
-        'Regional Manager Approval': app.regional_manager_approval ? 'Approved' : 'Pending',
-        'Admin Approval': app.admin_approval ? 'Approved' : 'Pending',
-        'Final Status': getApprovalStatus(app)
-      }));
+      // Prepare data for export with in-memory filtering for accurate status matching
+      const filteredData = data.filter(app => {
+        if (!exportConfig.status || exportConfig.status === 'all') return true;
+
+        const appStatus = app.status?.toLowerCase();
+        const approvalStatus = getApprovalStatus(app).toLowerCase();
+
+        if (exportConfig.status === 'pending') {
+          return appStatus.includes('pending') || approvalStatus.includes('pending');
+        }
+
+        return appStatus === exportConfig.status || approvalStatus === exportConfig.status;
+      });
+
+      const exportData = filteredData.map(app => {
+        const approvalStatus = getApprovalStatus(app);
+        const requestDate = parseApplicationDate(app);
+
+        return {
+          'Employee Name': app['Full Name'],
+          'Employee Number': app['Employee Number'],
+          'Mobile Number': employeeMobileNumbers[app["Employee Number"]] || 'N/A',
+          'Branch/Town': app['Office Branch'] || 'N/A',
+          'Amount Requested': app['Amount Requested'],
+          'Current Status': approvalStatus,
+          'Request Date': requestDate.toLocaleDateString(),
+          'Reason': app['Reason for Advance'] || '',
+          'BM Approval': app.branch_manager_approval ? 'Approved' : 'Pending',
+          'BM Notes': app.branch_manager_notes || '',
+          'BM Adjusted Amount': app.branch_manager_adjusted_amount || '',
+          'RM Approval': app.regional_manager_approval ? 'Approved' : 'Pending',
+          'RM Notes': app.regional_manager_notes || '',
+          'RM Adjusted Amount': app.regional_manager_adjusted_amount || '',
+          'Admin Approval': app.admin_approval ? 'Approved' : 'Pending',
+          'Admin Notes': app.admin_notes || '',
+          'Payment Status': app.status === 'paid' ? 'Paid' : 'Unpaid',
+          'Payment Date': app.payment_date ? new Date(app.payment_date).toLocaleDateString() : 'N/A'
+        };
+      });
 
       // Convert to CSV or Excel
       if (exportConfig.format === 'csv') {
