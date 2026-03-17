@@ -5366,9 +5366,10 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
             headers.map((header: string) => {
               const value = row[header];
               if (header === 'Amount Requested') {
-                return Number(value || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 });
+                const formatted = Number(value || 0).toLocaleString('en-KE', { minimumFractionDigits: 2 });
+                return `"${formatted}"`;
               }
-              return String(value || '');
+              return `"${String(value || '').replace(/"/g, '""')}"`;
             }).join('\t')
           )
         ].join('\n');
