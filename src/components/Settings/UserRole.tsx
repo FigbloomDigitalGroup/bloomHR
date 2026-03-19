@@ -73,7 +73,7 @@ const ROLES = {
 };
 
 // Valid roles for Mular Credit emails
-const MULAR_CREDIT_ROLES = ['MANAGER', 'REGIONAL'];
+const MULAR_CREDIT_ROLES = ['MANAGER', 'REGIONAL', 'OPERATIONS'];
 
 const StatusBadge = ({ status }: { status: string }) => {
   return (
@@ -475,7 +475,7 @@ const UserEditModal = ({
             {isMularCreditEmail && (
               <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
                 <Mail className="w-3 h-3" />
-                Mular Credit email detected. Must be Manager or Regional Manager.
+                Mular Credit email detected. Must be Manager, Regional Manager or Operations.
               </p>
             )}
           </div>
@@ -546,7 +546,7 @@ const UserEditModal = ({
                                   'border-gray-500 bg-gray-50 text-gray-700') :
                       'border-gray-200 hover:bg-gray-50'
                       } ${!isAllowedForMular ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    title={!isAllowedForMular ? 'Mular Credit emails must be Manager or Regional Manager' : ''}
+                    title={!isAllowedForMular ? 'Mular Credit emails must be Manager, Regional Manager or Operations' : ''}
                   >
                     {roleInfo.label}
                   </button>
@@ -555,7 +555,7 @@ const UserEditModal = ({
             </div>
             {isMularCreditEmail && (
               <p className="text-xs text-gray-500 mt-1">
-                Mular Credit emails must be assigned either Manager or Regional Manager role.
+                Mular Credit emails must be assigned either Manager, Regional Manager or Operations role.
               </p>
             )}
           </div>

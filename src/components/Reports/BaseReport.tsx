@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   Filter,
   Download,
-  Calendar,
   Building,
   User,
   ChevronDown,
@@ -40,8 +39,6 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface ReportFilters {
-  startDate: string;
-  endDate: string;
   town: string;
   employeeNumber: string;
   employeeName: string;
@@ -940,8 +937,6 @@ const BaseReport: React.FC<BaseReportProps> = ({
   onTownChange
 }) => {
   const [filters, setFilters] = useState<ReportFilters>({
-    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
     town: selectedTown || '',
     employeeNumber: '',
     employeeName: ''
@@ -1285,7 +1280,12 @@ const BaseReport: React.FC<BaseReportProps> = ({
   };
 
   const handleExport = () => {
-    if (reportData.length === 0) return;
+    // Only export rows that have actual advance records
+    const exportData = reportData.filter(row => row.status !== undefined && row.amount_requested && row.amount_requested > 0);
+    if (exportData.length === 0) {
+      alert('No advance records found to export. Please ensure advances exist for the selected filters.');
+      return;
+    }
 
     const headers = [
       'Employee Number',
@@ -1318,32 +1318,32 @@ const BaseReport: React.FC<BaseReportProps> = ({
 
     const csvContent = [
       headers.join(','),
-      ...reportData.map(row =>
+      ...exportData.map(row =>
         [
           `"${row.employee_number}"`,
           `"${row.first_name}"`,
           `"${row.last_name}"`,
           `"${row.town}"`,
           `"${row.branch}"`,
-          `"${row.phone_number}"`,
+          `"${row.phone_number || ''}"`,
           row.application_date || '',
           row.application_time || '',
           row.amount_requested || '',
           row.status || '',
-          `"${row.mpesa_code}"` || '',
+          `"${row.mpesa_code || ''}"`,
           row.disbursement_date || '',
           row.disbursement_time || '',
           row.repayment_date || '',
           row.repayment_time || '',
           row.repayment_status || '',
-          `"${row.approved_by}"` || '',
+          `"${row.approved_by || ''}"`,
           row.approval_date || '',
           row.approval_time || '',
-          `"${row.reason}"` || '',
-          `"${row.bank_account}"` || '',
-          `"${row.bank_name}"` || '',
+          `"${row.reason || ''}"`,
+          `"${row.bank_account || ''}"`,
+          `"${row.bank_name || ''}"`,
           row.deduction_month || '',
-          `"${row.remarks}"` || '',
+          `"${row.remarks || ''}"`,
           row.created_at || '',
           row.updated_at || ''
         ].join(',')
@@ -1361,8 +1361,6 @@ const BaseReport: React.FC<BaseReportProps> = ({
 
   const resetFilters = () => {
     const resetFilters = {
-      startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-      endDate: new Date().toISOString().split('T')[0],
       town: selectedTown || '',
       employeeNumber: '',
       employeeName: ''
@@ -1716,14 +1714,15 @@ const BaseReport: React.FC<BaseReportProps> = ({
               </h1>
               <p className="text-gray-600">Comprehensive financial overview of employee salary advances</p>
               <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                <div className="flex items-center gap-1">
-                  <Calendar className="w-4 h-4" />
-                  Period: {formatAccountingDate(filters.startDate)} - {formatAccountingDate(filters.endDate)}
-                </div>
-                {filters.town && (
+                {filters.town ? (
                   <div className="flex items-center gap-1">
                     <Building className="w-4 h-4" />
                     Location: {filters.town}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <Building className="w-4 h-4" />
+                    All Towns
                   </div>
                 )}
               </div>
@@ -1783,31 +1782,7 @@ const BaseReport: React.FC<BaseReportProps> = ({
           {/* Filters Panel */}
           {showFilters && (
             <div className="mt-6 p-4 bg-gray-50 rounded border border-gray-300">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                {/* Date Range */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    value={filters.startDate}
-                    onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    value={filters.endDate}
-                    onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
-                  />
-                </div>
-
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 {/* Town Filter */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
@@ -1817,7 +1792,7 @@ const BaseReport: React.FC<BaseReportProps> = ({
                     options={townOptions}
                     value={filters.town}
                     onChange={(value) => handleFilterChange('town', value)}
-                    placeholder="Select Town"
+                    placeholder="All Towns"
                   />
                 </div>
 
@@ -1830,7 +1805,7 @@ const BaseReport: React.FC<BaseReportProps> = ({
                     options={employeeOptions}
                     value={filters.employeeNumber}
                     onChange={(value) => handleFilterChange('employeeNumber', value)}
-                    placeholder="Select Employee"
+                    placeholder="All Employees"
                   />
                 </div>
               </div>
