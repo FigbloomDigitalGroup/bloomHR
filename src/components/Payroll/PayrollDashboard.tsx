@@ -4364,8 +4364,17 @@ export default function PayrollDashboard() {
             onChange={(date) => setSelectedPeriod(date)}
             dateFormat="MMMM yyyy"
             showMonthYearPicker
-            className="bg-gray-50 border border-gray-200 rounded-[25px] px-3 py-1.5 text-xs focus:ring-2 focus:ring-violet-300 focus:outline-none w-36"
-            placeholderText="Pay Period"
+            customInput={
+              <button className="w-40 h-[32px] bg-gray-50/50 border border-gray-300 rounded-md px-2.5 py-1.5 text-gray-900 focus:outline-none focus:border-green-500 hover:bg-white transition-all duration-200 flex items-center justify-between text-left group">
+                <div className="flex items-center gap-2 truncate flex-1">
+                  <Calendar size={13} className="text-gray-400 group-hover:text-green-600 transition-colors flex-shrink-0" />
+                  <span className="truncate text-xs text-gray-900 font-medium">
+                    {selectedPeriod ? selectedPeriod.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "Pay Period"}
+                  </span>
+                </div>
+                <ChevronDown size={14} className="text-gray-400 group-hover:text-green-500 transition-transform ml-1" />
+              </button>
+            }
           />
 
           {/* Branch */}
