@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import html2pdf from 'html2pdf.js';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 // HARDCODED STATUTORY SETTINGS - Updated to match payroll dashboard
 const statutorySettings = {
@@ -393,269 +395,74 @@ const PayslipModal = ({
           <head>
             <title>Payslip - ${record["Employee Name"] || record.employee_name}</title>
             <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              body { 
-                font-family: 'Avenir Next', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
-                line-height: 1.6; 
-                color: #1f2937; 
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                min-height: 100vh;
-                padding: 20px;
-              }
-              .payslip-container { 
-                max-width: 900px; 
-                margin: 0 auto; 
-                background: white;
-                border-radius: 20px;
-                box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
-                overflow: hidden;
-                position: relative;
-              }
-              .header-bg {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                height: 120px;
-                position: relative;
-              }
-              .header-overlay {
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(255, 255, 255, 0.1);
-              }
-              .header-content {
-                position: relative;
-                z-index: 2;
-                padding: 30px 40px;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                color: white;
-              }
-              .company-info {
-                display: flex;
-                align-items: center;
-                gap: 20px;
-              }
-              .company-logo { 
-                width: 60px; 
-                height: 60px; 
-                border-radius: 12px; 
-                background: rgba(255, 255, 255, 0.2);
-                padding: 8px;
-                backdrop-filter: blur(10px);
-              }
-              .company-details h1 { 
-                font-size: 28px; 
-                font-weight: 800; 
-                margin-bottom: 4px;
-                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-              }
-              .company-tagline { 
-                font-size: 14px; 
-                opacity: 0.9;
-                font-weight: 500;
-              }
-              .payslip-title {
-                text-align: right;
-              }
-              .payslip-title h2 { 
-                font-size: 24px; 
-                font-weight: 700; 
-                margin-bottom: 8px;
-                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-              }
-              .pay-period { 
-                font-size: 14px; 
-                opacity: 0.9;
-                background: rgba(255, 255, 255, 0.2);
-                padding: 8px 16px;
-                border-radius: 20px;
-                backdrop-filter: blur(10px);
-              }
-              .content {
-                padding: 40px;
-              }
-              .employee-section {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 30px;
-                margin-bottom: 40px;
-                padding-bottom: 30px;
-                border-bottom: 2px solid #f3f4f6;
-              }
-              .info-card {
-                background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-                padding: 25px;
-                border-radius: 16px;
-                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-                border: 1px solid #e2e8f0;
-              }
-              .info-card h3 {
-                font-size: 14px;
-                font-weight: 700;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-                color: #6366f1;
-                margin-bottom: 15px;
-              }
-              .info-item {
-                display: flex;
-                justify-content: space-between;
-                margin-bottom: 8px;
-                font-size: 14px;
-              }
-              .info-label {
-                color: #6b7280;
-                font-weight: 500;
-              }
-              .info-value {
-                font-weight: 600;
-                color: #1f2937;
-              }
-              .section {
-                margin-bottom: 35px;
-              }
-              .section-header {
-                background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-                color: white;
-                padding: 15px 25px;
-                border-radius: 12px;
-                margin-bottom: 20px;
-                font-weight: 700;
-                font-size: 16px;
-                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-              }
-              .earnings-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                gap: 20px;
-                margin-bottom: 25px;
-              }
-              .earning-item {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 15px 20px;
-                background: #f8fafc;
-                border-radius: 10px;
-                border-left: 4px solid #10b981;
-                transition: all 0.3s ease;
-              }
-              .earning-item:hover {
-                background: #ecfdf5;
-                transform: translateY(-2px);
-                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-              }
-              .earning-label {
-                font-weight: 500;
-                color: #374151;
-              }
-              .earning-amount {
-                font-weight: 700;
-                color: #059669;
-                font-size: 16px;
-              }
-              .deduction-item {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 15px 20px;
-                background: #fef2f2;
-                border-radius: 10px;
-                border-left: 4px solid #ef4444;
-                margin-bottom: 12px;
-                transition: all 0.3s ease;
-              }
-              .deduction-item:hover {
-                background: #fee2e2;
-                transform: translateY(-2px);
-                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-              }
-              .deduction-label {
-                font-weight: 500;
-                color: #374151;
-              }
-              .deduction-amount {
-                font-weight: 700;
-                color: #dc2626;
-                font-size: 16px;
-              }
-              .summary-section {
-                background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
-                color: white;
-                padding: 30px;
-                border-radius: 16px;
-                margin-bottom: 30px;
-                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-              }
-              .summary-row {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 15px 0;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-              }
-              .summary-row:last-child {
-                border-bottom: none;
-                border-top: 2px solid rgba(255, 255, 255, 0.2);
-                margin-top: 15px;
-                font-size: 20px;
-                font-weight: 800;
-              }
-              .net-pay {
-                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-                font-size: 24px;
-              }
-              .signature-section {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 40px;
-                margin-top: 50px;
-                padding-top: 30px;
-                border-top: 2px solid #f3f4f6;
-              }
-              .signature-box {
-                text-align: center;
-              }
-              .signature-line {
-                border-top: 2px solid #374151;
-                margin-bottom: 10px;
-                width: 200px;
-                margin: 40px auto 10px;
-              }
-              .signature-label {
-                font-weight: 600;
-                color: #6b7280;
-                margin-bottom: 5px;
-              }
-              .footer {
-                text-align: center;
-                margin-top: 40px;
-                padding: 25px;
-                background: #f8fafc;
-                border-radius: 12px;
-                color: #6b7280;
-                font-size: 12px;
-                border: 1px solid #e5e7eb;
-              }
-              .footer-line {
-                margin-bottom: 5px;
-              }
+              * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Calibri', 'Helvetica', sans-serif; }
+              body { background: white; color: black; padding: 40px; font-size: 11px; }
+              .payslip-container { max-width: 800px; margin: 0 auto; background: white; }
+              .flex { display: flex; }
+              .justify-between { justify-content: space-between; }
+              .items-center { align-items: center; }
+              .items-end { align-items: flex-end; }
+              .grid { display: grid; }
+              .grid-cols-2 { grid-template-columns: 1fr 1fr; }
+              .gap-6 { gap: 1.5rem; }
+              .gap-8 { gap: 2rem; }
+              .mb-1 { margin-bottom: 0.25rem; }
+              .mb-2 { margin-bottom: 0.5rem; }
+              .mb-3 { margin-bottom: 0.75rem; }
+              .mb-4 { margin-bottom: 1rem; }
+              .mb-6 { margin-bottom: 1.5rem; }
+              .mb-8 { margin-bottom: 2rem; }
+              .mt-1 { margin-top: 0.25rem; }
+              .mt-2 { margin-top: 0.5rem; }
+              .mt-6 { margin-top: 1.5rem; }
+              .border { border: 1px solid #9ca3af; }
+              .border-b { border-bottom: 1px solid #d1d5db; }
+              .border-b-3 { border-bottom: 3px solid #6b7280; }
+              .border-t { border-top: 1px solid #9ca3af; }
+              .border-gray-300 { border-color: #d1d5db; }
+              .border-gray-400 { border-color: #9ca3af; }
+              .border-gray-500 { border-color: #6b7280; }
+              .border-double { border-style: double; }
+              .p-1 { padding: 0.25rem; }
+              .p-2 { padding: 0.5rem; }
+              .p-3 { padding: 0.75rem; }
+              .p-4 { padding: 1rem; }
+              .p-6 { padding: 1.5rem; }
+              .pb-2 { padding-bottom: 0.5rem; }
+              .pt-1 { padding-top: 0.25rem; }
+              .pt-2 { padding-top: 0.5rem; }
+              .pt-4 { padding-top: 1rem; }
+              .pt-8 { padding-top: 2rem; }
+              .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+              .font-bold { font-weight: 700; }
+              .font-semibold { font-weight: 600; }
+              .text-right { text-align: right; }
+              .text-center { text-align: center; }
+              .text-sm { font-size: 0.875rem; }
+              .text-lg { font-size: 1.125rem; }
+              .text-xl { font-size: 1.25rem; }
+              .text-2xl { font-size: 1.5rem; }
+              .text-3xl { font-size: 1.875rem; }
+              .uppercase { text-transform: uppercase; }
+              .bg-white { background-color: white; }
+              .bg-gray-50 { background-color: #f9fafb; border: 1px solid #e5e7eb; }
+              .bg-gray-100 { background-color: #f3f4f6; }
+              .text-black { color: #000; }
+              .text-gray-500 { color: #6b7280; }
+              .text-gray-600 { color: #4b5563; }
+              .text-gray-800 { color: #1f2937; }
+              .text-gray-900 { color: #111827; }
+              .space-y-1 > * + * { margin-top: 0.25rem; }
+              .space-y-1\.5 > * + * { margin-top: 0.375rem; }
+              .space-y-2 > * + * { margin-top: 0.5rem; }
+              .mr-4 { margin-right: 1rem; }
+              .h-16 { height: 4rem; }
+              .w-16 { width: 4rem; }
+              .object-contain { object-fit: contain; }
+              .mx-auto { margin-left: auto; margin-right: auto; }
+              .leading-tight { line-height: 1.25; }
               @media print {
-                body { 
-                  background: white;
-                  padding: 0;
-                }
-                .no-print { display: none !important; }
-                .payslip-container { 
-                  box-shadow: none;
-                  border-radius: 0;
-                }
+                body { padding: 0; }
               }
             </style>
           </head>
@@ -712,102 +519,122 @@ const PayslipModal = ({
         </div>
 
         <div className="p-2 bg-gray-50 payslip-container print:p-0 print:w-[210mm] print:h-[297mm]">
-          <div id="payslip-content" className="bg-white rounded-lg shadow-lg overflow-hidden text-xs leading-tight">
-            <div className="bg-gray-800 text-white p-4 flex justify-between items-center">
+          <div id="payslip-content" className="bg-white border text-black border-gray-300 text-xs leading-tight mx-auto" style={{ maxWidth: '800px', boxShadow: '0 4px 15px rgba(0, 0, 0, 0.05)', fontFamily: 'Calibri, Helvetica, sans-serif' }}>
+            <div className="bg-white text-black p-6 flex justify-between items-end border-b-[3px] border-double border-gray-300">
               <div className="flex items-center">
                 {companyInfo?.image_url && (
-                  <img src={companyInfo.image_url} alt="Company Logo" className="h-12 w-12 mr-3 bg-white p-1 rounded" />
+                  <img src={companyInfo.image_url} alt="Company Logo" className="h-16 w-16 mr-4 object-contain" />
                 )}
                 <div>
-                  <h1 className="text-lg font-bold">{companyInfo?.company_name || 'Your Company Name'}</h1>
-                  <div className="text-gray-300 text-xs">{companyInfo?.company_tagline || 'Excellence in Service'}</div>
+                  <h1 className="text-2xl font-bold uppercase text-gray-900">{companyInfo?.company_name || 'Your Company Name'}</h1>
+                  <div className="text-gray-600 text-sm font-semibold mt-1">{companyInfo?.company_tagline || 'Excellence in service'}</div>
                 </div>
               </div>
               <div className="text-right">
-                <h2 className="text-xl font-bold">PAYSLIP</h2>
-                <div className="text-gray-300 text-xs">
-                  {record["Pay Period"] || record.pay_period ?
-                    new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'N/A'}
+                <h2 className="text-3xl font-bold uppercase text-gray-900 mb-1">PAYSLIP</h2>
+                <div className="text-gray-600 font-semibold text-sm">
+                  {payPeriod ? (() => {
+                    const [year, month] = String(payPeriod).split('-').map(Number);
+                    let prevMonth = month - 1;
+                    let prevYear = year;
+                    if (prevMonth === 0) { prevMonth = 12; prevYear = year - 1; }
+                    return new Date(prevYear, prevMonth - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                  })() : 'N/A'}
                 </div>
               </div>
             </div>
 
-            <div className="p-4">
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="border p-3 rounded">
-                  <h3 className="font-semibold border-b mb-2">EMPLOYEE INFORMATION</h3>
-                  <div className="space-y-1">
-                    <div className="flex justify-between"><span>Full Name:</span><span>{record["Employee Name"] || record.employee_name || 'N/A'}</span></div>
-                    <div className="flex justify-between"><span>Employee No:</span><span>{record["Employee ID"] || record.employee_id || 'N/A'}</span></div>
-                    <div className="flex justify-between"><span>Position:</span><span>{record["Position"] || record.position || 'N/A'}</span></div>
-                    <div className="flex justify-between"><span>Dept:</span><span>Operations</span></div>
-                    <div className="flex justify-between"><span>Region:</span><span>{record["Branch"] || record.branch || 'N/A'}</span></div>
+            <div className="p-6">
+              <div className="grid grid-cols-2 gap-6 mb-6">
+                <div className="border border-gray-300 p-4">
+                  <h3 className="font-bold border-b border-gray-300 pb-2 mb-3 text-gray-900 text-sm">Employee information</h3>
+                  <div className="space-y-1.5 text-black">
+                    <div className="flex justify-between"><span className="font-semibold text-gray-600">Full name:</span><span className="font-bold text-right">{record["Employee Name"] || record.employee_name || 'N/A'}</span></div>
+                    <div className="flex justify-between"><span className="font-semibold text-gray-600">Employee no:</span><span className="font-bold text-right">{record["Employee ID"] || record.employee_id || 'N/A'}</span></div>
+                    <div className="flex justify-between"><span className="font-semibold text-gray-600">Position:</span><span className="font-bold text-right">{record["Position"] || record.position || 'N/A'}</span></div>
+                    <div className="flex justify-between"><span className="font-semibold text-gray-600">Dept:</span><span className="font-bold text-right">Operations</span></div>
+                    <div className="flex justify-between"><span className="font-semibold text-gray-600">Region:</span><span className="font-bold text-right">{record["Branch"] || record.branch || 'N/A'}</span></div>
                   </div>
                 </div>
 
-                <div className="border p-3 rounded">
-                  <h3 className="font-semibold border-b mb-2">PAYMENT DETAILS</h3>
-                  <div className="space-y-1">
-                    <div className="flex justify-between"><span>Method:</span><span>{record["Payment Method"] || record.payment_method || 'M-Pesa'}</span></div>
+                <div className="border border-gray-300 p-4">
+                  <h3 className="font-bold border-b border-gray-300 pb-2 mb-3 text-gray-900 text-sm">Payment details</h3>
+                  <div className="space-y-1.5 text-black">
+                    <div className="flex justify-between"><span className="font-semibold text-gray-600">Method:</span><span className="font-bold text-right">{record["Payment Method"] || record.payment_method || 'M-Pesa'}</span></div>
                     {(record["Payment Method"] || record.payment_method) === 'Bank Transfer' && (
                       <>
-                        <div className="flex justify-between"><span>Bank:</span><span>{record["Bank Name"] || record.bank_name || 'N/A'}</span></div>
-                        <div className="flex justify-between"><span>Account:</span><span>{record["Account Number"] || record.account_number || 'N/A'}</span></div>
+                        <div className="flex justify-between"><span className="font-semibold text-gray-600">Bank:</span><span className="font-bold text-right">{record["Bank Name"] || record.bank_name || 'N/A'}</span></div>
+                        <div className="flex justify-between"><span className="font-semibold text-gray-600">Account:</span><span className="font-bold text-right">{record["Account Number"] || record.account_number || 'N/A'}</span></div>
                       </>
                     )}
                     {(record["Payment Method"] || record.payment_method) === 'M-Pesa' && (
-                      <div className="flex justify-between"><span>M-Pesa No:</span><span>{record["Phone Number"] || record.employeeNu || 'N/A'}</span></div>
+                      <div className="flex justify-between"><span className="font-semibold text-gray-600">M-Pesa no:</span><span className="font-bold text-right">{record["Phone Number"] || record.employeeNu || 'N/A'}</span></div>
                     )}
-                    <div className="flex justify-between"><span>Job Group:</span><span>{record["Job Group"] || record.jobGroup || 'N/A'}</span></div>
+                    <div className="flex justify-between"><span className="font-semibold text-gray-600">Job group:</span><span className="font-bold text-right">{record["Job Group"] || record.jobGroup || 'N/A'}</span></div>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="border rounded">
-                  <div className="bg-gray-200 font-semibold p-2">EARNINGS</div>
-                  <div className="p-2 space-y-1">
-                    <div className="flex justify-between"><span>Basic</span><span>KSh {calculated.basicSalary.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>House</span><span>KSh {calculated.houseAllowance.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Transport</span><span>KSh {calculated.transportAllowance.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Medical</span><span>KSh {calculated.medicalAllowance.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Other</span><span>KSh {calculated.otherAllowances.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Overtime</span><span>KSh {calculated.overtimePay.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Commission</span><span>KSh {calculated.commission.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Bonus</span><span>KSh {calculated.bonus.toLocaleString()}</span></div>
-                    <div className="flex justify-between bg-yellow-50 p-1"><span>Per Diem</span><span>KSh {calculated.perDiem.toLocaleString()}</span></div>
+              <div className="grid grid-cols-2 gap-6 mb-6">
+                <div className="border border-gray-300">
+                  <div className="bg-gray-100 border-b border-gray-300 font-bold p-3 text-gray-900">Earnings</div>
+                  <div className="p-3 space-y-2 text-black">
+                    <div className="flex justify-between"><span>Basic</span><span className="font-semibold">KSh {calculated.basicSalary.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>House</span><span className="font-semibold">KSh {calculated.houseAllowance.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>Transport</span><span className="font-semibold">KSh {calculated.transportAllowance.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>Medical</span><span className="font-semibold">KSh {calculated.medicalAllowance.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>Other</span><span className="font-semibold">KSh {calculated.otherAllowances.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>Overtime</span><span className="font-semibold">KSh {calculated.overtimePay.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>Commission</span><span className="font-semibold">KSh {calculated.commission.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>Bonus</span><span className="font-semibold">KSh {calculated.bonus.toLocaleString()}</span></div>
+                    <div className="flex justify-between bg-gray-50 p-1 border border-gray-200 mt-2"><span>Per diem</span><span className="font-bold">KSh {calculated.perDiem.toLocaleString()}</span></div>
                   </div>
                 </div>
 
-                <div className="border rounded">
-                  <div className="bg-gray-200 font-semibold p-2">DEDUCTIONS</div>
-                  <div className="p-2 space-y-1">
-                    <div className="flex justify-between"><span>PAYE</span><span>KSh {Math.round(calculated.payeTax).toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>SHIF</span><span>KSh {calculated.nhifDeduction.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>NSSF</span><span>KSh {calculated.nssfDeduction.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>AHL</span><span>KSh {calculated.housingLevy.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Loan</span><span>KSh {calculated.loanDeduction.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Advance</span><span>KSh {calculated.advanceDeduction.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Welfare</span><span>KSh {calculated.welfareDeduction.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Other</span><span>KSh {calculated.otherDeductions.toLocaleString()}</span></div>
-                    <div className="flex justify-between text-green-600"><span>Tax Relief:</span><span>KSh -2400</span></div>
+                <div className="border border-gray-300">
+                  <div className="bg-gray-100 border-b border-gray-300 font-bold p-3 text-gray-900">Deductions</div>
+                  <div className="p-3 space-y-2 text-black">
+                    <div className="flex justify-between"><span>PAYE</span><span className="font-semibold">KSh {Math.round(calculated.payeTax).toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>SHIF</span><span className="font-semibold">KSh {calculated.nhifDeduction.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>NSSF</span><span className="font-semibold">KSh {calculated.nssfDeduction.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>AHL</span><span className="font-semibold">KSh {calculated.housingLevy.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>Loan</span><span className="font-semibold">KSh {calculated.loanDeduction.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>Advance</span><span className="font-semibold">KSh {calculated.advanceDeduction.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>Welfare</span><span className="font-semibold">KSh {calculated.welfareDeduction.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>Other</span><span className="font-semibold">KSh {calculated.otherDeductions.toLocaleString()}</span></div>
+                    <div className="flex justify-between text-gray-600 mt-2 border-t border-gray-200 pt-1"><span>Tax relief:</span><span className="font-semibold">KSh -2400</span></div>
                   </div>
                 </div>
               </div>
 
-              <div className="border p-3 rounded mb-4">
-                <div className="flex justify-between border-b pb-1"><span>Gross Pay</span><span>KSh {calculated.grossPay.toLocaleString()}</span></div>
-                <div className="flex justify-between border-b pb-1"><span>Total Deductions</span><span className="text-red-600">KSh {calculated.totalDeductions.toLocaleString()}</span></div>
-                <div className="flex justify-between font-bold text-green-700"><span>NET PAY</span><span>KSh {Math.round(calculated.netPay).toLocaleString()}</span></div>
+              <div className="border border-gray-300 p-4 mb-8 bg-gray-50">
+                <div className="flex justify-between border-b border-gray-300 pb-2 mb-2 text-sm text-black">
+                  <span className="font-bold">Gross pay</span>
+                  <span className="font-bold">KSh {calculated.grossPay.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-300 pb-2 mb-3 text-sm text-black">
+                  <span className="font-bold">Total deductions</span>
+                  <span className="font-bold">KSh {calculated.totalDeductions.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center text-lg text-black mt-2">
+                  <span className="font-bold">Net pay</span>
+                  <span className="font-bold border-b-[3px] border-gray-400 border-double pb-0.5">KSh {Math.round(calculated.netPay).toLocaleString()}</span>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-4 text-center text-xs">
-                <div className="border border-dashed p-2">Employee Signature<br />Date: __________</div>
-                <div className="border border-dashed p-2">Authorized Signatory<br />Date: __________</div>
+              <div className="grid grid-cols-2 gap-8 mb-4 text-center text-xs">
+                <div className="p-2 pt-8">
+                  <div className="border-t border-gray-300 pt-2 font-bold text-gray-800">Employee signature</div>
+                  <div className="text-gray-500 mt-1">Date: ________________________</div>
+                </div>
+                <div className="p-2 pt-8">
+                  <div className="border-t border-gray-300 pt-2 font-bold text-gray-800">Authorized signatory</div>
+                  <div className="text-gray-500 mt-1">Date: ________________________</div>
+                </div>
               </div>
 
-              <div className="text-center text-gray-500 text-xs">
-                Generated on {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()} • {companyInfo?.company_name || 'Company'} • Confidential
+              <div className="text-center text-gray-500 text-xs border-t border-gray-300 pt-4 mt-6">
+                Generated on {new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })} {new Date().toLocaleTimeString()} &bull; {companyInfo?.company_name || 'Company'} &bull; Strictly confidential
               </div>
             </div>
           </div>
@@ -839,7 +666,7 @@ const PayslipViewer = () => {
   const [selectedPayslip, setSelectedPayslip] = useState(null);
   const [currentPayslipIndex, setCurrentPayslipIndex] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPeriod, setSelectedPeriod] = useState('all');
+  const [selectedPeriod, setSelectedPeriod] = useState<Date | null>(null);
   const [companyInfo, setCompanyInfo] = useState(null);
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [showSummary, setShowSummary] = useState(false);
@@ -1043,7 +870,11 @@ const PayslipViewer = () => {
       employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       employeeId.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesPeriod = selectedPeriod === 'all' || payPeriod === selectedPeriod;
+    let matchesPeriod = true;
+    if (selectedPeriod) {
+      const formattedSelected = `${selectedPeriod.getFullYear()}-${String(selectedPeriod.getMonth() + 1).padStart(2, '0')}`;
+      matchesPeriod = payPeriod === formattedSelected;
+    }
 
     return matchesSearch && matchesPeriod;
   });
@@ -1165,18 +996,16 @@ const PayslipViewer = () => {
 
           <div className="space-y-1">
             <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Pay Period</label>
-            <select
-              value={selectedPeriod}
-              onChange={(e) => setSelectedPeriod(e.target.value)}
+            <DatePicker
+              selected={selectedPeriod}
+              onChange={(date) => setSelectedPeriod(date)}
+              dateFormat="MM/yyyy"
+              showMonthYearPicker
+              isClearable
+              placeholderText="All Periods"
               className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-            >
-              <option value="all">All Periods</option>
-              {getUniquePeriods().map(period => (
-                <option key={period} value={period}>
-                  {new Date(period + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                </option>
-              ))}
-            </select>
+              wrapperClassName="w-full"
+            />
           </div>
 
           <div className="space-y-1">
