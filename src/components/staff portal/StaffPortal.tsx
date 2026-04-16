@@ -1462,13 +1462,20 @@ const SalaryAdvanceForm = () => {
         try {
           const { data, error } = await supabase
             .from('employees')
-            .select('"Employee Number", "First Name", "Last Name", "Office", "Basic Salary"')
+            .select('"Employee Number", "First Name", "Last Name", "Office", "Basic Salary", "Termination Date", "Status"')
             .eq('"Work Email"', user.email)
             .single();
 
           if (error) throw error;
 
           if (data) {
+            // Check if terminated
+            if (data['Termination Date'] || data['Status'] === 'Inactive') {
+               toast.error('Your employment account has been deactivated. You are not eligible to apply for a salary advance.', { duration: 6000 });
+               // Let them see the screen but prevent them from passing validation
+               setFormData(prev => ({ ...prev, "Employee Number": '' }));
+               return;
+            }
             const basicSalary = data["Basic Salary"] || '0';
             setFormData(prev => ({
               ...prev,
@@ -1607,6 +1614,13 @@ const SalaryAdvanceForm = () => {
     // Check if within application period
     if (!isAdvancePeriod()) {
       toast.error(advanceSettings.message || 'Salary advance applications are currently closed.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Verify not terminated based on our check in fetchEmployeeData
+    if (!formData["Employee Number"]) {
+      toast.error('Your employment account is inactive. Application denied.');
       setIsSubmitting(false);
       return;
     }

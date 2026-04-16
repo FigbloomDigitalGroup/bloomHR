@@ -248,6 +248,30 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         .single();
 
       if (userData) {
+        // Immediate termination checks - verify account status
+        if (userData.account_status && userData.account_status !== 'ACTIVE') {
+          await supabase.auth.signOut();
+          toast.error(`Your account is ${userData.account_status.toLowerCase()}. Please contact support.`);
+          setLoading(false);
+          return;
+        }
+
+        // Verify employment status for non-admin/management roles
+        if (!isAdminEmail(email)) {
+          const { data: empData } = await supabase
+            .from('employees')
+            .select('Status, "Termination Date"')
+            .eq('"Work Email"', email)
+            .maybeSingle();
+
+          if (empData && (empData.Status === 'Inactive' || empData['Termination Date'])) {
+            await supabase.auth.signOut();
+            toast.error('Your employment account has been deactivated. Please contact HR for assistance.');
+            setLoading(false);
+            return;
+          }
+        }
+
         onLoginSuccess(userData);
       }
     } catch (error: any) {

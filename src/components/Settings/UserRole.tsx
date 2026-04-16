@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { supabaseAdmin } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 // Role definitions
 const ROLES = {
@@ -918,9 +919,7 @@ export default function UserRolesSettings() {
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [resettingPasswordUser, setResettingPasswordUser] = useState<any | null>(null);
-  const [showBulkUpdateModal, setShowBulkUpdateModal] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+    const [showBulkUpdateModal, setShowBulkUpdateModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [usersPerPage] = useState(12);
   const navigate = useNavigate();
@@ -963,21 +962,15 @@ export default function UserRolesSettings() {
         .eq('id', 1);
       if (error) throw error;
       setMfaEnabled(newValue);
-      setSuccess(`MFA verification ${newValue ? 'enabled' : 'disabled'} successfully.`);
+      toast.success(`MFA verification ${newValue ? 'enabled' : 'disabled'} successfully.`);
     } catch (e: any) {
-      setError('Failed to update MFA setting: ' + (e.message || 'Unknown error'));
+      toast.error('Failed to update MFA setting: ' + (e.message || 'Unknown error'));
     } finally {
       setMfaLoading(false);
     }
   };
 
-  // Show success message temporarily
-  useEffect(() => {
-    if (success) {
-      const timer = setTimeout(() => setSuccess(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [success]);
+
 
   // Get users that need role updates
   const usersNeedingUpdate = users.filter(user =>
@@ -1006,7 +999,7 @@ export default function UserRolesSettings() {
   useEffect(() => {
     const fetchUsers = async () => {
       setLoading(true);
-      setError(null);
+      toast.error(null);
       try {
         let allUsers: any[] = [];
         let page = 1;
@@ -1043,7 +1036,7 @@ export default function UserRolesSettings() {
         setUsers(formattedUsers);
       } catch (err: any) {
         console.error('Error fetching users:', err);
-        setError(err.message || 'Failed to load users');
+        toast.error(err.message || 'Failed to load users');
       } finally {
         setLoading(false);
       }
@@ -1079,10 +1072,10 @@ export default function UserRolesSettings() {
       if (error) throw error;
 
       setUsers(users.filter(u => u.id !== user.id));
-      setSuccess(`User ${user.email} deleted successfully`);
+      toast.success(`User ${user.email} deleted successfully`);
     } catch (err: any) {
       console.error('Error deleting user:', err);
-      setError(err.message || 'Failed to delete user');
+      toast.error(err.message || 'Failed to delete user');
     } finally {
       setLoading(false);
     }
@@ -1101,7 +1094,7 @@ export default function UserRolesSettings() {
 
         if (error) throw error;
 
-        setSuccess(`Password reset email sent to ${user.email}`);
+        toast.success(`Password reset email sent to ${user.email}`);
       } else {
         // Set manual password
         const { error } = await supabaseAdmin.auth.admin.updateUserById(
@@ -1113,13 +1106,13 @@ export default function UserRolesSettings() {
 
         if (error) throw error;
 
-        setSuccess(`Password updated successfully for ${user.email}`);
+        toast.success(`Password updated successfully for ${user.email}`);
       }
 
       setResettingPasswordUser(null);
     } catch (err: any) {
       console.error('Error resetting password:', err);
-      setError(err.message || 'Failed to reset password');
+      toast.error(err.message || 'Failed to reset password');
     } finally {
       setLoading(false);
     }
@@ -1169,7 +1162,7 @@ export default function UserRolesSettings() {
           location: finalUserData.location || null
         } : u));
         setEditingUser(null);
-        setSuccess(`User ${finalUserData.email} updated successfully`);
+        toast.success(`User ${finalUserData.email} updated successfully`);
       } else {
         // Create new user with password
         const { data, error } = await supabaseAdmin.auth.admin.createUser({
@@ -1197,18 +1190,18 @@ export default function UserRolesSettings() {
           location: finalUserData.location || null
         }]);
         setShowAddUserModal(false);
-        setSuccess(`User ${finalUserData.email} created successfully`);
+        toast.success(`User ${finalUserData.email} created successfully`);
       }
     } catch (err: any) {
       console.error('Error saving user:', err);
-      setError(err.message || `Failed to ${editingUser ? 'update' : 'create'} user`);
+      toast.error(err.message || `Failed to ${editingUser ? 'update' : 'create'} user`);
     }
   };
 
   const handleBulkUpdate = async (selectedRole: 'MANAGER' | 'REGIONAL') => {
     try {
       setLoading(true);
-      setError(null);
+      toast.error(null);
 
       const updatePromises = usersNeedingUpdate.map(async (user) => {
         const { error } = await supabaseAdmin.auth.admin.updateUserById(
@@ -1235,10 +1228,10 @@ export default function UserRolesSettings() {
       ));
 
       setShowBulkUpdateModal(false);
-      setSuccess(`Successfully updated ${usersNeedingUpdate.length} users to ${selectedRole === 'MANAGER' ? 'Manager' : 'Regional Manager'} role`);
+      toast.success(`Successfully updated ${usersNeedingUpdate.length} users to ${selectedRole === 'MANAGER' ? 'Manager' : 'Regional Manager'} role`);
     } catch (err: any) {
       console.error('Error in bulk update:', err);
-      setError(err.message || 'Failed to update users in bulk');
+      toast.error(err.message || 'Failed to update users in bulk');
     } finally {
       setLoading(false);
     }
@@ -1331,33 +1324,7 @@ export default function UserRolesSettings() {
           </div>
         </div>
 
-        {/* Success message */}
-        {success && (
-          <div className="bg-green-50 border-l-4 border-green-500 p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <Check className="h-5 w-5 text-green-500" />
-              </div>
-              <div className="ml-3">
-                <p className="text-xs text-green-700">{success}</p>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* Error message */}
-        {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <X className="h-5 w-5 text-red-500" />
-              </div>
-              <div className="ml-3">
-                <p className="text-xs text-red-700">{error}</p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Bulk Update Alert */}
         {usersNeedingUpdate.length > 0 && (
