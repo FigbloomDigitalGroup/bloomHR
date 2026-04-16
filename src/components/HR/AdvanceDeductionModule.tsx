@@ -72,7 +72,7 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
                     remaining_balance: remaining >= 0 ? remaining : 0,
                     is_completed: remaining <= 0,
                     employee_name: emp ? `${emp['First Name']} ${emp['Last Name']}` : a['Employee Number'],
-                    branch: emp?.Branch || 'N/A',
+                    branch: emp?.Town || emp?.Branch || 'N/A',
                     town: emp?.Town || 'N/A',
                     mobile: emp?.['Mobile Number'] || 'N/A'
                 };

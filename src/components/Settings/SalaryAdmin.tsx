@@ -3532,6 +3532,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   const [showBulkPaymentModal, setShowBulkPaymentModal] = useState(false);
   const [isProcessingBulkPayment, setIsProcessingBulkPayment] = useState(false);
   const [employeeMobileNumbers, setEmployeeMobileNumbers] = useState<Record<string, string>>({});
+  const [employeeBranches, setEmployeeBranches] = useState<Record<string, string>>({});
   const [selectedStaff, setSelectedStaff] = useState<Record<string, boolean>>({});
   const [justification, setJustification] = useState('');
 
@@ -4063,17 +4064,20 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
       const { data, error } = await supabase
         .from('employees')
-        .select('"Employee Number", "Mobile Number"')
+        .select('"Employee Number", "Mobile Number", "Branch", "Town"')
         .in('"Employee Number"', employeeNumbers);
 
       if (error) throw error;
 
       const mobileMap: Record<string, string> = {};
+      const branchMap: Record<string, string> = {};
       data?.forEach(emp => {
         mobileMap[emp["Employee Number"]] = emp["Mobile Number"];
+        branchMap[emp["Employee Number"]] = emp.Town || emp.Branch || 'N/A';
       });
 
       setEmployeeMobileNumbers(mobileMap);
+      setEmployeeBranches(branchMap);
     } catch (error) {
       console.error('Error fetching mobile numbers:', error);
       toast.error('Failed to load mobile numbers');
@@ -5312,7 +5316,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
           'Employee Name': app['Full Name'],
           'Employee Number': app['Employee Number'],
           'Mobile Number': employeeMobileNumbers[app["Employee Number"]] || 'N/A',
-          'Branch/Town': app['Office Branch'] || 'N/A',
+          'Branch/Town': employeeBranches[app["Employee Number"]] || app['Office Branch'] || 'N/A',
           'Amount Requested': app['Amount Requested'],
           'Current Status': approvalStatus,
           'Request Date': requestDate.toLocaleDateString(),
@@ -6073,7 +6077,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
                               {/* Branch */}
                               <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-600">
-                                {app['Office Branch'] || app.Office_Branch || app.office_branch || 'N/A'}
+                                {employeeBranches[app["Employee Number"]] || app['Office Branch'] || app.Office_Branch || app.office_branch || 'N/A'}
                               </td>
 
                               {/* Amount */}

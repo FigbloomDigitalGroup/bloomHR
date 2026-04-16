@@ -181,7 +181,8 @@ const ViewEmployeePage = () => {
 
   // Check if user can approve terminations
   const canApproveTerminations = () => {
-    return userRole?.toUpperCase() === 'ADMIN';
+    const role = userRole?.toUpperCase();
+    return role === 'ADMIN' || role === 'HR';
   };
 
   // Check if user can terminate employees

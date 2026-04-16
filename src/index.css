@@ -171,3 +171,76 @@ h6 {
     display: none !important;
   }
 }
+
+/* Custom React Datepicker Styles for ZIRA Premium Feel */
+.react-datepicker-wrapper {
+  width: 100%;
+}
+
+.react-datepicker {
+  font-family: "Avenir Next", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 16px !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08) !important;
+  background: white !important;
+  padding: 8px;
+}
+
+.react-datepicker__header {
+  background: white !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+  padding: 16px 0 12px 0 !important;
+  border-top-left-radius: 16px !important;
+  border-top-right-radius: 16px !important;
+}
+
+.react-datepicker__current-month {
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  color: #111827 !important;
+}
+
+.react-datepicker__month {
+  margin: 12px !important;
+}
+
+.react-datepicker__month-text {
+  display: inline-block !important;
+  width: 52px !important;
+  margin: 4px !important;
+  padding: 8px 0 !important;
+  border-radius: 10px !important;
+  font-weight: 500 !important;
+  color: #374151 !important;
+  transition: all 0.2s ease !important;
+}
+
+.react-datepicker__month-text:hover {
+  background-color: #f3f4f6 !important;
+  color: #111827 !important;
+}
+
+.react-datepicker__month-text--keyboard-selected,
+.react-datepicker__month-text--selected {
+  background-color: #16a34a !important;
+  color: white !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3) !important;
+}
+
+.react-datepicker__navigation {
+  top: 18px !important;
+}
+
+.react-datepicker__navigation-icon::before {
+  border-color: #6b7280 !important;
+  border-width: 2px 2px 0 0 !important;
+}
+
+.react-datepicker__navigation:hover .react-datepicker__navigation-icon::before {
+  border-color: #111827 !important;
+}
+
+.react-datepicker__triangle {
+  display: none !important;
+}
