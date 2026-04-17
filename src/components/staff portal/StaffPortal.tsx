@@ -1462,7 +1462,7 @@ const SalaryAdvanceForm = () => {
         try {
           const { data, error } = await supabase
             .from('employees')
-            .select('"Employee Number", "First Name", "Last Name", "Office", "Basic Salary", "Termination Date", "Status"')
+            .select('"Employee Number", "First Name", "Last Name", "Office", "Basic Salary", "Termination Date"')
             .eq('"Work Email"', user.email)
             .single();
 
@@ -1470,7 +1470,7 @@ const SalaryAdvanceForm = () => {
 
           if (data) {
             // Check if terminated
-            if (data['Termination Date'] || data['Status'] === 'Inactive') {
+            if (data['Termination Date']) {
                toast.error('Your employment account has been deactivated. You are not eligible to apply for a salary advance.', { duration: 6000 });
                // Let them see the screen but prevent them from passing validation
                setFormData(prev => ({ ...prev, "Employee Number": '' }));
