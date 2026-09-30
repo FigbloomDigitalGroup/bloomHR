@@ -20,7 +20,8 @@ import {
   MapPin,
   Lock
 } from 'lucide-react';
-import { supabase, supabaseAdmin } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
+import { adminApi } from '../../lib/adminApi';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -798,63 +799,15 @@ export default function UserRolesSettings() {
 
 
 
-  // Early return if no admin client
-  if (!supabaseAdmin) {
-    return (
-      <div className="p-6 bg-gray-50 min-h-screen flex items-center justify-center">
-        <div className="bg-white rounded-xl border border-gray-200 p-8 max-w-md text-center">
-          <Shield className="w-10 h-10 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Admin Access Required</h2>
-          <p className="text-gray-600 mb-4 text-xs">
-            This feature requires admin privileges. Please check your environment configuration.
-          </p>
-          <p className="text-xs text-gray-500">
-            Ensure VITE_SUPABASE_SERVICE_ROLE_KEY is properly set.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   // Fetch users from Supabase - FIXED to get all users
   useEffect(() => {
     const fetchUsers = async () => {
       setLoading(true);
       toast.error(null);
       try {
-        let allUsers: any[] = [];
-        let page = 1;
-        let hasMore = true;
+        const users = await adminApi.listUsers();
 
-        // Fetch all users with pagination
-        while (hasMore) {
-          const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers({
-            page: page,
-            perPage: 100 // Maximum per page
-          });
-
-          if (error) throw error;
-
-          if (users.length === 0) {
-            hasMore = false;
-          } else {
-            allUsers = [...allUsers, ...users];
-            page++;
-          }
-        }
-
-        const formattedUsers = allUsers.map((user: any) => ({
-          id: user.id,
-          email: user.email,
-          role: user.user_metadata?.role || 'STAFF',
-          account_status: user.user_metadata?.account_status || (!user.banned_at && user.email_confirmed_at !== null ? 'ACTIVE' : 'DEACTIVATED'),
-          last_sign_in_at: user.last_sign_in_at,
-          created_at: user.created_at,
-          location: user.user_metadata?.location || null,
-          user_metadata: user.user_metadata
-        }));
-
-        setUsers(formattedUsers);
+        setUsers(users);
       } catch (err: any) {
         console.error('Error fetching users:', err);
         toast.error(err.message || 'Failed to load users');
@@ -888,9 +841,7 @@ export default function UserRolesSettings() {
 
     try {
       setLoading(true);
-      const { error } = await supabaseAdmin.auth.admin.deleteUser(user.id);
-
-      if (error) throw error;
+      await adminApi.deleteUser(user.id);
 
       setUsers(users.filter(u => u.id !== user.id));
       toast.success(`User ${user.email} deleted successfully`);
@@ -908,24 +859,12 @@ export default function UserRolesSettings() {
 
       if (typeof passwordOrEmail === 'string' && passwordOrEmail.includes('@')) {
         // Send password reset email
-        const { error } = await supabaseAdmin.auth.admin.generateLink({
-          type: 'recovery',
-          email: passwordOrEmail,
-        });
-
-        if (error) throw error;
+        await adminApi.sendResetEmail(user.id, `${window.location.origin}/update-password`);
 
         toast.success(`Password reset email sent to ${user.email}`);
       } else {
         // Set manual password
-        const { error } = await supabaseAdmin.auth.admin.updateUserById(
-          user.id,
-          {
-            password: passwordOrEmail
-          }
-        );
-
-        if (error) throw error;
+        await adminApi.updateUser(user.id, { password: passwordOrEmail });
 
         toast.success(`Password updated successfully for ${user.email}`);
       }
@@ -945,23 +884,12 @@ export default function UserRolesSettings() {
 
       if (editingUser) {
         // Update existing user
-        const { data, error } = await supabaseAdmin.auth.admin.updateUserById(
-          editingUser.id,
-          {
-            email: finalUserData.email,
-            user_metadata: {
-              ...editingUser.user_metadata,
-              role: finalUserData.role,
-              account_status: finalUserData.account_status,
-              ...(ROLES[finalUserData.role as keyof typeof ROLES]?.requiresLocation ? {
-                location: finalUserData.location || null
-              } : { location: null })
-            },
-            ban_duration: finalUserData.account_status === 'ACTIVE' ? 'none' : (finalUserData.account_status === 'SUSPENDED' ? '876000h' : 'permanent')
-          }
-        );
-
-        if (error) throw error;
+        await adminApi.updateUser(editingUser.id, {
+          email: finalUserData.email,
+          role: finalUserData.role,
+          account_status: finalUserData.account_status,
+          location: ROLES[finalUserData.role as keyof typeof ROLES]?.requiresLocation ? finalUserData.location || null : null
+        });
 
         setUsers(users.map(u => u.id === editingUser.id ? {
           ...u,
@@ -991,23 +919,16 @@ export default function UserRolesSettings() {
         }
 
         // Create new user with password
-        const { data, error } = await supabaseAdmin.auth.admin.createUser({
+        const created = await adminApi.createUser({
           email: finalUserData.email,
           password: finalUserData.password,
-          email_confirm: true, // Mark email as confirmed
-          user_metadata: {
-            role: finalUserData.role,
-            account_status: finalUserData.account_status,
-            ...(ROLES[finalUserData.role as keyof typeof ROLES]?.requiresLocation ? {
-              location: finalUserData.location || null
-            } : {})
-          }
+          role: finalUserData.role,
+          account_status: finalUserData.account_status,
+          location: ROLES[finalUserData.role as keyof typeof ROLES]?.requiresLocation ? finalUserData.location || null : null
         });
 
-        if (error) throw error;
-
         setUsers([...users, {
-          id: data.user.id,
+          id: created.id,
           email: finalUserData.email,
           role: finalUserData.role,
           account_status: finalUserData.account_status || 'ACTIVE',

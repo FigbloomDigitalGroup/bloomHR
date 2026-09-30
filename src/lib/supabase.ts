@@ -3,7 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 // Validate environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
   throw new Error(
@@ -19,15 +18,8 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   }
 });
 
-// Only create admin client if service role key exists
-export const supabaseAdmin = supabaseServiceRoleKey
-  ? createClient(supabaseUrl, supabaseServiceRoleKey, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true
-    }
-  })
-  : null;
+// Privileged operations (creating/updating/deleting auth users) go through the backend
+// admin API - see src/lib/adminApi.ts. The service-role key must never be a VITE_ variable.
 
 // ... rest of your tax calculation code remains the same ...
 // Kenyan tax calculations

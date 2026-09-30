@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase, supabaseAdmin } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
+import { adminApi } from '../lib/adminApi';
 import toast from 'react-hot-toast';
 import { sendEmail } from '../services/email';
 import * as XLSX from 'xlsx';
@@ -209,7 +210,7 @@ export function useStaffSignupLogic() {
     const trackEmailSend = async (email: any, subject: any, requestId: any = null, resendId: any = null) => {
         try {
             const requestIdBigInt = requestId ? parseInt(requestId, 10) : null;
-            const client = supabaseAdmin || supabase;
+            const client = supabase;
 
             const { data, error } = await client
                 .from('email_logs')
@@ -278,43 +279,12 @@ export function useStaffSignupLogic() {
         }
     };
 
-    // Get all auth users with pagination
+    // Get all auth users (fetched through the backend admin API)
     const getAllAuthUsers = async () => {
-        if (!supabaseAdmin) {
-            console.error('Supabase Admin client not initialized. Check VITE_SUPABASE_SERVICE_ROLE_KEY.');
-            return [];
-        }
-        let allUsers = [];
-        let page = 1;
-        const perPage = 1000;
-        let hasMore = true;
-
         try {
-            while (hasMore) {
-                const { data: users, error } = await supabaseAdmin.auth.admin.listUsers({
-                    page: page,
-                    perPage: perPage
-                });
-
-                if (error) {
-                    console.error('Error fetching auth users page', page, error);
-                    break;
-                }
-
-                if (users && users.users.length > 0) {
-                    allUsers = [...allUsers, ...users.users];
-                    page++;
-
-                    if (users.users.length < perPage) {
-                        hasMore = false;
-                    }
-                } else {
-                    hasMore = false;
-                }
-            }
-
-            console.log(`Fetched ${allUsers.length} total auth users`);
-            return allUsers;
+            const users = await adminApi.listAuthUsers();
+            console.log(`Fetched ${users.length} total auth users`);
+            return users;
         } catch (error) {
             console.error('Error in getAllAuthUsers:', error);
             return [];
@@ -531,10 +501,6 @@ export function useStaffSignupLogic() {
     };
 
     const handleProcessRequest = async (requestId, email, branch) => {
-        if (!supabaseAdmin) {
-            toast.error('Admin actions not available (Missing Service Role Key)');
-            return;
-        }
         setProcessingId(requestId);
         const tempPassword = generateRandomPassword();
 
@@ -542,20 +508,11 @@ export function useStaffSignupLogic() {
             const existingUserCheck = await checkExistingUser(email);
 
             if (existingUserCheck.exists) {
-                const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-                    existingUserCheck.user.id,
-                    {
-                        password: tempPassword,
-                        user_metadata: {
-                            ...existingUserCheck.user.user_metadata,
-                            role: 'STAFF',
-                            branch: branch || 'Main Branch',
-                            updated_at: new Date().toISOString()
-                        }
-                    }
-                );
-
-                if (updateError) throw updateError;
+                await adminApi.updateUser(existingUserCheck.user.id, {
+                    password: tempPassword,
+                    role: 'STAFF',
+                    branch: branch || 'Main Branch'
+                });
 
                 const { error: deleteError } = await supabase
                     .from('staff_signup_requests')
@@ -568,22 +525,19 @@ export function useStaffSignupLogic() {
                 toast.success(`Credentials updated and resent to ${email}`);
 
             } else {
-                const { data: userData, error: userError } = await supabaseAdmin.auth.admin.createUser({
-                    email,
-                    password: tempPassword,
-                    email_confirm: true,
-                    user_metadata: {
+                try {
+                    await adminApi.createUser({
+                        email,
+                        password: tempPassword,
                         role: 'STAFF',
                         branch: branch || 'Main Branch'
-                    }
-                });
-
-                if (userError) {
-                    if (userError.message.includes('already registered') || userError.status === 422) {
+                    });
+                } catch (createError: any) {
+                    if (/already/i.test(createError.message)) {
                         toast.error(`User ${email} was just created by another process. Please try again.`);
                         return;
                     }
-                    throw userError;
+                    throw createError;
                 }
 
                 const { error: deleteError } = await supabase
@@ -612,10 +566,6 @@ export function useStaffSignupLogic() {
 
 
     const handleBulkProcess = async () => {
-        if (!supabaseAdmin) {
-            toast.error('Admin actions not available (Missing Service Role Key)');
-            return;
-        }
         if (selectedRequests.size === 0) {
             toast.error('Please select at least one request to process');
             return;
@@ -645,37 +595,25 @@ export function useStaffSignupLogic() {
                     const existingUser = authUserMap.get(normalizedEmail);
 
                     if (existingUser) {
-                        const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-                            existingUser.id,
-                            {
-                                password: tempPassword,
-                                user_metadata: {
-                                    ...existingUser.user_metadata,
-                                    role: 'STAFF',
-                                    branch: request.branch || 'Main Branch',
-                                    updated_at: new Date().toISOString()
-                                }
-                            }
-                        );
-
-                        if (updateError) throw updateError;
+                        await adminApi.updateUser(existingUser.id, {
+                            password: tempPassword,
+                            role: 'STAFF',
+                            branch: request.branch || 'Main Branch'
+                        });
                         updatedExistingCount++;
                     } else {
-                        const { error: userError } = await supabaseAdmin.auth.admin.createUser({
-                            email: request.email,
-                            password: tempPassword,
-                            email_confirm: true,
-                            user_metadata: {
+                        try {
+                            await adminApi.createUser({
+                                email: request.email,
+                                password: tempPassword,
                                 role: 'STAFF',
                                 branch: request.branch || 'Main Branch'
-                            }
-                        });
-
-                        if (userError) {
-                            if (userError.message.includes('already registered') || userError.status === 422) {
+                            });
+                        } catch (createError: any) {
+                            if (/already/i.test(createError.message)) {
                                 continue;
                             }
-                            throw userError;
+                            throw createError;
                         }
                         createdNewCount++;
                     }
