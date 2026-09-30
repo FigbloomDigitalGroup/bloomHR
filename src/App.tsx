@@ -69,6 +69,9 @@ interface Branch {
   created_at?: string;
 }
 
+// SMS MFA for ADMIN/CHECKER logins. Off unless VITE_MFA_ENABLED=true.
+const MFA_ENABLED = import.meta.env.VITE_MFA_ENABLED === 'true';
+
 const Loader = () => {
   const loaderStyle: CSSProperties = {
     position: 'fixed',
@@ -683,7 +686,7 @@ function App() {
 
           // Normal navigation logic
           if ((currentPath === '/' || currentPath === '/login') && !isEmailConfirmation && !navigationHandled.current) {
-            const requiresMFA = userData.role === 'ADMIN' || userData.role === 'CHECKER';
+            const requiresMFA = MFA_ENABLED && (userData.role === 'ADMIN' || userData.role === 'CHECKER');
             const mfaCompleted = sessionStorage.getItem('mfaCompleted') === 'true';
             const mfaInProgress = sessionStorage.getItem('isMFAProcess') === 'true';
 
@@ -821,7 +824,7 @@ function App() {
           const publicPaths = ['/login', '/update-password', '/mfa'];
 
           // Check if MFA is required for this user
-          const requiresMFA = userData.role === 'ADMIN' || userData.role === 'CHECKER';
+          const requiresMFA = MFA_ENABLED && (userData.role === 'ADMIN' || userData.role === 'CHECKER');
           const mfaCompleted = sessionStorage.getItem('mfaCompleted') === 'true';
 
           // If MFA is in progress, prevent welcome toast and ensure we are on MFA page
