@@ -75,13 +75,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const ADMIN_EMAILS = [
-    'hr@zira.com',
-    'zira@zira.io',
-    'admin@malicash.co'
-  ];
-
-  const isAdminEmail = (email: string) => ADMIN_EMAILS.includes(email.toLowerCase());
   const { checkForUpdates } = useAppUpdate();
 
   useEffect(() => {
@@ -159,8 +152,8 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
   useEffect(() => {
     const detectTown = async () => {
-      // Don't detect for empty or admin emails
-      if (!email || isAdminEmail(email)) {
+      // Nothing to detect until an email is entered
+      if (!email) {
         setIsBranchAutoPopulated(false);
         setIsRegionalManager(false);
         return;
@@ -246,8 +239,8 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           return;
         }
 
-        // Verify employment status for non-admin/management roles
-        if (!isAdminEmail(email)) {
+        // Verify employment status for everyone except ADMIN (admins may have no employee record)
+        if (userData.role !== 'ADMIN') {
           const { data: empData } = await supabase
             .from('employees')
             .select('Status, "Termination Date"')
@@ -280,7 +273,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
         .from('staff_signup_requests')
         .insert([{
           email,
-          branch: isAdminEmail(email) ? 'HEAD_OFFICE' : selectedBranch,
+          branch: selectedBranch,
           status: 'pending'
         }]);
       if (error) throw error;
@@ -456,7 +449,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                   </div>
                 )}
 
-                {!isAdminEmail(email) && !isRegionalManager && (
+                {!isRegionalManager && (
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-gray-500 ml-1 flex items-center gap-2">
                       Town office
