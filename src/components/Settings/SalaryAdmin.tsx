@@ -1,7 +1,7 @@
 // SalaryAdmin - UI Refresh: white containers, compact inputs & buttons
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase, supabaseAdmin } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase';
 import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
 import toast from 'react-hot-toast';
 import {
@@ -3645,7 +3645,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         updateData.admin_rejection_date = new Date().toISOString();
       }
 
-      const client = supabaseAdmin || supabase;
+      const client = supabase;
       const { error } = await client
         .from('salary_advance')
         .update(updateData)
@@ -4621,7 +4621,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       setApplications(prev => prev.map(a => duplicateIds.includes(a.id) ? { ...a, status: 'approved' } : a));
 
       // We should also sync this reversion to DB just in case
-      const client = supabaseAdmin || supabase;
+      const client = supabase;
       try {
         await client
           .from('salary_advance')
@@ -4676,7 +4676,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         console.error(`❌ Failed to pay ${advance.full_name}:`, error);
 
         // Critical: Update status to 'failed' so it doesn't stay stuck in 'processing'
-        const client = supabaseAdmin || supabase;
+        const client = supabase;
         try {
           await client.from('salary_advance').update({
             status: 'failed',
@@ -4898,7 +4898,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         await createPaymentRequest(advancesData, justification);
 
         // Update all selected applications to 'processing' status to prevent double actions
-        const client = supabaseAdmin || supabase;
+        const client = supabase;
         const updatePromises = selectedApps.map(async (app: any) => {
           // Update DB
           await client
@@ -4935,7 +4935,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       setApplications(prev => prev.map(a => selectedIds.includes(a.id) ? { ...a, status: 'processing' } : a));
 
       try {
-        const client = supabaseAdmin || supabase;
+        const client = supabase;
         // Sync 'processing' status to DB immediately
         await client
           .from('salary_advance')
@@ -5005,7 +5005,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
     setApplications(prev => prev.map(a => (a.id === targetId) ? { ...a, status: 'processing' } : a));
 
     try {
-      const client = supabaseAdmin || supabase;
+      const client = supabase;
       // Sync 'processing' status to DB immediately
       await client
         .from('salary_advance')
