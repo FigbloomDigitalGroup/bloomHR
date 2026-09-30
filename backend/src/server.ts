@@ -197,9 +197,13 @@ app.post("/api/sms/send", async (req, res) => {
       return res.status(400).json({ error: "phone and message are required" });
     }
 
-    const apiKey = process.env.CELCOM_API_KEY || "***REMOVED***";
-    const partnerID = process.env.CELCOM_PARTNER_ID || "928";
-    const shortcode = process.env.CELCOM_SHORTCODE || "MularCredit";
+    const apiKey = process.env.CELCOM_API_KEY;
+    const partnerID = process.env.CELCOM_PARTNER_ID;
+    const shortcode = process.env.CELCOM_SHORTCODE;
+
+    if (!apiKey || !partnerID || !shortcode) {
+      return res.status(500).json({ error: "SMS gateway is not configured (CELCOM_API_KEY, CELCOM_PARTNER_ID, CELCOM_SHORTCODE)" });
+    }
 
     const encodedMessage = encodeURIComponent(message);
     const url = `https://isms.celcomafrica.com/api/services/sendsms/?apikey=${apiKey}&partnerID=${partnerID}&message=${encodedMessage}&shortcode=${shortcode}&mobile=${phone}`;

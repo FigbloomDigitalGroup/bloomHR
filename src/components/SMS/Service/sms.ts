@@ -1,8 +1,8 @@
 // SMS Service Configuration for SMS Leopard
 const SMS_LEOPARD_CONFIG = {
   baseUrl: 'https://api.smsleopard.com/v1',
-  username: 'yxFXqkhbsdbm2cCeXOju',
-  password: '***REMOVED***',
+  username: import.meta.env.VITE_SMS_LEOPARD_USERNAME || '',
+  password: import.meta.env.VITE_SMS_LEOPARD_PASSWORD || '',
   source: 'sms_Leopard'
 };
 
