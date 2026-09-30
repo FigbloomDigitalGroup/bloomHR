@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
+import StatusPill from '../UI/StatusPill';
 import { User, Briefcase, CreditCard, Phone, Mail, MapPin } from 'lucide-react';
 
 type Employee = Database['public']['Tables']['employees']['Row'] & {
@@ -665,7 +666,7 @@ const EmployeeBioPage = () => {
       >
         <div className="text-center">
           <div className="animate-pulse flex flex-col items-center">
-            <div className="w-16 h-16 bg-gradient-to-r from-green-50 to-green-200 rounded-full mb-6"></div>
+            <div className="w-16 h-16 bg-gradient-to-r from-green-tint to-brand/10 rounded-full mb-6"></div>
             <div className="h-5 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full w-64 mb-4"></div>
             <div className="h-4 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full w-48"></div>
           </div>
@@ -681,9 +682,9 @@ const EmployeeBioPage = () => {
         animate={{ opacity: 1 }}
         className="p-6 max-w-6xl mx-auto flex justify-center items-center min-h-[60vh] text-xs"
       >
-        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center border border-red-100">
-          <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-            <X className="w-8 h-8 text-red-600" />
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center border border-orange-tint">
+          <div className="bg-orange-tint w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+            <X className="w-8 h-8 text-status-danger" />
           </div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">Error Loading Employee</h2>
           <p className="text-gray-600 mb-6">{error}</p>
@@ -706,9 +707,9 @@ const EmployeeBioPage = () => {
         animate={{ opacity: 1 }}
         className="p-6 max-w-6xl mx-auto flex justify-center items-center min-h-[60vh] text-xs"
       >
-        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center border border-yellow-100">
-          <div className="bg-yellow-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-            <X className="w-8 h-8 text-yellow-600" />
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center border border-orange-tint-alt">
+          <div className="bg-orange-tint-alt w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+            <X className="w-8 h-8 text-orange-text-alt" />
           </div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">Employee Not Found</h2>
           <p className="text-gray-600 mb-6">The requested employee could not be found.</p>
@@ -757,7 +758,7 @@ const EmployeeBioPage = () => {
                 onClick={handleSave}
                 icon={Save}
                 loading={saving}
-                className="bg-green-200 hover:green-100 text-black"
+                className="bg-primary hover:bg-primary/90 text-white"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
               </GlowButton>
@@ -766,7 +767,7 @@ const EmployeeBioPage = () => {
             <GlowButton
               onClick={handleEditToggle}
               icon={PencilLine}
-              className="bg-green-600 hover:blue-100 text-white"
+              className="bg-primary hover:bg-primary/90 text-white"
             >
               update details
             </GlowButton>
@@ -776,13 +777,13 @@ const EmployeeBioPage = () => {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-300 overflow-hidden">
         {/* Header */}
-        <div className="bg-gray-500 p-6 md:p-8 border-b border-gray-300">
+        <div className="bg-brand p-6 md:p-8 border-b border-gray-300">
           <div className="flex flex-col md:flex-row md:items-start justify-between">
             <div className="flex items-start space-x-4">
               <div className="relative">
                 {isEditMode ? (
                   <div
-                    className="bg-gradient-to-br from-green-100 to-emerald-200 w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-emerald-800 cursor-pointer"
+                    className="bg-gradient-to-br from-green-tint to-brand/20 w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-brand cursor-pointer"
                     onClick={triggerFileInput}
                   >
                     {previewImage ? (
@@ -833,11 +834,11 @@ const EmployeeBioPage = () => {
                 </p>
               </div>
             </div>
-            <div className={`px-3 py-1 rounded-full text-xs font-medium mt-4 md:mt-0 ${employee['Termination Date']
-              ? 'bg-red-100 text-red-800 border border-red-200'
-              : 'bg-green-100 text-green-800 border border-green-200'
-              }`}>
-              {employee['Termination Date'] ? 'Inactive' : 'Active'}
+            <div className="mt-4 md:mt-0">
+              <StatusPill
+                label={employee['Termination Date'] ? 'Inactive' : 'Active'}
+                tone={employee['Termination Date'] ? 'danger' : 'success'}
+              />
             </div>
           </div>
         </div>
@@ -847,42 +848,42 @@ const EmployeeBioPage = () => {
           <nav className="flex overflow-x-auto">
             <button
               onClick={() => setActiveTab('personal')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'personal' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'personal' ? 'text-brand border-b-2 border-brand' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <User className="w-4 h-4 mr-2" />
               Personal
             </button>
             <button
               onClick={() => setActiveTab('employment')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'employment' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'employment' ? 'text-brand border-b-2 border-brand' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <Briefcase className="w-4 h-4 mr-2" />
               Employment
             </button>
             <button
               onClick={() => setActiveTab('contact')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'contact' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'contact' ? 'text-brand border-b-2 border-brand' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <Phone className="w-4 h-4 mr-2" />
               Contact
             </button>
             <button
               onClick={() => setActiveTab('financial')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'financial' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'financial' ? 'text-brand border-b-2 border-brand' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <CreditCard className="w-4 h-4 mr-2" />
               Financial
             </button>
             <button
               onClick={() => setActiveTab('emergency')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'emergency' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'emergency' ? 'text-brand border-b-2 border-brand' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <AlertCircle className="w-4 h-4 mr-2" />
               Emergency
             </button>
             <button
               onClick={() => setActiveTab('dependents')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'dependents' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'dependents' ? 'text-brand border-b-2 border-brand' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <Users className="w-4 h-4 mr-2" />
               Dependents
@@ -907,7 +908,7 @@ const EmployeeBioPage = () => {
                     <div className="w-full md:w-auto">
                       <div className="relative group">
                         <div
-                          className="relative w-40 h-40 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden border-2 border-gray-200 shadow-sm cursor-pointer transition-all duration-300 hover:border-emerald-300 hover:shadow-md"
+                          className="relative w-40 h-40 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden border-2 border-gray-200 shadow-sm cursor-pointer transition-all duration-300 hover:border-brand hover:shadow-md"
                           onClick={triggerFileInput}
                         >
                           {previewImage ? (
@@ -919,7 +920,7 @@ const EmployeeBioPage = () => {
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-400">
                               <div className="relative">
-                                <div className="bg-gradient-to-br from-green-100 to-emerald-200 w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-emerald-800">
+                                <div className="bg-gradient-to-br from-green-tint to-brand/20 w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-brand">
                                   {employee['First Name']?.[0]}{employee['Last Name']?.[0]}
                                 </div>
                               </div>
@@ -966,7 +967,7 @@ const EmployeeBioPage = () => {
                       </div>
                       <p className="mt-2 text-xs text-gray-500">JPG, PNG or GIF (Max 5MB)</p>
                       {errors.profileImage && (
-                        <p className="mt-1 text-xs text-red-500">{errors.profileImage}</p>
+                        <p className="mt-1 text-xs text-status-danger">{errors.profileImage}</p>
                       )}
                     </div>
                   </div>
@@ -1527,15 +1528,15 @@ const EmployeeBioPage = () => {
                         {isEditMode ? (
                           <button
                             type="button"
-                            className={`w-6 h-6 rounded flex items-center justify-center border ${deduction.isActive ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300'}`}
+                            className={`w-6 h-6 rounded flex items-center justify-center border ${deduction.isActive ? 'bg-primary border-primary' : 'border-gray-300'}`}
                             onClick={() => handleStatutoryDeductionChange(index, 'isActive', !deduction.isActive)}
                             disabled={!isEditMode}
                           >
                             {deduction.isActive && <Check className="w-4 h-4 text-white" />}
                           </button>
                         ) : (
-                          <div className={`w-6 h-6 rounded flex items-center justify-center border ${deduction.isActive ? 'bg-emerald-100 border-emerald-300' : 'border-gray-200 bg-gray-50'}`}>
-                            {deduction.isActive && <Check className="w-4 h-4 text-emerald-600" />}
+                          <div className={`w-6 h-6 rounded flex items-center justify-center border ${deduction.isActive ? 'bg-green-tint border-brand' : 'border-gray-200 bg-gray-50'}`}>
+                            {deduction.isActive && <Check className="w-4 h-4 text-brand" />}
                           </div>
                         )}
                         <span className="ml-2 font-medium min-w-[100px]">{deduction.name}</span>
@@ -1547,7 +1548,7 @@ const EmployeeBioPage = () => {
                               type="text"
                               value={deduction.number}
                               onChange={(e) => handleStatutoryDeductionChange(index, 'number', e.target.value)}
-                              className={`w-full h-11 bg-gray-50 border-gray-300 border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+                              className={`w-full h-11 bg-gray-50 border-gray-300 border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 shadow-sm`}
                               placeholder={`Enter ${deduction.name}`}
                               disabled={!isEditMode}
                               onBlur={() => validateField(`deduction${deduction.name}`, deduction.number)}
@@ -1558,7 +1559,7 @@ const EmployeeBioPage = () => {
                             </div>
                           )}
                           {errors[`deduction${deduction.name}`] && (
-                            <p className="mt-1 text-xs text-red-500">{errors[`deduction${deduction.name}`]}</p>
+                            <p className="mt-1 text-xs text-status-danger">{errors[`deduction${deduction.name}`]}</p>
                           )}
                         </div>
                       )}
@@ -1586,7 +1587,7 @@ const EmployeeBioPage = () => {
                       type="text"
                       value={emergencyContact.name}
                       onChange={(e) => handleEmergencyContactChange('name', e.target.value)}
-                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 shadow-sm`}
                       placeholder="Full Name"
                       disabled={!isEditMode}
                     />
@@ -1597,7 +1598,7 @@ const EmployeeBioPage = () => {
                       type="text"
                       value={emergencyContact.relationship}
                       onChange={(e) => handleEmergencyContactChange('relationship', e.target.value)}
-                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 shadow-sm`}
                       placeholder="Relationship"
                       disabled={!isEditMode}
                     />
@@ -1608,13 +1609,13 @@ const EmployeeBioPage = () => {
                       type="tel"
                       value={emergencyContact.phone}
                       onChange={(e) => handleEmergencyContactChange('phone', e.target.value)}
-                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 shadow-sm`}
                       placeholder="Phone Number"
                       disabled={!isEditMode}
                       onBlur={() => validateField('emergencyContactPhone', emergencyContact.phone)}
                     />
                     {errors['emergencyContactPhone'] && (
-                      <p className="mt-1 text-xs text-red-500">{errors['emergencyContactPhone']}</p>
+                      <p className="mt-1 text-xs text-status-danger">{errors['emergencyContactPhone']}</p>
                     )}
                   </div>
                   <div>
@@ -1623,7 +1624,7 @@ const EmployeeBioPage = () => {
                       type="email"
                       value={emergencyContact.email || ''}
                       onChange={(e) => handleEmergencyContactChange('email', e.target.value)}
-                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 shadow-sm`}
                       placeholder="Email"
                       disabled={!isEditMode}
                       onBlur={() => {
@@ -1633,7 +1634,7 @@ const EmployeeBioPage = () => {
                       }}
                     />
                     {errors['emergencyContactEmail'] && (
-                      <p className="mt-1 text-xs text-red-500">{errors['emergencyContactEmail']}</p>
+                      <p className="mt-1 text-xs text-status-danger">{errors['emergencyContactEmail']}</p>
                     )}
                   </div>
                 </div>
@@ -1658,7 +1659,7 @@ const EmployeeBioPage = () => {
                       {isEditMode && dependents.length > 1 && (
                         <button
                           onClick={() => removeDependent(index)}
-                          className="text-red-500 hover:text-red-700 transition-colors"
+                          className="text-status-danger hover:text-orange-text transition-colors"
                         >
                           <X className="w-5 h-5" />
                         </button>
@@ -1671,7 +1672,7 @@ const EmployeeBioPage = () => {
                           type="text"
                           value={dependent.name}
                           onChange={(e) => handleDependentChange(index, 'name', e.target.value)}
-                          className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+                          className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 shadow-sm`}
                           placeholder="Full Name"
                           disabled={!isEditMode}
                         />
@@ -1682,7 +1683,7 @@ const EmployeeBioPage = () => {
                           type="text"
                           value={dependent.relationship}
                           onChange={(e) => handleDependentChange(index, 'relationship', e.target.value)}
-                          className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+                          className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 shadow-sm`}
                           placeholder="Relationship"
                           disabled={!isEditMode}
                         />
@@ -1693,7 +1694,7 @@ const EmployeeBioPage = () => {
                           type="date"
                           value={dependent.dateOfBirth || ''}
                           onChange={(e) => handleDependentChange(index, 'dateOfBirth', e.target.value)}
-                          className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+                          className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 shadow-sm`}
                           disabled={!isEditMode}
                         />
                       </div>
@@ -1705,7 +1706,7 @@ const EmployeeBioPage = () => {
               {isEditMode && (
                 <button
                   onClick={addDependent}
-                  className="mt-4 flex items-center text-emerald-600 hover:text-emerald-800 transition-colors"
+                  className="mt-4 flex items-center text-brand hover:text-brand-dark transition-colors"
                 >
                   <Plus className="w-4 h-4 mr-1" />
                   Add Another Dependent
@@ -1718,7 +1719,7 @@ const EmployeeBioPage = () => {
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600"
+              className="mt-6 p-4 bg-orange-tint border border-orange-tint-alt rounded-lg text-status-danger"
             >
               <h3 className="font-medium mb-2">Please fix the following errors:</h3>
               <ul className="list-disc pl-5 space-y-1">
@@ -1745,7 +1746,7 @@ const EmployeeBioPage = () => {
                 onClick={handleSave}
                 icon={Save}
                 loading={saving}
-                className="bg-green-600 hover:bg-green-400 text-white"
+                className="bg-primary hover:bg-primary/90 text-white"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
               </GlowButton>
@@ -1804,7 +1805,7 @@ const FormField = ({
     <div className="space-y-1">
       <label htmlFor={fieldId} className="block font-medium text-gray-700">
         {label}
-        {required && <span className="text-red-500 ml-1">*</span>}
+        {required && <span className="text-status-danger ml-1">*</span>}
         {isReadOnly && (
           <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
             Read-only
@@ -1819,7 +1820,7 @@ const FormField = ({
           onChange={onChange}
           required={required}
           disabled={disabled || readOnly}
-          className={`w-full h-11 ${disabled || readOnly ? 'bg-gray-50 border-gray-200 cursor-not-allowed' : 'bg-white border-gray-300'} rounded-lg px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+          className={`w-full h-11 ${disabled || readOnly ? 'bg-gray-50 border-gray-200 cursor-not-allowed' : 'bg-white border-gray-300'} rounded-lg px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 shadow-sm`}
           style={readOnly ? { pointerEvents: 'none' } : {}}
         >
           <option value="">Select {label}</option>
@@ -1838,12 +1839,12 @@ const FormField = ({
           disabled={disabled || readOnly}
           readOnly={readOnly}
           placeholder={placeholder}
-          className={`w-full h-11 ${disabled || readOnly ? 'bg-gray-50 border-gray-200 cursor-not-allowed' : 'bg-white border-gray-300'} rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+          className={`w-full h-11 ${disabled || readOnly ? 'bg-gray-50 border-gray-200 cursor-not-allowed' : 'bg-white border-gray-300'} rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 shadow-sm`}
           style={readOnly ? { pointerEvents: 'none' } : {}}
         />
       )}
       {error && (
-        <p className="mt-1 text-xs text-red-500">{error}</p>
+        <p className="mt-1 text-xs text-status-danger">{error}</p>
       )}
     </div>
   );

@@ -110,7 +110,7 @@ const Pagination = ({
             onClick={() => onPageChange(page)}
             className={`text-xs w-10 h-10 rounded-lg border transition-colors ${
               currentPage === page 
-                ? 'bg-green-100 border-green-300 text-green-700' 
+                ? 'bg-primary/10 border-primary text-primary'
                 : 'border-gray-200 hover:bg-gray-50'
             }`}
           >
@@ -558,7 +558,7 @@ export const EmployeePerformanceTable = ({
             </button>
             <button
               onClick={handleExport}
-              className="text-xs px-3 py-2 bg-green-100 text-green-700 border border-green-300 rounded hover:bg-green-200 transition-colors flex items-center gap-1"
+              className="text-xs px-3 py-2 bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors flex items-center gap-1"
             >
               <Download className="w-4 h-4" />
               Export CSV
@@ -610,7 +610,7 @@ export const EmployeePerformanceTable = ({
       
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
-          <thead className="bg-green-500 border-b border-gray-200">
+          <thead className="bg-primary border-b border-gray-200">
             <tr>
               <th className="py-3 px-4 text-left font-semibold text-white">Employee Number</th>
               <th className="py-3 px-4 text-left font-semibold text-white">Full Name</th>
@@ -795,7 +795,7 @@ export const BranchPerformanceTable = ({
           <div className="flex gap-2">
             <button
               onClick={handleExport}
-              className="text-xs px-3 py-2 bg-green-100 text-green-700 border border-green-300 rounded hover:bg-green-200 transition-colors flex items-center gap-1"
+              className="text-xs px-3 py-2 bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors flex items-center gap-1"
             >
               <Download className="w-4 h-4" />
               Export CSV
@@ -847,7 +847,7 @@ export const BranchPerformanceTable = ({
       
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
-          <thead className="bg-green-500 border-b border-gray-200">
+          <thead className="bg-primary border-b border-gray-200">
             <tr>
               <th className="py-3 px-4 text-left font-semibold text-white">Branch</th>
               <th className="py-3 px-4 text-left font-semibold text-white">Month</th>

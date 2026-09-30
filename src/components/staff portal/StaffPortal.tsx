@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Phosphor Icons - Premium icon set
@@ -56,6 +56,8 @@ import {
   BriefcaseBusiness
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import StatusPill from '../UI/StatusPill';
+import { fetchStaffHRNotifications } from '../../hooks/useHRNotifications';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import TrainingModule from './Training';
@@ -213,7 +215,7 @@ function PortalCard({ icon, title, description, onClick, color = 'green', active
   active?: boolean
 }) {
   const themes = {
-    green: { avatarBg: 'bg-gradient-to-br from-green-600 to-emerald-700', headerBg: 'bg-gradient-to-r from-green-600/80 to-green-500/80', iconText: 'text-green-600', rowHover: 'group-hover:border-green-100 group-hover:bg-green-50/10', dot: 'bg-emerald-500' },
+    green: { avatarBg: 'bg-gradient-to-br from-brand to-brand-dark', headerBg: 'bg-gradient-to-r from-brand/80 to-brand-dark/80', iconText: 'text-brand', rowHover: 'group-hover:border-green-tint group-hover:bg-green-tint/10', dot: 'bg-status-success' },
     blue: { avatarBg: 'bg-gradient-to-br from-blue-600 to-blue-700', headerBg: 'bg-gradient-to-r from-blue-600/80 to-blue-500/80', iconText: 'text-blue-600', rowHover: 'group-hover:border-blue-100 group-hover:bg-blue-50/10', dot: 'bg-blue-500' },
     purple: { avatarBg: 'bg-gradient-to-br from-purple-600 to-purple-700', headerBg: 'bg-gradient-to-r from-purple-600/80 to-purple-500/80', iconText: 'text-purple-600', rowHover: 'group-hover:border-purple-100 group-hover:bg-purple-50/10', dot: 'bg-purple-500' },
     amber: { avatarBg: 'bg-gradient-to-br from-amber-500 to-amber-700', headerBg: 'bg-gradient-to-r from-amber-600/80 to-amber-500/80', iconText: 'text-amber-600', rowHover: 'group-hover:border-amber-100 group-hover:bg-amber-50/10', dot: 'bg-amber-500' },
@@ -228,11 +230,11 @@ function PortalCard({ icon, title, description, onClick, color = 'green', active
     <motion.div
       whileHover={{ y: -4 }}
       whileTap={{ scale: 0.98 }}
-      className="group flex flex-col bg-white rounded-2xl border border-gray-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:border-green-500/20 transition-all duration-300 overflow-hidden cursor-pointer"
+      className="group flex flex-col bg-white rounded-2xl border border-gray-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:border-brand/20 transition-all duration-300 overflow-hidden cursor-pointer"
       onClick={onClick}
     >
       {/* Header */}
-      <div className="relative h-14 px-4 flex items-center bg-gradient-to-r from-[#1B185D]/10 to-white">
+      <div className="relative h-14 px-4 flex items-center bg-gradient-to-r from-brand/10 to-white">
         <div className="flex items-center space-x-3 w-full">
           {/* Avatar-style icon circle */}
           <div className="relative">
@@ -243,7 +245,7 @@ function PortalCard({ icon, title, description, onClick, color = 'green', active
           </div>
           {/* Title & label */}
           <div className="space-y-0.5 min-w-0">
-            <h3 className="text-gray-900 font-normal text-[13px] leading-tight group-hover:text-green-700 transition-colors truncate">
+            <h3 className="text-gray-900 font-normal text-[13px] leading-tight group-hover:text-brand transition-colors truncate">
               {title}
             </h3>
             <span className="px-1.5 py-0.5 rounded-md bg-gray-50 text-gray-500 text-[9px] font-medium tracking-wide border border-gray-200">
@@ -272,8 +274,8 @@ function PortalCard({ icon, title, description, onClick, color = 'green', active
       {/* Footer */}
       <div className="h-11 px-4 flex items-center bg-white">
         <div className="flex items-center justify-between w-full">
-          <span className="text-[10px] font-bold text-gray-500 group-hover:text-green-600 transition-colors">Open</span>
-          <div className={`w-6 h-6 rounded-full bg-gray-100 group-hover:bg-green-100 flex items-center justify-center ${theme.iconText} transition-colors`}>
+          <span className="text-[10px] font-bold text-gray-500 group-hover:text-brand transition-colors">Open</span>
+          <div className={`w-6 h-6 rounded-full bg-gray-100 group-hover:bg-green-tint flex items-center justify-center ${theme.iconText} transition-colors`}>
             <ChevronRight className="w-3.5 h-3.5" />
           </div>
         </div>
@@ -300,7 +302,7 @@ function HeaderStatus({
       <div className="flex items-center text-xs">
         <PhClock className="h-4 w-4 text-gray-500 mr-1" weight="duotone" />
         {isLoggedIn ? (
-          <span className="text-green-600 font-medium">
+          <span className="text-brand font-medium">
             Logged in at {lastLogin ? new Date(lastLogin).toLocaleTimeString() : 'recently'}
           </span>
         ) : (
@@ -432,11 +434,11 @@ function NotificationSidebar({
                     layout="position"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className={`p-4 rounded-2xl border transition-all ${n.isRead ? 'bg-white border-gray-100' : 'bg-green-50/30 border-green-100/50'}`}
+                    className={`p-4 rounded-2xl border transition-all ${n.isRead ? 'bg-white border-gray-100' : 'bg-green-tint/50 border-green-tint'}`}
                   >
                     <div className="flex justify-between items-start mb-1">
-                      <h4 className={`text-[11px] font-bold ${n.isRead ? 'text-gray-700' : 'text-green-700'}`}>{n.title}</h4>
-                      <button onClick={() => onRemove(n.id)} className="text-gray-400 hover:text-red-500 p-1">
+                      <h4 className={`text-[11px] font-bold ${n.isRead ? 'text-gray-700' : 'text-brand'}`}>{n.title}</h4>
+                      <button onClick={() => onRemove(n.id)} className="text-gray-400 hover:text-status-danger p-1">
                         <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
@@ -446,7 +448,7 @@ function NotificationSidebar({
                       {!n.isRead && (
                         <button
                           onClick={() => onMarkRead(n)}
-                          className="text-[10px] font-bold text-green-600 hover:text-green-700"
+                          className="text-[10px] font-bold text-brand hover:text-brand-dark"
                         >
                           Mark as read
                         </button>
@@ -479,7 +481,7 @@ const LeaveApplicationForm = () => {
     "Employee Number": '',
     "Name": '',
     "Office Branch": '',
-    "Leave Type": 'month',
+    "Leave Type": '',
     "Start Date": '',
     "End Date": '',
     "Days": 0,
@@ -491,10 +493,39 @@ const LeaveApplicationForm = () => {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [existingLeave, setExistingLeave] = useState<any>(null);
-  const [userLeavesThisMonth, setUserLeavesThisMonth] = useState(0);
+  // Tracked but never displayed anywhere (pre-existing) - only the setter is
+  // used, so the read binding is intentionally skipped rather than kept
+  // unused.
+  const [, setUserLeavesThisMonth] = useState(0);
   const [userLeaveTypesThisMonth, setUserLeaveTypesThisMonth] = useState<string[]>([]);
+  // Real leave types from the leave_types catalog (see FIG-564) - replaces a
+  // hardcoded dropdown whose lowercase values ("sick", "maternity", "month")
+  // never matched the catalog's real names, silently breaking balance
+  // deduction for any leave submitted from this form (only admin-submitted
+  // applications, which already used real names, worked with the balance
+  // engine). "month"/"Monthly Leave" was a separate, mislabeled concept that
+  // belonged to Annual Leave (2 days/month accrual) all along - see FIG-571.
+  const [leaveTypeOptions, setLeaveTypeOptions] = useState<{ id: string; name: string }[]>([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchLeaveTypes = async () => {
+      const { data, error } = await supabase.from('leave_types').select('id, name').order('name');
+      if (error) {
+        console.error('Error fetching leave types:', error);
+        return;
+      }
+      if (data && data.length > 0) {
+        setLeaveTypeOptions(data);
+        setFormData(prev => ({
+          ...prev,
+          "Leave Type": prev["Leave Type"] || data.find(t => t.name === 'Annual Leave')?.name || data[0].name
+        }));
+      }
+    };
+
+    fetchLeaveTypes();
+  }, []);
 
   useEffect(() => {
     const fetchEmployeeData = async () => {
@@ -519,8 +550,7 @@ const LeaveApplicationForm = () => {
               "Office Branch": officeBranch
             }));
 
-            // Check leave rules with office branch
-            await checkLeaveRules(data["Employee Number"], officeBranch);
+            await checkLeaveRules(data["Employee Number"]);
           }
         } catch (error) {
           console.error('Error fetching employee data:', error);
@@ -531,45 +561,17 @@ const LeaveApplicationForm = () => {
     fetchEmployeeData();
   }, []);
 
-  const checkLeaveRules = async (employeeNumber: string, officeBranch: string) => {
+  // Personal rate limit only: an employee can't apply for the same leave
+  // type twice in the same calendar month. The previous per-branch
+  // "only one person on leave at a time" restriction was removed - the
+  // leave_balances/carry-forward system (FIG-563/565) is the real
+  // constraint on how much leave someone can take.
+  const checkLeaveRules = async (employeeNumber: string) => {
     try {
       const now = new Date();
       const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-      console.log('Checking leave rules for:', { employeeNumber, officeBranch });
-
-      // Only check for monthly leaves from same branch
-      const { data: activeMonthlyLeaves, error } = await supabase
-        .from('leave_application')
-        .select('*,"Name","Employee Number","Office Branch","Leave Type"')
-        .eq('"Office Branch"', officeBranch) // Compare with the same branch
-        .eq('"Leave Type"', 'month') // Only check monthly leaves
-        .in('Status', ['Pending', 'Approved'])
-        .gte('"Start Date"', firstDayOfMonth.toISOString().split('T')[0])
-        .lte('"Start Date"', lastDayOfMonth.toISOString().split('T')[0]);
-
-      if (error) {
-        console.error('Error fetching active leaves:', error);
-        return;
-      }
-
-      console.log('Active monthly leaves in same branch:', activeMonthlyLeaves);
-
-      // Filter out the current user's applications
-      const otherStaffLeaves = activeMonthlyLeaves?.filter(
-        leave => leave["Employee Number"] !== employeeNumber
-      ) || [];
-
-      console.log('Other staff leaves in same branch:', otherStaffLeaves);
-
-      if (otherStaffLeaves.length > 0) {
-        setExistingLeave(otherStaffLeaves[0]);
-      } else {
-        setExistingLeave(null);
-      }
-
-      // Check user's own leaves for the month
       const { data: userLeaves } = await supabase
         .from('leave_application')
         .select('*,"Leave Type"')
@@ -615,52 +617,13 @@ const LeaveApplicationForm = () => {
         "Days": days
       }));
     }
-
-    // If leave type changes, re-check rules
-    if (name === "Leave Type") {
-      // Re-fetch employee data to get current branch and check rules
-      const fetchAndCheckRules = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user?.email) {
-          try {
-            const { data } = await supabase
-              .from('employees')
-              .select('"Employee Number", "Town"')
-              .eq('"Work Email"', user.email)
-              .single();
-
-            if (data) {
-              await checkLeaveRules(data["Employee Number"], data["Town"] || '');
-            }
-          } catch (error) {
-            console.error('Error re-checking leave rules:', error);
-          }
-        }
-      };
-      fetchAndCheckRules();
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Check leave rules - only restrict for monthly leave type
-    if (formData["Leave Type"] === "month") {
-      if (existingLeave) {
-        toast.error(`Cannot submit monthly leave application. ${existingLeave.Name} from your office branch (${existingLeave["Office Branch"]}) already has an active monthly leave.`);
-        return;
-      }
-
-      // Allow multiple leaves per month but only one monthly leave per month
-      if (userLeaveTypesThisMonth.includes("month")) {
-        toast.error('You have already applied for monthly leave this month.');
-        return;
-      }
-    }
-
-    // For non-monthly leaves, check if user is trying to apply for the same type again
-    if (formData["Leave Type"] !== "month" && userLeaveTypesThisMonth.includes(formData["Leave Type"])) {
-      toast.error(`You have already applied for ${formData["Leave Type"]} leave this month.`);
+    if (userLeaveTypesThisMonth.includes(formData["Leave Type"])) {
+      toast.error(`You have already applied for ${formData["Leave Type"]} this month.`);
       return;
     }
 
@@ -683,16 +646,16 @@ const LeaveApplicationForm = () => {
         .from('leave_application')
         .insert([{
           "Employee Number": formData["Employee Number"],
-          "Name": formData["Name"],
+          "name": formData["Name"],
           "Office Branch": formData["Office Branch"],
           "Leave Type": formData["Leave Type"],
           "Start Date": formData["Start Date"],
           "End Date": formData["End Date"],
-          "Days": formData["Days"],
-          "Type": formData["Type"],
+          "days": formData["Days"],
+          "type": formData["Type"],
           "Application Type": formData["Application Type"],
-          "Reason": formData["Reason"],
-          "Status": formData["Status"],
+          "reason": formData["Reason"],
+          "status": formData["Status"],
           time_added: new Date().toISOString()
         }])
         .select();
@@ -706,7 +669,6 @@ const LeaveApplicationForm = () => {
 
       setFormData(prev => ({
         ...prev,
-        "Leave Type": 'month',
         "Start Date": '',
         "End Date": '',
         "Days": 0,
@@ -728,19 +690,12 @@ const LeaveApplicationForm = () => {
   const isSubmitDisabled = () => {
     if (isSubmitting) return true;
 
-    // For monthly leave, check restrictions
-    if (formData["Leave Type"] === "month") {
-      if (existingLeave) return true;
-      if (userLeaveTypesThisMonth.includes("month")) return true;
-    }
-
-    // For other leave types, only disable if already applied this month
-    if (formData["Leave Type"] !== "month" && userLeaveTypesThisMonth.includes(formData["Leave Type"])) {
+    if (userLeaveTypesThisMonth.includes(formData["Leave Type"])) {
       return true;
     }
 
     // Basic form validation
-    if (!formData["Start Date"] || !formData["End Date"] || !formData["Reason"]) {
+    if (!formData["Leave Type"] || !formData["Start Date"] || !formData["End Date"] || !formData["Reason"]) {
       return true;
     }
 
@@ -749,15 +704,8 @@ const LeaveApplicationForm = () => {
 
   // Get the current restriction message
   const getRestrictionMessage = () => {
-    if (formData["Leave Type"] === "month") {
-      if (existingLeave) {
-        return `Monthly leave restricted: ${existingLeave.Name} from ${existingLeave["Office Branch"]} branch has an active monthly leave`;
-      }
-      if (userLeaveTypesThisMonth.includes("month")) {
-        return "You have already applied for monthly leave this month";
-      }
-    } else if (userLeaveTypesThisMonth.includes(formData["Leave Type"])) {
-      return `You have already applied for ${formData["Leave Type"]} leave this month`;
+    if (userLeaveTypesThisMonth.includes(formData["Leave Type"])) {
+      return `You have already applied for ${formData["Leave Type"]} this month`;
     }
     return null;
   };
@@ -769,58 +717,23 @@ const LeaveApplicationForm = () => {
       <div className="mb-6">
         <h2 className="text-2xl font-semibold text-gray-800">Leave Application</h2>
         <div className="flex items-center mt-2">
-          <div className="h-1 w-8 bg-green-500 rounded-full mr-2"></div>
-          <p className="text-xs text-green-600">Staff members accrue two leave days each calendar month.</p>
+          <div className="h-1 w-8 bg-brand rounded-full mr-2"></div>
+          <p className="text-xs text-brand">Staff members accrue two leave days each calendar month.</p>
         </div>
 
         {/* Show warning messages */}
-        {existingLeave && formData["Leave Type"] === "month" && (
-          <div className="mt-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
+        {userLeaveTypesThisMonth.includes(formData["Leave Type"]) && (
+          <div className="mt-4 bg-orange-tint-alt border-l-4 border-orange-text-alt p-4 rounded-r-lg">
             <div className="flex">
-              <PhWarning className="h-5 w-5 text-red-500" weight="duotone" />
+              <PhWarning className="h-5 w-5 text-orange-text-alt" weight="duotone" />
               <div className="ml-3">
-                <p className="text-xs text-red-700">
-                  <strong>Monthly Leave Restriction:</strong> {existingLeave.Name} from your office branch ({existingLeave["Office Branch"]}) already has an active monthly leave application. Monthly leaves are restricted to one staff member per branch.
+                <p className="text-xs text-orange-text-alt">
+                  You have already applied for {formData["Leave Type"]} this month.
                 </p>
               </div>
             </div>
           </div>
         )}
-
-        {userLeaveTypesThisMonth.includes("month") && formData["Leave Type"] === "month" && (
-          <div className="mt-4 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
-            <div className="flex">
-              <PhWarning className="h-5 w-5 text-blue-500" weight="duotone" />
-              <div className="ml-3">
-                <p className="text-xs text-blue-700">
-                  You have already applied for monthly leave this month. You can apply for other leave types.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {formData["Leave Type"] !== "month" && userLeaveTypesThisMonth.includes(formData["Leave Type"]) && (
-          <div className="mt-4 bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg">
-            <div className="flex">
-              <PhWarning className="h-5 w-5 text-orange-500" weight="duotone" />
-              <div className="ml-3">
-                <p className="text-xs text-orange-700">
-                  You have already applied for {formData["Leave Type"]} leave this month.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Debug information */}
-        <div className="mt-4 bg-gray-50 p-3 rounded-lg">
-          <p className="text-xs text-gray-600">
-            <strong>Info:</strong> Branch: {formData["Office Branch"]} |
-            Existing Leave: {existingLeave ? 'Yes' : 'No'} |
-            User Monthly Leaves: {userLeaveTypesThisMonth.includes("month") ? 'Yes' : 'No'}
-          </p>
-        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -865,18 +778,16 @@ const LeaveApplicationForm = () => {
                 name="Leave Type"
                 value={formData["Leave Type"]}
                 onChange={handleChange}
-                className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                 required
               >
-                <option value="month">Monthly Leave</option>
-                <option value="sick">Sick Leave</option>
-                <option value="maternity">Maternity Leave</option>
-                <option value="paternity">Paternity Leave</option>
-                <option value="compassionate">Compassionate Leave</option>
-                <option value="annual" disabled>Annual Leave (Disabled)</option>
+                {leaveTypeOptions.length === 0 && <option value="">Loading...</option>}
+                {leaveTypeOptions.map(type => (
+                  <option key={type.id} value={type.name}>{type.name}</option>
+                ))}
               </select>
               {userLeaveTypesThisMonth.includes(formData["Leave Type"]) && (
-                <p className="text-xs text-purple-500 mt-1">You've already applied for this leave type this month</p>
+                <p className="text-xs text-status-purple mt-1">You've already applied for this leave type this month</p>
               )}
             </div>
             <div className="space-y-1">
@@ -885,7 +796,7 @@ const LeaveApplicationForm = () => {
                 name="Application Type"
                 value={formData["Application Type"]}
                 onChange={handleChange}
-                className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                 required
               >
                 <option value="First Application">First Application</option>
@@ -903,7 +814,7 @@ const LeaveApplicationForm = () => {
                 name="Start Date"
                 value={formData["Start Date"]}
                 onChange={handleChange}
-                className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                 required
                 min={new Date().toISOString().split('T')[0]}
               />
@@ -915,7 +826,7 @@ const LeaveApplicationForm = () => {
                 name="End Date"
                 value={formData["End Date"]}
                 onChange={handleChange}
-                className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                 required
                 min={formData["Start Date"] || new Date().toISOString().split('T')[0]}
               />
@@ -942,7 +853,7 @@ const LeaveApplicationForm = () => {
                   value="Full Day"
                   checked={formData["Type"] === 'Full Day'}
                   onChange={handleChange}
-                  className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300"
+                  className="h-4 w-4 text-brand focus:ring-primary border-gray-300"
                 />
                 <span className="ml-2 text-xs text-gray-700">Full Day</span>
               </label>
@@ -953,7 +864,7 @@ const LeaveApplicationForm = () => {
                   value="Half Day"
                   checked={formData["Type"] === 'Half Day'}
                   onChange={handleChange}
-                  className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300"
+                  className="h-4 w-4 text-brand focus:ring-primary border-gray-300"
                 />
                 <span className="ml-2 text-xs text-gray-700">Half Day</span>
               </label>
@@ -967,7 +878,7 @@ const LeaveApplicationForm = () => {
               rows={4}
               value={formData["Reason"]}
               onChange={handleChange}
-              className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               placeholder="Please provide details for your leave request"
               required
               minLength={10}
@@ -980,7 +891,7 @@ const LeaveApplicationForm = () => {
               disabled={isSubmitDisabled()}
               className={`w-full py-3 px-4 rounded-lg text-xs font-medium transition-colors flex items-center justify-center ${isSubmitDisabled()
                 ? 'bg-gray-400 text-white opacity-70 cursor-not-allowed'
-                : 'bg-green-600 text-white hover:bg-green-700'
+                : 'bg-primary text-white hover:bg-primary/90'
                 }`}
             >
               {isSubmitting ? (
@@ -1049,29 +960,29 @@ const LeaveApplicationsList = () => {
   }, []);
 
   const getStatusBadge = (status: string) => {
-    switch (status.toLowerCase()) {
+    switch ((status || '').toLowerCase()) {
       case 'approved':
-        return <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Approved</span>;
+        return <StatusPill tone="success" label="Approved" />;
       case 'rejected':
-        return <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">Rejected</span>;
+        return <StatusPill tone="danger" label="Rejected" />;
       case 'pending':
-        return <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Pending</span>;
+        return <StatusPill tone="warning" label="Pending" />;
       default:
-        return <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">Unknown</span>;
+        return <StatusPill tone="neutral" label="Unknown" />;
     }
   };
 
   if (isLoading) {
     return (
       <div className="p-8 flex justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-8 text-center text-red-500">
+      <div className="p-8 text-center text-status-danger">
         {error}
       </div>
     );
@@ -1096,8 +1007,8 @@ const LeaveApplicationsList = () => {
       <div className="mb-6">
         <h2 className="text-2xl font-semibold text-gray-800">My Leave Applications</h2>
         <div className="flex items-center mt-2">
-          <div className="h-1 w-8 bg-green-500 rounded-full mr-2"></div>
-          <p className="text-xs text-green-600">View the status of your leave requests</p>
+          <div className="h-1 w-8 bg-brand rounded-full mr-2"></div>
+          <p className="text-xs text-brand">View the status of your leave requests</p>
         </div>
       </div>
 
@@ -1131,7 +1042,7 @@ const LeaveApplicationsList = () => {
                       {app["Leave Type"].replace(/-/g, ' ')}
                     </div>
                     <div className="text-xs text-gray-500 mt-1 truncate max-w-xs">
-                      {app["Reason"]}
+                      {app.reason}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -1143,10 +1054,10 @@ const LeaveApplicationsList = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
-                    {app["Days"]} day{app["Days"] !== 1 ? 's' : ''}
+                    {app.days} day{app.days !== 1 ? 's' : ''}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(app["Status"])}
+                    {getStatusBadge(app.status)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
                     {parseApplicationDate(app).toLocaleDateString()}
@@ -1282,7 +1193,7 @@ const SalaryAdvanceForm = () => {
       return {
         status: 'paid',
         label: 'Paid',
-        class: 'bg-green-100 text-green-800 border border-green-200',
+        class: 'bg-green-tint text-status-success border border-green-tint',
         description: `Paid on ${new Date(app.payment_date).toLocaleDateString()}`,
         icon: '✅'
       };
@@ -1293,7 +1204,7 @@ const SalaryAdvanceForm = () => {
       return {
         status: 'paid',
         label: 'Paid',
-        class: 'bg-green-100 text-green-800 border border-green-200',
+        class: 'bg-green-tint text-status-success border border-green-tint',
         description: 'Payment processed',
         icon: '✅'
       };
@@ -1304,7 +1215,7 @@ const SalaryAdvanceForm = () => {
       return {
         status: 'approved',
         label: 'Approved - Awaiting Payment',
-        class: 'bg-blue-100 text-blue-800 border border-blue-200',
+        class: 'bg-status-info-tint text-status-info border border-status-info-tint',
         description: 'Approved by admin, payment pending',
         icon: '📋'
       };
@@ -1315,7 +1226,7 @@ const SalaryAdvanceForm = () => {
       return {
         status: 'approved',
         label: 'Approved by Managers',
-        class: 'bg-blue-100 text-blue-800 border border-blue-200',
+        class: 'bg-status-info-tint text-status-info border border-status-info-tint',
         description: 'Pending admin approval',
         icon: '👥'
       };
@@ -1326,7 +1237,7 @@ const SalaryAdvanceForm = () => {
       return {
         status: 'pending',
         label: 'Regional Manager Approved',
-        class: 'bg-purple-100 text-purple-800 border border-purple-200',
+        class: 'bg-status-purple-tint text-status-purple border border-status-purple-tint',
         description: 'Waiting for branch manager',
         icon: '🏢'
       };
@@ -1337,7 +1248,7 @@ const SalaryAdvanceForm = () => {
       return {
         status: 'pending',
         label: 'Branch Manager Approved',
-        class: 'bg-purple-100 text-purple-800 border border-purple-200',
+        class: 'bg-status-purple-tint text-status-purple border border-status-purple-tint',
         description: 'Waiting for regional manager',
         icon: '🏢'
       };
@@ -1351,7 +1262,7 @@ const SalaryAdvanceForm = () => {
         return {
           status: 'paid',
           label: 'Paid',
-          class: 'bg-green-100 text-green-800 border border-green-200',
+          class: 'bg-green-tint text-status-success border border-green-tint',
           description: 'Payment completed',
           icon: '✅'
         };
@@ -1359,7 +1270,7 @@ const SalaryAdvanceForm = () => {
         return {
           status: 'approved',
           label: 'Approved',
-          class: 'bg-blue-100 text-blue-800 border border-blue-200',
+          class: 'bg-status-info-tint text-status-info border border-status-info-tint',
           description: 'Application approved',
           icon: '📋'
         };
@@ -1367,7 +1278,7 @@ const SalaryAdvanceForm = () => {
         return {
           status: 'rejected',
           label: 'Rejected',
-          class: 'bg-red-100 text-red-800 border border-red-200',
+          class: 'bg-orange-tint text-status-danger border border-orange-tint',
           description: 'Application rejected',
           icon: '❌'
         };
@@ -1375,7 +1286,7 @@ const SalaryAdvanceForm = () => {
         return {
           status: 'pending',
           label: 'Under Review',
-          class: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+          class: 'bg-orange-tint-alt text-orange-text-alt border border-orange-tint-alt',
           description: 'Waiting for manager approval',
           icon: '⏳'
         };
@@ -1400,7 +1311,7 @@ const SalaryAdvanceForm = () => {
 
         {/* Show payment details if available */}
         {app.mpesa_transaction_id && (
-          <div className="text-xs text-green-700 bg-green-50 p-1 rounded border border-green-200">
+          <div className="text-xs text-status-success bg-green-tint p-1 rounded border border-green-tint">
             <strong>M-Pesa ID:</strong> {app.mpesa_transaction_id}
           </div>
         )}
@@ -1705,7 +1616,7 @@ const SalaryAdvanceForm = () => {
         disabled={isDisabled}
         className={`px-4 py-2 border border-transparent rounded-lg text-xs font-medium text-white flex items-center ${isDisabled
           ? 'bg-gray-400 cursor-not-allowed opacity-70'
-          : 'bg-green-600 hover:bg-green-700'
+          : 'bg-primary hover:bg-primary/90'
           }`}
       >
         {isSubmitting ? (
@@ -1739,8 +1650,8 @@ const SalaryAdvanceForm = () => {
           <div>
             <h2 className="text-2xl font-semibold text-gray-800">Salary Advance History</h2>
             <div className="flex items-center mt-2">
-              <div className="h-1 w-8 bg-green-500 rounded-full mr-2"></div>
-              <p className="text-xs text-green-600">View your salary advance applications and their current status</p>
+              <div className="h-1 w-8 bg-brand rounded-full mr-2"></div>
+              <p className="text-xs text-brand">View your salary advance applications and their current status</p>
             </div>
           </div>
           <div className="flex space-x-3">
@@ -1764,7 +1675,7 @@ const SalaryAdvanceForm = () => {
             </button>
             <button
               onClick={() => setView('form')}
-              className="px-4 py-2 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 flex items-center"
+              className="px-4 py-2 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 flex items-center"
             >
               <PhWallet className="h-4 w-4 mr-2" weight="duotone" />
               New Application
@@ -1782,7 +1693,7 @@ const SalaryAdvanceForm = () => {
               <p className="mt-1 text-xs text-gray-500">You haven't submitted any salary advance applications.</p>
               <button
                 onClick={() => setView('form')}
-                className="mt-4 px-4 py-2 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700"
+                className="mt-4 px-4 py-2 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90"
               >
                 Apply for Salary Advance
               </button>
@@ -1861,20 +1772,20 @@ const SalaryAdvanceForm = () => {
       <div className="mb-6">
         <h2 className="text-2xl font-semibold text-gray-800">Salary Advance Application</h2>
         <div className="flex items-center mt-2">
-          <div className="h-1 w-8 bg-green-500 rounded-full mr-2"></div>
-          <p className="text-xs text-green-600">Submit your request for a salary advance (up to 20% of your basic salary)</p>
+          <div className="h-1 w-8 bg-brand rounded-full mr-2"></div>
+          <p className="text-xs text-brand">Submit your request for a salary advance (up to 20% of your basic salary)</p>
         </div>
 
         {/* Application Schedule Information */}
-        <div className={`mt-3 border-l-4 p-4 rounded-r-lg ${isApplicationPeriod ? 'bg-green-50 border-green-500' : 'bg-red-50 border-red-500'}`}>
+        <div className={`mt-3 border-l-4 p-4 rounded-r-lg ${isApplicationPeriod ? 'bg-green-tint border-status-success' : 'bg-orange-tint border-status-danger'}`}>
           <div className="flex">
             {isApplicationPeriod ? (
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
+              <CheckCircle2 className="h-5 w-5 text-status-success" />
             ) : (
-              <Lock className="h-5 w-5 text-red-500" />
+              <Lock className="h-5 w-5 text-status-danger" />
             )}
             <div className="ml-3">
-              <p className={`text-xs ${isApplicationPeriod ? 'text-green-700' : 'text-red-700'}`}>
+              <p className={`text-xs ${isApplicationPeriod ? 'text-status-success' : 'text-status-danger'}`}>
                 {isApplicationPeriod ? (
                   <>
                     <strong>Applications Open:</strong> You can currently submit salary advance applications.
@@ -1891,16 +1802,16 @@ const SalaryAdvanceForm = () => {
 
         {/* Monthly Application Restriction Warning */}
         {hasAppliedThisMonth && (
-          <div className="mt-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
+          <div className="mt-4 bg-orange-tint border-l-4 border-status-danger p-4 rounded-r-lg">
             <div className="flex">
-              <PhWarning className="h-5 w-5 text-red-500" weight="duotone" />
+              <PhWarning className="h-5 w-5 text-status-danger" weight="duotone" />
               <div className="ml-3">
-                <p className="text-xs text-red-700">
+                <p className="text-xs text-status-danger">
                   <strong>Monthly Application Limit:</strong> You have already applied for a salary advance this month.
                   Only one salary advance application is allowed per calendar month.
                 </p>
                 {currentMonthApplication && (
-                  <p className="text-xs text-red-600 mt-1">
+                  <p className="text-xs text-status-danger mt-1">
                     Your current application status: <strong>{getEnhancedStatus(currentMonthApplication).label}</strong> -
                     Submitted on {parseApplicationDate(currentMonthApplication).toLocaleDateString()}
                   </p>
@@ -1968,7 +1879,7 @@ const SalaryAdvanceForm = () => {
                   name="Amount Requested"
                   value={formData["Amount Requested"]}
                   onChange={handleChange}
-                  className={`focus:ring-green-500 focus:border-green-500 block w-full pl-10 pr-12 py-2 sm:text-xs border border-gray-300 rounded-lg ${!isApplicationPeriod || hasAppliedThisMonth ? 'bg-gray-100 cursor-not-allowed' : ''
+                  className={`focus:ring-primary focus:border-primary block w-full pl-10 pr-12 py-2 sm:text-xs border border-gray-300 rounded-lg ${!isApplicationPeriod || hasAppliedThisMonth ? 'bg-gray-100 cursor-not-allowed' : ''
                     }`}
                   placeholder="0.00"
                   required
@@ -1984,7 +1895,7 @@ const SalaryAdvanceForm = () => {
                 </div>
               </div>
               {amountExceeded && (
-                <p className="text-xs text-red-500 mt-1">
+                <p className="text-xs text-status-danger mt-1">
                   Amount exceeds 20% of basic salary
                 </p>
               )}
@@ -2008,7 +1919,7 @@ const SalaryAdvanceForm = () => {
               rows={4}
               value={formData["Reason for Advance"]}
               onChange={handleChange}
-              className={`w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 ${!isApplicationPeriod || hasAppliedThisMonth ? 'bg-gray-100 cursor-not-allowed' : ''
+              className={`w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${!isApplicationPeriod || hasAppliedThisMonth ? 'bg-gray-100 cursor-not-allowed' : ''
                 }`}
               placeholder="Please explain why you need this salary advance"
               required
@@ -2276,11 +2187,11 @@ const LoanRequestForm = () => {
   const getStatusBadge = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'approved':
-        return <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Approved</span>;
+        return <StatusPill tone="success" label="Approved" />;
       case 'rejected':
-        return <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">Rejected</span>;
+        return <StatusPill tone="danger" label="Rejected" />;
       default:
-        return <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Pending</span>;
+        return <StatusPill tone="warning" label="Pending" />;
     }
   };
 
@@ -2291,13 +2202,13 @@ const LoanRequestForm = () => {
           <div>
             <h2 className="text-2xl font-semibold text-gray-800">Loan Applications</h2>
             <div className="flex items-center mt-2">
-              <div className="h-1 w-8 bg-green-500 rounded-full mr-2"></div>
-              <p className="text-xs text-green-600">View your loan application history</p>
+              <div className="h-1 w-8 bg-brand rounded-full mr-2"></div>
+              <p className="text-xs text-brand">View your loan application history</p>
             </div>
           </div>
           <button
             onClick={() => setView('form')}
-            className="px-4 py-2 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 flex items-center"
+            className="px-4 py-2 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 flex items-center"
           >
             <PhCurrencyDollar className="h-4 w-4 mr-2" weight="duotone" />
             New Application
@@ -2314,7 +2225,7 @@ const LoanRequestForm = () => {
               <p className="mt-1 text-xs text-gray-500">You haven't submitted any loan applications yet.</p>
               <button
                 onClick={() => setView('form')}
-                className="mt-4 px-4 py-2 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700"
+                className="mt-4 px-4 py-2 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90"
               >
                 Apply for Loan
               </button>
@@ -2386,8 +2297,8 @@ const LoanRequestForm = () => {
       <div className="mb-6">
         <h2 className="text-2xl font-semibold text-gray-800">Loan Request</h2>
         <div className="flex items-center mt-2">
-          <div className="h-1 w-8 bg-green-500 rounded-full mr-2"></div>
-          <p className="text-xs text-green-600">Submit your request for a staff loan with flexible payment terms</p>
+          <div className="h-1 w-8 bg-brand rounded-full mr-2"></div>
+          <p className="text-xs text-brand">Submit your request for a staff loan with flexible payment terms</p>
         </div>
       </div>
 
@@ -2448,7 +2359,7 @@ const LoanRequestForm = () => {
                   name="Loan Amount"
                   value={formData["Loan Amount"]}
                   onChange={handleChange}
-                  className="focus:ring-green-500 focus:border-green-500 block w-full pl-10 pr-12 py-2 sm:text-xs border border-gray-300 rounded-lg"
+                  className="focus:ring-primary focus:border-primary block w-full pl-10 pr-12 py-2 sm:text-xs border border-gray-300 rounded-lg"
                   placeholder="0.00"
                   required
                   min="0"
@@ -2462,7 +2373,7 @@ const LoanRequestForm = () => {
                 name="Number of Months"
                 value={formData["Number of Months"]}
                 onChange={handleChange}
-                className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                 required
               >
                 <option value={2}>2 Months</option>
@@ -2500,7 +2411,7 @@ const LoanRequestForm = () => {
                     name="Use Custom Deduction"
                     checked={formData["Use Custom Deduction"]}
                     onChange={handleChange}
-                    className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                    className="h-4 w-4 text-brand focus:ring-primary border-gray-300 rounded"
                   />
                   <span className="ml-2 text-xs font-medium text-gray-700">Use Custom Monthly Deduction</span>
                 </label>
@@ -2516,13 +2427,13 @@ const LoanRequestForm = () => {
                         name="Custom Monthly Deduction"
                         value={formData["Custom Monthly Deduction"]}
                         onChange={handleChange}
-                        className="focus:ring-green-500 focus:border-green-500 block w-full pl-10 pr-12 py-2 sm:text-xs border border-gray-300 rounded-lg"
+                        className="focus:ring-primary focus:border-primary block w-full pl-10 pr-12 py-2 sm:text-xs border border-gray-300 rounded-lg"
                         placeholder="0.00"
                         min="0"
                         step="0.01"
                       />
                     </div>
-                    <p className="text-xs text-orange-600">
+                    <p className="text-xs text-orange-text-alt">
                       Total custom payments over {formData["Number of Months"]} months: Ksh{(parseFloat(formData["Custom Monthly Deduction"]) * formData["Number of Months"] || 0).toFixed(2)}
                     </p>
                   </div>
@@ -2532,7 +2443,7 @@ const LoanRequestForm = () => {
 
             <div className="bg-white p-3 rounded border">
               <h4 className="text-xs font-medium text-gray-700 mb-2">Final Monthly Deduction</h4>
-              <div className="text-2xl font-bold text-green-600">
+              <div className="text-2xl font-bold text-brand">
                 Ksh{finalMonthlyDeduction || '0.00'}
               </div>
             </div>
@@ -2540,7 +2451,7 @@ const LoanRequestForm = () => {
 
           {/* Repayment Schedule */}
           {formData["Repayment Schedule"].length > 0 && (
-            <div className="bg-blue-50 p-4 rounded-lg">
+            <div className="bg-status-info-tint p-4 rounded-lg">
               <h3 className="text-lg font-medium text-gray-800 mb-3">Repayment Schedule</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 {formData["Repayment Schedule"].map((date, index) => (
@@ -2549,7 +2460,7 @@ const LoanRequestForm = () => {
                     <div className="text-xs font-medium text-gray-900">
                       {new Date(date).toLocaleDateString()}
                     </div>
-                    <div className="text-xs text-green-600">
+                    <div className="text-xs text-brand">
                       Ksh{finalMonthlyDeduction || '0.00'}
                     </div>
                   </div>
@@ -2565,7 +2476,7 @@ const LoanRequestForm = () => {
               rows={4}
               value={formData["Reason for Loan"]}
               onChange={handleChange}
-              className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               placeholder="Please explain why you need this loan"
               required
               minLength={10}
@@ -2584,7 +2495,7 @@ const LoanRequestForm = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`px-4 py-2 border border-transparent rounded-lg text-xs font-medium text-white bg-green-600 hover:bg-green-700 flex items-center ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
+              className={`px-4 py-2 border border-transparent rounded-lg text-xs font-medium text-white bg-primary hover:bg-primary/90 flex items-center ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
                 }`}
             >
               {isSubmitting ? (
@@ -2655,7 +2566,7 @@ const DocumentUploadForm = ({
           <select
             value={documentType}
             onChange={(e) => setDocumentType(e.target.value)}
-            className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             required
             disabled={availableTypes.length === 0}
           >
@@ -2665,7 +2576,7 @@ const DocumentUploadForm = ({
             ))}
           </select>
           {availableTypes.length === 0 && (
-            <p className="text-xs text-orange-600">All document types have been uploaded</p>
+            <p className="text-xs text-orange-text-alt">All document types have been uploaded</p>
           )}
         </div>
 
@@ -2675,7 +2586,7 @@ const DocumentUploadForm = ({
             ref={fileInputRef}
             type="file"
             onChange={handleFileSelect}
-            className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
             required
           />
@@ -2693,7 +2604,7 @@ const DocumentUploadForm = ({
       <button
         type="submit"
         disabled={uploading || !selectedFile || !documentType || availableTypes.length === 0}
-        className={`w-full px-4 py-2 border border-transparent rounded-lg text-xs font-medium text-white bg-green-600 hover:bg-green-700 flex items-center justify-center ${uploading || !selectedFile || !documentType || availableTypes.length === 0 ? 'opacity-70 cursor-not-allowed' : ''
+        className={`w-full px-4 py-2 border border-transparent rounded-lg text-xs font-medium text-white bg-primary hover:bg-primary/90 flex items-center justify-center ${uploading || !selectedFile || !documentType || availableTypes.length === 0 ? 'opacity-70 cursor-not-allowed' : ''
           }`}
       >
         {uploading ? (
@@ -2730,7 +2641,7 @@ const DashboardHome = ({ setActiveTab, userName }: { setActiveTab: (tab: string)
       >
         <div className="flex-1 space-y-2">
           <div className="flex items-center gap-2">
-            <span className="px-1.5 py-0.5 bg-emerald-50 border border-emerald-100 rounded text-[9px] font-bold tracking-[0.2em] text-emerald-600 uppercase">
+            <span className="px-1.5 py-0.5 bg-green-tint border border-green-tint rounded text-[9px] font-bold tracking-[0.2em] text-status-success uppercase">
               System Active
             </span>
             <div className="h-px w-6 bg-gray-300" />
@@ -2741,7 +2652,7 @@ const DashboardHome = ({ setActiveTab, userName }: { setActiveTab: (tab: string)
 
           <div className="flex flex-col gap-0 shadow-sm leading-tight text-shadow-sm">
             <h2 className="text-xl md:text-2xl font-light tracking-tight text-gray-900 leading-none pb-1">
-              {greeting}, <span className="font-bold text-gray-900 tracking-normal">{userName.split(' ')[0]}</span><span className="text-emerald-500">.</span>
+              {greeting}, <span className="font-bold text-gray-900 tracking-normal">{userName.split(' ')[0]}</span><span className="text-brand">.</span>
             </h2>
             <p className="text-gray-500 text-[11px] md:text-xs font-medium max-w-md pt-0.5">
               Your workspace is optimized and ready for deployment.
@@ -2949,7 +2860,7 @@ const staffMenuGroups: MenuGroup[] = [
         icon: PhPhone,
         hasSubmenu: true,
         submenu: [
-          { id: 'chat', label: 'Chat', isExternal: true, path: '/teams' },
+          { id: 'chat', label: 'Chat' },
           { id: 'VideoConf', label: 'Video Conference' }
         ]
       }
@@ -3012,6 +2923,13 @@ const StaffPortal = () => {
   const [showNotificationDot, setShowNotificationDot] = useState(false);
   const [notificationSidebarOpen, setNotificationSidebarOpen] = useState(false);
   const [employeeNumber, setEmployeeNumber] = useState<string>('');
+  // Badge on "Communication" (FIG-577/578): unread chat message count,
+  // persisted via `user_channel_states.last_read_at` (the same table the
+  // admin chat service already writes to) rather than in-memory-only state,
+  // so it survives a refresh and reflects reality across sessions. Lives
+  // here rather than inside ChatComponent since the badge must show even
+  // before the user opens the Chat tab.
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   const fetchCompanyProfile = async () => {
     try {
@@ -3046,21 +2964,48 @@ const StaffPortal = () => {
     };
   };
 
-  // Fetch notifications from warnings table
-  const fetchNotifications = async () => {
-    if (!employeeNumber) return;
+  // Fetch notifications from the warnings table, merged with leave
+  // approve/reject decisions (FIG-574) from the shared hr_notifications
+  // system (previously only read by the admin bell in Header.tsx).
+  //
+  // Takes the employee number as a parameter rather than reading the
+  // `employeeNumber` state directly: the only call site invokes this
+  // synchronously right after `setEmployeeNumber(...)`, and since state
+  // updates aren't applied until the next render, reading the closure
+  // variable there would still see the old ('') value and bail out on the
+  // `if (!employeeNumber) return` guard below - notifications (including
+  // pre-existing warnings, not just the new leave ones) never actually
+  // loaded on initial mount because of this.
+  const fetchNotifications = async (empNumber: string) => {
+    if (!empNumber) return;
 
     try {
       const { data: warnings, error } = await supabase
         .from('warnings')
         .select('*')
-        .eq('employee_id', employeeNumber)
+        .eq('employee_id', empNumber)
         .order('issued_at', { ascending: false });
 
       if (error) throw error;
 
-      const notificationItems = (warnings || []).map(warning =>
+      const warningItems = (warnings || []).map(warning =>
         createNotificationItem(warning)
+      );
+
+      const hrNotifs = await fetchStaffHRNotifications(empNumber);
+      const leaveItems = hrNotifs
+        .filter(n => n.notification_type === 'leave_approved' || n.notification_type === 'leave_rejected')
+        .map(n => ({
+          id: `hr-${n.id}`,
+          type: 'leave',
+          title: n.title,
+          message: n.message,
+          timestamp: new Date(n.created_at),
+          isRead: false
+        }));
+
+      const notificationItems = [...warningItems, ...leaveItems].sort(
+        (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
       );
 
       setNotifications(prev => ({
@@ -3108,12 +3053,70 @@ const StaffPortal = () => {
     };
   }, [employeeNumber]);
 
+  // Total unread chat messages across all channels, using the persisted
+  // `user_channel_states.last_read_at` (per user, per channel) rather than
+  // in-memory state - a channel with no row yet is treated as fully unread
+  // (matches standard chat-app behavior: you haven't opened it yet).
+  const fetchUnreadMessageCount = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) return;
+
+      const { data: channelsData } = await supabase.from('channels').select('id');
+      if (!channelsData || channelsData.length === 0) {
+        setUnreadMessageCount(0);
+        return;
+      }
+
+      const { data: readStates } = await supabase
+        .from('user_channel_states')
+        .select('channel_id, last_read_at')
+        .eq('user_id', user.id);
+
+      const lastReadMap = new Map((readStates || []).map((r: any) => [r.channel_id, r.last_read_at]));
+
+      const counts = await Promise.all(channelsData.map(async (ch: any) => {
+        const lastRead = lastReadMap.get(ch.id);
+        let query = supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('channel_id', ch.id);
+        if (lastRead) query = query.gt('created_at', lastRead);
+        const { count } = await query;
+        return count || 0;
+      }));
+
+      setUnreadMessageCount(counts.reduce((a, b) => a + b, 0));
+    } catch (err) {
+      console.error('Error fetching unread message count:', err);
+    }
+  }, []);
+
   // Check login status and fetch data on component mount
   useEffect(() => {
     checkLoginStatus();
     fetchUserData();
     fetchCompanyProfile();
+    fetchUnreadMessageCount();
   }, []);
+
+  // Live updates once a new message arrives anywhere (requires the
+  // supabase_realtime publication to include `messages` - see
+  // supabase/migrations/chat_realtime.sql; verified empirically that this
+  // wasn't the case before that migration, so without it this badge only
+  // updates on next page load, not live).
+  useEffect(() => {
+    const channel = supabase
+      .channel('staffportal_unread_messages')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+        fetchUnreadMessageCount();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchUnreadMessageCount]);
 
   const fetchUserData = async () => {
     try {
@@ -3130,8 +3133,10 @@ const StaffPortal = () => {
         setUserName(`${employeeData["First Name"]} ${employeeData["Last Name"]}`);
         setEmployeeNumber(employeeData["Employee Number"]);
 
-        // Fetch notifications after we have the employee number
-        fetchNotifications();
+        // Pass the freshly-fetched number directly - see fetchNotifications'
+        // own comment for why reading the `employeeNumber` state here
+        // instead would still see the pre-update ('') value.
+        fetchNotifications(employeeData["Employee Number"]);
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -3170,6 +3175,9 @@ const StaffPortal = () => {
   };
 
   const unreadNotifications = notifications.items.filter(item => !item.isRead);
+  // Badge on the "Leave" nav item (FIG-575): unread leave decisions only,
+  // not warnings - those already have their own bell indicator.
+  const unreadLeaveCount = notifications.items.filter(item => item.type === 'leave' && !item.isRead).length;
 
   const checkLoginStatus = async () => {
     try {
@@ -3248,15 +3256,14 @@ const StaffPortal = () => {
             initial="expanded"
             animate={isExpanded ? "expanded" : "collapsed"}
             variants={sidebarVariants}
-            className="relative flex flex-col h-full border-r border-white/5 shadow-2xl overflow-hidden font-lexend"
-            style={{ background: '#0f1c5e' }}
+            className="relative flex flex-col h-full border-r border-white/5 shadow-2xl overflow-hidden font-lexend bg-brand"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
           >
-            {/* Glowy Background: Blue & Green */}
-            <div className="absolute inset-0 bg-emerald-950/50 z-[-2] backdrop-blur-2xl" />
-            <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] pointer-events-none z-[-1]" />
-            <div className="absolute bottom-0 right-0 w-96 h-96 bg-green-500/10 rounded-full blur-[100px] pointer-events-none z-[-1]" />
+            {/* Glowy Background: Brand Accents */}
+            <div className="absolute inset-0 bg-brand-dark/50 z-[-2] backdrop-blur-2xl" />
+            <div className="absolute top-0 left-0 w-96 h-96 bg-brand-dark/20 rounded-full blur-[100px] pointer-events-none z-[-1]" />
+            <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-[100px] pointer-events-none z-[-1]" />
 
 
 
@@ -3281,7 +3288,7 @@ const StaffPortal = () => {
                       className="flex flex-col"
                     >
                       <h1 className="font-lexend font-bold text-xl text-white tracking-tight flex items-center">
-                        Zira<span className="text-white font-light ml-0.5">Pro</span>
+                        Figbloom<span className="text-white font-light ml-0.5">HR</span>
                       </h1>
                     </motion.div>
                   )}
@@ -3295,7 +3302,7 @@ const StaffPortal = () => {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <Menu className={`w-4 h-4 transition-colors ${isExpanded ? 'text-slate-400 group-hover:text-[#03c04a]' : 'text-[#03c04a]'}`} />
+                <Menu className={`w-4 h-4 transition-colors ${isExpanded ? 'text-white/50 group-hover:text-orange' : 'text-orange'}`} />
               </motion.button>
             </div>
 
@@ -3309,13 +3316,13 @@ const StaffPortal = () => {
                   className="px-5 mb-4 overflow-hidden"
                 >
                   <div className="relative group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#03c04a] transition-colors" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/45 transition-colors" />
                     <input
                       type="text"
                       placeholder="Search..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full bg-slate-800/50 border border-slate-700 rounded-xl py-2 pl-9 pr-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#03c04a] focus:border-[#03c04a]/50 transition-all font-normal"
+                      className="w-full bg-white/10 border border-white/10 rounded-xl py-2 pl-9 pr-3 text-xs text-white placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-white/30 focus:border-white/30 transition-all font-normal"
                     />
                   </div>
                 </motion.div>
@@ -3345,7 +3352,7 @@ const StaffPortal = () => {
                             exit={{ opacity: 0 }}
                             className="px-3 mb-2"
                           >
-                            <span className="text-[10px] font-normal text-cyan-400 tracking-wider font-sans pl-1">
+                            <span className="text-[10px] font-normal text-white/40 tracking-wider font-sans pl-1">
                               {group.title}
                             </span>
                           </motion.div>
@@ -3370,19 +3377,25 @@ const StaffPortal = () => {
                                   }
                                 }}
                                 className={`relative w-full flex items-center px-3 py-2.5 rounded-xl transition-all duration-300 group overflow-hidden ${!isExpanded && 'justify-center px-0'} ${isActive || (item.hasSubmenu && isMenuExpanded)
-                                  ? 'bg-[#03c04a] text-white border border-white/20 ring-1 ring-white/10'
-                                  : 'text-white/80 hover:bg-white/5 hover:text-[#03c04a]'}`}
+                                  ? 'bg-white text-brand font-semibold border border-white/20 ring-1 ring-white/10'
+                                  : 'text-white/80 hover:bg-white/10 hover:text-white'}`}
                                 whileTap={{ scale: 0.98 }}
                               >
                                 {/* Icon */}
                                 <div className="relative z-10 flex items-center justify-center">
                                   <item.icon
                                     className={`w-4 h-4 transition-all duration-300 ${isActive || (item.hasSubmenu && isMenuExpanded)
-                                      ? 'text-white'
-                                      : 'text-white/80 group-hover:text-[#03c04a] group-hover:scale-110'
+                                      ? 'text-brand'
+                                      : 'text-white/80 group-hover:text-white group-hover:scale-110'
                                       }`}
                                     weight={isActive ? "fill" : "duotone"}
                                   />
+                                  {item.id === 'leave' && unreadLeaveCount > 0 && !isExpanded && (
+                                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange border border-brand"></span>
+                                  )}
+                                  {item.id === 'communication' && unreadMessageCount > 0 && !isExpanded && (
+                                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange border border-brand"></span>
+                                  )}
                                 </div>
 
                                 {/* Label */}
@@ -3393,12 +3406,22 @@ const StaffPortal = () => {
                                         initial={{ opacity: 0, x: -10 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         exit={{ opacity: 0, x: -10 }}
-                                        className={`ml-3 text-xs truncate font-sans relative z-10 tracking-wide font-normal flex-1 text-left ${isActive ? 'text-white' : 'text-white/80'}`}
+                                        className={`ml-3 text-xs truncate font-sans relative z-10 tracking-wide font-normal flex-1 text-left ${isActive ? 'text-brand' : 'text-white/80'}`}
                                       >
                                         {item.label}
                                       </motion.span>
+                                      {item.id === 'leave' && unreadLeaveCount > 0 && (
+                                        <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-orange text-white text-[10px] font-bold mr-1">
+                                          {unreadLeaveCount > 99 ? '99+' : unreadLeaveCount}
+                                        </span>
+                                      )}
+                                      {item.id === 'communication' && unreadMessageCount > 0 && (
+                                        <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-orange text-white text-[10px] font-bold mr-1">
+                                          {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                                        </span>
+                                      )}
                                       {item.hasSubmenu && (
-                                        <ChevronRight className={`w-3.5 h-3.5 ml-2 ${isActive || isMenuExpanded ? 'text-white/80' : 'text-slate-400'} transition-transform duration-200 ${isMenuExpanded ? 'rotate-90' : ''}`} />
+                                        <ChevronRight className={`w-3.5 h-3.5 ml-2 ${isActive || isMenuExpanded ? 'text-white/80' : 'text-white/40'} transition-transform duration-200 ${isMenuExpanded ? 'rotate-90' : ''}`} />
                                       )}
                                     </>
                                   )}
@@ -3408,6 +3431,8 @@ const StaffPortal = () => {
                                 {!isExpanded && !isHovered && (
                                   <div className="absolute left-full ml-5 px-2.5 py-1.5 bg-slate-800 text-white text-[10px] font-semibold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 whitespace-nowrap shadow-xl translate-x-2 group-hover:translate-x-0">
                                     {item.label}
+                                    {item.id === 'leave' && unreadLeaveCount > 0 && ` (${unreadLeaveCount})`}
+                                    {item.id === 'communication' && unreadMessageCount > 0 && ` (${unreadMessageCount})`}
                                     <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 w-2 h-2 bg-slate-800 rotate-45" />
                                   </div>
                                 )}
@@ -3430,13 +3455,28 @@ const StaffPortal = () => {
                                             window.location.href = subItem.path;
                                           } else {
                                             setActiveTab(subItem.id);
+                                            if (item.id === 'leave') {
+                                              setNotifications(prev => ({
+                                                ...prev,
+                                                items: prev.items.map(n => n.type === 'leave' ? { ...n, isRead: true } : n)
+                                              }));
+                                            }
                                             if (window.innerWidth < 768) setSidebarOpen(false);
                                           }
                                         }}
-                                        className={`w-full flex items-center px-3 py-2 rounded-lg text-xs font-normal transition-all ${activeTab === subItem.id ? 'text-[#03c04a] bg-white/10' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                                        className={`w-full flex items-center px-3 py-2 rounded-lg text-xs font-normal transition-all ${activeTab === subItem.id ? 'text-white bg-white/10' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                                       >
-                                        <span className={`w-1.5 h-1.5 rounded-full mr-2 ${activeTab === subItem.id ? 'bg-[#03c04a] shadow-[0_0_8px_rgba(3,192,74,0.6)]' : 'bg-slate-600'}`}></span>
+                                        <span className={`w-1.5 h-1.5 rounded-full mr-2 ${activeTab === subItem.id ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'bg-white/20'}`}></span>
                                         {subItem.label}
+                                        {/* Per-source breakdown under "Communication" (FIG-578): Chat's
+                                            own count, so "Communication"'s badge reads as the total of
+                                            its children rather than a single opaque number. Video
+                                            Conference has no unread concept yet, so it gets none. */}
+                                        {subItem.id === 'chat' && unreadMessageCount > 0 && (
+                                          <span className="ml-auto min-w-[16px] h-[16px] px-1 flex items-center justify-center rounded-full bg-orange text-white text-[9px] font-bold">
+                                            {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                                          </span>
+                                        )}
                                       </button>
                                     ))}
                                   </motion.div>
@@ -3459,10 +3499,10 @@ const StaffPortal = () => {
                 onClick={() => setActiveTab('details')}
               >
                 <div className="relative">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#03c04a] to-emerald-600 flex items-center justify-center text-white font-bold text-xs shadow-lg shadow-emerald-500/20">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand to-brand-dark flex items-center justify-center text-white font-bold text-xs shadow-lg shadow-brand/20">
                     {userName[0]?.toUpperCase() || 'S'}
                   </div>
-                  <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full"></div>
+                  <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-status-success border-2 border-brand rounded-full"></div>
                 </div>
                 <AnimatePresence>
                   {isExpanded && (
@@ -3473,7 +3513,7 @@ const StaffPortal = () => {
                       className="flex-1 overflow-hidden"
                     >
                       <p className="text-xs font-semibold text-white truncate">{userName}</p>
-                      <p className="text-[10px] text-slate-400 truncate">Staff Member</p>
+                      <p className="text-[10px] text-white/40 truncate">Staff Member</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -3490,7 +3530,7 @@ const StaffPortal = () => {
         {/* Mobile Header Toggle */}
         <div className="md:hidden flex items-center justify-between p-4 bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-40">
           <div className="flex items-center space-x-3">
-            <div className="relative w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-200">
+            <div className="relative w-8 h-8 rounded-lg bg-brand flex items-center justify-center shadow-lg shadow-brand/20">
               <img src={solo} alt="Logo" className="w-5 h-5 object-contain brightness-0 invert" />
             </div>
             <span className="font-sans font-bold text-gray-900 tracking-tight">Staff Portal</span>
@@ -3498,11 +3538,11 @@ const StaffPortal = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setActiveTab('details')}
-              className="w-8 h-8 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xs"
+              className="w-8 h-8 rounded-full bg-green-tint border border-green-tint flex items-center justify-center text-brand font-bold text-xs"
             >
               {userName[0]?.toUpperCase()}
             </button>
-            <button onClick={() => setSidebarOpen(true)} className="p-2 text-gray-500 hover:text-emerald-600">
+            <button onClick={() => setSidebarOpen(true)} className="p-2 text-gray-500 hover:text-brand">
               <Menu className="w-6 h-6" />
             </button>
           </div>
@@ -3522,13 +3562,13 @@ const StaffPortal = () => {
                 {companyProfile?.image_url ? (
                   <img src={companyProfile.image_url} alt="Logo" className="w-10 h-10 rounded-xl object-cover shadow-sm ring-2 ring-white group-hover:ring-offset-1 transition-all" />
                 ) : (
-                  <div className="w-10 h-10 bg-gradient-to-br from-green-600 to-teal-700 rounded-xl flex items-center justify-center shadow-md ring-2 ring-white text-white font-bold text-lg">
+                  <div className="w-10 h-10 bg-gradient-to-br from-brand to-brand-dark rounded-xl flex items-center justify-center shadow-md ring-2 ring-white text-white font-bold text-lg">
                     {companyProfile?.company_name?.[0] || 'Z'}
                   </div>
                 )}
               </div>
               <div className="flex flex-col">
-                <h1 className="text-sm font-bold text-gray-800 group-hover:text-green-600 transition-colors">{companyProfile?.company_name || 'Staff Portal'}</h1>
+                <h1 className="text-sm font-bold text-gray-800 group-hover:text-brand transition-colors">{companyProfile?.company_name || 'Staff Portal'}</h1>
                 <p className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">Employee Dashboard</p>
               </div>
             </div>
@@ -3545,12 +3585,12 @@ const StaffPortal = () => {
 
               <motion.button
                 onClick={() => setNotificationSidebarOpen(true)}
-                className="relative p-2.5 text-gray-400 hover:text-green-600 transition-colors rounded-full hover:bg-green-50/50"
+                className="relative p-2.5 text-gray-400 hover:text-brand transition-colors rounded-full hover:bg-green-tint/50"
                 whileTap={{ scale: 0.95 }}
               >
                 <Bell className="w-5 h-5 stroke-[1.5px]" />
                 {unreadNotifications.length > 0 && (
-                  <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>
+                  <span className="absolute top-2 right-2.5 w-2 h-2 bg-status-danger rounded-full ring-2 ring-white"></span>
                 )}
               </motion.button>
 
@@ -3591,7 +3631,7 @@ const StaffPortal = () => {
               {activeTab === 'documents' && <DocumentsUploadPage />}
               {activeTab === 'incident-report' && <IncidentReport />}
               {activeTab === 'job-applications' && <JobApplications />}
-              {activeTab === 'chat' && <div className="relative h-screen"><ChatComponent /></div>}
+              {activeTab === 'chat' && <div className="relative h-screen"><ChatComponent onMessagesRead={fetchUnreadMessageCount} /></div>}
               {activeTab === 'VideoConf' && <VideoConferenceComponent />}
             </motion.div>
           </div>

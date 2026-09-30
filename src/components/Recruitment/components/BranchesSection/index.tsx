@@ -316,7 +316,7 @@ export const BranchesSection = () => {
                           <>
                             <button
                               onClick={saveEdit}
-                              className="p-1 text-green-600 hover:bg-green-50 rounded"
+                              className="p-1 text-primary hover:bg-primary/10 rounded"
                               title="Save"
                             >
                               <Save className="w-4 h-4" />
@@ -333,7 +333,7 @@ export const BranchesSection = () => {
                           <>
                             <button
                               onClick={() => startEditing(location)}
-                              className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                              className="p-1 text-brand hover:bg-green-tint rounded"
                               title="Edit"
                             >
                               <Edit className="w-4 h-4" />

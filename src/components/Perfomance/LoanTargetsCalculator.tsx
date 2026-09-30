@@ -211,7 +211,7 @@ const LoanTargetsCalculator: React.FC<LoanTargetsCalculatorProps> = ({
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Target className="w-5 h-5 text-green-500" />
+                <Target className="w-5 h-5 text-primary" />
                 Branch Loan Targets & Performance
               </h2>
               <p className="text-gray-600 text-xs">Monthly loan targeting based on branch age and retention metrics</p>
@@ -365,7 +365,7 @@ const LoanTargetsCalculator: React.FC<LoanTargetsCalculatorProps> = ({
       {/* Performance Insights */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-green-500" />
+          <BarChart3 className="w-5 h-5 text-primary" />
           Performance Insights
         </h3>
         

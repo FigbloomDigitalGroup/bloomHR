@@ -39,7 +39,7 @@ const Footer = () => {
                 style={{ fontFamily: "'Avenir Next', sans-serif" }}
                 whileHover={{ scale: 1.05 }}
               >
-                © {currentYear} Figbud Global
+                © {currentYear} Figbloom Digital Group
               </motion.span>
               <div className="hidden sm:block h-4 w-px bg-gray-900/30"></div>
               <motion.span

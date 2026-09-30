@@ -169,17 +169,17 @@ const DocumentsManager = () => {
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    e.currentTarget.classList.add('border-blue-400');
+    e.currentTarget.classList.add('border-brand');
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
-    e.currentTarget.classList.remove('border-blue-400');
+    e.currentTarget.classList.remove('border-brand');
   };
 
   const handleDrop = (e: React.DragEvent, documentType: string) => {
     e.preventDefault();
-    e.currentTarget.classList.remove('border-blue-400');
+    e.currentTarget.classList.remove('border-brand');
     
     // Prevent drop if document type is already uploaded
     if (uploadedDocuments[documentType]) {
@@ -501,16 +501,16 @@ const DocumentsManager = () => {
 
   const getFileIcon = (file: File | null, fileType?: string) => {
     if (file) {
-      if (file.type?.startsWith('image/')) return <Image size={24} className="text-blue-500" />;
-      if (file.type === 'application/pdf') return <FileText size={24} className="text-red-500" />;
+      if (file.type?.startsWith('image/')) return <Image size={24} className="text-status-info" />;
+      if (file.type === 'application/pdf') return <FileText size={24} className="text-status-danger" />;
       return <File size={24} className="text-gray-500" />;
     }
-    
+
     switch (fileType) {
       case 'image':
-        return <Image size={24} className="text-blue-500" />;
+        return <Image size={24} className="text-status-info" />;
       case 'pdf':
-        return <FileText size={24} className="text-red-500" />;
+        return <FileText size={24} className="text-status-danger" />;
       default:
         return <File size={24} className="text-gray-500" />;
     }
@@ -578,10 +578,10 @@ const DocumentsManager = () => {
   if (!user) {
     return (
       <div className="max-w-4xl mx-auto p-6">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-          <AlertCircle className="mx-auto mb-4 text-yellow-600" size={48} />
-          <h2 className="text-xl font-semibold text-yellow-800 mb-2">Authentication Required</h2>
-          <p className="text-yellow-700">Please log in to manage your documents.</p>
+        <div className="bg-orange-tint-alt border border-orange/20 rounded-lg p-6 text-center">
+          <AlertCircle className="mx-auto mb-4 text-orange-text-alt" size={48} />
+          <h2 className="text-xl font-semibold text-orange-text-alt mb-2">Authentication Required</h2>
+          <p className="text-orange-text-alt">Please log in to manage your documents.</p>
         </div>
       </div>
     );
@@ -590,10 +590,10 @@ const DocumentsManager = () => {
   if (!employeeNumber) {
     return (
       <div className="max-w-4xl mx-auto p-6">
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-          <AlertCircle className="mx-auto mb-4 text-yellow-600" size={48} />
-          <h2 className="text-xl font-semibold text-yellow-800 mb-2">Employee Information Missing</h2>
-          <p className="text-yellow-700">Unable to retrieve your employee information. Please contact support.</p>
+        <div className="bg-orange-tint-alt border border-orange/20 rounded-lg p-6 text-center">
+          <AlertCircle className="mx-auto mb-4 text-orange-text-alt" size={48} />
+          <h2 className="text-xl font-semibold text-orange-text-alt mb-2">Employee Information Missing</h2>
+          <p className="text-orange-text-alt">Unable to retrieve your employee information. Please contact support.</p>
         </div>
       </div>
     );
@@ -608,8 +608,8 @@ const DocumentsManager = () => {
             onClick={() => setActiveTab('upload')}
             className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${
               activeTab === 'upload'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-800'
+                ? 'bg-white text-brand shadow-sm'
+                : 'text-gray-600 hover:text-brand'
             }`}
           >
             <Plus size={16} />
@@ -619,8 +619,8 @@ const DocumentsManager = () => {
             onClick={() => setActiveTab('view')}
             className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${
               activeTab === 'view'
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-800'
+                ? 'bg-white text-brand shadow-sm'
+                : 'text-gray-600 hover:text-brand'
             }`}
           >
             <Newspaper size={16} />
@@ -649,37 +649,37 @@ const DocumentsManager = () => {
               return (
                 <div 
                   key={doc.id} 
-                  className={`bg-white rounded-lg border p-4 ${isUploaded ? 'border-green-200 bg-green-50' : 'border-gray-200'}`}
+                  className={`bg-white rounded-lg border p-4 ${isUploaded ? 'border-green-tint bg-green-tint' : 'border-gray-200'}`}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="font-medium text-gray-700">{doc.label}</h3>
                     <div className="flex items-center gap-2">
                       {isUploaded && (
-                        <div className="flex items-center gap-1 text-green-600">
+                        <div className="flex items-center gap-1 text-status-success">
                           <Check size={16} />
                           <span className="text-xs">Uploaded</span>
                         </div>
                       )}
                       {status?.status === 'success' && (
-                        <CheckCircle size={16} className="text-green-500" />
+                        <CheckCircle size={16} className="text-status-success" />
                       )}
                       {status?.status === 'error' && (
-                        <AlertCircle size={16} className="text-red-500" />
+                        <AlertCircle size={16} className="text-status-danger" />
                       )}
                       {status?.status === 'cancelled' && (
-                        <Ban size={16} className="text-orange-500" />
+                        <Ban size={16} className="text-orange" />
                       )}
                       {isUploading && (
-                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
                       )}
                     </div>
                   </div>
 
                   {isUploaded ? (
-                    <div className="text-center py-6 bg-green-100 rounded-lg">
-                      <CheckCircle size={32} className="mx-auto mb-2 text-green-500" />
-                      <p className="text-green-700 font-medium">Document already uploaded</p>
-                      <p className="text-xs text-green-600 mt-1">
+                    <div className="text-center py-6 bg-green-tint rounded-lg">
+                      <CheckCircle size={32} className="mx-auto mb-2 text-status-success" />
+                      <p className="text-status-success font-medium">Document already uploaded</p>
+                      <p className="text-xs text-status-success mt-1">
                         {uploadedDocuments[doc.id]}
                       </p>
                     </div>
@@ -687,9 +687,9 @@ const DocumentsManager = () => {
                     <div>
                       <div
                         className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
-                          files[doc.id] 
-                            ? 'border-green-300 bg-green-50' 
-                            : 'border-gray-300 hover:border-blue-400'
+                          files[doc.id]
+                            ? 'border-green-tint bg-green-tint'
+                            : 'border-gray-300 hover:border-brand'
                         }`}
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
@@ -707,7 +707,7 @@ const DocumentsManager = () => {
 
                         {files[doc.id] ? (
                           <div className="flex flex-col items-center">
-                            <div className="text-blue-500 mb-2">
+                            <div className="text-status-info mb-2">
                               {getFileIcon(files[doc.id])}
                             </div>
                             <p className="text-xs font-medium text-gray-700 truncate max-w-full">
@@ -725,7 +725,7 @@ const DocumentsManager = () => {
                                     e.stopPropagation();
                                     cancelUpload(doc.id);
                                   }}
-                                  className="text-orange-500 hover:text-orange-700 text-xs flex items-center"
+                                  className="text-orange hover:text-orange-text text-xs flex items-center"
                                 >
                                   <Square size={14} className="mr-1" /> Cancel
                                 </button>
@@ -737,7 +737,7 @@ const DocumentsManager = () => {
                                   removeFile(doc.id);
                                 }}
                                 disabled={isUploading || !!isUploaded}
-                                className="text-red-500 hover:text-red-700 text-xs flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="text-status-danger hover:text-status-danger/80 text-xs flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 <X size={14} className="mr-1" /> Remove
                               </button>
@@ -766,8 +766,8 @@ const DocumentsManager = () => {
                             <span>{progress}%</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            <div
+                              className="bg-primary h-2 rounded-full transition-all duration-300"
                               style={{ width: `${progress}%` }}
                             ></div>
                           </div>
@@ -778,10 +778,10 @@ const DocumentsManager = () => {
 
                   {status?.message && !isUploading && (
                     <p className={`text-xs mt-2 ${
-                      status?.status === 'error' ? 'text-red-500' : 
-                      status?.status === 'success' ? 'text-green-500' : 
-                      status?.status === 'cancelled' ? 'text-orange-500' :
-                      'text-blue-500'
+                      status?.status === 'error' ? 'text-status-danger' :
+                      status?.status === 'success' ? 'text-status-success' :
+                      status?.status === 'cancelled' ? 'text-orange' :
+                      'text-status-info'
                     }`}>
                       {status?.message}
                     </p>
@@ -797,7 +797,7 @@ const DocumentsManager = () => {
                 <button
                   type="button"
                   onClick={cancelAllUploads}
-                  className="bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-lg flex items-center"
+                  className="bg-orange hover:bg-orange/90 text-white font-medium py-2 px-4 rounded-lg flex items-center"
                 >
                   <Square size={16} className="mr-2" />
                   Cancel All
@@ -817,7 +817,7 @@ const DocumentsManager = () => {
               type="button"
               onClick={handleUpload}
               disabled={uploading || !hasFilesToUpload}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              className="bg-primary hover:bg-primary/90 text-white font-medium py-2 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             >
               {uploading ? (
                 <>
@@ -845,7 +845,7 @@ const DocumentsManager = () => {
             <button
               onClick={fetchDocuments}
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
             >
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
               Refresh
@@ -855,7 +855,7 @@ const DocumentsManager = () => {
           {loading ? (
             <div className="text-center py-12">
               <div className="inline-flex items-center gap-3">
-                <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
                 <span className="text-gray-600">Loading documents...</span>
               </div>
             </div>
@@ -866,7 +866,7 @@ const DocumentsManager = () => {
               <p className="text-gray-400 mb-4">Upload some documents to get started</p>
               <button
                 onClick={() => setActiveTab('upload')}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
               >
                 Upload Documents
               </button>
@@ -891,7 +891,7 @@ const DocumentsManager = () => {
                         </div>
                       </div>
                       {isAlreadyUploaded && (
-                        <div className="flex items-center gap-1 text-green-600">
+                        <div className="flex items-center gap-1 text-status-success">
                           <Check size={16} />
                         </div>
                       )}
@@ -911,14 +911,14 @@ const DocumentsManager = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleView(doc)}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-xs bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-xs bg-status-info-tint text-status-info rounded-lg hover:bg-status-info-tint/70"
                       >
                         <Eye size={14} />
                         View
                       </button>
                       <button
                         onClick={() => handleDownload(doc)}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-xs bg-green-50 text-green-600 rounded-lg hover:bg-green-100"
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-xs bg-green-tint text-status-success rounded-lg hover:bg-green-tint/70"
                       >
                         <Download size={14} />
                         Download
@@ -926,10 +926,10 @@ const DocumentsManager = () => {
                       <button
                         onClick={() => handleDelete(doc)}
                         disabled={deleting[doc.name]}
-                        className="flex items-center justify-center px-3 py-2 text-xs bg-red-50 text-red-600 rounded-lg hover:bg-red-100 disabled:opacity-50"
+                        className="flex items-center justify-center px-3 py-2 text-xs bg-orange-tint text-status-danger rounded-lg hover:bg-orange-tint/70 disabled:opacity-50"
                       >
                         {deleting[doc.name] ? (
-                          <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                          <div className="w-4 h-4 border-2 border-status-danger border-t-transparent rounded-full animate-spin"></div>
                         ) : (
                           <Trash2 size={14} />
                         )}
@@ -937,8 +937,8 @@ const DocumentsManager = () => {
                     </div>
                     
                     {isAlreadyUploaded && (
-                      <div className="mt-3 p-2 bg-blue-50 rounded-lg">
-                        <p className="text-xs text-blue-700 text-center">
+                      <div className="mt-3 p-2 bg-status-info-tint rounded-lg">
+                        <p className="text-xs text-status-info text-center">
                           <strong>Note:</strong> Delete this document from here to upload a new version
                         </p>
                       </div>
@@ -989,7 +989,7 @@ const DocumentsManager = () => {
                   </p>
                   <button
                     onClick={() => handleDownload(selectedDoc)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
                   >
                     Download to View
                   </button>

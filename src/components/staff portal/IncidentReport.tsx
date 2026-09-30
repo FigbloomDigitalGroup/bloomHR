@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
+import StatusPill from '../UI/StatusPill';
 
 interface IncidentReport {
     id: string;
@@ -44,10 +45,10 @@ const INCIDENT_TYPES = [
 ];
 
 const SEVERITY_LEVELS = [
-    { value: 'low', label: 'Low', color: 'bg-blue-100 text-blue-800 border-blue-300' },
-    { value: 'medium', label: 'Medium', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-    { value: 'high', label: 'High', color: 'bg-orange-100 text-orange-800 border-orange-300' },
-    { value: 'critical', label: 'Critical', color: 'bg-red-100 text-red-800 border-red-300' }
+    { value: 'low', label: 'Low', tone: 'success' as const },
+    { value: 'medium', label: 'Medium', tone: 'warning' as const },
+    { value: 'high', label: 'High', tone: 'danger' as const },
+    { value: 'critical', label: 'Critical', tone: 'purple' as const }
 ];
 
 const IncidentReport = () => {
@@ -194,19 +195,20 @@ const IncidentReport = () => {
     };
 
     const getStatusBadge = (status: string) => {
-        const styles = {
-            new: 'bg-blue-100 text-blue-800',
-            under_review: 'bg-yellow-100 text-yellow-800',
-            investigating: 'bg-orange-100 text-orange-800',
-            resolved: 'bg-green-100 text-green-800',
-            closed: 'bg-gray-100 text-gray-800',
-            dismissed: 'bg-red-100 text-red-800'
+        const tones = {
+            new: 'info' as const,
+            under_review: 'warning' as const,
+            investigating: 'purple' as const,
+            resolved: 'success' as const,
+            closed: 'neutral' as const,
+            dismissed: 'danger' as const
         };
 
         return (
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${styles[status as keyof typeof styles]}`}>
-                {status.replace('_', ' ').toUpperCase()}
-            </span>
+            <StatusPill
+                label={status.replace('_', ' ').toUpperCase()}
+                tone={tones[status as keyof typeof tones]}
+            />
         );
     };
 
@@ -218,26 +220,26 @@ const IncidentReport = () => {
                     animate={{ opacity: 1, scale: 1 }}
                     className="max-w-2xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center"
                 >
-                    <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
-                        <CheckCircle2 className="h-8 w-8 text-green-600" />
+                    <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-tint mb-4">
+                        <CheckCircle2 className="h-8 w-8 text-status-success" />
                     </div>
                     <h2 className="text-2xl font-semibold text-gray-900 mb-2">Report Submitted Successfully</h2>
                     <p className="text-gray-600 mb-4">
                         Your incident report has been submitted and will be reviewed by the appropriate personnel.
                     </p>
                     {!isAnonymous && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                            <p className="text-sm text-blue-800">
+                        <div className="bg-status-info-tint border border-status-info/30 rounded-lg p-4 mb-6">
+                            <p className="text-sm text-status-info">
                                 <strong>Report ID:</strong> {submittedReportId.substring(0, 8)}...
                             </p>
-                            <p className="text-xs text-blue-600 mt-1">
+                            <p className="text-xs text-status-info mt-1">
                                 You can track the status of your report in "My Reports"
                             </p>
                         </div>
                     )}
                     {isAnonymous && (
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                            <p className="text-sm text-yellow-800">
+                        <div className="bg-orange-tint-alt border border-orange-text-alt/30 rounded-lg p-4 mb-6">
+                            <p className="text-sm text-orange-text-alt">
                                 Your report was submitted anonymously. You will not be able to track its status.
                             </p>
                         </div>
@@ -247,7 +249,7 @@ const IncidentReport = () => {
                             setShowSuccess(false);
                             setIsAnonymous(false);
                         }}
-                        className="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+                        className="px-6 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary/90 transition-colors"
                     >
                         Submit Another Report
                     </button>
@@ -280,15 +282,15 @@ const IncidentReport = () => {
                     </div>
 
                     {/* Anonymity Toggle */}
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="bg-status-info-tint border border-status-info/30 rounded-lg p-4">
                         <div className="flex items-start">
-                            <Shield className="h-5 w-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+                            <Shield className="h-5 w-5 text-status-info mt-0.5 mr-3 flex-shrink-0" />
                             <div className="flex-1">
                                 <div className="flex items-center justify-between mb-2">
-                                    <h3 className="text-sm font-medium text-blue-900">Anonymity Protection</h3>
+                                    <h3 className="text-sm font-medium text-status-info">Anonymity Protection</h3>
                                     <button
                                         onClick={() => setIsAnonymous(!isAnonymous)}
-                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isAnonymous ? 'bg-blue-600' : 'bg-gray-300'
+                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isAnonymous ? 'bg-primary' : 'bg-gray-300'
                                             }`}
                                     >
                                         <span
@@ -297,7 +299,7 @@ const IncidentReport = () => {
                                         />
                                     </button>
                                 </div>
-                                <p className="text-xs text-blue-800">
+                                <p className="text-xs text-status-info">
                                     {isAnonymous ? (
                                         <>
                                             <EyeOff className="h-3 w-3 inline mr-1" />
@@ -340,10 +342,11 @@ const IncidentReport = () => {
                                                 {new Date(report.created_at).toLocaleDateString()}
                                             </span>
                                             <span className="capitalize">{report.incident_type.replace('_', ' ')}</span>
-                                            <span className={`px-2 py-0.5 rounded-full ${SEVERITY_LEVELS.find(s => s.value === report.severity)?.color
-                                                }`}>
-                                                {report.severity}
-                                            </span>
+                                            <StatusPill
+                                                label={report.severity}
+                                                tone={SEVERITY_LEVELS.find(s => s.value === report.severity)?.tone}
+                                                className="capitalize"
+                                            />
                                         </div>
                                     </div>
                                 ))}
@@ -365,7 +368,7 @@ const IncidentReport = () => {
                                     value={incidentType}
                                     onChange={(e) => setIncidentType(e.target.value)}
                                     required
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                                 >
                                     <option value="">Select incident type...</option>
                                     {INCIDENT_TYPES.map((type) => (
@@ -384,7 +387,7 @@ const IncidentReport = () => {
                                     value={severity}
                                     onChange={(e) => setSeverity(e.target.value)}
                                     required
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                                 >
                                     {SEVERITY_LEVELS.map((level) => (
                                         <option key={level.value} value={level.value}>
@@ -407,7 +410,7 @@ const IncidentReport = () => {
                                 required
                                 maxLength={200}
                                 placeholder="Brief summary of the incident"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                             />
                         </div>
 
@@ -422,7 +425,7 @@ const IncidentReport = () => {
                                 required
                                 rows={6}
                                 placeholder="Provide a detailed description of the incident, including what happened, when, and any other relevant information..."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                             />
                             <p className="text-xs text-gray-500 mt-1">
                                 Be as specific as possible. Include dates, times, locations, and names if applicable.
@@ -441,7 +444,7 @@ const IncidentReport = () => {
                                     value={incidentDate}
                                     onChange={(e) => setIncidentDate(e.target.value)}
                                     max={new Date().toISOString().split('T')[0]}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                                 />
                             </div>
 
@@ -455,7 +458,7 @@ const IncidentReport = () => {
                                     value={location}
                                     onChange={(e) => setLocation(e.target.value)}
                                     placeholder="Where did this occur?"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                                 />
                             </div>
 
@@ -469,18 +472,18 @@ const IncidentReport = () => {
                                     value={witnesses}
                                     onChange={(e) => setWitnesses(e.target.value)}
                                     placeholder="Any witnesses?"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                                 />
                             </div>
                         </div>
 
                         {/* Warning */}
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div className="bg-orange-tint-alt border border-orange-text-alt/30 rounded-lg p-4">
                             <div className="flex items-start">
-                                <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 mr-3 flex-shrink-0" />
+                                <AlertTriangle className="h-5 w-5 text-orange-text-alt mt-0.5 mr-3 flex-shrink-0" />
                                 <div>
-                                    <h4 className="text-sm font-medium text-yellow-900 mb-1">Important Information</h4>
-                                    <ul className="text-xs text-yellow-800 space-y-1">
+                                    <h4 className="text-sm font-medium text-orange-text-alt mb-1">Important Information</h4>
+                                    <ul className="text-xs text-orange-text-alt space-y-1">
                                         <li>• All reports are treated confidentially and investigated thoroughly</li>
                                         <li>• False or malicious reports may result in disciplinary action</li>
                                         <li>• You will not face retaliation for reporting in good faith</li>
@@ -503,7 +506,7 @@ const IncidentReport = () => {
                             <button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center"
+                                className="px-6 py-2 bg-primary text-white font-medium rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center"
                             >
                                 {isSubmitting ? (
                                     <>

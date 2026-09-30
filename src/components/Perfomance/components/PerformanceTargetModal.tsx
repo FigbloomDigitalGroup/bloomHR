@@ -325,7 +325,7 @@ const PerformanceTargetModal: React.FC<PerformanceTargetModalProps> = ({
               name="is_active"
               checked={formData.is_active}
               onChange={handleChange}
-              className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+              className="h-4 w-4 text-primary focus:ring-primary/50 border-gray-300 rounded"
             />
             <label className="ml-2 block text-xs text-gray-700">
               Active Target
@@ -343,7 +343,7 @@ const PerformanceTargetModal: React.FC<PerformanceTargetModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
+              className="px-4 py-2 text-xs font-medium text-white bg-primary rounded-md hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1"
             >
               {isSubmitting ? 'Saving...' : (
                 <>

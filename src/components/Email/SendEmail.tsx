@@ -25,7 +25,7 @@ export default function SendEmail() {
   // Form State
   const [mode, setMode] = useState<'single' | 'bulk'>('single');
   const [provider, setProvider] = useState<'resend' | 'cpanel'>('resend'); // Default provider
-  const [cpanelUser, setCpanelUser] = useState<string>('support@mularcredit.com'); // Default cPanel user
+  const [cpanelUser, setCpanelUser] = useState<string>(''); // Default cPanel user
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
 
   // Bulk Filters

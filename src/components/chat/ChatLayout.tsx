@@ -239,10 +239,26 @@ export function ChatLayout() {
     try {
       console.log("💬 Sending message...");
       const newMessage = await chatService.sendMessage(activeChannel.id, currentUser.id, content);
-      
+
       if (newMessage) {
-        setMessages(prev => [...prev, newMessage]);
-        
+        // Now that realtime is actually enabled (see chat_realtime.sql),
+        // the subscription below also delivers this same row back to its
+        // own sender - dedupe by id in both places so it doesn't appear
+        // twice, which is exactly what surfaced this once realtime started
+        // working.
+        setMessages(prev => prev.some(m => m.id === newMessage.id) ? prev : [...prev, newMessage]);
+
+        // Sending a message doesn't count as "unread" for the sender, but
+        // last_read_at only otherwise updates on channel *switch*
+        // (handleChannelSelect) - without this, the broader unread-count
+        // subscription below would immediately flag your own just-sent
+        // message as unread in the channel you're actively looking at.
+        if (!activeChannel.id.startsWith('dm-')) {
+          chatService.markMessagesAsRead(activeChannel.id, currentUser.id).catch(err =>
+            console.error('Error marking own message as read:', err)
+          );
+        }
+
         // Update DM activity status when a message is sent
         if (activeChannel.id.startsWith('dm-')) {
           setDirectMessages(prev => 
@@ -352,10 +368,10 @@ const handleDMCreate = async (userId: string) => {
         content: `You started a conversation with ${targetEmployee.fullName}. Send a message to begin chatting! 👋`,
         author: {
           id: 'system',
-          name: 'ZiraTeams',
+          name: 'Figbloom Teams',
           avatar: '',
-          initials: 'ZT',
-          email: 'system@zirateams.com',
+          initials: 'FT',
+          email: 'system@figbloomteams.com',
           status: 'online'
         },
         timestamp: new Date().toISOString(),
@@ -428,8 +444,17 @@ const handleDMCreate = async (userId: string) => {
     console.log("🔔 Setting up real-time subscription for:", activeChannel.name);
     const subscription = chatService.subscribeToMessages(activeChannel.id, (newMessage) => {
       console.log("📨 New real-time message received");
-      setMessages(prev => [...prev, newMessage]);
-      
+      setMessages(prev => prev.some(m => m.id === newMessage.id) ? prev : [...prev, newMessage]);
+
+      // Someone else's message arriving while this channel is already open
+      // shouldn't show as unread either - the channel is actively being
+      // viewed, same reasoning as the sender's own case in handleSendMessage.
+      if (currentUser && !activeChannel.id.startsWith('dm-')) {
+        chatService.markMessagesAsRead(activeChannel.id, currentUser.id).catch(err =>
+          console.error('Error marking incoming message as read:', err)
+        );
+      }
+
       // Update DM activity status for real-time messages
       if (activeChannel.id.startsWith('dm-')) {
         setDirectMessages(prev => 
@@ -453,7 +478,7 @@ const handleDMCreate = async (userId: string) => {
         chatService.unsubscribe(subscription);
       }
     };
-  }, [activeChannel?.id]);
+  }, [activeChannel?.id, currentUser]);
 
   // Refresh channels when employees are loaded (for DM partner data)
   useEffect(() => {
@@ -461,6 +486,32 @@ const handleDMCreate = async (userId: string) => {
       loadUserChannels(currentUser.id);
     }
   }, [employees.length]);
+
+  // Live per-channel unread badge updates (see getUnreadCountsByChannel in
+  // chatServices.ts - unread_count was always hardcoded to 0 until now).
+  // A message arriving in a channel other than the active one only shows up
+  // here, not in the per-active-channel subscription above, so this needs
+  // its own unscoped listener.
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const subscription = supabase
+      .channel('chatlayout_unread_counts')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async () => {
+        try {
+          const fresh = await chatService.getUserChannels(currentUser.id);
+          const regular = fresh.filter(ch => !ch.id.startsWith('dm-')) as Channel[];
+          setChannels(regular);
+        } catch (err) {
+          console.error('Error refreshing channel unread counts:', err);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [currentUser]);
 
   // Loading states
   if (authLoading) {
@@ -480,8 +531,8 @@ const handleDMCreate = async (userId: string) => {
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-gradient-to-br from-slate-50 to-blue-50/30">
+    <SidebarProvider className="h-full">
+      <div className="flex h-full w-full bg-background">
         <AppSidebar 
           channels={channels.filter(ch => !ch.id.startsWith('dm-'))}
           directMessages={directMessages}
@@ -516,9 +567,9 @@ const handleDMCreate = async (userId: string) => {
 // Supporting Components (same as before)
 function LoadingScreen({ message }: { message: string }) {
   return (
-    <div className="flex min-h-screen w-full bg-gradient-to-br from-blue-50 to-purple-50 items-center justify-center">
+    <div className="flex h-full w-full bg-background items-center justify-center">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand mx-auto"></div>
         <p className="mt-4 text-gray-600">{message}</p>
       </div>
     </div>
@@ -527,18 +578,18 @@ function LoadingScreen({ message }: { message: string }) {
 
 function SignInScreen() {
   return (
-    <div className="flex min-h-screen w-full bg-gradient-to-br from-blue-50 to-purple-50 items-center justify-center">
+    <div className="flex h-full w-full bg-background items-center justify-center">
       <div className="text-center max-w-md mx-auto p-8">
-        <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-          <span className="text-2xl font-bold text-white">Z</span>
+        <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-brand flex items-center justify-center">
+          <span className="text-2xl font-bold text-white">F</span>
         </div>
-        <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
-          Welcome to ZiraTeams
+        <h2 className="text-3xl font-bold text-brand mb-4">
+          Welcome to Figbloom Teams
         </h2>
         <p className="text-gray-600 mb-6">Please sign in to access the team chat</p>
-        <button 
+        <button
           onClick={() => window.location.reload()}
-          className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg font-semibold hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg"
+          className="px-6 py-3 bg-brand text-white rounded-lg font-semibold hover:bg-brand-dark transition-all shadow-lg"
         >
           Sign In
         </button>
@@ -549,16 +600,16 @@ function SignInScreen() {
 
 function ErrorScreen({ error, onRetry }: { error: string, onRetry: () => void }) {
   return (
-    <div className="flex min-h-screen w-full bg-gradient-to-br from-blue-50 to-purple-50 items-center justify-center">
+    <div className="flex h-full w-full bg-background items-center justify-center">
       <div className="text-center max-w-md mx-auto p-6">
         <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
           <span className="text-2xl text-red-600">⚠️</span>
         </div>
         <h3 className="text-lg font-semibold text-red-600 mb-2">Error</h3>
         <p className="text-gray-600 mb-4">{error}</p>
-        <button 
+        <button
           onClick={onRetry}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="px-4 py-2 bg-brand text-white rounded-lg hover:bg-brand-dark transition-colors"
         >
           Retry
         </button>
@@ -571,19 +622,19 @@ function WelcomeScreen({ currentUser, onCreateChannel }: { currentUser: User, on
   return (
     <div className="flex-1 flex items-center justify-center">
       <div className="text-center max-w-2xl mx-auto p-8">
-        <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+        <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-brand flex items-center justify-center shadow-lg">
           <span className="text-2xl font-bold text-white">
             {currentUser.initials}
           </span>
         </div>
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
-          Welcome to ZiraTeams
+        <h1 className="text-4xl font-bold text-brand mb-4">
+          Welcome to Figbloom Teams
         </h1>
         <p className="text-xl text-gray-600 mb-2">
           Hello, <strong>{currentUser.name}</strong>!
         </p>
         {currentUser.employeeData && (
-          <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-medium mb-6 shadow-sm">
+          <div className="inline-flex items-center gap-2 bg-green-tint text-brand px-4 py-2 rounded-full text-sm font-medium mb-6 shadow-sm">
             <span>{currentUser.employeeData.jobTitle}</span>
             <span>•</span>
             <span>{currentUser.employeeData.department}</span>
@@ -594,13 +645,13 @@ function WelcomeScreen({ currentUser, onCreateChannel }: { currentUser: User, on
           Start by creating a channel or sending a direct message.
         </p>
         <div className="flex gap-4 justify-center">
-          <button 
+          <button
             onClick={() => onCreateChannel('general', false)}
-            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg font-semibold hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl"
+            className="px-6 py-3 bg-brand text-white rounded-lg font-semibold hover:bg-brand-dark transition-all shadow-lg hover:shadow-xl"
           >
             Create General Channel
           </button>
-          <button className="px-6 py-3 border border-blue-500 text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-all shadow-sm">
+          <button className="px-6 py-3 border border-brand text-brand rounded-lg font-semibold hover:bg-green-tint transition-all shadow-sm">
             Explore Teams
           </button>
         </div>

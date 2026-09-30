@@ -145,7 +145,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         disabled={disabled}
-        className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 bg-white text-left flex items-center justify-between disabled:bg-gray-100 disabled:cursor-not-allowed"
+        className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:border-brand bg-white text-left flex items-center justify-between disabled:bg-gray-100 disabled:cursor-not-allowed"
       >
         <span className={value ? 'text-gray-900' : 'text-gray-500'}>
           {selectedOption ? selectedOption.label : placeholder}
@@ -163,7 +163,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-600 focus:border-blue-600"
+                className="w-full pl-8 pr-3 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand focus:border-brand"
                 autoFocus
               />
             </div>
@@ -182,8 +182,8 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                     setIsOpen(false);
                     setSearchTerm('');
                   }}
-                  className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 ${
-                    option.value === value ? 'bg-blue-50 text-blue-700' : 'text-gray-900'
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-green-tint hover:text-brand-dark ${
+                    option.value === value ? 'bg-green-tint text-brand-dark' : 'text-gray-900'
                   }`}
                 >
                   {option.label}
@@ -215,9 +215,9 @@ const ComplianceStatusBadge: React.FC<{ status?: string; type: 'deduction' | 'fi
         case 'Pending':
           return { color: 'bg-amber-50 text-amber-700 border-amber-200' };
         case 'Submitted':
-          return { color: 'bg-blue-50 text-blue-700 border-blue-200' };
+          return { color: 'bg-green-tint text-brand-dark border-brand/20' };
         case 'Verified':
-          return { color: 'bg-purple-50 text-purple-700 border-purple-200' };
+          return { color: 'bg-orange-tint text-orange-text-alt border-orange/20' };
         case 'Paid':
           return { color: 'bg-gray-50 text-gray-700 border-gray-300' };
         case 'Overdue':
@@ -232,7 +232,7 @@ const ComplianceStatusBadge: React.FC<{ status?: string; type: 'deduction' | 'fi
         case 'Late':
           return { color: 'bg-red-50 text-red-700 border-red-200' };
         case 'Upcoming':
-          return { color: 'bg-blue-50 text-blue-700 border-blue-200' };
+          return { color: 'bg-green-tint text-brand-dark border-brand/20' };
         default:
           return { color: 'bg-gray-50 text-gray-600 border-gray-300' };
       }
@@ -330,7 +330,7 @@ const Pagination: React.FC<PaginationProps> = ({
         <select
           value={itemsPerPage}
           onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-          className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+          className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-brand focus:border-brand"
         >
           <option value={10}>10</option>
           <option value={25}>25</option>
@@ -368,7 +368,7 @@ const Pagination: React.FC<PaginationProps> = ({
             disabled={page === '...'}
             className={`min-w-[2rem] px-2 py-1 text-sm rounded border ${
               currentPage === page
-                ? 'bg-blue-600 text-white border-blue-600'
+                ? 'bg-brand text-white border-brand'
                 : 'border-gray-300 text-gray-700 hover:bg-gray-100'
             } disabled:bg-transparent disabled:cursor-default`}
           >
@@ -867,7 +867,7 @@ const StatutoryDeductionsReport: React.FC<BaseReportProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 bg-gray-50 border-b border-gray-300">
         <div className="bg-white p-3 rounded border border-gray-300 shadow-sm">
           <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Total NITA</p>
-          <p className="text-xl font-bold text-purple-700 mt-1">{formatCurrency(totalNITA)}</p>
+          <p className="text-xl font-bold text-orange-text-alt mt-1">{formatCurrency(totalNITA)}</p>
           <p className="text-xs text-gray-500 mt-1">Training Levy</p>
         </div>
 
@@ -879,7 +879,7 @@ const StatutoryDeductionsReport: React.FC<BaseReportProps> = ({
 
         <div className="bg-white p-3 rounded border border-gray-300 shadow-sm">
           <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Total Deductions</p>
-          <p className="text-xl font-bold text-blue-700 mt-1">{totalDeductions}</p>
+          <p className="text-xl font-bold text-brand-dark mt-1">{totalDeductions}</p>
           <p className="text-xs text-gray-500 mt-1">All deduction records</p>
         </div>
       </div>
@@ -947,7 +947,7 @@ const StatutoryDeductionsReport: React.FC<BaseReportProps> = ({
                         </div>
                         <div className="text-sm">
                           <div className="text-gray-600 text-xs">NHIF Contributions</div>
-                          <div className="font-semibold text-blue-700">
+                          <div className="font-semibold text-brand-dark">
                             {formatCurrency(totalNHIF)}
                           </div>
                           {recentDeduction.nhif_tier && (
@@ -999,7 +999,7 @@ const StatutoryDeductionsReport: React.FC<BaseReportProps> = ({
                       <div className="space-y-2">
                         <div className="text-sm">
                           <div className="text-gray-600 text-xs">NITA Levy</div>
-                          <div className="font-semibold text-purple-700">
+                          <div className="font-semibold text-orange-text-alt">
                             {formatCurrency(totalNITA)}
                           </div>
                         </div>
@@ -1099,7 +1099,7 @@ const StatutoryDeductionsReport: React.FC<BaseReportProps> = ({
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium shadow-sm transition-colors"
+                className="inline-flex items-center gap-2 px-3 py-2 bg-brand hover:bg-brand-dark text-white rounded text-xs font-medium shadow-sm transition-colors"
               >
                 <Filter className="w-3 h-3" />
                 {showFilters ? 'Hide Filters' : 'Show Filters'}
@@ -1134,7 +1134,7 @@ const StatutoryDeductionsReport: React.FC<BaseReportProps> = ({
                     type="date"
                     value={filters.startDate}
                     onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                   />
                 </div>
                 <div>
@@ -1145,7 +1145,7 @@ const StatutoryDeductionsReport: React.FC<BaseReportProps> = ({
                     type="date"
                     value={filters.endDate}
                     onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                   />
                 </div>
 
@@ -1187,7 +1187,7 @@ const StatutoryDeductionsReport: React.FC<BaseReportProps> = ({
                 <button
                   onClick={handleGenerateReport}
                   disabled={generating}
-                  className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium shadow-sm disabled:opacity-50 transition-colors"
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-brand hover:bg-brand-dark text-white rounded text-xs font-medium shadow-sm disabled:opacity-50 transition-colors"
                 >
                   {generating ? (
                     <Loader2 className="w-3 h-3 animate-spin" />
@@ -1205,7 +1205,7 @@ const StatutoryDeductionsReport: React.FC<BaseReportProps> = ({
         <div className="bg-white rounded-lg border border-gray-300 shadow-sm overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+              <Loader2 className="w-8 h-8 text-brand animate-spin" />
             </div>
           ) : (
             renderDeductionsReportData(paginatedEmployeeData)

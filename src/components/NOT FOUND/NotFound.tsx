@@ -130,7 +130,7 @@ export default function Unauthorized() {
           <div className="mt-8 text-center">
             <p className="text-xs text-gray-400 flex items-center justify-center gap-1">
               <Zap className="h-3 w-3" />
-              Powered by figbud global
+              Powered by Figbloom Digital Group
             </p>
           </div>
         </div>

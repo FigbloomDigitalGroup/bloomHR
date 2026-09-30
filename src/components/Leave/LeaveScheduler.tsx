@@ -64,7 +64,7 @@ const STATUS_STYLES = {
     approved: { bg: 'bg-emerald-500', border: 'border-emerald-600', text: 'text-white', shadow: 'shadow-emerald-500/30' },
     pending: { bg: 'bg-amber-400', border: 'border-amber-500', text: 'text-amber-900', shadow: 'shadow-amber-500/30' },
     rejected: { bg: 'bg-rose-400', border: 'border-rose-500', text: 'text-white', shadow: 'shadow-rose-500/30' },
-    DEFAULT: { bg: 'bg-blue-500', border: 'border-blue-600', text: 'text-white', shadow: 'shadow-blue-500/30' }
+    DEFAULT: { bg: 'bg-brand', border: 'border-brand', text: 'text-white', shadow: 'shadow-brand/30' }
 };
 
 const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSchedulerProps) => {
@@ -115,10 +115,14 @@ const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSche
             if (empError) throw empError;
 
             // 2. Fetch Leaves
+            // `status` casing is inconsistent across rows ('Rejected' from
+            // older/Staff-Portal rows, 'rejected' from LeaveManagement's own
+            // writes) - a plain .neq('status', 'rejected') let capitalized
+            // "Rejected" rows back in, since it's a case-sensitive comparison.
             const { data: leaveData, error: leaveError } = await supabase
                 .from('leave_application')
                 .select('*')
-                .neq('Status', 'rejected')
+                .not('status', 'ilike', 'rejected')
                 .lte('Start Date', monthEnd.toISOString())
                 .gte('End Date', monthStart.toISOString());
 

@@ -281,12 +281,12 @@ const SummaryCard = ({
   isCount = false,
 }) => {
   const colorClasses = {
-    emerald: 'bg-emerald-100 text-emerald-600',
-    red: 'bg-red-100 text-red-600',
-    blue: 'bg-blue-100 text-blue-600',
-    purple: 'bg-purple-100 text-purple-600',
-    yellow: 'bg-yellow-100 text-yellow-600',
-    orange: 'bg-orange-100 text-orange-600'
+    emerald: 'bg-green-tint text-brand',
+    red: 'bg-orange-tint text-status-danger',
+    blue: 'bg-status-info-tint text-status-info',
+    purple: 'bg-status-purple-tint text-status-purple',
+    yellow: 'bg-orange-tint-alt text-orange-text-alt',
+    orange: 'bg-orange-tint text-orange'
   };
 
   return (
@@ -315,11 +315,11 @@ const StatutoryCard = ({
   rate
 }) => {
   const colorClasses = {
-    red: 'bg-red-100 text-red-600',
-    blue: 'bg-blue-100 text-blue-600',
-    green: 'bg-green-100 text-green-600',
-    yellow: 'bg-yellow-100 text-yellow-600',
-    purple: 'bg-purple-100 text-purple-600'
+    red: 'bg-orange-tint text-status-danger',
+    blue: 'bg-status-info-tint text-status-info',
+    green: 'bg-green-tint text-brand',
+    yellow: 'bg-orange-tint-alt text-orange-text-alt',
+    purple: 'bg-status-purple-tint text-status-purple'
   };
 
   return (
@@ -356,9 +356,9 @@ const GlowButton = ({
     lg: "px-6 py-3 text-base"
   };
   const variantClasses = {
-    primary: "bg-green-50 border-green-500 text-green-600 hover:bg-green-100 hover:border-green-600 hover:text-green-700 hover:shadow-[0_0_20px_rgba(34,197,94,0.5)] focus:shadow-[0_0_25px_rgba(34,197,94,0.6)]",
+    primary: "bg-green-tint border-brand text-brand hover:bg-green-tint hover:border-brand-dark hover:text-brand-dark hover:shadow-[0_0_20px_rgba(23,64,42,0.5)] focus:shadow-[0_0_25px_rgba(23,64,42,0.6)]",
     secondary: "bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-300 hover:border-gray-400",
-    danger: "bg-red-50 border-red-500 text-red-600 hover:bg-red-100 hover:border-red-600 hover:text-red-700 hover:shadow-[0_0_20px_rgba(239,68,68,0.5)]"
+    danger: "bg-orange-tint border-status-danger text-status-danger hover:bg-orange-tint-alt hover:border-status-danger hover:text-status-danger hover:shadow-[0_0_20px_rgba(192,57,43,0.5)]"
   };
 
   return (
@@ -889,7 +889,7 @@ const PayslipViewer = () => {
   if (isLoading) {
     return (
       <div className="p-8 flex justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-brand"></div>
       </div>
     );
   }
@@ -903,7 +903,7 @@ const PayslipViewer = () => {
             <h1 className="text-2xl font-bold text-gray-900 mb-1">My Payslips</h1>
             <p className="text-gray-600 text-xs">View and download your payroll payslips</p>
             {summaryTotals.totalAdvanceDeductions > 0 && (
-              <p className="text-xs text-orange-600 mt-1">
+              <p className="text-xs text-orange-text-alt mt-1">
                 Total Salary Advance Deductions: KSh {summaryTotals.totalAdvanceDeductions.toLocaleString()}
               </p>
             )}
@@ -989,7 +989,7 @@ const PayslipViewer = () => {
                 placeholder="Search payslips..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="w-full pl-10 pr-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
           </div>
@@ -1003,7 +1003,7 @@ const PayslipViewer = () => {
               showMonthYearPicker
               isClearable
               placeholderText="All Periods"
-              className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               wrapperClassName="w-full"
             />
           </div>
@@ -1113,31 +1113,31 @@ const PayslipViewer = () => {
                             <div className="text-gray-500 text-xs">{payslip["Employee ID"] || payslip.employee_id || 'N/A'}</div>
                           </div>
                         </td>
-                        <td className="px-4 py-4 text-right font-bold text-green-600">
+                        <td className="px-4 py-4 text-right font-bold text-status-success">
                           KSh {calculated.grossPay.toLocaleString()}
                         </td>
-                        <td className="px-4 py-4 text-right font-bold text-yellow-600">
+                        <td className="px-4 py-4 text-right font-bold text-orange-text-alt">
                           KSh {calculated.perDiem.toLocaleString()}
                         </td>
-                        <td className="px-4 py-4 text-right text-red-600">
+                        <td className="px-4 py-4 text-right text-status-danger">
                           KSh {Math.round(calculated.payeTax).toLocaleString()}
                         </td>
-                        <td className="px-4 py-4 text-right text-purple-600">
+                        <td className="px-4 py-4 text-right text-status-purple">
                           KSh {calculated.nhifDeduction.toLocaleString()}
                         </td>
-                        <td className="px-4 py-4 text-right text-blue-600">
+                        <td className="px-4 py-4 text-right text-status-info">
                           KSh {calculated.nssfDeduction.toLocaleString()}
                         </td>
-                        <td className="px-4 py-4 text-right text-yellow-600">
+                        <td className="px-4 py-4 text-right text-orange-text-alt">
                           KSh {calculated.housingLevy.toLocaleString()}
                         </td>
-                        <td className="px-4 py-4 text-right text-orange-600">
+                        <td className="px-4 py-4 text-right text-orange">
                           KSh {calculated.advanceDeduction.toLocaleString()}
                         </td>
-                        <td className="px-4 py-4 text-right font-bold text-red-600">
+                        <td className="px-4 py-4 text-right font-bold text-status-danger">
                           KSh {calculated.totalDeductions.toLocaleString()}
                         </td>
-                        <td className="px-4 py-4 text-right font-bold text-green-700">
+                        <td className="px-4 py-4 text-right font-bold text-status-success">
                           KSh {Math.round(calculated.netPay).toLocaleString()}
                         </td>
                         <td className="sticky right-0 z-10 bg-white px-4 py-4 text-center">
@@ -1174,7 +1174,7 @@ const PayslipViewer = () => {
                                   <span>Overtime Pay:</span>
                                   <span>KSh {calculated.overtimePay.toLocaleString()}</span>
                                 </div>
-                                <div className="flex justify-between font-bold bg-yellow-50 p-1">
+                                <div className="flex justify-between font-bold bg-orange-tint-alt p-1">
                                   <span>Per Diem:</span>
                                   <span>KSh {calculated.perDiem.toLocaleString()}</span>
                                 </div>
@@ -1184,19 +1184,19 @@ const PayslipViewer = () => {
                                 <h4 className="font-medium text-gray-900">Statutory Deductions</h4>
                                 <div className="flex justify-between">
                                   <span>PAYE:</span>
-                                  <span className="text-red-600">KSh {Math.round(calculated.payeTax).toLocaleString()}</span>
+                                  <span className="text-status-danger">KSh {Math.round(calculated.payeTax).toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span>SHIF:</span>
-                                  <span className="text-red-600">KSh {calculated.nhifDeduction.toLocaleString()}</span>
+                                  <span className="text-status-danger">KSh {calculated.nhifDeduction.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span>NSSF:</span>
-                                  <span className="text-red-600">KSh {calculated.nssfDeduction.toLocaleString()}</span>
+                                  <span className="text-status-danger">KSh {calculated.nssfDeduction.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span>Housing Levy:</span>
-                                  <span className="text-red-600">KSh {calculated.housingLevy.toLocaleString()}</span>
+                                  <span className="text-status-danger">KSh {calculated.housingLevy.toLocaleString()}</span>
                                 </div>
                               </div>
 
@@ -1204,19 +1204,19 @@ const PayslipViewer = () => {
                                 <h4 className="font-medium text-gray-900">Other Deductions</h4>
                                 <div className="flex justify-between">
                                   <span>Advance Deduction:</span>
-                                  <span className="text-red-600">KSh {calculated.advanceDeduction.toLocaleString()}</span>
+                                  <span className="text-status-danger">KSh {calculated.advanceDeduction.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span>Welfare:</span>
-                                  <span className="text-red-600">KSh {calculated.welfareDeduction.toLocaleString()}</span>
+                                  <span className="text-status-danger">KSh {calculated.welfareDeduction.toLocaleString()}</span>
                                 </div>
-                                <div className="flex justify-between text-green-600">
+                                <div className="flex justify-between text-status-success">
                                   <span>Tax Relief:</span>
                                   <span>KSh -{calculated.taxRelief.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between font-medium">
                                   <span>Total Deductions:</span>
-                                  <span className="text-red-600">KSh {calculated.totalDeductions.toLocaleString()}</span>
+                                  <span className="text-status-danger">KSh {calculated.totalDeductions.toLocaleString()}</span>
                                 </div>
                               </div>
                             </div>

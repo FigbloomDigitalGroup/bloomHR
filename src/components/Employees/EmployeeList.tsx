@@ -21,7 +21,7 @@ import { TownProps } from '../../types/supabase';
 import { supabase } from '../../lib/supabase';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 
@@ -51,7 +51,8 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
   const employeesPerPage = 6;
 
   // Filter state
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [selectedEmploymentType, setSelectedEmploymentType] = useState('all');
@@ -280,7 +281,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Employee Management</h1>
           <p className="text-gray-600 mt-1">
-            Managing employees for <span className="font-semibold text-green-600">{getDisplayName()}</span>
+            Managing employees for <span className="font-semibold text-primary">{getDisplayName()}</span>
           </p>
         </div>
         <div className='flex space-x-3'>
@@ -311,7 +312,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full pl-8 pr-3 py-1.5 text-[11px] border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full pl-8 pr-3 py-1.5 text-[11px] border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
             />
           </div>
 
@@ -382,7 +383,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                     Update ({selectedIds.length})
                   </GlowButton>
                   <button
-                    className="text-[10px] text-gray-500 hover:text-emerald-600 underline ml-1"
+                    className="text-[10px] text-gray-500 hover:text-primary underline ml-1"
                     onClick={handleSelectAllOnPage}
                   >
                     Toggle Page
@@ -456,8 +457,8 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
               }}
               className={`group flex flex-col bg-white rounded-2xl border shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all duration-300 overflow-hidden relative cursor-pointer
                 ${isSelected
-                  ? 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-lg'
-                  : 'border-gray-200/60 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:border-green-500/20'}
+                  ? 'border-primary ring-2 ring-primary/20 shadow-lg'
+                  : 'border-gray-200/60 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:border-primary/20'}
             `}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -468,7 +469,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
               {selectionAction && (
                 <div className="absolute top-3 right-3 z-20">
                   <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors
-                        ${isSelected ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-gray-300 group-hover:border-emerald-400'}
+                        ${isSelected ? 'bg-primary border-primary' : 'bg-white border-gray-300 group-hover:border-primary/60'}
                      `}>
                     {isSelected && <CheckSquare size={14} className="text-white" />}
                   </div>
@@ -480,7 +481,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                 <div className="flex items-center space-x-3 w-full">
                   {/* Avatar */}
                   <div className="relative">
-                    <div className="w-10 h-10 bg-gradient-to-br from-green-600 to-emerald-700 rounded-full flex items-center justify-center text-white font-bold text-sm border border-green-500/30 shadow-sm transition-colors duration-300">
+                    <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center text-white font-bold text-sm border border-primary/30 shadow-sm transition-colors duration-300">
                       {getInitials(employee['First Name'], employee['Middle Name'], employee['Last Name'])}
                     </div>
                     <div className={`absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${employee['Termination Date'] ? 'bg-red-500' : 'bg-emerald-500'}`} />
@@ -488,7 +489,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
 
                   {/* Name & ID */}
                   <div className="space-y-0.5 min-w-0">
-                    <h3 className="text-gray-900 font-bold text-[13px] leading-tight group-hover:text-green-700 transition-colors truncate">
+                    <h3 className="text-gray-900 font-bold text-[13px] leading-tight group-hover:text-primary transition-colors truncate">
                       {employee['First Name']} {employee['Last Name']}
                     </h3>
                     <div className="flex items-center space-x-1.5">
@@ -531,8 +532,8 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
 
                 {/* Contact Info */}
                 <div className="space-y-3 pt-2">
-                  <div className="flex items-center p-2 rounded-lg bg-gray-50/50 border border-gray-100 group-hover:border-green-100 group-hover:bg-green-50/10 transition-colors">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white flex items-center justify-center text-gray-400 shadow-sm border border-gray-100 group-hover:text-green-600 transition-colors">
+                  <div className="flex items-center p-2 rounded-lg bg-gray-50/50 border border-gray-100 group-hover:border-primary/10 group-hover:bg-primary/5 transition-colors">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white flex items-center justify-center text-gray-400 shadow-sm border border-gray-100 group-hover:text-primary transition-colors">
                       <Mail size={14} />
                     </div>
                     <div className="ml-3 min-w-0">
@@ -541,8 +542,8 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                     </div>
                   </div>
 
-                  <div className="flex items-center p-2 rounded-lg bg-gray-50/50 border border-gray-100 group-hover:border-green-100 group-hover:bg-green-50/10 transition-colors">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white flex items-center justify-center text-gray-400 shadow-sm border border-gray-100 group-hover:text-green-600 transition-colors">
+                  <div className="flex items-center p-2 rounded-lg bg-gray-50/50 border border-gray-100 group-hover:border-primary/10 group-hover:bg-primary/5 transition-colors">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white flex items-center justify-center text-gray-400 shadow-sm border border-gray-100 group-hover:text-primary transition-colors">
                       <Phone size={14} />
                     </div>
                     <div className="ml-3 min-w-0">
@@ -563,7 +564,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                     <GlowButton
                       variant="secondary"
                       size="sm"
-                      className="flex-1 bg-white border-gray-200 text-gray-600 hover:text-green-700 hover:border-green-200 hover:bg-green-50/30 shadow-sm !h-7 !text-[11px] !py-0"
+                      className="flex-1 bg-white border-gray-200 text-gray-600 hover:text-primary hover:border-primary/20 hover:bg-primary/5 shadow-sm !h-7 !text-[11px] !py-0"
                       icon={Settings}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -578,7 +579,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                     <GlowButton
                       variant="secondary"
                       size="sm"
-                      className="flex-1 bg-white border-gray-200 text-gray-600 hover:text-emerald-700 hover:border-emerald-200 hover:bg-emerald-50/30 shadow-sm !h-7 !text-[11px] !py-0"
+                      className="flex-1 bg-white border-gray-200 text-gray-600 hover:text-primary hover:border-primary/20 hover:bg-primary/5 shadow-sm !h-7 !text-[11px] !py-0"
                       icon={UserRoundCog}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -614,7 +615,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
               {/* Always show first page */}
               <button
                 onClick={() => setCurrentPage(1)}
-                className={`px-3 py-1 border rounded hover:bg-gray-50 transition-colors ${currentPage === 1 ? 'bg-green-100 border-green-500 text-green-800' : ''
+                className={`px-3 py-1 border rounded hover:bg-gray-50 transition-colors ${currentPage === 1 ? 'bg-primary/10 border-primary text-primary' : ''
                   }`}
               >
                 1
@@ -633,7 +634,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                     <button
                       key={page}
                       onClick={() => setCurrentPage(page)}
-                      className={`px-3 py-1 border rounded hover:bg-gray-50 transition-colors ${currentPage === page ? 'bg-green-100 border-green-500 text-green-800' : ''
+                      className={`px-3 py-1 border rounded hover:bg-gray-50 transition-colors ${currentPage === page ? 'bg-primary/10 border-primary text-primary' : ''
                         }`}
                     >
                       {page}
@@ -652,7 +653,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
               {totalPages > 1 && (
                 <button
                   onClick={() => setCurrentPage(totalPages)}
-                  className={`px-3 py-1 border rounded hover:bg-gray-50 transition-colors ${currentPage === totalPages ? 'bg-green-100 border-green-500 text-green-800' : ''
+                  className={`px-3 py-1 border rounded hover:bg-gray-50 transition-colors ${currentPage === totalPages ? 'bg-primary/10 border-primary text-primary' : ''
                     }`}
                 >
                   {totalPages}

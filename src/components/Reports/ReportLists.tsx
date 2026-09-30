@@ -16,9 +16,11 @@ import {
   ChevronLeft,
   ChevronRight,
   UserX,
-  CalendarDays
+  CalendarDays,
+  Search
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { EmptyState } from '../UI';
 
 interface ReportItem {
   id: string;
@@ -28,6 +30,14 @@ interface ReportItem {
   category: string;
   path: string;
 }
+
+const CATEGORY_TINTS: Record<string, string> = {
+  Payroll: 'bg-status-info-tint text-status-info',
+  Operations: 'bg-green-tint text-brand-dark',
+  Communication: 'bg-status-purple-tint text-status-purple',
+  Finance: 'bg-orange-tint text-orange-text',
+  HR: 'bg-orange-tint-alt text-orange-text-alt',
+};
 
 const REPORTS_LIST: ReportItem[] = [
   {
@@ -162,85 +172,80 @@ const ReportsList: React.FC = () => {
   }, [searchTerm, selectedCategory]);
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="p-6 bg-background min-h-screen">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Reports</h1>
-          <p className="text-gray-600">Access and generate various organizational reports</p>
+        <div className="mb-[18px]">
+          <h1 className="text-[21px] font-bold text-ink">Reports</h1>
+          <p className="text-[12.5px] text-muted-foreground mt-1">Access and generate various organizational reports</p>
         </div>
 
         {/* Search and Filter */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Search reports..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            </div>
-            <div className="w-full md:w-64">
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-              >
-                {categories.map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-            </div>
+        <div className="flex flex-col md:flex-row gap-3 mb-5 max-w-[640px]">
+          <div className="relative flex-1 max-w-[420px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-subtle w-3.5 h-3.5" />
+            <input
+              type="text"
+              placeholder="Search reports..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full box-border pl-8 pr-3 py-2.5 border border-border rounded-tile text-xs focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
+            />
           </div>
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="px-3 py-2.5 border border-border rounded-tile text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand"
+          >
+            {categories.map(category => (
+              <option key={category} value={category}>{category}</option>
+            ))}
+          </select>
         </div>
 
         {/* Results Count */}
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm text-gray-600">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[11.5px] text-muted-foreground">
             Showing {paginatedReports.length} of {filteredReports.length} reports
           </p>
           {totalPages > 1 && (
-            <p className="text-sm text-gray-600">
+            <p className="text-[11.5px] text-muted-foreground">
               Page {currentPage} of {totalPages}
             </p>
           )}
         </div>
 
         {/* Reports Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
           {paginatedReports.map((report) => {
             const Icon = report.icon;
+            const tint = CATEGORY_TINTS[report.category] || 'bg-secondary text-muted-foreground';
             return (
               <div
                 key={report.id}
                 onClick={() => handleReportClick(report)}
-                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200 cursor-pointer group"
+                className="bg-white rounded-card border border-border p-[18px] hover:border-brand/30 transition-colors cursor-pointer group"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
-                    <Icon className="w-4 h-4" />
+                <div className="flex items-center justify-between mb-3.5">
+                  <div className={`w-9 h-9 rounded-tile flex items-center justify-center ${tint}`}>
+                    <Icon className="w-4 h-4" strokeWidth={1.8} />
                   </div>
-                  <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                  <ArrowRight className="w-3.5 h-3.5 text-subtle group-hover:text-brand transition-colors" />
                 </div>
-                
-                <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
+
+                <h3 className="text-[14px] font-bold text-ink mb-1">
                   {report.title}
                 </h3>
-                
-                <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+
+                <p className="text-[11.5px] text-muted-foreground leading-relaxed line-clamp-2">
                   {report.description}
                 </p>
-                
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+
+                <div className="flex items-center justify-between mt-4">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-pill text-[10px] font-bold bg-secondary text-muted-foreground`}>
                     {report.category}
                   </span>
-                  <span className="text-xs text-gray-500">View Report</span>
+                  <span className="text-[11px] font-bold text-brand">View Report</span>
                 </div>
               </div>
             );
@@ -271,7 +276,7 @@ const ReportsList: React.FC = () => {
                     onClick={() => handlePageChange(page)}
                     className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md ${
                       currentPage === page
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-brand text-white'
                         : 'text-gray-700 hover:text-gray-500'
                     }`}
                   >
@@ -298,11 +303,11 @@ const ReportsList: React.FC = () => {
 
         {/* Empty State */}
         {filteredReports.length === 0 && (
-          <div className="text-center py-12">
-            <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No reports found</h3>
-            <p className="text-gray-600">Try adjusting your search or filter criteria</p>
-          </div>
+          <EmptyState
+            icon={<FileText className="w-[18px] h-[18px]" strokeWidth={2} />}
+            title="No reports found"
+            description="Try adjusting your search or filter criteria"
+          />
         )}
       </div>
     </div>

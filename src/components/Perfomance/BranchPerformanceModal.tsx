@@ -176,7 +176,7 @@ const BranchPerformanceTable: React.FC<BranchPerformanceModalProps> = ({
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-h-[85vh] overflow-hidden max-w-3xl border border-gray-100">
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 p-4 text-white">
+        <div className="bg-primary p-4 text-white">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <Building className="w-5 h-5" />
@@ -207,7 +207,7 @@ const BranchPerformanceTable: React.FC<BranchPerformanceModalProps> = ({
             {/* Basic Information */}
             <div className="bg-gray-50 rounded-xl p-4 space-y-4">
               <h4 className="text-xs font-semibold text-gray-800 flex items-center gap-2">
-                <CalendarIcon className="w-4 h-4 text-indigo-500" />
+                <CalendarIcon className="w-4 h-4 text-primary" />
                 Basic Information
               </h4>
               
@@ -233,7 +233,7 @@ const BranchPerformanceTable: React.FC<BranchPerformanceModalProps> = ({
                     name="date"
                     value={formData.date}
                     onChange={handleChange}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
                     required
                   />
                 </div>
@@ -244,7 +244,7 @@ const BranchPerformanceTable: React.FC<BranchPerformanceModalProps> = ({
                     name="period"
                     value={formData.period}
                     onChange={handleChange}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
                     required
                   >
                     <option value="daily">Daily</option>
@@ -258,9 +258,9 @@ const BranchPerformanceTable: React.FC<BranchPerformanceModalProps> = ({
             </div>
 
             {/* KPI Metrics */}
-            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-100">
+            <div className="bg-primary/5 rounded-xl p-4 border border-primary/10">
               <h4 className="text-xs font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-emerald-600" />
+                <TrendingUp className="w-4 h-4 text-primary" />
                 Key Performance Indicators
               </h4>
               
@@ -275,7 +275,7 @@ const BranchPerformanceTable: React.FC<BranchPerformanceModalProps> = ({
                     name="new_loans"
                     value={formData.new_loans}
                     onChange={handleChange}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
                     required
                     min="0"
                     placeholder="0"
@@ -292,7 +292,7 @@ const BranchPerformanceTable: React.FC<BranchPerformanceModalProps> = ({
                     name="total_loans_disbursed"
                     value={formData.total_loans_disbursed}
                     onChange={handleChange}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
                     required
                     min="0"
                     placeholder="0"
@@ -309,7 +309,7 @@ const BranchPerformanceTable: React.FC<BranchPerformanceModalProps> = ({
                     name="arrears_amount"
                     value={formData.arrears_amount}
                     onChange={handleChange}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
                     required
                     min="0"
                     step="0.01"
@@ -327,7 +327,7 @@ const BranchPerformanceTable: React.FC<BranchPerformanceModalProps> = ({
                     name="loans_in_arrears"
                     value={formData.loans_in_arrears}
                     onChange={handleChange}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
                     required
                     min="0"
                     placeholder="0"
@@ -344,7 +344,7 @@ const BranchPerformanceTable: React.FC<BranchPerformanceModalProps> = ({
                     name="total_active_loans"
                     value={formData.total_active_loans}
                     onChange={handleChange}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
                     required
                     min="0"
                     placeholder="0"
@@ -361,7 +361,7 @@ const BranchPerformanceTable: React.FC<BranchPerformanceModalProps> = ({
                     name="portfolio_size"
                     value={formData.portfolio_size}
                     onChange={handleChange}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
                     required
                     min="0"
                     step="0.01"
@@ -379,7 +379,7 @@ const BranchPerformanceTable: React.FC<BranchPerformanceModalProps> = ({
                     name="total_par"
                     value={formData.total_par}
                     onChange={handleChange}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
                     required
                     min="0"
                     step="0.01"
@@ -509,7 +509,7 @@ const BranchPerformanceTable: React.FC<BranchPerformanceModalProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-4 py-2 text-xs font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md transition-all"
+                className="px-4 py-2 text-xs font-medium text-white bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md transition-all"
               >
                 {isSubmitting ? (
                   <>

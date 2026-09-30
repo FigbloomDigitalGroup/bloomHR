@@ -121,8 +121,8 @@ const PasswordResetModal: React.FC<PasswordResetModalProps> = ({ isOpen, onClose
           {/* Header */}
           <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-tint rounded-lg flex items-center justify-center">
+                <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               </div>
               <div>
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900">Change Password</h3>
@@ -153,8 +153,8 @@ const PasswordResetModal: React.FC<PasswordResetModalProps> = ({ isOpen, onClose
                   className={`w-full px-3 py-2 sm:px-4 sm:py-3 pr-10 sm:pr-12 border rounded-lg focus:outline-none focus:ring-2 transition-colors text-xs sm:text-base ${errors.newPassword
                       ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                       : isPasswordStrong
-                        ? 'border-green-300 focus:ring-green-500 focus:border-green-500'
-                        : 'border-gray-300 focus:ring-green-500 focus:border-green-500'
+                        ? 'border-status-success focus:ring-status-success focus:border-status-success'
+                        : 'border-gray-300 focus:ring-primary focus:border-primary'
                     }`}
                   placeholder="Enter your new password"
                   required
@@ -181,11 +181,11 @@ const PasswordResetModal: React.FC<PasswordResetModalProps> = ({ isOpen, onClose
                     ].map((req, index) => (
                       <div key={index} className="flex items-center space-x-2">
                         {req.check ? (
-                          <CheckCircle2 className="h-3 w-3 text-green-500 flex-shrink-0" />
+                          <CheckCircle2 className="h-3 w-3 text-status-success flex-shrink-0" />
                         ) : (
                           <div className="h-3 w-3 rounded-full border border-gray-300 flex-shrink-0" />
                         )}
-                        <span className={`text-xs ${req.check ? 'text-green-600' : 'text-gray-500'}`}>
+                        <span className={`text-xs ${req.check ? 'text-status-success' : 'text-gray-500'}`}>
                           {req.text}
                         </span>
                       </div>
@@ -216,8 +216,8 @@ const PasswordResetModal: React.FC<PasswordResetModalProps> = ({ isOpen, onClose
                   className={`w-full px-3 py-2 sm:px-4 sm:py-3 pr-10 sm:pr-12 border rounded-lg focus:outline-none focus:ring-2 transition-colors text-xs sm:text-base ${errors.confirmPassword
                       ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                       : formData.confirmPassword && formData.newPassword === formData.confirmPassword
-                        ? 'border-green-300 focus:ring-green-500 focus:border-green-500'
-                        : 'border-gray-300 focus:ring-green-500 focus:border-green-500'
+                        ? 'border-status-success focus:ring-status-success focus:border-status-success'
+                        : 'border-gray-300 focus:ring-primary focus:border-primary'
                     }`}
                   placeholder="Confirm your new password"
                   required
@@ -232,7 +232,7 @@ const PasswordResetModal: React.FC<PasswordResetModalProps> = ({ isOpen, onClose
               </div>
 
               {formData.confirmPassword && formData.newPassword === formData.confirmPassword && (
-                <p className="text-xs sm:text-xs text-green-600 flex items-center">
+                <p className="text-xs sm:text-xs text-status-success flex items-center">
                   <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 flex-shrink-0" />
                   <span>Passwords match</span>
                 </p>
@@ -247,13 +247,13 @@ const PasswordResetModal: React.FC<PasswordResetModalProps> = ({ isOpen, onClose
             </div>
 
             {/* Security Notice */}
-            <div className="bg-blue-50 border-l-4 border-blue-500 p-3 sm:p-4 rounded-r-lg">
+            <div className="bg-status-info-tint border-l-4 border-status-info p-3 sm:p-4 rounded-r-lg">
               <div className="flex">
                 <div className="flex-shrink-0">
-                  <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
+                  <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-status-info" />
                 </div>
                 <div className="ml-3">
-                  <p className="text-xs sm:text-xs text-blue-700">
+                  <p className="text-xs sm:text-xs text-status-info">
                     <strong>Security Notice:</strong> Choose a strong password that you haven't used before.
                     You'll need to sign in again after changing your password.
                   </p>
@@ -276,7 +276,7 @@ const PasswordResetModal: React.FC<PasswordResetModalProps> = ({ isOpen, onClose
                 disabled={isSubmitting || !isPasswordStrong || formData.newPassword !== formData.confirmPassword}
                 className={`w-full sm:flex-1 px-4 py-2 sm:py-3 border border-transparent rounded-lg text-xs font-medium text-white transition-colors flex items-center justify-center ${isSubmitting || !isPasswordStrong || formData.newPassword !== formData.confirmPassword
                     ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-green-600 hover:bg-green-700'
+                    : 'bg-primary hover:bg-primary/90'
                   }`}
               >
                 {isSubmitting ? (

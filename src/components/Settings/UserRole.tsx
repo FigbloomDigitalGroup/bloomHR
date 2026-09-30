@@ -17,9 +17,6 @@ import {
   X,
   MoreVertical,
   Key,
-  Mail,
-  RefreshCw,
-  AlertTriangle,
   MapPin,
   Lock
 } from 'lucide-react';
@@ -73,9 +70,6 @@ const ROLES = {
   }
 };
 
-// Valid roles for Mular Credit emails
-const MULAR_CREDIT_ROLES = ['MANAGER', 'REGIONAL', 'OPERATIONS'];
-
 const StatusBadge = ({ status }: { status: string }) => {
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
@@ -118,19 +112,8 @@ const UserCard = ({
 }) => {
   const [showDropdown, setShowDropdown] = useState(false);
 
-  const isMularCreditEmail = user.email.toLowerCase().endsWith('@mularcredit.com');
-  const needsRoleUpdate = isMularCreditEmail && !MULAR_CREDIT_ROLES.includes(user.role);
-
   return (
-    <div className={`bg-white rounded-lg border p-4 shadow-sm hover:shadow-md transition-shadow ${needsRoleUpdate ? 'border-orange-300 bg-orange-50' : 'border-gray-200'
-      }`}>
-      {needsRoleUpdate && (
-        <div className="flex items-center gap-1 mb-2 p-2 bg-orange-100 rounded-lg">
-          <AlertTriangle className="w-3 h-3 text-orange-600" />
-          <span className="text-xs text-orange-700 font-medium">Needs Role Update</span>
-        </div>
-      )}
-
+    <div className="bg-white rounded-lg border p-4 shadow-sm hover:shadow-md transition-shadow border-gray-200">
       <div className="flex justify-between items-start">
         <div className="flex items-center gap-3 min-w-0">
           <div className="bg-gray-100 rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0">
@@ -288,7 +271,7 @@ const Pagination = ({
                 key={page}
                 onClick={() => onPageChange(page)}
                 className={`relative inline-flex items-center px-3 py-1.5 text-xs font-semibold ${currentPage === page
-                  ? 'bg-green-600 text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600'
+                  ? 'bg-primary text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
                   : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'
                   }`}
               >
@@ -348,7 +331,7 @@ const RoleToggle = ({
           onChange={() => onChange(role, !active)}
           className="sr-only peer"
         />
-        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600"></div>
+        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
       </label>
     </div>
   );
@@ -393,16 +376,6 @@ const UserEditModal = ({
     }
   }, [user]);
 
-  // Auto-detect Mular Credit domain and set role to MANAGER by default
-  useEffect(() => {
-    if (editedUser.email && editedUser.email.toLowerCase().endsWith('@mularcredit.com')) {
-      // Only auto-set if not already a valid Mular Credit role
-      if (!MULAR_CREDIT_ROLES.includes(editedUser.role)) {
-        setEditedUser(prev => ({ ...prev, role: 'MANAGER' }));
-      }
-    }
-  }, [editedUser.email]);
-
   const handleRoleChange = (role: keyof typeof ROLES) => {
     setEditedUser({ ...editedUser, role });
   };
@@ -444,9 +417,6 @@ const UserEditModal = ({
     onSave(userToSave);
   };
 
-  const isMularCreditEmail = editedUser.email.toLowerCase().endsWith('@mularcredit.com');
-  const currentRoleIsValidForMular = isMularCreditEmail && MULAR_CREDIT_ROLES.includes(editedUser.role);
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
@@ -473,12 +443,6 @@ const UserEditModal = ({
               placeholder="user@example.com"
               disabled={!!user}
             />
-            {isMularCreditEmail && (
-              <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
-                <Mail className="w-3 h-3" />
-                Mular Credit email detected. Must be Manager, Regional Manager or Operations.
-              </p>
-            )}
           </div>
 
           {!user && (
@@ -529,14 +493,11 @@ const UserEditModal = ({
             <div className="grid grid-cols-2 gap-2">
               {(Object.keys(ROLES) as Array<keyof typeof ROLES>).map((role) => {
                 const roleInfo = ROLES[role];
-                const isMularCreditRole = MULAR_CREDIT_ROLES.includes(role);
-                const isAllowedForMular = !isMularCreditEmail || isMularCreditRole;
 
                 return (
                   <button
                     key={role}
                     onClick={() => handleRoleChange(role)}
-                    disabled={!isAllowedForMular}
                     className={`p-2 border rounded-lg text-xs font-medium ${editedUser.role === role ?
                       (role === 'ADMIN' ? 'border-purple-500 bg-purple-50 text-purple-700' :
                         role === 'REGIONAL' ? 'border-violet-500 bg-violet-50 text-violet-700' :
@@ -546,19 +507,13 @@ const UserEditModal = ({
                                 role === 'STAFF' ? 'border-green-500 bg-green-50 text-green-700' :
                                   'border-gray-500 bg-gray-50 text-gray-700') :
                       'border-gray-200 hover:bg-gray-50'
-                      } ${!isAllowedForMular ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    title={!isAllowedForMular ? 'Mular Credit emails must be Manager, Regional Manager or Operations' : ''}
+                      }`}
                   >
                     {roleInfo.label}
                   </button>
                 );
               })}
             </div>
-            {isMularCreditEmail && (
-              <p className="text-xs text-gray-500 mt-1">
-                Mular Credit emails must be assigned either Manager, Regional Manager or Operations role.
-              </p>
-            )}
           </div>
 
           <div className="p-3 bg-gray-50 rounded-lg">
@@ -600,11 +555,7 @@ const UserEditModal = ({
           </button>
           <button
             onClick={handleSave}
-            disabled={isMularCreditEmail && !currentRoleIsValidForMular}
-            className={`px-4 py-2 rounded-lg text-xs flex items-center gap-2 ${isMularCreditEmail && !currentRoleIsValidForMular
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : 'bg-green-600 hover:bg-green-700 text-white'
-              }`}
+            className="px-4 py-2 rounded-lg text-xs flex items-center gap-2 bg-primary hover:bg-primary/90 text-white"
           >
             <Check className="w-4 h-4" />
             {user ? 'Save Changes' : 'Create User'}
@@ -694,7 +645,7 @@ const ResetPasswordModal = ({
                 value="email"
                 checked={resetMethod === 'email'}
                 onChange={() => setResetMethod('email')}
-                className="text-green-600 focus:ring-green-500"
+                className="text-primary focus:ring-primary"
               />
               <div>
                 <p className="text-xs font-medium text-gray-900">Send Reset Email</p>
@@ -711,7 +662,7 @@ const ResetPasswordModal = ({
                 value="manual"
                 checked={resetMethod === 'manual'}
                 onChange={() => setResetMethod('manual')}
-                className="text-green-600 focus:ring-green-500"
+                className="text-primary focus:ring-primary"
               />
               <div>
                 <p className="text-xs font-medium text-gray-900">Set Manual Password</p>
@@ -786,130 +737,6 @@ const ResetPasswordModal = ({
   );
 };
 
-const BulkUpdateModal = ({
-  usersToUpdate,
-  onClose,
-  onConfirm
-}: {
-  usersToUpdate: any[];
-  onClose: () => void;
-  onConfirm: () => void
-}) => {
-  const [selectedRole, setSelectedRole] = useState<'MANAGER' | 'REGIONAL'>('MANAGER');
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl">
-        <div className="flex justify-between items-center p-4 border-b">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Bulk Update Mular Credit Users
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-4 space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <p className="text-xs text-blue-700">
-              This will update {usersToUpdate.length} user(s) with @mularcredit.com emails to the selected role.
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-2">Select Role for Bulk Update</label>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                <input
-                  type="radio"
-                  name="bulkRole"
-                  value="MANAGER"
-                  checked={selectedRole === 'MANAGER'}
-                  onChange={() => setSelectedRole('MANAGER')}
-                  className="text-green-600 focus:ring-green-500"
-                />
-                <div className="flex items-center gap-2">
-                  <RoleBadge role="MANAGER" />
-                  <div>
-                    <p className="text-xs font-medium text-gray-900">Manager</p>
-                    <p className="text-xs text-gray-500">Single location management</p>
-                  </div>
-                </div>
-              </label>
-
-              <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                <input
-                  type="radio"
-                  name="bulkRole"
-                  value="REGIONAL"
-                  checked={selectedRole === 'REGIONAL'}
-                  onChange={() => setSelectedRole('REGIONAL')}
-                  className="text-green-600 focus:ring-green-500"
-                />
-                <div className="flex items-center gap-2">
-                  <RoleBadge role="REGIONAL" />
-                  <div>
-                    <p className="text-xs font-medium text-gray-900">Regional Manager</p>
-                    <p className="text-xs text-gray-500">Multiple locations/regions</p>
-                  </div>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          <div className="max-h-60 overflow-y-auto">
-            <div className="space-y-2">
-              {usersToUpdate.map(user => (
-                <div key={user.id} className="flex items-center justify-between p-2 border border-gray-200 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center">
-                      <User className="w-4 h-4 text-gray-500" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-gray-900">{user.email}</p>
-                      <p className="text-xs text-gray-500">Current role: {user.role}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500">→</span>
-                    <RoleBadge role={selectedRole} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-yellow-600" />
-              <p className="text-xs text-yellow-700 font-medium">This action cannot be undone.</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-4 border-t flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => onConfirm(selectedRole)}
-            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs flex items-center gap-2"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Update {usersToUpdate.length} Users to {selectedRole === 'MANAGER' ? 'Manager' : 'Regional Manager'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 export default function UserRolesSettings() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -919,7 +746,6 @@ export default function UserRolesSettings() {
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [resettingPasswordUser, setResettingPasswordUser] = useState<any | null>(null);
-    const [showBulkUpdateModal, setShowBulkUpdateModal] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [usersPerPage] = useState(12);
   const navigate = useNavigate();
@@ -971,11 +797,6 @@ export default function UserRolesSettings() {
   };
 
 
-
-  // Get users that need role updates
-  const usersNeedingUpdate = users.filter(user =>
-    user.email.toLowerCase().endsWith('@mularcredit.com') && !MULAR_CREDIT_ROLES.includes(user.role)
-  );
 
   // Early return if no admin client
   if (!supabaseAdmin) {
@@ -1120,19 +941,7 @@ export default function UserRolesSettings() {
 
   const handleSaveUser = async (userData: any) => {
     try {
-      // Auto-detect Mular Credit domain and enforce valid role
-      let finalRole = userData.role;
-      if (userData.email.toLowerCase().endsWith('@mularcredit.com')) {
-        // Ensure it's a valid Mular Credit role
-        if (!MULAR_CREDIT_ROLES.includes(userData.role)) {
-          finalRole = 'MANAGER'; // Default fallback
-        }
-      }
-
-      const finalUserData = {
-        ...userData,
-        role: finalRole
-      };
+      const finalUserData = userData;
 
       if (editingUser) {
         // Update existing user
@@ -1198,45 +1007,6 @@ export default function UserRolesSettings() {
     }
   };
 
-  const handleBulkUpdate = async (selectedRole: 'MANAGER' | 'REGIONAL') => {
-    try {
-      setLoading(true);
-      toast.error(null);
-
-      const updatePromises = usersNeedingUpdate.map(async (user) => {
-        const { error } = await supabaseAdmin.auth.admin.updateUserById(
-          user.id,
-          {
-            user_metadata: {
-              ...user.user_metadata,
-              role: selectedRole
-            }
-          }
-        );
-
-        if (error) throw error;
-        return user.id;
-      });
-
-      await Promise.all(updatePromises);
-
-      // Update local state
-      setUsers(users.map(user =>
-        user.email.toLowerCase().endsWith('@mularcredit.com') && !MULAR_CREDIT_ROLES.includes(user.role)
-          ? { ...user, role: selectedRole }
-          : user
-      ));
-
-      setShowBulkUpdateModal(false);
-      toast.success(`Successfully updated ${usersNeedingUpdate.length} users to ${selectedRole === 'MANAGER' ? 'Manager' : 'Regional Manager'} role`);
-    } catch (err: any) {
-      console.error('Error in bulk update:', err);
-      toast.error(err.message || 'Failed to update users in bulk');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
@@ -1249,8 +1019,8 @@ export default function UserRolesSettings() {
         {/* MFA Security Settings Card */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-            <div className="p-2 bg-green-50 rounded-lg">
-              <Lock className="w-4 h-4 text-green-600" />
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Lock className="w-4 h-4 text-primary" />
             </div>
             <div>
               <h2 className="text-sm font-semibold text-gray-900">Security Settings</h2>
@@ -1285,7 +1055,7 @@ export default function UserRolesSettings() {
                 id="mfa-toggle-btn"
                 onClick={handleMfaToggle}
                 disabled={mfaLoading || !mfaFetched}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${mfaEnabled ? 'bg-green-600' : 'bg-gray-200'
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${mfaEnabled ? 'bg-primary' : 'bg-gray-200'
                   }`}
                 role="switch"
                 aria-checked={mfaEnabled}
@@ -1305,18 +1075,9 @@ export default function UserRolesSettings() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2">
-            {usersNeedingUpdate.length > 0 && (
-              <button
-                onClick={() => setShowBulkUpdateModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-medium"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Update {usersNeedingUpdate.length} Mular Credit Users
-              </button>
-            )}
             <button
               onClick={() => setShowAddUserModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-medium"
             >
               <UserPlus className="w-4 h-4" />
               Add New User
@@ -1325,31 +1086,6 @@ export default function UserRolesSettings() {
         </div>
 
 
-
-        {/* Bulk Update Alert */}
-        {usersNeedingUpdate.length > 0 && (
-          <div className="bg-orange-50 border-l-4 border-orange-500 p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <AlertTriangle className="h-5 w-5 text-orange-500" />
-                </div>
-                <div className="ml-3">
-                  <p className="text-xs text-orange-700">
-                    <strong>{usersNeedingUpdate.length} user(s)</strong> with @mularcredit.com emails need to be updated to Manager or Regional Manager role.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowBulkUpdateModal(true)}
-                className="ml-3 inline-flex items-center gap-1 px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded text-xs font-medium"
-              >
-                <RefreshCw className="w-3 h-3" />
-                Update All
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Filters */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
@@ -1366,7 +1102,7 @@ export default function UserRolesSettings() {
                   placeholder="Search by email..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-green-100 focus:border-green-500 text-xs"
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs"
                 />
               </div>
             </div>
@@ -1378,7 +1114,7 @@ export default function UserRolesSettings() {
                 <select
                   value={selectedRole}
                   onChange={(e) => setSelectedRole(e.target.value)}
-                  className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-green-100 focus:border-green-500 text-xs appearance-none"
+                  className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs appearance-none"
                 >
                   <option value="ALL">All Roles</option>
                   {(Object.keys(ROLES) as Array<keyof typeof ROLES>).map((role) => (
@@ -1398,7 +1134,7 @@ export default function UserRolesSettings() {
                 <select
                   value={selectedStatus}
                   onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-green-100 focus:border-green-500 text-xs appearance-none"
+                  className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs appearance-none"
                 >
                   <option value="ALL">All Statuses</option>
                   <option value="ACTIVE">Active</option>
@@ -1414,7 +1150,7 @@ export default function UserRolesSettings() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
@@ -1438,36 +1174,12 @@ export default function UserRolesSettings() {
               </div>
             </div>
           </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Mular Credit Users</p>
-                <p className="text-xl font-bold text-gray-900">{users.filter(u => u.email.toLowerCase().endsWith('@mularcredit.com')).length}</p>
-              </div>
-              <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
-                <Mail className="w-5 h-5" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Needs Update</p>
-                <p className="text-xl font-bold text-gray-900">{usersNeedingUpdate.length}</p>
-              </div>
-              <div className="p-2 rounded-lg bg-orange-100 text-orange-600">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Users Grid */}
         {loading ? (
           <div className="bg-white rounded-xl border border-gray-200 p-8 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : (
           <>
@@ -1506,13 +1218,6 @@ export default function UserRolesSettings() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Role Permissions</h2>
           <div className="space-y-4">
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-xs text-blue-700 font-medium">Note for Mular Credit Users</p>
-              <p className="text-xs text-blue-600 mt-1">
-                Users with @mularcredit.com emails must be assigned either <strong>Manager</strong> or <strong>Regional Manager</strong> role.
-                Other roles are not permitted for Mular Credit domain.
-              </p>
-            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {(Object.keys(ROLES) as Array<keyof typeof ROLES>).map((role) => (
                 <RoleToggle
@@ -1549,14 +1254,6 @@ export default function UserRolesSettings() {
           user={resettingPasswordUser}
           onClose={() => setResettingPasswordUser(null)}
           onReset={(passwordOrEmail) => handleResetPassword(resettingPasswordUser, passwordOrEmail)}
-        />
-      )}
-
-      {showBulkUpdateModal && (
-        <BulkUpdateModal
-          usersToUpdate={usersNeedingUpdate}
-          onClose={() => setShowBulkUpdateModal(false)}
-          onConfirm={handleBulkUpdate}
         />
       )}
     </div>

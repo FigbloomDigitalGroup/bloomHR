@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { CELCOM_AFRICA_CONFIG } from '../config/sms';
 import toast from 'react-hot-toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -331,9 +332,9 @@ export default function MFAVerification() {
       if (storeError) throw storeError;
 
       // 3. Send SMS via Celcom directly (reverted to original working method)
-      const message = `Your Mular Credit verification code is: ${mfaCode}. This code expires in 10 minutes.`;
+      const message = `Your Figbloom HR verification code is: ${mfaCode}. This code expires in 10 minutes.`;
       const encodedMessage = encodeURIComponent(message);
-      const url = `https://isms.celcomafrica.com/api/services/sendsms/?apikey=***REMOVED***&partnerID=928&message=${encodedMessage}&shortcode=MularCredit&mobile=${formattedPhone}`;
+      const url = `${CELCOM_AFRICA_CONFIG.baseUrl}/?apikey=${CELCOM_AFRICA_CONFIG.apiKey}&partnerID=${CELCOM_AFRICA_CONFIG.partnerID}&message=${encodedMessage}&shortcode=${CELCOM_AFRICA_CONFIG.defaultShortcode}&mobile=${formattedPhone}`;
 
       console.log(`📡 Sending SMS to ${formattedPhone}...`);
 

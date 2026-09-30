@@ -222,9 +222,9 @@ const MpesaZapPortal: React.FC = () => {
                     <div>
                         <p className="text-xs font-medium text-gray-500">Utility Balance</p>
                         <p className="text-2xl font-semibold text-gray-900 mt-1">{utilityBalance}</p>
-                        <p className="text-xs text-indigo-600 mt-1">Paybill: 4084659</p>
+                        <p className="text-xs text-primary mt-1">Paybill: 4084659</p>
                     </div>
-                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg">
+                    <div className="p-3 bg-primary/10 text-primary rounded-lg">
                         <Landmark className="w-5 h-5" />
                     </div>
                 </div>
@@ -277,7 +277,7 @@ const MpesaZapPortal: React.FC = () => {
                                         placeholder="2547XXXXXXXX"
                                         value={phoneNumber}
                                         onChange={(e) => setPhoneNumber(e.target.value)}
-                                        className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                                        className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
                                     />
                                 </div>
                                 <p className="text-[10px] text-gray-500 mt-1">Must be Safaricom 254 format</p>
@@ -292,7 +292,7 @@ const MpesaZapPortal: React.FC = () => {
                                         placeholder="Min 10 - Max 100,000"
                                         value={amount}
                                         onChange={(e) => setAmount(e.target.value)}
-                                        className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                                        className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
                                     />
                                 </div>
                             </div>
@@ -300,7 +300,7 @@ const MpesaZapPortal: React.FC = () => {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm"
+                                className="w-full py-2.5 bg-primary hover:bg-primary/90 text-white rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm"
                             >
                                 {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
                                 Send Payment
@@ -329,7 +329,7 @@ const MpesaZapPortal: React.FC = () => {
                             </div>
                             <button
                                 onClick={fetchCallbacks}
-                                className="p-2 bg-white border border-gray-200 rounded-md text-gray-500 hover:text-indigo-600 transition-colors shadow-sm"
+                                className="p-2 bg-white border border-gray-200 rounded-md text-gray-500 hover:text-primary transition-colors shadow-sm"
                             >
                                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                             </button>
@@ -356,7 +356,7 @@ const MpesaZapPortal: React.FC = () => {
                                                         <span className="text-sm font-medium text-gray-900">
                                                             {log.employee_name || log.transaction_id || 'Pending Transfer'}
                                                         </span>
-                                                        <button onClick={() => copyToClipboard(log.transaction_id || '')} className="text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => copyToClipboard(log.transaction_id || '')} className="text-gray-400 hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity">
                                                             <Copy className="w-3.5 h-3.5" />
                                                         </button>
                                                     </div>
@@ -421,7 +421,7 @@ const MpesaZapPortal: React.FC = () => {
                                             placeholder="Enter your admin email"
                                             value={confirmEmail}
                                             onChange={(e) => setConfirmEmail(e.target.value)}
-                                            className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                                            className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
                                         />
                                     </div>
                                     <p className="text-[10px] text-gray-500 mt-1">Verify with: {user?.email}</p>
@@ -437,7 +437,7 @@ const MpesaZapPortal: React.FC = () => {
                                     <button
                                         onClick={handleConfirmSend}
                                         disabled={!confirmEmail || loading}
-                                        className="flex-1 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                        className="flex-1 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-md transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                                     >
                                         {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : null}
                                         Confirm

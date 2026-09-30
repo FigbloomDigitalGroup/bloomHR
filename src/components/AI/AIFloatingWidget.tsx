@@ -240,7 +240,7 @@ const ChatFloater = () => {
               setShowCurvedText(false);
             }}
             onMouseEnter={() => setShowCurvedText(true)}
-            className="group relative bg-blue-600/30 backdrop-blur-sm hover:bg-white/40 text-gray-600 p-3 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105 border border-gray-300/50"
+            className="group relative bg-brand/30 backdrop-blur-sm hover:bg-white/40 text-gray-600 p-3 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105 border border-gray-300/50"
           >
             <img
               src="/avatars.png"
@@ -260,7 +260,7 @@ const ChatFloater = () => {
       {isOpen && (
         <div className="fixed bottom-6 right-6 z-50 w-96 h-[500px] bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-200/50 flex flex-col overflow-hidden transition-all duration-500">
           {/* Header */}
-          <div className="relative bg-gradient-to-r from-blue-600/90 to-purple-600/90 backdrop-blur-lg p-4 border-b border-white/20">
+          <div className="relative bg-brand/90 backdrop-blur-lg p-4 border-b border-white/20">
             <div className="flex justify-between items-center">
               <div className="flex items-center space-x-3">
                 <div className="relative">
@@ -301,7 +301,7 @@ const ChatFloater = () => {
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-gray-50/50 to-white/50">
             {messages.length === 0 && (
               <div className="text-center py-8">
-                <div className="w-16 h-16 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full mx-auto mb-3 flex items-center justify-center">
+                <div className="w-16 h-16 bg-green-tint rounded-full mx-auto mb-3 flex items-center justify-center">
                   <img
                     src="/avatars.png"
                     alt="Avatar"
@@ -313,21 +313,21 @@ const ChatFloater = () => {
                 <div className="mt-4 space-y-2">
                   <p className="text-gray-500 text-xs font-medium">Try asking:</p>
                   <div className="flex flex-col space-y-1 text-xs">
-                    <button 
+                    <button
                       onClick={() => setInput("New branch with 40 previous borrowers and 200,000 KES OLB")}
-                      className="text-blue-500 hover:text-blue-600"
+                      className="text-brand hover:text-brand-dark"
                     >
                       • New branch with 40 borrowers
                     </button>
-                    <button 
+                    <button
                       onClick={() => setInput("Established branch with 60 borrowers and 500,000 KES OLB")}
-                      className="text-blue-500 hover:text-blue-600"
+                      className="text-brand hover:text-brand-dark"
                     >
                       • Established branch projections
                     </button>
-                    <button 
+                    <button
                       onClick={() => setInput("How to calculate retention rate?")}
-                      className="text-blue-500 hover:text-blue-600"
+                      className="text-brand hover:text-brand-dark"
                     >
                       • How to calculate retention
                     </button>
@@ -344,8 +344,8 @@ const ChatFloater = () => {
                 <div className={`flex items-start space-x-2 max-w-[85%] ${msg.role === "user" ? "flex-row-reverse space-x-reverse" : ""}`}>
                   {/* Avatar */}
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    msg.role === "user" 
-                      ? "bg-gradient-to-r from-blue-500 to-purple-500" 
+                    msg.role === "user"
+                      ? "bg-brand"
                       : "bg-gradient-to-r from-gray-200 to-gray-300"
                   }`}>
                     {msg.role === "user" ? 
@@ -361,7 +361,7 @@ const ChatFloater = () => {
                   {/* Message Bubble */}
                   <div className={`relative px-4 py-3 rounded-2xl ${
                     msg.role === "user"
-                      ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg"
+                      ? "bg-brand text-white shadow-lg"
                       : "bg-white border border-gray-200 text-gray-800 shadow-sm"
                   }`}>
                     <FormattedMessage content={msg.content} />
@@ -375,8 +375,8 @@ const ChatFloater = () => {
                     
                     {/* Message tail */}
                     <div className={`absolute top-4 w-2 h-2 transform rotate-45 ${
-                      msg.role === "user" 
-                        ? "-right-1 bg-gradient-to-r from-blue-500 to-purple-500" 
+                      msg.role === "user"
+                        ? "-right-1 bg-brand"
                         : "-left-1 bg-white border-l border-t border-gray-200"
                     }`}></div>
                   </div>
@@ -418,7 +418,7 @@ const ChatFloater = () => {
                   placeholder="Ask about targets, projections, OLB calculations..."
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  className="w-full px-4 py-3 pr-12 bg-gray-50 border border-gray-200 rounded-2xl text-xs placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-200"
+                  className="w-full px-4 py-3 pr-12 bg-gray-50 border border-gray-200 rounded-2xl text-xs placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all duration-200"
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
                   disabled={loading}
                 />
@@ -428,7 +428,7 @@ const ChatFloater = () => {
                     <button
                       onClick={handleSend}
                       disabled={loading}
-                      className="p-1.5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded-full transition-all duration-200 transform hover:scale-110 disabled:opacity-50 disabled:transform-none"
+                      className="p-1.5 bg-brand hover:bg-brand-dark text-white rounded-full transition-all duration-200 transform hover:scale-110 disabled:opacity-50 disabled:transform-none"
                     >
                       <Send size={14} />
                     </button>
@@ -449,7 +449,7 @@ const ChatFloater = () => {
                   key={i}
                   onClick={() => setInput(suggestion)}
                   disabled={loading}
-                  className="px-2 py-1 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors duration-200 disabled:opacity-50"
+                  className="px-2 py-1 text-xs text-gray-500 hover:text-brand hover:bg-green-tint rounded-full transition-colors duration-200 disabled:opacity-50"
                 >
                   {suggestion}
                 </button>

@@ -467,13 +467,13 @@ export function useStaffSignupLogic() {
 
     const sendWelcomeEmail = async (email, tempPassword, branch, isResend = false, requestId = null) => {
         const subject = isResend
-            ? `Your Zira HR Login Credentials - Resent`
-            : `Welcome to Zira HR - Staff Account Approved`;
+            ? `Your Figbloom HR Login Credentials - Resent`
+            : `Welcome to Figbloom HR - Staff Account Approved`;
 
         try {
             const htmlContent = isResend ? `
         <div style="font-family: 'Avenir Next', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-          <h2 style="color: #2563eb; text-align: center;">Your Zira HR Login Credentials</h2>
+          <h2 style="color: #17402A; text-align: center;">Your Figbloom HR Login Credentials</h2>
           <p style="font-size: 16px;">Your login credentials have been resent as requested.</p>
           
           <div style="background-color: #fef3cd; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #f59e0b;">
@@ -491,7 +491,7 @@ export function useStaffSignupLogic() {
         </div>
       ` : `
         <div style="font-family: 'Avenir Next', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-          <h2 style="color: #2563eb; text-align: center;">Welcome to Zira HR!</h2>
+          <h2 style="color: #17402A; text-align: center;">Welcome to Figbloom HR!</h2>
           <p style="font-size: 16px;">Your staff account has been approved by the administrator.</p>
           
           <div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0;">

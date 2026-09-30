@@ -126,13 +126,7 @@ const ManagerAssignment = () => {
     };
 
     const validateAssignment = async (emp: Employee, email: string, targetTown: string, targetRegion: string) => {
-        // 1. Email Domain
-        if (email && !email.trim().toLowerCase().endsWith('@mularcredit.com')) {
-            toast.error('Email must end with @mularcredit.com');
-            return false;
-        }
-
-        // 2. Unique Email Check (Is this email assigned to anyone else?)
+        // 1. Unique Email Check (Is this email assigned to anyone else?)
         if (email) {
             const emailConflict = employees.find(e =>
                 (e.manager_email === email || e.regional_manager === email) &&
@@ -446,10 +440,10 @@ const ManagerAssignment = () => {
                                                         value={emailInput}
                                                         onChange={(e) => setEmailInput(e.target.value)}
                                                         className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                                                        placeholder={`e.g. name@mularcredit.com`}
+                                                        placeholder={`e.g. name@company.com`}
                                                     />
                                                     <p className="text-[10px] text-gray-400 mt-1">
-                                                        Must be a unique <strong>@mularcredit.com</strong> email.
+                                                        Must be a unique email address.
                                                     </p>
                                                 </div>
 

@@ -26,3 +26,6 @@ dist-ssr
 .env.tenant
 .env.*
 ! .env.tenant.template
+
+# Supabase CLI local cache (may contain pooler/connection info)
+supabase/.temp/

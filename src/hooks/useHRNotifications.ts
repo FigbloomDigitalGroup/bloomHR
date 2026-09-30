@@ -21,11 +21,19 @@ const API_URL =
 export interface HRNotification {
     id: number;
     employee_number: string;
-    notification_type: 'contract_expiring' | 'probation_expiring';
+    // 'leave_recommended'/'leave_approved'/'leave_rejected' added in FIG-574
+    // (see supabase/migrations/leave_notifications.sql for the matching
+    // CHECK constraint) - this type was never updated to match, so every
+    // filter against those values silently compiled as "always false"
+    // (TS2367) without the strict, real tsconfig catching it.
+    notification_type: 'contract_expiring' | 'probation_expiring' | 'leave_recommended' | 'leave_approved' | 'leave_rejected';
     title: string;
     message: string;
-    end_date: string;
-    days_remaining: number;
+    // Nullable for leave notifications - only contract/probation reminders
+    // always have both (see leave_notifications.sql, which dropped the
+    // original NOT NULL constraints).
+    end_date: string | null;
+    days_remaining: number | null;
     is_read_admin: boolean;
     is_read_staff: boolean;
     email_sent: boolean;

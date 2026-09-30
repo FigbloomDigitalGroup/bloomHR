@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   UsersRound,
   CalendarRange,
@@ -6,6 +6,7 @@ import {
   Settings,
   Wand2,
   Menu,
+  ChevronLeft,
   ShieldAlert,
   LayoutGrid,
   Landmark,
@@ -22,13 +23,15 @@ import {
   Smartphone,
   Mails,
   ShieldHalf,
-  Search,
   HeartHandshake,
+  LogOut,
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
 import solo from '../../../public/solo.png';
 import { usePermissions } from '../../hooks/usePermissions';
+import { supabase } from '../../lib/supabase';
+import { SearchInput } from '../UI';
 
 // Grouping structure
 const menuGroups = [
@@ -88,17 +91,100 @@ interface SidebarProps {
   user?: { email: string; role: string } | null;
   isCollapsed: boolean;
   onToggle: (collapsed: boolean) => void;
+  onLogout?: () => void;
 }
 
-export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
+export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
-  const [isHovered, setIsHovered] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Use permissions hook for dynamic access control
   const { hasPermission, loading: permissionsLoading } = usePermissions();
+
+  // Badge on "Time Off" (FIG-575): count of pending leave applications that
+  // need action from the logged-in user specifically - not a global count,
+  // which would be noise for anyone who isn't ADMIN/HR. ADMIN/HR see every
+  // pending application (they're the final approver for all of them);
+  // everyone else only sees applications where they're the assigned
+  // Leave Approver/Alternate Approver (FIG-573) and it hasn't been
+  // recommended yet - i.e. genuinely waiting on them.
+  const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
+
+  useEffect(() => {
+    if (!user?.email) {
+      setPendingLeaveCount(0);
+      return;
+    }
+
+    const fetchPendingLeaveCount = async () => {
+      try {
+        if (user.role === 'ADMIN' || user.role === 'HR') {
+          // `status` is stored with inconsistent casing across rows
+          // ('Pending' from older/Staff-Portal-submitted rows, 'approved'
+          // etc. from LeaveManagement's own writes) - match case-insensitively.
+          const { count } = await supabase
+            .from('leave_application')
+            .select('id', { count: 'exact', head: true })
+            .ilike('status', 'pending');
+          setPendingLeaveCount(count || 0);
+          return;
+        }
+
+        const { data: me } = await supabase
+          .from('employees')
+          .select('"First Name", "Last Name"')
+          .eq('"Work Email"', user.email)
+          .single();
+
+        if (!me) {
+          setPendingLeaveCount(0);
+          return;
+        }
+        const myName = `${me["First Name"]} ${me["Last Name"]}`;
+
+        const { data: allEmployees } = await supabase
+          .from('employees')
+          .select('"Employee Number", "Leave Approver", "Alternate Approver"');
+
+        const myReportNumbers = (allEmployees || [])
+          .filter((e: any) => e["Leave Approver"] === myName || e["Alternate Approver"] === myName)
+          .map((e: any) => e["Employee Number"]);
+
+        if (myReportNumbers.length === 0) {
+          setPendingLeaveCount(0);
+          return;
+        }
+
+        const { count } = await supabase
+          .from('leave_application')
+          .select('id', { count: 'exact', head: true })
+          .ilike('status', 'pending')
+          .is('recstatus', null)
+          .in('"Employee Number"', myReportNumbers);
+
+        setPendingLeaveCount(count || 0);
+      } catch (err) {
+        console.error('Error fetching pending leave count:', err);
+      }
+    };
+
+    fetchPendingLeaveCount();
+
+    // Live updates: a new submission, a recommendation, or a decision can
+    // all change this count without the sidebar otherwise re-rendering.
+    const channel = supabase
+      .channel('sidebar_pending_leave_count')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leave_application' }, () => {
+        fetchPendingLeaveCount();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.email, user?.role]);
 
   const sidebarVariants: Variants = {
     expanded: {
@@ -111,7 +197,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
     }
   };
 
-  const isExpanded = isHovered || !isCollapsed;
+  const isExpanded = !isCollapsed;
   const userRole = user?.role || 'Admin';
   const userInitial = user?.email?.[0]?.toUpperCase() || 'A';
 
@@ -121,9 +207,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
         initial="expanded"
         animate={isExpanded ? "expanded" : "collapsed"}
         variants={sidebarVariants}
-        className="relative flex flex-col h-full border-r border-white/5 shadow-2xl overflow-hidden bg-[#1C0770] font-lexend"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        className="relative flex flex-col h-full border-r border-white/5 shadow-2xl overflow-hidden bg-brand"
       >
         {/* Brand Section */}
         {/* Brand Section */}
@@ -146,22 +230,27 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                   exit={{ opacity: 0, x: -10 }}
                   className="flex flex-col"
                 >
-                  <h1 className="font-lexend font-bold text-xl text-white tracking-tight flex items-center">
-                    Zira<span className="text-white font-light ml-0.5">Pro</span>
+                  <h1 className="font-bold text-xl text-white tracking-tight flex items-center">
+                    Figbloom<span className="text-white/70 font-normal ml-0.5">HR</span>
                   </h1>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
 
-          {/* Hamburger Toggle */}
+          {/* Collapse/Expand Toggle: chevron when open, hamburger when collapsed */}
           <motion.button
             onClick={() => onToggle(!isCollapsed)}
+            aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
             className={`p-2 rounded-xl hover:bg-white/10 transition-all duration-300 group border border-transparent hover:border-white/10 hover:shadow-sm ${!isExpanded ? 'bg-white/5' : ''}`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            <Menu className={`w-4 h-4 transition-colors ${isExpanded ? 'text-slate-400 group-hover:text-[#03c04a]' : 'text-[#03c04a]'}`} />
+            {isExpanded ? (
+              <ChevronLeft className="w-4 h-4 transition-colors text-white/50 group-hover:text-[#F26A1B]" />
+            ) : (
+              <Menu className="w-4 h-4 transition-colors text-[#F26A1B]" />
+            )}
           </motion.button>
         </div>
 
@@ -174,38 +263,21 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
               exit={{ opacity: 0, height: 0 }}
               className="px-5 mb-4 overflow-hidden"
             >
-              <div className="relative group">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-purple-300/70 group-focus-within:text-lime-400 transition-colors" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-white/10 border border-white/10 rounded-xl py-2 pl-9 pr-3 text-xs text-white placeholder-purple-300/50 focus:outline-none focus:ring-1 focus:ring-lime-400 focus:border-lime-400/50 transition-all"
-                />
-              </div>
+              <SearchInput
+                variant="dark"
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Scrollable Navigation */}
-        <motion.div
-          className="relative z-10 flex-1 overflow-y-auto px-3 pb-4 sidebar-scroll hover:overflow-y-auto overflow-hidden"
-          initial="hidden"
-          animate="visible"
-          variants={{
-            visible: { transition: { staggerChildren: 0.05 } }
-          }}
-        >
+        <div className="relative z-10 flex-1 overflow-y-auto px-3 pb-4 sidebar-scroll hover:overflow-y-auto overflow-hidden">
           <div className="space-y-6">
             {menuGroups.map((group) => (
-              <motion.div
-                key={group.title}
-                variants={{
-                  hidden: { opacity: 0, y: 10 },
-                  visible: { opacity: 1, y: 0 }
-                }}
-              >
+              <div key={group.title}>
                 {/* Section Header */}
                 <AnimatePresence>
                   {isExpanded && (
@@ -215,7 +287,7 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                       exit={{ opacity: 0 }}
                       className="px-3 mb-2"
                     >
-                      <span className="text-[10px] font-normal text-cyan-400 tracking-wider font-lexend pl-1">
+                      <span className="text-[9.5px] font-semibold text-white/40 uppercase tracking-[0.08em] pl-1">
                         {group.title}
                       </span>
                     </motion.div>
@@ -237,22 +309,25 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                       <motion.button
                         key={item.id}
                         onClick={() => navigate(item.path)}
-                        className={`relative w-full flex items-center px-3 py-2.5 rounded-xl transition-all duration-300 group overflow-hidden ${!isExpanded && 'justify-center px-0'
+                        className={`relative w-full flex items-center min-h-9 px-3 rounded-[9px] transition-all duration-300 group overflow-hidden ${!isExpanded && 'justify-center px-0'
                           } ${isActive
-                            ? 'bg-[#03c04a] text-white border border-white/20 ring-1 ring-white/10'
-                            : 'text-white/80 hover:bg-white/5 hover:text-[#03c04a]'}`}
+                            ? 'bg-white text-brand font-semibold shadow-sm'
+                            : 'text-white/80 hover:bg-white/10 hover:text-white'}`}
                         whileTap={{ scale: 0.98 }}
                       >
 
                         {/* Icon */}
                         <div className="relative z-10 flex items-center justify-center">
                           <item.icon
-                            className={`w-4 h-4 transition-all duration-300 ${isActive
-                              ? 'text-white'
-                              : 'text-white/80 group-hover:text-[#03c04a] group-hover:scale-110'
+                            className={`w-[15px] h-[15px] transition-all duration-300 ${isActive
+                              ? 'text-brand'
+                              : 'text-white/80 group-hover:text-white group-hover:scale-110'
                               }`}
-                            strokeWidth={isActive ? 2.5 : 2}
+                            strokeWidth={isActive ? 2.2 : 1.8}
                           />
+                          {item.id === 'leaves' && pendingLeaveCount > 0 && !isExpanded && (
+                            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange border border-brand"></span>
+                          )}
                         </div>
 
                         {/* Label */}
@@ -262,17 +337,24 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                               initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
                               exit={{ opacity: 0, x: -10 }}
-                              className={`ml-3 text-xs truncate font-lexend relative z-10 tracking-wide font-normal ${isActive ? 'text-white' : 'text-white/80'}`}
+                              className={`ml-[9px] text-[12.5px] truncate relative z-10 flex-1 flex items-center ${isActive ? 'text-brand font-semibold' : 'text-white/80 font-normal'}`}
                             >
                               {item.label}
+                              {item.id === 'leaves' && pendingLeaveCount > 0 && (
+                                <span className={`ml-auto min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full text-[10px] font-bold ${isActive ? 'bg-brand text-white' : 'bg-orange text-white'
+                                  }`}>
+                                  {pendingLeaveCount > 99 ? '99+' : pendingLeaveCount}
+                                </span>
+                              )}
                             </motion.span>
                           )}
                         </AnimatePresence>
 
                         {/* Tooltip (Collapsed) */}
-                        {!isExpanded && !isHovered && (
+                        {!isExpanded && (
                           <div className="absolute left-full ml-5 px-2.5 py-1.5 bg-slate-800 text-white text-[10px] font-semibold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 whitespace-nowrap shadow-xl translate-x-2 group-hover:translate-x-0">
                             {item.label}
+                            {item.id === 'leaves' && pendingLeaveCount > 0 && ` (${pendingLeaveCount})`}
                             <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 w-2 h-2 bg-slate-800 rotate-45" />
                           </div>
                         )}
@@ -280,24 +362,18 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                     );
                   })}
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
-        </motion.div>
+        </div>
 
         {/* User Profile */}
         <div className="relative z-10 p-3 mt-auto border-t border-white/10">
-          <div
-            className={`
-              relative overflow-hidden rounded-xl bg-white/5
-              hover:bg-white/10 border border-white/10
-              transition-all duration-300 cursor-pointer group p-2.5 backdrop-blur-sm
-            `}
-          >
+          <div className="relative overflow-hidden rounded-xl bg-white/5 border border-white/10 p-2.5 backdrop-blur-sm">
             <div className="flex items-center gap-3 relative z-10">
-              <div className="relative">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-100 to-green-100 flex items-center justify-center shadow-inner ring-1 ring-white">
-                  <span className="font-bold text-primary text-xs">{userInitial}</span>
+              <div className="relative flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-inner ring-1 ring-white/50">
+                  <span className="font-bold text-[#17402A] text-xs">{userInitial}</span>
                 </div>
               </div>
 
@@ -309,17 +385,35 @@ export default function Sidebar({ user, isCollapsed, onToggle }: SidebarProps) {
                     exit={{ opacity: 0, width: 0 }}
                     className="flex-1 overflow-hidden"
                   >
-                    <p className="text-xs font-bold text-slate-200 truncate font-lexend capitalize">
+                    <p className="text-xs font-bold text-white truncate font-lexend capitalize">
                       {userRole.toLowerCase()}
                     </p>
-                    <p className="text-[10px] text-slate-400 truncate">Admin Workspace</p>
+                    <p className="text-[10px] text-white/40 truncate">Admin Workspace</p>
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              {/* Settings Icon */}
               {isExpanded && (
-                <Settings className="w-3.5 h-3.5 text-slate-400 group-hover:text-primary transition-colors" />
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/settings')}
+                    aria-label="Settings"
+                    className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                  >
+                    <Settings className="w-3.5 h-3.5 text-white/40 hover:text-[#F26A1B] transition-colors" />
+                  </button>
+                  {onLogout && (
+                    <button
+                      type="button"
+                      onClick={onLogout}
+                      aria-label="Log out"
+                      className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                    >
+                      <LogOut className="w-3.5 h-3.5 text-white/40 hover:text-[#F26A1B] transition-colors" />
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>

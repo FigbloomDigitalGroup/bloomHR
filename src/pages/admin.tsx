@@ -73,7 +73,7 @@ export default function StaffSignupRequests() {
   if (loading && requests.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
-        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-4" />
+        <Loader2 className="w-8 h-8 text-brand animate-spin mb-4" />
         <p className="text-gray-500 font-medium text-sm">Loading requests...</p>
       </div>
     );
@@ -86,8 +86,8 @@ export default function StaffSignupRequests() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Staff Requests</h1>
-            <p className="text-sm text-gray-500 mt-1">Manage pending access approvals and invitations.</p>
+            <h1 className="text-[21px] font-bold tracking-tight text-ink">Staff Requests</h1>
+            <p className="text-[12.5px] text-muted-foreground mt-1">Manage pending access approvals and invitations</p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -143,7 +143,7 @@ export default function StaffSignupRequests() {
                             autoFocus
                             type="text"
                             placeholder="Filter branches..."
-                            className="w-full px-3 py-1.5 text-sm bg-gray-50 border-none rounded-md focus:ring-1 focus:ring-indigo-500 outline-none"
+                            className="w-full px-3 py-1.5 text-sm bg-gray-50 border-none rounded-md focus:ring-1 focus:ring-brand outline-none"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                           />
@@ -151,7 +151,7 @@ export default function StaffSignupRequests() {
                         <div className="max-h-[200px] overflow-y-auto p-1">
                           <button
                             onClick={() => handleBranchSelect('all')}
-                            className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${selectedBranch === 'all' ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50 text-gray-700'}`}
+                            className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${selectedBranch === 'all' ? 'bg-orange-tint text-brand-dark' : 'hover:bg-gray-50 text-gray-700'}`}
                           >
                             All Branches
                           </button>
@@ -159,7 +159,7 @@ export default function StaffSignupRequests() {
                             <button
                               key={branch}
                               onClick={() => handleBranchSelect(branch)}
-                              className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${selectedBranch === branch ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-gray-50 text-gray-700'}`}
+                              className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${selectedBranch === branch ? 'bg-orange-tint text-brand-dark' : 'hover:bg-gray-50 text-gray-700'}`}
                             >
                               {branch}
                             </button>
@@ -188,7 +188,7 @@ export default function StaffSignupRequests() {
                 </button>
                 <button
                   onClick={() => setShowBulkUpload(true)}
-                  className="px-3 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition-colors flex items-center gap-2"
+                  className="px-3 py-2 text-sm font-medium text-white bg-brand rounded-lg hover:bg-brand-dark shadow-sm transition-colors flex items-center gap-2"
                 >
                   <Upload className="w-4 h-4" />
                   Import Staff
@@ -198,17 +198,17 @@ export default function StaffSignupRequests() {
 
             {/* Bulk Actions Header */}
             {selectedRequests.size > 0 && (
-              <div className="flex items-center justify-between p-4 bg-indigo-50 border border-indigo-100 rounded-lg text-indigo-900 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center justify-between p-4 bg-orange-tint border border-orange/20 rounded-lg text-brand-dark animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="flex items-center gap-3">
                   <span className="font-semibold text-sm">{selectedRequests.size} selected</span>
-                  <button onClick={toggleSelectAll} className="text-xs hover:underline text-indigo-700">
+                  <button onClick={toggleSelectAll} className="text-xs hover:underline text-brand-dark">
                     {selectedRequests.size === filteredRequests.length ? 'Deselect All' : 'Select All'}
                   </button>
                 </div>
                 <button
                   onClick={handleBulkProcess}
                   disabled={bulkProcessing}
-                  className="px-4 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 shadow-sm disabled:opacity-70 transition-colors"
+                  className="px-4 py-1.5 bg-brand text-white text-sm font-medium rounded-md hover:bg-brand-dark shadow-sm disabled:opacity-70 transition-colors"
                 >
                   {bulkProcessing ? 'Processing...' : 'Approve Selected'}
                 </button>
@@ -218,12 +218,12 @@ export default function StaffSignupRequests() {
             {/* Request List */}
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
               {filteredRequests.length === 0 ? (
-                <div className="p-12 text-center">
-                  <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle className="w-6 h-6 text-gray-300" />
+                <div className="py-16 text-center">
+                  <div className="w-11 h-11 bg-green-tint text-brand-dark rounded-full flex items-center justify-center mx-auto mb-3">
+                    <CheckCircle className="w-[18px] h-[18px]" strokeWidth={1.8} />
                   </div>
-                  <h3 className="text-gray-900 font-medium">No pending requests</h3>
-                  <p className="text-gray-500 text-sm mt-1">There are no signup requests matching your filters.</p>
+                  <h3 className="text-[14px] font-bold text-ink">No pending requests</h3>
+                  <p className="text-muted-foreground text-xs mt-0.5">There are no signup requests matching your filters.</p>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
@@ -231,7 +231,7 @@ export default function StaffSignupRequests() {
                     <div className="w-6">
                       <button onClick={toggleSelectAll}>
                         {selectedRequests.size === filteredRequests.length && filteredRequests.length > 0 ? (
-                          <CheckSquare className="w-4 h-4 text-indigo-600" />
+                          <CheckSquare className="w-4 h-4 text-brand" />
                         ) : (
                           <Square className="w-4 h-4 text-gray-400" />
                         )}
@@ -252,11 +252,11 @@ export default function StaffSignupRequests() {
                     return (
                       <div
                         key={request.id}
-                        className={`px-6 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors group ${isSelected ? 'bg-indigo-50/30' : ''}`}
+                        className={`px-6 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors group ${isSelected ? 'bg-orange-tint/30' : ''}`}
                       >
                         <div className="w-6 flex-shrink-0">
-                          <button onClick={() => toggleRequestSelection(request.id)} className="text-gray-400 hover:text-indigo-600">
-                            {isSelected ? <CheckSquare className="w-4 h-4 text-indigo-600" /> : <Square className="w-4 h-4" />}
+                          <button onClick={() => toggleRequestSelection(request.id)} className="text-gray-400 hover:text-brand">
+                            {isSelected ? <CheckSquare className="w-4 h-4 text-brand" /> : <Square className="w-4 h-4" />}
                           </button>
                         </div>
 
@@ -303,7 +303,7 @@ export default function StaffSignupRequests() {
                           <button
                             onClick={() => handleProcessRequest(request.id, request.email, request.branch)}
                             disabled={processingId === request.id || hasBounced}
-                            className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                            className="p-1.5 text-brand hover:bg-orange-tint rounded-md transition-colors"
                             title="Approve"
                           >
                             {processingId === request.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
@@ -386,7 +386,7 @@ export default function StaffSignupRequests() {
                       type="text"
                       value={bulkBranch}
                       onChange={(e) => setBulkBranch(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none transition-all"
                       placeholder="e.g. Headquarters"
                     />
                   </div>
@@ -395,11 +395,11 @@ export default function StaffSignupRequests() {
                     <div className="space-y-3">
                       <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:bg-gray-50 transition-colors relative">
                         <input type="file" accept=".xlsx,.xls" onChange={handleExcelUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                        <Upload className="w-8 h-8 text-indigo-500 mx-auto mb-3" />
+                        <Upload className="w-8 h-8 text-brand mx-auto mb-3" />
                         <p className="text-sm font-medium text-gray-900">{excelFile ? (excelFile as any).name : 'Click to upload Excel file'}</p>
                         <p className="text-xs text-gray-500 mt-1">.xlsx or .xls files supported</p>
                       </div>
-                      <button onClick={downloadExcelTemplate} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center justify-center gap-1.5 w-full py-2">
+                      <button onClick={downloadExcelTemplate} className="text-xs font-semibold text-brand hover:text-brand-dark flex items-center justify-center gap-1.5 w-full py-2">
                         <Download className="w-3.5 h-3.5" /> Download Template
                       </button>
                     </div>
@@ -410,7 +410,7 @@ export default function StaffSignupRequests() {
                         value={bulkEmails}
                         onChange={(e) => setBulkEmails(e.target.value)}
                         placeholder="user@example.com&#10;another@example.com"
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm h-32 font-mono focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm h-32 font-mono focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none"
                       />
                     </div>
                   )}
@@ -424,7 +424,7 @@ export default function StaffSignupRequests() {
                 <button
                   onClick={uploadMethod === 'excel' ? handleBulkUploadFromExcel : handleManualBulkUpload}
                   disabled={uploadingBulk || !bulkBranch || (uploadMethod === 'excel' ? !parsedData.length : !bulkEmails)}
-                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm disabled:opacity-50 transition-colors flex items-center gap-2"
+                  className="px-4 py-2 text-sm font-medium text-white bg-brand hover:bg-brand-dark rounded-lg shadow-sm disabled:opacity-50 transition-colors flex items-center gap-2"
                 >
                   {uploadingBulk && <Loader2 className="w-4 h-4 animate-spin" />}
                   Import Users

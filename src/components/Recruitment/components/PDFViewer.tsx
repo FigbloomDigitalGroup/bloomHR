@@ -52,7 +52,7 @@ export const PDFViewer = ({ fileName, isPublic = true, onClose }: PDFViewerProps
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6">
           <div className="flex items-center gap-3">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600"></div>
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
             <span>Loading PDF...</span>
           </div>
         </div>
@@ -89,7 +89,7 @@ export const PDFViewer = ({ fileName, isPublic = true, onClose }: PDFViewerProps
               href={pdfUrl || '#'} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-xs flex items-center gap-2"
+              className="px-3 py-1.5 bg-green-tint hover:bg-brand/20 text-brand-dark rounded-lg text-xs flex items-center gap-2"
             >
               <ExternalLink className="w-4 h-4" />
               Open in New Tab
@@ -97,7 +97,7 @@ export const PDFViewer = ({ fileName, isPublic = true, onClose }: PDFViewerProps
             <a 
               href={pdfUrl || '#'} 
               download={fileName}
-              className="px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-xs flex items-center gap-2"
+              className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-xs flex items-center gap-2"
             >
               <Download className="w-4 h-4" />
               Download

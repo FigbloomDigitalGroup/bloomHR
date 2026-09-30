@@ -215,7 +215,7 @@ export const ApplicationsTable = ({ applications, setSelectedApplication }: Appl
                       <div className="flex">
                         <button
                           onClick={() => window.open(application.resume_file_url, '_blank')}
-                          className="px-1.5 sm:px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded text-xs flex items-center gap-1 whitespace-nowrap"
+                          className="px-1.5 sm:px-2 py-1 bg-primary/10 hover:bg-primary/20 text-primary rounded text-xs flex items-center gap-1 whitespace-nowrap"
                           title="View Resume"
                         >
                           <Eye className="w-3 h-3 flex-shrink-0" />

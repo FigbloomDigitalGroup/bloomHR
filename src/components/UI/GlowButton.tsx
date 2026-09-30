@@ -26,9 +26,9 @@ export default function GlowButton({
   const baseClasses = 'inline-flex text-xs items-center justify-center font-medium rounded-lg transition-all duration-200 border backdrop-blur-sm';
 
   const variantClasses = {
-    primary: 'bg-green-600 text-white hover:bg-green-700 border-green-500 hover:border-green-600 transition-all duration-300',
+    primary: 'bg-primary text-primary-foreground hover:bg-primary/90 border-primary/80 hover:border-primary transition-all duration-300',
     secondary: 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-300',
-    danger: 'bg-red-600 text-white hover:bg-red-700 border-red-500 hover:border-red-600 transition-all duration-300'
+    danger: 'bg-destructive text-destructive-foreground hover:bg-destructive/90 border-destructive/80 hover:border-destructive transition-all duration-300'
   };
 
   const sizeClasses = {

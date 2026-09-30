@@ -120,12 +120,12 @@ const MpesaCallbacks: React.FC = () => {
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="md:col-span-1 bg-gradient-to-br from-indigo-600 to-blue-700 rounded-[2rem] p-8 text-white shadow-xl shadow-indigo-100 relative overflow-hidden group"
+                    className="md:col-span-1 bg-primary rounded-[2rem] p-8 text-white shadow-xl shadow-primary/20 relative overflow-hidden group"
                 >
                     <div className="relative z-10 space-y-4">
                         <div className="space-y-1">
                             <h2 className="text-xl font-black tracking-tight">M-Pesa Live</h2>
-                            <p className="text-indigo-100 text-[10px] font-black uppercase tracking-widest opacity-80">Real-time Transaction Stream</p>
+                            <p className="text-primary-foreground/70 text-[10px] font-black uppercase tracking-widest opacity-80">Real-time Transaction Stream</p>
                         </div>
 
                         <div className="flex items-center gap-3">
@@ -180,7 +180,7 @@ const MpesaCallbacks: React.FC = () => {
                             placeholder="Search by Transaction ID, Receipt, or Employee..."
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
-                            className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-[11px] font-black uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                            className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-[11px] font-black uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
                         />
                     </div>
 
@@ -189,13 +189,13 @@ const MpesaCallbacks: React.FC = () => {
                             <button
                                 key={status}
                                 onClick={() => setStatusFilter(status)}
-                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${statusFilter === status ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-400 hover:text-indigo-600'
+                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${statusFilter === status ? 'bg-primary text-white shadow-lg' : 'text-gray-400 hover:text-primary'
                                     }`}
                             >
                                 {status}
                             </button>
                         ))}
-                        <button onClick={() => fetchLogs()} className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-indigo-600">
+                        <button onClick={() => fetchLogs()} className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-primary">
                             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                         </button>
                     </div>
@@ -213,11 +213,11 @@ const MpesaCallbacks: React.FC = () => {
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {currentLogs.map((log) => (
-                                <tr key={log.id} onClick={() => setSelectedLog(log)} className="hover:bg-indigo-50/30 transition-all cursor-pointer group">
+                                <tr key={log.id} onClick={() => setSelectedLog(log)} className="hover:bg-primary/5 transition-all cursor-pointer group">
                                     <td className="px-8 py-6">
                                         <div className="flex flex-col gap-1">
                                             <div className="flex items-center gap-2">
-                                                <span className="text-sm font-black text-gray-900 group-hover:text-indigo-600">
+                                                <span className="text-sm font-black text-gray-900 group-hover:text-primary">
                                                     {(() => {
                                                         const isGenericId = log.transaction_id === 'UAT1000000';
                                                         let displayId = log.transaction_id || '---';
@@ -242,7 +242,7 @@ const MpesaCallbacks: React.FC = () => {
                                                     })()}
                                                 </span>
                                                 <button onClick={(e) => { e.stopPropagation(); copyToClipboard(log.transaction_id); }}>
-                                                    <Copy className="w-3 h-3 text-gray-300 hover:text-indigo-600" />
+                                                    <Copy className="w-3 h-3 text-gray-300 hover:text-primary" />
                                                 </button>
                                             </div>
                                             <span className="text-[10px] font-bold text-gray-400 uppercase">{log.originator_conversation_id}</span>
@@ -251,7 +251,7 @@ const MpesaCallbacks: React.FC = () => {
                                     <td className="px-8 py-6">
                                         {log.employees ? (
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black">
+                                                <div className="w-10 h-10 rounded-2xl bg-primary text-white flex items-center justify-center font-black">
                                                     {log.employees["First Name"][0]}{log.employees["Last Name"][0]}
                                                 </div>
                                                 <div className="flex flex-col">
@@ -311,8 +311,8 @@ const MpesaCallbacks: React.FC = () => {
                                             {selectedLog.result_desc}
                                         </div>
                                     </div>
-                                    <div className="p-6 bg-indigo-600 rounded-3xl text-white">
-                                        <p className="text-[10px] font-black text-indigo-100 uppercase mb-2">Amount</p>
+                                    <div className="p-6 bg-primary rounded-3xl text-white">
+                                        <p className="text-[10px] font-black text-primary-foreground/70 uppercase mb-2">Amount</p>
                                         <div className="text-3xl font-black">{formatCurrency(selectedLog.amount)}</div>
                                     </div>
                                 </div>

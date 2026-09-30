@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { Users, Filter } from 'lucide-react';
+import { PageHeader, Button } from '../UI';
 import { StatusBadge } from './components/StatusBadge';
 import { SummaryCard } from './components/SummaryCard';
-import { GlowButton } from './components/GlowButton';
 import { FiltersSection } from './components/FiltersSection';
 import { TabsNavigation } from './components/TabsNavigation';
 import PositionsTable from './components/PositionsTable';
@@ -133,26 +133,16 @@ export default function RecruitmentDashboard() {
   }
 
   return (
-    <div className="p-4 space-y-6 bg-gray-50 min-h-screen max-w-screen-2xl mx-auto">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Employee Recruitment Portal</h1>
-            <p className="text-gray-600 text-xs">Manage open positions, applications, and hiring needs across all branches</p>
-          </div>
-          <div className="flex flex-wrap gap-2 w-full md:w-auto">
-            
-            <GlowButton 
-              variant="secondary"
-              icon={Filter}
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              {showFilters ? 'Hide Filters' : 'Show Filters'}
-            </GlowButton>
-          </div>
-        </div>
-      </div>
+    <div className="p-4 space-y-[18px] max-w-screen-2xl mx-auto">
+      <PageHeader
+        title="Employee Recruitment Portal"
+        subtitle="Manage open positions, applications, and hiring needs"
+        actions={
+          <Button variant="secondary" onClick={() => setShowFilters(!showFilters)} icon={<Filter className="w-3.5 h-3.5" />}>
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
+          </Button>
+        }
+      />
 
       {showNewPositionModal && (
         <NewPositionModal 

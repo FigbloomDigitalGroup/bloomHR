@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
+import StatusPill from '../UI/StatusPill';
+import type { StatusTone } from '../UI/StatusPill';
 
 interface JobPosting {
     id: string;
@@ -53,14 +55,14 @@ const JOB_TYPES = {
     temporary: 'Temporary'
 };
 
-const APPLICATION_STATUS = {
-    pending: { label: 'Pending', color: 'bg-blue-100 text-blue-800 border-blue-300' },
-    under_review: { label: 'Under Review', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-    shortlisted: { label: 'Shortlisted', color: 'bg-purple-100 text-purple-800 border-purple-300' },
-    interview_scheduled: { label: 'Interview Scheduled', color: 'bg-green-100 text-green-800 border-green-300' },
-    rejected: { label: 'Rejected', color: 'bg-red-100 text-red-800 border-red-300' },
-    accepted: { label: 'Accepted', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
-    withdrawn: { label: 'Withdrawn', color: 'bg-gray-100 text-gray-800 border-gray-300' }
+const APPLICATION_STATUS: Record<string, { label: string; tone: StatusTone }> = {
+    pending: { label: 'Pending', tone: 'neutral' },
+    under_review: { label: 'Under Review', tone: 'info' },
+    shortlisted: { label: 'Shortlisted', tone: 'purple' },
+    interview_scheduled: { label: 'Interview Scheduled', tone: 'warning' },
+    rejected: { label: 'Rejected', tone: 'danger' },
+    accepted: { label: 'Accepted', tone: 'success' },
+    withdrawn: { label: 'Withdrawn', tone: 'neutral' }
 };
 
 const JobApplications = () => {
@@ -240,7 +242,7 @@ const JobApplications = () => {
     if (isLoading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
     }
@@ -261,7 +263,7 @@ const JobApplications = () => {
                     <button
                         onClick={() => setActiveTab('browse')}
                         className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'browse'
-                                ? 'border-green-600 text-green-600'
+                                ? 'border-primary text-primary'
                                 : 'border-transparent text-gray-500 hover:text-gray-700'
                             }`}
                     >
@@ -271,7 +273,7 @@ const JobApplications = () => {
                     <button
                         onClick={() => setActiveTab('my-applications')}
                         className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'my-applications'
-                                ? 'border-green-600 text-green-600'
+                                ? 'border-primary text-primary'
                                 : 'border-transparent text-gray-500 hover:text-gray-700'
                             }`}
                     >
@@ -293,13 +295,13 @@ const JobApplications = () => {
                                         placeholder="Search jobs..."
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                                     />
                                 </div>
                                 <select
                                     value={departmentFilter}
                                     onChange={(e) => setDepartmentFilter(e.target.value)}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                                 >
                                     <option value="all">All Departments</option>
                                     {departments.map(dept => (
@@ -309,7 +311,7 @@ const JobApplications = () => {
                                 <select
                                     value={jobTypeFilter}
                                     onChange={(e) => setJobTypeFilter(e.target.value)}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                                 >
                                     <option value="all">All Job Types</option>
                                     {Object.entries(JOB_TYPES).map(([key, label]) => (
@@ -342,7 +344,7 @@ const JobApplications = () => {
                                                 <div className="flex items-center space-x-3 mb-2">
                                                     <h3 className="text-lg font-semibold text-gray-900">{job.job_title}</h3>
                                                     {hasApplied(job.id) && (
-                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-tint text-status-success">
                                                             <CheckCircle2 className="h-3 w-3 mr-1" />
                                                             Applied
                                                         </span>
@@ -375,7 +377,7 @@ const JobApplications = () => {
                                                 <p className="text-sm text-gray-700 mb-3 line-clamp-2">{job.description}</p>
 
                                                 {job.application_deadline && (
-                                                    <div className="flex items-center text-xs text-orange-600">
+                                                    <div className="flex items-center text-xs text-orange-text-alt">
                                                         <Calendar className="h-3 w-3 mr-1" />
                                                         Apply by {new Date(job.application_deadline).toLocaleDateString()}
                                                     </div>
@@ -387,7 +389,7 @@ const JobApplications = () => {
                                                     onClick={() => {
                                                         setSelectedJob(job);
                                                     }}
-                                                    className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center"
+                                                    className="px-4 py-2 text-sm text-brand hover:text-brand-dark font-medium flex items-center"
                                                 >
                                                     <Eye className="h-4 w-4 mr-1" />
                                                     View Details
@@ -395,7 +397,7 @@ const JobApplications = () => {
                                                 {!hasApplied(job.id) && (
                                                     <button
                                                         onClick={() => handleApply(job)}
-                                                        className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center"
+                                                        className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors flex items-center"
                                                     >
                                                         <Send className="h-4 w-4 mr-1" />
                                                         Apply Now
@@ -422,7 +424,7 @@ const JobApplications = () => {
                                 </p>
                                 <button
                                     onClick={() => setActiveTab('browse')}
-                                    className="mt-4 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700"
+                                    className="mt-4 px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90"
                                 >
                                     Browse Jobs
                                 </button>
@@ -439,10 +441,10 @@ const JobApplications = () => {
                                                 {app.job_posting?.job_title}
                                             </h3>
                                             <div className="flex items-center space-x-3 mb-3">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${APPLICATION_STATUS[app.status as keyof typeof APPLICATION_STATUS]?.color
-                                                    }`}>
-                                                    {APPLICATION_STATUS[app.status as keyof typeof APPLICATION_STATUS]?.label}
-                                                </span>
+                                                <StatusPill
+                                                    tone={APPLICATION_STATUS[app.status as keyof typeof APPLICATION_STATUS]?.tone || 'neutral'}
+                                                    label={APPLICATION_STATUS[app.status as keyof typeof APPLICATION_STATUS]?.label || app.status}
+                                                />
                                                 <span className="text-xs text-gray-500">
                                                     Applied on {new Date(app.applied_at).toLocaleDateString()}
                                                 </span>
@@ -457,7 +459,7 @@ const JobApplications = () => {
                                         {app.status === 'pending' && (
                                             <button
                                                 onClick={() => withdrawApplication(app.id)}
-                                                className="ml-4 px-3 py-1 text-sm text-red-600 hover:text-red-800 font-medium flex items-center"
+                                                className="ml-4 px-3 py-1 text-sm text-status-danger hover:text-status-danger/80 font-medium flex items-center"
                                             >
                                                 <Trash2 className="h-4 w-4 mr-1" />
                                                 Withdraw
@@ -500,14 +502,14 @@ const JobApplications = () => {
                             <div className="p-6 space-y-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Cover Letter <span className="text-red-500">*</span>
+                                        Cover Letter <span className="text-status-danger">*</span>
                                     </label>
                                     <textarea
                                         value={coverLetter}
                                         onChange={(e) => setCoverLetter(e.target.value)}
                                         rows={8}
                                         placeholder="Explain why you're interested in this position and what makes you a great fit..."
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                                     />
                                 </div>
 
@@ -520,14 +522,14 @@ const JobApplications = () => {
                                         onChange={(e) => setAdditionalInfo(e.target.value)}
                                         rows={4}
                                         placeholder="Any additional information you'd like to share..."
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                                     />
                                 </div>
 
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <div className="bg-status-info-tint border border-status-info/20 rounded-lg p-4">
                                     <div className="flex items-start">
-                                        <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
-                                        <p className="text-xs text-blue-800">
+                                        <AlertCircle className="h-4 w-4 text-status-info mt-0.5 mr-2 flex-shrink-0" />
+                                        <p className="text-xs text-status-info">
                                             Your application will be reviewed by the HR team. You will be notified of any updates via the notifications system.
                                         </p>
                                     </div>
@@ -549,7 +551,7 @@ const JobApplications = () => {
                                 <button
                                     onClick={submitApplication}
                                     disabled={isSubmitting || !coverLetter.trim()}
-                                    className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center"
+                                    className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center"
                                 >
                                     {isSubmitting ? (
                                         <>
@@ -640,8 +642,8 @@ const JobApplications = () => {
                                 )}
 
                                 {selectedJob.application_deadline && (
-                                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                                        <div className="flex items-center text-sm text-orange-800">
+                                    <div className="bg-orange-tint border border-orange/20 rounded-lg p-4">
+                                        <div className="flex items-center text-sm text-orange-text-alt">
                                             <Calendar className="h-4 w-4 mr-2" />
                                             Application deadline: {new Date(selectedJob.application_deadline).toLocaleDateString()}
                                         </div>
@@ -661,7 +663,7 @@ const JobApplications = () => {
                                         onClick={() => {
                                             setShowApplicationModal(true);
                                         }}
-                                        className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center"
+                                        className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors flex items-center"
                                     >
                                         <Send className="h-4 w-4 mr-2" />
                                         Apply for this Position

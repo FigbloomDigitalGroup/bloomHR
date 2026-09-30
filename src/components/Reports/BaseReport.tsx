@@ -228,14 +228,14 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6">
+        <div className="bg-gradient-to-r from-brand to-orange p-6">
           <div className="flex justify-between items-start">
             <div>
               <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-3">
                 <img src='/public/mobile-transfer.png' className='w-9' />
                 Transaction Details
               </h2>
-              <div className="flex items-center gap-4 text-blue-100">
+              <div className="flex items-center gap-4 text-white/70">
                 <div className="flex items-center gap-2">
                   <UserCheck className="w-4 h-4" />
                   <span className="font-medium">{employeeName}</span>
@@ -260,8 +260,8 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between mb-2">
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <Receipt className="w-5 h-5 text-blue-600" />
+                <div className="p-2 bg-green-tint rounded-lg">
+                  <Receipt className="w-5 h-5 text-brand" />
                 </div>
                 <span className="text-xs font-medium text-gray-500">Transactions</span>
               </div>
@@ -282,8 +282,8 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
 
             <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between mb-2">
-                <div className="p-2 bg-purple-50 rounded-lg">
-                  <Clock className="w-5 h-5 text-purple-600" />
+                <div className="p-2 bg-orange-tint rounded-lg">
+                  <Clock className="w-5 h-5 text-orange" />
                 </div>
                 <span className="text-xs font-medium text-gray-500">Last Transaction</span>
               </div>
@@ -307,7 +307,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
             </button>
             <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all hover:scale-105 active:scale-95 shadow-sm"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-brand hover:bg-brand-dark text-white rounded-lg font-medium transition-all hover:scale-105 active:scale-95 shadow-sm"
             >
               <Printer className="w-4 h-4" />
               Print Report
@@ -389,7 +389,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-sm font-mono text-blue-600">
+                        <div className="text-sm font-mono text-brand">
                           {transaction.mpesa_code || 'N/A'}
                         </div>
                       </td>
@@ -407,7 +407,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
                               `;
                               alert(details);
                             }}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="p-1.5 text-brand hover:bg-green-tint rounded-lg transition-colors"
                             title="View Details"
                           >
                             <Eye className="w-4 h-4" />
@@ -505,14 +505,14 @@ const BulkDownloadModal: React.FC<BulkDownloadModalProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-100">
         {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 rounded-t-2xl">
+        <div className="bg-gradient-to-r from-orange to-brand p-6 rounded-t-2xl">
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
                 <Download className="w-5 h-5" />
                 Download Reports
               </h2>
-              <p className="text-purple-100 text-sm">Export transaction data in multiple formats</p>
+              <p className="text-white/70 text-sm">Export transaction data in multiple formats</p>
             </div>
             <button
               onClick={onClose}
@@ -526,10 +526,10 @@ const BulkDownloadModal: React.FC<BulkDownloadModalProps> = ({
         {/* Content */}
         <div className="p-6">
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex items-center justify-between mb-4 p-3 bg-green-tint rounded-lg border border-brand/20">
               <div>
-                <p className="text-sm font-medium text-blue-900">Download Scope</p>
-                <p className="text-xs text-blue-700">
+                <p className="text-sm font-medium text-brand-dark">Download Scope</p>
+                <p className="text-xs text-brand-dark">
                   {selectedCount} employee{selectedCount !== 1 ? 's' : ''} selected
                 </p>
               </div>
@@ -538,7 +538,7 @@ const BulkDownloadModal: React.FC<BulkDownloadModalProps> = ({
                   type="checkbox"
                   checked={includeAll}
                   onChange={(e) => setIncludeAll(e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="rounded border-gray-300 text-brand focus:ring-brand"
                 />
                 <span className="text-sm text-gray-700">Include all {totalCount} employees</span>
               </label>
@@ -565,11 +565,11 @@ const BulkDownloadModal: React.FC<BulkDownloadModalProps> = ({
               <button
                 onClick={() => handleDownload('csv')}
                 disabled={isDownloading}
-                className="flex items-center justify-between p-4 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-all hover:scale-[1.02] disabled:opacity-50"
+                className="flex items-center justify-between p-4 bg-green-tint hover:bg-green-tint border border-brand/20 rounded-xl transition-all hover:scale-[1.02] disabled:opacity-50"
               >
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <FileText className="w-5 h-5 text-blue-600" />
+                  <div className="p-2 bg-green-tint rounded-lg">
+                    <FileText className="w-5 h-5 text-brand" />
                   </div>
                   <div className="text-left">
                     <p className="font-medium text-gray-900">CSV Format (.csv)</p>
@@ -672,7 +672,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         disabled={disabled}
-        className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600 bg-white text-left flex items-center justify-between disabled:bg-gray-100 disabled:cursor-not-allowed"
+        className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-brand focus:border-brand bg-white text-left flex items-center justify-between disabled:bg-gray-100 disabled:cursor-not-allowed"
       >
         <span className={value ? 'text-gray-900' : 'text-gray-500'}>
           {selectedOption ? selectedOption.label : placeholder}
@@ -690,7 +690,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-600 focus:border-blue-600"
+                className="w-full pl-8 pr-3 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand focus:border-brand"
                 autoFocus
               />
             </div>
@@ -709,7 +709,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                     setIsOpen(false);
                     setSearchTerm('');
                   }}
-                  className={`w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 ${option.value === value ? 'bg-blue-50 text-blue-700' : 'text-gray-900'
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-green-tint hover:text-brand-dark ${option.value === value ? 'bg-green-tint text-brand-dark' : 'text-gray-900'
                     }`}
                 >
                   {option.label}
@@ -739,14 +739,14 @@ const AccountingStatusBadge: React.FC<{ status?: string; type: 'status' | 'repay
         case 'Pending':
           return { color: 'bg-amber-50 text-amber-700 border-amber-200' };
         case 'Approved':
-          return { color: 'bg-blue-50 text-blue-700 border-blue-200' };
+          return { color: 'bg-green-tint text-brand-dark border-brand/20' };
         case 'Rejected':
           return { color: 'bg-red-50 text-red-700 border-red-200' };
         case 'Disbursed':
           return { color: 'bg-green-50 text-green-700 border-green-200' };
         case 'Deducted':
         case 'paid':
-          return { color: 'bg-purple-50 text-purple-700 border-purple-200' };
+          return { color: 'bg-orange-tint text-orange-text-alt border-orange/20' };
         default:
           return { color: 'bg-gray-50 text-gray-600 border-gray-300' };
       }
@@ -863,7 +863,7 @@ const Pagination: React.FC<PaginationProps> = ({
         <select
           value={itemsPerPage}
           onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-          className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+          className="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-2 focus:ring-brand focus:border-brand"
         >
           <option value={10}>10</option>
           <option value={25}>25</option>
@@ -900,7 +900,7 @@ const Pagination: React.FC<PaginationProps> = ({
             onClick={() => typeof page === 'number' && onPageChange(page)}
             disabled={page === '...'}
             className={`min-w-[2rem] px-2 py-1 text-sm rounded border ${currentPage === page
-              ? 'bg-blue-600 text-white border-blue-600'
+              ? 'bg-brand text-white border-brand'
               : 'border-gray-300 text-gray-700 hover:bg-gray-100'
               } disabled:bg-transparent disabled:cursor-default`}
           >
@@ -1445,12 +1445,12 @@ const BaseReport: React.FC<BaseReportProps> = ({
 
       {/* Bulk Actions Bar */}
       {selectedEmployees.size > 0 && (
-        <div className="px-4 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between">
+        <div className="px-4 py-3 bg-green-tint border-b border-brand/20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-1.5 bg-blue-100 rounded-lg">
-              <Download className="w-4 h-4 text-blue-600" />
+            <div className="p-1.5 bg-green-tint rounded-lg">
+              <Download className="w-4 h-4 text-brand" />
             </div>
-            <span className="text-sm font-medium text-blue-800">
+            <span className="text-sm font-medium text-brand-dark">
               {selectedEmployees.size} employee{selectedEmployees.size !== 1 ? 's' : ''} selected
             </span>
           </div>
@@ -1463,7 +1463,7 @@ const BaseReport: React.FC<BaseReportProps> = ({
             </button>
             <button
               onClick={() => setShowBulkDownloadModal(true)}
-              className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+              className="px-3 py-1.5 text-xs font-medium text-white bg-brand rounded-lg hover:bg-brand-dark flex items-center gap-2"
             >
               <Download className="w-3 h-3" />
               Download Selected
@@ -1489,7 +1489,7 @@ const BaseReport: React.FC<BaseReportProps> = ({
                       setSelectedEmployees(new Set(allIds));
                     }
                   }}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="rounded border-gray-300 text-brand focus:ring-brand"
                 />
               </th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider border-r border-gray-300">
@@ -1523,13 +1523,13 @@ const BaseReport: React.FC<BaseReportProps> = ({
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => toggleEmployeeSelection(employee.employee_number)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="rounded border-gray-300 text-brand focus:ring-brand"
                     />
                   </td>
 
                   {/* Employee Details with clickable link */}
                   <td className="px-4 py-3 border-r border-gray-300">
-                    <div className="text-sm font-semibold text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
+                    <div className="text-sm font-semibold text-gray-900 cursor-pointer hover:text-brand transition-colors"
                       onClick={() => handleViewTransactions(employeeGroup)}>
                       {employee.first_name} {employee.last_name}
                     </div>
@@ -1597,13 +1597,13 @@ const BaseReport: React.FC<BaseReportProps> = ({
                         {recentAdvance?.amount_requested && (
                           <div className="text-sm">
                             <div className="text-gray-600 text-xs">Latest Amount</div>
-                            <div className="font-semibold text-blue-700">
+                            <div className="font-semibold text-brand-dark">
                               {formatCurrency(recentAdvance.amount_requested)}
                             </div>
                           </div>
                         )}
                         {recentAdvance?.mpesa_code && (
-                          <div className="text-xs font-mono text-blue-700 bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                          <div className="text-xs font-mono text-brand-dark bg-green-tint px-2 py-1 rounded border border-brand/20">
                             Ref: {recentAdvance.mpesa_code}
                           </div>
                         )}
@@ -1618,7 +1618,7 @@ const BaseReport: React.FC<BaseReportProps> = ({
                     <div className="flex flex-col gap-2">
                       <button
                         onClick={() => handleViewTransactions(employeeGroup)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand bg-green-tint hover:bg-green-tint rounded-lg border border-brand/20 transition-colors"
                       >
                         <Eye className="w-3 h-3" />
                         View Transactions
@@ -1660,7 +1660,7 @@ const BaseReport: React.FC<BaseReportProps> = ({
                             alert(`Printing report for ${employee.first_name} ${employee.last_name}`);
                             // Add print logic here
                           }}
-                          className="flex-1 px-2 py-1 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded border border-purple-200 transition-colors"
+                          className="flex-1 px-2 py-1 text-xs font-medium text-orange bg-orange-tint hover:bg-orange-tint rounded border border-orange/20 transition-colors"
                         >
                           Print
                         </button>
@@ -1746,7 +1746,7 @@ const BaseReport: React.FC<BaseReportProps> = ({
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium shadow-sm transition-colors"
+                className="inline-flex items-center gap-2 px-3 py-2 bg-brand hover:bg-brand-dark text-white rounded text-xs font-medium shadow-sm transition-colors"
               >
                 <Filter className="w-3 h-3" />
                 {showFilters ? 'Hide Filters' : 'Show Filters'}
@@ -1764,7 +1764,7 @@ const BaseReport: React.FC<BaseReportProps> = ({
 
                   <button
                     onClick={() => setShowBulkDownloadModal(true)}
-                    className="inline-flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-medium shadow-sm transition-colors"
+                    className="inline-flex items-center gap-2 px-3 py-2 bg-orange hover:bg-orange-text-alt text-white rounded text-xs font-medium shadow-sm transition-colors"
                     disabled={selectedEmployees.size === 0}
                   >
                     <Download className="w-3 h-3" />
@@ -1821,7 +1821,7 @@ const BaseReport: React.FC<BaseReportProps> = ({
                 <button
                   onClick={handleGenerateReport}
                   disabled={generating}
-                  className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-medium shadow-sm disabled:opacity-50 transition-colors"
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-brand hover:bg-brand-dark text-white rounded text-xs font-medium shadow-sm disabled:opacity-50 transition-colors"
                 >
                   {generating ? (
                     <Loader2 className="w-3 h-3 animate-spin" />
@@ -1839,7 +1839,7 @@ const BaseReport: React.FC<BaseReportProps> = ({
         <div className="bg-white rounded-lg border border-gray-300 shadow-sm overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+              <Loader2 className="w-8 h-8 text-brand animate-spin" />
             </div>
           ) : (
             renderAccountingReportData(paginatedEmployeeData)

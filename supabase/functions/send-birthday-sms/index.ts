@@ -1,9 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const CELCOM_API_KEY = '***REMOVED***';
-const CELCOM_PARTNER_ID = '928';
-const CELCOM_SHORTCODE = 'MularCredit';
+const CELCOM_API_KEY = Deno.env.get('CELCOM_API_KEY') ?? '';
+const CELCOM_PARTNER_ID = Deno.env.get('CELCOM_PARTNER_ID') ?? '';
+const CELCOM_SHORTCODE = Deno.env.get('CELCOM_SHORTCODE') ?? '';
 
 serve(async (req) => {
     try {
@@ -92,7 +92,7 @@ serve(async (req) => {
 
             // Send SMS
             try {
-                const message = `Happy Birthday ${firstName}! 🎉 Wishing you a fantastic year ahead from Mular Credit Team`;
+                const message = `Happy Birthday ${firstName}! 🎉 Wishing you a fantastic year ahead from the Figbloom HR Team`;
                 const encodedMessage = encodeURIComponent(message);
                 const url = `https://isms.celcomafrica.com/api/services/sendsms/?apikey=${CELCOM_API_KEY}&partnerID=${CELCOM_PARTNER_ID}&message=${encodedMessage}&shortcode=${CELCOM_SHORTCODE}&mobile=${phone}`;
 

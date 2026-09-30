@@ -130,7 +130,7 @@ export default function HRReportsDashboard({ stats }: { stats: DashboardStats })
     const summaryWidgets = [
         { label: 'On Probation', value: stats.on_probation, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
         { label: 'Contracts Expiring', value: stats.contracts_expiring, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50' },
-        { label: 'Suspended', value: stats.suspended, icon: ShieldOff, color: 'text-purple-600', bg: 'bg-purple-50' },
+        { label: 'Suspended', value: stats.suspended, icon: ShieldOff, color: 'text-primary', bg: 'bg-primary/10' },
         { label: 'Terminated (90d)', value: stats.terminated, icon: XCircle, color: 'text-gray-600', bg: 'bg-gray-100' },
         { label: 'Missing Dates', value: stats.missing_joining_date, icon: AlertTriangle, color: 'text-orange-600', bg: 'bg-orange-50' },
         { label: 'Pending Confirmations', value: stats.pending_confirmations, icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50' },
@@ -184,7 +184,7 @@ export default function HRReportsDashboard({ stats }: { stats: DashboardStats })
                                 <button
                                     onClick={() => handleDownload(report)}
                                     disabled={isGenerating}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors disabled:opacity-50 flex-shrink-0"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex-shrink-0"
                                 >
                                     {isGenerating ? (
                                         <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />

@@ -43,11 +43,11 @@ export const UpdateNotification: React.FC = () => {
               {/* Text */}
               <div className="space-y-1.5">
                 <h3 className="text-lg font-bold text-gray-900">Update Available</h3>
-                <p className="text-xs font-semibold text-green-600 uppercase tracking-wide">New version ready</p>
+                <p className="text-xs font-semibold text-primary uppercase tracking-wide">New version ready</p>
               </div>
 
               <p className="text-sm text-gray-500 leading-relaxed">
-                A new version of Zira is available with the latest improvements and security patches. Refresh to get the latest version.
+                A new version of Figbloom HR is available with the latest improvements and security patches. Refresh to get the latest version.
               </p>
 
               {/* Action */}

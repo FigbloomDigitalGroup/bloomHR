@@ -204,7 +204,7 @@ export default function RolePermissions() {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <div className="flex flex-col items-center">
-                    <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin mb-4" />
+                    <RefreshCw className="w-8 h-8 text-primary animate-spin mb-4" />
                     <p className="text-gray-500 font-medium text-sm">Loading permissions...</p>
                 </div>
             </div>
@@ -218,7 +218,7 @@ export default function RolePermissions() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div>
                         <div className="flex items-center gap-3 mb-1">
-                            <Shield className="w-6 h-6 text-indigo-600" />
+                            <Shield className="w-6 h-6 text-primary" />
                             <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Role & Permissions</h1>
                         </div>
                         <p className="text-sm text-gray-500">
@@ -266,7 +266,7 @@ export default function RolePermissions() {
                                                 setHasChanges(false);
                                             }}
                                             className={`w-full text-left px-3 py-3 rounded-lg transition-colors flex items-center justify-between group ${isSelected
-                                                ? 'bg-indigo-50 text-indigo-700'
+                                                ? 'bg-primary/10 text-primary'
                                                 : 'text-gray-700 hover:bg-gray-50'
                                                 }`}
                                         >
@@ -276,7 +276,7 @@ export default function RolePermissions() {
                                             <div className={`
                                                 px-2 py-0.5 rounded text-xs font-bold
                                                 ${isSelected
-                                                    ? 'bg-indigo-100/50 text-indigo-700'
+                                                    ? 'bg-primary/10 text-primary'
                                                     : 'bg-gray-100 text-gray-500 group-hover:bg-gray-200'
                                                 }
                                             `}>
@@ -318,13 +318,13 @@ export default function RolePermissions() {
                                         placeholder="Search permissions..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                        className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                                     />
                                 </div>
                                 <select
                                     value={selectedCategory}
                                     onChange={(e) => setSelectedCategory(e.target.value)}
-                                    className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                    className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
                                 >
                                     <option value="all">All Categories</option>
                                     {PERMISSION_CATEGORIES.map(cat => (
@@ -340,7 +340,7 @@ export default function RolePermissions() {
                                 <select
                                     onChange={(e) => e.target.value && copyPermissionsFrom(e.target.value)}
                                     value=""
-                                    className="flex-1 sm:flex-none px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none"
+                                    className="flex-1 sm:flex-none px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
                                 >
                                     <option value="">Select role...</option>
                                     {AVAILABLE_ROLES.filter(r => r.id !== selectedRole).map(role => (
@@ -390,17 +390,17 @@ export default function RolePermissions() {
                                                             className={`
                                                                 cursor-pointer relative p-4 rounded-xl border text-left transition-all duration-200 group
                                                                 ${hasPermission
-                                                                    ? 'bg-indigo-50/50 border-indigo-200 shadow-sm'
+                                                                    ? 'bg-primary/5 border-primary/30 shadow-sm'
                                                                     : 'bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                                                                 }
                                                             `}
                                                         >
                                                             <div className="flex items-start gap-3">
-                                                                <div className={`mt-0.5 ${hasPermission ? 'text-indigo-600' : 'text-gray-300 group-hover:text-gray-400'}`}>
+                                                                <div className={`mt-0.5 ${hasPermission ? 'text-primary' : 'text-gray-300 group-hover:text-gray-400'}`}>
                                                                     {hasPermission ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
                                                                 </div>
                                                                 <div>
-                                                                    <p className={`text-sm font-semibold mb-1 ${hasPermission ? 'text-indigo-900' : 'text-gray-700'}`}>
+                                                                    <p className={`text-sm font-semibold mb-1 ${hasPermission ? 'text-primary' : 'text-gray-700'}`}>
                                                                         {permission.module_name}
                                                                     </p>
                                                                     <p className="text-xs text-gray-500 leading-relaxed">

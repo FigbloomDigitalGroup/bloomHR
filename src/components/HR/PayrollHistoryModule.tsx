@@ -105,7 +105,7 @@ export default function PayrollHistoryModule() {
                     <p className="text-xs text-gray-500">Full payroll history, salary revisions, allowances and deductions per employee</p>
                 </div>
                 <button onClick={handleExport}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 transition-colors">
+                    className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-xs font-medium rounded-lg hover:bg-primary/90 transition-colors">
                     <Download className="w-3.5 h-3.5" /> Export Report
                 </button>
             </div>

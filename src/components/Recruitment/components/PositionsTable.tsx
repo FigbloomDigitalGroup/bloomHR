@@ -18,7 +18,7 @@ const Toast = ({ message, type, onClose }: { message: string; type: 'success' | 
     success: 'bg-green-50 border-green-200 text-green-800',
     error: 'bg-red-50 border-red-200 text-red-800',
     warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-    info: 'bg-blue-50 border-blue-200 text-blue-800'
+    info: 'bg-green-tint border-brand/20 text-brand-dark'
   };
   
   const Icon = icons[type];
@@ -319,7 +319,7 @@ const JobDetailModal = ({ position, onClose }: { position: Position; onClose: ()
               onClick={() => setActiveTab('description')}
               className={`py-4 px-1 border-b-2 font-medium text-xs flex items-center gap-2 ${
                 activeTab === 'description'
-                  ? 'border-blue-500 text-blue-600'
+                  ? 'border-brand text-brand'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
@@ -330,7 +330,7 @@ const JobDetailModal = ({ position, onClose }: { position: Position; onClose: ()
               onClick={() => setActiveTab('qualifications')}
               className={`py-4 px-1 border-b-2 font-medium text-xs flex items-center gap-2 ${
                 activeTab === 'qualifications'
-                  ? 'border-blue-500 text-blue-600'
+                  ? 'border-brand text-brand'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
@@ -393,16 +393,16 @@ const JobDetailModal = ({ position, onClose }: { position: Position; onClose: ()
                 <ul className="space-y-3">
                   {details.qualifications.map((qualification, index) => (
                     <li key={index} className="flex items-start gap-3">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 flex-shrink-0"></div>
+                      <div className="w-2 h-2 bg-brand rounded-full mt-1.5 flex-shrink-0"></div>
                       <span className="text-gray-700 leading-relaxed text-xs">{qualification}</span>
                     </li>
                   ))}
                 </ul>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-semibold text-blue-900 mb-2 text-xs">Application Requirements</h4>
-                <ul className="list-disc list-inside space-y-1 text-blue-800 text-xs">
+              <div className="bg-green-tint border border-brand/20 rounded-lg p-4">
+                <h4 className="font-semibold text-brand-dark mb-2 text-xs">Application Requirements</h4>
+                <ul className="list-disc list-inside space-y-1 text-brand-dark text-xs">
                   <li>Updated professional resume/CV with quantifiable achievements</li>
                   <li>Cover letter addressing position requirements</li>
                   <li>Copies of relevant certifications and educational transcripts</li>
@@ -779,13 +779,13 @@ const PositionsTable = ({ positions, onUpdate = () => {} }: PositionsTableProps)
           <tbody>
             {/* Add new position row */}
             {isAdding && (
-              <tr className="bg-blue-50 border-b border-blue-100">
+              <tr className="bg-green-tint border-b border-brand/20">
                 <td className="py-4 px-4">
                   <input
                     type="text"
                     value={newPosition.title || ''}
                     onChange={(e) => setNewPosition({...newPosition, title: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                     placeholder="Enter position title"
                   />
                 </td>
@@ -793,7 +793,7 @@ const PositionsTable = ({ positions, onUpdate = () => {} }: PositionsTableProps)
                   <select
                     value={newPosition.department || ''}
                     onChange={(e) => setNewPosition({...newPosition, department: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                   >
                     <option value="">Select Department</option>
                     {departments.map(dept => (
@@ -807,7 +807,7 @@ const PositionsTable = ({ positions, onUpdate = () => {} }: PositionsTableProps)
                   <select
                     value={newPosition.type || ''}
                     onChange={(e) => setNewPosition({...newPosition, type: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                   >
                     <option value="">Select Type</option>
                     {positionTypes.map(type => (
@@ -821,7 +821,7 @@ const PositionsTable = ({ positions, onUpdate = () => {} }: PositionsTableProps)
                   <select
                     value={newPosition.branch || ''}
                     onChange={(e) => setNewPosition({...newPosition, branch: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                   >
                     <option value="">Select branch</option>
                     {branches.map(branch => (
@@ -835,7 +835,7 @@ const PositionsTable = ({ positions, onUpdate = () => {} }: PositionsTableProps)
                   <select
                     value={newPosition.status || 'open'}
                     onChange={(e) => setNewPosition({...newPosition, status: e.target.value as any})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand"
                   >
                     {allowedStatuses.map(status => (
                       <option key={status.value} value={status.value}>
@@ -849,7 +849,7 @@ const PositionsTable = ({ positions, onUpdate = () => {} }: PositionsTableProps)
                     <button
                       onClick={handleAdd}
                       disabled={isLoading}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+                      className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
                     >
                       <Save size={16} />
                       {isLoading ? 'Saving...' : 'Save'}
@@ -889,19 +889,19 @@ const PositionsTable = ({ positions, onUpdate = () => {} }: PositionsTableProps)
                           type="text"
                           value={editedPosition?.title || ''}
                           onChange={(e) => setEditedPosition({...editedPosition, title: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand"
                         />
                       ) : (
                         <div className="space-y-1">
                           <p 
-                            className="text-gray-900 font-semibold cursor-pointer hover:text-blue-600 transition-colors"
+                            className="text-gray-900 font-semibold cursor-pointer hover:text-brand transition-colors"
                             onClick={() => setSelectedPosition(position)}
                           >
                             {position.title}
                           </p>
                           <button 
                             onClick={() => setSelectedPosition(position)}
-                            className="text-blue-600 hover:text-blue-800 text-xs flex items-center gap-1 transition-colors"
+                            className="text-brand hover:text-brand-dark text-xs flex items-center gap-1 transition-colors"
                           >
                             <FileText size={12} />
                             View Details & Requirements
@@ -914,7 +914,7 @@ const PositionsTable = ({ positions, onUpdate = () => {} }: PositionsTableProps)
                         <select
                           value={editedPosition?.department || ''}
                           onChange={(e) => setEditedPosition({...editedPosition, department: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand"
                         >
                           <option value="">Select Department</option>
                           {departments.map(dept => (
@@ -932,7 +932,7 @@ const PositionsTable = ({ positions, onUpdate = () => {} }: PositionsTableProps)
                         <select
                           value={editedPosition?.type || ''}
                           onChange={(e) => setEditedPosition({...editedPosition, type: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand"
                         >
                           <option value="">Select Type</option>
                           {positionTypes.map(type => (
@@ -950,7 +950,7 @@ const PositionsTable = ({ positions, onUpdate = () => {} }: PositionsTableProps)
                         <select
                           value={editedPosition?.branch || ''}
                           onChange={(e) => setEditedPosition({...editedPosition, branch: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand"
                         >
                           {branches.map(branch => (
                             <option key={branch.id} value={branch.id}>
@@ -967,7 +967,7 @@ const PositionsTable = ({ positions, onUpdate = () => {} }: PositionsTableProps)
                         <select
                           value={editedPosition?.status || 'open'}
                           onChange={(e) => setEditedPosition({...editedPosition, status: e.target.value as any})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand"
                         >
                           {allowedStatuses.map(status => (
                             <option key={status.value} value={status.value}>
@@ -986,7 +986,7 @@ const PositionsTable = ({ positions, onUpdate = () => {} }: PositionsTableProps)
                             <button
                               onClick={handleSave}
                               disabled={isLoading}
-                              className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-1 text-xs"
+                              className="px-3 py-1 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1 text-xs"
                             >
                               <Save size={14} />
                               {isLoading ? 'Saving...' : 'Save'}
@@ -1005,7 +1005,7 @@ const PositionsTable = ({ positions, onUpdate = () => {} }: PositionsTableProps)
                             <button
                               onClick={() => handleEdit(position)}
                               disabled={isLoading}
-                              className="px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1 text-xs"
+                              className="px-3 py-1 bg-brand text-white rounded-lg hover:bg-brand-dark disabled:opacity-50 flex items-center gap-1 text-xs"
                             >
                               <Edit size={14} />
                               {isValidUUID(String(position.id)) ? 'Edit' : 'Adjust'}

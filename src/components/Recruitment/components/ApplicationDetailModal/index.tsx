@@ -39,7 +39,7 @@ export const ApplicationDetailModal = ({ application, onClose }: ApplicationDeta
                 <h3 className="text-2xl font-bold">
                   {application.first_name} {application.last_name}
                 </h3>
-                <p className="text-blue-100 mt-1">
+                <p className="text-white/70 mt-1">
                   Application for {application.position || 'Position'}
                 </p>
               </div>
@@ -58,7 +58,7 @@ export const ApplicationDetailModal = ({ application, onClose }: ApplicationDeta
               {/* Personal Information */}
               <div className="bg-white border border-gray-100 shadow-sm rounded-lg p-5">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-blue-50 p-2 rounded-full">
+                  <div className="bg-green-tint p-2 rounded-full">
                     <User className="w-5 h-5 text-[#38d270]" />
                   </div>
                   <h4 className="font-semibold text-gray-800 text-lg">
@@ -77,7 +77,7 @@ export const ApplicationDetailModal = ({ application, onClose }: ApplicationDeta
               {/* Address Information */}
               <div className="bg-white border border-gray-100 shadow-sm rounded-lg p-5">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-blue-50 p-2 rounded-full">
+                  <div className="bg-green-tint p-2 rounded-full">
                     <MapPin className="w-5 h-5 text-[#38d270]" />
                   </div>
                   <h4 className="font-semibold text-gray-800 text-lg">
@@ -95,7 +95,7 @@ export const ApplicationDetailModal = ({ application, onClose }: ApplicationDeta
               {/* Education */}
               <div className="bg-white border border-gray-100 shadow-sm rounded-lg p-5">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-blue-50 p-2 rounded-full">
+                  <div className="bg-green-tint p-2 rounded-full">
                     <GraduationCap className="w-5 h-5 text-[#38d270]" />
                   </div>
                   <h4 className="font-semibold text-gray-800 text-lg">
@@ -112,7 +112,7 @@ export const ApplicationDetailModal = ({ application, onClose }: ApplicationDeta
               {/* Work Experience */}
               <div className="bg-white border border-gray-100 shadow-sm rounded-lg p-5">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-blue-50 p-2 rounded-full">
+                  <div className="bg-green-tint p-2 rounded-full">
                     <Briefcase className="w-5 h-5 text-[#38d270]" />
                   </div>
                   <h4 className="font-semibold text-gray-800 text-lg">
@@ -131,7 +131,7 @@ export const ApplicationDetailModal = ({ application, onClose }: ApplicationDeta
               {/* Skills & Languages */}
               <div className="bg-white border border-gray-100 shadow-sm rounded-lg p-5">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-blue-50 p-2 rounded-full">
+                  <div className="bg-green-tint p-2 rounded-full">
                     <Code className="w-5 h-5 text-[#38d270]" />
                   </div>
                   <h4 className="font-semibold text-gray-800 text-lg">
@@ -148,7 +148,7 @@ export const ApplicationDetailModal = ({ application, onClose }: ApplicationDeta
               {/* Application Materials */}
               <div className="bg-white border border-gray-100 shadow-sm rounded-lg p-5">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="bg-blue-50 p-2 rounded-full">
+                  <div className="bg-green-tint p-2 rounded-full">
                     <FileText className="w-5 h-5 text-[#38d270]" />
                   </div>
                   <h4 className="font-semibold text-gray-800 text-lg">

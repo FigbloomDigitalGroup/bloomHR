@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import StatusPill from '../UI/StatusPill';
 
 // Icons
 import {
@@ -68,6 +69,7 @@ type TrainingCategory = {
   icon: React.ReactNode;
   color: string;
   bgColor: string;
+  borderColor: string;
 };
 
 const TrainingModule = () => {
@@ -168,14 +170,14 @@ const TrainingModule = () => {
         const uniqueCategories = [...new Set(documentsData.map(doc => doc.category))];
         const generatedCategories = uniqueCategories.map((category, index) => {
           const colors = [
-            { color: 'text-blue-600', bgColor: 'bg-blue-50' },
-            { color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
-            { color: 'text-amber-600', bgColor: 'bg-amber-50' },
-            { color: 'text-violet-600', bgColor: 'bg-violet-50' },
-            { color: 'text-rose-600', bgColor: 'bg-rose-50' },
-            { color: 'text-cyan-600', bgColor: 'bg-cyan-50' },
-            { color: 'text-orange-600', bgColor: 'bg-orange-50' },
-            { color: 'text-lime-600', bgColor: 'bg-lime-50' }
+            { color: 'text-brand', bgColor: 'bg-green-tint', borderColor: 'border-brand' },
+            { color: 'text-status-info', bgColor: 'bg-status-info-tint', borderColor: 'border-status-info' },
+            { color: 'text-orange', bgColor: 'bg-orange-tint', borderColor: 'border-orange' },
+            { color: 'text-status-purple', bgColor: 'bg-status-purple-tint', borderColor: 'border-status-purple' },
+            { color: 'text-status-danger', bgColor: 'bg-orange-tint', borderColor: 'border-status-danger' },
+            { color: 'text-orange-text-alt', bgColor: 'bg-orange-tint-alt', borderColor: 'border-orange-text-alt' },
+            { color: 'text-brand-dark', bgColor: 'bg-green-tint', borderColor: 'border-brand-dark' },
+            { color: 'text-muted-foreground', bgColor: 'bg-secondary', borderColor: 'border-border' }
           ];
           const colorSet = colors[index % colors.length];
           
@@ -488,11 +490,11 @@ const TrainingModule = () => {
   };
 
   // Get file type badge
-  const getFileTypeBadge = (fileType: string) => {
-    if (isVideoFile(fileType)) return { text: 'Video', color: 'bg-red-100 text-red-800' };
-    if (isPDFFile(fileType)) return { text: 'PDF', color: 'bg-red-100 text-red-800' };
-    if (isImageFile(fileType)) return { text: 'Image', color: 'bg-green-100 text-green-800' };
-    return { text: 'Document', color: 'bg-blue-100 text-blue-800' };
+  const getFileTypeBadge = (fileType: string): { text: string; tone: 'success' | 'danger' | 'warning' | 'info' | 'purple' | 'neutral' } => {
+    if (isVideoFile(fileType)) return { text: 'Video', tone: 'danger' };
+    if (isPDFFile(fileType)) return { text: 'PDF', tone: 'danger' };
+    if (isImageFile(fileType)) return { text: 'Image', tone: 'success' };
+    return { text: 'Document', tone: 'info' };
   };
 
   // Calculate progress percentage based on time spent
@@ -542,21 +544,15 @@ const TrainingModule = () => {
             <span className="font-medium">Back to training</span>
           </button>
           <div className="flex items-center space-x-3">
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${fileTypeBadge.color}`}>
-              {fileTypeBadge.text}
-            </span>
+            <StatusPill tone={fileTypeBadge.tone} label={fileTypeBadge.text} />
             <span className="text-xs font-medium text-gray-500">
               {currentDocument.category} Training
             </span>
             {currentDocument.required && (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                Required
-              </span>
+              <StatusPill tone="warning" label="Required" />
             )}
             {currentDocument.quiz_required && (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                Quiz Required
-              </span>
+              <StatusPill tone="purple" label="Quiz Required" />
             )}
           </div>
         </div>
@@ -638,7 +634,7 @@ const TrainingModule = () => {
             </div>
             <div className="flex items-center space-x-3">
               {progress[currentDocument.id]?.completed && (
-                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-green-tint text-status-success">
                   <CheckCircle2 className="h-4 w-4 mr-1.5" />
                   Completed
                 </span>
@@ -655,8 +651,8 @@ const TrainingModule = () => {
                   <span className="font-semibold">{currentProgress}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3">
-                  <div 
-                    className="bg-emerald-600 h-3 rounded-full" 
+                  <div
+                    className="bg-primary h-3 rounded-full"
                     style={{ width: `${currentProgress}%` }}
                   ></div>
                 </div>
@@ -670,7 +666,7 @@ const TrainingModule = () => {
                       updateDocumentProgress(currentDocument.id, currentProgress + 10);
                     }
                   }}
-                  className="px-6 py-3 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm whitespace-nowrap"
+                  className="px-6 py-3 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 transition-colors shadow-sm whitespace-nowrap"
                 >
                   {currentProgress >= 90 ? 'Mark Complete' : 'Add Progress +10%'}
                 </button>
@@ -687,7 +683,7 @@ const TrainingModule = () => {
           {showQuiz && (
             <div className="border-t border-gray-200 pt-8 mt-8">
               <div className="flex items-center mb-6">
-                <div className="p-3 rounded-lg bg-blue-100 text-blue-600 mr-4">
+                <div className="p-3 rounded-lg bg-status-info-tint text-status-info mr-4">
                   <HelpCircle className="h-6 w-6" />
                 </div>
                 <div>
@@ -712,7 +708,7 @@ const TrainingModule = () => {
                                 ...prev,
                                 [q.id]: opt
                               }))}
-                              className="h-5 w-5 text-emerald-600 focus:ring-emerald-500 border-gray-300"
+                              className="h-5 w-5 text-primary focus:ring-primary border-gray-300"
                             />
                             <span className="text-gray-700">{opt}</span>
                           </label>
@@ -725,7 +721,7 @@ const TrainingModule = () => {
                     <button
                       onClick={handleQuizSubmit}
                       disabled={Object.keys(quizAnswers).length < quizQuestions.length}
-                      className={`px-6 py-3 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm ${
+                      className={`px-6 py-3 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 transition-colors shadow-sm ${
                         Object.keys(quizAnswers).length < quizQuestions.length 
                           ? 'opacity-50 cursor-not-allowed' 
                           : ''
@@ -738,12 +734,12 @@ const TrainingModule = () => {
               ) : (
                 <div className="text-center py-8">
                   <div className={`mx-auto flex items-center justify-center h-16 w-16 rounded-full ${
-                    quizScore && quizScore >= 80 ? 'bg-emerald-100' : 'bg-red-100'
+                    quizScore && quizScore >= 80 ? 'bg-green-tint' : 'bg-orange-tint'
                   } mb-6`}>
                     {quizScore && quizScore >= 80 ? (
-                      <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+                      <CheckCircle2 className="h-8 w-8 text-status-success" />
                     ) : (
-                      <X className="h-8 w-8 text-red-600" />
+                      <X className="h-8 w-8 text-status-danger" />
                     )}
                   </div>
                   <h3 className="text-2xl font-semibold text-gray-900 mb-2">
@@ -751,8 +747,8 @@ const TrainingModule = () => {
                   </h3>
                   <p className="text-gray-600 mb-6">
                     Your score: <span className={`font-semibold ${
-                      quizScore && quizScore >= 80 ? 'text-emerald-600' : 'text-red-600'
-                    }`}>{quizScore}%</span> {quizScore && quizScore >= 80 ? 
+                      quizScore && quizScore >= 80 ? 'text-status-success' : 'text-status-danger'
+                    }`}>{quizScore}%</span> {quizScore && quizScore >= 80 ?
                     '— Well done!' : '— Minimum passing score is 80%'}
                   </p>
                   <div className="flex justify-center gap-4">
@@ -762,14 +758,14 @@ const TrainingModule = () => {
                           setQuizSubmitted(false);
                           setQuizAnswers({});
                         }}
-                        className="px-6 py-3 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                        className="px-6 py-3 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 transition-colors shadow-sm"
                       >
                         Try Again
                       </button>
                     ) : (
                       <button
                         onClick={() => setCurrentDocument(null)}
-                        className="px-6 py-3 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
+                        className="px-6 py-3 bg-primary text-white text-xs font-medium rounded-lg hover:bg-primary/90 transition-colors shadow-sm"
                       >
                         Continue Training
                       </button>
@@ -811,7 +807,7 @@ const TrainingModule = () => {
             ) : (
               <button
                 onClick={() => setCurrentDocument(null)}
-                className="flex-1 flex items-center justify-center px-6 py-3 border border-transparent text-xs font-medium rounded-lg shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
+                className="flex-1 flex items-center justify-center px-6 py-3 border border-transparent text-xs font-medium rounded-lg shadow-sm text-white bg-primary hover:bg-primary/90 transition-colors"
               >
                 Finish Section
               </button>
@@ -840,8 +836,8 @@ const TrainingModule = () => {
               <span className="font-semibold">{overallProgress}%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-3">
-              <div 
-                className="bg-emerald-600 h-3 rounded-full" 
+              <div
+                className="bg-primary h-3 rounded-full"
                 style={{ width: `${overallProgress}%` }}
               ></div>
             </div>
@@ -852,7 +848,7 @@ const TrainingModule = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mt-8">
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-blue-100 text-blue-600 mr-4">
+              <div className="p-3 rounded-lg bg-status-info-tint text-status-info mr-4">
                 <Bookmark className="h-5 w-5" />
               </div>
               <div>
@@ -863,7 +859,7 @@ const TrainingModule = () => {
           </div>
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-emerald-100 text-emerald-600 mr-4">
+              <div className="p-3 rounded-lg bg-green-tint text-status-success mr-4">
                 <CheckCircle2 className="h-5 w-5" />
               </div>
               <div>
@@ -876,7 +872,7 @@ const TrainingModule = () => {
           </div>
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-amber-100 text-amber-600 mr-4">
+              <div className="p-3 rounded-lg bg-orange-tint-alt text-orange-text-alt mr-4">
                 <Video className="h-5 w-5" />
               </div>
               <div>
@@ -887,7 +883,7 @@ const TrainingModule = () => {
           </div>
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-purple-100 text-purple-600 mr-4">
+              <div className="p-3 rounded-lg bg-status-purple-tint text-status-purple mr-4">
                 <FileText className="h-5 w-5" />
               </div>
               <div>
@@ -910,7 +906,7 @@ const TrainingModule = () => {
                 placeholder="Search training materials..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                className="w-full pl-10 pr-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
               />
             </div>
           </div>
@@ -918,8 +914,8 @@ const TrainingModule = () => {
             <button
               onClick={() => setActiveTab('all')}
               className={`px-4 py-2 text-xs font-medium rounded-lg transition-colors ${
-                activeTab === 'all' 
-                  ? 'bg-emerald-600 text-white' 
+                activeTab === 'all'
+                  ? 'bg-primary text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -928,8 +924,8 @@ const TrainingModule = () => {
             <button
               onClick={() => setActiveTab('videos')}
               className={`px-4 py-2 text-xs font-medium rounded-lg transition-colors flex items-center gap-2 ${
-                activeTab === 'videos' 
-                  ? 'bg-red-600 text-white' 
+                activeTab === 'videos'
+                  ? 'bg-primary text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -939,8 +935,8 @@ const TrainingModule = () => {
             <button
               onClick={() => setActiveTab('documents')}
               className={`px-4 py-2 text-xs font-medium rounded-lg transition-colors flex items-center gap-2 ${
-                activeTab === 'documents' 
-                  ? 'bg-blue-600 text-white' 
+                activeTab === 'documents'
+                  ? 'bg-primary text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -960,7 +956,7 @@ const TrainingModule = () => {
                 onClick={() => setActiveCategory(null)}
                 className={`whitespace-nowrap py-5 px-6 border-b-2 font-medium text-xs flex items-center ${
                   !activeCategory
-                    ? 'border-emerald-500 text-emerald-600'
+                    ? 'border-brand text-brand'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
@@ -973,7 +969,7 @@ const TrainingModule = () => {
                   onClick={() => setActiveCategory(cat.id)}
                   className={`whitespace-nowrap py-5 px-6 border-b-2 font-medium text-xs flex items-center transition-colors ${
                     activeCategory === cat.id
-                      ? `${cat.color} border-${cat.color.split('-')[1]}-500`
+                      ? `${cat.color} ${cat.borderColor}`
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >
@@ -1013,28 +1009,26 @@ const TrainingModule = () => {
                 key={document.id}
                 whileHover={{ y: -4 }}
                 className={`bg-white rounded-xl shadow-sm overflow-hidden border ${
-                  isCompleted ? 'border-emerald-200' : 'border-gray-200'
+                  isCompleted ? 'border-green-tint' : 'border-gray-200'
                 } hover:shadow-md transition-shadow`}
               >
                 <div className="p-6">
                   <div className="flex items-start justify-between mb-3">
                     <div className={`p-2 rounded-lg ${
-                      isCompleted 
-                        ? 'bg-emerald-100 text-emerald-600' 
+                      isCompleted
+                        ? 'bg-green-tint text-status-success'
                         : isLocked
                           ? 'bg-gray-100 text-gray-400'
                           : category?.bgColor + ' ' + category?.color
                     }`}>
                       {getFileIcon(document.file_type)}
                     </div>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${fileTypeBadge.color}`}>
-                      {fileTypeBadge.text}
-                    </span>
+                    <StatusPill tone={fileTypeBadge.tone} label={fileTypeBadge.text} />
                   </div>
-                  
+
                   <div className="flex-1">
                     <h3 className={`text-lg font-semibold ${
-                      isCompleted ? 'text-emerald-800' : 'text-gray-900'
+                      isCompleted ? 'text-status-success' : 'text-gray-900'
                     }`}>
                       {document.title}
                     </h3>
@@ -1044,14 +1038,10 @@ const TrainingModule = () => {
                         {formatFileSize(document.file_size)}
                       </span>
                       {document.required && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                          Required
-                        </span>
+                        <StatusPill tone="warning" label="Required" />
                       )}
                       {document.quiz_required && (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                          Quiz
-                        </span>
+                        <StatusPill tone="purple" label="Quiz" />
                       )}
                     </div>
                   </div>
@@ -1062,10 +1052,10 @@ const TrainingModule = () => {
                       <span className="font-medium">{progressPercentage}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-1.5">
-                      <div 
+                      <div
                         className={`h-1.5 rounded-full ${
-                          isCompleted ? 'bg-emerald-600' : 'bg-blue-600'
-                        }`} 
+                          isCompleted ? 'bg-primary' : 'bg-status-info'
+                        }`}
                         style={{ width: `${progressPercentage}%` }}
                       ></div>
                     </div>
@@ -1079,10 +1069,10 @@ const TrainingModule = () => {
                         isLocked
                           ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
                           : isCompleted
-                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                            ? 'border-green-tint bg-green-tint text-status-success hover:bg-green-tint/70'
                             : isVideo
-                              ? 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100'
-                              : 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                              ? 'border-orange-tint bg-orange-tint text-status-danger hover:bg-orange-tint/70'
+                              : 'border-status-info-tint bg-status-info-tint text-status-info hover:bg-status-info-tint/70'
                       } rounded-lg text-xs font-medium transition-colors`}
                     >
                       {isLocked ? (
@@ -1119,7 +1109,7 @@ const TrainingModule = () => {
       {documents.length > 0 && 
        documents.filter(d => d.required).length === 
        Object.values(progress).filter(p => p.completed).length && (
-        <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-xl shadow-lg p-8 border border-emerald-200">
+        <div className="bg-gradient-to-r from-green-tint to-status-info-tint rounded-xl shadow-lg p-8 border border-green-tint">
           <div className="flex flex-col md:flex-row md:items-center gap-6">
             <div className="flex-1">
               <h2 className="text-2xl font-semibold text-gray-900 mb-2">Training Complete! 🎉</h2>
@@ -1128,7 +1118,7 @@ const TrainingModule = () => {
               </p>
             </div>
             <div>
-              <button className="inline-flex items-center px-6 py-3 border border-transparent text-xs font-medium rounded-lg shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 transition-colors">
+              <button className="inline-flex items-center px-6 py-3 border border-transparent text-xs font-medium rounded-lg shadow-sm text-white bg-primary hover:bg-primary/90 transition-colors">
                 <Award className="h-5 w-5 mr-2" />
                 Download Certificate
               </button>

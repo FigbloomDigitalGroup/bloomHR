@@ -76,17 +76,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   const [searchParams] = useSearchParams();
 
   const ADMIN_EMAILS = [
-    'admin@mularcredit.co.ke',
-    'checker@mularcredit.com',
-    'hr@mularcredit.co.ke',
-    'it@mularcredit.co.ke',
     'hr@zira.com',
-    'olivia.hr@mularcredit.com',
-    'daniel.admin@mularcredit.com',
-    'checker.superadmin@mularcredit.com',
-    'titus1admin@mularcredit.co.ke',
-    'ian3admin@mularcredit.co.ke',
-    'collins2admin@mularcredit.co.ke',
     'zira@zira.io',
     'admin@malicash.co'
   ];
@@ -345,7 +335,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center shadow-lg shadow-black/20">
               <img src="/solo.png" alt="Company Logo" className="w-6 h-6 object-contain brightness-0 invert" />
             </div>
-            <span className="text-white font-bold text-2xl tracking-tight">Zira<span className="text-gray-400">HR</span></span>
+            <span className="text-white font-bold text-2xl tracking-tight">Figbloom<span className="text-gray-400">HR</span></span>
           </div>
 
           <div className="space-y-6">
@@ -376,7 +366,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           </div>
 
           <div className="text-white text-xs font-light">
-            © 2026 ZiraHr · Business edition
+            © 2026 Figbloom HR · Business edition
           </div>
         </div>
       </div>
@@ -390,7 +380,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
                 <img src="/solo.png" alt="Logo" className="w-5 h-5 brightness-0 invert" />
               </div>
-              <span className="text-2xl font-bold text-gray-900 tracking-tight">Zira<span className="text-gray-500">HR</span></span>
+              <span className="text-2xl font-bold text-gray-900 tracking-tight">Figbloom<span className="text-gray-500">HR</span></span>
             </div>
           </div>
 

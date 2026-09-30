@@ -3,15 +3,20 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { v4 as uuidv4 } from '@lukeed/uuid';
 
+// Matches the real `messages` table (see master_schema.sql / chatServices.ts,
+// the admin Teams chat's data layer) - this component previously used
+// entirely fictional column names (sender_id/sender_email/channel/type)
+// that don't exist on the table, so every fetch/insert/realtime filter
+// silently errored (FIG-577).
 interface Message {
   id: string;
   content: string;
-  sender_id: string;
-  sender_email: string;
-  sender_name?: string;
-  channel: string;
+  author_id: string;
+  author_name?: string;
+  author_initials?: string;
+  author_avatar?: string;
+  channel_id: string;
   created_at: string;
-  type: 'text' | 'system';
   reply_to?: string;
 }
 
@@ -31,30 +36,63 @@ interface Channel {
   is_private: boolean;
 }
 
-const ChatComponent = () => {
+interface ChatComponentProps {
+  // Called after marking a channel read, so a parent-level badge (the
+  // "Communication" nav item's unread count in StaffPortal.tsx) can refresh
+  // immediately instead of waiting for the next realtime event or reload.
+  onMessagesRead?: () => void;
+}
+
+const ChatComponent = ({ onMessagesRead }: ChatComponentProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [currentChannel, setCurrentChannel] = useState('general');
+  // Was hardcoded to the string 'general' - not a real channels.id (uuid),
+  // so every query against it would fail. Starts empty until real channels
+  // load below, then defaults to the first one.
+  const [currentChannel, setCurrentChannel] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
-  const [lastReadMessages, setLastReadMessages] = useState<{[channel: string]: string}>({});
-  
+  // Real channels from the `channels` table (see master_schema.sql) -
+  // previously a hardcoded fictional list with slug ids like 'general'
+  // that never corresponded to any real row (FIG-577).
+  const [channels, setChannels] = useState<Channel[]>([]);
+  // Per-channel unread counts for the sidebar list below, persisted via
+  // `user_channel_states.last_read_at`. The old `getUnreadCount` filtered
+  // the `messages` state array, but that only ever holds the *currently
+  // active* channel's messages (see fetchMessages's query) - so it could
+  // structurally never return anything but 0 for every other channel in
+  // the list, which is why no channel ever showed a badge (FIG-578).
+  const [unreadByChannel, setUnreadByChannel] = useState<Record<string, number>>({});
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
   const subscriptionRef = useRef<any>(null);
 
-  // Channels configuration
-  const channels: Channel[] = [
-    { id: 'general', name: 'General', description: 'Company-wide announcements and chat', is_private: false },
-    { id: 'support', name: 'Support', description: 'Customer support discussions', is_private: false },
-    { id: 'engineering', name: 'Engineering', description: 'Engineering team chat', is_private: false },
-    { id: 'random', name: 'Random', description: 'Non-work banter and fun', is_private: false }
-  ];
+  const fetchChannels = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('channels')
+        .select('id, name, description, is_private')
+        .order('name');
+
+      if (error) throw error;
+
+      setChannels(data || []);
+      setCurrentChannel(prev => prev || data?.[0]?.id || '');
+    } catch (err) {
+      console.error('Error fetching channels:', err);
+      setError('Failed to load channels');
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchChannels();
+  }, [fetchChannels]);
 
   // Memoized functions
   const getCurrentUser = useCallback(async () => {
@@ -70,31 +108,72 @@ const ChatComponent = () => {
     }
   }, []);
 
+  // Persists to `user_channel_states` (the same table the admin chat
+  // service writes to - see chatServices.ts) so both the "Communication"
+  // nav badge in StaffPortal.tsx and the per-channel counts below reflect
+  // reality across sessions, not client-only state that resets on refresh.
+  const markChannelRead = useCallback(async (channelId: string, userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_channel_states')
+        .upsert(
+          { user_id: userId, channel_id: channelId, last_read_at: new Date().toISOString() },
+          { onConflict: 'user_id,channel_id' }
+        );
+      if (error) throw error;
+      setUnreadByChannel(prev => ({ ...prev, [channelId]: 0 }));
+      onMessagesRead?.();
+    } catch (err) {
+      console.error('Error marking channel read:', err);
+    }
+  }, [onMessagesRead]);
+
+  // Real per-channel unread counts for the sidebar list, replacing the
+  // structurally-broken client-side getUnreadCount below.
+  const fetchUnreadCounts = useCallback(async (userId: string) => {
+    if (channels.length === 0) return;
+    try {
+      const { data: readStates } = await supabase
+        .from('user_channel_states')
+        .select('channel_id, last_read_at')
+        .eq('user_id', userId);
+
+      const lastReadMap = new Map((readStates || []).map((r: any) => [r.channel_id, r.last_read_at]));
+
+      const entries = await Promise.all(channels.map(async (ch) => {
+        const lastRead = lastReadMap.get(ch.id);
+        let query = supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('channel_id', ch.id);
+        if (lastRead) query = query.gt('created_at', lastRead);
+        const { count } = await query;
+        return [ch.id, count || 0] as const;
+      }));
+
+      setUnreadByChannel(Object.fromEntries(entries));
+    } catch (err) {
+      console.error('Error fetching per-channel unread counts:', err);
+    }
+  }, [channels]);
+
   const fetchMessages = useCallback(async () => {
     if (!currentChannel) return;
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const { data, error } = await supabase
         .from('messages')
         .select('*')
-        .eq('channel', currentChannel)
+        .eq('channel_id', currentChannel)
         .order('created_at', { ascending: true })
         .limit(100);
 
       if (error) throw error;
       
       setMessages(data || []);
-      
-      // Mark messages as read
-      if (data && data.length > 0) {
-        setLastReadMessages(prev => ({
-          ...prev,
-          [currentChannel]: data[data.length - 1].id
-        }));
-      }
     } catch (error) {
       console.error('Error fetching messages:', error);
       setError('Failed to load messages');
@@ -117,17 +196,17 @@ const ChatComponent = () => {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: `channel=eq.${currentChannel}`
+          filter: `channel_id=eq.${currentChannel}`
         },
         (payload) => {
           const newMessage = payload.new as Message;
           setMessages(prev => [...prev, newMessage]);
-          
-          // Auto-mark as read if user is active
-          setLastReadMessages(prev => ({
-            ...prev,
-            [currentChannel]: newMessage.id
-          }));
+
+          // Persist read-state: this arrived for the channel currently
+          // being viewed, so it shouldn't count toward the unread badge.
+          if (currentUser) {
+            markChannelRead(currentChannel, currentUser.id);
+          }
         }
       )
       .on(
@@ -136,7 +215,7 @@ const ChatComponent = () => {
           event: 'DELETE',
           schema: 'public',
           table: 'messages',
-          filter: `channel=eq.${currentChannel}`
+          filter: `channel_id=eq.${currentChannel}`
         },
         (payload) => {
           setMessages(prev => prev.filter(msg => msg.id !== payload.old.id));
@@ -153,7 +232,7 @@ const ChatComponent = () => {
         supabase.removeChannel(subscriptionRef.current);
       }
     };
-  }, [currentChannel]);
+  }, [currentChannel, currentUser, markChannelRead]);
 
   // Effects
   useEffect(() => {
@@ -161,12 +240,33 @@ const ChatComponent = () => {
   }, [getCurrentUser]);
 
   useEffect(() => {
-    if (currentUser) {
+    if (currentUser && currentChannel) {
       fetchMessages();
+      markChannelRead(currentChannel, currentUser.id);
       const cleanup = setupRealtimeSubscription();
       return cleanup;
     }
-  }, [currentChannel, currentUser, fetchMessages, setupRealtimeSubscription]);
+  }, [currentChannel, currentUser, fetchMessages, markChannelRead, setupRealtimeSubscription]);
+
+  // Per-channel sidebar badges: initial load once channels + user are ready,
+  // then live updates via an unfiltered subscription (a message landing in
+  // any channel, not just the active one, can change another channel's
+  // count).
+  useEffect(() => {
+    if (!currentUser || channels.length === 0) return;
+    fetchUnreadCounts(currentUser.id);
+
+    const subscription = supabase
+      .channel('staffchat_unread_counts')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+        fetchUnreadCounts(currentUser.id);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [currentUser, channels, fetchUnreadCounts]);
 
   useEffect(() => {
     scrollToBottom();
@@ -188,21 +288,23 @@ const ChatComponent = () => {
     setIsSending(true);
     setError(null);
 
+    const authorName = currentUser.user_metadata?.name || currentUser.email;
+    const authorInitials = getInitials(currentUser.email);
+
     // Optimistic update
     const optimisticMessage: Message = {
       id: tempId,
       content: messageContent,
-      sender_id: currentUser.id,
-      sender_email: currentUser.email,
-      sender_name: currentUser.user_metadata?.name,
-      channel: currentChannel,
-      created_at: new Date().toISOString(),
-      type: 'text'
+      author_id: currentUser.id,
+      author_name: authorName,
+      author_initials: authorInitials,
+      channel_id: currentChannel,
+      created_at: new Date().toISOString()
     };
 
     setMessages(prev => [...prev, optimisticMessage]);
     setNewMessage('');
-    
+
     // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -213,10 +315,10 @@ const ChatComponent = () => {
         .from('messages')
         .insert([{
           content: messageContent,
-          sender_id: currentUser.id,
-          sender_email: currentUser.email,
-          channel: currentChannel,
-          type: 'text',
+          author_id: currentUser.id,
+          author_name: authorName,
+          author_initials: authorInitials,
+          channel_id: currentChannel,
           created_at: new Date().toISOString()
         }]);
 
@@ -286,14 +388,6 @@ const ChatComponent = () => {
     return colors[index];
   };
 
-  const getUnreadCount = (channelId: string) => {
-    const lastReadId = lastReadMessages[channelId];
-    if (!lastReadId) return messages.filter(m => m.channel === channelId).length;
-    
-    const lastReadIndex = messages.findIndex(m => m.id === lastReadId);
-    return messages.length - lastReadIndex - 1;
-  };
-
   const currentChannelData = channels.find(ch => ch.id === currentChannel);
 
   return (
@@ -303,7 +397,7 @@ const ChatComponent = () => {
         {/* Team Header */}
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-r from-brand to-brand-dark rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg">T</span>
             </div>
             <div>
@@ -321,14 +415,14 @@ const ChatComponent = () => {
             </h3>
             <div className="space-y-1">
               {channels.map((channel) => {
-                const unreadCount = getUnreadCount(channel.id);
+                const unreadCount = unreadByChannel[channel.id] || 0;
                 return (
                   <button
                     key={channel.id}
                     onClick={() => setCurrentChannel(channel.id)}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition-colors ${
                       currentChannel === channel.id
-                        ? 'bg-blue-50 text-blue-600'
+                        ? 'bg-green-tint text-brand'
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
@@ -337,7 +431,7 @@ const ChatComponent = () => {
                       <span className="font-medium">{channel.name}</span>
                     </div>
                     {unreadCount > 0 && (
-                      <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full min-w-5 flex items-center justify-center">
+                      <span className="bg-orange text-white text-xs px-2 py-1 rounded-full min-w-5 flex items-center justify-center">
                         {unreadCount}
                       </span>
                     )}
@@ -402,11 +496,11 @@ const ChatComponent = () => {
         >
           {isLoading ? (
             <div className="flex justify-center items-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           ) : error ? (
             <div className="flex justify-center items-center h-32">
-              <div className="text-red-500 text-center">
+              <div className="text-status-danger text-center">
                 <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -426,8 +520,8 @@ const ChatComponent = () => {
           ) : (
             <div className="space-y-4">
               {messages.map((message, index) => {
-                const isCurrentUser = message.sender_id === currentUser?.id;
-                const showAvatar = index === 0 || messages[index - 1]?.sender_id !== message.sender_id;
+                const isCurrentUser = message.author_id === currentUser?.id;
+                const showAvatar = index === 0 || messages[index - 1]?.author_id !== message.author_id;
                 const showTimestamp = index === 0 || 
                   new Date(message.created_at).getTime() - new Date(messages[index - 1].created_at).getTime() > 300000; // 5 minutes
 
@@ -452,10 +546,10 @@ const ChatComponent = () => {
                         
                         {/* Avatar */}
                         {showAvatar && (
-                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${getAvatarColor(message.sender_email)} ${
+                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${getAvatarColor(message.author_id)} ${
                             isCurrentUser ? 'ml-3' : 'mr-3'
                           }`}>
-                            {getInitials(message.sender_email)}
+                            {message.author_initials || getInitials(message.author_name || '')}
                           </div>
                         )}
                         
@@ -469,7 +563,7 @@ const ChatComponent = () => {
                           {showAvatar && !isCurrentUser && (
                             <div className="flex items-center space-x-2 mb-1">
                               <span className="text-sm font-semibold text-gray-900">
-                                {message.sender_name || message.sender_email}
+                                {message.author_name || 'Unknown'}
                               </span>
                               <span className="text-xs text-gray-500">
                                 {formatMessageTime(message.created_at)}
@@ -478,8 +572,8 @@ const ChatComponent = () => {
                           )}
                           
                           <div className={`relative rounded-2xl px-4 py-2 ${
-                            isCurrentUser 
-                              ? 'bg-blue-500 text-white rounded-br-md' 
+                            isCurrentUser
+                              ? 'bg-primary text-white rounded-br-md'
                               : 'bg-white text-gray-900 rounded-bl-md border border-gray-200'
                           }`}>
                             <div className="text-sm whitespace-pre-wrap break-words">
@@ -514,7 +608,7 @@ const ChatComponent = () => {
                 onKeyPress={handleKeyPress}
                 placeholder={`Message #${currentChannelData?.name}`}
                 rows={1}
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-white placeholder-gray-500"
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none bg-white placeholder-gray-500"
                 style={{ minHeight: '44px', maxHeight: '120px' }}
                 disabled={isSending}
               />
@@ -542,7 +636,7 @@ const ChatComponent = () => {
             <button
               type="submit"
               disabled={!newMessage.trim() || isSending}
-              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center min-w-[80px]"
+              className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center min-w-[80px]"
             >
               {isSending ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

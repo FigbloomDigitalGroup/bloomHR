@@ -276,7 +276,7 @@ const IncidentReportsManagement = () => {
     if (isLoading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
         );
     }
@@ -312,13 +312,13 @@ const IncidentReportsManagement = () => {
                                 placeholder="Search reports..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                             />
                         </div>
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         >
                             {STATUS_OPTIONS.map(option => (
                                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -327,7 +327,7 @@ const IncidentReportsManagement = () => {
                         <select
                             value={typeFilter}
                             onChange={(e) => setTypeFilter(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         >
                             {INCIDENT_TYPES.map(option => (
                                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -336,7 +336,7 @@ const IncidentReportsManagement = () => {
                         <select
                             value={severityFilter}
                             onChange={(e) => setSeverityFilter(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         >
                             {SEVERITY_LEVELS.map(option => (
                                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -518,7 +518,7 @@ const IncidentReportsManagement = () => {
                                             value={selectedReport.status}
                                             onChange={(e) => updateReportStatus(selectedReport.id, e.target.value)}
                                             disabled={isUpdating}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                                         >
                                             {STATUS_OPTIONS.filter(s => s.value !== 'all').map(option => (
                                                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -533,7 +533,7 @@ const IncidentReportsManagement = () => {
                                             onChange={(e) => setAdminNotes(e.target.value)}
                                             rows={3}
                                             placeholder="Add investigation notes or comments..."
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                                         />
                                     </div>
 
@@ -544,7 +544,7 @@ const IncidentReportsManagement = () => {
                                             onChange={(e) => setResolution(e.target.value)}
                                             rows={3}
                                             placeholder="Document the resolution..."
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                                         />
                                     </div>
 
@@ -575,7 +575,7 @@ const IncidentReportsManagement = () => {
                             <button
                                 onClick={() => updateReportStatus(selectedReport.id, selectedReport.status)}
                                 disabled={isUpdating}
-                                className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center"
+                                className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center"
                             >
                                 {isUpdating ? (
                                     <>

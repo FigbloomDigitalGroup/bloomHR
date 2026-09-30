@@ -128,7 +128,7 @@ export function AppSidebar({
     return (
       <Avatar className="h-6 w-6 ring-2 ring-white flex-shrink-0">
         <AvatarImage src={avatarUrl} />
-        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xs">
+        <AvatarFallback className="bg-brand text-white text-xs">
           {channel.name.slice(0, 2).toUpperCase()}
         </AvatarFallback>
       </Avatar>
@@ -138,15 +138,15 @@ export function AppSidebar({
   return (
     <>
       <Sidebar className="border-r border-gray-200 bg-white/80 backdrop-blur-sm">
-        <SidebarHeader className="border-b border-gray-200 p-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+        <SidebarHeader className="border-b border-gray-200 p-4 bg-brand text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                <img src="/solo.png" alt="ZiraTeams" className="w-6 h-6" />
+                <img src="/solo.png" alt="Figbloom Teams" className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="font-bold text-white text-lg">ZiraTeams</h2>
-                <p className="text-xs text-blue-100">Collaboration starts here</p>
+                <h2 className="font-bold text-white text-lg">Figbloom Teams</h2>
+                <p className="text-xs text-white/70">Collaboration starts here</p>
               </div>
             </div>
           </div>
@@ -194,7 +194,7 @@ export function AppSidebar({
                       <SidebarMenuButton
                         onClick={() => onChannelSelect(channel)}
                         isActive={isChannelActive(channel)}
-                        className="group mx-2 rounded-lg transition-all hover:bg-blue-50 hover:border-blue-200"
+                        className="group mx-2 rounded-lg transition-all hover:bg-green-tint hover:border-brand/30"
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           {/* Channel Avatar */}
@@ -202,7 +202,7 @@ export function AppSidebar({
 
                           <span className="flex-1 truncate font-medium text-xs">{channel.name}</span>
                           {channel.unread_count && channel.unread_count > 0 && (
-                            <Badge variant="default" className="h-5 min-w-5 px-1.5 text-xs bg-blue-600">
+                            <Badge variant="default" className="h-5 min-w-5 px-1.5 text-xs bg-orange">
                               {channel.unread_count > 99 ? '99+' : channel.unread_count}
                             </Badge>
                           )}
@@ -287,7 +287,7 @@ export function AppSidebar({
                           <SidebarMenuButton
                             onClick={() => onChannelSelect(dm)}
                             isActive={isChannelActive(dm)}
-                            className="group mx-2 rounded-lg transition-all hover:bg-blue-50 hover:border-blue-200"
+                            className="group mx-2 rounded-lg transition-all hover:bg-green-tint hover:border-brand/30"
                           >
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                               <div className="relative flex-shrink-0">
@@ -359,7 +359,7 @@ export function AppSidebar({
                           <SidebarMenuButton
                             onClick={() => onChannelSelect(dm)}
                             isActive={isChannelActive(dm)}
-                            className="group mx-2 rounded-lg transition-all hover:bg-blue-50 hover:border-blue-200"
+                            className="group mx-2 rounded-lg transition-all hover:bg-green-tint hover:border-brand/30"
                           >
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                               <div className="relative flex-shrink-0">
@@ -411,7 +411,7 @@ export function AppSidebar({
                 <div className="relative cursor-pointer">
                   <Avatar className="h-10 w-10 ring-2 ring-white shadow-sm">
                     <AvatarImage src={safeCurrentUser.avatar || ''} />
-                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                    <AvatarFallback className="bg-brand text-white">
                       {safeCurrentUser.initials || 'U'}
                     </AvatarFallback>
                   </Avatar>

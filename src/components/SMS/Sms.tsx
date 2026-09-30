@@ -8,6 +8,7 @@ import {
   Loader, Shield, Smartphone, RefreshCw, Save
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
 import toast from 'react-hot-toast';
 
 // Types
@@ -90,15 +91,6 @@ type SenderIDConfig = {
   status: 'pending' | 'approved' | 'rejected';
   created_at?: string;
   updated_at?: string;
-};
-
-// Celcom Africa API Configuration
-// Celcom Africa API Configuration
-const CELCOM_AFRICA_CONFIG = {
-  baseUrl: 'https://isms.celcomafrica.com/api/services/sendsms',
-  apiKey: '***REMOVED***',
-  partnerID: '928',
-  defaultShortcode: 'MularCredit'
 };
 
 // Phone Number Formatting for Celcom Africa
@@ -467,7 +459,7 @@ const replaceTemplateVariables = (
   message = message.replace(/{town}/gi, employee.town || '');
 
   // Replace company variable
-  message = message.replace(/{company}/gi, 'Mular Credit');
+  message = message.replace(/{company}/gi, 'Figbloom HR');
 
   // Replace current date variables
   const now = new Date();
@@ -645,7 +637,7 @@ export function SMSCenter() {
       id: 'test',
       name: 'Simple Test',
       category: 'Business',
-      content: 'Test SMS from Mular Credit SMS Center. Please ignore.',
+      content: 'Test SMS from Figbloom HR SMS Center. Please ignore.',
       variables: []
     }
   ];
@@ -1078,7 +1070,7 @@ export function SMSCenter() {
 
         const result = await SMSService.sendSMSWithRetry(
           formatted,
-          'Test SMS from Mular Credit SMS Center - Please ignore',
+          'Test SMS from Figbloom HR SMS Center - Please ignore',
           currentShortcode
         );
 

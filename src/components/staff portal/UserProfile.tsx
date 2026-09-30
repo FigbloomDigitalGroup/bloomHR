@@ -155,13 +155,13 @@ const UserProfileDropdown = ({
     <div className="relative">
       <button
         ref={buttonRef}
-        className="flex items-center w-full p-3 text-left rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500"
+        className="flex items-center w-full p-3 text-left rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
         onClick={handleButtonClick}
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
-        <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center mr-3">
-          <User className="h-4 w-4 text-green-600" />
+        <div className="h-8 w-8 rounded-full bg-green-tint flex items-center justify-center mr-3">
+          <User className="h-4 w-4 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-medium text-gray-900 truncate">{userName}</p>

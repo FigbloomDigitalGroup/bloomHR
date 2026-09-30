@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { 
+import { Button, EmptyState } from '../UI';
+import {
   Plus, Check, Circle, Trash2, Calendar, AlertCircle, Clock, User, 
   ChevronDown, X, Users, Building, Shield, RadioTower, Filter,
   Edit3, Star, Repeat, Tag, FolderOpen, Link, Paperclip, MessageSquare,
@@ -318,9 +319,9 @@ const getPriorityColor = (priority: string) => {
 const getStatusColor = (status: string) => {
   switch (status) {
     case 'not-started': return 'bg-gray-50 text-gray-700 border-gray-200';
-    case 'in-progress': return 'bg-blue-50 text-blue-700 border-blue-200';
-    case 'pending-review': return 'bg-purple-50 text-purple-700 border-purple-200';
-    case 'pending-approval': return 'bg-violet-50 text-violet-700 border-violet-200';
+    case 'in-progress': return 'bg-green-tint text-brand-dark border-brand/20';
+    case 'pending-review': return 'bg-orange-tint text-orange-text-alt border-orange/20';
+    case 'pending-approval': return 'bg-orange-tint text-orange-text-alt border-orange/20';
     case 'on-hold': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
     case 'completed': return 'bg-green-50 text-green-700 border-green-200';
     case 'cancelled': return 'bg-red-50 text-red-700 border-red-200';
@@ -343,12 +344,12 @@ const getStatusIcon = (status: string) => {
 
 const getDepartmentColor = (department: string) => {
   switch (department) {
-    case 'operations': return 'bg-blue-50 text-blue-700 border-blue-200';
+    case 'operations': return 'bg-green-tint text-brand-dark border-brand/20';
     case 'credit': return 'bg-green-50 text-green-700 border-green-200';
-    case 'accounting': return 'bg-purple-50 text-purple-700 border-purple-200';
+    case 'accounting': return 'bg-orange-tint text-orange-text-alt border-orange/20';
     case 'relationship': return 'bg-pink-50 text-pink-700 border-pink-200';
     case 'compliance': return 'bg-red-50 text-red-700 border-red-200';
-    case 'management': return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+    case 'management': return 'bg-orange-tint text-brand-dark border-orange/20';
     case 'it': return 'bg-teal-50 text-teal-700 border-teal-200';
     case 'hr': return 'bg-amber-50 text-amber-700 border-amber-200';
     default: return 'bg-slate-50 text-slate-700 border-slate-200';
@@ -372,11 +373,11 @@ const getDepartmentIcon = (department: string) => {
 const getCategoryColor = (category: string) => {
   switch (category) {
     case 'loan-processing': return 'bg-green-50 text-green-700 border-green-200';
-    case 'client-followup': return 'bg-blue-50 text-blue-700 border-blue-200';
+    case 'client-followup': return 'bg-green-tint text-brand-dark border-brand/20';
     case 'collections': return 'bg-orange-50 text-orange-700 border-orange-200';
-    case 'accounting': return 'bg-purple-50 text-purple-700 border-purple-200';
+    case 'accounting': return 'bg-orange-tint text-orange-text-alt border-orange/20';
     case 'compliance': return 'bg-red-50 text-red-700 border-red-200';
-    case 'reporting': return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+    case 'reporting': return 'bg-orange-tint text-brand-dark border-orange/20';
     case 'training': return 'bg-teal-50 text-teal-700 border-teal-200';
     case 'meeting': return 'bg-pink-50 text-pink-700 border-pink-200';
     case 'other': return 'bg-slate-50 text-slate-700 border-slate-200';
@@ -399,7 +400,7 @@ const MicrofinanceFormInput = ({
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={`w-full ${Icon ? 'pl-8' : 'px-3'} pr-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-slate-400 text-xs`}
+          className={`w-full ${Icon ? 'pl-8' : 'px-3'} pr-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all placeholder:text-slate-400 text-xs`}
           placeholder={placeholder}
           required={required}
         />
@@ -418,7 +419,7 @@ const MicrofinanceFormSelect = ({ label, value, onChange, options, icon: Icon, h
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
-        className={`w-full ${Icon ? 'pl-8' : 'px-3'} pr-8 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all appearance-none cursor-pointer text-xs relative z-0 ${
+        className={`w-full ${Icon ? 'pl-8' : 'px-3'} pr-8 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all appearance-none cursor-pointer text-xs relative z-0 ${
           disabled ? 'opacity-50 cursor-not-allowed' : ''
         }`}
       >
@@ -459,7 +460,7 @@ const EmployeeSelect = ({ label, value, onChange, employees, loading, helperText
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-xs text-left flex justify-between items-center hover:bg-slate-50"
+          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all text-xs text-left flex justify-between items-center hover:bg-slate-50"
         >
           <span className="truncate">
             {selectedEmployee 
@@ -482,7 +483,7 @@ const EmployeeSelect = ({ label, value, onChange, employees, loading, helperText
                   setIsOpen(false);
                 }}
                 className={`w-full text-left px-2 py-1.5 rounded text-xs hover:bg-slate-100 ${
-                  value === '' ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                  value === '' ? 'bg-green-tint text-brand-dark' : 'text-slate-700'
                 }`}
               >
                 <div className="font-medium">Unassigned</div>
@@ -495,7 +496,7 @@ const EmployeeSelect = ({ label, value, onChange, employees, loading, helperText
                   setIsOpen(false);
                 }}
                 className={`w-full text-left px-2 py-1.5 rounded text-xs hover:bg-slate-100 ${
-                  value === 'current-user' ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                  value === 'current-user' ? 'bg-green-tint text-brand-dark' : 'text-slate-700'
                 }`}
               >
                 <div className="font-medium">Assign to me</div>
@@ -515,7 +516,7 @@ const EmployeeSelect = ({ label, value, onChange, employees, loading, helperText
                         setIsOpen(false);
                       }}
                       className={`w-full text-left px-2 py-1.5 rounded text-xs hover:bg-slate-100 flex flex-col ${
-                        value === emp.id ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                        value === emp.id ? 'bg-green-tint text-brand-dark' : 'text-slate-700'
                       }`}
                     >
                       <span className="font-medium truncate">{emp.name}</span>
@@ -567,12 +568,12 @@ const TagInput = ({ tags, onChange }: any) => {
       <div className="border border-slate-300 rounded-lg p-2 min-h-[40px]">
         <div className="flex flex-wrap gap-1 mb-1">
           {safeTags.map((tag: string, index: number) => (
-            <span key={index} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+            <span key={index} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-green-tint text-brand-dark rounded text-xs">
               {tag}
               <button 
                 type="button" 
                 onClick={() => removeTag(index)} 
-                className="text-blue-500 hover:text-blue-700"
+                className="text-brand hover:text-brand-dark"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -599,7 +600,7 @@ const ProgressBar = ({ progress, size = 'sm' }: { progress: number; size?: 'sm' 
   return (
     <div className="w-full bg-slate-200 rounded-full">
       <div 
-        className={`${height} bg-blue-600 rounded-full transition-all duration-300`}
+        className={`${height} bg-brand rounded-full transition-all duration-300`}
         style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
       />
     </div>
@@ -1016,7 +1017,7 @@ export function MicrofinanceTodoList() {
               className={`flex-shrink-0 mt-0.5 transition-all ${
                 todo.completed 
                   ? 'text-green-500 hover:text-slate-400' 
-                  : 'text-slate-300 hover:text-blue-600'
+                  : 'text-slate-300 hover:text-brand'
               }`}
             >
               {todo.completed ? (
@@ -1039,7 +1040,7 @@ export function MicrofinanceTodoList() {
           <div className="flex items-center gap-1">
             <button
               onClick={() => { setEditingTodo(todo); setShowForm(true); }}
-              className="text-slate-400 hover:text-blue-500 transition-colors p-1"
+              className="text-slate-400 hover:text-brand transition-colors p-1"
               title="Edit task"
             >
               <Edit3 className="w-3 h-3" />
@@ -1118,7 +1119,7 @@ export function MicrofinanceTodoList() {
         {safeTags.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-2">
             {safeTags.map((tag, index) => (
-              <span key={index} className="inline-flex items-center px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+              <span key={index} className="inline-flex items-center px-1.5 py-0.5 bg-green-tint text-brand-dark rounded text-xs">
                 {tag}
               </span>
             ))}
@@ -1249,8 +1250,8 @@ export function MicrofinanceTodoList() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left Column - Core Information */}
               <div className="space-y-4">
-                <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-                  <h4 className="font-semibold text-blue-900 mb-2 flex items-center gap-1 text-xs">
+                <div className="bg-green-tint rounded-lg p-3 border border-brand/20">
+                  <h4 className="font-semibold text-brand-dark mb-2 flex items-center gap-1 text-xs">
                     <FileText className="w-3 h-3" />
                     Core Information
                   </h4>
@@ -1271,7 +1272,7 @@ export function MicrofinanceTodoList() {
                     <textarea
                       value={formData.description}
                       onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-slate-400 text-xs resize-none"
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all placeholder:text-slate-400 text-xs resize-none"
                       placeholder="Provide detailed instructions, context, or requirements..."
                       rows={3}
                     />
@@ -1299,7 +1300,7 @@ export function MicrofinanceTodoList() {
                           value={formData.due_date}
                           onChange={(e) => setFormData(prev => ({ ...prev, due_date: e.target.value }))}
                           min={new Date().toISOString().split('T')[0]}
-                          className="w-full pl-7 pr-2 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all cursor-pointer text-xs"
+                          className="w-full pl-7 pr-2 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all cursor-pointer text-xs"
                         />
                       </div>
                     </div>
@@ -1419,8 +1420,8 @@ export function MicrofinanceTodoList() {
                   />
                 </div>
 
-                <div className="bg-purple-50 rounded-lg p-3 border border-purple-200">
-                  <h4 className="font-semibold text-purple-900 mb-2 flex items-center gap-1 text-xs">
+                <div className="bg-orange-tint rounded-lg p-3 border border-orange/20">
+                  <h4 className="font-semibold text-orange-text-alt mb-2 flex items-center gap-1 text-xs">
                     <Shield className="w-3 h-3" />
                     Settings & Permissions
                   </h4>
@@ -1461,7 +1462,7 @@ export function MicrofinanceTodoList() {
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, is_private: !prev.is_private }))}
                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                          formData.is_private ? 'bg-blue-500' : 'bg-slate-300'
+                          formData.is_private ? 'bg-brand' : 'bg-slate-300'
                         }`}
                       >
                         <span
@@ -1484,7 +1485,7 @@ export function MicrofinanceTodoList() {
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, requires_approval: !prev.requires_approval }))}
                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                          formData.requires_approval ? 'bg-purple-500' : 'bg-slate-300'
+                          formData.requires_approval ? 'bg-orange' : 'bg-slate-300'
                         }`}
                       >
                         <span
@@ -1502,7 +1503,7 @@ export function MicrofinanceTodoList() {
             <div className="flex gap-2 pt-4 mt-4 border-t border-slate-200">
               <button
                 type="submit"
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-semibold transition-all text-xs shadow-lg hover:shadow-xl"
+                className="flex-1 bg-brand hover:bg-brand-dark text-white py-2 rounded-lg font-semibold transition-all text-xs shadow-lg hover:shadow-xl"
               >
                 {editingTodo ? 'Update Task' : 'Create Task'}
               </button>
@@ -1522,28 +1523,26 @@ export function MicrofinanceTodoList() {
 
   // Enhanced Search and Filters with text-xs
   const SearchAndFilters = () => (
-    <div className="bg-white rounded-xl p-4 mb-4 border border-slate-300 shadow-sm">
+    <div className="bg-white rounded-card p-4 mb-4 border border-border">
       <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center justify-between mb-3">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-subtle" />
           <input
             type="text"
             placeholder="Search tasks, descriptions, tags..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-7 pr-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-xs"
+            className="w-full pl-8 pr-3 py-2 bg-white border border-border rounded-tile focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all text-xs"
           />
         </div>
-        
+
         <div className="flex items-center gap-2">
-          <button className="flex items-center gap-1 px-2 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition-all text-xs">
-            <Download className="w-3 h-3" />
+          <Button variant="secondary" icon={<Download className="w-3 h-3" />}>
             Export
-          </button>
-          <button className="flex items-center gap-1 px-2 py-1.5 bg-slate-100 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-200 transition-all text-xs">
-            <Filter className="w-3 h-3" />
+          </Button>
+          <Button variant="secondary" icon={<Filter className="w-3 h-3" />}>
             More Filters
-          </button>
+          </Button>
         </div>
       </div>
       
@@ -1552,7 +1551,7 @@ export function MicrofinanceTodoList() {
         <select
           value={branchFilter}
           onChange={(e) => setBranchFilter(e.target.value)}
-          className="px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-xs"
+          className="px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all text-xs"
         >
           <option value="">All Branches</option>
           {uniqueTowns.map(town => (
@@ -1563,7 +1562,7 @@ export function MicrofinanceTodoList() {
         <select
           value={departmentFilter}
           onChange={(e) => setDepartmentFilter(e.target.value)}
-          className="px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-xs"
+          className="px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all text-xs"
         >
           <option value="">All Departments</option>
           {MICROFINANCE_CONSTANTS.departments.map(dept => (
@@ -1576,7 +1575,7 @@ export function MicrofinanceTodoList() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-xs"
+          className="px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all text-xs"
         >
           <option value="">All Statuses</option>
           {MICROFINANCE_CONSTANTS.statuses.map(status => (
@@ -1589,7 +1588,7 @@ export function MicrofinanceTodoList() {
         <select
           value={priorityFilter}
           onChange={(e) => setPriorityFilter(e.target.value)}
-          className="px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-xs"
+          className="px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all text-xs"
         >
           <option value="">All Priorities</option>
           {MICROFINANCE_CONSTANTS.priorities.map(priority => (
@@ -1602,7 +1601,7 @@ export function MicrofinanceTodoList() {
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-xs"
+          className="px-2 py-1.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all text-xs"
         >
           <option value="">All Categories</option>
           {MICROFINANCE_CONSTANTS.categories.map(category => (
@@ -1617,7 +1616,7 @@ export function MicrofinanceTodoList() {
 
   // Enhanced Tabs Component with text-xs
   const Tabs = () => (
-    <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-300 mb-4 overflow-x-auto shadow-sm">
+    <div className="flex items-center gap-2 mb-4 flex-wrap">
       {[
         { id: 'all', label: 'All Tasks', count: todos.length, icon: List },
         { id: 'active', label: 'Active', count: todos.filter(t => !t.completed && t.status !== 'cancelled').length, icon: Clock },
@@ -1631,21 +1630,15 @@ export function MicrofinanceTodoList() {
         <button
           key={tab.id}
           onClick={() => setActiveTab(tab.id)}
-          className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-xs transition-all whitespace-nowrap ${
+          className={`flex items-center gap-1.5 px-3 py-[7px] rounded-tile text-[11.5px] font-semibold transition-all whitespace-nowrap ${
             activeTab === tab.id
-              ? 'bg-blue-50 text-blue-700 border border-blue-200'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              ? 'bg-brand text-white'
+              : 'bg-secondary text-ink hover:bg-secondary/70'
           }`}
         >
           <tab.icon className="w-3 h-3" />
           {tab.label}
-          <span className={`px-1 py-0.5 rounded text-xs font-medium ${
-            activeTab === tab.id
-              ? 'bg-blue-100 text-blue-700'
-              : 'bg-slate-200 text-slate-600'
-          }`}>
-            {tab.count}
-          </span>
+          <span className="opacity-55">{tab.count}</span>
         </button>
       ))}
     </div>
@@ -1670,29 +1663,29 @@ export function MicrofinanceTodoList() {
 
     return (
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-4">
-        <div className="bg-white p-3 rounded-xl border border-slate-300 shadow-sm">
-          <div className="text-lg font-bold text-slate-900">{stats.total}</div>
-          <div className="text-xs text-slate-600">Total Tasks</div>
+        <div className="bg-white p-[14px] rounded-tile border border-border">
+          <div className="text-lg font-bold text-ink">{stats.total}</div>
+          <div className="text-[10.5px] font-semibold text-muted-foreground mt-0.5">Total Tasks</div>
         </div>
-        <div className="bg-white p-3 rounded-xl border border-slate-300 shadow-sm">
-          <div className="text-lg font-bold text-green-600">{stats.completed}</div>
-          <div className="text-xs text-slate-600">Completed</div>
+        <div className="bg-white p-[14px] rounded-tile border border-border">
+          <div className="text-lg font-bold text-status-success">{stats.completed}</div>
+          <div className="text-[10.5px] font-semibold text-muted-foreground mt-0.5">Completed</div>
         </div>
-        <div className="bg-white p-3 rounded-xl border border-slate-300 shadow-sm">
-          <div className="text-lg font-bold text-red-600">{stats.overdue}</div>
-          <div className="text-xs text-slate-600">Overdue</div>
+        <div className="bg-white p-[14px] rounded-tile border border-border">
+          <div className="text-lg font-bold text-status-danger">{stats.overdue}</div>
+          <div className="text-[10.5px] font-semibold text-muted-foreground mt-0.5">Overdue</div>
         </div>
-        <div className="bg-white p-3 rounded-xl border border-slate-300 shadow-sm">
-          <div className="text-lg font-bold text-amber-600">{stats.important}</div>
-          <div className="text-xs text-slate-600">Important</div>
+        <div className="bg-white p-[14px] rounded-tile border border-border">
+          <div className="text-lg font-bold text-orange">{stats.important}</div>
+          <div className="text-[10.5px] font-semibold text-muted-foreground mt-0.5">Important</div>
         </div>
-        <div className="bg-white p-3 rounded-xl border border-slate-300 shadow-sm">
-          <div className="text-lg font-bold text-blue-600">{stats.inProgress}</div>
-          <div className="text-xs text-slate-600">In Progress</div>
+        <div className="bg-white p-[14px] rounded-tile border border-border">
+          <div className="text-lg font-bold text-status-info">{stats.inProgress}</div>
+          <div className="text-[10.5px] font-semibold text-muted-foreground mt-0.5">In Progress</div>
         </div>
-        <div className="bg-white p-3 rounded-xl border border-slate-300 shadow-sm">
-          <div className="text-lg font-bold text-purple-600">{formatTime(stats.totalTime)}</div>
-          <div className="text-xs text-slate-600">Total Time</div>
+        <div className="bg-white p-[14px] rounded-tile border border-border">
+          <div className="text-lg font-bold text-status-purple">{formatTime(stats.totalTime)}</div>
+          <div className="text-[10.5px] font-semibold text-muted-foreground mt-0.5">Total Time</div>
         </div>
       </div>
     );
@@ -1702,7 +1695,7 @@ export function MicrofinanceTodoList() {
   if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand"></div>
       </div>
     );
   }
@@ -1719,7 +1712,7 @@ export function MicrofinanceTodoList() {
         </p>
         <button
           onClick={() => window.location.href = '/login'}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg font-semibold transition-all text-xs"
+          className="bg-brand hover:bg-brand-dark text-white px-4 py-1.5 rounded-lg font-semibold transition-all text-xs"
         >
           Go to Login
         </button>
@@ -1732,9 +1725,9 @@ export function MicrofinanceTodoList() {
       {/* Header */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Task Management</h1>
-          <p className="text-xs text-slate-600 mt-1">
-            Manage microfinance operations and workflows
+          <h1 className="text-[21px] font-bold text-ink">Task Management</h1>
+          <p className="text-xs text-muted-foreground mt-1">
+            Manage tasks and workflows across the business
           </p>
         </div>
         
@@ -1764,7 +1757,7 @@ export function MicrofinanceTodoList() {
 
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-semibold transition-all text-xs shadow-lg hover:shadow-xl"
+            className="flex items-center gap-1 bg-brand hover:bg-brand-dark text-white px-3 py-1.5 rounded-lg font-semibold transition-all text-xs shadow-lg hover:shadow-xl"
           >
             <Plus className="w-3 h-3" />
             New Task
@@ -1786,25 +1779,20 @@ export function MicrofinanceTodoList() {
 
       {/* Todo List */}
       {filteredTodos.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-300 p-8 text-center">
-          <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <FileText className="w-6 h-6 text-slate-400" />
-          </div>
-          <h3 className="text-base font-semibold text-slate-900 mb-1">
-            {todos.length === 0 ? 'No Tasks Yet' : 'No Tasks Match Your Criteria'}
-          </h3>
-          <p className="text-xs text-slate-500 mb-4">
-            {todos.length === 0 
-              ? 'Create your first task to get started with microfinance operations' 
+        <div className="bg-white rounded-card border border-border flex-1 flex items-center justify-center py-16">
+          <EmptyState
+            icon={<FileText className="w-5 h-5" strokeWidth={1.8} />}
+            title={todos.length === 0 ? 'No Tasks Yet' : 'No Tasks Match Your Criteria'}
+            description={todos.length === 0
+              ? 'Create your first task to get started'
               : 'Try adjusting your search or filters to see more results'
             }
-          </p>
-          <button
-            onClick={() => setShowForm(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg font-semibold transition-all text-xs"
-          >
-            Create Your First Task
-          </button>
+            action={
+              <Button variant="primary" onClick={() => setShowForm(true)}>
+                Create Your First Task
+              </Button>
+            }
+          />
         </div>
       ) : (
         <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4' : 'space-y-3'}`}>
@@ -1839,7 +1827,7 @@ export function MicrofinanceTodoList() {
                     onClick={() => setCurrentPage(pageNum)}
                     className={`w-6 h-6 rounded text-xs font-medium transition-all ${
                       currentPage === pageNum
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-brand text-white'
                         : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
                     }`}
                   >

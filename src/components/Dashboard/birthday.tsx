@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Cake, Send, Users, Phone, Calendar, CheckCircle, AlertCircle, Loader, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
 import toast from 'react-hot-toast';
 
 // Phone formatting function (same as your SMS system)
@@ -36,9 +37,9 @@ const sendSMS = async (phone: string, message: string) => {
     }
 
     // Celcom Africa API - SIMPLE VERSION
-    const apiKey = '***REMOVED***';
-    const partnerID = '928';
-    const shortcode = 'MularCredit';
+    const apiKey = CELCOM_AFRICA_CONFIG.apiKey;
+    const partnerID = CELCOM_AFRICA_CONFIG.partnerID;
+    const shortcode = CELCOM_AFRICA_CONFIG.defaultShortcode;
     const encodedMessage = encodeURIComponent(message);
     
     // Create the URL
@@ -153,9 +154,9 @@ export default function BirthdaySMS() {
 
     setIsSending(true);
     try {
-      const message = `Happy Birthday ${employee.employee_name}! 🎉 Wishing you a fantastic year ahead from Mular Credit Team`;
+      const message = `Happy Birthday ${employee.employee_name}! 🎉 Wishing you a fantastic year ahead from the Figbloom HR Team`;
       const result = await sendSMS(employee.phone_number, message);
-      
+
       if (result.success) {
         toast.success(`Birthday SMS sent to ${employee.employee_name}`);
         // Log it
@@ -163,7 +164,7 @@ export default function BirthdaySMS() {
           recipient_phone: employee.phone_number,
           message: message,
           status: 'sent',
-          sender_id: 'MularCredit',
+          sender_id: CELCOM_AFRICA_CONFIG.defaultShortcode,
           created_at: new Date().toISOString()
         });
       } else {
@@ -193,18 +194,18 @@ export default function BirthdaySMS() {
       const employee = validBirthdays[i];
       
       try {
-        const message = `Happy Birthday ${employee.employee_name}! 🎉 Wishing you a fantastic year ahead from Mular Credit Team`;
+        const message = `Happy Birthday ${employee.employee_name}! 🎉 Wishing you a fantastic year ahead from the Figbloom HR Team`;
         const result = await sendSMS(employee.phone_number, message);
-        
+
         if (result.success) {
           successCount++;
-          
+
           // Log it
           await supabase.from('sms_logs').insert({
             recipient_phone: employee.phone_number,
             message: message,
             status: 'sent',
-            sender_id: 'MularCredit',
+            sender_id: CELCOM_AFRICA_CONFIG.defaultShortcode,
             created_at: new Date().toISOString()
           });
           

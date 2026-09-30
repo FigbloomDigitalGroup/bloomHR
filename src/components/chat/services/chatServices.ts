@@ -137,7 +137,9 @@ class ChatService {
     if (!data || data.length === 0) {
       return await this.createDefaultChannels();
     }
-    
+
+    const unreadCounts = await this.getUnreadCountsByChannel(userId, data.map(c => c.id));
+
     const channels: Channel[] = data.map(channel => ({
       id: channel.id,
       name: channel.name,
@@ -145,12 +147,46 @@ class ChatService {
       description: channel.description || `Channel for ${channel.name}`,
       isPrivate: channel.is_private || false,
       memberCount: channel.member_count || 1,
-      unread_count: channel.unread_count || 0,
+      unread_count: unreadCounts[channel.id] || 0,
       createdBy: channel.created_by || userId,
       createdAt: channel.created_at || new Date().toISOString()
     }));
 
     return channels;
+  }
+
+  // Real per-channel unread counts via `user_channel_states.last_read_at`
+  // (the same table `markMessagesAsRead` already writes to, but until now
+  // nothing ever read it back - every channel's `unread_count` was a
+  // hardcoded 0, since `channels` itself has no such column). A channel
+  // with no read-state row yet counts as fully unread.
+  private async getUnreadCountsByChannel(userId: string, channelIds: string[]): Promise<Record<string, number>> {
+    if (channelIds.length === 0) return {};
+
+    try {
+      const { data: readStates } = await supabase
+        .from('user_channel_states')
+        .select('channel_id, last_read_at')
+        .eq('user_id', userId);
+
+      const lastReadMap = new Map((readStates || []).map((r: any) => [r.channel_id, r.last_read_at]));
+
+      const entries = await Promise.all(channelIds.map(async (channelId) => {
+        const lastRead = lastReadMap.get(channelId);
+        let query = supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('channel_id', channelId);
+        if (lastRead) query = query.gt('created_at', lastRead);
+        const { count } = await query;
+        return [channelId, count || 0] as const;
+      }));
+
+      return Object.fromEntries(entries);
+    } catch (error) {
+      console.error('Error computing unread counts:', error);
+      return {};
+    }
   }
 
   private getDefaultChannels(): Channel[] {
@@ -261,10 +297,10 @@ class ChatService {
         content: `Welcome to the channel! This is the beginning of the conversation. 👋`,
         author: {
           id: 'system',
-          name: 'ZiraTeams',
+          name: 'Figbloom Teams',
           avatar: '',
-          initials: 'ZT',
-          email: 'system@zirateams.com',
+          initials: 'FT',
+          email: 'system@figbloomteams.com',
           status: 'online'
         },
         timestamp: new Date().toISOString(),
@@ -337,14 +373,16 @@ class ChatService {
         userAvatar = AvatarService.generateAvatar(avatarSeed, 'adventurer');
       }
 
+      // `topic`/`extension` were never real columns on `messages` (see
+      // master_schema.sql) - this insert always errored and silently fell
+      // back to createMockMessage below, so channel messages looked sent
+      // but were never actually persisted (FIG-577).
       const { data, error } = await supabase
         .from('messages')
         .insert({
           channel_id: channelId,
-          topic: 'general',
           author_id: userId,
           content: content,
-          extension: 'text',
           created_at: new Date().toISOString(),
           author_name: fullName,
           author_initials: initials,

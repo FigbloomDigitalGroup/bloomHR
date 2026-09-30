@@ -42,7 +42,7 @@ const TransactionStatusChecker: React.FC = () => {
                 },
                 body: JSON.stringify({
                     transactionID: singleCode.trim(),
-                    remarks: 'Manual status check from ZiraPro',
+                    remarks: 'Manual status check from Figbloom HR',
                     occasion: 'StatusCheck'
                 }),
             });

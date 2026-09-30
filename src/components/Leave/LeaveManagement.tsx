@@ -25,7 +25,6 @@ import {
   Save,
   ThumbsUp,
   ThumbsDown,
-  MapPin,
   RefreshCw,
   Loader2,
   Search as SearchIcon
@@ -34,7 +33,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@supabase/supabase-js';
 import { TownProps } from '../../types/supabase';
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
+import { useUser } from '../ProtectedRoutes/UserContext';
 import LeaveScheduler from './LeaveScheduler';
+import { PageHeader, StatCard, Card, TabBar, Button, EmptyState } from '../UI';
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -50,6 +51,10 @@ type LeaveType = {
   is_continuous: boolean;
   max_days?: number;
   icon: string;
+  // Joined in from leave_policies (see current_leave_policies view) and
+  // editable via the Leave Type form - see handleSaveLeaveType.
+  accrual_method?: 'annual' | 'monthly_non_cumulative' | 'none';
+  carry_forward_max_days?: number;
 };
 
 type Holiday = {
@@ -85,6 +90,8 @@ type EmployeeLeaveBalance = {
   office: string;
   leave_type_id: string;
   leave_type_name: string;
+  year: number;
+  month: number;
   accrued_days: number;
   used_days: number;
   remaining_days: number;
@@ -138,10 +145,10 @@ const PremiumSearchableDropdown = ({
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}
-        className={`w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm transition-all duration-200 hover:bg-white hover:border-indigo-300 focus:outline-none focus:ring-4 focus:ring-indigo-500/5 ${isOpen ? 'border-indigo-500 bg-white ring-4 ring-indigo-500/5' : ''}`}
+        className={`w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm transition-all duration-200 hover:bg-white hover:border-primary/30 focus:outline-none focus:ring-4 focus:ring-primary/5 ${isOpen ? 'border-primary bg-white ring-4 ring-primary/5' : ''}`}
       >
         <div className="flex items-center gap-2 truncate text-gray-700">
-          {Icon && <Icon className={`w-4 h-4 ${isOpen ? 'text-indigo-500' : 'text-gray-400'}`} />}
+          {Icon && <Icon className={`w-4 h-4 ${isOpen ? 'text-primary' : 'text-gray-400'}`} />}
           <span className={selected ? 'font-medium text-gray-900' : 'text-gray-400'}>
             {selected ? selected.label : placeholder}
           </span>
@@ -167,7 +174,7 @@ const PremiumSearchableDropdown = ({
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Type to search..."
-                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10"
+                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
                 />
               </div>
             </div>
@@ -181,11 +188,11 @@ const PremiumSearchableDropdown = ({
                     setIsOpen(false);
                     setSearch('');
                   }}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors mb-0.5 flex items-center justify-between group ${value === opt.value ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-600 hover:bg-indigo-50/50 hover:text-indigo-600'}`}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors mb-0.5 flex items-center justify-between group ${value === opt.value ? 'bg-primary/10 text-primary font-semibold' : 'text-gray-600 hover:bg-primary/5 hover:text-primary'}`}
                 >
                   <span className="truncate">{opt.label}</span>
                   {value === opt.value && (
-                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                   )}
                 </button>
               ))}
@@ -210,6 +217,12 @@ type Employee = {
   "Work Email"?: string;
   Branch?: string;
   Town?: string;
+  // Two-level leave approval (see FIG-573): the department head who must
+  // recommend before HR/Admin can give final approval. Stored as a plain
+  // "First Last" name string (matched against employees, not a FK) - see
+  // the "Leave Approvers" section of Add/Edit Employee.
+  "Leave Approver"?: string;
+  "Alternate Approver"?: string;
 };
 
 interface AreaTownMapping {
@@ -219,17 +232,6 @@ interface AreaTownMapping {
 interface BranchAreaMapping {
   [branch: string]: string;
 }
-
-// Default leave types (Kenyan standard)
-const DEFAULT_LEAVE_TYPES: LeaveType[] = [
-  { id: 'annual', name: 'Annual Leave', description: 'Paid time off work', is_deductible: true, is_continuous: true, max_days: 24, icon: 'Sun' },
-  { id: 'compassionate', name: 'Compassionate Leave', description: 'Time off due to family bereavement', is_deductible: false, is_continuous: true, max_days: 7, icon: 'Heart' },
-  { id: 'maternity', name: 'Maternity Leave', description: 'Time off for new mothers', is_deductible: false, is_continuous: true, max_days: 90, icon: 'Baby' },
-  { id: 'paternity', name: 'Paternity Leave', description: 'Time off for new fathers', is_deductible: false, is_continuous: true, max_days: 14, icon: 'Baby' },
-  { id: 'sick', name: 'Sick Leave', description: 'Time off due to illness', is_deductible: true, is_continuous: true, max_days: 14, icon: 'Activity' },
-  { id: 'overtime', name: 'Overtime Compensation', description: 'Leave awarded for overtime work', is_deductible: false, is_continuous: false, icon: 'Zap' },
-  { id: 'other', name: 'Other Leave', description: 'Other types of leave', is_deductible: true, is_continuous: true, icon: 'Gift' },
-];
 
 // Sample holidays (Kenyan public holidays)
 const SAMPLE_HOLIDAYS: Holiday[] = [
@@ -306,7 +308,7 @@ const StatusBadge = ({ status }: { status: string }) => {
     'pending': 'bg-yellow-100 text-yellow-800',
     'approved': 'bg-green-100 text-green-800',
     'rejected': 'bg-red-100 text-red-800',
-    'recommended': 'bg-blue-100 text-blue-800',
+    'recommended': 'bg-green-tint text-brand-dark',
     'not_recommended': 'bg-orange-100 text-orange-800',
   };
 
@@ -340,7 +342,7 @@ const RecStatusBadge = ({ recstatus }: { recstatus: string | null }) => {
   }
 
   const statusClasses = {
-    'recommended': 'bg-blue-100 text-blue-800',
+    'recommended': 'bg-green-tint text-brand-dark',
     'not_recommended': 'bg-orange-100 text-orange-800',
   };
 
@@ -363,7 +365,7 @@ const RecStatusBadge = ({ recstatus }: { recstatus: string | null }) => {
 const LeaveTypeIcon = ({ type }: { type: LeaveType }) => {
   const Icon = getIconComponent(type.icon);
   return (
-    <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
+    <div className="p-2 rounded-lg bg-green-tint text-brand">
       <Icon className="w-5 h-5" />
     </div>
   );
@@ -448,8 +450,8 @@ const LeaveApplicationDetails = ({ application, onClose }: { application: LeaveA
             {application.recommendation_notes && (
               <div>
                 <p className="text-xs text-gray-500">Recommendation Notes</p>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="font-medium whitespace-pre-line text-blue-800">{application.recommendation_notes}</p>
+                <div className="bg-green-tint border border-brand/20 rounded-lg p-3">
+                  <p className="font-medium whitespace-pre-line text-brand-dark">{application.recommendation_notes}</p>
                 </div>
               </div>
             )}
@@ -545,7 +547,7 @@ const StatusUpdateModal = ({
     switch (action) {
       case 'approve': return 'bg-green-600 hover:bg-green-700';
       case 'reject': return 'bg-red-600 hover:bg-red-700';
-      case 'recommend': return 'bg-blue-600 hover:bg-blue-700';
+      case 'recommend': return 'bg-brand hover:bg-brand-dark';
       case 'not_recommend': return 'bg-orange-600 hover:bg-orange-700';
       default: return 'bg-gray-600 hover:bg-gray-700';
     }
@@ -588,7 +590,7 @@ const StatusUpdateModal = ({
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
               rows={4}
               placeholder={getNotesPlaceholder()}
             />
@@ -647,7 +649,7 @@ const Pagination = ({
         <select
           value={itemsPerPage}
           onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-          className="bg-gray-50 border border-gray-300 text-gray-700 text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1"
+          className="bg-gray-50 border border-gray-300 text-gray-700 text-xs rounded-lg focus:ring-brand focus:border-brand p-1"
         >
           <option value={5}>5</option>
           <option value={10}>10</option>
@@ -673,7 +675,7 @@ const Pagination = ({
             <button
               key={number}
               onClick={() => onPageChange(number)}
-              className={`px-3 py-1 border rounded-md text-xs font-medium ${currentPage === number ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300'}`}
+              className={`px-3 py-1 border rounded-md text-xs font-medium ${currentPage === number ? 'bg-brand text-white border-brand' : 'border-gray-300'}`}
             >
               {number}
             </button>
@@ -771,15 +773,13 @@ const LeaveTypeFormModal = ({
   onClose,
   newLeaveType,
   setNewLeaveType,
-  handleSaveLeaveType,
-  handleAddLeaveType
+  handleSaveLeaveType
 }: {
   isOpen: boolean;
   onClose: () => void;
   newLeaveType: any;
   setNewLeaveType: React.Dispatch<React.SetStateAction<any>>;
-  handleSaveLeaveType: (type: LeaveType) => void;
-  handleAddLeaveType: () => void;
+  handleSaveLeaveType: (type: LeaveType) => Promise<void>;
 }) => {
   if (!isOpen) return null;
 
@@ -807,7 +807,7 @@ const LeaveTypeFormModal = ({
               type="text"
               value={newLeaveType.name}
               onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, name: e.target.value }))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
               placeholder="e.g., Annual Leave"
             />
           </div>
@@ -819,7 +819,7 @@ const LeaveTypeFormModal = ({
             <textarea
               value={newLeaveType.description}
               onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, description: e.target.value }))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
               rows={3}
               placeholder="Describe this leave type..."
             />
@@ -834,7 +834,7 @@ const LeaveTypeFormModal = ({
                 type="number"
                 value={newLeaveType.max_days || ''}
                 onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, max_days: e.target.value ? Number(e.target.value) : undefined }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
                 placeholder="Unlimited"
               />
             </div>
@@ -846,7 +846,7 @@ const LeaveTypeFormModal = ({
               <select
                 value={newLeaveType.icon}
                 onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, icon: e.target.value }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
               >
                 <option value="Sun">Sun</option>
                 <option value="Heart">Heart</option>
@@ -854,7 +854,44 @@ const LeaveTypeFormModal = ({
                 <option value="Activity">Activity</option>
                 <option value="Zap">Zap</option>
                 <option value="Gift">Gift</option>
+                <option value="FileText">FileText</option>
               </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Accrual Method
+              </label>
+              <select
+                value={newLeaveType.accrual_method || 'annual'}
+                onChange={(e) => setNewLeaveType((prev: any) => ({
+                  ...prev,
+                  accrual_method: e.target.value,
+                  ...(e.target.value !== 'annual' ? { carry_forward_max_days: 0 } : {})
+                }))}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
+              >
+                <option value="annual">Annual (resets Jan 1)</option>
+                <option value="monthly_non_cumulative">Monthly (resets every month, no carry-over)</option>
+                <option value="none">None (not accrual-based)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Carry-Forward Cap (days)
+              </label>
+              <input
+                type="number"
+                value={newLeaveType.carry_forward_max_days ?? 0}
+                onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, carry_forward_max_days: Number(e.target.value) }))}
+                disabled={newLeaveType.accrual_method !== 'annual'}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-gray-100 disabled:text-gray-400"
+                min="0"
+                placeholder="0"
+              />
             </div>
           </div>
 
@@ -864,7 +901,7 @@ const LeaveTypeFormModal = ({
                 type="checkbox"
                 checked={newLeaveType.is_deductible}
                 onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, is_deductible: e.target.checked }))}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="rounded border-gray-300 text-brand focus:ring-brand"
               />
               <label className="ml-2 text-xs text-gray-700">Deductible from balance</label>
             </div>
@@ -874,7 +911,7 @@ const LeaveTypeFormModal = ({
                 type="checkbox"
                 checked={newLeaveType.is_continuous}
                 onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, is_continuous: e.target.checked }))}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="rounded border-gray-300 text-brand focus:ring-brand"
               />
               <label className="ml-2 text-xs text-gray-700">Continuous leave</label>
             </div>
@@ -885,21 +922,22 @@ const LeaveTypeFormModal = ({
           <button
             onClick={() => {
               onClose();
-              setNewLeaveType({ name: '', description: '', is_deductible: true, is_continuous: true, icon: 'Sun' });
+              setNewLeaveType({ name: '', description: '', is_deductible: true, is_continuous: true, icon: 'Sun', accrual_method: 'annual', carry_forward_max_days: 0 });
             }}
             className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs"
           >
             Cancel
           </button>
           <button
-            onClick={() => {
-              if (newLeaveType.id) {
-                handleSaveLeaveType(newLeaveType as LeaveType);
-              } else {
-                handleAddLeaveType();
-              }
+            onClick={async () => {
+              const payload: LeaveType = newLeaveType.id
+                ? (newLeaveType as LeaveType)
+                : { ...newLeaveType, id: `custom-${Date.now()}` };
+              await handleSaveLeaveType(payload);
+              onClose();
+              setNewLeaveType({ name: '', description: '', is_deductible: true, is_continuous: true, icon: 'Sun', accrual_method: 'annual', carry_forward_max_days: 0 });
             }}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs flex items-center gap-2"
+            className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs flex items-center gap-2"
           >
             <Save className="w-4 h-4" />
             {newLeaveType.id ? 'Update' : 'Save'} Leave Type
@@ -955,7 +993,7 @@ const HolidayFormModal = ({
               type="text"
               value={newHoliday.name}
               onChange={(e) => setNewHoliday((prev: any) => ({ ...prev, name: e.target.value }))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
               placeholder="e.g., New Year's Day"
             />
           </div>
@@ -968,7 +1006,7 @@ const HolidayFormModal = ({
               type="date"
               value={newHoliday.date}
               onChange={(e) => setNewHoliday((prev: any) => ({ ...prev, date: e.target.value }))}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
             />
           </div>
 
@@ -977,7 +1015,7 @@ const HolidayFormModal = ({
               type="checkbox"
               checked={newHoliday.recurring}
               onChange={(e) => setNewHoliday((prev: any) => ({ ...prev, recurring: e.target.checked }))}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="rounded border-gray-300 text-brand focus:ring-brand"
             />
             <label className="ml-2 text-xs text-gray-700">Recurring holiday (every year)</label>
           </div>
@@ -1001,7 +1039,7 @@ const HolidayFormModal = ({
                 handleAddHoliday();
               }
             }}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs flex items-center gap-2"
+            className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs flex items-center gap-2"
           >
             <Save className="w-4 h-4" />
             {newHoliday.id ? 'Update' : 'Save'} Holiday
@@ -1012,27 +1050,39 @@ const HolidayFormModal = ({
   );
 };
 
-// Accrual Settings Modal
+// Leave Reset Modal. Each leave type resets on its own schedule (see
+// leave_policies.accrual_method): Annual/Sick/Maternity/Paternity/Study-Exam
+// reset once a year with a capped carry-forward, while Compassionate Leave
+// resets every month with nothing carried over. Both jobs are idempotent -
+// running one for a period that's already been reset just does nothing, so
+// these on-demand buttons are safe as a backstop if the scheduled job (see
+// the migration) doesn't fire, not just for testing.
 const AccrualSettingsModal = ({
   isOpen,
   onClose,
-  accrualSettings,
-  handleRunAccrual,
-  employees
+  leaveTypes,
+  employees,
+  handleRunAnnualReset,
+  handleRunMonthlyReset
 }: {
   isOpen: boolean;
   onClose: () => void;
-  accrualSettings: any;
-  handleRunAccrual: () => void;
+  leaveTypes: LeaveType[];
   employees: Employee[];
+  handleRunAnnualReset: () => Promise<void>;
+  handleRunMonthlyReset: () => Promise<void>;
 }) => {
   if (!isOpen) return null;
+
+  const annualTypes = leaveTypes.filter(t => t.is_deductible && t.accrual_method !== 'monthly_non_cumulative' && t.accrual_method !== 'none');
+  const monthlyTypes = leaveTypes.filter(t => t.is_deductible && t.accrual_method === 'monthly_non_cumulative');
+  const monthName = new Date().toLocaleDateString(undefined, { month: 'long' });
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-base text-gray-900">Run Leave Accrual</h3>
+          <h3 className="text-lg font-base text-gray-900">Leave Balance Resets</h3>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700"
@@ -1042,45 +1092,45 @@ const AccrualSettingsModal = ({
         </div>
 
         <div className="space-y-4">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5" />
-              <div>
-                <p className="text-xs font-medium text-yellow-800">Important</p>
-                <p className="text-xs text-yellow-700 mt-1">
-                  This will add {accrualSettings.accrualAmount} days to all employees' leave balances
-                  for deductible leave types. This action cannot be undone.
-                </p>
-              </div>
-            </div>
+          <div className="border border-gray-200 rounded-lg p-4 space-y-2">
+            <p className="text-xs font-medium text-gray-800">Annual reset ({employees.length} employees)</p>
+            <p className="text-xs text-gray-600">
+              Grants each type's yearly allotment, carrying forward unused days up to each type's cap.
+              Covers: {annualTypes.length ? annualTypes.map(t => t.name).join(', ') : 'no deductible annual leave types yet'}.
+            </p>
+            <button
+              onClick={handleRunAnnualReset}
+              disabled={annualTypes.length === 0}
+              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-lg text-xs font-medium"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Run Annual Reset
+            </button>
           </div>
 
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs font-medium text-gray-700">Accrual Details:</p>
-              <ul className="text-xs text-gray-600 space-y-1 mt-2">
-                <li>• Amount: {accrualSettings.accrualAmount} days per employee</li>
-                <li>• Interval: {accrualSettings.accrualInterval}</li>
-                <li>• Next accrual: {formatDate(accrualSettings.nextAccrualDate)}</li>
-                <li>• Affected employees: {employees.length}</li>
-              </ul>
-            </div>
+          <div className="border border-gray-200 rounded-lg p-4 space-y-2">
+            <p className="text-xs font-medium text-gray-800">Monthly reset ({monthName})</p>
+            <p className="text-xs text-gray-600">
+              Grants a fresh monthly allotment that does not carry over.
+              Covers: {monthlyTypes.length ? monthlyTypes.map(t => t.name).join(', ') : 'no monthly leave types yet'}.
+            </p>
+            <button
+              onClick={handleRunMonthlyReset}
+              disabled={monthlyTypes.length === 0}
+              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-brand hover:bg-brand-dark disabled:opacity-50 text-white rounded-lg text-xs font-medium"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Run Monthly Reset
+            </button>
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 pt-6">
+        <div className="flex justify-end pt-6">
           <button
             onClick={onClose}
             className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs"
           >
-            Cancel
-          </button>
-          <button
-            onClick={handleRunAccrual}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs flex items-center gap-2"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Run Accrual Now
+            Close
           </button>
         </div>
       </div>
@@ -1180,7 +1230,7 @@ const LeaveApplicationFormModal = ({
                 type="date"
                 value={newLeaveApplication["Start Date"]}
                 onChange={(e) => setNewLeaveApplication((prev: any) => ({ ...prev, "Start Date": e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand"
               />
             </div>
 
@@ -1192,7 +1242,7 @@ const LeaveApplicationFormModal = ({
                 type="date"
                 value={newLeaveApplication["End Date"]}
                 onChange={(e) => setNewLeaveApplication((prev: any) => ({ ...prev, "End Date": e.target.value }))}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand"
               />
             </div>
 
@@ -1204,7 +1254,7 @@ const LeaveApplicationFormModal = ({
                 type="number"
                 value={newLeaveApplication["Days"]}
                 readOnly
-                className="w-full border border-gray-100 bg-gray-50 rounded-lg px-3 py-2 text-sm font-bold text-blue-600"
+                className="w-full border border-gray-100 bg-gray-50 rounded-lg px-3 py-2 text-sm font-bold text-brand"
               />
             </div>
           </div>
@@ -1243,7 +1293,7 @@ const LeaveApplicationFormModal = ({
             <textarea
               value={newLeaveApplication["Reason"]}
               onChange={(e) => setNewLeaveApplication((prev: any) => ({ ...prev, "Reason": e.target.value }))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand/20 focus:border-brand"
               rows={3}
               placeholder="Reason for granting this leave..."
             />
@@ -1259,7 +1309,7 @@ const LeaveApplicationFormModal = ({
           </button>
           <button
             onClick={handleApplyLeave}
-            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/20 active:scale-[0.98] transition-all"
+            className="px-6 py-2.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-lg shadow-primary/20 active:scale-[0.98] transition-all"
           >
             <Save className="w-4 h-4" />
             Confirm Assignment
@@ -1280,9 +1330,14 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
   const [townsInArea, setTownsInArea] = useState<string[]>([]);
   const [debugInfo, setDebugInfo] = useState<string>("Initializing...");
 
+  // Two-level leave approval (FIG-573): who is the logged-in user, for
+  // matching against an applicant's assigned "Leave Approver" below.
+  const { user: currentAuthUser } = useUser();
+
   // Original state variables
   const [activeTab, setActiveTab] = useState('applications');
-  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>(DEFAULT_LEAVE_TYPES);
+  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
+  const [leaveTypesError, setLeaveTypesError] = useState<string | null>(null);
   const [holidays, setHolidays] = useState<Holiday[]>(SAMPLE_HOLIDAYS);
   const [leaveApplications, setLeaveApplications] = useState<LeaveApplication[]>([]);
   const [leaveBalances, setLeaveBalances] = useState<EmployeeLeaveBalance[]>([]);
@@ -1322,7 +1377,9 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
     description: '',
     is_deductible: true,
     is_continuous: true,
-    icon: 'Sun'
+    icon: 'Sun',
+    accrual_method: 'annual',
+    carry_forward_max_days: 0
   });
   const [newHoliday, setNewHoliday] = useState<Partial<Holiday>>({
     name: '',
@@ -1343,11 +1400,8 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
     "Status": 'pending',
     "recstatus": null
   });
-  const [accrualSettings, setAccrualSettings] = useState({
-    accrualInterval: 'monthly',
-    accrualAmount: 2,
-    nextAccrualDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().split('T')[0]
-  });
+  // Bumped after a manual reset to force the balances effect to refetch.
+  const [balancesRefreshKey, setBalancesRefreshKey] = useState(0);
 
   // Load area-town mapping and saved town from localStorage on component mount
   useEffect(() => {
@@ -1430,6 +1484,14 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
     }
   }, [currentTown, areaTownMapping]);
 
+  // Two-level leave approval (FIG-573): the logged-in user's own name, for
+  // matching against each application's assigned "Leave Approver"/
+  // "Alternate Approver". Only meaningful once `employees` has loaded.
+  const currentUserEmployee = employees.find(e => e["Work Email"] === currentAuthUser?.email);
+  const currentUserFullName = currentUserEmployee
+    ? `${currentUserEmployee["First Name"]} ${currentUserEmployee["Last Name"]}`
+    : null;
+
   // Calculate paginated data
   const paginatedApplications = leaveApplications.slice(
     (applicationsPage - 1) * applicationsPerPage,
@@ -1455,61 +1517,6 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
   );
   const totalHolidayPages = Math.ceil(holidays.length / holidaysPerPage);
 
-  // Function to create leave balance records
-  const createLeaveBalances = (employeesData: Employee[], applicationsData: LeaveApplication[]) => {
-    const balances: EmployeeLeaveBalance[] = [];
-
-    const deductibleLeaveTypes = DEFAULT_LEAVE_TYPES.filter(type => type.is_deductible);
-
-    employeesData.forEach(employee => {
-      deductibleLeaveTypes.forEach(leaveType => {
-        const usedDays = applicationsData
-          .filter(app =>
-            app["Employee Number"] === employee["Employee Number"] &&
-            app["Leave Type"] === leaveType.name &&
-            app.Status === 'approved'
-          )
-          .reduce((sum, app) => sum + (app.Days || 0), 0);
-
-        let monthlyAccrual = 0;
-        let quarterlyAccrual = 0;
-        let annualAccrual = 0;
-
-        if (leaveType.name === 'Annual Leave') {
-          monthlyAccrual = 2;
-          quarterlyAccrual = 6;
-          annualAccrual = 24;
-        } else if (leaveType.name === 'Sick Leave') {
-          monthlyAccrual = 1;
-          quarterlyAccrual = 3;
-          annualAccrual = 14;
-        }
-
-        const accruedDays = leaveType.max_days || annualAccrual;
-        const remainingDays = accruedDays - usedDays;
-
-        balances.push({
-          id: `${employee["Employee Number"]}-${leaveType.id}`,
-          employee_number: employee["Employee Number"],
-          first_name: employee["First Name"],
-          last_name: employee["Last Name"],
-          office: employee.Branch || employee.Town || 'N/A',
-          leave_type_id: leaveType.id,
-          leave_type_name: leaveType.name,
-          accrued_days: accruedDays,
-          used_days: usedDays,
-          remaining_days: remainingDays,
-          last_accrual_date: new Date().toISOString().split('T')[0],
-          monthly_accrual: monthlyAccrual,
-          quarterly_accrual: quarterlyAccrual,
-          annual_accrual: annualAccrual
-        });
-      });
-    });
-
-    return balances;
-  };
-
   // Function to update balance accruals
   const updateBalanceAccrual = (balanceIndex: number, field: 'monthly_accrual' | 'quarterly_accrual' | 'annual_accrual', value: number) => {
     setLeaveBalances(prev => {
@@ -1522,12 +1529,25 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
     });
   };
 
-  // Function to save balance changes
+  // Persists the one thing this tab actually lets someone edit per row: the
+  // monthly accrual rate override. accrued_days/used_days are read-only here
+  // and are never touched by this save (they change via approvals and
+  // "Run Accrual Now" instead).
   const saveBalanceChanges = async () => {
     setSavingBalances(true);
     try {
-      console.log('Saving balance changes:', leaveBalances);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const results = await Promise.all(
+        leaveBalances.map(balance =>
+          supabase
+            .from('leave_balances')
+            .update({ monthly_accrual: balance.monthly_accrual })
+            .eq('id', balance.id)
+        )
+      );
+
+      const failed = results.find(r => r.error);
+      if (failed?.error) throw failed.error;
+
       alert('Leave balance settings saved successfully!');
     } catch (err) {
       setError('Failed to save balance changes. Please try again.');
@@ -1546,17 +1566,46 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
 
   // Function to update leave status with reason
   const handleUpdateStatus = async (applicationId: string, status: 'approved' | 'rejected' | 'recommended' | 'not_recommended', notes: string) => {
+    // Two-level leave approval (FIG-573): defense-in-depth mirror of the
+    // disabled Approve button - refuse final approval here too if the
+    // applicant has an assigned Leave Approver who hasn't recommended it
+    // yet, in case this ever gets called from somewhere other than that
+    // button. (This is a client-side guard only, same as every other role
+    // check in this file - real enforcement needs RLS, see FIG-515.)
+    if (status === 'approved') {
+      const application = leaveApplications.find(app => app.id === applicationId);
+      const applicantEmployee = application
+        ? employees.find(e => e["Employee Number"] === application["Employee Number"])
+        : undefined;
+      const deptHeadName = applicantEmployee?.["Leave Approver"];
+      if (deptHeadName && application?.recstatus !== 'recommended') {
+        setError(`Cannot approve: awaiting ${deptHeadName}'s recommendation first.`);
+        return;
+      }
+    }
+
     setUpdatingStatus(true);
     try {
-      let updateData: any = {};
+      // DB payload: `leave_application` stores status/reason as lowercase columns
+      // (see fetchLeaveApplications above); local state uses the capitalized shape.
+      let dbUpdateData: any = {};
+      let localUpdateData: Partial<LeaveApplication> = {};
 
       if (status === 'approved' || status === 'rejected') {
-        updateData = {
+        dbUpdateData = {
+          "status": status,
+          "reason": notes
+        };
+        localUpdateData = {
           "Status": status,
           "Reason": notes
         };
       } else if (status === 'recommended' || status === 'not_recommended') {
-        updateData = {
+        dbUpdateData = {
+          "recstatus": status,
+          "recommendation_notes": notes
+        };
+        localUpdateData = {
           "recstatus": status,
           "recommendation_notes": notes
         };
@@ -1564,7 +1613,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
 
       const { error } = await supabase
         .from('leave_application')
-        .update(updateData)
+        .update(dbUpdateData)
         .eq('id', applicationId);
 
       if (error) throw error;
@@ -1572,9 +1621,90 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
       setLeaveApplications(prev => prev.map(app =>
         app.id === applicationId ? {
           ...app,
-          ...updateData
+          ...localUpdateData
         } : app
       ));
+
+      // Deduct from the real leave_balances row on approval (see FIG-563).
+      // Rejecting needs no reversal here: nothing is deducted until
+      // approval, so there's nothing to undo on rejection.
+      if (status === 'approved') {
+        const application = leaveApplications.find(app => app.id === applicationId);
+        const leaveType = application ? leaveTypes.find(lt => lt.name === application["Leave Type"]) : undefined;
+
+        if (application && leaveType?.is_deductible) {
+          const startDate = new Date(application["Start Date"]);
+          const isMonthly = leaveType.accrual_method === 'monthly_non_cumulative';
+
+          const { data: updatedBalance, error: balanceError } = await supabase.rpc(
+            'increment_leave_balance_used_days',
+            {
+              p_employee_number: application["Employee Number"],
+              p_leave_type_id: leaveType.id,
+              p_year: startDate.getFullYear(),
+              p_days: application.Days,
+              p_month: isMonthly ? startDate.getMonth() + 1 : 0
+            }
+          );
+
+          if (balanceError) {
+            console.error('Failed to update leave balance:', balanceError);
+            setError('Status updated, but the leave balance could not be adjusted. Check the Balances tab.');
+          } else if (updatedBalance) {
+            setLeaveBalances(prev => {
+              const exists = prev.some(b => b.id === updatedBalance.id);
+              if (!exists) return prev; // balance is for a different period than what's loaded
+              return prev.map(b => b.id === updatedBalance.id ? {
+                ...b,
+                accrued_days: updatedBalance.accrued_days,
+                used_days: updatedBalance.used_days,
+                remaining_days: updatedBalance.remaining_days
+              } : b);
+            });
+          }
+        }
+      }
+
+      // Notify (FIG-574): recommending alerts HR/Admin via the existing
+      // admin bell (fetchAdminHRNotifications has no type filter, so a new
+      // notification_type shows up there with no other wiring needed);
+      // approving/rejecting alerts the employee via the Staff Portal's
+      // notification panel. "Leave submitted" has no new notification here
+      // - Header.tsx already shows a generic one for any new application.
+      if (status === 'recommended' || status === 'approved' || status === 'rejected') {
+        const application = leaveApplications.find(app => app.id === applicationId);
+        if (application) {
+          const dayLabel = `${application.Days} day${application.Days !== 1 ? 's' : ''}`;
+          const notificationsToInsert =
+            status === 'recommended'
+              ? [{
+                notification_type: 'leave_recommended',
+                title: 'Leave application recommended - awaiting final approval',
+                message: `${currentUserFullName || 'The department head'} recommended ${application.Name}'s ${application["Leave Type"]} application (${dayLabel}). Awaiting HR/Admin approval.`
+              }]
+              : [{
+                notification_type: status === 'approved' ? 'leave_approved' : 'leave_rejected',
+                title: status === 'approved' ? 'Leave application approved' : 'Leave application rejected',
+                message: status === 'approved'
+                  ? `Your ${application["Leave Type"]} application (${dayLabel}, ${application["Start Date"]} to ${application["End Date"]}) has been approved.`
+                  : `Your ${application["Leave Type"]} application (${dayLabel}) has been rejected.${notes ? ` Reason: ${notes}` : ''}`
+              }];
+
+          const { error: notifyError } = await supabase.from('hr_notifications').insert(
+            notificationsToInsert.map(n => ({
+              employee_number: application["Employee Number"],
+              employee_name: application.Name,
+              end_date: application["End Date"],
+              is_read_admin: false,
+              is_read_staff: false,
+              email_sent: false,
+              ...n
+            }))
+          );
+
+          if (notifyError) console.error('Failed to create leave notification:', notifyError);
+        }
+      }
 
     } catch (err) {
       setError(`Failed to update status. Please try again.`);
@@ -1603,57 +1733,180 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
     fetchEmployees();
   }, []);
 
-  // Fetch leave balances
+  // Fetch leave balances from the real leave_balances table (see FIG-563).
+  // Each leave type reads from its own bucket: annual-cadence types use
+  // month 0 (the whole year), Compassionate Leave (monthly_non_cumulative)
+  // uses the current calendar month - see run_annual_leave_reset /
+  // run_monthly_leave_reset in the migration for how those buckets get
+  // created and rolled over (FIG-565). Missing rows are bootstrapped once,
+  // seeding used_days from already-approved applications in that same
+  // bucket so pre-existing leave taken isn't lost; every increment after
+  // that goes through increment_leave_balance_used_days at approval time
+  // instead of being recomputed on each render.
   useEffect(() => {
     const fetchLeaveBalances = async () => {
       try {
-        // In a real app, you'd fetch from a leave_balances table
-        // For now, we'll create them from employees and applications
-        const { data: employeesData } = await supabase
-          .from('employees')
-          .select('*');
+        const today = new Date();
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth() + 1;
+        const deductibleLeaveTypes = leaveTypes.filter(type => type.is_deductible);
+        const bucketFor = (lt: LeaveType) => lt.accrual_method === 'monthly_non_cumulative' ? currentMonth : 0;
 
-        const { data: applicationsData } = await supabase
-          .from('leave_application')
-          .select('*');
-
-        if (employeesData && applicationsData) {
-          const balances = createLeaveBalances(employeesData, applicationsData);
-          setLeaveBalances(balances);
+        if (deductibleLeaveTypes.length === 0 || employees.length === 0) {
+          setLeaveBalances([]);
+          return;
         }
+
+        const { data: rawRows, error: balancesError } = await supabase
+          .from('leave_balances')
+          .select('*')
+          .eq('year', currentYear)
+          .in('month', [0, currentMonth]);
+
+        if (balancesError) throw balancesError;
+
+        const existingRows = (rawRows || []).filter((r: any) => {
+          const lt = deductibleLeaveTypes.find(t => t.id === r.leave_type_id);
+          return lt && r.month === bucketFor(lt);
+        });
+
+        const existingByKey = new Set(
+          existingRows.map((r: any) => `${r.employee_number}::${r.leave_type_id}`)
+        );
+
+        const missing = employees.flatMap(employee =>
+          deductibleLeaveTypes
+            .filter(lt => !existingByKey.has(`${employee["Employee Number"]}::${lt.id}`))
+            .map(leaveType => ({ employee, leaveType }))
+        );
+
+        let bootstrapped: any[] = [];
+        if (missing.length > 0) {
+          // `status` casing is inconsistent across rows (older/Staff-Portal
+          // rows store 'Approved', this file's own writes use lowercase
+          // 'approved') - match case-insensitively so historical usage
+          // isn't undercounted on bootstrap.
+          const { data: applicationsData } = await supabase
+            .from('leave_application')
+            .select('*')
+            .ilike('status', 'approved');
+
+          const rowsToInsert = missing.map(({ employee, leaveType }) => {
+            const isMonthly = leaveType.accrual_method === 'monthly_non_cumulative';
+            const usedDays = (applicationsData || [])
+              .filter((app: any) => {
+                if (app["Employee Number"] !== employee["Employee Number"] || app["Leave Type"] !== leaveType.name) return false;
+                const start = new Date(app["Start Date"]);
+                if (start.getFullYear() !== currentYear) return false;
+                return isMonthly ? start.getMonth() + 1 === currentMonth : true;
+              })
+              .reduce((sum: number, app: any) => sum + (Number(app.days) || 0), 0);
+
+            return {
+              employee_number: employee["Employee Number"],
+              leave_type_id: leaveType.id,
+              year: currentYear,
+              month: bucketFor(leaveType),
+              accrued_days: leaveType.max_days || 0,
+              used_days: usedDays,
+              carried_over_days: 0,
+              monthly_accrual: 0
+            };
+          });
+
+          const { data: inserted, error: insertError } = await supabase
+            .from('leave_balances')
+            .upsert(rowsToInsert, { onConflict: 'employee_number,leave_type_id,year,month', ignoreDuplicates: true })
+            .select();
+
+          if (insertError) throw insertError;
+          bootstrapped = inserted || [];
+        }
+
+        const balances: EmployeeLeaveBalance[] = [...existingRows, ...bootstrapped].map((row: any) => {
+          const employee = employees.find(e => e["Employee Number"] === row.employee_number);
+          const leaveType = deductibleLeaveTypes.find(lt => lt.id === row.leave_type_id);
+          const isMonthly = leaveType?.accrual_method === 'monthly_non_cumulative';
+          const annualAccrual = isMonthly ? 0 : (leaveType?.max_days || 0);
+          const quarterlyAccrual = isMonthly ? 0 : Math.round((annualAccrual / 4) * 10) / 10;
+
+          return {
+            id: row.id,
+            employee_number: row.employee_number,
+            first_name: employee?.["First Name"] || '',
+            last_name: employee?.["Last Name"] || '',
+            office: employee?.Branch || employee?.Town || 'N/A',
+            leave_type_id: row.leave_type_id,
+            leave_type_name: leaveType?.name || '',
+            year: row.year,
+            month: row.month,
+            accrued_days: row.accrued_days,
+            used_days: row.used_days,
+            remaining_days: row.remaining_days,
+            last_accrual_date: row.last_accrual_date || new Date().toISOString().split('T')[0],
+            monthly_accrual: row.monthly_accrual,
+            quarterly_accrual: quarterlyAccrual,
+            annual_accrual: annualAccrual
+          };
+        });
+
+        setLeaveBalances(balances);
       } catch (err) {
         console.error('Error fetching leave balances:', err);
+        setError('Failed to load leave balances.');
       }
     };
 
     if (activeTab === 'balances') {
       fetchLeaveBalances();
     }
-  }, [activeTab]);
+  }, [activeTab, leaveTypes, employees, balancesRefreshKey]);
 
-  // Fetch leave types from Supabase
+  // Fetch leave types + their current policy from Supabase. Runs on mount
+  // (not gated behind the "types" tab) since the new-application form's leave
+  // type dropdown depends on this too. No hardcoded fallback: if this fails,
+  // the UI shows an error instead of quietly using fake defaults.
   useEffect(() => {
     const fetchLeaveTypes = async () => {
       try {
-        const { data, error } = await supabase
-          .from('leave_types')
-          .select('*')
-          .order('name');
+        const [typesResult, policiesResult] = await Promise.all([
+          supabase.from('leave_types').select('*').order('name'),
+          supabase.from('current_leave_policies').select('*'),
+        ]);
 
-        if (error) throw error;
-        if (data && data.length > 0) {
-          setLeaveTypes(data);
-        }
+        if (typesResult.error) throw typesResult.error;
+        if (policiesResult.error) throw policiesResult.error;
+
+        const policyByTypeId = new Map(
+          (policiesResult.data || []).map((p: any) => [p.leave_type_id, p])
+        );
+
+        const merged: LeaveType[] = (typesResult.data || []).map((t: any) => {
+          const policy = policyByTypeId.get(t.id);
+          return {
+            id: t.id,
+            name: t.name,
+            description: t.description || '',
+            is_deductible: t.is_deductible,
+            is_continuous: t.is_continuous,
+            icon: t.icon,
+            max_days: policy?.days_allotted ?? undefined,
+            accrual_method: policy?.accrual_method || 'none',
+            carry_forward_max_days: policy?.carry_forward_max_days ?? 0,
+          };
+        });
+
+        setLeaveTypes(merged);
+        setLeaveTypesError(null);
       } catch (err) {
-        console.error('Error fetching leave types:', err);
-        // Fallback to default types if table doesn't exist
+        console.error('Error fetching leave types/policies:', err);
+        setLeaveTypesError('Failed to load leave types. Confirm the leave_types/leave_policies migration has been applied.');
+        setLeaveTypes([]);
       }
     };
 
-    if (activeTab === 'types') {
-      fetchLeaveTypes();
-    }
-  }, [activeTab]);
+    fetchLeaveTypes();
+  }, []);
 
   // Fetch holidays from Supabase
   useEffect(() => {
@@ -1683,6 +1936,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
   useEffect(() => {
     const fetchLeaveApplications = async () => {
       setLoading(true);
+      setError(null);
       try {
         console.log('[DEBUG] Fetching applications for town:', currentTown);
 
@@ -1708,22 +1962,26 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
           throw error;
         }
 
-        // Type cast and transform the data
-        const applications = (data as LeaveApplication[]).map(app => {
+        // Type cast and transform the data. The `leave_application` table stores
+        // name/status/reason/days/type as lowercase columns (everything else is a
+        // quoted, capitalized column) - read the raw row as `any` and map explicitly
+        // rather than casting straight to LeaveApplication, which silently produced
+        // `undefined` for these fields and crashed the whole fetch on `.toLowerCase()`.
+        const applications = ((data || []) as any[]).map(app => {
           console.log('[DEBUG] Processing application:', app.id, 'with branch:', app["Office Branch"]);
           return {
             id: app.id,
             "Employee Number": app["Employee Number"],
-            "Name": app["Name"],
+            "Name": app.name,
             "Leave Type": app["Leave Type"],
             "Start Date": app["Start Date"],
             "End Date": app["End Date"],
-            "Days": app["Days"],
-            "Type": app["Type"],
+            "Days": app.days,
+            "Type": app.type,
             "Application Type": app["Application Type"],
             "Office Branch": app["Office Branch"] || 'N/A',
-            "Reason": app["Reason"],
-            "Status": app["Status"].toLowerCase() as 'pending' | 'approved' | 'rejected',
+            "Reason": app.reason,
+            "Status": (app.status || 'pending').toLowerCase() as 'pending' | 'approved' | 'rejected',
             "recstatus": app.recstatus || null,
             "time_added": app.time_added,
             "recommendation_notes": app.recommendation_notes || undefined
@@ -1759,22 +2017,25 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
           console.log('[DEBUG] Realtime update:', payload);
 
           if (!payload.new) return;
-          const application = payload.new as LeaveApplication;
+          // Raw realtime payload, not yet mapped - see the fetch above for why this
+          // can't be cast straight to LeaveApplication (name/status/reason/days/type
+          // are lowercase columns in the DB, everything else is capitalized).
+          const application = payload.new as any;
 
           if (payload.eventType === 'INSERT') {
             setLeaveApplications(prev => [{
               id: application.id,
               "Employee Number": application["Employee Number"],
-              "Name": application["Name"],
+              "Name": application.name,
               "Leave Type": application["Leave Type"],
               "Start Date": application["Start Date"],
               "End Date": application["End Date"],
-              "Days": application["Days"],
-              "Type": application["Type"],
+              "Days": application.days,
+              "Type": application.type,
               "Application Type": application["Application Type"],
               "Office Branch": application["Office Branch"] || 'N/A',
-              "Reason": application["Reason"],
-              "Status": application["Status"].toLowerCase() as 'pending' | 'approved' | 'rejected',
+              "Reason": application.reason,
+              "Status": (application.status || 'pending').toLowerCase() as 'pending' | 'approved' | 'rejected',
               "recstatus": application.recstatus || null,
               "time_added": application.time_added,
               "recommendation_notes": application.recommendation_notes
@@ -1784,10 +2045,10 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
             setLeaveApplications(prev => prev.map(app =>
               app.id === application.id ? {
                 ...app,
-                "Status": application["Status"].toLowerCase() as 'pending' | 'approved' | 'rejected',
+                "Status": (application.status || 'pending').toLowerCase() as 'pending' | 'approved' | 'rejected',
                 "recstatus": application.recstatus || null,
-                "Reason": application["Reason"],
-                "Days": application["Days"],
+                "Reason": application.reason,
+                "Days": application.days,
                 "recommendation_notes": application.recommendation_notes
               } : app
             ));
@@ -1806,16 +2067,6 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
   }, [currentTown]);
 
   // Form handlers
-  const handleAddLeaveType = () => {
-    const newType: LeaveType = {
-      ...newLeaveType as Omit<LeaveType, 'id'>,
-      id: `custom-${Date.now()}`,
-    };
-    setLeaveTypes([...leaveTypes, newType]);
-    setShowLeaveTypeForm(false);
-    setNewLeaveType({ name: '', description: '', is_deductible: true, is_continuous: true, icon: 'Sun' });
-  };
-
   const handleAddHoliday = () => {
     const newHolidayWithId: Holiday = {
       ...newHoliday as Omit<Holiday, 'id'>,
@@ -1839,20 +2090,22 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
         holidays
       );
 
+      // `leave_application` stores name/days/type/reason/status as lowercase
+      // columns (see fetchLeaveApplications above); everything else is quoted/capitalized.
       const { error } = await supabase
         .from('leave_application')
         .insert([{
           "Employee Number": newLeaveApplication["Employee Number"],
-          "Name": `${employee["First Name"]} ${employee["Last Name"]}`,
+          "name": `${employee["First Name"]} ${employee["Last Name"]}`,
           "Leave Type": newLeaveApplication["Leave Type"],
           "Start Date": newLeaveApplication["Start Date"],
           "End Date": newLeaveApplication["End Date"],
-          "Days": days,
-          "Type": newLeaveApplication["Type"],
+          "days": days,
+          "type": newLeaveApplication["Type"],
           "Application Type": newLeaveApplication["Application Type"],
           "Office Branch": employee.Branch || employee.Town || 'N/A',
-          "Reason": newLeaveApplication["Reason"],
-          "Status": newLeaveApplication["Status"],
+          "reason": newLeaveApplication["Reason"],
+          "status": newLeaveApplication["Status"],
           "recstatus": newLeaveApplication["recstatus"],
           "time_added": new Date().toISOString()
         }])
@@ -1883,32 +2136,53 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
     }
   };
 
-  const handleRunAccrual = () => {
-    const newBalances = leaveBalances.map(balance => {
-      const leaveType = leaveTypes.find(lt => lt.id === balance.leave_type_id);
-      if (leaveType?.is_deductible) {
-        return {
-          ...balance,
-          accrued_days: balance.accrued_days + accrualSettings.accrualAmount,
-          remaining_days: balance.remaining_days + accrualSettings.accrualAmount,
-          last_accrual_date: new Date().toISOString().split('T')[0]
-        };
-      }
-      return balance;
-    });
+  // Runs the real, policy-driven engine (see run_annual_leave_reset /
+  // run_monthly_leave_reset in the migration) instead of adding a flat,
+  // admin-chosen number to every balance regardless of leave type. Both are
+  // idempotent server-side, so re-running for an already-reset period is a
+  // safe no-op.
+  const handleRunAnnualReset = async () => {
+    try {
+      const { error } = await supabase.rpc('run_annual_leave_reset', { p_year: new Date().getFullYear() });
+      if (error) throw error;
+      setBalancesRefreshKey(k => k + 1);
+      setShowAccrualSettings(false);
+    } catch (err) {
+      setError('Failed to run the annual leave reset. Please try again.');
+      console.error(err);
+    }
+  };
 
-    setLeaveBalances(newBalances);
-    setShowAccrualSettings(false);
-    console.log(`Leave days accrued. Next accrual would be on ${accrualSettings.nextAccrualDate}`);
+  const handleRunMonthlyReset = async () => {
+    try {
+      const today = new Date();
+      const { error } = await supabase.rpc('run_monthly_leave_reset', {
+        p_year: today.getFullYear(),
+        p_month: today.getMonth() + 1
+      });
+      if (error) throw error;
+      setBalancesRefreshKey(k => k + 1);
+      setShowAccrualSettings(false);
+    } catch (err) {
+      setError('Failed to run the monthly leave reset. Please try again.');
+      console.error(err);
+    }
   };
 
   // Add these new form handlers for the missing tabs:
 
   // Leave Types Tab Handlers
+  // Saves both the leave_types row and its current leave_policies row
+  // (name/description/max days/accrual method/carry-forward cap/deductible/
+  // continuous/icon - see FIG-566). Writing a new leave_policies row here
+  // (rather than updating in place) is what lets a change take effect only
+  // from today onward without rewriting history - current_leave_policies
+  // always resolves to the latest effective_from <= today.
   const handleSaveLeaveType = async (type: LeaveType) => {
     try {
+      let leaveTypeId = type.id;
+
       if (type.id.startsWith('custom-')) {
-        // New type - insert
         const { data, error } = await supabase
           .from('leave_types')
           .insert([{
@@ -1916,18 +2190,13 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
             description: type.description,
             is_deductible: type.is_deductible,
             is_continuous: type.is_continuous,
-            max_days: type.max_days,
             icon: type.icon
           }])
           .select();
 
         if (error) throw error;
-
-        if (data) {
-          setLeaveTypes(prev => prev.map(t => t.id === type.id ? { ...type, id: data[0].id } : t));
-        }
+        leaveTypeId = data[0].id;
       } else {
-        // Existing type - update
         const { error } = await supabase
           .from('leave_types')
           .update({
@@ -1935,13 +2204,31 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
             description: type.description,
             is_deductible: type.is_deductible,
             is_continuous: type.is_continuous,
-            max_days: type.max_days,
             icon: type.icon
           })
           .eq('id', type.id);
 
         if (error) throw error;
       }
+
+      const { error: policyError } = await supabase
+        .from('leave_policies')
+        .upsert([{
+          leave_type_id: leaveTypeId,
+          days_allotted: type.max_days ?? null,
+          accrual_method: type.accrual_method || 'annual',
+          carry_forward_max_days: type.carry_forward_max_days ?? 0,
+          effective_from: new Date().toISOString().split('T')[0]
+        }], { onConflict: 'leave_type_id,effective_from' });
+
+      if (policyError) throw policyError;
+
+      const savedType: LeaveType = { ...type, id: leaveTypeId };
+      setLeaveTypes(prev =>
+        type.id.startsWith('custom-')
+          ? [...prev, savedType]
+          : prev.map(t => (t.id === leaveTypeId ? savedType : t))
+      );
     } catch (err) {
       setError('Failed to save leave type. Please try again.');
       console.error(err);
@@ -2051,13 +2338,19 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
           <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
             <button
               onClick={() => setShowLeaveTypeForm(true)}
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium"
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-medium"
             >
               <Plus className="w-3 h-3" />
               Add Leave Type
             </button>
           </RoleButtonWrapper>
         </div>
+        {leaveTypesError && (
+          <div className="mt-4 flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {leaveTypesError}
+          </div>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -2067,6 +2360,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
               <th className="text-left py-3 px-4 text-gray-700 font-base">Type</th>
               <th className="text-left py-3 px-4 text-gray-700 font-base">Description</th>
               <th className="text-left py-3 px-4 text-gray-700 font-base">Max Days</th>
+              <th className="text-left py-3 px-4 text-gray-700 font-base">Accrual</th>
               <th className="text-left py-3 px-4 text-gray-700 font-base">Deductible</th>
               <th className="text-left py-3 px-4 text-gray-700 font-base">Continuous</th>
               <th className="text-center py-3 px-4 text-gray-700 font-base">Actions</th>
@@ -2090,13 +2384,22 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
                   <p className="text-gray-700">{type.max_days || 'Unlimited'}</p>
                 </td>
                 <td className="py-4 px-4">
+                  <p className="text-gray-700">
+                    {type.accrual_method === 'monthly_non_cumulative' && 'Monthly (no carry-over)'}
+                    {type.accrual_method === 'annual' && (
+                      type.carry_forward_max_days ? `Annual · carries up to ${type.carry_forward_max_days}d` : 'Annual · no carry-over'
+                    )}
+                    {(!type.accrual_method || type.accrual_method === 'none') && 'None'}
+                  </p>
+                </td>
+                <td className="py-4 px-4">
                   <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full ${type.is_deductible ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                     }`}>
                     {type.is_deductible ? 'Yes' : 'No'}
                   </span>
                 </td>
                 <td className="py-4 px-4">
-                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full ${type.is_continuous ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full ${type.is_continuous ? 'bg-green-tint text-brand-dark' : 'bg-gray-100 text-gray-800'
                     }`}>
                     {type.is_continuous ? 'Yes' : 'No'}
                   </span>
@@ -2109,7 +2412,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
                           setNewLeaveType(type);
                           setShowLeaveTypeForm(true);
                         }}
-                        className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs"
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-green-tint hover:bg-brand/20 text-brand-dark rounded text-xs"
                       >
                         <Edit className="w-3 h-3" />
                         Edit
@@ -2154,7 +2457,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setShowAccrualSettings(true)}
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium"
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg text-xs font-medium"
             >
               <RefreshCw className="w-3 h-3" />
               Run Accrual
@@ -2162,7 +2465,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
             <button
               onClick={saveBalanceChanges}
               disabled={savingBalances}
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-medium disabled:opacity-50"
             >
               {savingBalances ? (
                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -2257,7 +2560,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
           <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
             <button
               onClick={() => setShowHolidayForm(true)}
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium"
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-medium"
             >
               <Plus className="w-3 h-3" />
               Add Holiday
@@ -2299,7 +2602,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
                           setNewHoliday(holiday);
                           setShowHolidayForm(true);
                         }}
-                        className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded text-xs"
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-green-tint hover:bg-brand/20 text-brand-dark rounded text-xs"
                       >
                         <Edit className="w-3 h-3" />
                         Edit
@@ -2337,61 +2640,19 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
       <div className="space-y-6">
         <div>
-          <h3 className="text-lg font-base text-gray-900 mb-4">Accrual Settings</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Accrual Interval
-                </label>
-                <select
-                  value={accrualSettings.accrualInterval}
-                  onChange={(e) => setAccrualSettings(prev => ({ ...prev, accrualInterval: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                >
-                  <option value="monthly">Monthly</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="annual">Annual</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Accrual Amount (Days)
-                </label>
-                <input
-                  type="number"
-                  value={accrualSettings.accrualAmount}
-                  onChange={(e) => setAccrualSettings(prev => ({ ...prev, accrualAmount: Number(e.target.value) }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                  min="0"
-                  step="0.5"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Next Accrual Date
-                </label>
-                <input
-                  type="date"
-                  value={accrualSettings.nextAccrualDate}
-                  onChange={(e) => setAccrualSettings(prev => ({ ...prev, nextAccrualDate: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                />
-              </div>
-
-              <button
-                onClick={handleRunAccrual}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-medium mt-6"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Run Accrual Now
-              </button>
-            </div>
-          </div>
+          <h3 className="text-lg font-base text-gray-900 mb-4">Leave Balance Resets</h3>
+          <p className="text-xs text-gray-500 mb-4">
+            Each leave type resets on its own schedule, defined per policy in the Types tab.
+            These run automatically (see the scheduled job), but can also be triggered on demand -
+            safe to click even if a period has already been reset.
+          </p>
+          <button
+            onClick={() => setShowAccrualSettings(true)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-medium"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Open Reset Controls
+          </button>
         </div>
 
         <div className="border-t border-gray-200 pt-6">
@@ -2422,155 +2683,48 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
 
 
   return (
-    <div className="p-4 space-y-6 bg-gray-50 min-h-screen max-w-screen-2xl mx-auto">
-      {/* Header Section with Town Filter */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Leave Management System</h1>
-            <p className="text-gray-600 text-xs">Manage employee leave applications, balances, and settings</p>
-            <div className="flex items-center mt-2">
-              <span className="text-xs text-gray-600 mr-2">Viewing:</span>
-              <span className="font-medium text-indigo-600 flex items-center">
-                <MapPin className="w-4 h-4 mr-1" />
-                {getDisplayName(currentTown, isArea)}
-              </span>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 w-full md:w-auto">
-            <button
-              onClick={handleRefresh}
-              className="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium border border-gray-300"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </button>
-          </div>
-        </div>
-      </div>
+    <div className="p-4 space-y-[18px] max-w-screen-2xl mx-auto">
+      <PageHeader
+        title="Leave Management System"
+        subtitle={`Manage employee leave applications, balances, and settings · Viewing: ${getDisplayName(currentTown, isArea)}`}
+        actions={
+          <Button variant="secondary" onClick={handleRefresh} icon={<RefreshCw className="w-3.5 h-3.5" />}>
+            Refresh
+          </Button>
+        }
+      />
 
       {/* Stats Cards */}
       {loading ? (
         <StatsSkeletonLoader />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-yellow-100 text-yellow-600">
-                <Clock className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-gray-600 text-xs font-base tracking-wide">Pending Applications</p>
-              <p className="text-gray-900 text-xl font-bold">{pendingApplications}</p>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-green-100 text-green-600">
-                <CheckCircle className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-gray-600 text-xs font-base tracking-wide">Approved Applications</p>
-              <p className="text-gray-900 text-xl font-bold">{approvedApplications}</p>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
-                <ThumbsUp className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-gray-600 text-xs font-base tracking-wide">Recommended</p>
-              <p className="text-gray-900 text-xl font-bold">{recommendedApplications}</p>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-orange-100 text-orange-600">
-                <ThumbsDown className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-gray-600 text-xs font-base tracking-wide">Not Recommended</p>
-              <p className="text-gray-900 text-xl font-bold">{notRecommendedApplications}</p>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-orange-100 text-orange-600">
-                <Calendar className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-gray-600 text-xs font-base tracking-wide">Leave Days Used</p>
-              <p className="text-gray-900 text-xl font-bold">{totalLeaveDaysUsed}</p>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-purple-100 text-purple-600">
-                <User className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-gray-600 text-xs font-base tracking-wide">Leave Days Remaining</p>
-              <p className="text-gray-900 text-xl font-bold">{totalLeaveDaysRemaining}</p>
-            </div>
-          </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <StatCard label="Pending Applications" value={pendingApplications} tint="orange" icon={<Clock className="w-[18px] h-[18px]" strokeWidth={1.8} />} />
+          <StatCard label="Approved Applications" value={approvedApplications} tint="green" icon={<CheckCircle className="w-[18px] h-[18px]" strokeWidth={1.8} />} />
+          <StatCard label="Recommended" value={recommendedApplications} tint="info" icon={<ThumbsUp className="w-[18px] h-[18px]" strokeWidth={1.8} />} />
+          <StatCard label="Not Recommended" value={notRecommendedApplications} tint="orange" icon={<ThumbsDown className="w-[18px] h-[18px]" strokeWidth={1.8} />} />
+          <StatCard label="Leave Days Used" value={totalLeaveDaysUsed} tint="orange" icon={<Calendar className="w-[18px] h-[18px]" strokeWidth={1.8} />} />
+          <StatCard label="Leave Days Remaining" value={totalLeaveDaysRemaining} tint="purple" icon={<User className="w-[18px] h-[18px]" strokeWidth={1.8} />} />
         </div>
       )}
 
       {/* Tabs Navigation */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="border-b border-gray-200">
-          <nav className="flex -mb-px">
-            <button
-              onClick={() => setActiveTab('applications')}
-              className={`py-4 px-6 text-center border-b-2 font-medium text-xs ${activeTab === 'applications' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-            >
-              Leave Applications
-            </button>
-            <button
-              onClick={() => setActiveTab('scheduler')}
-              className={`py-4 px-6 text-center border-b-2 font-medium text-xs ${activeTab === 'scheduler' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-            >
-              Scheduler
-            </button>
-            <button
-              onClick={() => setActiveTab('balances')}
-              className={`py-4 px-6 text-center border-b-2 font-medium text-xs ${activeTab === 'balances' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-            >
-              Leave Balances
-            </button>
-            <button
-              onClick={() => setActiveTab('types')}
-              className={`py-4 px-6 text-center border-b-2 font-medium text-xs ${activeTab === 'types' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-            >
-              Leave Types
-            </button>
-            <button
-              onClick={() => setActiveTab('holidays')}
-              className={`py-4 px-6 text-center border-b-2 font-medium text-xs ${activeTab === 'holidays' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-            >
-              Holidays
-            </button>
-            <button
-              onClick={() => setActiveTab('settings')}
-              className={`py-4 px-6 text-center border-b-2 font-medium text-xs ${activeTab === 'settings' ? 'border-green-500 text-green-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
-            >
-              Settings
-            </button>
-          </nav>
+      <Card padding="none">
+        <div className="px-3.5 pt-2.5">
+          <TabBar
+            items={[
+              { id: 'applications', label: 'Leave Applications' },
+              { id: 'scheduler', label: 'Scheduler' },
+              { id: 'balances', label: 'Leave Balances' },
+              { id: 'types', label: 'Leave Types' },
+              { id: 'holidays', label: 'Holidays' },
+              { id: 'settings', label: 'Settings' },
+            ]}
+            activeId={activeTab}
+            onChange={setActiveTab}
+          />
         </div>
-      </div>
+      </Card>
 
       {/* Content based on selected tab */}
       {activeTab === 'scheduler' && (
@@ -2593,38 +2747,32 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
       )}
 
       {activeTab === 'applications' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-4 md:p-6 border-b border-gray-200">
+        <div className="bg-white rounded-card border border-border overflow-hidden">
+          <div className="p-4 md:p-[18px] border-b border-border">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div>
-                <h2 className="text-lg font-base text-gray-900">Leave Applications</h2>
-                <p className="text-gray-600 text-xs">{leaveApplications.length} applications found</p>
+                <h2 className="text-[14px] font-bold text-ink">Leave Applications</h2>
+                <p className="text-muted-foreground text-[11px]">{leaveApplications.length} applications found</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setShowLeaveApplicationForm(true)}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-medium shadow-sm active:scale-95 transition-all"
-                >
-                  <Plus className="w-3 h-3" />
+                <Button variant="primary" onClick={() => setShowLeaveApplicationForm(true)} icon={<Plus className="w-3 h-3" />}>
                   Apply Leave
-                </button>
-                <button className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium border border-gray-300">
-                  <Filter className="w-3 h-3" />
+                </Button>
+                <Button variant="secondary" icon={<Filter className="w-3 h-3" />}>
                   Filter
-                </button>
-                <button className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium border border-gray-300">
-                  <Download className="w-3 h-3" />
+                </Button>
+                <Button variant="secondary" icon={<Download className="w-3 h-3" />}>
                   Export
-                </button>
+                </Button>
               </div>
             </div>
             {/* Actions & Status Legend */}
             <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-4 text-[10px] text-gray-500 font-medium bg-gray-50/50 p-2 rounded-xl">
               <span className="uppercase tracking-widest font-bold text-gray-400">Icon Guide:</span>
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><Eye className="w-3 h-3 text-blue-600" /> View</div>
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><Eye className="w-3 h-3 text-brand" /> View</div>
               <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><CheckCircle className="w-3 h-3 text-emerald-600" /> Approve</div>
               <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><XCircle className="w-3 h-3 text-rose-600" /> Reject</div>
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><ThumbsUp className="w-3 h-3 text-blue-600" /> Recommend</div>
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><ThumbsUp className="w-3 h-3 text-brand" /> Recommend</div>
               <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><ThumbsDown className="w-3 h-3 text-orange-600" /> Not Recommend</div>
             </div>
           </div>
@@ -2647,16 +2795,41 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
               <tbody>
                 {loading ? (
                   <TableSkeletonLoader rows={5} columns={9} />
+                ) : paginatedApplications.length === 0 ? (
+                  <tr>
+                    <td colSpan={9}>
+                      <EmptyState
+                        icon={<Calendar className="w-[18px] h-[18px]" strokeWidth={2} />}
+                        title="No leave applications found"
+                        description="Applications will appear here once submitted."
+                      />
+                    </td>
+                  </tr>
                 ) : (
-                  paginatedApplications.map((application) => (
-                    <tr key={application.id} className="border-b border-gray-50 hover:bg-emerald-50/40 transition-colors group">
+                  paginatedApplications.map((application) => {
+                    // Two-level leave approval (FIG-573): dept head must
+                    // recommend before HR/Admin can give final approval -
+                    // unless the applicant has no Leave Approver assigned,
+                    // in which case it goes straight to HR (today's
+                    // pre-existing behavior, unchanged for anyone not yet
+                    // set up in Add/Edit Employee's "Leave Approvers").
+                    const applicantEmployee = employees.find(e => e["Employee Number"] === application["Employee Number"]);
+                    const deptHeadName = applicantEmployee?.["Leave Approver"] || null;
+                    const altDeptHeadName = applicantEmployee?.["Alternate Approver"] || null;
+                    const isDeptHeadForApp = currentAuthUser?.role === 'ADMIN' ||
+                      (!!currentUserFullName && (currentUserFullName === deptHeadName || currentUserFullName === altDeptHeadName));
+                    const requiresDeptHeadApproval = !!deptHeadName;
+                    const canFinalApprove = !requiresDeptHeadApproval || application.recstatus === 'recommended';
+
+                    return (
+                    <tr key={application.id} className="border-b border-gray-50 hover:bg-primary/5 transition-colors group">
                       <td className="py-3 px-6">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 flex-shrink-0 rounded-full bg-gradient-to-br from-emerald-100 to-emerald-200 flex items-center justify-center text-emerald-700 font-bold shadow-sm ring-2 ring-white">
+                          <div className="w-9 h-9 flex-shrink-0 rounded-full bg-gradient-to-br from-primary/10 to-primary/20 flex items-center justify-center text-primary font-bold shadow-sm ring-2 ring-white">
                             {getInitials(application.Name)}
                           </div>
                           <div>
-                            <p className="text-gray-900 font-bold text-sm group-hover:text-emerald-700 transition-colors">{application.Name}</p>
+                            <p className="text-gray-900 font-bold text-sm group-hover:text-primary transition-colors">{application.Name}</p>
                             <span className="font-mono text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-500 border border-gray-200">{application["Employee Number"]}</span>
                           </div>
                         </div>
@@ -2675,7 +2848,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
                       </td>
                       <td className="py-3 px-6">
                         <div className="flex items-center gap-1.5">
-                          <div className="w-6 h-6 rounded bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">{application.Days}</div>
+                          <div className="w-6 h-6 rounded bg-primary/10 text-primary flex items-center justify-center font-bold">{application.Days}</div>
                           <span className="text-gray-500 text-[10px]">days</span>
                         </div>
                       </td>
@@ -2695,7 +2868,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
                         <div className="flex justify-center gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => setSelectedApplication(application)}
-                            className="p-1.5 bg-gray-50 hover:bg-blue-50 text-blue-600 rounded-md transition-colors shadow-sm ring-1 ring-gray-200 hover:ring-blue-200"
+                            className="p-1.5 bg-gray-50 hover:bg-green-tint text-brand rounded-md transition-colors shadow-sm ring-1 ring-gray-200 hover:ring-brand/20"
                             title="View Details"
                           >
                             <Eye className="w-4 h-4" />
@@ -2704,9 +2877,13 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
                             <>
                               <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
                                 <button
-                                  onClick={() => openStatusModal(application.id, 'approve')}
-                                  className="p-1.5 bg-gray-50 hover:bg-emerald-50 text-emerald-600 rounded-md transition-colors shadow-sm ring-1 ring-gray-200 hover:ring-emerald-200"
-                                  title="Approve"
+                                  onClick={() => canFinalApprove && openStatusModal(application.id, 'approve')}
+                                  disabled={!canFinalApprove}
+                                  className={`p-1.5 rounded-md transition-colors shadow-sm ring-1 ${canFinalApprove
+                                    ? 'bg-gray-50 hover:bg-emerald-50 text-emerald-600 ring-gray-200 hover:ring-emerald-200'
+                                    : 'bg-gray-50 text-gray-300 ring-gray-100 cursor-not-allowed'
+                                    }`}
+                                  title={canFinalApprove ? 'Approve' : `Awaiting ${deptHeadName}'s recommendation`}
                                 >
                                   <CheckCircle className="w-4 h-4" />
                                 </button>
@@ -2720,26 +2897,31 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
                                   <XCircle className="w-4 h-4" />
                                 </button>
                               </RoleButtonWrapper>
-                              <button
-                                onClick={() => openStatusModal(application.id, 'recommend')}
-                                className="p-1.5 bg-gray-50 hover:bg-blue-50 text-blue-600 rounded-md transition-colors shadow-sm ring-1 ring-gray-200 hover:ring-blue-200"
-                                title="Recommend"
-                              >
-                                <ThumbsUp className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => openStatusModal(application.id, 'not_recommend')}
-                                className="p-1.5 bg-gray-50 hover:bg-orange-50 text-orange-600 rounded-md transition-colors shadow-sm ring-1 ring-gray-200 hover:ring-orange-200"
-                                title="Not Recommend"
-                              >
-                                <ThumbsDown className="w-4 h-4" />
-                              </button>
+                              {isDeptHeadForApp && (
+                                <>
+                                  <button
+                                    onClick={() => openStatusModal(application.id, 'recommend')}
+                                    className="p-1.5 bg-gray-50 hover:bg-green-tint text-brand rounded-md transition-colors shadow-sm ring-1 ring-gray-200 hover:ring-brand/20"
+                                    title="Recommend"
+                                  >
+                                    <ThumbsUp className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => openStatusModal(application.id, 'not_recommend')}
+                                    className="p-1.5 bg-gray-50 hover:bg-orange-50 text-orange-600 rounded-md transition-colors shadow-sm ring-1 ring-gray-200 hover:ring-orange-200"
+                                    title="Not Recommend"
+                                  >
+                                    <ThumbsDown className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
                             </>
                           )}
                         </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -2821,7 +3003,6 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
           newLeaveType={newLeaveType}
           setNewLeaveType={setNewLeaveType}
           handleSaveLeaveType={handleSaveLeaveType}
-          handleAddLeaveType={handleAddLeaveType}
         />
       )}
       {showHolidayForm && (
@@ -2838,9 +3019,10 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
         <AccrualSettingsModal
           isOpen={showAccrualSettings}
           onClose={() => setShowAccrualSettings(false)}
-          accrualSettings={accrualSettings}
-          handleRunAccrual={handleRunAccrual}
+          leaveTypes={leaveTypes}
           employees={employees}
+          handleRunAnnualReset={handleRunAnnualReset}
+          handleRunMonthlyReset={handleRunMonthlyReset}
         />
       )}
 
@@ -2848,7 +3030,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
       {loading && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center">
-            <Loader2 className="w-8 h-8 text-blue-600 animate-spin mb-3" />
+            <Loader2 className="w-8 h-8 text-brand animate-spin mb-3" />
             <p className="text-gray-700">Loading data...</p>
           </div>
         </div>

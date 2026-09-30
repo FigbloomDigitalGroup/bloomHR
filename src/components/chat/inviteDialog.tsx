@@ -82,7 +82,7 @@ export function InviteDialog({
                 key={user.id}
                 className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
                   selectedUsers.includes(user.id) 
-                    ? 'bg-blue-50 border border-blue-200' 
+                    ? 'bg-green-tint border border-brand/30'
                     : 'hover:bg-gray-50'
                 }`}
                 onClick={() => toggleUserSelection(user.id)}
@@ -96,7 +96,7 @@ export function InviteDialog({
                   <div className="text-xs text-gray-500 truncate">{user.email}</div>
                 </div>
                 {selectedUsers.includes(user.id) && (
-                  <Check className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                  <Check className="h-4 w-4 text-brand flex-shrink-0" />
                 )}
               </div>
             ))}
@@ -115,7 +115,7 @@ export function InviteDialog({
             <Button 
               onClick={handleInvite} 
               disabled={selectedUsers.length === 0}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-brand hover:bg-brand-dark"
             >
               Invite Users
             </Button>

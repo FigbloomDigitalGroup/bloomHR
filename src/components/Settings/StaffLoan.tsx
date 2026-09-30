@@ -125,19 +125,19 @@ const LoanRequestsAdmin = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="md:col-span-1 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[2.5rem] p-8 text-white shadow-xl shadow-indigo-100 relative overflow-hidden group"
+          className="md:col-span-1 bg-primary rounded-[2.5rem] p-8 text-white shadow-xl shadow-primary/20 relative overflow-hidden group"
         >
           <div className="relative z-10 space-y-6">
             <div className="space-y-1">
               <h2 className="text-2xl font-black tracking-tight italic uppercase">Loan Registry</h2>
-              <p className="text-indigo-100 text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Credit Governance Node</p>
+              <p className="text-primary-foreground/70 text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Credit Governance Node</p>
             </div>
 
             <div className="flex items-center gap-3">
               <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
-                <Wallet className="w-5 h-5 text-indigo-300" />
+                <Wallet className="w-5 h-5 text-primary-foreground/80" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-indigo-100 italic">Disbursement Console</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-primary-foreground/70 italic">Disbursement Console</span>
             </div>
 
             <div className="flex flex-col gap-2 pt-4">
@@ -159,7 +159,7 @@ const LoanRequestsAdmin = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="space-y-4 col-span-1 md:col-span-2">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                <div className="p-2 bg-primary/10 text-primary rounded-lg">
                   <ShieldCheck className="w-4 h-4" />
                 </div>
                 <h3 className="text-lg font-black text-gray-900 uppercase italic">Credit Verification Matrix</h3>
@@ -173,11 +173,11 @@ const LoanRequestsAdmin = () => {
               <div className="flex flex-wrap items-center gap-3 justify-end">
                 <div className="p-4 bg-gray-50 rounded-[1.5rem] border border-gray-100 flex flex-col items-end">
                   <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Aggregate Exposure</span>
-                  <span className="text-lg font-black text-indigo-600 italic">
+                  <span className="text-lg font-black text-primary italic">
                     {formatKES(loans.filter(l => l.status === 'Approved').reduce((acc, curr) => acc + (Number(curr["Loan Amount"]) || 0), 0))}
                   </span>
                 </div>
-                <button onClick={fetchLoans} className="p-4 bg-indigo-600 text-white rounded-[1.5rem] shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
+                <button onClick={fetchLoans} className="p-4 bg-primary text-white rounded-[1.5rem] shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all">
                   <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
                 </button>
               </div>
@@ -196,7 +196,7 @@ const LoanRequestsAdmin = () => {
               placeholder="SEARCH BY EMPLOYEE OR BRANCH..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-14 pr-6 py-4 bg-white border border-gray-100 rounded-[2rem] text-[10px] font-black uppercase tracking-widest focus:ring-4 focus:ring-indigo-100 transition-all font-mono shadow-sm"
+              className="w-full pl-14 pr-6 py-4 bg-white border border-gray-100 rounded-[2rem] text-[10px] font-black uppercase tracking-widest focus:ring-4 focus:ring-primary/20 transition-all font-mono shadow-sm"
             />
           </div>
           <div className="flex items-center gap-3">
@@ -222,15 +222,15 @@ const LoanRequestsAdmin = () => {
                   key={loan.id}
                   layout
                   onClick={() => setSelectedLoan(loan)}
-                  className="hover:bg-indigo-50/30 transition-all group cursor-pointer"
+                  className="hover:bg-primary/5 transition-all group cursor-pointer"
                 >
                   <td className="px-10 py-8">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black shadow-lg shadow-indigo-100">
+                      <div className="w-12 h-12 rounded-2xl bg-primary text-white flex items-center justify-center font-black shadow-lg shadow-primary/20">
                         {loan["Full Name"][0]}
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-sm font-black text-gray-900 group-hover:text-indigo-600 transition-colors uppercase italic">{loan["Full Name"]}</span>
+                        <span className="text-sm font-black text-gray-900 group-hover:text-primary transition-colors uppercase italic">{loan["Full Name"]}</span>
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{loan["Employee Number"]} • {loan["Office Branch"]}</span>
                       </div>
                     </div>
@@ -255,7 +255,7 @@ const LoanRequestsAdmin = () => {
                   <td className="px-10 py-8">
                     <div className="flex items-center gap-3">
                       <div className="p-3 bg-white rounded-xl border border-gray-100 shadow-sm opacity-0 group-hover:opacity-100 transition-all">
-                        <ArrowUpRight className="w-4 h-4 text-indigo-600" />
+                        <ArrowUpRight className="w-4 h-4 text-primary" />
                       </div>
                     </div>
                   </td>
@@ -319,7 +319,7 @@ const LoanRequestsAdmin = () => {
                         type="number"
                         defaultValue={selectedLoan["Loan Amount"]}
                         onBlur={(e) => handleLoanAmountSave(selectedLoan.id, e.target.value)}
-                        className="w-full p-8 bg-gray-900 rounded-[2.5rem] text-2xl font-black text-indigo-400 shadow-inner focus:ring-4 focus:ring-indigo-100 transition-all font-mono"
+                        className="w-full p-8 bg-gray-900 rounded-[2.5rem] text-2xl font-black text-primary-foreground/90 shadow-inner focus:ring-4 focus:ring-primary/20 transition-all font-mono"
                       />
                       <p className="absolute bottom-4 right-8 text-[10px] font-black text-white/20 uppercase tracking-widest">KES Scalar</p>
                     </div>
@@ -334,7 +334,7 @@ const LoanRequestsAdmin = () => {
 
                 <div className="space-y-6 pt-10 border-t border-gray-100">
                   <div className="flex items-center gap-3">
-                    <Activity className="w-5 h-5 text-indigo-600" />
+                    <Activity className="w-5 h-5 text-primary" />
                     <h4 className="text-xl font-black text-gray-900 italic uppercase">Audit Action Center</h4>
                   </div>
 
@@ -344,14 +344,14 @@ const LoanRequestsAdmin = () => {
                       value={notes[selectedLoan.id] || ''}
                       onChange={(e) => setNotes(p => ({ ...p, [selectedLoan.id]: e.target.value }))}
                       rows={3}
-                      className="w-full p-6 bg-gray-50 border-none rounded-[2rem] text-[10px] font-black uppercase tracking-widest focus:ring-4 focus:ring-indigo-100 transition-all resize-none shadow-inner"
+                      className="w-full p-6 bg-gray-50 border-none rounded-[2rem] text-[10px] font-black uppercase tracking-widest focus:ring-4 focus:ring-primary/20 transition-all resize-none shadow-inner"
                       placeholder="DOCUMENT AUDIT FINDINGS..."
                     />
                   </div>
 
                   {(!selectedLoan["status"] || selectedLoan["status"].toLowerCase() === 'pending') && (
                     <div className="flex gap-4 pt-4">
-                      <button onClick={() => handleStatusUpdate(selectedLoan.id, 'Approved')} className="flex-1 py-5 bg-indigo-600 text-white rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 transition-all hover:bg-indigo-700">Authorize Disbursement</button>
+                      <button onClick={() => handleStatusUpdate(selectedLoan.id, 'Approved')} className="flex-1 py-5 bg-primary text-white rounded-[2rem] text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-primary/20 transition-all hover:bg-primary/90">Authorize Disbursement</button>
                       <button onClick={() => handleStatusUpdate(selectedLoan.id, 'Rejected')} className="px-10 py-5 bg-white border border-red-100 text-[10px] font-black uppercase tracking-[0.2em] text-red-500 rounded-[2rem] transition-all hover:bg-red-50">Revoke Request</button>
                     </div>
                   )}

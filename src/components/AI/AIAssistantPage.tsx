@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { queryDeepSeek } from '../../services/deepseek'
 import { supabase } from '../../lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, User, Cpu, Database, Users, Activity, Sparkles, Bot, BarChart2, MapPin } from 'lucide-react'
+import { Send, User, Cpu, Database, Users, Activity, Bot, BarChart2, Wand2 } from 'lucide-react'
 import { TownProps } from '../../types/supabase'
 
 interface AreaTownMapping {
@@ -27,8 +27,8 @@ const formatAIResponse = (content: string) => {
     .replace(/\*(.*?)\*/gim, '<em class="italic text-gray-700">$1</em>')
     
     // Lists
-    .replace(/^\* (.*$)/gim, '<li class="flex items-start mb-1"><span class="text-blue-500 mr-2 mt-1">•</span><span>$1</span></li>')
-    .replace(/^- (.*$)/gim, '<li class="flex items-start mb-1"><span class="text-blue-500 mr-2 mt-1">-</span><span>$1</span></li>')
+    .replace(/^\* (.*$)/gim, '<li class="flex items-start mb-1"><span class="text-brand mr-2 mt-1">•</span><span>$1</span></li>')
+    .replace(/^- (.*$)/gim, '<li class="flex items-start mb-1"><span class="text-brand mr-2 mt-1">-</span><span>$1</span></li>')
     .replace(/(<li.*?<\/li>)/gims, '<ul class="space-y-2 my-3">$1</ul>')
     
     // Code blocks
@@ -38,7 +38,7 @@ const formatAIResponse = (content: string) => {
     .replace(/\n/g, '<br>')
     
     // Sections with cards
-    .replace(/\[card\](.*?)\[\/card\]/gims, '<div class="bg-blue-50 border border-blue-200 rounded-xl p-4 my-3">$1</div>')
+    .replace(/\[card\](.*?)\[\/card\]/gims, '<div class="bg-green-tint border border-brand/20 rounded-xl p-4 my-3">$1</div>')
     
     // Highlights
     .replace(/\[highlight\](.*?)\[\/highlight\]/gims, '<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 my-2">$1</div>');
@@ -373,101 +373,78 @@ export const AIAssistantPage = ({ selectedTown, onTownChange }: TownProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 p-4 md:p-8">
+    <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <motion.header 
+        <motion.header
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4"
+          className="mb-5 flex items-center justify-between gap-4"
         >
-          <div>
-            <h1 className="text-4xl font-bold text-gray-800 flex items-center gap-4">
-              <div className="p-3  rounded-xl text-blue-600 border border-blue-200">
-                <img
-                  src="/avatars.png"
-                  alt="Avatar"
-                  className="w-10 h-10 object-cover rounded-full"
-                />
-              </div>
-              <span className="text-lg bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
-                HR AI Assistant
-              </span>
-            </h1>
-            <p className="text-gray-600 mt-2 max-w-lg text-xs">
-              AI-powered workforce analytics and insights for{" "}
-              <span className="font-medium text-blue-600 flex items-center mt-1">
-                <MapPin className="w-4 h-4 mr-1" />
-                {getTownDisplayName()}
-              </span>
-            </p>
+          <div className="flex items-center gap-3.5">
+            <div className="w-[52px] h-[52px] rounded-tile bg-gradient-to-br from-brand to-brand-dark flex items-center justify-center text-white flex-shrink-0">
+              <Wand2 className="w-6 h-6" strokeWidth={1.8} />
+            </div>
+            <div>
+              <div className="text-[16px] font-bold text-brand">HR AI Assistant</div>
+              <p className="text-xs text-muted-foreground">
+                AI-powered workforce analytics and insights for{' '}
+                <span className="font-semibold text-brand">{getTownDisplayName()}</span>
+              </p>
+            </div>
           </div>
-          
-          <motion.div 
+
+          <motion.div
             whileHover={{ scale: 1.02 }}
-            className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-full px-4 py-2"
+            className="flex items-center gap-1.5 bg-orange-tint border border-orange/20 rounded-tile px-4 py-2.5 flex-shrink-0"
           >
-            <Sparkles className="w-5 h-5 text-blue-500" />
-            <span className="text-xs font-medium text-blue-700">AI Assistant</span>
+            <Wand2 className="w-3.5 h-3.5 text-orange-text" />
+            <span className="text-[12.5px] font-bold text-orange-text">AI Assistant</span>
           </motion.div>
         </motion.header>
 
         {/* HR Summary Cards */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
+          className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5"
         >
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
-                <Users className="w-6 h-6" />
-              </div>
-              <h6 className="font-medium text-gray-700">Total Employees</h6>
+          <div className="bg-white border border-border rounded-card p-[18px] flex items-center gap-3">
+            <div className="w-10 h-10 rounded-tile bg-status-info-tint text-status-info flex items-center justify-center flex-shrink-0">
+              <Users className="w-[18px] h-[18px]" strokeWidth={1.8} />
             </div>
-            <p className="text-4xl font-bold text-gray-900">
-              {filteredEmployees.length}
-              <span className="text-xs font-normal ml-2 text-gray-500">
-                {getTownContext()}
-              </span>
-            </p>
-          </motion.div>
+            <div>
+              <div className="text-[11.5px] font-semibold text-muted-foreground">Total Employees</div>
+              <div className="text-xl font-bold text-ink">
+                {filteredEmployees.length} <span className="text-[11px] font-medium text-subtle">{getTownContext()}</span>
+              </div>
+            </div>
+          </div>
 
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-green-100 rounded-lg text-green-600">
-                <Activity className="w-6 h-6" />
-              </div>
-              <h6 className="font-medium text-gray-700">Active Employees</h6>
+          <div className="bg-white border border-border rounded-card p-[18px] flex items-center gap-3">
+            <div className="w-10 h-10 rounded-tile bg-green-tint text-brand flex items-center justify-center flex-shrink-0">
+              <Activity className="w-[18px] h-[18px]" strokeWidth={1.8} />
             </div>
-            <p className="text-4xl font-bold text-gray-900">
-              {activeEmployees}
-              <span className="text-xs font-normal ml-2 text-gray-500">active</span>
-            </p>
-          </motion.div>
+            <div>
+              <div className="text-[11.5px] font-semibold text-muted-foreground">Active Employees</div>
+              <div className="text-xl font-bold text-ink">
+                {activeEmployees} <span className="text-[11px] font-medium text-subtle">active</span>
+              </div>
+            </div>
+          </div>
 
-          <motion.div 
-            whileHover={{ y: -5 }}
-            className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all"
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-purple-100 rounded-lg text-purple-600">
-                <BarChart2 className="w-6 h-6" />
-              </div>
-              <h6 className="font-medium text-gray-700">Avg. Tenure</h6>
+          <div className="bg-white border border-border rounded-card p-[18px] flex items-center gap-3">
+            <div className="w-10 h-10 rounded-tile bg-orange-tint text-orange-text flex items-center justify-center flex-shrink-0">
+              <BarChart2 className="w-[18px] h-[18px]" strokeWidth={1.8} />
             </div>
-            <p className="text-4xl font-bold text-gray-900">
-              {avgTenure ? avgTenure.toFixed(1) : '--'}
-              <span className="text-xs font-normal ml-2 text-gray-500">years</span>
-            </p>
-          </motion.div>
+            <div>
+              <div className="text-[11.5px] font-semibold text-muted-foreground">Avg. Tenure</div>
+              <div className="text-xl font-bold text-ink">
+                {avgTenure ? avgTenure.toFixed(1) : '--'} <span className="text-[11px] font-medium text-subtle">years</span>
+              </div>
+            </div>
+          </div>
         </motion.div>
 
         {/* Chat Interface */}
@@ -475,7 +452,7 @@ export const AIAssistantPage = ({ selectedTown, onTownChange }: TownProps) => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-lg"
+          className="bg-white rounded-card overflow-hidden border border-border"
         >
           {/* Messages */}
           <div 
@@ -494,9 +471,9 @@ export const AIAssistantPage = ({ selectedTown, onTownChange }: TownProps) => {
                     transition={{ duration: 0.3 }}
                     className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
-                    <div className={`max-w-[80%] rounded-2xl p-5 ${msg.role === 'user' 
-                      ? 'bg-gradient-to-br from-blue-600 to-blue-500 text-white rounded-br-none' 
-                      : 'bg-gray-100 text-gray-800 rounded-bl-none border border-gray-200'}`}
+                    <div className={`max-w-[80%] rounded-2xl p-5 ${msg.role === 'user'
+                      ? 'bg-brand text-white rounded-br-none'
+                      : 'bg-background text-ink rounded-bl-none border border-border'}`}
                     >
                       <div className="flex items-center gap-3 mb-2">
                         {msg.role === 'user' ? (
@@ -504,12 +481,8 @@ export const AIAssistantPage = ({ selectedTown, onTownChange }: TownProps) => {
                             <User className="w-4 h-4" />
                           </div>
                         ) : (
-                          <div className="p-1.5 bg-blue-500/20 rounded-full">
-                            <img
-                              src="/avatars.png"
-                              alt="Avatar"
-                              className="w-10 h-10 object-cover rounded-full"
-                            />
+                          <div className="w-[30px] h-[30px] rounded-full bg-brand text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0">
+                            HR
                           </div>
                         )}
                         <span className="text-xs font-medium">
@@ -535,21 +508,17 @@ export const AIAssistantPage = ({ selectedTown, onTownChange }: TownProps) => {
                   animate={{ opacity: 1 }}
                   className="flex justify-start"
                 >
-                  <div className="bg-gray-100 text-gray-800 rounded-2xl rounded-bl-none p-5 max-w-[80%] border border-gray-200">
+                  <div className="bg-background text-ink rounded-2xl rounded-bl-none p-5 max-w-[80%] border border-border">
                     <div className="flex items-center gap-3">
-                      <div className="p-1.5 bg-blue-500/20 rounded-full">
-                       <img
-                  src="/avatars.png"
-                  alt="Avatar"
-                  className="w-10 h-10 object-cover rounded-full"
-                />
+                      <div className="w-[30px] h-[30px] rounded-full bg-brand text-white flex items-center justify-center text-[11px] font-bold flex-shrink-0">
+                        HR
                       </div>
                       <span className="text-xs font-medium">HR Assistant</span>
                     </div>
                     <div className="mt-3 flex space-x-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '200ms' }} />
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{ animationDelay: '400ms' }} />
+                      <div className="w-2 h-2 bg-brand rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
+                      <div className="w-2 h-2 bg-brand rounded-full animate-pulse" style={{ animationDelay: '200ms' }} />
+                      <div className="w-2 h-2 bg-brand rounded-full animate-pulse" style={{ animationDelay: '400ms' }} />
                     </div>
                   </div>
                 </motion.div>
@@ -573,7 +542,7 @@ export const AIAssistantPage = ({ selectedTown, onTownChange }: TownProps) => {
                 type="text"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                className="flex-1 bg-white border border-gray-300 rounded-xl px-5 py-3.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 placeholder-gray-400 text-xs"
+                className="flex-1 bg-white border border-gray-300 rounded-xl px-5 py-3.5 focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent text-gray-800 placeholder-gray-400 text-xs"
                 placeholder="Ask about your HR data (e.g. 'Show turnover trends')"
                 disabled={loading}
               />
@@ -582,7 +551,7 @@ export const AIAssistantPage = ({ selectedTown, onTownChange }: TownProps) => {
                 disabled={loading || !message.trim()}
                 whileTap={{ scale: 0.95 }}
                 whileHover={{ scale: 1.05 }}
-                className="p-3.5 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl hover:from-blue-400 hover:to-blue-500 disabled:opacity-50 transition-all flex items-center justify-center shadow-md shadow-blue-500/30"
+                className="p-3.5 bg-brand text-white rounded-xl hover:bg-brand-dark disabled:opacity-50 transition-all flex items-center justify-center shadow-md shadow-brand/30"
               >
                 <Send className="w-5 h-5" />
               </motion.button>

@@ -99,7 +99,7 @@ export function MessageList({ messages, channel }: MessageListProps) {
                         <EmployeeProfile employee={message.author as any}>
                           <Avatar className="h-10 w-10 ring-2 ring-white shadow-sm cursor-pointer">
                             <AvatarImage src={message.author.avatar} />
-                            <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                            <AvatarFallback className="bg-brand text-white">
                               {message.author.initials}
                             </AvatarFallback>
                           </Avatar>
@@ -122,7 +122,7 @@ export function MessageList({ messages, channel }: MessageListProps) {
                           </span>
                           {/* Town Display - Added Here */}
                           {message.author.town && message.author.town !== 'Unknown' && (
-                            <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                            <span className="text-xs text-brand bg-green-tint px-2 py-0.5 rounded-full border border-brand/20">
                               📍 {message.author.town}
                             </span>
                           )}
@@ -199,7 +199,7 @@ export function MessageList({ messages, channel }: MessageListProps) {
         
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-full bg-green-tint flex items-center justify-center mb-4">
               <MessageSquare className="h-8 w-8 text-gray-400" />
             </div>
             <div className="text-lg font-semibold mb-2">No messages yet</div>

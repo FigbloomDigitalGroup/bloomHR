@@ -139,7 +139,7 @@ router.post("/send", async (req, res) => {
 
         // 2. Send via cPanel (SMTP)
         let mailOptions = {
-            from: process.env.SMTP_FROM || `"Zira HR" <${process.env.SMTP_USER}>`,
+            from: process.env.SMTP_FROM || `"Figbloom HR" <${process.env.SMTP_USER}>`,
             to,
             subject,
             html,
@@ -151,13 +151,18 @@ router.post("/send", async (req, res) => {
         };
 
         if (provider === 'cpanel') {
-            const cpanelUser = req.body.cpanelUser || "support@mularcredit.com";
-            const cpanelPass = "5q{%i1B&C+=CgVfG";
+            const cpanelUser = req.body.cpanelUser || process.env.CPANEL_USER;
+            const cpanelPass = process.env.CPANEL_PASSWORD;
+            const cpanelHost = process.env.CPANEL_HOST;
 
-            console.log(`🔌 Attempting cPanel SMTP with user: '${cpanelUser}' and host: mail.mularcredit.com`);
+            if (!cpanelUser || !cpanelPass || !cpanelHost) {
+                return res.status(500).json({ error: 'cPanel email is not configured (CPANEL_USER/CPANEL_PASSWORD/CPANEL_HOST env vars missing)' });
+            }
+
+            console.log(`🔌 Attempting cPanel SMTP with user: '${cpanelUser}' and host: ${cpanelHost}`);
 
             const cpanelTransporter = nodemailer.createTransport({
-                host: "mail.mularcredit.com",
+                host: cpanelHost,
                 port: 465,
                 secure: true,
                 auth: {

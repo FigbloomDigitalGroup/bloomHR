@@ -65,7 +65,7 @@ export function ChatArea({ channel, messages, onSendMessage, onToggleMute, emplo
             <SidebarTrigger />
             <div className="flex items-center gap-3">
               {channel.type === 'channel' ? (
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-lg bg-brand flex items-center justify-center">
                   <Hash className="h-5 w-5 text-white" />
                 </div>
               ) : (
@@ -103,10 +103,10 @@ export function ChatArea({ channel, messages, onSendMessage, onToggleMute, emplo
           <div className="flex items-center gap-1">
             {channel.type === 'direct_message' && (
               <>
-                <Button variant="ghost" size="icon" onClick={handleVoiceCall} className="text-gray-500 hover:text-blue-600 hover:bg-blue-50">
+                <Button variant="ghost" size="icon" onClick={handleVoiceCall} className="text-gray-500 hover:text-brand hover:bg-green-tint">
                   <Phone className="h-5 w-5" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={handleVideoCall} className="text-gray-500 hover:text-blue-600 hover:bg-blue-50">
+                <Button variant="ghost" size="icon" onClick={handleVideoCall} className="text-gray-500 hover:text-brand hover:bg-green-tint">
                   <Video className="h-5 w-5" />
                 </Button>
               </>
@@ -118,7 +118,7 @@ export function ChatArea({ channel, messages, onSendMessage, onToggleMute, emplo
               <Search className="h-5 w-5" />
             </Button>
             {channel.type === 'channel' && (
-              <Button variant="ghost" size="icon" onClick={handleShowUsers} className="text-gray-500 hover:text-purple-600 hover:bg-purple-50">
+              <Button variant="ghost" size="icon" onClick={handleShowUsers} className="text-gray-500 hover:text-brand hover:bg-green-tint">
                 <Users className="h-5 w-5" />
               </Button>
             )}

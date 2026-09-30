@@ -3,43 +3,51 @@
 @tailwind utilities;
 
 :root {
-  /* SkillAlley - Periwinkle Blue */
-  --background: 240 20% 98%;
-  /* Soft Off-White */
-  --foreground: 224 71% 4%;
+  /* Figbloom brand — forest green + orange (see figbloom-schools/packages/shared/src/tokens.ts) */
+  --background: 120 12% 97%;
+  /* surface.page #F6F8F6 */
+  --foreground: 144 19% 11%;
+  /* surface.ink #16201A */
 
   --card: 0 0% 100%;
-  --card-foreground: 224 71% 4%;
+  --card-foreground: 144 19% 11%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 224 71% 4%;
+  --popover-foreground: 144 19% 11%;
 
-  /* Primary - Periwinkle Blue */
-  --primary: 248 57% 60%;
+  /* Primary - Figbloom forest */
+  --primary: 148 47% 17%;
+  /* brand.forest #17402A */
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 240 5% 96%;
-  --secondary-foreground: 240 6% 10%;
+  --secondary: 135 17% 95%;
+  /* surface.sunken #F1F5F2 */
+  --secondary-foreground: 144 19% 11%;
 
-  --muted: 240 5% 96%;
-  --muted-foreground: 240 4% 46%;
+  --muted: 120 10% 94%;
+  /* status.mutedBg #EEF1EE */
+  --muted-foreground: 135 6% 40%;
+  /* status.mutedInk #5F6B62 */
 
-  --accent: 240 5% 96%;
-  --accent-foreground: 240 6% 10%;
+  --accent: 26 84% 95%;
+  /* brand.orangeSoft #FDF1E8 */
+  --accent-foreground: 24 89% 29%;
+  /* brand.orangeInk #8A3D08 */
 
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
 
-  --border: 240 6% 90%;
-  --input: 240 6% 90%;
-  --ring: 248 57% 60%;
+  --border: 120 7% 89%;
+  /* surface.line #E2E6E2 */
+  --input: 120 7% 89%;
+  --ring: 148 47% 17%;
 
   --radius: 1.5rem;
 }
 
 body {
-  font-family: "Avenir Next", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  background: #F5F5FA;
+  font-family: "Figtree", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background: #F6F8F6;
   color: hsl(var(--foreground));
   overflow-x: hidden;
 }
@@ -80,7 +88,7 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: "Avenir Next", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-family: "Figtree", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
   letter-spacing: -0.025em;
   font-weight: 600;
 }

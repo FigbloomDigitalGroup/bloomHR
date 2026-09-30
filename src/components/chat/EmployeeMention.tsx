@@ -124,7 +124,7 @@ export function MentionPopover({
               key={employee.id}
               className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
                 index === selectedIndex 
-                  ? 'bg-blue-50 border border-blue-200' 
+                  ? 'bg-green-tint border border-brand/30'
                   : 'hover:bg-gray-50'
               }`}
               onClick={() => onSelect(employee)}

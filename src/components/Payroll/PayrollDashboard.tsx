@@ -436,7 +436,7 @@ const PendingPaymentCard = ({
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
           <p className="text-xs text-gray-600">Total Amount</p>
-          <p className="font-bold text-lg text-green-600">
+          <p className="font-bold text-lg text-primary">
             KSh {totalAmount.toLocaleString()}
           </p>
         </div>
@@ -478,7 +478,7 @@ const PendingPaymentCard = ({
           <>
             <button
               onClick={() => onApprove(payment)}
-              className="flex-1 px-3 py-2 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 flex items-center justify-center gap-2"
+              className="flex-1 px-3 py-2 text-xs font-medium text-white bg-primary rounded-md hover:bg-primary/90 flex items-center justify-center gap-2"
             >
               <CheckCircle className="w-4 h-4" />
               Approve
@@ -551,7 +551,7 @@ const PaymentDetailsModal = ({
               </div>
               <div>
                 <p className="text-xs text-gray-600">Total Amount</p>
-                <p className="font-semibold text-green-600">
+                <p className="font-semibold text-primary">
                   KSh {totalAmount.toLocaleString()}
                 </p>
               </div>
@@ -695,7 +695,7 @@ const PaymentDetailsModal = ({
             <div className="flex gap-3 pt-4 border-t border-gray-200">
               <button
                 onClick={() => onApprove(payment)}
-                className="flex-1 px-4 py-3 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-3 text-xs font-medium text-white bg-primary rounded-lg hover:bg-primary/90 flex items-center justify-center gap-2"
               >
                 <CheckCircle className="w-4 h-4" />
                 Approve Payment
@@ -820,7 +820,7 @@ const MpesaSinglePaymentModal = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-md w-full p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-          <Smartphone className="h-5 w-5 text-green-600" />
+          <Smartphone className="h-5 w-5 text-primary" />
           {userRole === "maker"
             ? "Create Payment Request"
             : "Confirm M-PESA Payment"}
@@ -854,7 +854,7 @@ const MpesaSinglePaymentModal = ({
               onChange={(e) => setJustification(e.target.value)}
               placeholder="Please provide a justification for this payment request..."
               rows={3}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
             />
           </div>
         )}
@@ -883,7 +883,7 @@ const MpesaSinglePaymentModal = ({
           </button>
           <button
             onClick={handlePayment}
-            className="px-4 py-2 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 flex items-center gap-2"
+            className="px-4 py-2 text-xs font-medium text-white bg-primary rounded-md hover:bg-primary/90 flex items-center gap-2"
             disabled={
               isProcessing || (userRole === "maker" && !justification.trim())
             }
@@ -999,7 +999,7 @@ const MpesaBulkPaymentModal = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-          <Users className="h-5 w-5 text-green-600" />
+          <Users className="h-5 w-5 text-primary" />
           {userRole === "maker"
             ? "Create Bulk Payment Request"
             : "Confirm M-PESA Bulk Payment"}
@@ -1030,7 +1030,7 @@ const MpesaBulkPaymentModal = ({
           <div className="mt-3 border-t pt-3">
             <div className="flex justify-between text-xs">
               <span className="font-medium">Total Amount:</span>
-              <span className="font-bold text-green-700">
+              <span className="font-bold text-primary">
                 KSh {calculateTotalAmount().toLocaleString()}
               </span>
             </div>
@@ -1047,7 +1047,7 @@ const MpesaBulkPaymentModal = ({
               onChange={(e) => setJustification(e.target.value)}
               placeholder="Please provide a justification for this bulk payment request..."
               rows={3}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
             />
           </div>
         )}
@@ -1074,7 +1074,7 @@ const MpesaBulkPaymentModal = ({
             placeholder="Search employees..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 pr-4 py-2 border border-gray-300 rounded-md text-xs w-full focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500"
+            className="pl-10 pr-4 py-2 border border-gray-300 rounded-md text-xs w-full focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
           />
         </div>
 
@@ -1091,7 +1091,7 @@ const MpesaBulkPaymentModal = ({
                     type="checkbox"
                     checked={selectedStaff[emp.employee_id] || false}
                     onChange={() => toggleStaffSelection(emp.employee_id)}
-                    className="mr-2 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                    className="mr-2 h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                   />
                   <div>
                     <div
@@ -1132,7 +1132,7 @@ const MpesaBulkPaymentModal = ({
           </button>
           <button
             onClick={handleBulkPayment}
-            className="px-4 py-2 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 flex items-center gap-2"
+            className="px-4 py-2 text-xs font-medium text-white bg-primary rounded-md hover:bg-primary/90 flex items-center gap-2"
             disabled={
               isProcessing ||
               getSelectedStaffCount() === 0 ||
@@ -1619,7 +1619,7 @@ const ExportModal = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-md w-full p-6">
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-          <Download className="h-5 w-5 text-green-600" />
+          <Download className="h-5 w-5 text-primary" />
           Export Payroll Data
         </h3>
 
@@ -1680,7 +1680,7 @@ const ExportModal = ({
           </button>
           <button
             onClick={handleExport}
-            className="px-4 py-2 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700 flex items-center gap-2"
+            className="px-4 py-2 text-xs font-medium text-white bg-primary rounded-md hover:bg-primary/90 flex items-center gap-2"
             disabled={isExporting}
           >
             {isExporting ? (
@@ -1727,7 +1727,7 @@ const GlowButtonss = ({
   };
   const variantClasses = {
     primary:
-      "bg-green-50 border-green-500 text-green-600 hover:bg-green-100 hover:border-green-600 hover:text-green-700 transition-all duration-300",
+      "bg-primary/10 border-primary text-primary hover:bg-primary/20 hover:border-primary hover:text-primary transition-all duration-300",
     secondary:
       "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-300",
     danger:
@@ -1761,7 +1761,7 @@ const SummaryCard = ({
   isCount?: boolean;
 }) => {
   const colorClasses = {
-    emerald: "bg-emerald-100 text-xs text-emerald-600",
+    emerald: "bg-primary/10 text-xs text-primary",
     red: "bg-red-100 text-xs text-red-600",
     blue: "bg-blue-100 text-xs text-blue-600",
     purple: "bg-purple-100 text-xs text-purple-600",
@@ -1807,7 +1807,7 @@ const StatutoryCard = ({
   const colorClasses = {
     red: "bg-red-100 text-red-600",
     blue: "bg-blue-100 text-blue-600",
-    green: "bg-green-100 text-green-600",
+    green: "bg-primary/10 text-primary",
     yellow: "bg-yellow-100 text-yellow-600",
     purple: "bg-purple-100 text-purple-600",
   };
@@ -2305,7 +2305,7 @@ const Pagination = ({
                 key={page}
                 onClick={() => onPageChange(page)}
                 className={`relative inline-flex items-center px-4 py-2 text-xs font-semibold ${currentPage === page
-                  ? "z-10 bg-green-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
+                  ? "z-10 bg-primary text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                   : "text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0"
                   }`}
               >
@@ -2618,13 +2618,13 @@ const StatutoryOverrideToggle = ({
       <div className="flex items-center gap-2">
         <button
           onClick={onToggle}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isEnabled ? "bg-green-500" : "bg-gray-300"}`}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isEnabled ? "bg-primary" : "bg-gray-300"}`}
         >
           <span
             className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isEnabled ? "translate-x-6" : "translate-x-1"}`}
           />
         </button>
-        <span className={`text-sm font-medium ${isEnabled ? "text-green-700" : "text-gray-700"}`}>
+        <span className={`text-sm font-medium ${isEnabled ? "text-primary" : "text-gray-700"}`}>
           Statutory Override
         </span>
       </div>
@@ -4002,7 +4002,7 @@ export default function PayrollDashboard() {
     return (
       <div className="p-4 bg-gray-50 min-h-screen max-w-screen-2xl mx-auto flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-gray-600">
             {settingsLoading
               ? "Loading statutory settings..."
@@ -4038,7 +4038,7 @@ export default function PayrollDashboard() {
                   <>
                     <button
                       onClick={handleBulkApprove}
-                      className="px-4 py-1.5 text-xs font-medium text-white bg-green-600 rounded-[25px] hover:bg-green-700 flex items-center gap-2 transition-colors"
+                      className="px-4 py-1.5 text-xs font-medium text-white bg-primary rounded-[25px] hover:bg-primary/90 flex items-center gap-2 transition-colors"
                       disabled={isLoadingRequests}
                     >
                       <CheckCircle className="w-4 h-4" />
@@ -4365,14 +4365,14 @@ export default function PayrollDashboard() {
             dateFormat="MMMM yyyy"
             showMonthYearPicker
             customInput={
-              <button className="w-40 h-[32px] bg-gray-50/50 border border-gray-300 rounded-md px-2.5 py-1.5 text-gray-900 focus:outline-none focus:border-green-500 hover:bg-white transition-all duration-200 flex items-center justify-between text-left group">
+              <button className="w-40 h-[32px] bg-gray-50/50 border border-gray-300 rounded-md px-2.5 py-1.5 text-gray-900 focus:outline-none focus:border-primary hover:bg-white transition-all duration-200 flex items-center justify-between text-left group">
                 <div className="flex items-center gap-2 truncate flex-1">
-                  <Calendar size={13} className="text-gray-400 group-hover:text-green-600 transition-colors flex-shrink-0" />
+                  <Calendar size={13} className="text-gray-400 group-hover:text-primary transition-colors flex-shrink-0" />
                   <span className="truncate text-xs text-gray-900 font-medium">
                     {selectedPeriod ? selectedPeriod.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "Pay Period"}
                   </span>
                 </div>
-                <ChevronDown size={14} className="text-gray-400 group-hover:text-green-500 transition-transform ml-1" />
+                <ChevronDown size={14} className="text-gray-400 group-hover:text-primary transition-transform ml-1" />
               </button>
             }
           />
@@ -4420,7 +4420,7 @@ export default function PayrollDashboard() {
           <button
             onClick={handleBulkMpesaPayment}
             disabled={finalFilteredRecords.length === 0}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white hover:bg-green-700 rounded-[25px] text-xs font-medium transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white hover:bg-primary/90 rounded-[25px] text-xs font-medium transition-colors disabled:opacity-50"
           >
             <TabletSmartphone className="w-3 h-3" />
             {userRole === "credit_analyst_officer" ? "M-PESA Bulk Pay" : "Make Bulk Pay"}
@@ -4447,11 +4447,11 @@ export default function PayrollDashboard() {
           <button
             onClick={toggleStatutoryOverride}
             className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-[25px] text-xs font-medium transition-colors border ${overrideStatutoryChecks
-              ? "bg-green-50 text-green-700 border-green-200"
+              ? "bg-primary/10 text-primary border-primary/20"
               : "bg-white text-gray-600 border-gray-200 hover:text-violet-700 hover:bg-violet-50"
               }`}
           >
-            <span className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${overrideStatutoryChecks ? "bg-green-500" : "bg-gray-300"
+            <span className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${overrideStatutoryChecks ? "bg-primary" : "bg-gray-300"
               }`}>
               <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${overrideStatutoryChecks ? "translate-x-3.5" : "translate-x-0.5"
                 }`} />
@@ -4730,7 +4730,7 @@ export default function PayrollDashboard() {
                           <div className="flex flex-col gap-1.5">
                             <button
                               onClick={() => handleSingleMpesaPayment(record)}
-                              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-white bg-green-600 hover:bg-green-700 rounded-[25px] transition-colors"
+                              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-white bg-primary hover:bg-primary/90 rounded-[25px] transition-colors"
                             >
                               <Smartphone className="w-3 h-3" />
                               {userRole === "credit_analyst_officer"

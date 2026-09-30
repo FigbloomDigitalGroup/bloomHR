@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, supabaseAdmin } from '../../lib/supabase';
+import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
 import toast from 'react-hot-toast';
 import {
   CheckCircle2, XCircle, Clock, Search, ChevronDown, Send, Users,
@@ -23,15 +24,6 @@ import SearchableDropdown from '../UI/SearchableDropdown';
 import TransactionStatusChecker from './TransactionStatusChecker';
 
 
-// SMS Service Configuration
-const CELCOM_AFRICA_CONFIG = {
-  baseUrl: 'https://isms.celcomafrica.com/api/services/sendsms',
-  apiKey: '***REMOVED***',
-  partnerID: '928',
-  defaultShortcode: 'MularCredit'
-};
-
-// SMS Service Functions
 // SMS Service Functions
 const SMSService = {
   // Format phone number for SMS - handles all Kenyan formats
@@ -175,7 +167,7 @@ const SMSService = {
 
   // Send disbursement notification
   async sendDisbursementNotification(employeeName: string, phoneNumber: string | number, amount: number, transactionId?: string) {
-    const message = `Dear ${employeeName}, thank you for being an invaluable team member. Your salary advance of KES ${amount.toLocaleString()} is now in your M-Pesa account. We're here to support you. Keep up the great work! - Mular Credit`;
+    const message = `Dear ${employeeName}, thank you for being an invaluable team member. Your salary advance of KES ${amount.toLocaleString()} is now in your M-Pesa account. We're here to support you. Keep up the great work! - Figbloom HR`;
 
     return await this.sendSMS(phoneNumber, message);
   }

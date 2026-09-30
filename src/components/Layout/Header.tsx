@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Bell, LogOut, X, Trash2, CheckCircle, UserPlus, Calendar, Image, Upload, MapPin, ChevronDown, AlertTriangle, Clock } from 'lucide-react';
+import { Bell, X, Trash2, CheckCircle, UserPlus, Calendar, Image, Upload, MapPin, ChevronDown, AlertTriangle, Clock, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { useHRNotifications, fetchAdminHRNotifications, markAdminNotificationRead, type HRNotification } from '../../hooks/useHRNotifications';
+import { SearchInput } from '../UI';
 
 interface HeaderProps {
   user?: { email: string; role: string };
@@ -76,7 +77,7 @@ const HeaderDropdown = ({ value, options, onChange, placeholder, icon: Icon }: {
         className={`flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all duration-200 hover:bg-white hover:shadow-sm ${isOpen ? 'bg-white shadow-sm' : 'bg-transparent'}`}
       >
         <div className="flex items-center gap-2 max-w-[120px]">
-          {Icon && <Icon className={`w-3.5 h-3.5 ${isOpen ? 'text-[#03c04a]' : 'text-gray-400'}`} />}
+          {Icon && <Icon className={`w-3.5 h-3.5 ${isOpen ? 'text-[#17402A]' : 'text-gray-400'}`} />}
           <span className={`text-xs font-bold truncate ${selected ? 'text-gray-900' : 'text-gray-400'}`}>
             {selected ? selected.label : placeholder}
           </span>
@@ -102,10 +103,10 @@ const HeaderDropdown = ({ value, options, onChange, placeholder, icon: Icon }: {
                     onChange(opt.value);
                     setIsOpen(false);
                   }}
-                  className={`w-full text-left px-4 py-2 text-xs transition-colors hover:bg-green-50/50 hover:text-[#03c04a] flex items-center justify-between group ${value === opt.value ? 'bg-green-50 text-[#03c04a] font-bold underline' : 'text-gray-600'}`}
+                  className={`w-full text-left px-4 py-2 text-xs transition-colors hover:bg-[#E3EFE7]/50 hover:text-[#17402A] flex items-center justify-between group ${value === opt.value ? 'bg-[#E3EFE7] text-[#17402A] font-bold' : 'text-gray-600'}`}
                 >
                   <span>{opt.label}</span>
-                  {value === opt.value && <CheckCircle className="w-3.5 h-3.5 text-[#03c04a]" />}
+                  {value === opt.value && <CheckCircle className="w-3.5 h-3.5 text-[#17402A]" />}
                 </button>
               ))}
             </div>
@@ -156,7 +157,7 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
         id: `leave-${data.id || Date.now()}`,
         type: 'leave',
         title: 'New Leave Application',
-        message: `Leave application submitted by ${data["First Name"] && data["Last Name"] || 'Employee'}`,
+        message: `Leave application submitted by ${data.name || 'Employee'}`,
         timestamp,
         isRead: false
       };
@@ -509,56 +510,47 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
 
   return (
     <>
-      {/* Floating Header with Premium Glassmorphism */}
+      {/* Header: company switcher, centered search, region/town filters, utilities */}
       <motion.header
-        className="z-40 mx-6 mt-4 mb-6 relative font-sans"
-        initial={{ y: -20, opacity: 0 }}
+        className="z-40 relative font-sans h-[60px] px-5 bg-white border-b border-border grid grid-cols-[1fr_460px_1fr] items-center box-border"
+        initial={{ y: -12, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
       >
-        <div
-          className="px-6 py-3 bg-white/60 backdrop-blur-2xl rounded-[24px] shadow-sm border border-white/40 flex items-center justify-between transition-all duration-300 hover:shadow-md hover:bg-white/70"
+        {/* Company switcher */}
+        <motion.button
+          type="button"
+          className="flex items-center gap-2 group justify-self-start"
+          onClick={() => setProfileModalOpen(true)}
+          whileTap={{ scale: 0.99 }}
         >
-          {/* Company Identity */}
-          <motion.div
-            className="flex items-center space-x-4 cursor-pointer group"
-            onClick={() => setProfileModalOpen(true)}
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-          >
-            <div className="relative">
-              {companyProfile?.image_url ? (
-                <img
-                  src={companyProfile.image_url}
-                  alt="Company Logo"
-                  className="w-11 h-11 rounded-xl object-cover shadow-sm ring-2 ring-white/50 group-hover:ring-indigo-100 transition-all"
-                />
-              ) : (
-                <div className="w-11 h-11 bg-gradient-to-br from-blue-600 to-[#03c04a] rounded-xl flex items-center justify-center shadow-lg ring-2 ring-white/50 text-white font-bold text-lg font-sans">
-                  {companyProfile?.company_name?.[0] || 'Z'}
-                </div>
-              )}
-              {/* Edit indicator on hover */}
-              <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity text-[#03c04a]">
-                <div className="w-2.5 h-2.5 bg-[#03c04a] rounded-full border-2 border-white"></div>
+          <div className="relative flex-shrink-0">
+            {companyProfile?.image_url ? (
+              <img
+                src={companyProfile.image_url}
+                alt="Company Logo"
+                className="w-[26px] h-[26px] rounded-[7px] object-cover"
+              />
+            ) : (
+              <div className="w-[26px] h-[26px] bg-brand rounded-[7px] flex items-center justify-center text-white font-bold text-xs">
+                {companyProfile?.company_name?.[0] || 'F'}
               </div>
-            </div>
+            )}
+          </div>
+          <span className="text-[13.5px] font-bold text-ink tracking-tight leading-tight truncate max-w-[180px]">
+            {companyProfile?.company_name || 'Figbloom Digital Group'}
+          </span>
+          <ChevronDown className="w-3 h-3 text-subtle flex-shrink-0" strokeWidth={2.2} />
+        </motion.button>
 
-            <div className="flex flex-col">
-              <h1 className="text-sm font-bold text-gray-900 tracking-tight leading-tight group-hover:text-[#03c04a] transition-colors font-sans">
-                {companyProfile?.company_name || 'ZiraPro'}
-              </h1>
-              <p className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">
-                {companyProfile?.company_tagline || 'Workspace'}
-              </p>
-            </div>
-          </motion.div>
+        {/* Search */}
+        <SearchInput placeholder="Search Figbloom HR" />
 
-          {/* Right Section: Location, Search, Profile */}
-          <div className="flex items-center space-x-2 md:space-x-5">
-            {/* Region/Town Selectors - Premium Style */}
-            {(regions && onRegionChange) && (
-              <div className="hidden lg:flex items-center bg-white/50 backdrop-blur-md rounded-2xl p-1 border border-gray-200/50 shadow-sm gap-1">
+        {/* Right utilities */}
+        <div className="flex items-center justify-end gap-1">
+          {(regions && onRegionChange) && (
+            <>
+              <div className="hidden lg:flex items-center gap-0.5">
                 <HeaderDropdown
                   value={selectedRegion || ''}
                   options={regions.map(r => ({ label: r, value: r }))}
@@ -566,7 +558,6 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
                   placeholder="Region"
                   icon={MapPin}
                 />
-                <div className="w-px h-6 bg-gray-200/80 mx-0.5"></div>
                 <HeaderDropdown
                   value={selectedTown || ''}
                   options={[
@@ -578,55 +569,31 @@ export default function Header({ user, onLogout, selectedTown, onTownChange, sel
                   icon={MapPin}
                 />
               </div>
+              <div className="w-px h-[18px] bg-border mx-1 hidden lg:block"></div>
+            </>
+          )}
+
+          <motion.button
+            type="button"
+            aria-label="Help"
+            className="w-[30px] h-[30px] rounded-pill flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors"
+            whileTap={{ scale: 0.95 }}
+          >
+            <HelpCircle className="w-[15px] h-[15px] stroke-[1.8px]" />
+          </motion.button>
+
+          <motion.button
+            type="button"
+            aria-label="Notifications"
+            className="relative w-[30px] h-[30px] rounded-pill flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors"
+            whileTap={{ scale: 0.95 }}
+            onClick={handleBellClick}
+          >
+            <Bell className="w-[15px] h-[15px] stroke-[1.8px]" />
+            {showNotificationDot && totalNotifications > 0 && (
+              <span className="absolute top-[5px] right-[6px] w-1.5 h-1.5 rounded-full bg-orange border-[1.5px] border-white"></span>
             )}
-
-            <div className="w-px h-8 bg-gradient-to-b from-transparent via-gray-200 to-transparent hidden md:block"></div>
-
-
-            {/* Notification Bell */}
-            <motion.button
-              className="relative p-2.5 text-gray-500 hover:text-[#03c04a] transition-colors rounded-full hover:bg-green-50/50 group border border-transparent hover:border-green-100"
-              whileTap={{ scale: 0.95 }}
-              onClick={handleBellClick}
-            >
-              <Bell className="w-5 h-5 stroke-[1.8px]" />
-              {showNotificationDot && totalNotifications > 0 && (
-                <span className="absolute top-2 right-2.5 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white animate-pulse"></span>
-              )}
-            </motion.button>
-
-            {/* User Profile Pill */}
-            <motion.div
-              className="flex items-center gap-3 pl-1 pr-4 py-1 rounded-full bg-white/80 border border-gray-100 shadow-sm hover:shadow-lg hover:border-green-100 transition-all cursor-pointer group"
-              whileHover={{ y: -1 }}
-            >
-              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#1a1c2e] to-[#2e3250] text-white flex items-center justify-center text-xs font-bold ring-2 ring-white shadow-md">
-                {user?.email?.[0].toUpperCase() || 'U'}
-              </div>
-              <div className="flex flex-col items-start">
-                <span className="text-xs font-bold text-gray-800 group-hover:text-[#03c04a] transition-colors font-sans">
-                  {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1).toLowerCase() : 'Admin'}
-                </span>
-                <div className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                  <span className="text-[10px] text-gray-400 font-medium">Online</span>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Logout */}
-            {onLogout && (
-              <motion.button
-                onClick={onLogout}
-                className="p-2.5 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all border border-transparent hover:border-rose-100"
-                title="Logout"
-                whileHover={{ rotate: 90 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                <LogOut className="w-4 h-4 stroke-[2px]" />
-              </motion.button>
-            )}
-          </div>
+          </motion.button>
         </div>
       </motion.header>
 

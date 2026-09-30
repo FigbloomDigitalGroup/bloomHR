@@ -146,7 +146,7 @@ const Profile = () => {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -170,7 +170,7 @@ const Profile = () => {
                 <img 
                   src={profileImage} 
                   alt="Profile" 
-                  className="h-16 w-16 rounded-full object-cover border-2 border-green-600"
+                  className="h-16 w-16 rounded-full object-cover border-2 border-primary"
                 />
               ) : (
                 <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-300">
@@ -179,7 +179,7 @@ const Profile = () => {
               )}
               <label 
                 htmlFor="profile-upload"
-                className={`absolute -bottom-1 -right-1 bg-green-600 text-white p-1 rounded-full cursor-pointer ${imageUploading ? 'opacity-50' : ''}`}
+                className={`absolute -bottom-1 -right-1 bg-primary text-white p-1 rounded-full cursor-pointer ${imageUploading ? 'opacity-50' : ''}`}
               >
                 {imageUploading ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -228,7 +228,7 @@ const Profile = () => {
           onClick={() => setActiveSection('statutory')}
           className={`px-4 py-2 font-medium text-xs ${
             activeSection === 'statutory'
-              ? 'border-b-2 border-green-600 text-green-700'
+              ? 'border-b-2 border-primary text-brand'
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -238,7 +238,7 @@ const Profile = () => {
           onClick={() => setActiveSection('voluntary')}
           className={`px-4 py-2 font-medium text-xs ${
             activeSection === 'voluntary'
-              ? 'border-b-2 border-green-600 text-green-700'
+              ? 'border-b-2 border-primary text-brand'
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -457,7 +457,7 @@ const Profile = () => {
           <button
             onClick={handleSubmit}
             disabled={isUpdating}
-            className="px-4 py-2 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700"
+            className="px-4 py-2 bg-primary text-white text-xs font-medium rounded hover:bg-primary/90"
           >
             {isUpdating ? (
               <>

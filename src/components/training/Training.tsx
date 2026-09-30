@@ -248,7 +248,7 @@ const AdminVideoUpload = () => {
     } else if (file.type.includes('presentation') || file.type.includes('powerpoint')) {
       return <FileText className="h-5 w-5 text-orange-600" />;
     } else if (file.type.includes('word')) {
-      return <FileText className="h-5 w-5 text-blue-600" />;
+      return <FileText className="h-5 w-5 text-brand" />;
     }
     return <FileText className="h-5 w-5 text-gray-600" />;
   };
@@ -437,51 +437,51 @@ const AdminVideoUpload = () => {
   const currentFormData = contentType === 'video' ? videoFormData : documentFormData;
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
+    <div className="max-w-[780px] mx-auto py-8 px-4">
+      <div className="bg-white rounded-2xl border border-border p-[26px]">
         {/* Header */}
-        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-          <h1 className="text-xl font-medium text-gray-900 flex items-center">
-            <BookOpen className="h-5 w-5 mr-2 text-blue-500" />
+        <div className="mb-5">
+          <h1 className="text-[15px] font-bold text-ink flex items-center gap-2.5">
+            <BookOpen className="h-[18px] w-[18px] text-brand" strokeWidth={1.8} />
             Upload Training Content
           </h1>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-0.5">
             Add new training videos or documents to the staff portal
           </p>
         </div>
 
         {/* Content Type Selector */}
-        <div className="px-6 py-4 border-b border-gray-200">
-          <div className="flex space-x-4">
+        <div className="mb-5">
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setContentType('video')}
-              className={`flex items-center px-4 py-2 rounded-md text-sm font-medium ${
+              className={`flex items-center px-4 py-2.5 rounded-tile text-[12.5px] font-semibold ${
                 contentType === 'video'
-                  ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                  ? 'bg-status-info-tint text-status-info'
+                  : 'text-muted-foreground hover:bg-secondary'
               }`}
             >
-              <Film className="h-4 w-4 mr-2" />
+              <Film className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.8} />
               Video Content
             </button>
             <button
               type="button"
               onClick={() => setContentType('document')}
-              className={`flex items-center px-4 py-2 rounded-md text-sm font-medium ${
+              className={`flex items-center px-4 py-2.5 rounded-tile text-[12.5px] font-semibold ${
                 contentType === 'document'
-                  ? 'bg-blue-100 text-blue-700 border border-blue-300'
-                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                  ? 'bg-status-info-tint text-status-info'
+                  : 'text-muted-foreground hover:bg-secondary'
               }`}
             >
-              <FileText className="h-4 w-4 mr-2" />
+              <FileText className="h-3.5 w-3.5 mr-1.5" strokeWidth={1.8} />
               Document Content
             </button>
           </div>
         </div>
 
         {/* Main form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {/* File Upload Section */}
           <div className="space-y-4">
             {contentType === 'video' ? (
@@ -496,7 +496,7 @@ const AdminVideoUpload = () => {
                     <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
                       <div className="space-y-1 text-center">
                         <div className="flex text-xs text-gray-600 justify-center">
-                          <label className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none">
+                          <label className="relative cursor-pointer bg-white rounded-md font-medium text-brand hover:text-brand focus-within:outline-none">
                             <span>Upload a video file</span>
                             <input
                               ref={fileInputRef}
@@ -519,8 +519,8 @@ const AdminVideoUpload = () => {
                     <div className="mt-1 rounded-md border border-gray-200 p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
-                          <div className="bg-blue-100 p-2 rounded-lg">
-                            <Film className="h-5 w-5 text-blue-600" />
+                          <div className="bg-green-tint p-2 rounded-lg">
+                            <Film className="h-5 w-5 text-brand" />
                           </div>
                           <div>
                             <p className="text-xs font-medium text-gray-900 truncate max-w-xs">
@@ -569,7 +569,7 @@ const AdminVideoUpload = () => {
                     <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
                       <div className="space-y-1 text-center">
                         <div className="flex text-xs text-gray-600 justify-center">
-                          <label className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none">
+                          <label className="relative cursor-pointer bg-white rounded-md font-medium text-brand hover:text-brand focus-within:outline-none">
                             <span>Upload a thumbnail</span>
                             <input
                               ref={thumbnailInputRef}
@@ -592,8 +592,8 @@ const AdminVideoUpload = () => {
                     <div className="mt-1 rounded-md border border-gray-200 p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
-                          <div className="bg-purple-100 p-2 rounded-lg">
-                            <Image className="h-5 w-5 text-purple-600" />
+                          <div className="bg-orange-tint p-2 rounded-lg">
+                            <Image className="h-5 w-5 text-orange" />
                           </div>
                           <div>
                             <p className="text-xs font-medium text-gray-900 truncate max-w-xs">
@@ -641,7 +641,7 @@ const AdminVideoUpload = () => {
                   <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
                     <div className="space-y-1 text-center">
                       <div className="flex text-xs text-gray-600 justify-center">
-                        <label className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none">
+                        <label className="relative cursor-pointer bg-white rounded-md font-medium text-brand hover:text-brand focus-within:outline-none">
                           <span>Upload a document</span>
                           <input
                             ref={documentInputRef}
@@ -702,7 +702,7 @@ const AdminVideoUpload = () => {
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2.5">
                 <div
-                  className="bg-blue-600 h-2.5 rounded-full"
+                  className="bg-brand h-2.5 rounded-full"
                   style={{ width: `${uploadProgress}%` }}
                 ></div>
               </div>
@@ -721,7 +721,7 @@ const AdminVideoUpload = () => {
                 name="title"
                 value={currentFormData.title}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand focus:border-brand"
                 required
               />
             </div>
@@ -735,7 +735,7 @@ const AdminVideoUpload = () => {
                 name="category"
                 value={currentFormData.category}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand focus:border-brand"
                 required
               >
                 <option value="introduction">Introduction</option>
@@ -758,7 +758,7 @@ const AdminVideoUpload = () => {
                   value={videoFormData.duration}
                   onChange={handleInputChange}
                   pattern="^([0-1][0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand focus:border-brand"
                   placeholder="00:10:00"
                 />
               </div>
@@ -775,7 +775,7 @@ const AdminVideoUpload = () => {
                 min="1"
                 value={currentFormData.order}
                 onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand focus:border-brand"
               />
             </div>
 
@@ -787,7 +787,7 @@ const AdminVideoUpload = () => {
                   type="checkbox"
                   checked={currentFormData.required}
                   onChange={handleInputChange}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-brand focus:ring-brand border-gray-300 rounded"
                 />
                 <label htmlFor="required" className="ml-2 block text-xs text-gray-700">
                   Required Training
@@ -801,7 +801,7 @@ const AdminVideoUpload = () => {
                   type="checkbox"
                   checked={currentFormData.quiz_required}
                   onChange={handleInputChange}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-brand focus:ring-brand border-gray-300 rounded"
                 />
                 <label htmlFor="quiz_required" className="ml-2 block text-xs text-gray-700">
                   Include Quiz
@@ -821,7 +821,7 @@ const AdminVideoUpload = () => {
               rows={3}
               value={currentFormData.description}
               onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand focus:border-brand"
             />
           </div>
 
@@ -837,7 +837,7 @@ const AdminVideoUpload = () => {
             <button
               type="submit"
               disabled={isUploading || (contentType === 'video' ? !videoFile : !documentFile)}
-              className={`px-4 py-2 border border-transparent rounded-md text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 ${
+              className={`px-4 py-2 border border-transparent rounded-md text-xs font-medium text-white bg-brand hover:bg-brand-dark ${
                 isUploading || (contentType === 'video' ? !videoFile : !documentFile) ? 'opacity-70 cursor-not-allowed' : ''
               }`}
             >
@@ -888,7 +888,7 @@ const AdminVideoUpload = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-xs font-medium text-gray-900">
                         <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
                           item.url?.includes('/training-videos/') 
-                            ? 'bg-blue-100 text-blue-800'
+                            ? 'bg-green-tint text-brand-dark'
                             : 'bg-green-100 text-green-800'
                         }`}>
                           {item.url?.includes('/training-videos/') ? 'Video' : 'Document'}

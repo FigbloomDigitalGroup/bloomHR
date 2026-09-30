@@ -180,7 +180,7 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
                     </button>
                     <button
                         onClick={() => setShowModal(true)}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-md text-sm font-medium text-white transition-colors shadow-sm focus:outline-none flex items-center gap-2"
+                        className="px-4 py-2 bg-primary hover:bg-primary/90 rounded-md text-sm font-medium text-primary-foreground transition-colors shadow-sm focus:outline-none flex items-center gap-2"
                     >
                         <Plus className="w-4 h-4" />
                         New Advance
@@ -207,11 +207,11 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
                     <div>
                         <p className="text-xs font-medium text-gray-500">Current Exposure</p>
                         <p className="text-2xl font-semibold text-gray-900 mt-1">{formatKES(stats.outstanding)}</p>
-                        <p className="text-xs text-indigo-600 mt-1 flex items-center gap-1">
+                        <p className="text-xs text-primary mt-1 flex items-center gap-1">
                             Awaiting recovery
                         </p>
                     </div>
-                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg">
+                    <div className="p-3 bg-primary/10 text-primary rounded-lg">
                         <TrendingUp className="w-5 h-5" />
                     </div>
                 </div>
@@ -241,7 +241,7 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
                             placeholder="Search employee..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                            className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
                         />
                     </div>
 
@@ -290,7 +290,7 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
                                     <tr key={a.id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-semibold text-sm">
+                                                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-sm">
                                                     {a.employee_name?.split(' ').map(n => n[0]).join('') || '?'}
                                                 </div>
                                                 <div>
@@ -337,7 +337,7 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
                                                 {!a.is_completed && (
                                                     <button
                                                         onClick={() => handleRecordRepayment(a)}
-                                                        className="text-xs font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded transition-colors"
+                                                        className="text-xs font-medium text-primary hover:text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded transition-colors"
                                                     >
                                                         Deduct Monthly
                                                     </button>
@@ -365,7 +365,7 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
                         </button>
                         <div className="flex items-center gap-1 mx-2">
                             {Array.from({ length: totalPages }, (_, i) => (
-                                <button key={i} onClick={() => setCurrentPage(i + 1)} className={`w-8 h-8 rounded-md text-sm font-medium transition-colors ${currentPage === i + 1 ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}>
+                                <button key={i} onClick={() => setCurrentPage(i + 1)} className={`w-8 h-8 rounded-md text-sm font-medium transition-colors ${currentPage === i + 1 ? 'bg-primary text-primary-foreground' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}>
                                     {i + 1}
                                 </button>
                             ))}
@@ -405,7 +405,7 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
                                         <select
                                             value={form.employeeNumber}
                                             onChange={e => setForm(f => ({ ...f, employeeNumber: e.target.value }))}
-                                            className="w-full pl-9 pr-8 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors appearance-none"
+                                            className="w-full pl-9 pr-8 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-colors appearance-none"
                                         >
                                             <option value="">Select Employee...</option>
                                             {employees.map(e => (
@@ -424,7 +424,7 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
                                             type="date"
                                             value={form.advance_date}
                                             onChange={e => setForm(f => ({ ...f, advance_date: e.target.value }))}
-                                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
                                         />
                                     </div>
                                     <div>
@@ -433,7 +433,7 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
                                             type="number"
                                             value={form.advance_amount || ''}
                                             onChange={e => setForm(f => ({ ...f, advance_amount: Number(e.target.value) }))}
-                                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
                                             placeholder="0"
                                         />
                                     </div>
@@ -445,7 +445,7 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
                                         type="number"
                                         value={form.monthly_deduction || ''}
                                         onChange={e => setForm(f => ({ ...f, monthly_deduction: Number(e.target.value) }))}
-                                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
+                                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
                                         placeholder="0"
                                     />
                                 </div>
@@ -456,7 +456,7 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
                                         rows={3}
                                         value={form.notes}
                                         onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors resize-none"
+                                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-colors resize-none"
                                         placeholder="Add any additional details..."
                                     />
                                 </div>
@@ -472,7 +472,7 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
                                 <button
                                     onClick={handleSave}
                                     disabled={saving}
-                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                                    className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                                 >
                                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                                     Save Record

@@ -145,7 +145,7 @@ const GlowButton: React.FC<{
       lg: "px-6 py-3 text-base"
     };
     const variantClasses = {
-      primary: "bg-green-100 border-green-300 text-green-600 hover:bg-green-200 hover:border-green-600 hover:text-green-700 hover:shadow-[0_0_20px_rgba(34,197,94,0.5)] focus:shadow-[0_0_25px_rgba(34,197,94,0.6)]",
+      primary: "bg-primary/10 border-primary/30 text-primary hover:bg-primary/20 hover:border-primary hover:text-primary hover:shadow-[0_0_20px_rgba(23,64,42,0.5)] focus:shadow-[0_0_25px_rgba(23,64,42,0.6)]",
       secondary: "bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-300 hover:border-gray-400",
       danger: "bg-red-50 border-red-500 text-red-600 hover:bg-red-100 hover:border-red-600 hover:text-red-700 hover:shadow-[0_0_20px_rgba(239,68,68,0.5)]"
     };
@@ -260,7 +260,7 @@ const Pagination: React.FC<{
           <button
             key={page}
             onClick={() => onPageChange(page)}
-            className={`w-10 h-10 rounded-lg border ${currentPage === page ? 'bg-green-100 border-green-500 text-green-600' : 'border-gray-200'}`}
+            className={`w-10 h-10 rounded-lg border ${currentPage === page ? 'bg-primary/10 border-primary text-primary' : 'border-gray-200'}`}
           >
             {page}
           </button>
@@ -1702,7 +1702,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
   if (loading) {
     return (
       <div className="p-4 flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -1715,7 +1715,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Performance Dashboard</h1>
             <p className="text-xs text-gray-600 mt-1 flex items-center">
               Monitor and manage employee and branch performance
-              <span className="flex items-center ml-4 text-indigo-600 font-medium">
+              <span className="flex items-center ml-4 text-primary font-medium">
                 <MapPin className="w-4 h-4 mr-1" />
                 {getDisplayName()}
               </span>
@@ -1752,7 +1752,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
                   setSelectedBranch(e.target.value);
                   setEmployeePage(1);
                 }}
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-green-100 focus:border-green-500"
+                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary"
               >
                 <option value="all">All Branches</option>
                 {filteredBranchesByTown.map(branch => {
@@ -1776,7 +1776,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
                   setSelectedRole(e.target.value);
                   setEmployeePage(1);
                 }}
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-green-100 focus:border-green-500"
+                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary"
               >
                 {roles.map(role => (
                   <option key={role} value={role}>{role}</option>
@@ -1788,7 +1788,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
               <select
                 value={rowsPerPage}
                 onChange={handleRowsPerPageChange}
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-green-100 focus:border-green-500"
+                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary"
               >
                 {[5, 10, 20, 50].map(num => (
                   <option key={num} value={num}>{num}</option>
@@ -1810,7 +1810,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
                     setEmployeePage(1);
                     setBranchPage(1);
                   }}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-green-100 focus:border-green-500 text-xs"
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs"
                 />
               </div>
             </div>
@@ -1911,7 +1911,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
                   onClick={() => setSelectedTab(tab.key as any)}
                   className={`py-4 px-6 whitespace-nowrap text-center border-b-2 font-medium text-xs transition-colors duration-200 border-r border-gray-200 last:border-r-0
                     ${selectedTab === tab.key
-                      ? "border-b-green-500 text-green-600 bg-green-50"
+                      ? "border-b-primary text-primary bg-primary/5"
                       : "border-b-transparent text-gray-500 hover:text-gray-700 hover:border-b-gray-300 bg-transparent hover:bg-gray-50"}`}
                 >
                   {tab.label}
@@ -1925,7 +1925,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
                   <button
                     onClick={() => setViewMode("summary")}
                     className={`px-4 py-2 rounded-full text-xs font-medium transition-all duration-200 ${viewMode === "summary"
-                      ? "bg-white text-green-600 shadow-sm"
+                      ? "bg-white text-primary shadow-sm"
                       : "text-gray-600 hover:text-gray-800"
                       }`}
                   >
@@ -1934,7 +1934,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
                   <button
                     onClick={() => setViewMode("detailed")}
                     className={`px-4 py-2 rounded-full text-xs font-medium transition-all duration-200 ${viewMode === "detailed"
-                      ? "bg-white text-green-600 shadow-sm"
+                      ? "bg-white text-primary shadow-sm"
                       : "text-gray-600 hover:text-gray-800"
                       }`}
                   >
@@ -2072,7 +2072,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
                                   {/* Disbursement Targets Card */}
                                   <div className="border border-gray-200 rounded-lg p-4">
                                     <h3 className="font-semibold text-xs flex items-center gap-2 mb-3">
-                                      <Target className="w-4 h-4 text-green-500" />
+                                      <Target className="w-4 h-4 text-primary" />
                                       Disbursement Targets
                                     </h3>
                                     <div className="space-y-3">
@@ -2085,7 +2085,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
                                         </div>
                                         <div className="w-full bg-gray-200 rounded-full h-2">
                                           <div
-                                            className="bg-green-500 h-2 rounded-full"
+                                            className="bg-primary h-2 rounded-full"
                                             style={{ width: `${Math.min(100, (employee.disbursementTargets.achieved.today / (employee.disbursementTargets.daily || 1)) * 100)}%` }}
                                           ></div>
                                         </div>
@@ -2099,7 +2099,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
                                         </div>
                                         <div className="w-full bg-gray-200 rounded-full h-2">
                                           <div
-                                            className="bg-purple-500 h-2 rounded-full"
+                                            className="bg-accent-foreground h-2 rounded-full"
                                             style={{ width: `${Math.min(100, (employee.disbursementTargets.achieved.thisWeek / (employee.disbursementTargets.weekly || 1)) * 100)}%` }}
                                           ></div>
                                         </div>
@@ -2113,7 +2113,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
                                         </div>
                                         <div className="w-full bg-gray-200 rounded-full h-2">
                                           <div
-                                            className="bg-green-500 h-2 rounded-full"
+                                            className="bg-primary h-2 rounded-full"
                                             style={{ width: `${Math.min(100, (employee.loansDisbursed / (employee.target || 1)) * 100)}%` }}
                                           ></div>
                                         </div>
@@ -2124,7 +2124,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
                                   {/* Client Portfolio Card */}
                                   <div className="border border-gray-200 rounded-lg p-4">
                                     <h3 className="font-semibold text-xs flex items-center gap-2 mb-3">
-                                      <Users className="w-4 h-4 text-green-500" />
+                                      <Users className="w-4 h-4 text-primary" />
                                       Client Portfolio
                                     </h3>
                                     <div className="flex items-center justify-between mb-3">
@@ -2511,7 +2511,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
                                 {/* Disbursement Targets Card */}
                                 <div className="border border-gray-200 rounded-lg p-4">
                                   <h3 className="font-semibold text-xs flex items-center gap-2 mb-3">
-                                    <Target className="w-4 h-4 text-green-500" />
+                                    <Target className="w-4 h-4 text-primary" />
                                     Disbursement Targets
                                   </h3>
                                   <div className="space-y-3">
@@ -2524,7 +2524,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
                                       </div>
                                       <div className="w-full bg-gray-200 rounded-full h-2">
                                         <div
-                                          className="bg-green-500 h-2 rounded-full"
+                                          className="bg-primary h-2 rounded-full"
                                           style={{ width: `${Math.min(100, disbursementRate)}%` }}
                                         ></div>
                                       </div>
@@ -2543,7 +2543,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
                                 {/* Staff Metrics Card */}
                                 <div className="border border-gray-200 rounded-lg p-4">
                                   <h3 className="font-semibold text-xs flex items-center gap-2 mb-3">
-                                    <Users className="w-4 h-4 text-green-500" />
+                                    <Users className="w-4 h-4 text-primary" />
                                     Staff Metrics
                                   </h3>
                                   <div className="space-y-3">

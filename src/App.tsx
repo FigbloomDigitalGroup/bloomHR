@@ -53,6 +53,7 @@ import MpesaZapPortal from './components/Settings/MpesaZapPortal';
 import RolePermissions from './components/Settings/RolePermissions';
 import EmailPortal from './components/Email/EmailPortal';
 import HRLifecycleDashboard from './components/HR/HRLifecycleDashboard';
+import CompanyCalendar from './components/Calendar/CompanyCalendar';
 
 interface User {
   email: string;
@@ -573,7 +574,7 @@ function App() {
 
             // Show email verification toast only once
             if (!hasShownWelcomeToast.current) {
-              toast.success('Email verified successfully! Welcome to Zira HR.');
+              toast.success('Email verified successfully! Welcome to Figbloom HR.');
               hasShownWelcomeToast.current = true;
             }
 
@@ -910,7 +911,6 @@ function App() {
             />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/update-password" element={<UpdatePasswordPage />} />
-            <Route path="/teams" element={<ChatLayout />} />
             <Route
               path="/staff"
               element={session ? <StaffPortalLanding /> : <Login onLoginSuccess={handleLoginSuccess} />}
@@ -925,14 +925,15 @@ function App() {
                   <StaffPortalLanding />
                 ) : (
                   <div className="flex flex-col min-h-screen bg-gray-50/50">
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-200/40 via-purple-100/20 to-transparent pointer-events-none"></div>
-                    <div className="relative flex flex-1 w-full overflow-x-hidden">
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-accent/10 to-transparent pointer-events-none"></div>
+                    <div className="relative flex flex-1 min-h-0 w-full overflow-x-hidden">
                       <Sidebar
                         user={user}
                         isCollapsed={isSidebarCollapsed}
                         onToggle={setIsSidebarCollapsed}
+                        onLogout={handleLogout}
                       />
-                      <div className={`flex-1 min-w-0 flex flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${isSidebarCollapsed ? 'ml-[88px]' : 'ml-[280px]'}`}>
+                      <div className={`flex-1 min-w-0 min-h-0 flex flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${isSidebarCollapsed ? 'ml-[88px]' : 'ml-[280px]'}`}>
                         <Header
                           user={user}
                           onLogout={handleLogout}
@@ -944,7 +945,7 @@ function App() {
                           regions={regions}
                           allTowns={branches}
                         />
-                        <main className="flex-1 overflow-x-hidden p-4">
+                        <main className={location.pathname === '/teams' ? 'flex-1 min-h-0 overflow-hidden flex flex-col' : 'flex-1 overflow-x-hidden p-4'}>
                           <AnimatePresence mode="wait">
                             <motion.div
                               key={location.pathname}
@@ -973,6 +974,7 @@ function App() {
                                     </AuthRoute>
                                   }
                                 />
+                                <Route path="/calendar" element={<CompanyCalendar />} />
                                 <Route path="/employees" element={<EmployeeList selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />} />
                                 <Route path="/add-employee" element={<AddEmployeePage />} />
                                 <Route path="/view-employee/:id" element={<ViewEmployeePage />} />
@@ -1085,7 +1087,6 @@ function App() {
 
                                 <Route path="/fogs" element={<EmployeeDataTable selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />} />
                                 <Route path="/mpesa-zap" element={<MpesaZapPortal />} />
-                                <Route path="/teams" element={<ChatLayout />} />
 
                                 <Route path="/email-portal" element={
                                   <AuthRoute allowedRoles={['ADMIN', 'HR', 'CHECKER', 'MANAGER', 'OPERATIONS']}>
@@ -1109,7 +1110,7 @@ function App() {
                             </motion.div>
                           </AnimatePresence>
                         </main>
-                        <Footer />
+                        {location.pathname !== '/teams' && <Footer />}
                       </div>
                     </div>
                   </div>

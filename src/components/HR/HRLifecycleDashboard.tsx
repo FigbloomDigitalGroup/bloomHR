@@ -110,7 +110,7 @@ export default function HRLifecycleDashboard() {
     const statCards = [
         { label: 'On Probation', value: stats.on_probation, icon: Clock, color: 'from-amber-500 to-orange-500', bg: 'bg-amber-50', text: 'text-amber-700', tab: 'status' },
         { label: 'Contracts Expiring', value: stats.contracts_expiring, icon: AlertTriangle, color: 'from-red-500 to-rose-500', bg: 'bg-red-50', text: 'text-red-700', tab: 'status' },
-        { label: 'Suspended', value: stats.suspended, icon: ShieldOff, color: 'from-purple-500 to-violet-500', bg: 'bg-purple-50', text: 'text-purple-700', tab: 'suspension' },
+        { label: 'Suspended', value: stats.suspended, icon: ShieldOff, color: 'from-primary to-primary/80', bg: 'bg-primary/10', text: 'text-primary', tab: 'suspension' },
         { label: 'Missing Joining Date', value: stats.missing_joining_date, icon: AlertTriangle, color: 'from-orange-500 to-red-500', bg: 'bg-orange-50', text: 'text-orange-700', tab: 'status' },
         { label: 'Pending Confirmations', value: stats.pending_confirmations, icon: CheckCircle, color: 'from-emerald-500 to-green-600', bg: 'bg-emerald-50', text: 'text-emerald-700', tab: 'status' },
     ];
@@ -121,7 +121,7 @@ export default function HRLifecycleDashboard() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
                             <Users className="w-4 h-4 text-white" />
                         </div>
                         HR Lifecycle Management
@@ -149,7 +149,7 @@ export default function HRLifecycleDashboard() {
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`relative flex items-center gap-2 px-4 py-3 text-xs font-medium transition-all whitespace-nowrap
                   ${isActive
-                                        ? 'text-violet-700 border-b-2 border-violet-600 bg-violet-50/50'
+                                        ? 'text-primary border-b-2 border-primary bg-primary/10'
                                         : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-b-2 border-transparent'
                                     }`}
                             >
@@ -234,7 +234,7 @@ export default function HRLifecycleDashboard() {
                                                 {loading ? <Loader2 className="w-5 h-5 animate-spin text-gray-400" /> : card.value}
                                             </div>
                                             <p className="text-xs text-gray-500">{card.label}</p>
-                                            <div className="flex items-center gap-1 mt-2 text-[10px] text-violet-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex items-center gap-1 mt-2 text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity">
                                                 View details <ChevronRight className="w-3 h-3" />
                                             </div>
                                         </motion.button>
@@ -256,10 +256,10 @@ export default function HRLifecycleDashboard() {
                                             <button
                                                 key={action.tab}
                                                 onClick={() => setActiveTab(action.tab)}
-                                                className="flex flex-col items-start gap-1.5 p-3 rounded-lg border border-gray-100 hover:border-violet-200 hover:bg-violet-50/30 transition-all group text-left"
+                                                className="flex flex-col items-start gap-1.5 p-3 rounded-lg border border-gray-100 hover:border-primary/30 hover:bg-primary/5 transition-all group text-left"
                                             >
-                                                <div className="w-7 h-7 rounded-md bg-violet-100 flex items-center justify-center group-hover:bg-violet-200 transition-colors">
-                                                    <Icon className="w-3.5 h-3.5 text-violet-700" />
+                                                <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                                                    <Icon className="w-3.5 h-3.5 text-primary" />
                                                 </div>
                                                 <p className="text-xs font-semibold text-gray-800">{action.label}</p>
                                                 <p className="text-[10px] text-gray-500">{action.desc}</p>
