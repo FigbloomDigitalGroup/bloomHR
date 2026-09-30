@@ -1,6 +1,6 @@
 # New Tenant Setup Guide
 
-This guide explains how to add a new tenant to the ZiraPro system while maintaining a completely separate database and independence for each client.
+This guide explains how to add a new tenant to the Figbloom HR system while maintaining a completely separate database and independence for each client.
 
 ## 1. Create a New Supabase Project
 Each tenant requires its own Supabase project:

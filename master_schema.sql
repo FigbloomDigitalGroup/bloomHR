@@ -1,5 +1,5 @@
 -- ========================================================
--- ZiraPro COMPLETE Master Schema Replicator
+-- Figbloom HR COMPLETE Master Schema Replicator
 -- Optimized for Security (RLS) and Performance
 -- ========================================================
 

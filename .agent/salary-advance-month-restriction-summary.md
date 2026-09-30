@@ -101,7 +101,7 @@ const isCurrentMonth = (app: any) => {
 5. **Select All**: Verify "Select All" only selects current month applications
 
 ## Files Modified
-- `/Users/mac/Downloads/zirapro-main 3/src/components/Settings/SalaryAdmin.tsx`
+- `./src/components/Settings/SalaryAdmin.tsx`
 
 ## Lines of Code Changed
 - Approximately 100 lines modified/added across multiple functions and components

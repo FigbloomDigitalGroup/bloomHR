@@ -13,7 +13,7 @@ The `.env` file is **completely missing** all M-Pesa configuration variables. Wi
 
 ### **Step 1: Add M-Pesa Credentials to `.env`**
 
-You need to add the following variables to your `/Users/mac/Downloads/ZiraPro/.env` file:
+You need to add the following variables to your the project-root `.env` file:
 
 ```env
 # ============================================================================
@@ -133,7 +133,7 @@ Once you have your callback URLs set up, you need to register them with Safarico
 
 ### **1. Start the M-Pesa Backend Server:**
 ```bash
-cd /Users/mac/Downloads/ZiraPro
+cd <project-root>
 npm start
 ```
 This will start the server on `http://localhost:3001`
