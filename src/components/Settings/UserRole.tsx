@@ -20,7 +20,7 @@ import {
   MapPin,
   Lock
 } from 'lucide-react';
-import { supabaseAdmin } from '../../lib/supabase';
+import { supabase, supabaseAdmin } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -973,6 +973,23 @@ export default function UserRolesSettings() {
         setEditingUser(null);
         toast.success(`User ${finalUserData.email} updated successfully`);
       } else {
+        // The Staff Portal resolves the employee by matching "Work Email", so a STAFF
+        // login without a matching employees row can never load its data.
+        if (finalUserData.role === 'STAFF') {
+          const { data: employee, error: employeeError } = await supabase
+            .from('employees')
+            .select('"Employee Number"')
+            .ilike('"Work Email"', finalUserData.email)
+            .maybeSingle();
+
+          if (employeeError) throw employeeError;
+          if (!employee) {
+            throw new Error(
+              `No employee has the Work Email ${finalUserData.email}. Add the employee first, then create their login.`
+            );
+          }
+        }
+
         // Create new user with password
         const { data, error } = await supabaseAdmin.auth.admin.createUser({
           email: finalUserData.email,
