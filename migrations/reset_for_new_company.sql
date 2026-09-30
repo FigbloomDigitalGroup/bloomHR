@@ -1,4 +1,4 @@
--- SQL Script to Reset ZiraPro for a New Company
+-- SQL Script to Reset Figbloom HR for a New Company
 -- WARNING: This will delete ALL employee data, transactions, and company-specific records.
 -- Run this in your Supabase SQL Editor.
 
@@ -50,4 +50,4 @@ WHERE id = (SELECT id FROM company_logo LIMIT 1);
 -- Enable triggers back
 -- SET session_replication_role = 'origin';
 
-SELECT 'ZiraPro data reset complete. Ready for new company setup.' as status;
+SELECT 'Figbloom HR data reset complete. Ready for new company setup.' as status;
