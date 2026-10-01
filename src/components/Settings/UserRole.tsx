@@ -901,19 +901,22 @@ export default function UserRolesSettings() {
         setEditingUser(null);
         toast.success(`User ${finalUserData.email} updated successfully`);
       } else {
-        // The Staff Portal resolves the employee by matching "Work Email", so a STAFF
-        // login without a matching employees row can never load its data.
+        // The Staff Portal resolves the employee with an exact match on "Work Email", so a
+        // STAFF login without a matching employees row can never load its data. Only STAFF
+        // logins land in the portal (see App.tsx), so other roles don't need a linked row.
+        // Use the same exact match as the portal: .ilike would treat '_' and '%' in an
+        // email as wildcards and could pass a row the portal then fails to find.
         if (finalUserData.role === 'STAFF') {
           const { data: employee, error: employeeError } = await supabase
             .from('employees')
             .select('"Employee Number"')
-            .ilike('"Work Email"', finalUserData.email)
+            .eq('"Work Email"', finalUserData.email)
             .maybeSingle();
 
           if (employeeError) throw employeeError;
           if (!employee) {
             throw new Error(
-              `No employee has the Work Email ${finalUserData.email}. Add the employee first, then create their login.`
+              `No employee has the Work Email ${finalUserData.email} (exact match, including letter case). Add or correct the employee first, then create their login.`
             );
           }
         }
