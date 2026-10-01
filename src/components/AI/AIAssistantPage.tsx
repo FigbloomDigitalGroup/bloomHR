@@ -53,7 +53,7 @@ export const AIAssistantPage = ({ selectedTown, onTownChange }: TownProps) => {
   
   // Area/Town mapping state
   const [areaTownMapping, setAreaTownMapping] = useState<AreaTownMapping>({});
-  const [branchAreaMapping, setBranchAreaMapping] = useState<BranchAreaMapping>({});
+  const [, setBranchAreaMapping] = useState<BranchAreaMapping>({});
   const [isArea, setIsArea] = useState<boolean>(false);
   const [townsInArea, setTownsInArea] = useState<string[]>([]);
   const [currentTown, setCurrentTown] = useState<string>(selectedTown || '');

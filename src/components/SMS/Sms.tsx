@@ -65,18 +65,6 @@ type BulkUpload = {
   uploadedAt: string;
 };
 
-type SMSLog = {
-  id?: string;
-  recipient_phone: string;
-  message: string;
-  status: 'sent' | 'failed';
-  error_message?: string;
-  message_id?: string;
-  sender_id: string;
-  cost?: number;
-  created_at?: string;
-};
-
 type SenderIDConfig = {
   id?: string;
   user_id: string;
@@ -144,7 +132,7 @@ export const SMSService = {
 
       // Use fetch with no-cors mode - this will send the request but we can't read response
       // This is fine since we know the API works and we just need to fire the request
-      const response = await fetch(endpoint, {
+      await fetch(endpoint, {
         method: 'GET',
         mode: 'no-cors', // This prevents CORS errors but we can't read response
       });
@@ -199,7 +187,7 @@ export const SMSService = {
     phoneNumber: string,
     message: string,
     shortcode: string,
-    maxRetries = 1 // Only 1 retry since we're using no-cors
+    _maxRetries = 1 // Only 1 retry since we're using no-cors
   ): Promise<{ success: boolean; error?: string; messageId?: string; cost?: number }> {
 
     console.log(`📤 Sending SMS to ${phoneNumber}`);
@@ -1978,7 +1966,7 @@ export function SMSCenter() {
                             name="senderType"
                             value="default"
                             checked={senderIdConfig.sender_id_type === 'default'}
-                            onChange={(e) => setSenderIdConfig(prev => ({
+                            onChange={(_e) => setSenderIdConfig(prev => ({
                               ...prev,
                               sender_id_type: 'default'
                             }))}
@@ -1992,7 +1980,7 @@ export function SMSCenter() {
                             name="senderType"
                             value="custom"
                             checked={senderIdConfig.sender_id_type === 'custom'}
-                            onChange={(e) => setSenderIdConfig(prev => ({
+                            onChange={(_e) => setSenderIdConfig(prev => ({
                               ...prev,
                               sender_id_type: 'custom'
                             }))}

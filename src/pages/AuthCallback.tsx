@@ -33,7 +33,7 @@ export default function AuthCallback() {
                 // 3. If we have a PKCE code, exchange it
                 if (code) {
                     console.log('🔑 Exchanging code for session...');
-                    const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+                    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
                     if (exchangeError) {
                         console.error('Code exchange failed:', exchangeError.message);
                         toast.error('Session expired or invalid link.');

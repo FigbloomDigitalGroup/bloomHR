@@ -306,23 +306,6 @@ const formatAccountingDate = (dateString?: string, timeString?: string) => {
   return timeString ? `${formattedDate} ${formattedTime}` : formattedDate;
 };
 
-// Calculate loan metrics for salary deduction
-const calculateLoanMetrics = (loan: StaffLoanData) => {
-  const deductionsMade = loan.amount_deducted && loan.monthly_deduction 
-    ? Math.floor(loan.amount_deducted / loan.monthly_deduction)
-    : 0;
-  
-  const deductionsRemaining = loan.monthly_deduction && loan.amount_remaining
-    ? Math.ceil(loan.amount_remaining / loan.monthly_deduction)
-    : 0;
-
-  const progress = loan.amount_deducted && loan.total_repayable 
-    ? (loan.amount_deducted / loan.total_repayable) * 100 
-    : 0;
-
-  return { deductionsMade, deductionsRemaining, progress };
-};
-
 // Pagination Component
 interface PaginationProps {
   currentPage: number;
@@ -445,10 +428,7 @@ const Pagination: React.FC<PaginationProps> = ({
 };
 
 const StaffLoansReport: React.FC<BaseReportProps> = ({
-  reportTitle,
-  reportDescription,
   onGenerateReport,
-  renderReportData,
   selectedTown,
   onTownChange
 }) => {
@@ -477,10 +457,7 @@ const StaffLoansReport: React.FC<BaseReportProps> = ({
   // Calculate totals for accounting summary
   const totalLoanPortfolio = reportData.reduce((sum, loan) => sum + (loan.approved_amount || 0), 0);
   const totalAmountDeducted = reportData.reduce((sum, loan) => sum + (loan.amount_deducted || 0), 0);
-  const totalMonthlyDeductions = reportData.reduce((sum, loan) => sum + (loan.monthly_deduction || 0), 0);
   const activeLoans = reportData.filter(loan => loan.status === 'Active' || loan.status === 'Disbursed').length;
-  const completedLoans = reportData.filter(loan => loan.status === 'Completed').length;
-  const pendingLoans = reportData.filter(loan => loan.status === 'Pending').length;
 
   // Calculate M-Pesa transaction totals
   const totalMpesaTransactions = reportData.reduce((sum, loan) => 
@@ -515,7 +492,6 @@ const StaffLoansReport: React.FC<BaseReportProps> = ({
   }, {} as Record<string, any>);
 
   const employeeLoanArray = Object.values(employeeLoans);
-  const totalEmployees = employeeLoanArray.length;
   const totalLoans = reportData.length;
 
   // Calculate paginated data for employee groups
@@ -879,7 +855,7 @@ const StaffLoansReport: React.FC<BaseReportProps> = ({
           </thead>
           <tbody className="bg-white divide-y divide-gray-300">
             {employeeData.map((employeeGroup: any) => {
-              const { employee, loans, totalApprovedAmount, totalAmountDeducted, totalMonthlyDeductions, loanCount } = employeeGroup;
+              const { employee, loans, loanCount } = employeeGroup;
               const recentLoan = loans[0]; // Most recent loan
 
               return (

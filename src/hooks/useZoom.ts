@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { ZoomUser, ChatMessage } from '../types/zoom';
 
 // Mock implementation - replace with actual Zoom SDK
@@ -11,7 +11,6 @@ export const useZoomSDK = () => {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
 
-  const clientRef = useRef<any>(null);
 
   const joinMeeting = useCallback(async (config: any) => {
     try {

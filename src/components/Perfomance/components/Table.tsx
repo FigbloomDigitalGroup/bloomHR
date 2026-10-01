@@ -26,28 +26,6 @@ type EmployeePerformance = {
   overdue_loans: number;
 };
 
-type BranchPerformance = {
-  id: string;
-  branch: string;
-  month: string;
-  total_clients: number;
-  retained_clients: number;
-  new_clients_active: number;
-  new_clients_inactive: number;
-  retained_active: number;
-  retained_inactive: number;
-  total_active: number;
-  total_inactive: number;
-  no_of_disb: number;
-  disb_amount: number;
-  targeted_disb_no: number;
-  targeted_disb_amount: number;
-  targeted_olb: number;
-  actual_olb: number;
-  collected_loan_amount: number;
-  overdue_loan_amount: number;
-};
-
 type Employee = {
   'Employee Number': string;
   'First Name': string;
@@ -315,7 +293,7 @@ const BulkUploadModal = ({
         const lines = content.split('\n');
         const headers = lines[0].split(',').map(h => h.trim());
         
-        const data = lines.slice(1).map((line, index) => {
+        const data = lines.slice(1).map((line, _index) => {
           if (!line.trim()) return null;
           
           const values = line.split(',').map(v => v.trim());

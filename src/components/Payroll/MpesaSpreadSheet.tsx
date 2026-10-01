@@ -377,7 +377,7 @@ const MPesaSpreadsheetFullPage = ({ onBack, userRole }) => {
           created_at: new Date().toISOString()
         };
 
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('payment_flows')
           .insert([paymentData])
           .select()

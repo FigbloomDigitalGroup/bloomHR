@@ -51,17 +51,6 @@ export const ApplicationsTable = ({ applications, setSelectedApplication }: Appl
     }
   };
 
-  const getResumeFileName = (application: any) => {
-    if (application.resume_file_name) {
-      return application.resume_file_name;
-    }
-    if (application.resume_file_url) {
-      const urlParts = application.resume_file_url.split('/');
-      return urlParts[urlParts.length - 1];
-    }
-    return 'resume.pdf';
-  };
-
   const handleOpenScheduleModal = (application: any) => {
     setSelectedApplicationForSchedule(application);
     setScheduleData({
@@ -185,7 +174,7 @@ export const ApplicationsTable = ({ applications, setSelectedApplication }: Appl
               </tr>
             </thead>
             <tbody>
-              {currentApplications.map((application, index) => (
+              {currentApplications.map((application, _index) => (
                 <tr key={application.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-3 sm:py-4 px-2 sm:px-4">
                     <div className="space-y-1">

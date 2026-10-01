@@ -22,7 +22,6 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { adminApi } from '../../lib/adminApi';
-import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 // Role definitions
@@ -379,10 +378,6 @@ const UserEditModal = ({
 
   const handleRoleChange = (role: keyof typeof ROLES) => {
     setEditedUser({ ...editedUser, role });
-  };
-
-  const handleStatusChange = (active: boolean) => {
-    setEditedUser({ ...editedUser, active });
   };
 
   const validatePassword = () => {
@@ -749,7 +744,6 @@ export default function UserRolesSettings() {
   const [resettingPasswordUser, setResettingPasswordUser] = useState<any | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [usersPerPage] = useState(12);
-  const navigate = useNavigate();
 
   // MFA Settings
   const [mfaEnabled, setMfaEnabled] = useState(false);

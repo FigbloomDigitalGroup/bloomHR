@@ -49,12 +49,6 @@ interface Expense {
   receiptUploaded?: boolean;
 }
 
-interface Employee {
-  id: string;
-  office: string;
-  job_level: string;
-}
-
 interface AreaTownMapping {
   [area: string]: string[];
 }
@@ -100,7 +94,7 @@ const EXPENSE_CATEGORIES = [
   { id: 'other', name: 'Other', color: 'bg-slate-500' }
 ];
 
-const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange, selectedRegion }) => {
+const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
   const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
   const [branches, setBranches] = useState<string[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
@@ -127,15 +121,15 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange, select
   // Enhanced town filtering state with improved mappings
   const [currentTown, setCurrentTown] = useState<string>('');
   const [areaTownMapping, setAreaTownMapping] = useState<AreaTownMapping>({});
-  const [branchAreaMapping, setBranchAreaMapping] = useState<BranchAreaMapping>({});
+  const [, setBranchAreaMapping] = useState<BranchAreaMapping>({});
   const [townAreaMapping, setTownAreaMapping] = useState<TownAreaMapping>({});
   const [townBranchMapping, setTownBranchMapping] = useState<TownBranchMapping>({});
-  const [branchTownMapping, setBranchTownMapping] = useState<BranchTownMapping>({});
+  const [, setBranchTownMapping] = useState<BranchTownMapping>({});
   const [isArea, setIsArea] = useState<boolean>(false);
-  const [townsInArea, setTownsInArea] = useState<string[]>([]);
+  const [, setTownsInArea] = useState<string[]>([]);
   const [selectedTowns, setSelectedTowns] = useState<string[]>([]);
   const [eligibleBranches, setEligibleBranches] = useState<string[]>([]);
-  const [debugInfo, setDebugInfo] = useState<string>("Initializing...");
+  const [, setDebugInfo] = useState<string>("Initializing...");
 
   const [newExpense, setNewExpense] = useState({
     title: '',

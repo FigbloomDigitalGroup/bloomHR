@@ -286,7 +286,7 @@ const AdminVideoUpload = () => {
         }
 
         // Upload video file
-        const { data: videoData, error: videoError } = await supabase.storage
+        const { error: videoError } = await supabase.storage
           .from('training-videos')
           .upload(videoPath, videoFile!, {
             cacheControl: '3600',
@@ -345,7 +345,7 @@ const AdminVideoUpload = () => {
         const docPath = `documents/${contentId}.${docExt}`;
 
         // Upload document file
-        const { data: docData, error: docError } = await supabase.storage
+        const { error: docError } = await supabase.storage
           .from('training-documents')
           .upload(docPath, documentFile!, {
             cacheControl: '3600',

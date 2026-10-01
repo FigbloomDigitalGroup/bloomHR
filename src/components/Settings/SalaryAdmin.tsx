@@ -4,12 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
 import toast from 'react-hot-toast';
-import {
-  CheckCircle2, XCircle, Clock, Search, ChevronDown, Send, Users,
+import { XCircle, Clock, Search, ChevronDown, Send, Users,
   CheckSquare, Square, ChevronLeft, ChevronRight, UserCheck, ShieldCheck,
-  Eye, AlertTriangle, Loader, CheckCircle, XCircle as XCircleIcon,
-  User, UserCog, Settings, MapPin, Filter, X, Edit3, DollarSign,
-  Crown, Building, Map as MapIcon, Award, Smartphone, RefreshCw,
+  Eye, AlertTriangle, Loader, CheckCircle, XCircle as XCircleIcon, UserCog, Settings, MapPin, Filter, X, Edit3, DollarSign, Building, Award, Smartphone, RefreshCw,
   Download, Upload, Calendar, Activity, TrendingUp,
   Banknote, Zap
 } from 'lucide-react';
@@ -87,7 +84,7 @@ const SMSService = {
 
       console.log('🚀 Sending SMS via Celcom Africa to:', formattedPhone);
 
-      const response: any = await fetch(endpoint, {
+      await fetch(endpoint, {
         method: 'GET',
         mode: 'no-cors',
       });
@@ -163,7 +160,7 @@ const SMSService = {
   },
 
   // Send disbursement notification
-  async sendDisbursementNotification(employeeName: string, phoneNumber: string | number, amount: number, transactionId?: string) {
+  async sendDisbursementNotification(employeeName: string, phoneNumber: string | number, amount: number, _transactionId?: string) {
     const message = `Dear ${employeeName}, thank you for being an invaluable team member. Your salary advance of KES ${amount.toLocaleString()} is now in your M-Pesa account. We're here to support you. Keep up the great work! - Figbloom HR`;
 
     return await this.sendSMS(phoneNumber, message);
@@ -332,22 +329,6 @@ const ExportModal = ({ isOpen, onClose, onExport, isLoading, filterOptions }: {
     { value: 'pending-admin', label: 'Pending Admin' }
   ];
 
-  const monthOptions = [
-    { value: 'all', label: 'All Months' },
-    { value: '0', label: 'January' },
-    { value: '1', label: 'February' },
-    { value: '2', label: 'March' },
-    { value: '3', label: 'April' },
-    { value: '4', label: 'May' },
-    { value: '5', label: 'June' },
-    { value: '6', label: 'July' },
-    { value: '7', label: 'August' },
-    { value: '8', label: 'September' },
-    { value: '9', label: 'October' },
-    { value: '10', label: 'November' },
-    { value: '11', label: 'December' }
-  ];
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-[10px] max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
@@ -496,7 +477,7 @@ const ExportModal = ({ isOpen, onClose, onExport, isLoading, filterOptions }: {
 };
 
 // Import Modal Component
-const ImportModal = ({ isOpen, onClose, onImport, isLoading }: {
+const ImportModal = ({ isOpen, onClose, isLoading }: {
   isOpen: boolean;
   onClose: () => void;
   onImport: (file: File, type: string) => void;
@@ -521,15 +502,6 @@ const ImportModal = ({ isOpen, onClose, onImport, isLoading }: {
 
       setFile(selectedFile);
     }
-  };
-
-  const handleImport = () => {
-    if (!file) {
-      toast.error('Please select a file');
-      return;
-    }
-
-    onImport(file, importType);
   };
 
   return (
@@ -647,7 +619,6 @@ const EnhancedFilter = ({
   onTownChange,
   allTowns,
   userRole,
-  userTown,
   isRegionalManager,
   selectedStatus,
   onStatusChange,
@@ -1513,180 +1484,6 @@ const BypassConfirmModal = ({
         </motion.div>
       </div>
     </AnimatePresence>
-  );
-};
-
-// Enhanced// User Role Display Component
-const UserRoleDisplay = ({ userRole, userEmail, actualRole, userTown, userRegion, isRegionalManager }: {
-  userRole: string;
-  userEmail: string;
-  actualRole: string;
-  userTown: string;
-  userRegion: string;
-  isRegionalManager: boolean;
-}) => {
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'credit_analyst_officer': return 'Admin';
-      case 'checker': return 'Checker';
-      case 'maker': return 'Maker';
-      case 'branch_manager': return 'Branch Manager';
-      case 'regional_manager': return 'Regional Manager';
-      default: return role;
-    }
-  };
-
-  const getActualRoleLabel = (role: string) => {
-    return role;
-  };
-
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'maker': return <User className="w-4 h-4" />;
-      case 'checker': return <UserCheck className="w-4 h-4" />;
-      case 'credit_analyst_officer': return <Crown className="w-4 h-4" />;
-      case 'branch_manager': return <Building className="w-4 h-4" />;
-      case 'regional_manager': return <MapIcon className="w-4 h-4" />;
-      default: return <User className="w-4 h-4" />;
-    }
-  };
-
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'maker': return 'bg-blue-100 text-blue-800 border-gray-200';
-      case 'checker': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'credit_analyst_officer': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'branch_manager': return 'bg-green-100 text-green-800 border-green-200';
-      case 'regional_manager': return 'bg-indigo-100 text-indigo-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-3">
-      <div className="flex flex-col items-end">
-        <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium border ${getRoleColor(userRole)}`}>
-          {getRoleIcon(userRole)}
-          {userRole.replace(/_/g, ' ').toUpperCase()}
-        </span>
-        <div className="text-xs text-gray-500 mt-1">
-          <div>Actual: {actualRole}</div>
-          {userTown && <div>{isRegionalManager ? 'Region' : 'Town'}: {userTown}</div>}
-          {userRegion && isRegionalManager && <div>Region: {userRegion}</div>}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Town/Region Filter Component
-const TownFilter = ({
-  selectedTown,
-  onTownChange,
-  allTowns,
-  userRole,
-  userTown,
-  isRegionalManager
-}: {
-  selectedTown: string;
-  onTownChange: (town: string) => void;
-  allTowns: string[];
-  userRole: string;
-  userTown: string;
-  isRegionalManager: boolean;
-}) => {
-  const [showFilter, setShowFilter] = useState(false);
-
-  const isBranchManager = userRole === 'branch_manager';
-  const isManager = isBranchManager || isRegionalManager;
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setShowFilter(!showFilter)}
-        className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50"
-      >
-        <MapPin className="w-4 h-4" />
-        {isRegionalManager ? 'Region Filter' : 'Town Filter'}
-        {selectedTown && (
-          <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-            1
-          </span>
-        )}
-      </button>
-
-      {showFilter && (
-        <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-[10px] shadow-lg border border-gray-200 z-50 p-4">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-sm font-medium text-gray-900">
-              {isRegionalManager ? 'Filter by Region' : 'Filter by Town'}
-            </h3>
-            <button
-              onClick={() => setShowFilter(false)}
-              className="text-xs text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {isManager && selectedTown && (
-            <div className="mb-3 p-2 bg-white rounded-[10px]">
-              <p className="text-xs text-blue-700">
-                {isRegionalManager
-                  ? `Viewing applications for your region: ${selectedTown}`
-                  : `Viewing applications for your town: ${selectedTown}`
-                }
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-2">
-                {isRegionalManager ? 'Region' : 'Town'}
-                {isManager && <span className="text-gray-500"> (Auto-filtered)</span>}
-              </label>
-              <select
-                value={selectedTown || ''}
-                onChange={(e) => onTownChange(e.target.value)}
-                disabled={isManager}
-                className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-xs focus:ring-1 focus:ring-green-500 focus:border-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="">All {isRegionalManager ? 'Regions' : 'Towns'}</option>
-                {allTowns.map(town => (
-                  <option key={town} value={town}>
-                    {town}
-                  </option>
-                ))}
-              </select>
-              {isManager && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Managers are automatically filtered to their assigned {isRegionalManager ? 'region' : 'town'}
-                </p>
-              )}
-            </div>
-
-            <div className="flex justify-between pt-2 border-t border-gray-200">
-              <button
-                onClick={() => {
-                  onTownChange('');
-                }}
-                className="text-xs text-gray-600 hover:text-gray-800"
-                disabled={isManager}
-              >
-                Clear Filter
-              </button>
-              <button
-                onClick={() => setShowFilter(false)}
-                className="px-3 py-1 bg-green-600 text-white text-xs rounded-md hover:bg-green-700"
-              >
-                Apply Filter
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
   );
 };
 
@@ -2563,94 +2360,6 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
     } catch (error: unknown) {
       console.error('Error checking status:', error);
       toast.error('Error checking status');
-    } finally {
-      setIsCheckingStatus(false);
-    }
-  };
-
-  // Bulk Transaction Status Check
-  const checkBulkTransactionStatus = async () => {
-    // Get all pending transactions
-    const pendingTransactions = filteredCallbacks.filter(
-      callback => callback.status?.toLowerCase() === 'pending' && callback.transaction_id
-    );
-
-    if (pendingTransactions.length === 0) {
-      toast.error('No pending transactions to check');
-      return;
-    }
-
-    const toastId = toast.loading(`Checking ${pendingTransactions.length} pending transactions...`);
-    let successCount = 0;
-    let failCount = 0;
-
-    try {
-      setIsCheckingStatus(true);
-
-      // Process in batches to avoid overwhelming the server
-      const batchSize = 5;
-      for (let i = 0; i < pendingTransactions.length; i += batchSize) {
-        const batch = pendingTransactions.slice(i, i + batchSize);
-
-        await Promise.all(
-          batch.map(async (callback) => {
-            try {
-              const response = await fetch('https://mpesa-22p0.onrender.com/api/mpesa/check-transaction-status', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  transactionID: callback.transaction_id,
-                  remarks: 'Bulk status check from Admin Portal',
-                  occasion: 'BulkStatusCheck'
-                }),
-              });
-
-              const result = await response.json();
-              if (result.success) {
-                successCount++;
-              } else {
-                failCount++;
-              }
-            } catch (error) {
-              console.error(`Error checking ${callback.transaction_id}:`, error);
-              failCount++;
-            }
-          })
-        );
-
-        // Update progress
-        toast.loading(
-          `Checking transactions... ${Math.min(i + batchSize, pendingTransactions.length)}/${pendingTransactions.length}`,
-          { id: toastId }
-        );
-
-        // Small delay between batches
-        if (i + batchSize < pendingTransactions.length) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
-
-      // Show final result
-      if (failCount === 0) {
-        toast.success(
-          `✅ Successfully initiated status checks for ${successCount} transactions. Results will update shortly.`,
-          { id: toastId, duration: 5000 }
-        );
-      } else {
-        toast.success(
-          `Completed: ${successCount} successful, ${failCount} failed`,
-          { id: toastId, duration: 5000 }
-        );
-      }
-
-      // Refresh after a delay to show updated statuses
-      setTimeout(() => fetchCallbacks(), 10000);
-
-    } catch (error: unknown) {
-      console.error('Bulk status check error:', error);
-      toast.error('Error during bulk status check', { id: toastId });
     } finally {
       setIsCheckingStatus(false);
     }
@@ -3534,11 +3243,11 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   const [adminBypassMode, setAdminBypassMode] = useState(false);
 
 
-  const [allTownsState, setAllTownsState] = useState<string[]>([]);
+  const [, setAllTownsState] = useState<string[]>([]);
   const [userTown, setUserTown] = useState<string>('');
   const [userRegion, setUserRegion] = useState<string>('');
-  const [areaTownMapping, setAreaTownMapping] = useState<Record<string, string[]>>({});
-  const [branchAreaMapping, setBranchAreaMapping] = useState<Record<string, string>>({});
+  const [, setAreaTownMapping] = useState<Record<string, string[]>>({});
+  const [, setBranchAreaMapping] = useState<Record<string, string>>({});
   // const [isArea, setIsArea] = useState<boolean>(false);
   // const [townsInArea, setTownsInArea] = useState<string[]>([]);
 
@@ -3557,9 +3266,9 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   // Maker-Checker Payment Flow State
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
   const [userRole, setUserRole] = useState('maker');
-  const [actualUserRole, setActualUserRole] = useState('STAFF');
+  const [, setActualUserRole] = useState('STAFF');
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [userEmail, setUserEmail] = useState<string>('');
+  const [, setUserEmail] = useState<string>('');
   const [showApprovalQueue, setShowApprovalQueue] = useState(false);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] = useState(null);
   const [showPaymentDetails, setShowPaymentDetails] = useState(false);
@@ -3594,12 +3303,6 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   const isChecker = userRole === 'checker';
   const isMaker = userRole === 'maker';
   const isAdminOrChecker = isAdmin || isChecker;
-
-  // Enhanced status filter handler
-  const handleStatusFilter = (status: string) => {
-    setSelectedStatus(status);
-    setCurrentPage(1);
-  };
 
   /*
   // Duplicate prevention function
@@ -3754,7 +3457,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
       console.log('🔍 Looking up manager assignment for email:', user.email);
 
-      const { data: regionalManagerData, error: regionalManagerError } = await supabase
+      const { data: regionalManagerData } = await supabase
         .from('employees')
         .select('"Town", "Branch"')
         .eq('regional_manager', user.email)
@@ -3766,7 +3469,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         userTown = userRegion;
         console.log('📍 Regional Manager assigned to Region:', userRegion);
       } else {
-        const { data: branchManagerData, error: branchManagerError } = await supabase
+        const { data: branchManagerData } = await supabase
           .from('employees')
           .select('"Town", "Branch"')
           .eq('manager_email', user.email)
@@ -3780,7 +3483,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         } else {
           console.log('❌ User email not found in regional_manager or manager_email columns');
 
-          const { data: employeeData, error: employeeError } = await supabase
+          const { data: employeeData } = await supabase
             .from('employees')
             .select('"Town", "Branch"')
             .eq('"Work Email"', user.email)
@@ -4132,17 +3835,6 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   // Format phone number for M-Pesa (254 format)
   const formatPhoneNumber = (phone: string) => {
     return SMSService.formatPhoneNumberForSMS(phone);
-  };
-
-  // Calculate total amount for selected applications
-  const calculateTotalAmount = () => {
-    const approvedApps = getFullyApprovedApplications();
-    return approvedApps.reduce((total, app) => {
-      if (selectedStaff[app.id]) {
-        return total + Number(app["Amount Requested"] || 0);
-      }
-      return total;
-    }, 0);
   };
 
   // Get count of selected staff
@@ -4727,7 +4419,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         approved_by_email: user.email
       };
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('salary_advance_payment_flows')
         .update(updateData)
         .eq('id', payment.id)
@@ -4816,7 +4508,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         rejected_by_email: user.email
       };
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('salary_advance_payment_flows')
         .update(updateData)
         .eq('id', payment.id)
@@ -5052,19 +4744,6 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       await fetchApplications();
     } finally {
       setIsBypassLoading(false);
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'approved':
-        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-      case 'rejected':
-        return <XCircle className="h-4 w-4 text-red-500" />;
-      case 'paid':
-        return <CheckCircle2 className="h-4 w-4 text-blue-500" />;
-      default:
-        return <Clock className="h-4 w-4 text-yellow-500" />;
     }
   };
 

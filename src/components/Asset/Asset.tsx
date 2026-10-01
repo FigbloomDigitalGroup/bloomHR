@@ -229,7 +229,7 @@ const AssetManagement: React.FC = () => {
   // Handle functions
   const handleAddAsset = async () => {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('assets')
         .insert([{
           ...newAsset,

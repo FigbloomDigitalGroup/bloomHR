@@ -181,7 +181,6 @@ const QRScanner: React.FC = () => {
             
             // Simple QR code detection (placeholder)
             // In a real app, you would use a QR code library here
-            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
             
             // This is a placeholder - you should integrate a QR library like jsqr
             // For now, we'll use manual input as primary method
@@ -386,7 +385,7 @@ const QRScanner: React.FC = () => {
                     disabled={scanning}
                     className="h-[34px] bg-gray-50 border border-gray-300 rounded-lg px-3 py-1.5 text-xs text-gray-900 focus:outline-none focus:border-green-500 focus:shadow-[0_0_10px_rgba(34,197,94,0.3)] transition-all duration-200"
                   >
-                    {cameras.map((camera, index) => (
+                    {cameras.map((camera, _index) => (
                       <option key={camera.deviceId} value={camera.deviceId}>
                         {camera.label}
                       </option>

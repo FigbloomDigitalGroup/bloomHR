@@ -184,7 +184,7 @@ export class DatabaseService {
   async canUseRealtime(): Promise<boolean> {
     try {
       // Check if messages table has replica identity set
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('messages')
         .select('id')
         .limit(1);

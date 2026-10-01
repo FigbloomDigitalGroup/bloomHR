@@ -9,7 +9,7 @@ import './index.css'
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js')
-    .then((registration) => {
+    .then((_registration) => {
       console.log('SW registered');
     })
     .catch((error) => {

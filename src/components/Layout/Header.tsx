@@ -117,7 +117,7 @@ const HeaderDropdown = ({ value, options, onChange, placeholder, icon: Icon }: {
   );
 };
 // ...
-export default function Header({ user, onLogout, selectedTown, onTownChange, selectedRegion, onRegionChange, towns, regions }: HeaderProps) {
+export default function Header({ selectedTown, onTownChange, selectedRegion, onRegionChange, towns, regions }: HeaderProps) {
   const [notifications, setNotifications] = useState<NotificationState>({
     staff: 0,
     leave: 0,

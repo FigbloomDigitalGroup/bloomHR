@@ -694,31 +694,6 @@ const Pagination = ({
   );
 };
 
-// Function to get branch from town using the reference table
-const getBranchFromTown = async (town: string): Promise<string | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('kenya_branches')
-      .select('"Branch Office"')
-      .ilike('Area', `%${town}%`)
-      .limit(1);
-
-    if (error) {
-      console.error("Error fetching branch from town:", error);
-      return null;
-    }
-
-    if (data && data.length > 0) {
-      return data[0]['Branch Office'];
-    }
-
-    return null;
-  } catch (error) {
-    console.error("Error in getBranchFromTown:", error);
-    return null;
-  }
-};
-
 // Get town/area display name
 const getDisplayName = (currentTown: string, isArea: boolean) => {
   if (!currentTown) return "All Towns";
@@ -1321,14 +1296,14 @@ const LeaveApplicationFormModal = ({
 };
 
 // Leave Management Dashboard
-export default function LeaveManagementSystem({ selectedTown, onTownChange, selectedRegion }: TownProps) {
+export default function LeaveManagementSystem({ selectedTown, onTownChange }: TownProps) {
   // State variables for town filtering
   const [currentTown, setCurrentTown] = useState<string>(selectedTown || '');
   const [areaTownMapping, setAreaTownMapping] = useState<AreaTownMapping>({});
-  const [branchAreaMapping, setBranchAreaMapping] = useState<BranchAreaMapping>({});
+  const [, setBranchAreaMapping] = useState<BranchAreaMapping>({});
   const [isArea, setIsArea] = useState<boolean>(false);
   const [townsInArea, setTownsInArea] = useState<string[]>([]);
-  const [debugInfo, setDebugInfo] = useState<string>("Initializing...");
+  const [, setDebugInfo] = useState<string>("Initializing...");
 
   // Two-level leave approval (FIG-573): who is the logged-in user, for
   // matching against an applicant's assigned "Leave Approver" below.
@@ -1350,7 +1325,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange, sele
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
   const [statusAction, setStatusAction] = useState<'approve' | 'reject' | 'recommend' | 'not_recommend' | null>(null);
-  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [, setUpdatingStatus] = useState(false);
 
   // Pagination states
   const [applicationsPage, setApplicationsPage] = useState(1);

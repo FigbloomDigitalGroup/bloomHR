@@ -104,7 +104,6 @@ const TransactionStatusChecker: React.FC = () => {
             setResults(prev => [...newResults, ...prev]);
 
             let successCount = 0;
-            let failCount = 0;
 
             const batchSize = 5;
             for (let i = 0; i < codes.length; i += batchSize) {
@@ -136,7 +135,6 @@ const TransactionStatusChecker: React.FC = () => {
                                         : r
                                 ));
                             } else {
-                                failCount++;
                                 setResults(prev => prev.map(r =>
                                     r.transactionID === code
                                         ? { ...r, status: 'failed', error: result.message }
@@ -144,7 +142,6 @@ const TransactionStatusChecker: React.FC = () => {
                                 ));
                             }
                         } catch {
-                            failCount++;
                             setResults(prev => prev.map(r =>
                                 r.transactionID === code
                                     ? { ...r, status: 'failed', error: 'Connection Error' }

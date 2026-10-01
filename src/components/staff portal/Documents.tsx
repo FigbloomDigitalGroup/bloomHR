@@ -290,7 +290,6 @@ const DocumentsManager = () => {
     // Process uploads with limited concurrency (2 at a time to avoid overwhelming the server)
     const concurrencyLimit = 2;
     const results = [];
-    let hasErrors = false;
 
     for (let i = 0; i < filesToUpload.length; i += concurrencyLimit) {
       const batch = filesToUpload.slice(i, i + concurrencyLimit);
@@ -321,7 +320,6 @@ const DocumentsManager = () => {
             }
           }));
 
-          hasErrors = true;
           return { docType, error, success: false };
         }
       });

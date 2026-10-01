@@ -14,8 +14,7 @@ export const DetailItem = ({
   value, 
   isTextArea = false,
   isPdf = false,
-  fileName = '',
-  onViewPdf
+  fileName = ''
 }: DetailItemProps) => {
   if (!value && !isPdf) return null;
   

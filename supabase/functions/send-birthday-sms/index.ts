@@ -5,7 +5,7 @@ const CELCOM_API_KEY = Deno.env.get('CELCOM_API_KEY') ?? '';
 const CELCOM_PARTNER_ID = Deno.env.get('CELCOM_PARTNER_ID') ?? '';
 const CELCOM_SHORTCODE = Deno.env.get('CELCOM_SHORTCODE') ?? '';
 
-serve(async (req) => {
+serve(async (_req) => {
     try {
         // Initialize Supabase client
         const supabaseClient = createClient(
@@ -96,7 +96,7 @@ serve(async (req) => {
                 const encodedMessage = encodeURIComponent(message);
                 const url = `https://isms.celcomafrica.com/api/services/sendsms/?apikey=${CELCOM_API_KEY}&partnerID=${CELCOM_PARTNER_ID}&message=${encodedMessage}&shortcode=${CELCOM_SHORTCODE}&mobile=${phone}`;
 
-                const response = await fetch(url, { method: 'GET' });
+                await fetch(url, { method: 'GET' });
 
                 // Log to sms_logs
                 await supabaseClient.from('sms_logs').insert({

@@ -178,43 +178,6 @@ const StatusBadge: React.FC<{ status: string; value?: number }> = ({ status, val
     </span>
   );
 };
-const SummaryCard: React.FC<{
-  label: string;
-  value: number;
-  icon: React.ComponentType<{ className?: string }>;
-  color: string;
-  isPercentage?: boolean;
-  unit?: string;
-}> = ({
-  label,
-  value,
-  icon: Icon,
-  color,
-  isPercentage = false,
-  unit = ''
-}) => {
-    const colorClasses = {
-      red: 'bg-red-100 text-red-600',
-      orange: 'bg-orange-100 text-orange-600',
-      green: 'bg-green-100 text-green-600',
-      purple: 'bg-purple-100 text-purple-600'
-    };
-    return (
-      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <div className={`p-2 rounded-lg ${colorClasses[color as keyof typeof colorClasses]}`}>
-            <Icon className="w-5 h-5" />
-          </div>
-        </div>
-        <div className="space-y-1">
-          <p className="text-gray-600 text-xs font-semibold uppercase tracking-wide">{label}</p>
-          <p className="text-gray-900 text-xl font-bold">
-            {Math.round(value)}{isPercentage ? '%' : ''}{unit ? ` ${unit}` : ''}
-          </p>
-        </div>
-      </div>
-    );
-  };
 const Pagination: React.FC<{
   currentPage: number;
   totalPages: number;
@@ -288,7 +251,7 @@ const Pagination: React.FC<{
     </div>
   );
 };
-const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange, selectedRegion }) => {
+const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
   const [selectedTab, setSelectedTab] = useState<'individual' | 'branch' | 'targets' | 'clients' | 'loans' | 'payments' | 'employeePerformance' | 'branchPerformance' | 'clientVisit'>('individual');
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [selectedRole, setSelectedRole] = useState('All Roles');
@@ -317,15 +280,15 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
   // Town filtering state
   const [currentTown, setCurrentTown] = useState<string>('');
   const [areaTownMapping, setAreaTownMapping] = useState<AreaTownMapping>({});
-  const [branchAreaMapping, setBranchAreaMapping] = useState<BranchAreaMapping>({});
+  const [, setBranchAreaMapping] = useState<BranchAreaMapping>({});
   const [townAreaMapping, setTownAreaMapping] = useState<TownAreaMapping>({});
   const [townBranchMapping, setTownBranchMapping] = useState<TownBranchMapping>({});
-  const [branchTownMapping, setBranchTownMapping] = useState<BranchTownMapping>({});
+  const [, setBranchTownMapping] = useState<BranchTownMapping>({});
   const [isArea, setIsArea] = useState<boolean>(false);
-  const [townsInArea, setTownsInArea] = useState<string[]>([]);
+  const [, setTownsInArea] = useState<string[]>([]);
   const [selectedTowns, setSelectedTowns] = useState<string[]>([]);
   const [eligibleBranches, setEligibleBranches] = useState<string[]>([]);
-  const [debugInfo, setDebugInfo] = useState<string>("Initializing...");
+  const [, setDebugInfo] = useState<string>("Initializing...");
   // Email state
   const [emailSending, setEmailSending] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -339,11 +302,6 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
   });
 
   // Modal states
-  const [showEmployeePerfModal, setShowEmployeePerfModal] = useState(false);
-  const [showBranchPerfModal, setShowBranchPerfModal] = useState(false);
-  const [showTargetModal, setShowTargetModal] = useState(false);
-  const [showVisitModal, setShowVisitModal] = useState(false);
-  const [currentRecord, setCurrentRecord] = useState<any>(null);
   // Helper function to normalize strings for matching
   const normalizeString = (str: string): string => {
     return str.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -617,20 +575,6 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
     } else {
       // Show just the town name for specific town selection
       return `${currentTown}`;
-    }
-  };
-  const handleCloseModal = () => {
-    setShowEmployeePerfModal(false);
-    setShowBranchPerfModal(false);
-    setShowTargetModal(false);
-    setShowVisitModal(false);
-    setCurrentRecord(null);
-  };
-  const handleSaveRecord = async (type: string, record: any) => {
-    try {
-      console.log(`Saved ${type}:`, record);
-    } catch (error) {
-      console.error(`Error saving ${type}:`, error);
     }
   };
   useEffect(() => {
@@ -1241,8 +1185,6 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
     const loansDisbursed = employeeLoans.filter(loan =>
       loan.status === 'Disbursed' || loan.status === 'Active' || loan.status === 'Completed'
     ).length;
-
-    const collectionTarget = employeeTargets.find(t => t.target_type === 'collection')?.target_value || 0;
     const totalPortfolio = employeeLoans.reduce((sum, loan) => sum + (loan.amount_disbursed || 0), 0);
     const outstandingBalance = employeeLoans.reduce((sum, loan) => sum + (loan.outstanding_balance || 0), 0);
     const collectedAmount = totalPortfolio - outstandingBalance;
@@ -1251,13 +1193,9 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
     const parLoans = employeeLoans.filter(loan => loan.par_days > 0);
     const parAmount = parLoans.reduce((sum, loan) => sum + (loan.outstanding_balance || 0), 0);
     const parRate = totalPortfolio > 0 ? (parAmount / totalPortfolio) * 100 : 0;
-
-    const fieldVisitsTarget = employeeTargets.find(t => t.target_type === 'field_visits')?.target_value || 0;
     const fieldVisits = clientVisits
       .filter(visit => visit.employee_id === employee["Employee Number"])
       .length;
-
-    const attendanceTarget = employeeTargets.find(t => t.target_type === 'attendance')?.target_value || 0;
     const attendanceDays = latestPerformance?.attendance_days || 0;
     const workingDays = latestPerformance?.working_days || 1;
     const attendanceRate = (attendanceDays / workingDays) * 100;
@@ -1325,8 +1263,6 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
       return isStringMatch(employee.Branch || '', branch["Branch Office"] || '') ||
         isStringMatch(employee.Town || '', branch["Town"] || '');
     }).map(employee => {
-      // Calculate performance metrics for each employee
-      const employeeClients = clients.filter(client => client.loan_officer === employee["Employee Number"]);
       const employeeLoans = loans.filter(loan => loan.loan_officer === employee["Employee Number"]);
 
       const loansDisbursed = employeeLoans.filter(loan =>
@@ -1438,100 +1374,6 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
     setEmployeePage(1);
     setBranchPage(1);
   };
-  // Client operations
-  const handleUpdateClient = async (updatedClient: Client) => {
-    try {
-      const { error } = await supabase
-        .from('clients')
-        .update(updatedClient)
-        .eq('client_id', updatedClient.client_id);
-
-      if (error) throw error;
-      setClients(prevClients =>
-        prevClients.map(c =>
-          c.client_id === updatedClient.client_id ? updatedClient : c
-        )
-      );
-
-      await refreshData();
-      handleCloseModal();
-
-    } catch (error) {
-      console.error('Error saving client:', error);
-    }
-  };
-  const handleDeleteClient = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('clients')
-        .delete()
-        .eq('client_id', id);
-
-      if (error) throw error;
-      setClients(clients.filter(c => c.client_id !== id));
-      await refreshData();
-    } catch (error) {
-      console.error('Error deleting client:', error);
-    }
-  };
-  // Loan operations
-  const handleUpdateLoan = async (updatedLoan: Loan) => {
-    try {
-      const { error } = await supabase
-        .from('loans')
-        .update(updatedLoan)
-        .eq('loan_id', updatedLoan.loan_id);
-
-      if (error) throw error;
-      setLoans(loans.map(l => l.loan_id === updatedLoan.loan_id ? updatedLoan : l));
-      await refreshData();
-    } catch (error) {
-      console.error('Error updating loan:', error);
-    }
-  };
-  const handleDeleteLoan = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('loans')
-        .delete()
-        .eq('loan_id', id);
-
-      if (error) throw error;
-      setLoans(loans.filter(l => l.loan_id !== id));
-      await refreshData();
-    } catch (error) {
-      console.error('Error deleting loan:', error);
-    }
-  };
-  // Payment operations
-  const handleUpdatePayment = async (updatedPayment: LoanPayment) => {
-    try {
-      const { error } = await supabase
-        .from('loan_payments')
-        .update(updatedPayment)
-        .eq('payment_id', updatedPayment.payment_id);
-
-      if (error) throw error;
-      setLoanPayments(loanPayments.map(p => p.payment_id === updatedPayment.payment_id ? updatedPayment : p));
-      await refreshData();
-    } catch (error) {
-      console.error('Error updating payment:', error);
-    }
-  };
-  const handleDeletePayment = async (id: number) => {
-    try {
-      const { error } = await supabase
-        .from('loan_payments')
-        .delete()
-        .eq('payment_id', id);
-
-      if (error) throw error;
-      setLoanPayments(loanPayments.filter(p => p.payment_id !== id));
-      await refreshData();
-    } catch (error) {
-      console.error('Error deleting payment:', error);
-    }
-  };
   // Fixed Employee Performance operations
   const handleUpdateEmployeePerformance = async (updatedPerf: EmployeePerformance) => {
     try {
@@ -1605,94 +1447,6 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
     } catch (error) {
       console.error('Error deleting employee performance:', error);
       toast.error('Failed to delete performance record. Please try again.');
-    }
-  };
-  // Branch Performance operations
-  const handleUpdateBranchPerformance = async (updatedPerf: BranchPerformance) => {
-    try {
-      const { error } = await supabase
-        .from('branch_performance')
-        .update(updatedPerf)
-        .eq('id', updatedPerf.id);
-
-      if (error) throw error;
-      setBranchPerformance(branchPerformance.map(p => p.id === updatedPerf.id ? updatedPerf : p));
-      await refreshData();
-    } catch (error) {
-      console.error('Error updating branch performance:', error);
-    }
-  };
-  const handleDeleteBranchPerformance = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('branch_performance')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      setBranchPerformance(branchPerformance.filter(p => p.id !== id));
-      await refreshData();
-    } catch (error) {
-      console.error('Error deleting branch performance:', error);
-    }
-  };
-  // Performance Target operations
-  const handleUpdatePerformanceTarget = async (updatedTarget: PerformanceTarget) => {
-    try {
-      const { error } = await supabase
-        .from('performance_targets')
-        .update(updatedTarget)
-        .eq('id', updatedTarget.id);
-
-      if (error) throw error;
-      setPerformanceTargets(performanceTargets.map(t => t.id === updatedTarget.id ? updatedTarget : t));
-      await refreshData();
-    } catch (error) {
-      console.error('Error updating performance target:', error);
-    }
-  };
-  const handleDeletePerformanceTarget = async (id: number) => {
-    try {
-      const { error } = await supabase
-        .from('performance_targets')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      setPerformanceTargets(performanceTargets.filter(t => t.id !== id));
-      await refreshData();
-    } catch (error) {
-      console.error('Error deleting performance target:', error);
-    }
-  };
-  // Client Visit operations
-  const handleUpdateClientVisit = async (updatedVisit: ClientVisit) => {
-    try {
-      const { error } = await supabase
-        .from('client_visits')
-        .update(updatedVisit)
-        .eq('visit_id', updatedVisit.visit_id);
-
-      if (error) throw error;
-      setClientVisits(clientVisits.map(v => v.visit_id === updatedVisit.visit_id ? updatedVisit : v));
-      await refreshData();
-    } catch (error) {
-      console.error('Error updating client visit:', error);
-    }
-  };
-  const handleDeleteClientVisit = async (id: number | string) => {
-    try {
-      const numericId = typeof id === 'string' ? Number(id) : id;
-      const { error } = await supabase
-        .from('client_visits')
-        .delete()
-        .eq('visit_id', numericId);
-
-      if (error) throw error;
-      setClientVisits(clientVisits.filter(v => v.visit_id !== numericId));
-      await refreshData();
-    } catch (error) {
-      console.error('Error deleting client visit:', error);
     }
   };
 
@@ -2205,11 +1959,6 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange,
             <>
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {paginatedEmployees.map(employee => {
-                  // Find the corresponding branch data for display
-                  const branchInfo = filteredBranchesByTown.find(b =>
-                    isStringMatch(b["Branch Office"] || '', employee.branch || '') ||
-                    isStringMatch(b["Town"] || '', employee.branch || '')
-                  );
                   const activeClients = employee.clients.filter(c => c.status === 'active').length;
                   const clientRatio = employee.clients.length > 0 ? Math.round((activeClients / employee.clients.length) * 100) : 0;
 

@@ -18,10 +18,6 @@ export default function Unauthorized() {
     setFloatingElements(elements);
   }, []);
 
-  const handleContactAdmin = () => {
-    console.log('Contact admin functionality');
-  };
-
   const modules = [
     { name: "Dashboard", icon:'💎'},
     { name: "AI assistant", icon:'💎'},

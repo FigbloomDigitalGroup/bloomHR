@@ -103,9 +103,6 @@ export function ChatLayout() {
       setError(null);
       const userChannels = await chatService.getUserChannels(userId);
       console.log("✅ Loaded channels:", userChannels.length);
-      
-      // Separate regular channels and DMs
-      const regularChannels = userChannels.filter(ch => !ch.id.startsWith('dm-')) as Channel[];
       const dmChannels = userChannels.filter(ch => ch.id.startsWith('dm-')) as Channel[];
       
       setChannels(userChannels);
