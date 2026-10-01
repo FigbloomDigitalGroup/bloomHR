@@ -21,6 +21,7 @@ import {
   Lock
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { assertEmployeeForStaffLogin } from '../../lib/staffEmployee';
 import { adminApi } from '../../lib/adminApi';
 import toast from 'react-hot-toast';
 
@@ -895,25 +896,8 @@ export default function UserRolesSettings() {
         setEditingUser(null);
         toast.success(`User ${finalUserData.email} updated successfully`);
       } else {
-        // The Staff Portal resolves the employee with an exact match on "Work Email", so a
-        // STAFF login without a matching employees row can never load its data. Only STAFF
-        // logins land in the portal (see App.tsx), so other roles don't need a linked row.
-        // Use the same exact match as the portal: .ilike would treat '_' and '%' in an
-        // email as wildcards and could pass a row the portal then fails to find.
-        if (finalUserData.role === 'STAFF') {
-          const { data: employee, error: employeeError } = await supabase
-            .from('employees')
-            .select('"Employee Number"')
-            .eq('"Work Email"', finalUserData.email)
-            .maybeSingle();
-
-          if (employeeError) throw employeeError;
-          if (!employee) {
-            throw new Error(
-              `No employee has the Work Email ${finalUserData.email} (exact match, including letter case). Add or correct the employee first, then create their login.`
-            );
-          }
-        }
+        // A STAFF login needs a matching employees row (see assertEmployeeForStaffLogin).
+        await assertEmployeeForStaffLogin(supabase, finalUserData.role, finalUserData.email);
 
         // Create new user with password
         const created = await adminApi.createUser({
