@@ -4,22 +4,13 @@ import {
   Download, 
   Calendar, 
   Building, 
-  User, 
   ChevronDown,
   Loader2,
   Search,
-  DollarSign,
-  Shield,
-  FileText,
-  CheckCircle,
-  AlertCircle,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight,
-  Landmark,
-  Calculator,
-  Receipt
+  ChevronsRight
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import { TownProps } from '../../types/supabase';

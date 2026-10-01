@@ -150,7 +150,7 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
             }).eq('id', advance.id);
             toast.success(isNowCompleted ? 'Advance fully repaid! ✓' : 'Repayment recorded');
             fetchData();
-        } catch (err) {
+        } catch {
             toast.error('Failed to record repayment');
         }
     };

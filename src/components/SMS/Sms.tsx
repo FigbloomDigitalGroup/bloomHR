@@ -1,10 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import {
-  MessageSquare, Send, Upload, FileText, CreditCard,
-  CheckCircle, AlertCircle, Info, Package, Receipt,
-  Building, User, Phone, Mail, Download, Clock,
-  Calendar, Users, UserCheck, FileEdit, Trash2,
-  Plus, X, ChevronDown, ChevronUp, Bell, Search,
+  MessageSquare, Send, Upload, FileText, CreditCard, Info, Clock, Users, FileEdit, Trash2,
+  Plus, X, Search,
   Loader, Shield, Smartphone, RefreshCw, Save
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';

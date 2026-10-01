@@ -189,7 +189,7 @@ export default function SendEmail() {
 
           if (!response.ok) throw new Error('Failed');
           return true;
-        } catch (e) {
+        } catch {
           return false;
         }
       };

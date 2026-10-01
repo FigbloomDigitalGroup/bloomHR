@@ -2,23 +2,12 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Phone,
-    CheckCircle2,
     XCircle,
-    Clock,
     Search,
-    Filter,
-    AlertCircle,
-    User,
-    Calendar,
-    MessageSquare,
-    ChevronLeft,
-    ChevronRight,
     ArrowUpRight,
-    Building,
     MapPin,
     ShieldCheck,
     X,
-    CheckCircle,
     Zap
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -153,7 +142,7 @@ const PhoneNumberApprovals = () => {
             setSelectedRequest(null);
             setAdminNotes('');
             await fetchRequests();
-        } catch (error) {
+        } catch {
             toast.error('Failed to approve request');
         } finally {
             setIsProcessing(false);
@@ -204,7 +193,7 @@ const PhoneNumberApprovals = () => {
             setSelectedRequest(null);
             setAdminNotes('');
             await fetchRequests();
-        } catch (error) {
+        } catch {
             toast.error('Failed to reject request');
         } finally {
             setIsProcessing(false);

@@ -4,23 +4,13 @@ import {
   Download, 
   Calendar, 
   Building, 
-  User, 
   ChevronDown,
   Loader2,
   Search,
-  DollarSign,
-  Phone,
-  FileText,
-  CheckCircle,
-  XCircle,
-  Clock,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight,
-  Scale,
-  CreditCard,
-  CalendarClock
+  ChevronsRight
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import { TownProps } from '../../types/supabase';
@@ -797,8 +787,8 @@ const StaffLoansReport: React.FC<BaseReportProps> = ({
           row.status || '',
           row.deduction_status || '',
           row.disbursement_method || '',
-          `"${row.mpesa_code}"` || '',
-          `"${row.approved_by}"` || ''
+          row.mpesa_code ? `"${row.mpesa_code}"` : '',
+          row.approved_by ? `"${row.approved_by}"` : ''
         ].join(',')
       )
     ].join('\n');

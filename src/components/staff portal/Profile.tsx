@@ -1,7 +1,7 @@
 // Profile.tsx
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Loader2, User, UploadCloud, Edit, X } from 'lucide-react';
+import { Loader2, User, UploadCloud, Edit, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 

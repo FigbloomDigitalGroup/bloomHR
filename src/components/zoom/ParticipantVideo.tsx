@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, MicOff, Video, VideoOff, Crown, User } from 'lucide-react';
+import { Mic, MicOff, VideoOff, Crown, User } from 'lucide-react';
 import { ZoomUser } from '../../types/zoom';
 
 interface ParticipantVideoProps {

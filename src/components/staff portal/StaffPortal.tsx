@@ -3,16 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // Phosphor Icons - Premium icon set
 import {
-  CreditCard as PhCreditCard,
-  Coins as PhCoins,
-  Receipt as PhReceipt,
   ChatCircleDots as PhChatCircleDots,
-  ClockCounterClockwise as PhClockCounterClockwise,
   FileText as PhFileText,
-  Fingerprint as PhFingerprint,
-  FolderOpen as PhFolderOpen,
-  Lifebuoy as PhLifebuoy,
-  Sparkle as PhSparkle,
   SquaresFour as PhSquaresFour,
   GraduationCap as PhGraduationCap,
   TrendUp as PhTrendUp,
@@ -26,16 +18,13 @@ import {
   Briefcase as PhBriefcase,
   Clock as PhClock,
   CurrencyDollar as PhCurrencyDollar,
-  Warning as PhWarning,
-  Lightning as PhLightning
+  Warning as PhWarning
 } from '@phosphor-icons/react';
 
 // Keep Lucide icons for UI elements only
 import {
   X,
   ChevronRight,
-  MapPin,
-  MapPinOff,
   Trash2,
   Bell,
   Menu,
@@ -72,7 +61,6 @@ import EmployeeBioPage from './Bio';
 import IncidentReport from './IncidentReport';
 import JobApplications from './JobApplications';
 import solo from '../../../public/solo.png';
-import bannerAvatar from '../../../public/banner-avatar.png';
 
 interface CompanyProfile {
   id: number;
@@ -347,7 +335,7 @@ async function checkExistingLogin(employeeNumber: string): Promise<boolean> {
       .single();
 
     return !!data;
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -546,7 +534,7 @@ const LeaveApplicationForm = () => {
             setFormData(prev => ({
               ...prev,
               "Employee Number": data["Employee Number"] || '',
-              "Name": `${data["First Name"]} ${data["Last Name"]}` || '',
+              "Name": `${data["First Name"]} ${data["Last Name"]}`,
               "Office Branch": officeBranch
             }));
 
@@ -1391,7 +1379,7 @@ const SalaryAdvanceForm = () => {
             setFormData(prev => ({
               ...prev,
               "Employee Number": data["Employee Number"] || '',
-              "Full Name": `${data["First Name"]} ${data["Last Name"]}` || '',
+              "Full Name": `${data["First Name"]} ${data["Last Name"]}`,
               "Office Branch": data["Office"] || '',
               "Basic Salary": basicSalary,
               "Net Salary": basicSalary
@@ -2009,7 +1997,7 @@ const LoanRequestForm = () => {
             setFormData(prev => ({
               ...prev,
               "Employee Number": data["Employee Number"] || '',
-              "Full Name": `${data["First Name"]} ${data["Last Name"]}` || '',
+              "Full Name": `${data["First Name"]} ${data["Last Name"]}`,
               "Office Branch": data["Office"] || '',
               "Basic Salary": basicSalary,
               "Repayment Schedule": generateRepaymentSchedule(2)

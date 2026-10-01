@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Smartphone, DollarSign, Send, RefreshCw,
-    CheckCircle, XCircle, Clock, Activity,
-    Search, Copy, ShieldCheck, Mail, AlertTriangle, Zap, Landmark, Building, MapPin, X, ArrowRight, TrendingUp
+    Smartphone, DollarSign, RefreshCw,
+    CheckCircle, XCircle, Clock,
+    Search, Copy, ShieldCheck, Mail, AlertTriangle, Zap, Landmark
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -79,7 +79,7 @@ const MpesaZapPortal: React.FC = () => {
                     if (fundsParam?.Value) {
                         setUtilityBalance(`KES ${Number(fundsParam.Value).toLocaleString()}`);
                     }
-                } catch (e) {
+                } catch {
                     // Silent fail
                 }
             }

@@ -9,15 +9,12 @@ import {
   CheckSquare, Square, ChevronLeft, ChevronRight, UserCheck, ShieldCheck,
   Eye, AlertTriangle, Loader, CheckCircle, XCircle as XCircleIcon,
   User, UserCog, Settings, MapPin, Filter, X, Edit3, DollarSign,
-  Crown, Key, Building, Map as MapIcon, Award, Smartphone, RefreshCw,
+  Crown, Building, Map as MapIcon, Award, Smartphone, RefreshCw,
   Download, Upload, Calendar, Activity, TrendingUp,
-  Banknote, Zap, ToggleLeft, ToggleRight, Unlock, Sparkles
+  Banknote, Zap
 } from 'lucide-react';
-import {
-  AreaChart,
-  Area,
-  ResponsiveContainer
-} from 'recharts';
+
+
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 import AdvanceApplicationManager from './staffSetting';
 import SearchableDropdown from '../UI/SearchableDropdown';
@@ -34,7 +31,7 @@ const SMSService = {
     }
 
     // Remove all non-numeric characters
-    let cleaned = String(phone).replace(/\D/g, '');
+    const cleaned = String(phone).replace(/\D/g, '');
 
     console.log('Formatting phone:', phone, '-> cleaned:', cleaned);
 
@@ -3261,7 +3258,7 @@ const BulkPaymentModal = ({
   const parseApplicationDate = (app: any): Date => {
     const dateValue = app.time_added || app.created_at || app.application_date;
     if (!dateValue) return new Date();
-    let parsedDate = new Date(dateValue);
+    const parsedDate = new Date(dateValue);
     if (isNaN(parsedDate.getTime()) || parsedDate.getFullYear() < 2020) {
       return new Date();
     }
@@ -4243,7 +4240,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
     const { action, notes, adjustedAmount } = recommendationData;
 
     try {
-      let updateData: any = {
+      const updateData: any = {
         admin_notes: notes,
         last_updated: new Date().toISOString()
       };
@@ -5503,7 +5500,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                 updateData.last_updated = new Date().toISOString();
 
                 // Try to find by employee number first, then by name
-                let query = supabase.from('salary_advance');
+                const query = supabase.from('salary_advance');
 
                 if (update['Employee Number']) {
                   // Update by employee number
@@ -5575,7 +5572,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
   // Enhanced filtering function
   const getFilteredApplications = () => {
-    let filtered = applications.filter(app => {
+    const filtered = applications.filter(app => {
       const matchesSearch =
         app["Employee Number"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         app["Full Name"]?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -5627,10 +5624,11 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
           case 'this_month':
             if (appDate < startOfMonth) return false;
             break;
-          case 'last_month':
+          case 'last_month': {
             const endOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
             if (appDate < startOfLastMonth || appDate > endOfLastMonth) return false;
             break;
+          }
           case 'last_3_months':
             if (appDate < startOfLast3Months) return false;
             break;
@@ -6291,7 +6289,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                         {(() => {
                           const maxVisible = 5;
                           let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
-                          let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+                          const endPage = Math.min(totalPages, startPage + maxVisible - 1);
                           if (endPage - startPage < maxVisible - 1) startPage = Math.max(1, endPage - maxVisible + 1);
                           return Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i).map(page => (
                             <button

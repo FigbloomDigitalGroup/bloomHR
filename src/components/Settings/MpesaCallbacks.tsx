@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Search, RefreshCw, CheckCircle, XCircle, Clock,
-    Copy, ChevronLeft, ChevronRight, Activity,
-    Banknote, Zap, X
+    Search, RefreshCw,
+    Copy, ChevronLeft, ChevronRight, Activity, X
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -234,7 +233,7 @@ const MpesaCallbacks: React.FC = () => {
                                                                         displayId = receiptParam.Value;
                                                                     }
                                                                 }
-                                                            } catch (e) {
+                                                            } catch {
                                                                 // fallback
                                                             }
                                                         }

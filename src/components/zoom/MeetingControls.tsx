@@ -8,7 +8,6 @@ import {
   ScreenShare,
   MessageSquare,
   Users,
-  Settings,
   MoreHorizontal
 } from 'lucide-react';
 

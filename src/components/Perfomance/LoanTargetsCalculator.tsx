@@ -1,5 +1,5 @@
 import React from 'react';
-import { Building, Target, Calendar, TrendingUp, DollarSign, BarChart3 } from 'lucide-react';
+import { Building, Target, TrendingUp, DollarSign, BarChart3 } from 'lucide-react';
 
 interface Branch {
   id: number;

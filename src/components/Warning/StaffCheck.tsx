@@ -4,7 +4,6 @@ import toast from 'react-hot-toast';
 import { sendEmail } from '../../services/email';
 import {
   AlertTriangle,
-  User,
   Mail,
   FileText,
   ChevronDown,
@@ -14,8 +13,6 @@ import {
   Loader2,
   Calendar,
   Search,
-  Filter,
-  Clock,
   Building,
   BadgeAlert,
   ChevronLeft,
@@ -342,7 +339,7 @@ Make sure to incorporate the severity level (${severity}) and be specific about 
       let suggestedType = '';
       let generatedMessage = '';
 
-      for (let line of responseLines) {
+      for (const line of responseLines) {
         if (line.startsWith('WARNING TYPE:')) {
           suggestedType = line.replace('WARNING TYPE:', '').trim();
         } else if (line.startsWith('MESSAGE:')) {

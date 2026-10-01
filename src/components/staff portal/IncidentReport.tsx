@@ -3,8 +3,6 @@ import { motion } from 'framer-motion';
 import {
     AlertTriangle,
     Shield,
-    Upload,
-    X,
     CheckCircle2,
     Eye,
     EyeOff,

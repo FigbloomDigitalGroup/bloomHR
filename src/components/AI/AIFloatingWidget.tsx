@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { queryDeepSeek } from "../../services/deepseek";
-import { MessageCircle, X, Send, Bot, User, MessageCircleMore, Cpu } from "lucide-react";
+import { X, Send, User } from "lucide-react";
 
 const ChatFloater = () => {
   const [isOpen, setIsOpen] = useState(false);

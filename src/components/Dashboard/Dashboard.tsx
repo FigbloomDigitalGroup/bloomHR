@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Users, CalendarDays, Wallet, NotepadText, Phone, AlertCircle, Settings, HelpCircle, MapPin, RefreshCw, Cake, Video, BookOpen, FileText, TrendingUp, ChevronRight, Crown, Send } from "lucide-react";
+import { Users, CalendarDays, Wallet, NotepadText, Phone, AlertCircle, MapPin, RefreshCw, Cake, Video, BookOpen, FileText, TrendingUp, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase"
 import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
@@ -155,7 +155,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
           const birthDate = new Date(emp['Date of Birth']);
           return birthDate.getMonth() + 1 === currentMonth &&
             birthDate.getDate() === currentDay;
-        } catch (e) {
+        } catch {
           return false;
         }
       }).map(emp => {
@@ -192,7 +192,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
           if (i < birthdayEmployees.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 1000));
           }
-        } catch (error) {
+        } catch {
           failCount++;
         }
       }
@@ -241,7 +241,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
           const birthDay = birthDate.getDate();
 
           return birthMonth === currentMonth && birthDay === currentDay;
-        } catch (e) {
+        } catch {
           return false;
         }
       }) || [];
@@ -273,7 +273,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
               return { employee, birthDateThisYear };
             }
             return null;
-          } catch (e) {
+          } catch {
             return null;
           }
         })
@@ -524,7 +524,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
       let expensesCount = 0;
 
       // 1. Try exact match in Town column
-      let { count: townEmployees, error: townError } = await supabase
+      const { count: townEmployees, error: townError } = await supabase
         .from('employees')
         .select('*', { count: 'exact', head: true })
         .eq('Town', currentTown);

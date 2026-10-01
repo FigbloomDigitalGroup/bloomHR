@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, AlertCircle, Check, Edit2, Save, Plus, Upload, Download, FileSpreadsheet, Users, CheckCircle, AlertTriangle, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, AlertCircle, Edit2, Save, Plus, Upload, Download, FileSpreadsheet, CheckCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { TownProps } from '../../types/supabase';
 import * as XLSX from 'xlsx';

@@ -164,7 +164,7 @@ const VideoConferenceComponent = () => {
           currentLangIndex = (currentLangIndex + 1) % languages.length;
           try {
             recognition.lang = languages[currentLangIndex];
-          } catch (e) {
+          } catch {
             console.log('Language switch not supported');
           }
         }

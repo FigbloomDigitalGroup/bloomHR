@@ -70,7 +70,7 @@ const TransactionStatusChecker: React.FC = () => {
                         : r
                 ));
             }
-        } catch (error) {
+        } catch {
             toast.error('Network Error: Could not connect to API', { id: toastId });
             setResults(prev => prev.map(r =>
                 r.transactionID === singleCode.trim()
@@ -143,7 +143,7 @@ const TransactionStatusChecker: React.FC = () => {
                                         : r
                                 ));
                             }
-                        } catch (error) {
+                        } catch {
                             failCount++;
                             setResults(prev => prev.map(r =>
                                 r.transactionID === code
@@ -160,7 +160,7 @@ const TransactionStatusChecker: React.FC = () => {
 
             toast.success(`Bulk Check Complete: ${successCount} Successful`, { id: toastId });
             setBulkCodes('');
-        } catch (error) {
+        } catch {
             toast.error('Bulk Check Interrupted', { id: toastId });
         } finally {
             setIsChecking(false);

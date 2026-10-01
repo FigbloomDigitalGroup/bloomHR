@@ -1,5 +1,5 @@
 // ChatArea.tsx
-import { Hash, MoreVertical, Search, Users, Pin, Bell, BellOff, Video, Phone, Home, User, Settings } from "lucide-react";
+import { Hash, MoreVertical, Search, Users, Bell, BellOff, Video, Phone, Home, User, Settings } from "lucide-react";
 import { Button } from "./ui/button";
 import { SidebarTrigger } from "./ui/sidebar";
 import { MessageList } from "./MessageList";

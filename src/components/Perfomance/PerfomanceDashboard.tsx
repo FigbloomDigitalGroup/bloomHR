@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Users, Search, Briefcase, Building, Clock, AlertCircle, Plus,
-  Edit, Trash2, Filter, X, Check, BarChart2, Target, Calendar,
-  CheckCircle, Clock as ClockIcon, Download, PieChart, UserCheck,
-  UserX, ArrowUpRight, ArrowDownRight, Wallet, CreditCard, Coins,
+  Users, Search, Clock, Filter, BarChart2, Target, PieChart, UserCheck, Coins,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Mail, Send,
   MapPin
 } from 'lucide-react';
@@ -226,7 +223,7 @@ const Pagination: React.FC<{
 }> = ({ currentPage, totalPages, onPageChange, className = '' }) => {
   const maxVisiblePages = 5;
   let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-  let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+  const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
   if (endPage - startPage + 1 < maxVisiblePages) {
     startPage = Math.max(1, endPage - maxVisiblePages + 1);
   }

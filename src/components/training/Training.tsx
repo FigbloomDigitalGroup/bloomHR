@@ -3,16 +3,10 @@ import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from '@lukeed/uuid';
 import {
-  UploadCloud,
   X,
-  CheckCircle2,
   Film,
   Image,
-  Clock,
   FileText,
-  Lock,
-  AlertCircle,
-  ChevronDown,
   File,
   BookOpen
 } from 'lucide-react';

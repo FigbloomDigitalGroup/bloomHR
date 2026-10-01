@@ -1,6 +1,6 @@
 // components/MessageInput.tsx
 import { useState, useRef, useEffect } from "react";
-import { Send, Paperclip, Smile, AtSign, Image, X } from "lucide-react";
+import { Send, Paperclip, Smile, AtSign, X } from "lucide-react";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { EmojiPicker } from "./EmojiPicker";

@@ -3,16 +3,12 @@ import {
   Filter,
   Download,
   Building,
-  User,
   ChevronDown,
   X,
   Loader2,
   Search,
   DollarSign,
-  Phone,
   FileText,
-  CheckCircle,
-  XCircle,
   Clock,
   ChevronLeft,
   ChevronRight,
@@ -24,11 +20,7 @@ import {
   CreditCard,
   FileDown,
   Printer,
-  Share2,
   Copy,
-  ExternalLink,
-  MoreVertical,
-  Archive,
   AlertCircle
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
@@ -783,7 +775,7 @@ const formatCurrency = (amount?: number) => {
 const formatAccountingDate = (dateString?: string, timeString?: string) => {
   if (!dateString) return '-';
 
-  let date = new Date(dateString);
+  const date = new Date(dateString);
   // Robust check: if date is invalid or 1970 (Unix epoch), try to return a sensible fallback or now
   if (isNaN(date.getTime()) || date.getFullYear() < 2000) {
     // If it's a valid string but old, it might be the 1970 issue the user reported
