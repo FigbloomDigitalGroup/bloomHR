@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { Routes, Route, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from './lib/supabase';
@@ -8,52 +8,54 @@ import { CSSProperties } from 'react';
 import { UpdateNotification } from '../src/components/Settings/update';
 import Sidebar from './components/Layout/Sidebar';
 import Header from './components/Layout/Header';
-import AdminVideoUpload from './components/training/Training';
 import Footer from './components/Layout/Footer';
 import Login from './pages/Login';
-import Dashboard from './components/Dashboard/Dashboard';
-import ExpenseModule from './components/Epense/Expense';
-import EmployeeList from './components/Employees/EmployeeList';
-import LoanRequestsAdmin from './components/Settings/StaffLoan';
-import PayrollDashboard from './components/Payroll/PayrollDashboard';
-import StaffSignupRequests from './pages/admin';
-import StaffPortalLanding from './components/staff portal/StaffPortal';
-import RecruitmentDashboard from './components/Recruitment/RecruitmentDashboard';
-import LeaveManagementSystem from './components/Leave/LeaveManagement';
-import PerformanceDashboard from './components/Perfomance/PerfomanceDashboard';
-import AddEmployeePage from './components/Add Form/AddEmployeePage';
-import ViewEmployeePage from './components/view_form/EmployeeDetails';
-import ManagerAssignment from './components/Employees/ManagerAssignment';
-import SuccessPage from './components/Add Form/SuccessPage';
-import EmployeeDataTable from './components/Payroll/fog';
-import EditEmployeePage from './components/Add Form/EditEmployee';
-import { AIAssistantPage } from './components/AI/AIAssistantPage';
-import UserRolesSettings from './components/Settings/UserRole';
 import AuthRoute from './components/ProtectedRoutes/AuthRoute';
 import NotFound from './components/NOT FOUND/NotFound';
 import UpdatePasswordPage from './pages/UpdatePassword';
 
 import AuthCallback from './pages/AuthCallback';
-import SalaryAdvanceAdmin from './components/Settings/SalaryAdmin';
-import IncidentReportsManagement from './components/Settings/IncidentReportsManagement';
-import WarningModule from './components/Warning/StaffCheck'
 import React from 'react';
 import { UserProvider } from '../src/components/ProtectedRoutes/UserContext';
 import MFAVerification from './pages/MFAverification';
-import { MicrofinanceTodoList } from './components/Task Manager/TaskManager';
-import { SMSCenter } from './components/SMS/Sms';
-import { ChatLayout } from './components/chat/ChatLayout';
-import BaseReport from './components/Reports/BaseReport';
-import ReportsList from './components/Reports/ReportLists';
-import StaffLoansReport from './components/Reports/staffloans';
-import StatutoryDeductionsReport from './components/Reports/statutory';
-import AssetManagement from './components/Asset/Asset';
-import QRScanner from './components/Asset/scan';
-import MpesaZapPortal from './components/Settings/MpesaZapPortal';
-import RolePermissions from './components/Settings/RolePermissions';
-import EmailPortal from './components/Email/EmailPortal';
-import HRLifecycleDashboard from './components/HR/HRLifecycleDashboard';
-import CompanyCalendar from './components/Calendar/CompanyCalendar';
+
+// Route-level code splitting: each page is fetched when first visited.
+const AdminVideoUpload = lazy(() => import('./components/training/Training'));
+const Dashboard = lazy(() => import('./components/Dashboard/Dashboard'));
+const ExpenseModule = lazy(() => import('./components/Epense/Expense'));
+const EmployeeList = lazy(() => import('./components/Employees/EmployeeList'));
+const LoanRequestsAdmin = lazy(() => import('./components/Settings/StaffLoan'));
+const PayrollDashboard = lazy(() => import('./components/Payroll/PayrollDashboard'));
+const StaffSignupRequests = lazy(() => import('./pages/admin'));
+const StaffPortalLanding = lazy(() => import('./components/staff portal/StaffPortal'));
+const RecruitmentDashboard = lazy(() => import('./components/Recruitment/RecruitmentDashboard'));
+const LeaveManagementSystem = lazy(() => import('./components/Leave/LeaveManagement'));
+const PerformanceDashboard = lazy(() => import('./components/Perfomance/PerfomanceDashboard'));
+const AddEmployeePage = lazy(() => import('./components/Add Form/AddEmployeePage'));
+const ViewEmployeePage = lazy(() => import('./components/view_form/EmployeeDetails'));
+const ManagerAssignment = lazy(() => import('./components/Employees/ManagerAssignment'));
+const SuccessPage = lazy(() => import('./components/Add Form/SuccessPage'));
+const EmployeeDataTable = lazy(() => import('./components/Payroll/fog'));
+const EditEmployeePage = lazy(() => import('./components/Add Form/EditEmployee'));
+const UserRolesSettings = lazy(() => import('./components/Settings/UserRole'));
+const SalaryAdvanceAdmin = lazy(() => import('./components/Settings/SalaryAdmin'));
+const IncidentReportsManagement = lazy(() => import('./components/Settings/IncidentReportsManagement'));
+const WarningModule = lazy(() => import('./components/Warning/StaffCheck'));
+const BaseReport = lazy(() => import('./components/Reports/BaseReport'));
+const ReportsList = lazy(() => import('./components/Reports/ReportLists'));
+const StaffLoansReport = lazy(() => import('./components/Reports/staffloans'));
+const StatutoryDeductionsReport = lazy(() => import('./components/Reports/statutory'));
+const AssetManagement = lazy(() => import('./components/Asset/Asset'));
+const QRScanner = lazy(() => import('./components/Asset/scan'));
+const MpesaZapPortal = lazy(() => import('./components/Settings/MpesaZapPortal'));
+const RolePermissions = lazy(() => import('./components/Settings/RolePermissions'));
+const EmailPortal = lazy(() => import('./components/Email/EmailPortal'));
+const HRLifecycleDashboard = lazy(() => import('./components/HR/HRLifecycleDashboard'));
+const CompanyCalendar = lazy(() => import('./components/Calendar/CompanyCalendar'));
+const AIAssistantPage = lazy(() => import('./components/AI/AIAssistantPage').then((m) => ({ default: m.AIAssistantPage })));
+const MicrofinanceTodoList = lazy(() => import('./components/Task Manager/TaskManager').then((m) => ({ default: m.MicrofinanceTodoList })));
+const SMSCenter = lazy(() => import('./components/SMS/Sms').then((m) => ({ default: m.SMSCenter })));
+const ChatLayout = lazy(() => import('./components/chat/ChatLayout').then((m) => ({ default: m.ChatLayout })));
 
 interface User {
   email: string;
@@ -904,6 +906,7 @@ function App() {
       <ErrorBoundary>
         <div className="min-h-screen bg-white overflow-x-hidden">
           <UpdateNotification />
+          <Suspense fallback={<Loader />}>
           <Routes>
             <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
             <Route
@@ -958,6 +961,7 @@ function App() {
                               transition={{ duration: 0.3 }}
                               className="w-full h-full"
                             >
+                              <Suspense fallback={<Loader />}>
                               <Routes>
                                 <Route
                                   path="/"
@@ -1110,6 +1114,7 @@ function App() {
 
                                 <Route path="*" element={<NotFound />} />
                               </Routes>
+                              </Suspense>
                             </motion.div>
                           </AnimatePresence>
                         </main>
@@ -1121,6 +1126,7 @@ function App() {
               }
             />
           </Routes>
+          </Suspense>
           <Toaster
             position="top-right"
             containerStyle={{
