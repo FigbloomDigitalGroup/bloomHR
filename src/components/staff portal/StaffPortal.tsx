@@ -42,7 +42,8 @@ import {
   Fingerprint,
   FolderClosed,
   ShieldAlert,
-  BriefcaseBusiness
+  BriefcaseBusiness,
+  AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import StatusPill from '../UI/StatusPill';
@@ -2911,6 +2912,9 @@ const StaffPortal = () => {
   const [showNotificationDot, setShowNotificationDot] = useState(false);
   const [notificationSidebarOpen, setNotificationSidebarOpen] = useState(false);
   const [employeeNumber, setEmployeeNumber] = useState<string>('');
+  // False once we know this login has no employees row with a matching Work Email
+  // (null = not checked yet). Every Staff Portal lookup depends on that row.
+  const [employeeLinked, setEmployeeLinked] = useState<boolean | null>(null);
   // Badge on "Communication" (FIG-577/578): unread chat message count,
   // persisted via `user_channel_states.last_read_at` (the same table the
   // admin chat service already writes to) rather than in-memory-only state,
@@ -3115,7 +3119,9 @@ const StaffPortal = () => {
         .from('employees')
         .select('"Employee Number", "First Name", "Last Name"')
         .eq('"Work Email"', user.email)
-        .single();
+        .maybeSingle();
+
+      setEmployeeLinked(!!employeeData);
 
       if (employeeData) {
         setUserName(`${employeeData["First Name"]} ${employeeData["Last Name"]}`);
@@ -3605,6 +3611,18 @@ const StaffPortal = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
             >
+              {employeeLinked === false && (
+                <div className="m-6 mb-0 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
+                  <div>
+                    <p className="font-semibold">Your account isn't linked to an employee record</p>
+                    <p className="mt-1">
+                      We couldn't find an employee with the work email you signed in with, so leave, payslips and
+                      other staff features won't load. Please contact HR to link your account.
+                    </p>
+                  </div>
+                </div>
+              )}
               {/* Render Active Tab */}
               {activeTab === 'home' && <DashboardHome setActiveTab={setActiveTab} userName={userName} />}
               {activeTab === 'salary-advance' && <div className="p-6"><SalaryAdvanceForm /></div>}
