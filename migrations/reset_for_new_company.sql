@@ -6,19 +6,26 @@
 -- SET session_replication_role = 'replica';
 
 -- 2. Clear Transactional & Child Tables First (to avoid foreign key constraint errors)
-TRUNCATE TABLE dependents CASCADE;
-TRUNCATE TABLE emergency_contact CASCADE;
-TRUNCATE TABLE employee_specific CASCADE;
-TRUNCATE TABLE salary_advance CASCADE;
-TRUNCATE TABLE loan_requests CASCADE;
-TRUNCATE TABLE leave_application CASCADE;
-TRUNCATE TABLE attendance_logs CASCADE;
-TRUNCATE TABLE warnings CASCADE;
-TRUNCATE TABLE job_applications CASCADE;
-TRUNCATE TABLE expenses CASCADE;
-TRUNCATE TABLE company_news CASCADE;
-TRUNCATE TABLE payroll_records CASCADE; -- If exists
-TRUNCATE TABLE mpesa_transactions CASCADE; -- If exists
+-- Each table is truncated only if it exists, so a table missing from this deployment
+-- (the list below covers several optional modules) does not abort the whole script.
+DO $$
+DECLARE
+  t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'dependents', 'emergency_contact', 'employee_specific', 'salary_advance',
+    'loan_requests', 'leave_application', 'attendance_logs', 'warnings',
+    'job_applications', 'expenses', 'company_news', 'payroll_records',
+    'mpesa_transactions'
+  ]
+  LOOP
+    IF to_regclass('public.' || quote_ident(t)) IS NOT NULL THEN
+      EXECUTE format('TRUNCATE TABLE public.%I CASCADE', t);
+    ELSE
+      RAISE NOTICE 'Skipping % (table does not exist)', t;
+    END IF;
+  END LOOP;
+END $$;
 
 -- 3. Clear Main Employee Table
 TRUNCATE TABLE employees CASCADE;
@@ -29,16 +36,13 @@ TRUNCATE TABLE employees CASCADE;
 
 -- 5. Reset Company Details (Update with new company info)
 -- Assuming 'company_logo' table holds the company profile
+-- Only columns defined in master_schema.sql are touched; extend this if your company_logo has more.
 UPDATE company_logo
-SET 
+SET
   company_name = 'New Company Name',
-  company_email = 'info@newcompany.com',
-  company_phone = '+254700000000',
-  kra_pin = 'P000000000A',
-  nssf = '00000',
-  nhif = '00000',
-  logo_url = 'https://example.com/logo.png' -- Replace with new logo URL
-WHERE id = (SELECT id FROM company_logo LIMIT 1); 
+  company_tagline = 'Your tagline',
+  image_url = 'https://example.com/logo.png' -- Replace with new logo URL
+WHERE id = (SELECT id FROM company_logo LIMIT 1);
 -- Or if you want to start fresh:
 -- TRUNCATE TABLE company_logo;
 -- INSERT INTO company_logo (company_name, ...) VALUES (...);
