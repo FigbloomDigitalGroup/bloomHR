@@ -22,6 +22,8 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       'unused-imports/no-unused-imports': 'error',
+      // ~500 existing uses; surfaced as warnings so new code is nudged without blocking CI.
+      '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': [
         'error',
         {
