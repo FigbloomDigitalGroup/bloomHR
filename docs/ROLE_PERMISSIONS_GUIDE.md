@@ -5,7 +5,7 @@ This system replaces hard-coded role permissions with a dynamic, database-driven
 
 ## Components Created
 
-### 1. Database Schema (`migrations/create_role_permissions.sql`)
+### 1. Database Schema (`supabase/migrations/20260930000000_role_permissions.sql`)
 - **permissions** table: Stores all available system modules/features
 - **role_permissions** table: Maps roles to their granted permissions
 - Helper functions: `has_permission()` and `get_user_permissions()`
@@ -41,7 +41,7 @@ Provides:
 ### 1. Run Database Migration
 ```bash
 # Connect to your Supabase database and run:
-psql $DATABASE_URL -f migrations/create_role_permissions.sql
+psql $DATABASE_URL -f supabase/migrations/20260930000000_role_permissions.sql
 ```
 
 Or use Supabase SQL Editor to execute the migration script.

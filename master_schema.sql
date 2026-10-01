@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS mfa_codes (id uuid PRIMARY KEY DEFAULT uuid_generate_
 CREATE TABLE IF NOT EXISTS company_logo (id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY, image_url text, company_name text, company_tagline text, created_at timestamp with time zone DEFAULT NOW());
 
 -- 15. PERMISSIONS
-CREATE TABLE IF NOT EXISTS role_permissions (id uuid PRIMARY KEY DEFAULT uuid_generate_v4(), role_name text UNIQUE, permissions text[], created_at timestamp with time zone DEFAULT NOW());
+-- role_permissions + permissions tables live in supabase/migrations/20260930000000_role_permissions.sql (single source of truth).
 
 -- ========================================================
 -- SECURITY: GLOBAL RLS POLICY GENERATOR

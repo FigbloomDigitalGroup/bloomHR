@@ -1,6 +1,8 @@
 -- Role & Permissions migration (canonical).
 -- Roles live in auth.users metadata (user_metadata.role), not the employees table.
 
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 -- Create permissions table
 CREATE TABLE IF NOT EXISTS permissions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
