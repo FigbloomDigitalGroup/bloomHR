@@ -524,7 +524,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
       let expensesCount = 0;
 
       // 1. Try exact match in Town column
-      let { count: townEmployees, error: townError } = await supabase
+      const { count: townEmployees, error: townError } = await supabase
         .from('employees')
         .select('*', { count: 'exact', head: true })
         .eq('Town', currentTown);

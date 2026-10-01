@@ -453,7 +453,7 @@ const PayslipModal = ({
               .text-gray-800 { color: #1f2937; }
               .text-gray-900 { color: #111827; }
               .space-y-1 > * + * { margin-top: 0.25rem; }
-              .space-y-1\.5 > * + * { margin-top: 0.375rem; }
+              .space-y-1\\.5 > * + * { margin-top: 0.375rem; }
               .space-y-2 > * + * { margin-top: 0.5rem; }
               .mr-4 { margin-right: 1rem; }
               .h-16 { height: 4rem; }

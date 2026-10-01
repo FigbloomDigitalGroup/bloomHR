@@ -553,7 +553,7 @@ const EmployeeBioPage = () => {
       }
 
       // Prepare update data, preserving read-only fields for non-HR/Admin users
-      let updateData = { ...employee };
+      const updateData = { ...employee };
 
       // If user is not HR/Admin, don't update read-only fields
       if (userRole !== 'hr' && userRole !== 'admin') {

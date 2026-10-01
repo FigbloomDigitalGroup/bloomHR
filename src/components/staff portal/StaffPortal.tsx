@@ -546,7 +546,7 @@ const LeaveApplicationForm = () => {
             setFormData(prev => ({
               ...prev,
               "Employee Number": data["Employee Number"] || '',
-              "Name": `${data["First Name"]} ${data["Last Name"]}` || '',
+              "Name": `${data["First Name"]} ${data["Last Name"]}`,
               "Office Branch": officeBranch
             }));
 
@@ -1391,7 +1391,7 @@ const SalaryAdvanceForm = () => {
             setFormData(prev => ({
               ...prev,
               "Employee Number": data["Employee Number"] || '',
-              "Full Name": `${data["First Name"]} ${data["Last Name"]}` || '',
+              "Full Name": `${data["First Name"]} ${data["Last Name"]}`,
               "Office Branch": data["Office"] || '',
               "Basic Salary": basicSalary,
               "Net Salary": basicSalary
@@ -2009,7 +2009,7 @@ const LoanRequestForm = () => {
             setFormData(prev => ({
               ...prev,
               "Employee Number": data["Employee Number"] || '',
-              "Full Name": `${data["First Name"]} ${data["Last Name"]}` || '',
+              "Full Name": `${data["First Name"]} ${data["Last Name"]}`,
               "Office Branch": data["Office"] || '',
               "Basic Salary": basicSalary,
               "Repayment Schedule": generateRepaymentSchedule(2)

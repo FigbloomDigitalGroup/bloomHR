@@ -783,7 +783,7 @@ const formatCurrency = (amount?: number) => {
 const formatAccountingDate = (dateString?: string, timeString?: string) => {
   if (!dateString) return '-';
 
-  let date = new Date(dateString);
+  const date = new Date(dateString);
   // Robust check: if date is invalid or 1970 (Unix epoch), try to return a sensible fallback or now
   if (isNaN(date.getTime()) || date.getFullYear() < 2000) {
     // If it's a valid string but old, it might be the 1970 issue the user reported

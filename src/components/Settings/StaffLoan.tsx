@@ -72,7 +72,7 @@ const LoanRequestsAdmin = () => {
 
   const formatDate = (dateValue: any) => {
     if (!dateValue) return 'N/A';
-    let d = new Date(dateValue);
+    const d = new Date(dateValue);
     return d.toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 

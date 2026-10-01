@@ -1911,7 +1911,7 @@ const PayslipModal = ({
               .text-gray-800 { color: #1f2937; }
               .text-gray-900 { color: #111827; }
               .space-y-1 > * + * { margin-top: 0.25rem; }
-              .space-y-1\.5 > * + * { margin-top: 0.375rem; }
+              .space-y-1\\.5 > * + * { margin-top: 0.375rem; }
               .space-y-2 > * + * { margin-top: 0.5rem; }
               .mr-4 { margin-right: 1rem; }
               .h-16 { height: 4rem; }
@@ -2247,7 +2247,7 @@ const Pagination = ({
   const maxVisiblePages = 5;
 
   let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-  let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+  const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
 
   if (endPage - startPage + 1 < maxVisiblePages) {
     startPage = Math.max(1, endPage - maxVisiblePages + 1);

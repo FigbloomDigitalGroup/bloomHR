@@ -342,7 +342,7 @@ Make sure to incorporate the severity level (${severity}) and be specific about 
       let suggestedType = '';
       let generatedMessage = '';
 
-      for (let line of responseLines) {
+      for (const line of responseLines) {
         if (line.startsWith('WARNING TYPE:')) {
           suggestedType = line.replace('WARNING TYPE:', '').trim();
         } else if (line.startsWith('MESSAGE:')) {

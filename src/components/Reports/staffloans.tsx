@@ -797,8 +797,8 @@ const StaffLoansReport: React.FC<BaseReportProps> = ({
           row.status || '',
           row.deduction_status || '',
           row.disbursement_method || '',
-          `"${row.mpesa_code}"` || '',
-          `"${row.approved_by}"` || ''
+          row.mpesa_code ? `"${row.mpesa_code}"` : '',
+          row.approved_by ? `"${row.approved_by}"` : ''
         ].join(',')
       )
     ].join('\n');

@@ -38,7 +38,7 @@ export function usePermissions(): UsePermissionsReturn {
 
             // Get user's role from user_metadata (not from employees table)
             // Normalize to uppercase to match database role_name
-            let rawRole = user.user_metadata?.role;
+            const rawRole = user.user_metadata?.role;
             const role = rawRole ? rawRole.toUpperCase() : null;
             setUserRole(role);
 

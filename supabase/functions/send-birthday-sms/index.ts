@@ -68,7 +68,7 @@ serve(async (req) => {
             const fullName = `${firstName} ${lastName}`.trim();
 
             // Get phone number
-            let rawPhone = emp['Mobile Number'] || emp['Personal Mobile'] || emp['Work Mobile'] || '';
+            const rawPhone = emp['Mobile Number'] || emp['Personal Mobile'] || emp['Work Mobile'] || '';
             const phone = formatPhoneNumber(rawPhone);
 
             if (!phone || phone.length !== 12) {
