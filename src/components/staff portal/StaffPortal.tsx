@@ -335,7 +335,7 @@ async function checkExistingLogin(employeeNumber: string): Promise<boolean> {
       .single();
 
     return !!data;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

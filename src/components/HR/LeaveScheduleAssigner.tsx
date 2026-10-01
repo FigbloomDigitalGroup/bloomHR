@@ -98,7 +98,7 @@ export default function LeaveScheduleAssigner({ onRefresh }: { onRefresh?: () =>
             setForm({ employeeNumber: '', leave_type: 'Annual Leave', leave_start_date: '', leave_end_date: '', leave_days: 1, notify_5days: true, notify_1day: true, notes: '' });
             fetchData();
             onRefresh?.();
-        } catch (err) {
+        } catch {
             toast.error('Failed to save leave schedule');
         } finally {
             setSaving(false);
@@ -110,7 +110,7 @@ export default function LeaveScheduleAssigner({ onRefresh }: { onRefresh?: () =>
             await supabase.from('hr_leave_schedules').update({ status }).eq('id', id);
             toast.success(`Status updated to ${status}`);
             fetchData();
-        } catch (err) {
+        } catch {
             toast.error('Failed to update status');
         }
     };

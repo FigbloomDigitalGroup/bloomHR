@@ -79,7 +79,7 @@ const MpesaZapPortal: React.FC = () => {
                     if (fundsParam?.Value) {
                         setUtilityBalance(`KES ${Number(fundsParam.Value).toLocaleString()}`);
                     }
-                } catch (e) {
+                } catch {
                     // Silent fail
                 }
             }

@@ -43,7 +43,7 @@ const LoanRequestsAdmin = () => {
         initialNotes[loan.id] = loan.admin_notes || '';
       });
       setNotes(initialNotes);
-    } catch (error) {
+    } catch {
       toast.error('Failed to load loan registry');
     } finally {
       setIsLoading(false);
@@ -76,7 +76,7 @@ const LoanRequestsAdmin = () => {
       toast.success('Disbursement amount adjusted');
       setEditingId(null);
       fetchLoans();
-    } catch (error) {
+    } catch {
       toast.error('Protocol adjustment failed');
     }
   };
@@ -88,7 +88,7 @@ const LoanRequestsAdmin = () => {
       toast.success(`Loan request ${status.toLowerCase()}`);
       setSelectedLoan(null);
       fetchLoans();
-    } catch (error) {
+    } catch {
       toast.error('Status synchronization failed');
     }
   };

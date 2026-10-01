@@ -102,7 +102,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           .order('Town', { ascending: true });
         if (error) throw error;
         setBranches(data || []);
-      } catch (error) {
+      } catch {
         toast.error('Failed to load towns');
       } finally {
         setIsFetchingBranches(false);
@@ -136,7 +136,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       }
       setEmailExists(false);
       return false;
-    } catch (error) {
+    } catch {
       return false;
     } finally {
       setIsCheckingEmail(false);

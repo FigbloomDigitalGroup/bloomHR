@@ -105,7 +105,7 @@ export default function BirthdaySMS() {
           const birthDate = new Date(emp['Date of Birth']);
           return birthDate.getMonth() + 1 === currentMonth && 
                  birthDate.getDate() === currentDay;
-        } catch (e) {
+        } catch {
           return false;
         }
       }).map(emp => {

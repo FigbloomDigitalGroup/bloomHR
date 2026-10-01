@@ -123,7 +123,7 @@ export class DatabaseService {
           rowCount: countError ? 0 : count
         };
 
-      } catch (error) {
+      } catch {
         status[table] = { exists: false };
       }
     }
@@ -143,7 +143,7 @@ export class DatabaseService {
         .single();
 
       return !error && !!data;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -194,12 +194,12 @@ export class DatabaseService {
       // Try to set replica identity if not already set
       try {
         await supabase.rpc('set_replica_identity', { table_name: 'messages' });
-      } catch (e) {
+      } catch {
         // Ignore errors - replica identity might already be set
       }
 
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }

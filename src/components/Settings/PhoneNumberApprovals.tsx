@@ -142,7 +142,7 @@ const PhoneNumberApprovals = () => {
             setSelectedRequest(null);
             setAdminNotes('');
             await fetchRequests();
-        } catch (error) {
+        } catch {
             toast.error('Failed to approve request');
         } finally {
             setIsProcessing(false);
@@ -193,7 +193,7 @@ const PhoneNumberApprovals = () => {
             setSelectedRequest(null);
             setAdminNotes('');
             await fetchRequests();
-        } catch (error) {
+        } catch {
             toast.error('Failed to reject request');
         } finally {
             setIsProcessing(false);

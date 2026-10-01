@@ -155,7 +155,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
           const birthDate = new Date(emp['Date of Birth']);
           return birthDate.getMonth() + 1 === currentMonth &&
             birthDate.getDate() === currentDay;
-        } catch (e) {
+        } catch {
           return false;
         }
       }).map(emp => {
@@ -192,7 +192,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
           if (i < birthdayEmployees.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 1000));
           }
-        } catch (error) {
+        } catch {
           failCount++;
         }
       }
@@ -241,7 +241,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
           const birthDay = birthDate.getDate();
 
           return birthMonth === currentMonth && birthDay === currentDay;
-        } catch (e) {
+        } catch {
           return false;
         }
       }) || [];
@@ -273,7 +273,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
               return { employee, birthDateThisYear };
             }
             return null;
-          } catch (e) {
+          } catch {
             return null;
           }
         })

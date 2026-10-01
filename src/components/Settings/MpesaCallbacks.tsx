@@ -233,7 +233,7 @@ const MpesaCallbacks: React.FC = () => {
                                                                         displayId = receiptParam.Value;
                                                                     }
                                                                 }
-                                                            } catch (e) {
+                                                            } catch {
                                                                 // fallback
                                                             }
                                                         }

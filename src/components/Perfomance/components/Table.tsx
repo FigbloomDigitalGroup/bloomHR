@@ -344,7 +344,7 @@ const BulkUploadModal = ({
         onUpload(data);
         setIsProcessing(false);
         onClose();
-      } catch (err) {
+      } catch {
         setError('Error processing file. Please check the format.');
         setIsProcessing(false);
       }

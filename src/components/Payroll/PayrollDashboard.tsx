@@ -1504,7 +1504,7 @@ const ExportModal = ({
       saveAs(data, `payroll_${new Date().toISOString().slice(0, 10)}.xlsx`);
 
       toast.success("Excel file exported successfully!");
-    } catch (error) {
+    } catch {
       toast.error("Failed to export Excel file");
     } finally {
       setIsExporting(false);
@@ -1542,7 +1542,7 @@ const ExportModal = ({
       saveAs(data, `payroll_${new Date().toISOString().slice(0, 10)}.csv`);
 
       toast.success("CSV file exported successfully!");
-    } catch (error) {
+    } catch {
       toast.error("Failed to export CSV file");
     } finally {
       setIsExporting(false);
@@ -1589,7 +1589,7 @@ const ExportModal = ({
 
       doc.save(`payroll_${new Date().toISOString().slice(0, 10)}.pdf`);
       toast.success("PDF file exported successfully!");
-    } catch (error) {
+    } catch {
       toast.error("Failed to export PDF file");
     } finally {
       setIsExporting(false);
@@ -2790,7 +2790,7 @@ export default function PayrollDashboard() {
               advancePeriod = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
             }
           }
-        } catch (e) {
+        } catch {
           console.warn("Error parsing advance date:", advanceDate);
           return false;
         }
@@ -3946,7 +3946,7 @@ export default function PayrollDashboard() {
 
       await saveSalaryHistoryBatch(historyRecords);
       toast.success(`Successfully saved ${historyRecords.length} records to history for ${actualPeriod}.`);
-    } catch (error) {
+    } catch {
       toast.error("Failed to save history.");
     } finally {
       setIsSavingHistory(false);
