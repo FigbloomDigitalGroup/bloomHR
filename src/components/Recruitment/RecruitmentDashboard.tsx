@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Users, Filter } from 'lucide-react';
+import { Filter } from 'lucide-react';
 import { PageHeader, Button } from '../UI';
-import { StatusBadge } from './components/StatusBadge';
 import { SummaryCard } from './components/SummaryCard';
 import { FiltersSection } from './components/FiltersSection';
 import { TabsNavigation } from './components/TabsNavigation';

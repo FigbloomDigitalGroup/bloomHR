@@ -1,23 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  CheckCircle2,
-  XCircle,
-  Clock,
   Search,
-  ChevronDown,
   Activity,
   Wallet,
-  Calendar,
-  User,
   ArrowUpRight,
-  Edit3,
-  MoreVertical,
-  FileText,
   ShieldCheck,
-  AlertTriangle,
   X,
-  Filter,
   RefreshCw,
   GanttChart
 } from 'lucide-react';

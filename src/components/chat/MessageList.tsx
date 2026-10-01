@@ -2,11 +2,11 @@
 import { ScrollArea } from "./ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
-import { MoreHorizontal, Smile, Reply, Heart, ThumbsUp, MessageSquare } from "lucide-react";
+import { MoreHorizontal, Smile, Reply, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { ReactionPicker } from "./ReactionPicker";
 import { EmployeeProfile } from "./EmployeeProfile";
-import type { Message, Channel, DirectMessage, Reaction } from "../chat/types/types";
+import type { Message, Channel, DirectMessage } from "../chat/types/types";
 
 interface MessageListProps {
   messages: Message[];

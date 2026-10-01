@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { queryDeepSeek } from '../../services/deepseek'
 import { supabase } from '../../lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, User, Cpu, Database, Users, Activity, Bot, BarChart2, Wand2 } from 'lucide-react'
+import { Send, User, Users, Activity, BarChart2, Wand2 } from 'lucide-react'
 import { TownProps } from '../../types/supabase'
 
 interface AreaTownMapping {

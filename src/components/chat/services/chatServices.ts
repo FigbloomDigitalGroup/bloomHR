@@ -1,7 +1,7 @@
 // services/chatServices.ts
 import { supabase } from "../../../lib/supabase";
 import { databaseService } from "./databaseService";
-import type { Channel, Message, User, Employee, DirectMessage } from "../types/types";
+import type { Channel, Message, Employee, DirectMessage } from "../types/types";
 import { AvatarService } from './avatar';
 
 class ChatService {

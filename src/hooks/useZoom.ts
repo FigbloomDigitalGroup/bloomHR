@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { ZoomUser, ChatMessage } from '../types/zoom';
 
 // Mock implementation - replace with actual Zoom SDK

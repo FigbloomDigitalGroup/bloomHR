@@ -5,10 +5,8 @@ import {
   Lock,
   AlertCircle,
   CheckCircle2,
-  Calendar,
   Clock,
   Settings,
-  Bell,
   CalendarClock as Schedule // Using CalendarClock as Schedule replacement
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';

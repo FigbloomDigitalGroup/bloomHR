@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Wallet, X, Check, Calendar as CalendarIcon } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import Select from 'react-select';
-import { v4 as uuidv4 } from '@lukeed/uuid';
 
 interface LoanPayment {
   payment_id?: number;

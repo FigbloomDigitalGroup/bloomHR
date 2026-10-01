@@ -9,15 +9,12 @@ import {
   CheckSquare, Square, ChevronLeft, ChevronRight, UserCheck, ShieldCheck,
   Eye, AlertTriangle, Loader, CheckCircle, XCircle as XCircleIcon,
   User, UserCog, Settings, MapPin, Filter, X, Edit3, DollarSign,
-  Crown, Key, Building, Map as MapIcon, Award, Smartphone, RefreshCw,
+  Crown, Building, Map as MapIcon, Award, Smartphone, RefreshCw,
   Download, Upload, Calendar, Activity, TrendingUp,
-  Banknote, Zap, ToggleLeft, ToggleRight, Unlock, Sparkles
+  Banknote, Zap
 } from 'lucide-react';
-import {
-  AreaChart,
-  Area,
-  ResponsiveContainer
-} from 'recharts';
+
+
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 import AdvanceApplicationManager from './staffSetting';
 import SearchableDropdown from '../UI/SearchableDropdown';

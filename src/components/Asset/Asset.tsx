@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
-  Search, Plus, Eye, Edit, Trash2, Filter, Download, 
+  Search, Plus, Eye, Edit, Trash2, Download, 
   PrinterIcon, ChevronLeft, ChevronRight, X, Settings,
   HardDrive, Smartphone, Monitor, Camera, Car, Wrench, 
   Server, Headphones, Cpu, CheckCircle, AlertCircle,
   Clock, Archive, MoreVertical, QrCode, MapPin, User,
-  Tag, Building, Briefcase, CircleOff, ChevronDown,
-  Mail, Phone, BookUser
+  Tag, Building, Briefcase, CircleOff, ChevronDown
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';

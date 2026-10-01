@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { UserCheck, X, Check, Calendar as CalendarIcon, MapPin } from 'lucide-react';
+import { UserCheck, X, Check, MapPin } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import Select from 'react-select';
 

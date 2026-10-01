@@ -4,10 +4,10 @@ import { Button, EmptyState } from '../UI';
 import {
   Plus, Check, Circle, Trash2, Calendar, AlertCircle, Clock, User, 
   ChevronDown, X, Users, Building, Shield, RadioTower, Filter,
-  Edit3, Star, Repeat, Tag, FolderOpen, Link, Paperclip, MessageSquare,
-  List, Grid, ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Unlock,
-  CreditCard, FileText, Landmark, Wallet, Target, MapPin, BarChart3,
-  Download, Upload, Share2, Copy, Archive, RotateCcw, Search, Play, Pause, Square
+  Edit3, Star, Repeat, FolderOpen,
+  List, Grid, ChevronLeft, ChevronRight, Eye, Lock, Unlock,
+  CreditCard, FileText, Landmark, MapPin, BarChart3,
+  Download, Search, Play, Pause
 } from 'lucide-react';
 
 // Simple Auth Hook

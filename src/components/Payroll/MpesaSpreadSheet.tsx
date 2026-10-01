@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, Download, Send, CheckCircle, X, Plus, Trash2, FileSpreadsheet, Users, ArrowLeft, Search, Edit, Copy, AlertCircle, Loader } from 'lucide-react';
+import { Upload, Download, Send, CheckCircle, X, Plus, Trash2, Users, ArrowLeft, Search, Copy, AlertCircle, Loader } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';

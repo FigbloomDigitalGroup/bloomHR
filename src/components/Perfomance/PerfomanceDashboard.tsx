@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Users, Search, Briefcase, Building, Clock, AlertCircle, Plus,
-  Edit, Trash2, Filter, X, Check, BarChart2, Target, Calendar,
-  CheckCircle, Clock as ClockIcon, Download, PieChart, UserCheck,
-  UserX, ArrowUpRight, ArrowDownRight, Wallet, CreditCard, Coins,
+  Users, Search, Clock, Filter, BarChart2, Target, PieChart, UserCheck, Coins,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Mail, Send,
   MapPin
 } from 'lucide-react';

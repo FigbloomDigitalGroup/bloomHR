@@ -1,12 +1,12 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useEffect, useState, useRef } from 'react';
-import { X, Save, PrinterIcon, Download, ArrowLeft, Plus, Upload, AlertCircle, Users, Check, PencilLine, Bell } from 'lucide-react';
+import { X, Save, ArrowLeft, Plus, Upload, AlertCircle, Users, Check, PencilLine } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import StatusPill from '../UI/StatusPill';
-import { User, Briefcase, CreditCard, Phone, Mail, MapPin } from 'lucide-react';
+import { User, Briefcase, CreditCard, Phone, MapPin } from 'lucide-react';
 
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'SHIF Number'?: string | null;

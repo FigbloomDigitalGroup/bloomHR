@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { Search, Building2, Mail, Phone } from "lucide-react";
+import { Search, Building2, Mail } from "lucide-react";
 import { useState } from "react";
 import type { User } from "../chat/types/types";
 

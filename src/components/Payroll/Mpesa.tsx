@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Smartphone, Users, CheckSquare, Square, Send, X, Search, ChevronDown } from 'lucide-react';
+import { Smartphone, Users, CheckSquare, Square, Send, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 

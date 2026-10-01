@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Check, User, MapPin, GraduationCap, Code, FileText, Download, ExternalLink, Briefcase } from 'lucide-react';
+import { X, User, MapPin, GraduationCap, Code, FileText, Briefcase } from 'lucide-react';
 import { DetailItem } from '../DetailItem';
 import { PDFViewer } from '../PDFViewer';
 

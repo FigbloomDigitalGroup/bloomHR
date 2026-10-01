@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { Home, Mail, Sparkles, Compass, Zap, BadgeCheck } from 'lucide-react';
+import { Home, Sparkles, Compass, Zap } from 'lucide-react';
 
 export default function Unauthorized() {
   const navigate = useNavigate();

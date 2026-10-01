@@ -1,5 +1,5 @@
 // AppSidebar.tsx
-import { MessageSquare, Plus, Settings, Building2, Users, Search, Clock } from "lucide-react";
+import { Plus, Settings, Building2, Users, Search, Clock } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -21,7 +21,7 @@ import { CreateChannelDialog } from "./CreateDialogChannel";
 import { CreateDMDialog } from "./CreateDialog";
 import { SettingsDialog } from "./SettingsDialog";
 import { EmployeeProfile } from "./EmployeeProfile";
-import type { Channel, User, DirectMessage, Employee } from "../chat/types/types";
+import type { Channel, User, DirectMessage } from "../chat/types/types";
 
 interface AppSidebarProps {
   channels: Channel[];

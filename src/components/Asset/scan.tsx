@@ -4,7 +4,7 @@ import {
   QrCode, Camera, Search, X, CheckCircle, AlertCircle,
   Download, PrinterIcon, Smartphone, Monitor, Car,
   HardDrive, User, MapPin, Building, Tag, Info,
-  RefreshCw, Eye, Edit, Trash2, Plus, ArrowLeft,
+  RefreshCw, Eye, Edit, Plus, ArrowLeft,
   Clock, VideoOff
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';

@@ -1,4 +1,4 @@
-import { Download, Eye } from 'lucide-react';
+import { Download } from 'lucide-react';
 
 interface DetailItemProps {
   label: string;

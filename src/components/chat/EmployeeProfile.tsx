@@ -1,7 +1,7 @@
 // EmployeeProfile.tsx
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { Building2, Mail, Phone, MapPin, Calendar, Users, Briefcase } from "lucide-react";
+import { Building2, Mail, Phone, Calendar, Users, Briefcase } from "lucide-react";
 import type { Employee } from "../chat/types/types";
 
 interface EmployeeProfileProps {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Cake, Send, Users, Phone, Calendar, CheckCircle, AlertCircle, Loader, RefreshCw } from 'lucide-react';
+import { Cake, Send, Phone, Calendar, CheckCircle, Loader, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
 import toast from 'react-hot-toast';

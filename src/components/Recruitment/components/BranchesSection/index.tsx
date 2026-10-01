@@ -3,7 +3,7 @@ import { BranchCard } from './BranchCard';
 import { jobPositions } from '../constants/jobPositions';
 import { StatusBadge } from '../StatusBadge';
 import GlowButton from '../../../UI/GlowButton';
-import { Briefcase, Edit, Save, X, Plus } from 'lucide-react';
+import { Edit, Save, X, Plus } from 'lucide-react';
 import { supabase } from '../../../../lib/supabase';
 
 interface KenyaOfficeLocation {

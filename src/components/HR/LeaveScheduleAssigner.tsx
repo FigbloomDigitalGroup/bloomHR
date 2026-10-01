@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Plus, Search, X, Loader2, CheckCircle, Clock, Bell } from 'lucide-react';
+import { Calendar, Plus, Search, X, Loader2, CheckCircle, Bell } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 

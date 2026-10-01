@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import {
     AlertTriangle,
     Search,
-    Filter,
     Eye,
     CheckCircle2,
     XCircle,
@@ -11,10 +10,7 @@ import {
     Shield,
     User,
     Calendar,
-    MapPin,
-    Users,
-    MessageSquare,
-    Download
+    MapPin
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';

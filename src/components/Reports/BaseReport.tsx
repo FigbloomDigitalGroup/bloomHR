@@ -3,16 +3,12 @@ import {
   Filter,
   Download,
   Building,
-  User,
   ChevronDown,
   X,
   Loader2,
   Search,
   DollarSign,
-  Phone,
   FileText,
-  CheckCircle,
-  XCircle,
   Clock,
   ChevronLeft,
   ChevronRight,
@@ -24,11 +20,7 @@ import {
   CreditCard,
   FileDown,
   Printer,
-  Share2,
   Copy,
-  ExternalLink,
-  MoreVertical,
-  Archive,
   AlertCircle
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';

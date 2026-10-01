@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BarChart2, X, Check, Calendar as CalendarIcon } from 'lucide-react';
+import { BarChart2, X, Check } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import Select from 'react-select';
 

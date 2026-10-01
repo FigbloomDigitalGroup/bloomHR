@@ -1,7 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users,
-  FileText,
   CheckCircle,
   Loader2,
   AlertCircle,
@@ -11,8 +10,7 @@ import {
   Upload,
   Download,
   X,
-  ArrowRight,
-  Table
+  ArrowRight
 } from 'lucide-react';
 import EmailDashboard from '../components/Email/EmailDashboard';
 import { useStaffSignupLogic } from '../hooks/useStaffSignupLogic';

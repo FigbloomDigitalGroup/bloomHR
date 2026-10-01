@@ -1,6 +1,5 @@
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Button } from "./ui/button";
-import { Smile } from "lucide-react";
 
 // Organized by categories for better UX
 const emojiCategories = {
