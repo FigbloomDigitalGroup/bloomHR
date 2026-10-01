@@ -11,7 +11,7 @@ TRUNCATE TABLE emergency_contact CASCADE;
 TRUNCATE TABLE employee_specific CASCADE;
 TRUNCATE TABLE salary_advance CASCADE;
 TRUNCATE TABLE loan_requests CASCADE;
-TRUNCATE TABLE leave_applications CASCADE;
+TRUNCATE TABLE leave_application CASCADE;
 TRUNCATE TABLE attendance_logs CASCADE;
 TRUNCATE TABLE warnings CASCADE;
 TRUNCATE TABLE job_applications CASCADE;
