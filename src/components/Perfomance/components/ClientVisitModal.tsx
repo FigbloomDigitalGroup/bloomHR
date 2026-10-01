@@ -107,7 +107,7 @@ const ClientVisitModal: React.FC<ClientVisitModalProps> = ({
       if (!formData.purpose) throw new Error('Purpose is required');
 
       // Prepare data without visit_id for new records
-      const { visit_id, ...dataWithoutId } = formData;
+      const { ...dataWithoutId } = formData;
 
       if (formData.visit_id) {
         // Update existing visit

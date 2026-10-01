@@ -383,99 +383,6 @@ const PayslipModal = ({
   const payPeriod = record["Pay Period"] || record.pay_period || null;
   const calculated = calculatePayrollValues(record, overrideStatutoryChecks, salaryAdvances, payPeriod);
 
-  const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Payslip - ${record["Employee Name"] || record.employee_name}</title>
-            <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Calibri', 'Helvetica', sans-serif; }
-              body { background: white; color: black; padding: 40px; font-size: 11px; }
-              .payslip-container { max-width: 800px; margin: 0 auto; background: white; }
-              .flex { display: flex; }
-              .justify-between { justify-content: space-between; }
-              .items-center { align-items: center; }
-              .items-end { align-items: flex-end; }
-              .grid { display: grid; }
-              .grid-cols-2 { grid-template-columns: 1fr 1fr; }
-              .gap-6 { gap: 1.5rem; }
-              .gap-8 { gap: 2rem; }
-              .mb-1 { margin-bottom: 0.25rem; }
-              .mb-2 { margin-bottom: 0.5rem; }
-              .mb-3 { margin-bottom: 0.75rem; }
-              .mb-4 { margin-bottom: 1rem; }
-              .mb-6 { margin-bottom: 1.5rem; }
-              .mb-8 { margin-bottom: 2rem; }
-              .mt-1 { margin-top: 0.25rem; }
-              .mt-2 { margin-top: 0.5rem; }
-              .mt-6 { margin-top: 1.5rem; }
-              .border { border: 1px solid #9ca3af; }
-              .border-b { border-bottom: 1px solid #d1d5db; }
-              .border-b-3 { border-bottom: 3px solid #6b7280; }
-              .border-t { border-top: 1px solid #9ca3af; }
-              .border-gray-300 { border-color: #d1d5db; }
-              .border-gray-400 { border-color: #9ca3af; }
-              .border-gray-500 { border-color: #6b7280; }
-              .border-double { border-style: double; }
-              .p-1 { padding: 0.25rem; }
-              .p-2 { padding: 0.5rem; }
-              .p-3 { padding: 0.75rem; }
-              .p-4 { padding: 1rem; }
-              .p-6 { padding: 1.5rem; }
-              .pb-2 { padding-bottom: 0.5rem; }
-              .pt-1 { padding-top: 0.25rem; }
-              .pt-2 { padding-top: 0.5rem; }
-              .pt-4 { padding-top: 1rem; }
-              .pt-8 { padding-top: 2rem; }
-              .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
-              .font-bold { font-weight: 700; }
-              .font-semibold { font-weight: 600; }
-              .text-right { text-align: right; }
-              .text-center { text-align: center; }
-              .text-sm { font-size: 0.875rem; }
-              .text-lg { font-size: 1.125rem; }
-              .text-xl { font-size: 1.25rem; }
-              .text-2xl { font-size: 1.5rem; }
-              .text-3xl { font-size: 1.875rem; }
-              .uppercase { text-transform: uppercase; }
-              .bg-white { background-color: white; }
-              .bg-gray-50 { background-color: #f9fafb; border: 1px solid #e5e7eb; }
-              .bg-gray-100 { background-color: #f3f4f6; }
-              .text-black { color: #000; }
-              .text-gray-500 { color: #6b7280; }
-              .text-gray-600 { color: #4b5563; }
-              .text-gray-800 { color: #1f2937; }
-              .text-gray-900 { color: #111827; }
-              .space-y-1 > * + * { margin-top: 0.25rem; }
-              .space-y-1\\.5 > * + * { margin-top: 0.375rem; }
-              .space-y-2 > * + * { margin-top: 0.5rem; }
-              .mr-4 { margin-right: 1rem; }
-              .h-16 { height: 4rem; }
-              .w-16 { width: 4rem; }
-              .object-contain { object-fit: contain; }
-              .mx-auto { margin-left: auto; margin-right: auto; }
-              .leading-tight { line-height: 1.25; }
-              @media print {
-                body { padding: 0; }
-              }
-            </style>
-          </head>
-          <body>
-            ${document.getElementById('payslip-content')?.innerHTML}
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-      }, 500);
-    }
-  };
-
   const handleDownloadPDF = () => {
     const element = document.getElementById('payslip-content');
     const opt = {
@@ -665,8 +572,8 @@ const PayslipViewer = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<Date | null>(null);
   const [companyInfo, setCompanyInfo] = useState(null);
   const [expandedRows, setExpandedRows] = useState(new Set());
-  const [showSummary, setShowSummary] = useState(false);
-  const [overrideStatutoryChecks, setOverrideStatutoryChecks] = useState(true);
+  const [showSummary] = useState(false);
+  const [overrideStatutoryChecks] = useState(true);
   const [salaryAdvances, setSalaryAdvances] = useState<any[]>([]);
 
   useEffect(() => {
@@ -875,11 +782,6 @@ const PayslipViewer = () => {
     return matchesSearch && matchesPeriod;
   });
 
-  const getUniquePeriods = () => {
-    const periods = [...new Set(payslips.map(p => p["Pay Period"] || p.pay_period).filter(Boolean))];
-    return periods.sort((a, b) => new Date(b + '-01') - new Date(a + '-01'));
-  };
-
   const summaryTotals = calculateSummaryTotals();
 
   if (isLoading) {
@@ -1087,12 +989,6 @@ const PayslipViewer = () => {
                                     }
 
                                     const prevMonthDate = new Date(prevYear, prevMonth - 1, 1);
-
-                                    // Show both period and previous month
-                                    const currentMonth = new Date(year, month - 1, 1).toLocaleDateString('en-US', {
-                                      month: 'long',
-                                      year: 'numeric'
-                                    });
 
                                     return `${prevMonthDate.toLocaleDateString('en-US', {
                                       month: 'long',

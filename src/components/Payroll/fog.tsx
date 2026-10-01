@@ -104,7 +104,7 @@ type BulkUploadPreview = {
   };
 };
 
-const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
+const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,10 +141,7 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown, onTownChange }) 
     regional_manager: ''
   });
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadResults, setUploadResults] = useState<UploadOperation[]>([]);
-  const [showUploadResults, setShowUploadResults] = useState(false);
   const [bulkUploadPreview, setBulkUploadPreview] = useState<BulkUploadPreview | null>(null);
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({
     processed: 0,

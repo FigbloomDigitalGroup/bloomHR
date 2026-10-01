@@ -127,11 +127,6 @@ const EmployeeBioPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Phone number change request state
-  const [pendingPhoneRequest, setPendingPhoneRequest] = useState<any>(null);
-  const [showPhoneRequestModal, setShowPhoneRequestModal] = useState(false);
-  const [requestedPhone, setRequestedPhone] = useState('');
-  const [phoneChangeReason, setPhoneChangeReason] = useState('');
-  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
 
   // Check if a field should be editable based on user role
   const canEditField = (fieldName: string): boolean => {

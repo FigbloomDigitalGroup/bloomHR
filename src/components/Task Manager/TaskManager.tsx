@@ -5,8 +5,7 @@ import {
   Plus, Check, Circle, Trash2, Calendar, AlertCircle, Clock, User, 
   ChevronDown, X, Users, Building, Shield, RadioTower, Filter,
   Edit3, Star, Repeat, FolderOpen,
-  List, Grid, ChevronLeft, ChevronRight, Eye, Lock, Unlock,
-  CreditCard, FileText, Landmark, MapPin, BarChart3,
+  List, Grid, ChevronLeft, ChevronRight, Eye, Lock, Unlock, FileText, MapPin, BarChart3,
   Download, Search, Play, Pause
 } from 'lucide-react';
 
@@ -86,82 +85,6 @@ const useEmployees = () => {
   }, [fetchEmployees]);
 
   return { employees, loading, refetch: fetchEmployees };
-};
-
-// Timer Hook for tracking time spent on tasks
-const useTaskTimer = (todoId: string, initialTimeSpent: number = 0, isCompleted: boolean = false) => {
-  const [timeSpent, setTimeSpent] = useState(initialTimeSpent);
-  const [isRunning, setIsRunning] = useState(false);
-  const [startTime, setStartTime] = useState<number | null>(null);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-
-    if (isRunning && startTime) {
-      interval = setInterval(() => {
-        const currentTime = Date.now();
-        const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
-        setTimeSpent(initialTimeSpent + elapsedSeconds);
-      }, 1000);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isRunning, startTime, initialTimeSpent]);
-
-  const startTimer = () => {
-    if (!isCompleted) {
-      setIsRunning(true);
-      setStartTime(Date.now());
-    }
-  };
-
-  const pauseTimer = () => {
-    setIsRunning(false);
-  };
-
-  const stopTimer = async () => {
-    setIsRunning(false);
-    // Save the time to the database
-    try {
-      const { error } = await supabase
-        .from('todos')
-        .update({ 
-          actual_time_spent: timeSpent,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', todoId);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error saving time:', error);
-    }
-  };
-
-  const resetTimer = () => {
-    setIsRunning(false);
-    setTimeSpent(0);
-    setStartTime(null);
-  };
-
-  const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  return {
-    timeSpent,
-    isRunning,
-    formattedTime: formatTime(timeSpent),
-    startTimer,
-    pauseTimer,
-    stopTimer,
-    resetTimer,
-    setTimeSpent
-  };
 };
 
 // Enhanced Constants
@@ -339,49 +262,6 @@ const getStatusIcon = (status: string) => {
     case 'completed': return <Check className="w-3 h-3" />;
     case 'cancelled': return <X className="w-3 h-3" />;
     default: return <Circle className="w-3 h-3" />;
-  }
-};
-
-const getDepartmentColor = (department: string) => {
-  switch (department) {
-    case 'operations': return 'bg-green-tint text-brand-dark border-brand/20';
-    case 'credit': return 'bg-green-50 text-green-700 border-green-200';
-    case 'accounting': return 'bg-orange-tint text-orange-text-alt border-orange/20';
-    case 'relationship': return 'bg-pink-50 text-pink-700 border-pink-200';
-    case 'compliance': return 'bg-red-50 text-red-700 border-red-200';
-    case 'management': return 'bg-orange-tint text-brand-dark border-orange/20';
-    case 'it': return 'bg-teal-50 text-teal-700 border-teal-200';
-    case 'hr': return 'bg-amber-50 text-amber-700 border-amber-200';
-    default: return 'bg-slate-50 text-slate-700 border-slate-200';
-  }
-};
-
-const getDepartmentIcon = (department: string) => {
-  switch (department) {
-    case 'operations': return <RadioTower className="w-3 h-3" />;
-    case 'credit': return <CreditCard className="w-3 h-3" />;
-    case 'accounting': return <FileText className="w-3 h-3" />;
-    case 'relationship': return <Users className="w-3 h-3" />;
-    case 'compliance': return <Shield className="w-3 h-3" />;
-    case 'management': return <Landmark className="w-3 h-3" />;
-    case 'it': return <Circle className="w-3 h-3" />;
-    case 'hr': return <User className="w-3 h-3" />;
-    default: return <FolderOpen className="w-3 h-3" />;
-  }
-};
-
-const getCategoryColor = (category: string) => {
-  switch (category) {
-    case 'loan-processing': return 'bg-green-50 text-green-700 border-green-200';
-    case 'client-followup': return 'bg-green-tint text-brand-dark border-brand/20';
-    case 'collections': return 'bg-orange-50 text-orange-700 border-orange-200';
-    case 'accounting': return 'bg-orange-tint text-orange-text-alt border-orange/20';
-    case 'compliance': return 'bg-red-50 text-red-700 border-red-200';
-    case 'reporting': return 'bg-orange-tint text-brand-dark border-orange/20';
-    case 'training': return 'bg-teal-50 text-teal-700 border-teal-200';
-    case 'meeting': return 'bg-pink-50 text-pink-700 border-pink-200';
-    case 'other': return 'bg-slate-50 text-slate-700 border-slate-200';
-    default: return 'bg-slate-50 text-slate-700 border-slate-200';
   }
 };
 
@@ -635,7 +515,7 @@ const TimerDisplay = ({ timeSpent, isRunning }: { timeSpent: number; isRunning: 
 
 // Main Component
 export function MicrofinanceTodoList() {
-  const { user, userId, loading: authLoading } = useAuth();
+  const { userId, loading: authLoading } = useAuth();
   const { employees, loading: employeesLoading } = useEmployees();
   const [todos, setTodos] = useState<MicrofinanceTodo[]>([]);
   const [filteredTodos, setFilteredTodos] = useState<MicrofinanceTodo[]>([]);
@@ -653,7 +533,6 @@ export function MicrofinanceTodoList() {
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
-  const [dateRangeFilter, setDateRangeFilter] = useState('');
 
   // Get unique towns and branches from employees for dropdowns
   const uniqueTowns = useMemo(() => {
@@ -974,13 +853,6 @@ export function MicrofinanceTodoList() {
     };
 
     const currentTimeSpent = calculateTimeSpent();
-
-    const formatTime = (seconds: number) => {
-      const hours = Math.floor(seconds / 3600);
-      const minutes = Math.floor((seconds % 3600) / 60);
-      const secs = seconds % 60;
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    };
 
     return (
       <div className={`bg-white rounded-xl border border-slate-300 p-3 transition-all hover:border-slate-400 hover:shadow-lg ${

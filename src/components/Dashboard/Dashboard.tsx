@@ -2,10 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { Users, CalendarDays, Wallet, NotepadText, Phone, AlertCircle, MapPin, RefreshCw, Cake, Video, BookOpen, FileText, TrendingUp, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase"
-import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
 import { TownProps } from '../../types/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import toast from 'react-hot-toast';
 import { PageHeader, StatCard, Card, TabBar, EmptyState, Button } from '../UI';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -17,10 +15,6 @@ const LEAVE_STATUS_COLORS: Record<string, string> = {
 
 interface AreaTownMapping {
   [area: string]: string[];
-}
-
-interface BranchAreaMapping {
-  [branch: string]: string;
 }
 
 interface NewsItem {
@@ -44,175 +38,29 @@ interface ActivityItem {
   amount?: number;
 }
 
-export default function DashboardMain({ selectedTown, onTownChange, selectedRegion }: TownProps) {
+export default function DashboardMain({ selectedTown, onTownChange }: TownProps) {
   const [activeTab, setActiveTab] = useState("overview");
-  const [showSupportPopup, setShowSupportPopup] = useState(false);
-  const [showUnauthorizedPopup, setShowUnauthorizedPopup] = useState(false);
+  const [showSupportPopup] = useState(false);
+  const [showUnauthorizedPopup] = useState(false);
   const [stats, setStats] = useState({
     employees: 0,
     leaveRequests: 0,
     activeBranches: 0
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [debugInfo, setDebugInfo] = useState<string>("Initializing...");
+  const [, setDebugInfo] = useState<string>("Initializing...");
   const [currentTown, setCurrentTown] = useState<string>(selectedTown || '');
   const [areaTownMapping, setAreaTownMapping] = useState<AreaTownMapping>({});
-  const [branchAreaMapping, setBranchAreaMapping] = useState<BranchAreaMapping>({});
   const [isArea, setIsArea] = useState<boolean>(false);
   const [townsInArea, setTownsInArea] = useState<string[]>([]);
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [isNewsLoading, setIsNewsLoading] = useState(true);
-  const [isSendingBirthdaySMS, setIsSendingBirthdaySMS] = useState(false);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [leaveByStatus, setLeaveByStatus] = useState<{ name: string; value: number }[]>([]);
   const [employeesByTown, setEmployeesByTown] = useState<{ town: string; count: number }[]>([]);
 
   const navigate = useNavigate();
-
-  // Phone formatting function for SMS
-  const formatPhoneNumberForSMS = (phone: string): string => {
-    if (!phone) return '';
-
-    let cleaned = phone.replace(/\D/g, '');
-
-    if (cleaned.startsWith('0') && cleaned.length === 10) {
-      cleaned = '254' + cleaned.substring(1);
-    } else if (cleaned.startsWith('7') && cleaned.length === 9) {
-      cleaned = '254' + cleaned;
-    } else if (cleaned.startsWith('254') && cleaned.length === 12) {
-      // Keep as is
-    } else if (cleaned.startsWith('+254') && cleaned.length === 13) {
-      cleaned = cleaned.substring(1);
-    }
-
-    if (cleaned.length === 12 && cleaned.startsWith('254')) {
-      return cleaned;
-    }
-
-    return '';
-  };
-
-  // Send birthday SMS function
-  const sendBirthdaySMS = async (employeeName: string, phoneNumber: string) => {
-    try {
-      const formattedPhone = formatPhoneNumberForSMS(phoneNumber);
-
-      if (!formattedPhone) {
-        throw new Error(`Invalid phone number: ${phoneNumber}`);
-      }
-
-      const birthdayMessage = `Happy Birthday ${employeeName}! 🎉 Wishing you a fantastic year ahead from the Figbloom HR Team`;
-      const apiKey = CELCOM_AFRICA_CONFIG.apiKey;
-      const partnerID = CELCOM_AFRICA_CONFIG.partnerID;
-      const shortcode = CELCOM_AFRICA_CONFIG.defaultShortcode;
-      const encodedMessage = encodeURIComponent(birthdayMessage);
-
-      const url = `https://isms.celcomafrica.com/api/services/sendsms/?apikey=${apiKey}&partnerID=${partnerID}&message=${encodedMessage}&shortcode=${shortcode}&mobile=${formattedPhone}`;
-
-      console.log('Sending birthday SMS to:', formattedPhone);
-
-      await fetch(url, {
-        method: 'GET',
-        mode: 'no-cors'
-      });
-
-      // Log to database
-      await supabase.from('sms_logs').insert({
-        recipient_phone: formattedPhone,
-        message: birthdayMessage,
-        status: 'sent',
-        sender_id: shortcode,
-        created_at: new Date().toISOString()
-      });
-
-      return { success: true, message: 'SMS sent successfully' };
-
-    } catch (error) {
-      console.error('SMS Error:', error);
-      return { success: false, error: error.message };
-    }
-  };
-
-  // Send birthday SMS to all today's birthdays
-  const sendAllBirthdaySMS = async () => {
-    setIsSendingBirthdaySMS(true);
-
-    try {
-      // Find birthday employees
-      const { data: employees } = await supabase
-        .from('employees')
-        .select('"First Name", "Last Name", "Mobile Number", "Personal Mobile", "Work Mobile", "Date of Birth"')
-        .not('Date of Birth', 'is', null);
-
-      const today = new Date();
-      const currentMonth = today.getMonth() + 1;
-      const currentDay = today.getDate();
-
-      const birthdayEmployees = employees?.filter(emp => {
-        if (!emp['Date of Birth']) return false;
-        try {
-          const birthDate = new Date(emp['Date of Birth']);
-          return birthDate.getMonth() + 1 === currentMonth &&
-            birthDate.getDate() === currentDay;
-        } catch {
-          return false;
-        }
-      }).map(emp => {
-        const rawPhone = emp['Mobile Number'] || emp['Personal Mobile'] || emp['Work Mobile'] || '';
-        const phone = formatPhoneNumberForSMS(rawPhone);
-        const fullName = `${emp['First Name'] || ''} ${emp['Last Name'] || ''}`.trim();
-
-        return { name: fullName, phone: phone };
-      }).filter(emp => emp.phone && emp.phone.length === 12 && emp.phone.startsWith('254'));
-
-      if (!birthdayEmployees || birthdayEmployees.length === 0) {
-        toast.error('No birthdays with valid phone numbers today');
-        setIsSendingBirthdaySMS(false);
-        return;
-      }
-
-      let successCount = 0;
-      let failCount = 0;
-
-      for (let i = 0; i < birthdayEmployees.length; i++) {
-        const employee = birthdayEmployees[i];
-
-        try {
-          const result = await sendBirthdaySMS(employee.name, employee.phone);
-
-          if (result.success) {
-            successCount++;
-            toast.success(`Sent to ${employee.name}`, { duration: 1500 });
-          } else {
-            failCount++;
-          }
-
-          // Wait between SMS
-          if (i < birthdayEmployees.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
-        } catch {
-          failCount++;
-        }
-      }
-
-      if (successCount > 0) {
-        toast.success(`🎉 Sent ${successCount} birthday SMS successfully!`);
-      }
-      if (failCount > 0) {
-        toast.error(`Failed to send ${failCount} SMS`);
-      }
-
-    } catch (error) {
-      toast.error('Error sending birthday SMS');
-      console.error(error);
-    } finally {
-      setIsSendingBirthdaySMS(false);
-      // Refresh news
-      fetchBirthdayNews();
-    }
-  };
 
   // Fetch birthday news from employees table
   const fetchBirthdayNews = async () => {
@@ -520,8 +368,6 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
       // Try multiple approaches to filter data
       let employeesCount = 0;
       let leaveRequestsCount = 0;
-      let salaryAdvancesCount = 0;
-      let expensesCount = 0;
 
       // 1. Try exact match in Town column
       const { count: townEmployees, error: townError } = await supabase
@@ -545,19 +391,11 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
         if (branch) {
           console.log('Using branch for filtering:', branch);
 
-          const [
-            { count: leaves },
-            { count: advances },
-            { count: exp }
-          ] = await Promise.all([
-            supabase.from('leave_application').select('*', { count: 'exact', head: true }).eq('Office Branch', branch),
-            supabase.from('salary_advance').select('*', { count: 'exact', head: true }).eq('Office Branch', branch),
-            supabase.from('expenses').select('*', { count: 'exact', head: true }).eq('branch', branch)
+          const [{ count: leaves }] = await Promise.all([
+            supabase.from('leave_application').select('*', { count: 'exact', head: true }).eq('Office Branch', branch)
           ]);
 
           leaveRequestsCount = leaves || 0;
-          salaryAdvancesCount = advances || 0;
-          expensesCount = exp || 0;
         }
       }
       // 2. Try Branch column if Town didn't work
@@ -572,19 +410,11 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
           console.log('Found employees by Branch column:', branchEmployees);
           employeesCount = branchEmployees || 0;
 
-          const [
-            { count: leaves },
-            { count: advances },
-            { count: exp }
-          ] = await Promise.all([
-            supabase.from('leave_application').select('*', { count: 'exact', head: true }).ilike('Office Branch', `%${currentTown}%`),
-            supabase.from('salary_advance').select('*', { count: 'exact', head: true }).ilike('Office Branch', `%${currentTown}%`),
-            supabase.from('expenses').select('*', { count: 'exact', head: true }).ilike('branch', `%${currentTown}%`)
+          const [{ count: leaves }] = await Promise.all([
+            supabase.from('leave_application').select('*', { count: 'exact', head: true }).ilike('Office Branch', `%${currentTown}%`)
           ]);
 
           leaveRequestsCount = leaves || 0;
-          salaryAdvancesCount = advances || 0;
-          expensesCount = exp || 0;
         }
         // 3. Try partial match as last resort
         else {
@@ -597,19 +427,11 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
           if (!partialError) {
             employeesCount = partialEmployees || 0;
 
-            const [
-              { count: leaves },
-              { count: advances },
-              { count: exp }
-            ] = await Promise.all([
-              supabase.from('leave_application').select('*', { count: 'exact', head: true }).ilike('Office Branch', `%${currentTown}%`),
-              supabase.from('salary_advance').select('*', { count: 'exact', head: true }).ilike('Office Branch', `%${currentTown}%`),
-              supabase.from('expenses').select('*', { count: 'exact', head: true }).ilike('branch', `%${currentTown}%`)
+            const [{ count: leaves }] = await Promise.all([
+              supabase.from('leave_application').select('*', { count: 'exact', head: true }).ilike('Office Branch', `%${currentTown}%`)
             ]);
 
             leaveRequestsCount = leaves || 0;
-            salaryAdvancesCount = advances || 0;
-            expensesCount = exp || 0;
           }
         }
       }
@@ -665,23 +487,13 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
       const branches = branchesData?.map(b => b['Branch Office']).filter(Boolean) || [];
 
       let leaveRequestsCount = 0;
-      let salaryAdvancesCount = 0;
-      let expensesCount = 0;
 
       if (branches.length > 0) {
-        const [
-          { count: leaves },
-          { count: advances },
-          { count: exp }
-        ] = await Promise.all([
-          supabase.from('leave_application').select('*', { count: 'exact', head: true }).in('Office Branch', branches),
-          supabase.from('salary_advance').select('*', { count: 'exact', head: true }).in('Office Branch', branches),
-          supabase.from('expenses').select('*', { count: 'exact', head: true }).in('branch', branches)
+        const [{ count: leaves }] = await Promise.all([
+          supabase.from('leave_application').select('*', { count: 'exact', head: true }).in('Office Branch', branches)
         ]);
 
         leaveRequestsCount = leaves || 0;
-        salaryAdvancesCount = advances || 0;
-        expensesCount = exp || 0;
       }
 
       if (fetchId !== fetchIdRef.current) return;
@@ -873,7 +685,7 @@ export default function DashboardMain({ selectedTown, onTownChange, selectedRegi
                 </div>
 
                 <div className="space-y-3 flex-1 mt-4">
-                  {recentActivity.length > 0 ? recentActivity.map((activity, index) => (
+                  {recentActivity.length > 0 ? recentActivity.map((activity, _index) => (
                     <div
                       key={activity.id}
                       className="group flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 hover:shadow-sm transition-all border border-transparent hover:border-gray-100"

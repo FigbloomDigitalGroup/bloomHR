@@ -78,7 +78,7 @@ const TrainingModule = () => {
   const [progress, setProgress] = useState<Record<string, UserProgress>>({});
   const [loading, setLoading] = useState(true);
   const [currentDocument, setCurrentDocument] = useState<TrainingDocument | null>(null);
-  const [documentProgress, setDocumentProgress] = useState(0);
+  const [, setDocumentProgress] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [showQuiz, setShowQuiz] = useState(false);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
@@ -87,7 +87,7 @@ const TrainingModule = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [employeeNumber, setEmployeeNumber] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'videos' | 'documents'>('all');
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [, setIsVideoPlaying] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
 

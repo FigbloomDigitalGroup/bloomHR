@@ -130,7 +130,7 @@ const EmployeePerformanceModal: React.FC<EmployeePerformanceModalProps> = ({
         if (error) throw error;
       } else {
         // Create new performance record - exclude id to let database auto-generate it
-        const { id, ...insertData } = formData;
+        const { ...insertData } = formData;
         
         const { data, error } = await supabase
           .from('employee_performance')

@@ -1746,93 +1746,6 @@ const GlowButtonss = ({
   );
 };
 
-
-const SummaryCard = ({
-  label,
-  value,
-  icon: Icon,
-  color,
-  isCount = false,
-}: {
-  label: string;
-  value: string | number;
-  icon: any;
-  color: "emerald" | "red" | "blue" | "purple" | "yellow";
-  isCount?: boolean;
-}) => {
-  const colorClasses = {
-    emerald: "bg-primary/10 text-xs text-primary",
-    red: "bg-red-100 text-xs text-red-600",
-    blue: "bg-blue-100 text-xs text-blue-600",
-    purple: "bg-purple-100 text-xs text-purple-600",
-    yellow: "bg-yellow-100 text-xs text-yellow-600",
-  };
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-      <div className="flex items-center justify-between mb-3">
-        <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
-          <Icon className="w-3 h-3" />
-        </div>
-      </div>
-      <div className="space-y-1">
-        <p className="text-gray-600 text-xs font-semibold uppercase tracking-wide">
-          {label}
-        </p>
-        <p className="text-gray-900 text-lg font-normal">
-          {isCount
-            ? value
-            : typeof value === "number"
-              ? `KSh ${value.toLocaleString()}`
-              : value}
-        </p>
-      </div>
-    </div>
-  );
-};
-
-const StatutoryCard = ({
-  label,
-  value,
-  icon: Icon,
-  color,
-  rate,
-}: {
-  label: string;
-  value: string | number;
-  icon: any;
-  color: "red" | "blue" | "green" | "yellow" | "purple";
-  rate: string;
-}) => {
-  const colorClasses = {
-    red: "bg-red-100 text-red-600",
-    blue: "bg-blue-100 text-blue-600",
-    green: "bg-primary/10 text-primary",
-    yellow: "bg-yellow-100 text-yellow-600",
-    purple: "bg-purple-100 text-purple-600",
-  };
-
-  return (
-    <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className={`p-2 rounded-md ${colorClasses[color]}`}>
-          <Icon className="w-4 h-4" />
-        </div>
-        <span className="text-xs font-medium text-gray-500 bg-white px-2 py-1 rounded-full">
-          {rate}
-        </span>
-      </div>
-      <div className="space-y-1">
-        <p className="text-gray-900 text-lg font-bold">
-          {typeof value === "number"
-            ? `KSh ${Math.round(value).toLocaleString()}`
-            : value}
-        </p>
-      </div>
-    </div>
-  );
-};
-
 const PayslipModal = ({
   record,
   onClose,
@@ -1846,97 +1759,6 @@ const PayslipModal = ({
   onNext?: () => void;
   companyInfo: any;
 }) => {
-  const handlePrint = () => {
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Payslip - ${record.employee_name}</tit            <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Calibri', 'Helvetica', sans-serif; }
-              body { background: white; color: black; padding: 40px; font-size: 11px; }
-              .payslip-container { max-width: 800px; margin: 0 auto; background: white; }
-              .flex { display: flex; }
-              .justify-between { justify-content: space-between; }
-              .items-center { align-items: center; }
-              .items-end { align-items: flex-end; }
-              .grid { display: grid; }
-              .grid-cols-2 { grid-template-columns: 1fr 1fr; }
-              .gap-6 { gap: 1.5rem; }
-              .gap-8 { gap: 2rem; }
-              .mb-1 { margin-bottom: 0.25rem; }
-              .mb-2 { margin-bottom: 0.5rem; }
-              .mb-3 { margin-bottom: 0.75rem; }
-              .mb-4 { margin-bottom: 1rem; }
-              .mb-6 { margin-bottom: 1.5rem; }
-              .mb-8 { margin-bottom: 2rem; }
-              .mt-1 { margin-top: 0.25rem; }
-              .mt-2 { margin-top: 0.5rem; }
-              .mt-6 { margin-top: 1.5rem; }
-              .border { border: 1px solid #9ca3af; }
-              .border-b { border-bottom: 1px solid #d1d5db; }
-              .border-b-3 { border-bottom: 3px solid #6b7280; }
-              .border-t { border-top: 1px solid #9ca3af; }
-              .border-gray-300 { border-color: #d1d5db; }
-              .border-gray-400 { border-color: #9ca3af; }
-              .border-gray-500 { border-color: #6b7280; }
-              .border-double { border-style: double; }
-              .p-1 { padding: 0.25rem; }
-              .p-2 { padding: 0.5rem; }
-              .p-3 { padding: 0.75rem; }
-              .p-4 { padding: 1rem; }
-              .p-6 { padding: 1.5rem; }
-              .pb-2 { padding-bottom: 0.5rem; }
-              .pt-1 { padding-top: 0.25rem; }
-              .pt-2 { padding-top: 0.5rem; }
-              .pt-4 { padding-top: 1rem; }
-              .pt-8 { padding-top: 2rem; }
-              .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
-              .font-bold { font-weight: 700; }
-              .font-semibold { font-weight: 600; }
-              .text-right { text-align: right; }
-              .text-center { text-align: center; }
-              .text-sm { font-size: 0.875rem; }
-              .text-lg { font-size: 1.125rem; }
-              .text-xl { font-size: 1.25rem; }
-              .text-2xl { font-size: 1.5rem; }
-              .text-3xl { font-size: 1.875rem; }
-              .uppercase { text-transform: uppercase; }
-              .bg-white { background-color: white; }
-              .bg-gray-50 { background-color: #f9fafb; border: 1px solid #e5e7eb; }
-              .bg-gray-100 { background-color: #f3f4f6; }
-              .text-black { color: #000; }
-              .text-gray-500 { color: #6b7280; }
-              .text-gray-600 { color: #4b5563; }
-              .text-gray-800 { color: #1f2937; }
-              .text-gray-900 { color: #111827; }
-              .space-y-1 > * + * { margin-top: 0.25rem; }
-              .space-y-1\\.5 > * + * { margin-top: 0.375rem; }
-              .space-y-2 > * + * { margin-top: 0.5rem; }
-              .mr-4 { margin-right: 1rem; }
-              .h-16 { height: 4rem; }
-              .w-16 { width: 4rem; }
-              .object-contain { object-fit: contain; }
-              .mx-auto { margin-left: auto; margin-right: auto; }
-              .leading-tight { line-height: 1.25; }
-              @media print {
-                body { padding: 0; }
-              }
-            </style>yle>
-          </head>
-          <body>
-            ${document.getElementById("payslip-content")?.innerHTML}
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-      }, 500);
-    }
-  };
 
   const handleDownloadPDF = () => {
     const element = document.getElementById("payslip-content");
@@ -2234,7 +2056,6 @@ const Pagination = ({
   onPageChange,
   totalItems,
   itemsPerPage,
-  currentItemsCount,
 }: {
   currentPage: number;
   totalPages: number;
@@ -2344,7 +2165,7 @@ const P10FormGenerator = ({
   calculateNHIF: (grossSalary: number) => number;
   calculateHousingLevy: (grossSalary: number, hasTaxPIN: boolean) => number;
 }) => {
-  const [selectedYear, setSelectedYear] = useState(
+  const [selectedYear] = useState(
     new Date().getFullYear().toString(),
   );
   const [isLoading, setIsLoading] = useState(false);
@@ -2605,38 +2426,6 @@ const P10FormGenerator = ({
   );
 };
 
-// Statutory Override Toggle Component
-const StatutoryOverrideToggle = ({
-  isEnabled,
-  onToggle,
-}: {
-  isEnabled: boolean;
-  onToggle: () => void;
-}) => {
-  return (
-    <div className="flex items-center gap-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-      <div className="flex items-center gap-2">
-        <button
-          onClick={onToggle}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isEnabled ? "bg-primary" : "bg-gray-300"}`}
-        >
-          <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isEnabled ? "translate-x-6" : "translate-x-1"}`}
-          />
-        </button>
-        <span className={`text-sm font-medium ${isEnabled ? "text-primary" : "text-gray-700"}`}>
-          Statutory Override
-        </span>
-      </div>
-      <div className="text-xs text-yellow-700">
-        {isEnabled
-          ? "All statutory deductions will be applied regardless of PIN status"
-          : "Statutory deductions require valid PIN numbers"}
-      </div>
-    </div>
-  );
-};
-
 export default function PayrollDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState<Date | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState("all");
@@ -2644,11 +2433,10 @@ export default function PayrollDashboard() {
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [isSendingPayslips, setIsSendingPayslips] = useState(false);
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [currentRecordIndex, setCurrentRecordIndex] = useState<number | null>(null);
-  const [employees, setEmployees] = useState<any[]>([]);
+  const [, setEmployees] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [departments, setDepartments] = useState(["all"]);
   const [branches, setBranches] = useState([
@@ -2674,10 +2462,6 @@ export default function PayrollDashboard() {
 
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
   const [userRole, setUserRole] = useState("maker");
-  const isAdmin =
-    userRole &&
-    (userRole.toLowerCase() === "admin" ||
-      userRole.toLowerCase() === "credit_analyst_officer");
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showApprovalQueue, setShowApprovalQueue] = useState(false);
   const [selectedPaymentForDetails, setSelectedPaymentForDetails] =
@@ -2702,9 +2486,9 @@ export default function PayrollDashboard() {
   const [showClearQueueModal, setShowClearQueueModal] = useState(false);
 
   // SMS balance state
-  const [smsBalance, setSmsBalance] = useState<any>(null);
-  const [sendingSMS, setSendingSMS] = useState(false);
-  const [smsSendingStatus, setSmsSendingStatus] = useState({});
+  const [, setSmsBalance] = useState<any>(null);
+  const [sendingSMS] = useState(false);
+  const [smsSendingStatus] = useState({});
   // Add this with your other state declarations
   const [salaryAdvances, setSalaryAdvances] = useState<any[]>([]);
   const [currentView, setCurrentView] = useState("dashboard");
@@ -2859,81 +2643,6 @@ export default function PayrollDashboard() {
       );
       return { success: false, error: error.message };
     }
-  };
-
-  const sendBulkPayslipNotifications = async () => {
-    setIsSendingPayslips(true);
-    const results = [];
-    const employeesWithPhones = finalFilteredRecords.filter(
-      (emp: any) => emp.employeeNu,
-    );
-
-    if (employeesWithPhones.length === 0) {
-      toast.error("No employees with phone numbers found");
-      setIsSendingPayslips(false);
-      return [];
-    }
-
-    toast(`Sending ${employeesWithPhones.length} SMS notifications...`, { icon: 'ℹ️' });
-
-    for (const [index, employee] of employeesWithPhones.entries()) {
-      if (employee.employeeNu) {
-        setSmsSendingStatus((prev) => ({
-          ...prev,
-          [employee.employee_id]: "sending",
-        }));
-
-        const result = await sendPayslipNotification(employee);
-        results.push({
-          employee: employee.employee_id,
-          employeeName: employee.employee_name,
-          success: result.success,
-          error: result.error,
-        });
-
-        setSmsSendingStatus((prev) => ({
-          ...prev,
-          [employee.employee_id]: result.success ? "success" : "failed",
-        }));
-
-        if (index < employeesWithPhones.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
-      }
-    }
-
-    const successCount = results.filter((r) => r.success).length;
-    const totalCount = results.length;
-
-    if (successCount === totalCount) {
-      toast.success(
-        `All ${totalCount} payslip notifications sent successfully!`,
-      );
-    } else if (successCount > 0) {
-      toast.success(
-        `${successCount} of ${totalCount} payslip notifications sent successfully`,
-      );
-
-      const failed = results.filter((r) => !r.success);
-      if (failed.length > 0) {
-        console.log("Failed SMS deliveries:", failed);
-        toast.error(
-          `${failed.length} messages failed. Check console for details.`,
-        );
-      }
-    } else {
-      toast.error(
-        "All SMS notifications failed. Please check your SMS configuration.",
-      );
-    }
-
-    setIsSendingPayslips(false);
-
-    setTimeout(() => {
-      setSmsSendingStatus({});
-    }, 5000);
-
-    return results;
   };
 
   // NEW: Clear payment queue function
@@ -3826,23 +3535,9 @@ export default function PayrollDashboard() {
     (sum: number, record: any) => sum + record.housing_levy,
     0,
   );
-  const totalPerDiem = finalFilteredRecords.reduce(
-    (sum: number, record: any) => sum + (record.per_diem || 0),
-    0,
-  );
-  const totalAdvanceDeductions = finalFilteredRecords.reduce(
-    (sum: number, record: any) => sum + (record.advance_deduction || 0),
-    0,
-  );
 
   const pendingCount = paymentRequests.filter(
     (p) => p.status === "pending",
-  ).length;
-  const approvedCount = paymentRequests.filter(
-    (p) => p.status === "approved",
-  ).length;
-  const rejectedCount = paymentRequests.filter(
-    (p) => p.status === "rejected",
   ).length;
   const pendingPayments = paymentRequests.filter((p) => p.status === "pending");
 
@@ -3853,41 +3548,6 @@ export default function PayrollDashboard() {
     "Airtel Money",
     "Cash",
   ];
-  const payPeriods = [
-    { value: "current", label: "Current Month" },
-    { value: "2024-12", label: "December 2024" },
-    { value: "2024-11", label: "November 2024" },
-    { value: "2024-10", label: "October 2024" },
-    { value: "2024-09", label: "September 2024" },
-  ];
-
-  const formatPeriodDisplay = (period: string) => {
-    if (period === "current") {
-      const currentDate = new Date();
-      return `${currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
-    }
-    return new Date(period + "-01").toLocaleDateString("en-US", {
-      month: "long",
-      year: "numeric",
-    });
-  };
-
-  const handleSendPayslips = async (method: string) => {
-    if (method === "sms") {
-      await sendBulkPayslipNotifications();
-    } else {
-      setIsSendingPayslips(true);
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        toast.success(`Payslips sent successfully via ${method}`);
-      } catch (error) {
-        console.error("Error sending payslips:", error);
-        toast.error("Failed to send payslips");
-      } finally {
-        setIsSendingPayslips(false);
-      }
-    }
-  };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -4655,10 +4315,6 @@ export default function PayrollDashboard() {
               <tbody className="bg-[#f3f4f6] divide-y divide-gray-200">
                 {currentItems.map((record, index) => {
                   const isExpanded = expandedRows.has(record.id);
-                  const voluntaryDeductions =
-                    record.loan_deduction +
-                    record.advance_deduction +
-                    record.welfare_deduction;
                   const smsStatus = (smsSendingStatus as Record<string, any>)[record.employee_id];
 
                   return (

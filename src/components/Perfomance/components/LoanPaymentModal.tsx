@@ -166,7 +166,7 @@ const LoanPaymentModal: React.FC<LoanPaymentModalProps> = ({
         if (error) throw error;
       } else {
         // Create new payment - exclude payment_id to let database auto-generate it
-        const { payment_id, ...insertData } = formData;
+        const { ...insertData } = formData;
         
         const { data, error } = await supabase
           .from('loan_payments')

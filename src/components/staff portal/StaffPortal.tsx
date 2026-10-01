@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Phosphor Icons - Premium icon set
@@ -78,32 +78,10 @@ interface NotificationItem {
   timestamp: Date;
   isRead: boolean;
 }
-interface TrainingDocument {
-  id: string;
-  title: string;
-  description: string | null;
-  url: string;
-  file_name: string;
-  file_size: number;
-  file_type: string;
-  category: string;
-  required: boolean;
-  order: number;
-  quiz_required: boolean;
-  created_at: string;
-}
 
 interface NotificationState {
   items: NotificationItem[];
   lastUpdated: Date | null;
-}
-
-// Geolocation and Time Tracking Types
-interface GeolocationPosition {
-  latitude: number;
-  longitude: number;
-  accuracy: number;
-  timestamp: number;
 }
 
 // Robust Helper function to safely parse date from application/record
@@ -138,64 +116,8 @@ const parseApplicationDate = (app: any): Date => {
   return parsedDate;
 };
 
-interface AttendanceLog {
-  id?: string;
-  employee_number: string;
-  login_time: string;
-  logout_time: string | null;
-  geolocation: GeolocationPosition | null;
-  status: 'logged_in' | 'logged_out';
-  created_at?: string;
-}
-interface TrainingProgress {
-  document_id: string;
-  employee_number: string;
-  completed: boolean;
-  completed_at: string | null;
-  quiz_passed: boolean | null;
-  quiz_score: number | null;
-  time_spent: number; // in minutes
-  last_accessed: string;
-}
-// Modernized SidebarNavItem
-function SidebarNavItem({
-  icon,
-  label,
-  active,
-  onClick,
-  hasSubmenu = false,
-  isExpanded = false
-}: {
-  icon: React.ReactNode,
-  label: string,
-  active: boolean,
-  onClick: () => void,
-  hasSubmenu?: boolean,
-  isExpanded?: boolean
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`group flex items-center justify-between w-full px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 ease-out ${active
-        ? 'bg-gray-900 text-white shadow-lg shadow-gray-900/20'
-        : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
-        }`}
-    >
-      <div className="flex items-center gap-3">
-        <span className={`transition-colors duration-200 ${active ? 'text-white' : 'text-gray-400 group-hover:text-gray-600'}`}>
-          {icon}
-        </span>
-        <span>{label}</span>
-      </div>
-      {hasSubmenu && (
-        <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
-      )}
-    </button>
-  );
-}
-
 // Elevated PortalCard Component — matches Employee card design
-function PortalCard({ icon, title, description, onClick, color = 'green', active = false }: {
+function PortalCard({ icon, title, description, onClick, color = 'green' }: {
   icon: React.ReactNode,
   title: string,
   description: string,
@@ -277,13 +199,11 @@ function PortalCard({ icon, title, description, onClick, color = 'green', active
 function HeaderStatus({
   isLoggedIn,
   lastLogin,
-  userName,
 }: {
   isLoggedIn: boolean;
   lastLogin: string | null;
   userName: string;
 }) {
-  const navigate = useNavigate();
 
   return (
     <div className="flex items-center space-x-4">
@@ -305,7 +225,7 @@ function HeaderStatus({
 // Time Tracking Functions
 async function logLoginTime(employeeNumber: string): Promise<boolean> {
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('attendance_logs')
       .insert([{
         employee_number: employeeNumber,
@@ -320,23 +240,6 @@ async function logLoginTime(employeeNumber: string): Promise<boolean> {
     return true;
   } catch (error) {
     console.error('Error logging login time:', error);
-    return false;
-  }
-}
-
-async function checkExistingLogin(employeeNumber: string): Promise<boolean> {
-  try {
-    const { data, error } = await supabase
-      .from('attendance_logs')
-      .select('id')
-      .eq('employee_number', employeeNumber)
-      .is('logout_time', null)
-      .order('login_time', { ascending: false })
-      .limit(1)
-      .single();
-
-    return !!data;
-  } catch {
     return false;
   }
 }
@@ -631,7 +534,7 @@ const LeaveApplicationForm = () => {
     }
 
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('leave_application')
         .insert([{
           "Employee Number": formData["Employee Number"],
@@ -1096,7 +999,7 @@ const SalaryAdvanceForm = () => {
   useEffect(() => {
     const fetchAdvanceSettings = async () => {
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('salary_advance_settings')
           .select('*')
           .eq('id', 1)
@@ -1135,32 +1038,6 @@ const SalaryAdvanceForm = () => {
       supabase.removeChannel(subscription);
     };
   }, []);
-
-  // Get the next application period
-  const getNextApplicationPeriod = () => {
-    const today = new Date();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
-
-    let nextMonth = currentMonth;
-    let nextYear = currentYear;
-
-    if (today.getDate() > 16) {
-      nextMonth = currentMonth + 1;
-      if (nextMonth > 11) {
-        nextMonth = 0;
-        nextYear = currentYear + 1;
-      }
-    }
-
-    const nextStart = new Date(nextYear, nextMonth, 13);
-    const nextEnd = new Date(nextYear, nextMonth, 16);
-
-    return {
-      start: nextStart,
-      end: nextEnd
-    };
-  };
 
   // Calculate maximum eligible advance amount (20% of basic salary)
   const calculateMaxAdvance = () => {
@@ -1554,7 +1431,7 @@ const SalaryAdvanceForm = () => {
     }
 
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('salary_advance')
         .insert([{
           "Employee Number": formData["Employee Number"],
@@ -1754,7 +1631,6 @@ const SalaryAdvanceForm = () => {
   }
 
   const isApplicationPeriod = isAdvancePeriod();
-  const nextPeriod = getNextApplicationPeriod();
 
   return (
     <div className="p-6">
@@ -2132,7 +2008,7 @@ const LoanRequestForm = () => {
     }
 
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('loan_requests')
         .insert([{
           "Employee Number": formData["Employee Number"],
@@ -2509,112 +2385,6 @@ const LoanRequestForm = () => {
   );
 };
 
-// Document Upload Form Component
-const DocumentUploadForm = ({
-  onUpload,
-  availableTypes,
-  uploading
-}: {
-  onUpload: (file: File, type: string) => Promise<boolean>;
-  availableTypes: string[];
-  uploading: boolean;
-}) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [documentType, setDocumentType] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!selectedFile || !documentType) {
-      toast.error('Please select a file and document type');
-      return;
-    }
-
-    const success = await onUpload(selectedFile, documentType);
-    if (success) {
-      setSelectedFile(null);
-      setDocumentType('');
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <label className="block text-xs font-medium text-gray-700">Document Type</label>
-          <select
-            value={documentType}
-            onChange={(e) => setDocumentType(e.target.value)}
-            className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            required
-            disabled={availableTypes.length === 0}
-          >
-            <option value="">Select document type</option>
-            {availableTypes.map((type) => (
-              <option key={type} value={type}>{type}</option>
-            ))}
-          </select>
-          {availableTypes.length === 0 && (
-            <p className="text-xs text-orange-text-alt">All document types have been uploaded</p>
-          )}
-        </div>
-
-        <div className="space-y-1">
-          <label className="block text-xs font-medium text-gray-700">Choose File</label>
-          <input
-            ref={fileInputRef}
-            type="file"
-            onChange={handleFileSelect}
-            className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-            required
-          />
-        </div>
-      </div>
-
-      {selectedFile && (
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-xs text-gray-700">
-            Selected: <strong>{selectedFile.name}</strong> ({Math.round(selectedFile.size / 1024)} KB)
-          </p>
-        </div>
-      )}
-
-      <button
-        type="submit"
-        disabled={uploading || !selectedFile || !documentType || availableTypes.length === 0}
-        className={`w-full px-4 py-2 border border-transparent rounded-lg text-xs font-medium text-white bg-primary hover:bg-primary/90 flex items-center justify-center ${uploading || !selectedFile || !documentType || availableTypes.length === 0 ? 'opacity-70 cursor-not-allowed' : ''
-          }`}
-      >
-        {uploading ? (
-          <>
-            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Uploading...
-          </>
-        ) : (
-          <>
-            <PhUpload className="h-4 w-4 mr-2" weight="duotone" />
-            Upload Document
-          </>
-        )}
-      </button>
-    </form>
-  );
-};
-
 // Enhanced DashboardHome with Payslip button
 const DashboardHome = ({ setActiveTab, userName }: { setActiveTab: (tab: string) => void, userName: string }) => {
   const currentHour = new Date().getHours();
@@ -2764,32 +2534,6 @@ const DashboardHome = ({ setActiveTab, userName }: { setActiveTab: (tab: string)
   );
 };
 
-type UserProfileHeaderProps = {
-  userName: string;
-  setActiveTab: (tab: string) => void;
-};
-
-// UserProfileHeader Component for the header
-const UserProfileHeader = ({ userName, setActiveTab }: UserProfileHeaderProps) => {
-  const navigate = useNavigate();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  return (
-    <div className="flex items-center space-x-4">
-      <UserProfileDropdown
-        onPasswordReset={() => setIsModalOpen(true)}
-        loginStatus={{ isLoggedIn: true, lastLogin: "2025-08-21" }}
-        userName={userName}
-        setActiveTab={setActiveTab}
-      />
-      <PasswordResetModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
-    </div>
-  );
-};
-
 interface MenuItem {
   id: string;
   label: string;
@@ -2909,7 +2653,7 @@ const StaffPortal = () => {
     items: [],
     lastUpdated: null
   });
-  const [showNotificationDot, setShowNotificationDot] = useState(false);
+  const [, setShowNotificationDot] = useState(false);
   const [notificationSidebarOpen, setNotificationSidebarOpen] = useState(false);
   const [employeeNumber, setEmployeeNumber] = useState<string>('');
   // False once we know this login has no employees row with a matching Work Email
@@ -3000,7 +2744,7 @@ const StaffPortal = () => {
         (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
       );
 
-      setNotifications(prev => ({
+      setNotifications(_prev => ({
         items: notificationItems,
         lastUpdated: new Date()
       }));
@@ -3214,14 +2958,6 @@ const StaffPortal = () => {
       }
     } catch (error) {
       console.error('Error checking login status:', error);
-    }
-  };
-
-  const toggleMenu = (menu: string) => {
-    if (expandedMenu === menu) {
-      setExpandedMenu(null);
-    } else {
-      setExpandedMenu(menu);
     }
   };
 

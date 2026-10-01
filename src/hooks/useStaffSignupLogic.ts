@@ -30,7 +30,7 @@ export function useStaffSignupLogic() {
     const [excelFile, setExcelFile] = useState(null);
     const [parsedData, setParsedData] = useState<any[]>([]);
     const [parsingExcel, setParsingExcel] = useState(false);
-    const [webhookEnabled, setWebhookEnabled] = useState(true);
+    const [webhookEnabled] = useState(true);
     const [webhookStats, setWebhookStats] = useState({
         total: 0,
         bounced: 0,

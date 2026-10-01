@@ -54,7 +54,6 @@ const ChatComponent = ({ onMessagesRead }: ChatComponentProps) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
   // Real channels from the `channels` table (see master_schema.sql) -
   // previously a hardcoded fictional list with slug ids like 'general'
   // that never corresponded to any real row (FIG-577).

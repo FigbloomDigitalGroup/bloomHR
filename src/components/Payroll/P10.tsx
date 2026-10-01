@@ -4,39 +4,11 @@ import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
-interface P10FormData {
-  pin: string;
-  name: string;
-  residentStatus: string;
-  employeeType: string;
-  pwd: string;
-  exemptionCert: string;
-  cashPay: number;
-  carBenefit: number;
-  meals: number;
-  nonCashBenefits: number;
-  housingType: string;
-  housingBenefit: number;
-  otherBenefits: number;
-  grossPay: number;
-  shif: number;
-  nssf: number;
-  pension: number;
-  medicalFund: number;
-  mortgageInterest: number;
-  housingLevy: number;
-  taxablePay: number;
-  personalRelief: number;
-  insuranceRelief: number;
-  payeTax: number;
-  selfAssessedPaye: number;
-}
-
 const P10FormGenerator: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [isLoading, setIsLoading] = useState(false);
   const [employees, setEmployees] = useState<any[]>([]);
-  const [payrollData, setPayrollData] = useState<any[]>([]);
+  const [, setPayrollData] = useState<any[]>([]);
 
   useEffect(() => {
     if (isOpen) {

@@ -131,7 +131,7 @@ const PerformanceTargetModal: React.FC<PerformanceTargetModalProps> = ({
       }
 
       // Prepare the data to be saved
-      const { id, ...dataWithoutId } = formData;
+      const { ...dataWithoutId } = formData;
 
       if (formData.id) {
         // Update existing target

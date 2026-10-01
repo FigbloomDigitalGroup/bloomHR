@@ -428,7 +428,7 @@ Make sure to incorporate the severity level (${severity}) and be specific about 
       }
 
       // 1. Save warning to database
-      const { data: warningData, error: warningError } = await supabase
+      const { error: warningError } = await supabase
         .from('warnings')
         .insert([
           {

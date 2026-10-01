@@ -388,10 +388,7 @@ const Pagination: React.FC<PaginationProps> = ({
 };
 
 const StatutoryDeductionsReport: React.FC<BaseReportProps> = ({
-  reportTitle,
-  reportDescription,
   onGenerateReport,
-  renderReportData,
   selectedTown,
   onTownChange
 }) => {

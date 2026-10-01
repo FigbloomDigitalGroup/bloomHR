@@ -5,6 +5,7 @@ import { StatusBadge } from '../StatusBadge';
 import GlowButton from '../../../UI/GlowButton';
 import { Edit, Save, X, Plus } from 'lucide-react';
 import { supabase } from '../../../../lib/supabase';
+import toast from 'react-hot-toast';
 
 interface KenyaOfficeLocation {
   id: string;
@@ -125,27 +126,6 @@ export const BranchesSection = () => {
     }
   };
 
-  // Delete office (soft delete)
-  const deleteOffice = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this office?')) return;
-
-    try {
-      const { error } = await supabase
-        .from('kenya_office_locations')
-        .update({ is_active: false })
-        .eq('id', id);
-
-      if (error) throw error;
-
-      // Refresh the data
-      await fetchKenyaOfficeLocations();
-      toast.success('Office deleted successfully!');
-    } catch (err) {
-      console.error('Error deleting office:', err);
-      toast.error('Failed to delete office');
-    }
-  };
-
   // Calculate position counts for each location
   const getLocationStats = (locationId: string) => {
     const locationPositions = jobPositions.filter(p => p.branch === locationId);
@@ -200,7 +180,6 @@ export const BranchesSection = () => {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {kenyaOfficeLocations.map((location) => {
-            const stats = getLocationStats(location.id);
             return (
               <BranchCard 
                 key={location.id} 

@@ -38,7 +38,7 @@ export const saveSalaryHistoryBatch = async (records: SalaryHistoryRecord[]) => 
     if (!records || records.length === 0) return { success: true, count: 0 };
 
     try {
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from('salary_history')
             .upsert(
                 records.map(record => ({

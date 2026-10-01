@@ -61,7 +61,6 @@ const LoanTargetsCalculator: React.FC<LoanTargetsCalculatorProps> = ({
       
       // Calculate actual performance
       const branchLoans = loans.filter(loan => {
-        const loanOfficer = loan.loan_officer;
         const employee = clients.find(c => c.client_id === loan.client_id);
         // This is a simplified calculation - you might need to adjust based on your data structure
         return loan.branch === branch["Branch Office"] || 

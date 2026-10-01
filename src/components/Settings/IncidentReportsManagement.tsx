@@ -219,7 +219,7 @@ const IncidentReportsManagement = () => {
         }
     };
 
-    const notifyReporter = async (employeeNumber: string, status: string, reportId: string) => {
+    const notifyReporter = async (employeeNumber: string, status: string, _reportId: string) => {
         try {
             const statusMessages = {
                 under_review: 'Your incident report is now under review.',

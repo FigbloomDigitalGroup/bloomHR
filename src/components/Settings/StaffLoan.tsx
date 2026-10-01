@@ -17,9 +17,7 @@ const LoanRequestsAdmin = () => {
   const [loans, setLoans] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editedLoanAmount, setEditedLoanAmount] = useState('');
-  const [editedInstallment, setEditedInstallment] = useState('');
+  const [, setEditingId] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [selectedLoan, setSelectedLoan] = useState<any | null>(null);
 
@@ -57,12 +55,6 @@ const LoanRequestsAdmin = () => {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
-  };
-
-  const formatDate = (dateValue: any) => {
-    if (!dateValue) return 'N/A';
-    const d = new Date(dateValue);
-    return d.toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
   const handleLoanAmountSave = async (id: string, amount: string) => {

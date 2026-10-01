@@ -353,7 +353,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {transactions.map((transaction, index) => (
+                  {transactions.map((transaction, _index) => (
                     <tr key={transaction.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
                         <div className="text-sm font-medium text-gray-900">
@@ -921,10 +921,7 @@ const Pagination: React.FC<PaginationProps> = ({
 };
 
 const BaseReport: React.FC<BaseReportProps> = ({
-  reportTitle,
-  reportDescription,
   onGenerateReport,
-  renderReportData,
   selectedTown,
   onTownChange
 }) => {
