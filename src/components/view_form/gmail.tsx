@@ -59,7 +59,7 @@ const GmailCallback = () => {
             gmail_refresh_token: data.refresh_token,
             gmail_token_expiry: new Date(Date.now() + data.expires_in * 1000).toISOString(),
             updated_at: new Date().toISOString(),
-          });
+          }, { onConflict: 'tenant_id,id' });
 
         if (supabaseError) throw supabaseError;
 
