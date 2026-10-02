@@ -37,6 +37,10 @@ const MPESA_URLS = {
 
 // --- Supabase Init ---
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+// Service-role writes bypass RLS and have no per-user tenant default, so they must name a tenant.
+// Until per-tenant M-Pesa credentials and callback routing exist (FIG-652) every deployment is one
+// tenant: the default one created by the tenants migration.
+const DEFAULT_TENANT_ID = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001';
 const supabaseKey = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_KEY;
 
 const supabase = (supabaseUrl && supabaseKey)
@@ -158,6 +162,7 @@ router.post("/transaction-status-result", async (req, res) => {
             }
 
             const { error } = await supabase.from('mpesa_callbacks').upsert({
+              tenant_id: DEFAULT_TENANT_ID,
               originator_conversation_id: result.OriginatorConversationID, // PK preferably
               transaction_id: finalTransactionID,
               result_type: 'TransactionStatus',
@@ -269,6 +274,7 @@ router.post("/check-transaction-status", async (req, res) => {
     if (supabase) {
       try {
         await supabase.from('mpesa_callbacks').insert({
+          tenant_id: DEFAULT_TENANT_ID,
           originator_conversation_id: uniqueOriginatorID,
           transaction_id: transactionID,
           result_type: 'TransactionStatus_Pending',
@@ -326,6 +332,7 @@ router.post("/check-transaction-by-receipt", async (req, res) => {
     if (supabase) {
       try {
         await supabase.from('mpesa_callbacks').insert({
+          tenant_id: DEFAULT_TENANT_ID,
           originator_conversation_id: uniqueOriginatorID,
           transaction_id: receiptNumber,
           result_type: 'TransactionStatus_Pending',
@@ -420,6 +427,7 @@ router.post("/c2b-confirmation", async (req, res) => {
       if (supabase) {
         try {
           await supabase.from('mpesa_callbacks').upsert({
+            tenant_id: DEFAULT_TENANT_ID,
             transaction_id: transactionData.TransID,
             result_type: 'C2B',
             result_code: 0,
@@ -630,6 +638,7 @@ router.post("/b2c", async (req, res) => {
     if (supabase) {
       try {
         await supabase.from('mpesa_callbacks').insert({
+          tenant_id: DEFAULT_TENANT_ID,
           originator_conversation_id: originatorConversationID,
           result_type: 'B2C',
           amount: numericAmount,
@@ -691,6 +700,7 @@ router.post("/b2c-result", async (req, res) => {
         try {
           // Attempt to match by OriginatorConversationID or ConversationID
           const { error } = await supabase.from('mpesa_callbacks').upsert({
+            tenant_id: DEFAULT_TENANT_ID,
             originator_conversation_id: result.OriginatorConversationID,
             transaction_id: transactionId,
             conversation_id: result.ConversationID,
@@ -708,6 +718,7 @@ router.post("/b2c-result", async (req, res) => {
             console.error("❌ DB Error during B2C success save:", error.message);
             // Fallback: If upsert failed due to missing constraint, try simple insert
             await supabase.from('mpesa_callbacks').insert({
+              tenant_id: DEFAULT_TENANT_ID,
               originator_conversation_id: result.OriginatorConversationID,
               transaction_id: transactionId,
               conversation_id: result.ConversationID,
@@ -737,6 +748,7 @@ router.post("/b2c-result", async (req, res) => {
       if (supabase) {
         try {
           await supabase.from('mpesa_callbacks').upsert({
+            tenant_id: DEFAULT_TENANT_ID,
             originator_conversation_id: result.OriginatorConversationID,
             conversation_id: result.ConversationID,
             result_type: 'B2C',

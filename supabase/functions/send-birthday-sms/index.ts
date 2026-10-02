@@ -24,7 +24,7 @@ serve(async (_req) => {
         // Fetch employees with birthdays today
         const { data: employees, error: fetchError } = await supabaseClient
             .from('employees')
-            .select('"Employee Number", "First Name", "Last Name", "Mobile Number", "Personal Mobile", "Work Mobile", "Date of Birth"')
+            .select('tenant_id, "Employee Number", "First Name", "Last Name", "Mobile Number", "Personal Mobile", "Work Mobile", "Date of Birth"')
             .not('Date of Birth', 'is', null);
 
         if (fetchError) {
@@ -100,6 +100,7 @@ serve(async (_req) => {
 
                 // Log to sms_logs
                 await supabaseClient.from('sms_logs').insert({
+                    tenant_id: emp.tenant_id,
                     recipient_phone: phone,
                     message: message,
                     status: 'sent',
@@ -108,6 +109,7 @@ serve(async (_req) => {
 
                 // Log to birthday_sms_log
                 await supabaseClient.from('birthday_sms_log').insert({
+                    tenant_id: emp.tenant_id,
                     employee_id: employeeId,
                     employee_name: fullName,
                     phone_number: phone,
@@ -127,6 +129,7 @@ serve(async (_req) => {
 
                 // Log failure
                 await supabaseClient.from('birthday_sms_log').insert({
+                    tenant_id: emp.tenant_id,
                     employee_id: employeeId,
                     employee_name: fullName,
                     phone_number: phone,
