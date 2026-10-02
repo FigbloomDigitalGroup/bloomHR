@@ -33,7 +33,7 @@ describe('anonymous access', () => {
     });
   });
 
-  it('no policy on a tenant table is granted to PUBLIC or anon, apart from the known role_permissions ones', async () => {
+  it('no permissive policy on any table is granted to PUBLIC or anon', async () => {
     const granted = (
       await db.query<{ tablename: string; policyname: string }>(
         `select tablename, policyname from pg_policies
@@ -43,11 +43,6 @@ describe('anonymous access', () => {
       )
     ).rows.map((p) => `${p.tablename}: ${p.policyname}`);
 
-    // Allowed for now: role_permissions "view" is harmless (the tenant policy still blocks anon) and
-    // its admin policy is tracked separately (it trusts user_metadata.role, see the RFC, risk 4).
-    expect(granted).toEqual([
-      'role_permissions: Anyone can view role permissions',
-      'role_permissions: Only admins can modify role permissions',
-    ]);
+    expect(granted).toEqual([]);
   });
 });
