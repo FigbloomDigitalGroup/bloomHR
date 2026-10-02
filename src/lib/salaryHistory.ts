@@ -45,7 +45,8 @@ export const saveSalaryHistoryBatch = async (records: SalaryHistoryRecord[]) => 
                     ...record,
                     created_at: new Date().toISOString()
                 })),
-                { onConflict: 'employee_id,pay_period' }
+                // unique per tenant since FIG-515; tenant_id is stamped by the column default
+                { onConflict: 'tenant_id,employee_id,pay_period' }
             );
 
         if (error) {

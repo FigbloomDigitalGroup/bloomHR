@@ -134,7 +134,8 @@ export default function RolePermissions() {
                     permissions: rolePermissions[selectedRole] || [],
                     updated_at: new Date().toISOString()
                 }, {
-                    onConflict: 'role_name'
+                    // unique per tenant (FIG-515); tenant_id is stamped by the column default
+                    onConflict: 'tenant_id,role_name'
                 });
 
             if (error) throw error;

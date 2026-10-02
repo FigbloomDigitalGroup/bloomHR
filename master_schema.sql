@@ -71,6 +71,9 @@ CREATE TABLE IF NOT EXISTS company_logo (id bigint PRIMARY KEY GENERATED ALWAYS 
 -- ========================================================
 -- SECURITY: GLOBAL RLS POLICY GENERATOR
 -- ========================================================
+-- This only gives every signed-in user access *within the database*. Isolation between companies
+-- is added on top by supabase/migrations/20261002000100_tenant_rls.sql (a restrictive per-tenant
+-- policy), so run this file first and the migrations after it.
 
 DO $$ 
 DECLARE 

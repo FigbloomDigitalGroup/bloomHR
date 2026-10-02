@@ -33,8 +33,10 @@ class HttpError extends Error {
 // Supabase Auth ban durations for each account status.
 const banDuration = (status) => (status === "ACTIVE" ? "none" : status === "SUSPENDED" ? "876000h" : "permanent");
 
-// Verifies the bearer token and loads the caller's role from user_profiles.
-// user_metadata is user-editable, so it is never trusted for authorization.
+// Verifies the bearer token and loads the caller's role and tenant from user_profiles.
+// user_metadata is user-editable, so it is never trusted for authorization. Every query below
+// runs with the service-role key (no RLS), so tenant isolation is enforced here, in code: each
+// handler is scoped to caller.tenantId (docs/MULTI_TENANCY_RFC.md, section 4).
 async function authenticate(req) {
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
@@ -45,14 +47,14 @@ async function authenticate(req) {
 
   const { data: profile, error: profileError } = await admin
     .from("user_profiles")
-    .select("role, account_status")
+    .select("role, account_status, tenant_id")
     .eq("user_id", data.user.id)
     .maybeSingle();
   if (profileError) throw new HttpError(500, "Could not verify caller role");
-  if (!profile || (profile.account_status && profile.account_status !== "ACTIVE")) {
+  if (!profile || !profile.tenant_id || (profile.account_status && profile.account_status !== "ACTIVE")) {
     throw new HttpError(403, "Forbidden");
   }
-  return { id: data.user.id, role: profile.role };
+  return { id: data.user.id, role: profile.role, tenantId: profile.tenant_id };
 }
 
 // Wraps a handler with auth, a role allow-list and uniform error handling.
@@ -99,11 +101,34 @@ const toUserView = (user, profile) => ({
 });
 
 // Keeps user_profiles (the trusted role source) in step with the auth user.
-async function syncProfile(userId, email, role, accountStatus) {
+async function syncProfile(userId, email, role, accountStatus, tenantId) {
   const { error } = await admin
     .from("user_profiles")
-    .upsert({ user_id: userId, email, role, account_status: accountStatus }, { onConflict: "user_id" });
+    .upsert({ user_id: userId, email, role, account_status: accountStatus, tenant_id: tenantId }, { onConflict: "user_id" });
   if (error) throw error;
+}
+
+// The target of a by-id operation must belong to the caller's tenant. A user in another tenant
+// is reported as "not found" so the endpoint does not reveal that they exist.
+async function loadTenantProfile(userId, caller) {
+  const { data, error } = await admin
+    .from("user_profiles")
+    .select("role, account_status, tenant_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data || data.tenant_id !== caller.tenantId) throw new HttpError(404, "User not found");
+  return data;
+}
+
+// Ids of every login in the caller's tenant, with their profile.
+async function tenantProfiles(caller) {
+  const { data, error } = await admin
+    .from("user_profiles")
+    .select("user_id, role, account_status")
+    .eq("tenant_id", caller.tenantId);
+  if (error) throw error;
+  return new Map(data.map((p) => [p.user_id, p]));
 }
 
 // HR may only manage STAFF accounts (the staff sign-up approval flow); ADMIN may manage any.
@@ -126,23 +151,20 @@ function validateFields({ email, role, account_status, password }, { requireAll 
 // GET /api/admin/users - every auth user with role/status (ADMIN)
 router.get(
   "/users",
-  guard(["ADMIN"], async (_req, res) => {
-    const [users, profiles] = await Promise.all([
-      listAllAuthUsers(),
-      admin.from("user_profiles").select("user_id, role, account_status"),
-    ]);
-    if (profiles.error) throw profiles.error;
-    const byId = new Map(profiles.data.map((p) => [p.user_id, p]));
-    res.json({ users: users.map((u) => toUserView(u, byId.get(u.id))) });
+  guard(["ADMIN"], async (_req, res, caller) => {
+    const [users, byId] = await Promise.all([listAllAuthUsers(), tenantProfiles(caller)]);
+    res.json({ users: users.filter((u) => byId.has(u.id)).map((u) => toUserView(u, byId.get(u.id))) });
   })
 );
 
 // GET /api/admin/auth-users - slim id/email/metadata list for sign-up matching (ADMIN, HR)
 router.get(
   "/auth-users",
-  guard(["ADMIN", "HR"], async (_req, res) => {
-    const users = await listAllAuthUsers();
-    res.json({ users: users.map((u) => ({ id: u.id, email: u.email, user_metadata: u.user_metadata })) });
+  guard(["ADMIN", "HR"], async (_req, res, caller) => {
+    const [users, byId] = await Promise.all([listAllAuthUsers(), tenantProfiles(caller)]);
+    res.json({
+      users: users.filter((u) => byId.has(u.id)).map((u) => ({ id: u.id, email: u.email, user_metadata: u.user_metadata })),
+    });
   })
 );
 
@@ -173,7 +195,7 @@ router.post(
       throw new HttpError(exists ? 409 : 400, error.message);
     }
     try {
-      await syncProfile(data.user.id, email, role, account_status);
+      await syncProfile(data.user.id, email, role, account_status, caller.tenantId);
     } catch (profileErr) {
       // Don't leave a login that can never pass the role check.
       await admin.auth.admin.deleteUser(data.user.id);
@@ -192,11 +214,11 @@ router.patch(
     const email = req.body?.email === undefined ? undefined : normalizeEmail(req.body.email);
     validateFields({ email, role, account_status, password }, { requireAll: false });
 
+    const currentProfile = await loadTenantProfile(id, caller);
     const { data: existing, error: getError } = await admin.auth.admin.getUserById(id);
     if (getError || !existing?.user) throw new HttpError(404, "User not found");
     const current = existing.user;
 
-    const { data: currentProfile } = await admin.from("user_profiles").select("role, account_status").eq("user_id", id).maybeSingle();
     const currentRole = currentProfile?.role || current.user_metadata?.role || "STAFF";
     assertCanManageRole(caller, currentRole);
     const nextRole = role ?? currentRole;
@@ -229,7 +251,7 @@ router.patch(
 
     const { data, error } = await admin.auth.admin.updateUserById(id, update);
     if (error) throw new HttpError(error.status === 422 ? 409 : 400, error.message);
-    await syncProfile(id, data.user.email, nextRole, nextStatus);
+    await syncProfile(id, data.user.email, nextRole, nextStatus, caller.tenantId);
     res.json({ user: toUserView(data.user, { role: nextRole, account_status: nextStatus }) });
   })
 );
@@ -239,6 +261,7 @@ router.delete(
   "/users/:id",
   guard(["ADMIN"], async (req, res, caller) => {
     if (req.params.id === caller.id) throw new HttpError(400, "You cannot delete your own account");
+    await loadTenantProfile(req.params.id, caller);
     const { error } = await admin.auth.admin.deleteUser(req.params.id);
     if (error) throw new HttpError(error.status === 404 ? 404 : 400, error.message);
     await admin.from("user_profiles").delete().eq("user_id", req.params.id);
@@ -249,7 +272,8 @@ router.delete(
 // POST /api/admin/users/:id/reset-email - send the user a password reset email (ADMIN)
 router.post(
   "/users/:id/reset-email",
-  guard(["ADMIN"], async (req, res) => {
+  guard(["ADMIN"], async (req, res, caller) => {
+    await loadTenantProfile(req.params.id, caller);
     const { data, error } = await admin.auth.admin.getUserById(req.params.id);
     if (error || !data?.user?.email) throw new HttpError(404, "User not found");
     const redirectTo = typeof req.body?.redirectTo === "string" ? req.body.redirectTo : undefined;
