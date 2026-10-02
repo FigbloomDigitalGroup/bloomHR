@@ -58,3 +58,5 @@ Tenant isolation keeps companies apart; these rules keep staff out of each other
 
 Known gaps: the statutory deduction fields that affect payroll (`Tax Exempted`, `NSSF/NHIF/Housing Levy Deduction`, `HELB option`, ...) are still self-editable because the Profile page lets staff change them; managers and regional managers see every employee in the company (town/region scoping is still done in the frontend); tiers 2-4 of FIG-657 still carry the blanket policy.
 
+Tier 4 specifics (chat, notifications, tasks, logs, MFA, sign-up requests, profiles): ownership rules instead of modules. A channel is visible if it is public, you created it, or it is restricted to your job title (the rule the chat screens already used); messages follow the channel; tasks are company-visible unless private; MFA tables are limited to your own email as a stop-gap because the codes are still created and checked in the browser (tracked separately). Pre-login tables (`staff_signup_requests`, `mfa_*`) are not reachable anonymously; the proper pre-login endpoints belong to FIG-516.
+
