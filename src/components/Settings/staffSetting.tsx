@@ -79,7 +79,7 @@ const AdvanceApplicationManager = ({ onStatusChange }: AdvanceApplicationManager
           closed_at: new Date().toISOString(),
           closed_by: 'Admin', // Get from auth in real implementation
           schedule_type: 'manual'
-        });
+        }, { onConflict: 'tenant_id,id' });
 
       if (updateError) throw updateError;
 
@@ -117,7 +117,7 @@ const AdvanceApplicationManager = ({ onStatusChange }: AdvanceApplicationManager
           closed_until: null,
           reopened_at: new Date().toISOString(),
           schedule_type: 'manual'
-        });
+        }, { onConflict: 'tenant_id,id' });
 
       if (updateError) throw updateError;
 
@@ -153,7 +153,7 @@ const AdvanceApplicationManager = ({ onStatusChange }: AdvanceApplicationManager
           scheduled_close: scheduleSettings.scheduled_close || null,
           scheduled_open: scheduleSettings.scheduled_open || null,
           custom_message: scheduleSettings.custom_message || null
-        });
+        }, { onConflict: 'tenant_id,id' });
 
       if (error) throw error;
 

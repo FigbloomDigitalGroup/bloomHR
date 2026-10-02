@@ -483,13 +483,9 @@ function App() {
     // For CHECKER and ADMIN, check if MFA is enabled in DB before triggering MFA flow
     if (role === 'CHECKER' || role === 'ADMIN') {
       try {
-        const { data: settingsData } = await supabase
-          .from('system_settings')
-          .select('mfa_enabled')
-          .eq('id', 1)
-          .single();
+        const { data: mfaRequired } = await supabase.rpc('mfa_required');
 
-        if (settingsData?.mfa_enabled) {
+        if (mfaRequired) {
           sessionStorage.setItem('isMFAProcess', 'true');
           const mfaData = {
             userId: userData.id,
