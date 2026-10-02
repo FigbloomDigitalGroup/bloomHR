@@ -112,7 +112,7 @@ export function useHRNotifications() {
             // Fetch employee details
             const empNumbers = statuses.map((s: any) => s['Employee Number']);
             const { data: employees } = await supabase
-                .from('employees')
+                .from('employee_directory')
                 .select('"Employee Number", "First Name", "Last Name", "Work Email"')
                 .in('"Employee Number"', empNumbers);
 

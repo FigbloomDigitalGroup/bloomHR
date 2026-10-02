@@ -181,43 +181,43 @@ const EmployeeBioPage = () => {
 
         // Fetch dropdown options
         const { data: empTypes } = await supabase
-          .from('employees')
+          .from('employee_directory')
           .select('"Employee Type"')
           .not('Employee Type', 'is', null)
           .order('"Employee Type"', { ascending: true });
 
         const { data: branches } = await supabase
-          .from('employees')
+          .from('employee_directory')
           .select('"Branch"')
           .not('Branch', 'is', null)
           .order('"Branch"', { ascending: true });
 
         const { data: jobLevels } = await supabase
-          .from('employees')
+          .from('employee_directory')
           .select('"Job Level"')
           .not('Job Level', 'is', null)
           .order('"Job Level"', { ascending: true });
 
         const { data: jobGroup } = await supabase
-          .from('employees')
+          .from('employee_directory')
           .select('"Job Group"')
           .not('Job Group', 'is', null)
           .order('"Job Group"', { ascending: true });
 
         const { data: office } = await supabase
-          .from('employees')
+          .from('employee_directory')
           .select('"Town"')
           .not('Town', 'is', null)
           .order('"Town"', { ascending: true });
 
         const { data: jobTitles } = await supabase
-          .from('employees')
+          .from('employee_directory')
           .select('"Job Title"')
           .not('Job Title', 'is', null)
           .order('"Job Title"', { ascending: true });
 
         const { data: supervisors } = await supabase
-          .from('employees')
+          .from('employee_directory')
           .select('"First Name", "Last Name"')
           .order('"First Name"', { ascending: true });
 

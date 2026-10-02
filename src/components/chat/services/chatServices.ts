@@ -23,7 +23,7 @@ class ChatService {
       console.log("📊 Fetching employees from database...");
       
       const { data, error } = await supabase
-        .from('employees')
+        .from('employee_directory')
         .select('*')
         .order('First Name', { ascending: true });
 

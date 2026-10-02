@@ -145,7 +145,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
         const myName = `${me["First Name"]} ${me["Last Name"]}`;
 
         const { data: allEmployees } = await supabase
-          .from('employees')
+          .from('employee_directory')
           .select('"Employee Number", "Leave Approver", "Alternate Approver"');
 
         const myReportNumbers = (allEmployees || [])

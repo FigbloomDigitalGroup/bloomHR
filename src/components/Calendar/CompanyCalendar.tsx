@@ -51,7 +51,7 @@ export default function CompanyCalendar() {
     setLoading(true);
     try {
       const [{ data: employees }, { data: holidays }, { data: events }] = await Promise.all([
-        supabase.from('employees').select('"First Name", "Last Name", "Date of Birth", Town'),
+        supabase.from('employee_directory').select('"First Name", "Last Name", "Date of Birth", Town'),
         supabase.from('holidays').select('name, date, recurring'),
         supabase.from('company_events').select('id, title, date, description').order('date'),
       ]);
