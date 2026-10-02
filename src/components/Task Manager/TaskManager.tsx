@@ -55,7 +55,7 @@ const useEmployees = () => {
   const fetchEmployees = useCallback(async () => {
     try {
       const { data, error } = await supabase
-        .from('employees')
+        .from('employee_directory')
         .select('"Employee Number", "First Name", "Middle Name", "Last Name", "Town", "Work Email", "Branch"')
         .order('"First Name"', { ascending: true });
 

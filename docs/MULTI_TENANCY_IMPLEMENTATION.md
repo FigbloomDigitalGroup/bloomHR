@@ -46,3 +46,15 @@ Rollback: drop the `tenant_isolation` policies and `alter column tenant_id drop 
 ## Pre-existing exposure worth knowing
 
 The live database has `public` (anonymous-readable) policies on `hr_notifications` (`ALL ... USING (true)`) and `role_permissions` / `permissions` (`SELECT ... USING (true)`). The tenant policy closes the cross-tenant side of that, but anonymous access to `hr_notifications` within a tenant is a separate hole to close (`create policy ... to authenticated`).
+
+## Access inside a company (FIG-657)
+
+Tenant isolation keeps companies apart; these rules keep staff out of each other's records within one company. All of them are enforced in the database (`supabase/migrations/20261002000500...0700`) and covered by tests in `supabase/tests`.
+
+- **Modules decide access.** `has_module()` / `has_any_module()` check the signed-in user's role (from `user_profiles`) against `role_permissions`, the same module list that shows or hides the sidebar screens. ADMIN always passes.
+- **Admin-only tables** (payroll flows, loans, statutory deductions, expenses, M-Pesa, terminations...) are reachable only through their modules.
+- **Staff-facing tables** (payslips, advances, loan requests, warnings, incident reports, phone changes, dependents, emergency contact) add "own rows": the employee whose Work Email equals the login email.
+- **`employees`**: modules that work with employee data read the whole company; everyone else reads only their own row. Staff may edit only personal and statutory details of their own row (a trigger rejects changes to pay, job, status, organisation, contract); unchanged values in a full-row update are fine. Colleague lookups (chat, task assignment, birthdays, dropdown options, approver lookups) use the `employee_directory` view, which has no pay, ID, tax, bank or personal-contact columns.
+
+Known gaps: the statutory deduction fields that affect payroll (`Tax Exempted`, `NSSF/NHIF/Housing Levy Deduction`, `HELB option`, ...) are still self-editable because the Profile page lets staff change them; managers and regional managers see every employee in the company (town/region scoping is still done in the frontend); tiers 2-4 of FIG-657 still carry the blanket policy.
+

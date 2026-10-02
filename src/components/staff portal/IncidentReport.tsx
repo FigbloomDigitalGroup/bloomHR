@@ -172,7 +172,7 @@ const IncidentReport = () => {
     const notifyAdmins = async (reportId: string) => {
         try {
             const { data: admins } = await supabase
-                .from('employees')
+                .from('employee_directory')
                 .select('"Employee Number"')
                 .in('"Job Title"', ['Admin', 'HR Manager', 'System Administrator']);
 

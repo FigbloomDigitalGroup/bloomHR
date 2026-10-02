@@ -41,8 +41,8 @@ beforeAll(async () => {
       ('${USER_B}', 'b@b.co', 'STAFF', '${B}');
 
     insert into employees ("Employee Number", "First Name", "Work Email", tenant_id) values
-      ('EMP-A1', 'Alice', 'alice@a.co', '${A}'),
-      ('EMP-B1', 'Bob',   'bob@b.co',   '${B}');
+      ('EMP-A1', 'Alice', 'a@a.co', '${A}'),
+      ('EMP-B1', 'Bob',   'b@b.co',   '${B}');
 
     insert into leave_types (name, is_deductible, tenant_id) values
       ('Annual Leave', true, '${B}');
@@ -88,7 +88,9 @@ describe('classification (every table is accounted for)', () => {
        where n.nspname='public' and c.relkind='v'`
     );
     expect(views.length).toBeGreaterThan(0);
-    for (const v of views) expect([v.relname, v.reloptions]).toEqual([v.relname, expect.arrayContaining(['security_invoker=true'])]);
+    // employee_directory is the one deliberate exception: it runs with the owner's rights to expose
+    // non-sensitive columns of every colleague, and filters by tenant itself (tested in employees_access.test.ts)
+    for (const v of views.filter((v) => v.relname !== 'employee_directory')) expect([v.relname, v.reloptions]).toEqual([v.relname, expect.arrayContaining(['security_invoker=true'])]);
   });
 });
 
@@ -135,15 +137,15 @@ describe('cross-tenant access is blocked on every tenant table', () => {
     await asUser(db, USER_A, async () => {
       expect((await rows<{ n: string }>(`select "Employee Number" n from employees`)).map((r) => r.n)).toEqual(['EMP-A1']);
       await expect(
-        db.query(`insert into employees ("Employee Number", "First Name", tenant_id) values ('EMP-X', 'Mallory', '${B}')`)
+        db.query(`insert into kenya_branches ("Town", tenant_id) values ('Mallory-ville', '${B}')`)
       ).rejects.toThrow(/row-level security/);
     });
   });
 
   it('new rows are stamped with the caller’s tenant automatically', async () => {
     await asUser(db, USER_A, async () => {
-      await db.query(`insert into employees ("Employee Number", "First Name") values ('EMP-A2', 'Anna')`);
-      const [row] = await rows<{ tenant_id: string }>(`select tenant_id from employees where "Employee Number" = 'EMP-A2'`);
+      await db.query(`insert into kenya_branches ("Town") values ('Annaville')`);
+      const [row] = await rows<{ tenant_id: string }>(`select tenant_id from kenya_branches where "Town" = 'Annaville'`);
       expect(row.tenant_id).toBe(A);
     });
   });
@@ -203,7 +205,7 @@ describe('suspension kill switch', () => {
       await asUser(db, USER_B, async () => {
         expect(await rows(`select 1 from employees`)).toEqual([]);
         expect(await rows(`select 1 from tenants`)).toEqual([]);
-        await expect(db.query(`insert into employees ("Employee Number", "First Name") values ('EMP-B9', 'Zed')`)).rejects.toThrow();
+        await expect(db.query(`insert into kenya_branches ("Town") values ('Zedville')`)).rejects.toThrow();
       });
     } finally {
       await db.exec(`update tenants set status = 'active' where id = '${B}'`);
@@ -228,9 +230,9 @@ describe('permission helpers', () => {
 
 describe('uniqueness is per tenant', () => {
   it('two tenants can use the same work email and the same role name', async () => {
-    await db.exec(`insert into employees ("Employee Number", "First Name", "Work Email", tenant_id) values ('EMP-B2', 'Alicia', 'alice@a.co', '${B}')`);
+    await db.exec(`insert into employees ("Employee Number", "First Name", "Work Email", tenant_id) values ('EMP-B2', 'Alicia', 'a@a.co', '${B}')`);
     await expect(
-      db.query(`insert into employees ("Employee Number", "First Name", "Work Email", tenant_id) values ('EMP-A9', 'Dup', 'alice@a.co', '${A}')`)
+      db.query(`insert into employees ("Employee Number", "First Name", "Work Email", tenant_id) values ('EMP-A9', 'Dup', 'a@a.co', '${A}')`)
     ).rejects.toThrow(/unique/i);
     const roles = await rows(`select 1 from role_permissions where role_name = 'STAFF'`);
     expect(roles.length).toBe(2);

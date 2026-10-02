@@ -36,7 +36,7 @@ export function CreateChannelDialog({
       setLoadingJobTitles(true);
       try {
         const { data, error } = await supabase
-          .from('employees')
+          .from('employee_directory')
           .select('"Job Title"')
           .not('"Job Title"', 'is', null)
           .order('"Job Title"', { ascending: true });
