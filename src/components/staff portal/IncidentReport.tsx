@@ -131,7 +131,11 @@ const IncidentReport = () => {
 
         setIsSubmitting(true);
         try {
+            // The id is generated here so we never have to read the new row back: an anonymous report
+            // has no employee number, so the database (rightly) lets nobody but a reviewer select it.
+            const reportId = crypto.randomUUID();
             const reportData = {
+                id: reportId,
                 employee_number: isAnonymous ? null : employeeNumber,
                 is_anonymous: isAnonymous,
                 incident_type: incidentType,
@@ -144,18 +148,16 @@ const IncidentReport = () => {
                 status: 'new'
             };
 
-            const { data, error } = await supabase
+            const { error } = await supabase
                 .from('incident_reports')
-                .insert(reportData)
-                .select()
-                .single();
+                .insert(reportData);
 
             if (error) throw error;
 
             // Notify admins
-            await notifyAdmins(data.id);
+            await notifyAdmins(reportId);
 
-            setSubmittedReportId(data.id);
+            setSubmittedReportId(reportId);
             setShowSuccess(true);
             resetForm();
             toast.success('Incident report submitted successfully');
