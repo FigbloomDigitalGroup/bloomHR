@@ -100,7 +100,7 @@ end $$;
 --    company B uses a value (a leak) or be blocked by it (a bug). Only the keys listed below are
 --    converted: changing a unique constraint breaks every `upsert(..., { onConflict })` that names
 --    its old columns, so each conversion is deliberate and its callers are updated with it
---    (RolePermissions.tsx for role_permissions). Any other candidate is reported with a NOTICE
+--    (RolePermissions.tsx for role_permissions, lib/salaryHistory.ts for salary_history). Any other candidate is reported with a NOTICE
 --    for review. Constraints that include a uuid column are globally unique already, and ones
 --    referenced by a foreign key (employees."Employee Number") cannot change without migrating the
 --    FKs - tracked separately.
@@ -124,7 +124,10 @@ begin
                       where a.attname = 'tenant_id' or a.atttypid = 'uuid'::regtype)
       and not exists (select 1 from pg_constraint f where f.contype = 'f' and f.confrelid = con.conrelid and f.confkey = con.conkey)
   loop
-    if (c.tbl, c.cols) in (('role_permissions', 'role_name'), ('employees', '"Work Email"')) then
+    if (c.tbl, c.cols) in (('role_permissions', 'role_name'),
+                           ('employees', '"Work Email"'),
+                           ('emergency_contact', '"Employee Number"'),
+                           ('salary_history', 'employee_id, pay_period')) then
       execute format('alter table %s drop constraint %I', c.tbl, c.conname);
       execute format('alter table %s add constraint %I unique (tenant_id, %s)', c.tbl, c.conname, c.cols);
       raise notice 'unique per tenant: %.% is now (tenant_id, %)', c.tbl, c.conname, c.cols;
@@ -134,9 +137,11 @@ begin
   end loop;
 end $$;
 
--- Views defined with `select *` froze their column list before tenant_id existed. Re-expand the
--- ones we know about so they expose tenant_id (CREATE OR REPLACE may append columns).
-create or replace view public.current_leave_policies as
+-- Views defined with `select *` froze their column list before tenant_id existed. Re-create the
+-- ones we know about so they expose tenant_id. (DROP + CREATE rather than CREATE OR REPLACE: the
+-- live leave_policies has a different column order than the migration that defined it.)
+drop view if exists public.current_leave_policies;
+create view public.current_leave_policies as
 select distinct on (leave_type_id) *
 from public.leave_policies
 where effective_from <= current_date

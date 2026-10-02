@@ -593,7 +593,8 @@ const EmployeeBioPage = () => {
             phone_number: emergencyContact.phone,
             email: emergencyContact.email || null
           }, {
-            onConflict: 'Employee Number'
+            // emergency_contact is unique per tenant (FIG-515); tenant_id is stamped by the column default
+            onConflict: 'tenant_id,Employee Number'
           });
 
         if (contactsError) throw contactsError;

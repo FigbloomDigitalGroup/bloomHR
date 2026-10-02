@@ -92,3 +92,22 @@ export async function asAnon<T>(db: PGlite, fn: () => Promise<T>): Promise<T> {
     await db.exec('reset role');
   }
 }
+
+/**
+ * Same stack, but starting from a snapshot of the real ziradev schema instead of master_schema.sql:
+ * the live tables plus only the tenant migrations (everything older is already part of the snapshot).
+ */
+export async function bootLiveDb() {
+  const db = new PGlite({ extensions: { uuid_ossp } });
+  await db.exec(SUPABASE_STUBS);
+  await db.exec('create extension if not exists "uuid-ossp"');
+  await db.exec(readFileSync(join(root, 'supabase', 'tests', 'fixtures', 'live_schema.sql'), 'utf8'));
+  for (const file of migrationFiles().filter((f) => /^\d{14}_/.test(f) && f >= '20261001')) {
+    try {
+      await db.exec(readFileSync(join(root, 'supabase', 'migrations', file), 'utf8'));
+    } catch (e) {
+      throw new Error(`migration ${file} failed on the live schema: ${(e as Error).message}`);
+    }
+  }
+  return db;
+}

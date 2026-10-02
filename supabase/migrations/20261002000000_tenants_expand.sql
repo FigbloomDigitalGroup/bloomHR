@@ -75,6 +75,15 @@ begin
       and c.relname <> all (exempt)
     order by c.relname
   loop
+    -- hr_contract_settings already has an unrelated text tenant_id (from database/hr_lifecycle_schema.sql).
+    -- Keep its values under another name and let tenant_id be the real uuid.
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = r.relname and column_name = 'tenant_id' and udt_name <> 'uuid'
+    ) then
+      execute format('alter table public.%I rename column tenant_id to legacy_tenant_id', r.relname);
+      raise notice 'renamed %.tenant_id (not a uuid) to legacy_tenant_id', r.relname;
+    end if;
     execute format('alter table public.%I add column if not exists tenant_id uuid', r.relname);
     execute format('update public.%I set tenant_id = %L where tenant_id is null', r.relname, '00000000-0000-0000-0000-000000000001');
     -- leave_types/hr_contract_settings already had a nullable, unconstrained tenant_id: make sure
