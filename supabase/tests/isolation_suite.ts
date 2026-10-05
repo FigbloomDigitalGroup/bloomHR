@@ -9,6 +9,9 @@ const A = '00000000-0000-0000-0000-000000000001'; // the default tenant created 
 const B = '00000000-0000-0000-0000-0000000000b2';
 const USER_A = '00000000-0000-0000-0000-00000000a001';
 const USER_B = '00000000-0000-0000-0000-00000000b001';
+// admins (every module) for the tests that need to write; the STAFF users above are read-mostly
+const ADMIN_A = '00000000-0000-0000-0000-00000000a0ad';
+const ADMIN_B = '00000000-0000-0000-0000-00000000b0ad';
 
 // Keep in sync with the "exempt" arrays in the migrations.
 const NOT_TENANT_OWNED = ['tenants', 'permissions', 'user_profiles', 'Employee_Records_Duplicate', 'kenya_branches_duplicate'];
@@ -35,10 +38,14 @@ beforeAll(async () => {
 
     insert into auth.users (id, email, raw_user_meta_data) values
       ('${USER_A}', 'a@a.co', '{"role":"STAFF"}'),
-      ('${USER_B}', 'b@b.co', '{"role":"STAFF"}');
+      ('${USER_B}', 'b@b.co', '{"role":"STAFF"}'),
+      ('${ADMIN_A}', 'adm@a.co', '{"role":"ADMIN"}'),
+      ('${ADMIN_B}', 'adm@b.co', '{"role":"ADMIN"}');
     insert into user_profiles (user_id, email, role, tenant_id) values
       ('${USER_A}', 'a@a.co', 'STAFF', '${A}'),
-      ('${USER_B}', 'b@b.co', 'STAFF', '${B}');
+      ('${USER_B}', 'b@b.co', 'STAFF', '${B}'),
+      ('${ADMIN_A}', 'adm@a.co', 'ADMIN', '${A}'),
+      ('${ADMIN_B}', 'adm@b.co', 'ADMIN', '${B}');
 
     insert into employees ("Employee Number", "First Name", "Work Email", tenant_id) values
       ('EMP-A1', 'Alice', 'a@a.co', '${A}'),
@@ -136,6 +143,8 @@ describe('cross-tenant access is blocked on every tenant table', () => {
   it('a user only sees their own tenant’s employees and cannot insert into another tenant', async () => {
     await asUser(db, USER_A, async () => {
       expect((await rows<{ n: string }>(`select "Employee Number" n from employees`)).map((r) => r.n)).toEqual(['EMP-A1']);
+    });
+    await asUser(db, ADMIN_A, async () => {
       await expect(
         db.query(`insert into kenya_branches ("Town", tenant_id) values ('Mallory-ville', '${B}')`)
       ).rejects.toThrow(/row-level security/);
@@ -143,7 +152,7 @@ describe('cross-tenant access is blocked on every tenant table', () => {
   });
 
   it('new rows are stamped with the caller’s tenant automatically', async () => {
-    await asUser(db, USER_A, async () => {
+    await asUser(db, ADMIN_A, async () => {
       await db.query(`insert into kenya_branches ("Town") values ('Annaville')`);
       const [row] = await rows<{ tenant_id: string }>(`select tenant_id from kenya_branches where "Town" = 'Annaville'`);
       expect(row.tenant_id).toBe(A);
@@ -172,7 +181,7 @@ describe('tenants and user_profiles', () => {
 
   it('profiles are readable within the tenant only', async () => {
     await asUser(db, USER_A, async () => {
-      expect((await rows<{ user_id: string }>(`select user_id from user_profiles`)).map((r) => r.user_id)).toEqual([USER_A]);
+      expect((await rows<{ user_id: string }>(`select user_id from user_profiles`)).map((r) => r.user_id).sort()).toEqual([USER_A, ADMIN_A].sort());
     });
   });
 
@@ -193,7 +202,7 @@ describe('tenants and user_profiles', () => {
 
   it('the users view only lists the caller’s tenant', async () => {
     await asUser(db, USER_A, async () => {
-      expect((await rows<{ email: string }>(`select email from users`)).map((r) => r.email)).toEqual(['a@a.co']);
+      expect((await rows<{ email: string }>(`select email from users`)).map((r) => r.email).sort()).toEqual(['a@a.co', 'adm@a.co']);
     });
   });
 });
@@ -205,6 +214,8 @@ describe('suspension kill switch', () => {
       await asUser(db, USER_B, async () => {
         expect(await rows(`select 1 from employees`)).toEqual([]);
         expect(await rows(`select 1 from tenants`)).toEqual([]);
+      });
+      await asUser(db, ADMIN_B, async () => {
         await expect(db.query(`insert into kenya_branches ("Town") values ('Zedville')`)).rejects.toThrow();
       });
     } finally {

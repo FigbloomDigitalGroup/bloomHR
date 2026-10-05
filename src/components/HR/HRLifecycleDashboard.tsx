@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
+import { useSearchParams } from 'react-router-dom';
 import EmploymentStatusModule from './EmploymentStatusModule';
 import LifecycleHistoryModule from './LifecycleHistoryModule';
 import SuspensionModule from './SuspensionModule';
@@ -32,7 +33,12 @@ const tabs = [
 ];
 
 export default function HRLifecycleDashboard() {
-    const [activeTab, setActiveTab] = useState('overview');
+    // Deep link, e.g. from Employee Management's Terminate: /hr-lifecycle?tab=status&q=<employee number>
+    const [searchParams] = useSearchParams();
+    const requestedTab = searchParams.get('tab');
+    const [activeTab, setActiveTab] = useState(
+        tabs.some(t => t.id === requestedTab) ? (requestedTab as string) : 'overview'
+    );
     const [stats, setStats] = useState<DashboardStats>({
         on_probation: 0, contracts_expiring: 0,
         suspended: 0, terminated: 0, missing_joining_date: 0,
@@ -296,7 +302,7 @@ export default function HRLifecycleDashboard() {
                         </div>
                     )}
 
-                    {activeTab === 'status' && <EmploymentStatusModule onRefresh={fetchDashboardStats} />}
+                    {activeTab === 'status' && <EmploymentStatusModule onRefresh={fetchDashboardStats} initialSearch={searchParams.get('q') || ''} />}
                     {activeTab === 'history' && <LifecycleHistoryModule />}
                     {activeTab === 'suspension' && <SuspensionModule onRefresh={fetchDashboardStats} />}
                     {activeTab === 'reports' && <HRReportsDashboard stats={stats} />}

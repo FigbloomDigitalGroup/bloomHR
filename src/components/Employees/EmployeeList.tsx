@@ -1,9 +1,8 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Search, Plus, MapPin, Mail, Phone,
-  ChevronLeft, ChevronRight, Briefcase,
-  Settings,
+  Search, Plus, Mail, Phone,
+  ChevronLeft, ChevronRight, ChevronDown,
   Edit3Icon,
   UserRoundCog,
   Copy,
@@ -15,12 +14,10 @@ import {
 import DuplicateCheckModal from './DuplicateCheckModal';
 import BulkEditModal from './BulkEditModal';
 import BulkTerminateModal from './BulkTerminateModal';
-import SearchableDropdown from '../UI/SearchableDropdown';
-import { motion } from 'framer-motion';
 import { TownProps } from '../../types/supabase';
 import { supabase } from '../../lib/supabase';
 import { Database } from '../../types/supabase';
-import GlowButton from '../UI/GlowButton';
+import { PageHeader, Card, Button, StatusPill, EmptyState, SearchInput } from '../UI';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
@@ -63,6 +60,9 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showBulkTerminateModal, setShowBulkTerminateModal] = useState(false);
+
+  // Single-employee terminate confirmation (hands off to HR Lifecycle)
+  const [terminateTarget, setTerminateTarget] = useState<Employee | null>(null);
 
   // Load area-town mapping and set current town
   useEffect(() => {
@@ -255,435 +255,345 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
 
   if (loading) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="p-6 max-w-6xl mx-auto flex justify-center items-center min-h-[60vh] text-xs"
-      >
-        <div className="text-center">
-          <div className="animate-pulse flex flex-col items-center">
-            <div className="w-16 h-16 bg-gradient-to-r from-green-50 to-green-200 rounded-full mb-6"></div>
-            <div className="h-5 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full w-64 mb-4"></div>
-            <div className="h-4 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full w-48"></div>
-          </div>
+      <div className="p-6 flex justify-center items-center min-h-[60vh] text-xs">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="w-14 h-14 bg-green-tint rounded-full mb-5" />
+          <div className="h-4 bg-secondary rounded-full w-64 mb-3" />
+          <div className="h-3 bg-secondary rounded-full w-48" />
         </div>
-      </motion.div>
+      </div>
     );
   }
 
-  if (error) return <div className="p-6 text-center text-red-500">Error: {error}</div>;
+  if (error) return <div className="p-6 text-center text-status-danger">Error: {error}</div>;
+
+  const pillSelect =
+    'appearance-none rounded-tile border border-border bg-white pl-3 pr-7 py-2 text-xs font-semibold text-ink outline-none focus:border-brand cursor-pointer';
+
+  const renderPillSelect = (
+    options: string[],
+    value: string,
+    onChange: (v: string) => void,
+    allLabel: string,
+    ariaLabel: string
+  ) => (
+    <label className="relative inline-block">
+      <select
+        aria-label={ariaLabel}
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setCurrentPage(1);
+        }}
+        className={pillSelect}
+      >
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o === 'all' ? allLabel : o}
+          </option>
+        ))}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-subtle" strokeWidth={2} />
+    </label>
+  );
 
   return (
-    <div className="p-6 space-y-6">
-
-
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Employee Management</h1>
-          <p className="text-gray-600 mt-1">
-            Managing employees for <span className="font-semibold text-primary">{getDisplayName()}</span>
-          </p>
-        </div>
-        <div className='flex space-x-3'>
+    <div>
+      <PageHeader
+        title="Employee Management"
+        subtitle={
+          <>
+            Managing employees for <span className="font-semibold text-brand">{getDisplayName()}</span>
+          </>
+        }
+        actions={
           <RoleButtonWrapper allowedRoles={['ADMIN', 'HR', 'MANAGER', 'REGIONAL']}>
-            <GlowButton
-              icon={Plus}
-              onClick={() => navigate('/add-employee')}
-            >
+            <Button onClick={() => navigate('/add-employee')} icon={<Plus className="w-3.5 h-3.5" strokeWidth={2.2} />}>
               Add Employee
-            </GlowButton>
+            </Button>
           </RoleButtonWrapper>
-
-
-        </div>
-      </div>
+        }
+      />
 
       {/* Filters */}
-      <div className="bg-white/80 text-xs backdrop-blur-sm border border-gray-200 rounded-lg p-3 relative z-20">
-        <div className="grid grid-cols-1 md:grid-cols-5 lg:grid-cols-7 gap-2 items-center">
-          {/* Search Input */}
-          <div className="relative md:col-span-2 lg:col-span-2">
-            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
-            <input
-              type="text"
-              placeholder="Search by name, ID, email, or phone..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full pl-8 pr-3 py-1.5 text-[11px] border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-            />
-          </div>
-
-          {/* Department Dropdown */}
-          <SearchableDropdown
-            options={departments}
-            value={selectedDepartment}
-            onChange={(value) => {
-              setSelectedDepartment(value);
+      <div className="flex flex-wrap items-center gap-2 mb-[18px] relative z-20">
+        <div className="flex-1 min-w-[200px]">
+          <SearchInput
+            placeholder="Search by name, ID, email, or phone..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
               setCurrentPage(1);
             }}
-            placeholder="All Departments"
-            icon={Briefcase}
+            className="!bg-white !border-border"
           />
-
-          {/* Branch Dropdown */}
-          <SearchableDropdown
-            options={branches}
-            value={selectedBranch}
-            onChange={(value) => {
-              setSelectedBranch(value);
-              setCurrentPage(1);
-            }}
-            placeholder="All Branches"
-            icon={MapPin}
-          />
-
-          {/* Employment Type Dropdown */}
-          <SearchableDropdown
-            options={employmentTypes}
-            value={selectedEmploymentType}
-            onChange={(value) => {
-              setSelectedEmploymentType(value);
-              setCurrentPage(1);
-            }}
-            placeholder="Town Office"
-            icon={Building2}
-          />
-
-          {/* Buttons */}
-          <div className="flex space-x-2 h-[32px] md:col-span-5 lg:col-span-2">
-            <div className="flex space-x-1.5 h-full w-full justify-end">
-              {selectionAction ? (
-                <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
-                  <GlowButton
-                    variant="secondary"
-                    size="sm"
-                    className="h-full !text-[11px] bg-red-50 text-red-600 border-red-100 hover:bg-red-100"
-                    onClick={() => {
-                      setSelectionAction(null);
-                      setSelectedIds([]);
-                    }}
-                    icon={X}
-                  >
-                    Cancel
-                  </GlowButton>
-                  <GlowButton
-                    variant="primary"
-                    size="sm"
-                    className="h-full !text-[11px]"
-                    disabled={selectedIds.length === 0}
-                    onClick={() => {
-                      if (selectionAction === 'relocate') setShowBulkEditModal(true);
-                      if (selectionAction === 'terminate') setShowBulkTerminateModal(true);
-                    }}
-                    icon={Save}
-                  >
-                    Update ({selectedIds.length})
-                  </GlowButton>
-                  <button
-                    className="text-[10px] text-gray-500 hover:text-primary underline ml-1"
-                    onClick={handleSelectAllOnPage}
-                  >
-                    Toggle Page
-                  </button>
-                </RoleButtonWrapper>
-              ) : (
-                <>
-                  <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
-                    <GlowButton
-                      variant="secondary"
-                      icon={Copy}
-                      size="sm"
-                      className="h-full !text-[11px]"
-                      onClick={() => setShowDuplicateModal(true)}
-                    >
-                      Duplicates
-                    </GlowButton>
-                  </RoleButtonWrapper>
-
-                  <RoleButtonWrapper allowedRoles={['ADMIN']}>
-                    <GlowButton
-                      variant="primary"
-                      icon={Edit3Icon}
-                      size="sm"
-                      className="h-full !text-[11px]"
-                      onClick={() => navigate('/fogs')}
-                    >
-                      Bulk Edit
-                    </GlowButton>
-                  </RoleButtonWrapper>
-
-                  <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
-                    <GlowButton
-                      variant="secondary"
-                      icon={Building2}
-                      size="sm"
-                      className="h-full !text-[11px]"
-                      onClick={() => setSelectionAction('relocate')}
-                    >
-                      Relocate
-                    </GlowButton>
-                  </RoleButtonWrapper>
-
-                  <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
-                    <GlowButton
-                      variant="secondary"
-                      icon={UserRoundCog}
-                      size="sm"
-                      className="h-full !text-[11px] hover:text-red-700 hover:border-red-200 hover:bg-red-50"
-                      onClick={() => setSelectionAction('terminate')}
-                    >
-                      Terminate
-                    </GlowButton>
-                  </RoleButtonWrapper>
-                </>
-              )}
-            </div>
-          </div>
         </div>
+
+        {renderPillSelect(departments, selectedDepartment, setSelectedDepartment, 'All Departments', 'Filter by department')}
+        {renderPillSelect(branches, selectedBranch, setSelectedBranch, 'All Branches', 'Filter by branch')}
+        {renderPillSelect(employmentTypes, selectedEmploymentType, setSelectedEmploymentType, 'Town Office', 'Filter by town office')}
+
+        {selectionAction ? (
+          <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setSelectionAction(null);
+                setSelectedIds([]);
+              }}
+              icon={<X className="w-3.5 h-3.5" />}
+            >
+              Cancel
+            </Button>
+            <Button variant="ghost" onClick={handleSelectAllOnPage}>
+              Toggle Page
+            </Button>
+            <Button
+              disabled={selectedIds.length === 0}
+              onClick={() => {
+                if (selectionAction === 'relocate') setShowBulkEditModal(true);
+                if (selectionAction === 'terminate') setShowBulkTerminateModal(true);
+              }}
+              icon={<Save className="w-3.5 h-3.5" />}
+            >
+              Update ({selectedIds.length})
+            </Button>
+          </RoleButtonWrapper>
+        ) : (
+          <>
+            <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+              <Button variant="secondary" onClick={() => setShowDuplicateModal(true)} icon={<Copy className="w-3.5 h-3.5" />}>
+                Duplicates
+              </Button>
+            </RoleButtonWrapper>
+            <RoleButtonWrapper allowedRoles={['ADMIN']}>
+              <Button variant="secondary" onClick={() => navigate('/fogs')} icon={<Edit3Icon className="w-3.5 h-3.5" />}>
+                Bulk Edit
+              </Button>
+            </RoleButtonWrapper>
+            <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+              <Button variant="secondary" onClick={() => setSelectionAction('relocate')} icon={<Building2 className="w-3.5 h-3.5" />}>
+                Relocate
+              </Button>
+            </RoleButtonWrapper>
+            <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+              <Button
+                variant="secondary"
+                className="!text-status-danger"
+                onClick={() => setSelectionAction('terminate')}
+                icon={<UserRoundCog className="w-3.5 h-3.5" />}
+              >
+                Bulk Terminate
+              </Button>
+            </RoleButtonWrapper>
+          </>
+        )}
       </div>
 
       {/* Employee Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {currentEmployees.map((employee, index) => {
-          const isSelected = selectedIds.includes(employee["Employee Number"]);
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {currentEmployees.map((employee) => {
+          const empNo = employee['Employee Number'];
+          const isSelected = selectedIds.includes(empNo);
+          const isInactive = !!employee['Termination Date'];
+          const fullName = [employee['First Name'], employee['Last Name']].filter(Boolean).join(' ');
           return (
-            <motion.div
-              key={employee["Employee Number"]}
+            <Card
+              key={empNo}
               onClick={() => {
-                if (selectionAction) toggleEmployeeSelection(employee["Employee Number"]);
+                if (selectionAction) toggleEmployeeSelection(empNo);
               }}
-              className={`group flex flex-col bg-white rounded-2xl border shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all duration-300 overflow-hidden relative cursor-pointer
-                ${isSelected
-                  ? 'border-primary ring-2 ring-primary/20 shadow-lg'
-                  : 'border-gray-200/60 hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:border-primary/20'}
-            `}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              whileHover={{ y: selectionAction ? 0 : -4 }}
+              className={`relative transition-colors ${selectionAction ? 'cursor-pointer' : ''} ${
+                isSelected ? '!border-brand ring-2 ring-brand/20' : ''
+              }`}
             >
-              {/* CHECKBOX OVERLAY */}
               {selectionAction && (
-                <div className="absolute top-3 right-3 z-20">
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors
-                        ${isSelected ? 'bg-primary border-primary' : 'bg-white border-gray-300 group-hover:border-primary/60'}
-                     `}>
-                    {isSelected && <CheckSquare size={14} className="text-white" />}
-                  </div>
+                <div
+                  className={`absolute top-3 right-3 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                    isSelected ? 'bg-brand border-brand' : 'bg-white border-border'
+                  }`}
+                >
+                  {isSelected && <CheckSquare size={12} className="text-white" />}
                 </div>
               )}
 
-              {/* Header Section */}
-              <div className="relative h-14 px-4 flex items-center bg-gradient-to-r from-green-200/70 to-white">
-                <div className="flex items-center space-x-3 w-full">
-                  {/* Avatar */}
-                  <div className="relative">
-                    <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center text-white font-bold text-sm border border-primary/30 shadow-sm transition-colors duration-300">
-                      {getInitials(employee['First Name'], employee['Middle Name'], employee['Last Name'])}
-                    </div>
-                    <div className={`absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${employee['Termination Date'] ? 'bg-red-500' : 'bg-emerald-500'}`} />
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-[38px] h-[38px] shrink-0 rounded-full bg-brand text-white flex items-center justify-center text-[12.5px] font-bold">
+                    {getInitials(employee['First Name'], null, employee['Last Name'])}
                   </div>
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-bold text-ink truncate">{fullName}</div>
+                    <div className="text-[10.5px] text-subtle">{empNo}</div>
+                  </div>
+                </div>
+                {!selectionAction && (
+                  <StatusPill label={isInactive ? 'Inactive' : 'Active'} tone={isInactive ? 'warning' : 'success'} />
+                )}
+              </div>
 
-                  {/* Name & ID */}
-                  <div className="space-y-0.5 min-w-0">
-                    <h3 className="text-gray-900 font-bold text-[13px] leading-tight group-hover:text-primary transition-colors truncate">
-                      {employee['First Name']} {employee['Last Name']}
-                    </h3>
-                    <div className="flex items-center space-x-1.5">
-                      <span className="px-1.5 py-0.5 rounded-md bg-white/70 text-gray-500 text-[9px] font-medium tracking-wide border border-gray-200/50">
-                        {employee['Employee Number']}
-                      </span>
-                      <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${employee['Termination Date']
-                        ? 'bg-red-50 text-red-600 border border-red-100'
-                        : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                        }`}>
-                        {employee['Termination Date'] ? 'Inactive' : 'Active'}
-                      </span>
-                    </div>
-                  </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground mb-2.5">
+                <div className="min-w-0">
+                  <div className="text-[9.5px] font-bold uppercase text-subtle">Position</div>
+                  <div className="truncate" title={employee['Job Title'] || ''}>{employee['Job Title'] || 'N/A'}</div>
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[9.5px] font-bold uppercase text-subtle">Location</div>
+                  <div className="truncate">{[employee.Branch, employee.Town].filter(Boolean).join(' / ') || 'N/A'}</div>
                 </div>
               </div>
 
-              {/* Slick Line Separator */}
-              <div className="h-px w-full bg-gray-300" />
-
-              {/* Body Content */}
-              <div className="px-5 py-5 space-y-4 flex-grow bg-white">
-                {/* Role & Location */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Position</p>
-                    <div className="flex items-center text-xs font-medium text-gray-700 truncate" title={employee['Job Title'] || ''}>
-                      <Briefcase className="w-3.5 h-3.5 mr-1.5 text-gray-400" />
-                      <span className="truncate">{employee['Job Title'] || 'N/A'}</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">Location</p>
-                    <div className="flex items-center text-xs font-medium text-gray-700 truncate">
-                      <MapPin className="w-3.5 h-3.5 mr-1.5 text-black" />
-                      <span className="truncate font-bold text-black">{employee.Branch} / {employee.Town}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Contact Info */}
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center p-2 rounded-lg bg-gray-50/50 border border-gray-100 group-hover:border-primary/10 group-hover:bg-primary/5 transition-colors">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white flex items-center justify-center text-gray-400 shadow-sm border border-gray-100 group-hover:text-primary transition-colors">
-                      <Mail size={14} />
-                    </div>
-                    <div className="ml-3 min-w-0">
-                      <p className="text-[10px] text-gray-400 font-medium">Email Address</p>
-                      <p className="text-xs font-medium text-gray-700 truncate">{employee['Work Email']}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center p-2 rounded-lg bg-gray-50/50 border border-gray-100 group-hover:border-primary/10 group-hover:bg-primary/5 transition-colors">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white flex items-center justify-center text-gray-400 shadow-sm border border-gray-100 group-hover:text-primary transition-colors">
-                      <Phone size={14} />
-                    </div>
-                    <div className="ml-3 min-w-0">
-                      <p className="text-[10px] text-gray-400 font-medium">Phone Number</p>
-                      <p className="text-xs font-medium text-gray-700">{employee['Mobile Number']}</p>
-                    </div>
-                  </div>
-                </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground px-[9px] py-[7px] bg-background rounded-lg mb-1.5">
+                <Mail className="w-3 h-3 shrink-0" strokeWidth={2} />
+                <span className="truncate">{employee['Work Email'] || '—'}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground px-[9px] py-[7px] bg-background rounded-lg mb-3">
+                <Phone className="w-3 h-3 shrink-0" strokeWidth={2} />
+                <span className="truncate">{employee['Mobile Number'] || '—'}</span>
               </div>
 
-              {/* Separator */}
-              <div className="h-px w-full bg-gray-200" />
-
-              {/* Footer Actions - DISABLED IN SELECTION MODE */}
-              <div className={`h-14 px-4 flex items-center bg-white border-t-0 mt-auto transition-opacity ${selectionAction ? 'opacity-40 pointer-events-none' : ''}`}>
-                <div className="flex items-center gap-2 w-full">
-                  <RoleButtonWrapper allowedRoles={['ADMIN', 'HR', 'MANAGER', 'REGIONAL']}>
-                    <GlowButton
-                      variant="secondary"
-                      size="sm"
-                      className="flex-1 bg-white border-gray-200 text-gray-600 hover:text-primary hover:border-primary/20 hover:bg-primary/5 shadow-sm !h-7 !text-[11px] !py-0"
-                      icon={Settings}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/edit-employee/${employee['Employee Number']}`)
-                      }}
-                    >
-                      Manage
-                    </GlowButton>
-                  </RoleButtonWrapper>
-
-                  <RoleButtonWrapper allowedRoles={['ADMIN', 'HR', 'MANAGER', 'REGIONAL']}>
-                    <GlowButton
-                      variant="secondary"
-                      size="sm"
-                      className="flex-1 bg-white border-gray-200 text-gray-600 hover:text-primary hover:border-primary/20 hover:bg-primary/5 shadow-sm !h-7 !text-[11px] !py-0"
-                      icon={UserRoundCog}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/view-employee/${employee['Employee Number']}`)
-                      }}
-                    >
-                      Terminate
-                    </GlowButton>
-                  </RoleButtonWrapper>
-                </div>
+              <div className={`flex gap-2 ${selectionAction ? 'opacity-40 pointer-events-none' : ''}`}>
+                <RoleButtonWrapper allowedRoles={['ADMIN', 'HR', 'MANAGER', 'REGIONAL']}>
+                  <button
+                    type="button"
+                    className="flex-1 text-center py-[7px] rounded-lg border border-border bg-white text-[11px] font-semibold text-ink hover:bg-secondary transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/edit-employee/${empNo}`);
+                    }}
+                  >
+                    Manage
+                  </button>
+                </RoleButtonWrapper>
+                <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+                  <button
+                    type="button"
+                    disabled={isInactive}
+                    className="flex-1 text-center py-[7px] rounded-lg border border-[#F6DCC7] bg-white text-[11px] font-semibold text-status-danger hover:bg-orange-tint transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTerminateTarget(employee);
+                    }}
+                  >
+                    Terminate
+                  </button>
+                </RoleButtonWrapper>
               </div>
-            </motion.div>
-          )
+            </Card>
+          );
         })}
       </div>
 
       {/* Pagination */}
-      {
-        filteredEmployees.length > 0 && (
-          <div className="mt-6 flex flex-col text-xs sm:flex-row justify-between items-center gap-4">
-            <div className="text-xs text-gray-600">
-              Showing {indexOfFirstEmployee + 1} to {Math.min(indexOfLastEmployee, filteredEmployees.length)} of {filteredEmployees.length} employees
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-3 text-xs py-1 border rounded disabled:opacity-50 hover:bg-gray-50 transition-colors"
-              >
-                <ChevronLeft size={16} />
-              </button>
-
-              {/* Always show first page */}
-              <button
-                onClick={() => setCurrentPage(1)}
-                className={`px-3 py-1 border rounded hover:bg-gray-50 transition-colors ${currentPage === 1 ? 'bg-primary/10 border-primary text-primary' : ''
-                  }`}
-              >
-                1
-              </button>
-
-              {/* Show ellipsis if needed */}
-              {currentPage > 3 && (
-                <span className="px-3 py-1">...</span>
-              )}
-
-              {/* Show current page and neighbors */}
-              {Array.from({ length: Math.min(5, totalPages - 2) }, (_, i) => {
-                const page = Math.max(2, Math.min(currentPage - 2, totalPages - 4)) + i;
-                if (page > 1 && page < totalPages) {
-                  return (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`px-3 py-1 border rounded hover:bg-gray-50 transition-colors ${currentPage === page ? 'bg-primary/10 border-primary text-primary' : ''
-                        }`}
-                    >
-                      {page}
-                    </button>
-                  );
-                }
-                return null;
-              })}
-
-              {/* Show ellipsis if needed */}
-              {currentPage < totalPages - 2 && (
-                <span className="px-3 py-1">...</span>
-              )}
-
-              {/* Always show last page if there's more than one page */}
-              {totalPages > 1 && (
-                <button
-                  onClick={() => setCurrentPage(totalPages)}
-                  className={`px-3 py-1 border rounded hover:bg-gray-50 transition-colors ${currentPage === totalPages ? 'bg-primary/10 border-primary text-primary' : ''
-                    }`}
-                >
-                  {totalPages}
-                </button>
-              )}
-
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-gray-50 transition-colors"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
+      {filteredEmployees.length > 0 && (
+        <div className="mt-6 flex flex-col text-xs sm:flex-row justify-between items-center gap-4">
+          <div className="text-xs text-muted-foreground">
+            Showing {indexOfFirstEmployee + 1} to {Math.min(indexOfLastEmployee, filteredEmployees.length)} of {filteredEmployees.length} employees
           </div>
-        )
-      }
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              aria-label="Previous page"
+              className="px-3 py-1 border border-border bg-white rounded-lg disabled:opacity-50 hover:bg-secondary transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+
+            <button
+              onClick={() => setCurrentPage(1)}
+              className={`px-3 py-1 border rounded-lg transition-colors ${currentPage === 1 ? 'bg-green-tint border-brand text-brand font-semibold' : 'bg-white border-border hover:bg-secondary'}`}
+            >
+              1
+            </button>
+
+            {currentPage > 3 && <span className="px-3 py-1">...</span>}
+
+            {Array.from({ length: Math.max(0, Math.min(5, totalPages - 2)) }, (_, i) => {
+              const page = Math.max(2, Math.min(currentPage - 2, totalPages - 4)) + i;
+              if (page > 1 && page < totalPages) {
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1 border rounded-lg transition-colors ${currentPage === page ? 'bg-green-tint border-brand text-brand font-semibold' : 'bg-white border-border hover:bg-secondary'}`}
+                  >
+                    {page}
+                  </button>
+                );
+              }
+              return null;
+            })}
+
+            {currentPage < totalPages - 2 && <span className="px-3 py-1">...</span>}
+
+            {totalPages > 1 && (
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                className={`px-3 py-1 border rounded-lg transition-colors ${currentPage === totalPages ? 'bg-green-tint border-brand text-brand font-semibold' : 'bg-white border-border hover:bg-secondary'}`}
+              >
+                {totalPages}
+              </button>
+            )}
+
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              aria-label="Next page"
+              className="px-3 py-1 border border-border bg-white rounded-lg disabled:opacity-50 hover:bg-secondary transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Empty state */}
-      {
-        filteredEmployees.length === 0 && (
-          <div className="mt-12 text-center">
-            <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              <Search className="text-gray-400" size={32} />
+      {filteredEmployees.length === 0 && (
+        <Card className="mt-4">
+          <EmptyState
+            icon={<Search size={20} />}
+            title="No employees found"
+            description="Try adjusting your search or filters"
+          />
+        </Card>
+      )}
+
+      {/* Terminate confirmation: hands off to HR Lifecycle, where the termination itself is recorded */}
+      {terminateTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="terminate-title"
+          onClick={() => setTerminateTarget(null)}
+        >
+          <Card className="w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <h2 id="terminate-title" className="m-0 text-[15px] font-bold text-ink">
+              Terminate {terminateTarget['First Name']} {terminateTarget['Last Name']}?
+            </h2>
+            <p className="text-xs text-muted-foreground mt-2 mb-4">
+              You will be taken to HR Lifecycle to record the termination date and reason for{' '}
+              <span className="font-semibold text-ink">{terminateTarget['Employee Number']}</span>. Nothing changes until you confirm there.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setTerminateTarget(null)}>
+                Cancel
+              </Button>
+              <Button
+                className="!bg-status-danger !border-status-danger"
+                onClick={() => {
+                  const id = terminateTarget['Employee Number'];
+                  setTerminateTarget(null);
+                  navigate(`/hr-lifecycle?tab=status&q=${encodeURIComponent(id)}`);
+                }}
+              >
+                Continue to HR Lifecycle
+              </Button>
             </div>
-            <h3 className="text-lg font-medium text-gray-700">No employees found</h3>
-            <p className="text-gray-500">Try adjusting your search or filters</p>
-          </div>
-        )
-      }
+          </Card>
+        </div>
+      )}
 
       {/* Duplicate Check Modal */}
       <DuplicateCheckModal
@@ -706,7 +616,6 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
         }}
       />
 
-      {/* NEW: Bulk Terminate Modal */}
       <BulkTerminateModal
         isOpen={showBulkTerminateModal}
         onClose={() => setShowBulkTerminateModal(false)}
