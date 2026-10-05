@@ -54,7 +54,7 @@ async function authenticate(req) {
   if (!profile || !profile.tenant_id || (profile.account_status && profile.account_status !== "ACTIVE")) {
     throw new HttpError(403, "Forbidden");
   }
-  return { id: data.user.id, role: profile.role, tenantId: profile.tenant_id };
+  return { id: data.user.id, email: data.user.email, role: profile.role, tenantId: profile.tenant_id };
 }
 
 // Wraps a handler with auth, a role allow-list and uniform error handling.
@@ -282,5 +282,8 @@ router.post(
     res.json({ ok: true });
   })
 );
+
+// Shared with sms_routes.js so every service-role route checks the caller the same way.
+export { authenticate, HttpError, admin };
 
 export default router;
