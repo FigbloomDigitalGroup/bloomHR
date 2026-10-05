@@ -1,10 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import {
-  MessageSquare, Send, Upload, FileText, CreditCard, Info, Clock, Users, FileEdit, Trash2,
+  Send, Upload, CreditCard, Info, Clock, FileEdit, Trash2,
   Plus, X, Search,
-  Loader, Shield, Smartphone, RefreshCw, Save
+  Loader, RefreshCw, Save
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { smsSegments } from '../../lib/smsSegments';
+import { Card, Button, TabBar } from '../UI';
 import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
 import toast from 'react-hot-toast';
 
@@ -535,7 +537,6 @@ export function SMSCenter() {
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
-  const [characterCount, setCharacterCount] = useState(0);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
@@ -860,11 +861,9 @@ export function SMSCenter() {
         if (firstEmployee) {
           const previewMessage = replaceTemplateVariables(template.content, firstEmployee, additionalVariables, personalizationType);
           setMessage(previewMessage);
-          setCharacterCount(previewMessage.length);
         }
       } else {
         setMessage(template.content);
-        setCharacterCount(template.content.length);
       }
 
       // Check if we need additional variables
@@ -910,7 +909,6 @@ export function SMSCenter() {
       if (template && firstEmployee) {
         const previewMessage = replaceTemplateVariables(template.content, firstEmployee, additionalVariables, personalizationType);
         setMessage(previewMessage);
-        setCharacterCount(previewMessage.length);
       }
     }
     setShowAdditionalVariablesModal(false);
@@ -1028,7 +1026,6 @@ export function SMSCenter() {
 
       setMessage('');
       setSelectedEmployees([]);
-      setCharacterCount(0);
       setSelectedTemplate('');
       setAdditionalVariables({});
 
@@ -1295,110 +1292,68 @@ export function SMSCenter() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <p className="text-slate-600 text-xs">Manage and send SMS messages to employees</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <button
-            onClick={testSMS}
-            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700"
-          >
-            <Smartphone className="w-4 h-4" />
-            <span className="text-xs">Test SMS</span>
-          </button>
-          <button
-            onClick={loadSMSStats}
-            className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700"
-          >
-            <RefreshCw className="w-4 h-4" />
-            <span className="text-xs">Refresh Balance</span>
-          </button>
-          <div className="bg-white rounded-xl border border-slate-200 p-2">
-            <div className="flex items-center gap-3">
-              <CreditCard className="w-4 h-4 text-green-500" />
-              <div>
-                <p className="text-xs text-slate-600">SMS Balance</p>
-                <p className="text-xs text-green-500">{smsStats.balance}</p>
-              </div>
+    <div className="space-y-4">
+      <div className="flex flex-wrap justify-between items-center gap-3">
+        <p className="m-0 text-[13px] text-muted-foreground">Manage and send SMS messages to employees</p>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button variant="secondary" onClick={testSMS}>
+            Test SMS
+          </Button>
+          <Button variant="secondary" onClick={loadSMSStats} icon={<RefreshCw className="w-3 h-3" strokeWidth={2} />}>
+            Refresh Balance
+          </Button>
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-tile bg-green-tint text-brand" role="status">
+            <CreditCard className="w-3.5 h-3.5" strokeWidth={2} />
+            <div>
+              <div className="text-[9.5px] font-semibold opacity-75">SMS Balance</div>
+              <div className="text-[12.5px] font-bold">{smsStats.balance}</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Stats Cards without icons */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <div>
-            <p className="text-xs text-slate-600 mb-1">Sent This Month</p>
-            <p className="text-xl font-base text-slate-900">{smsStats.sentThisMonth.toLocaleString()}</p>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <div>
-            <p className="text-xs text-slate-600 mb-1">Remaining SMS</p>
-            <p className="text-xl font-base text-slate-900">{smsStats.remaining.toLocaleString()}</p>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <div>
-            <p className="text-xs text-slate-600 mb-1">Delivery Rate</p>
-            <p className="text-xl font-base text-slate-900">{smsStats.deliveryRate}%</p>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <div>
-            <p className="text-xs text-slate-600 mb-1">Failed SMS</p>
-            <p className="text-xl font-base text-slate-900">{smsStats.failed}</p>
-          </div>
-        </div>
+      {/* Stat tiles */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {[
+          { label: 'Sent This Month', value: smsStats.sentThisMonth.toLocaleString() },
+          { label: 'Remaining SMS', value: smsStats.remaining.toLocaleString() },
+          { label: 'Delivery Rate', value: `${smsStats.deliveryRate}%` },
+          { label: 'Failed SMS', value: String(smsStats.failed) },
+        ].map((tile) => (
+          <Card key={tile.label} padding="sm" className="!p-4">
+            <div className="text-[11px] font-semibold text-muted-foreground">{tile.label}</div>
+            <div className="text-xl font-bold text-ink mt-1">{tile.value}</div>
+          </Card>
+        ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200">
-        <div className="border-b border-slate-200">
-          <nav className="flex space-x-8 px-6" aria-label="Tabs">
-            {[
-              { id: 'compose', name: 'Compose SMS', icon: MessageSquare },
-              { id: 'templates', name: 'Templates', icon: FileText },
-              { id: 'scheduled', name: 'Scheduled', icon: Clock },
-              { id: 'bulk', name: 'Bulk SMS', icon: Users },
-              { id: 'sender-id', name: 'Sender ID', icon: Shield },
-            ].map((tab) => {
-              const IconComponent = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-xs ${activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                    }`}
-                >
-                  <IconComponent className="w-4 h-4" />
-                  {tab.name}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
+      <div>
+        <TabBar
+          items={[
+            { id: 'compose', label: 'Compose SMS' },
+            { id: 'templates', label: 'Templates' },
+            { id: 'scheduled', label: 'Scheduled' },
+            { id: 'bulk', label: 'Bulk SMS' },
+            { id: 'sender-id', label: 'Sender ID' },
+          ]}
+          activeId={activeTab}
+          onChange={(id) => setActiveTab(id as typeof activeTab)}
+          className="border-b border-border"
+        />
 
-        <div className="p-6">
+        <div className="pt-4">
           {activeTab === 'compose' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 space-y-4">
-                  <div className="bg-white rounded-xl border border-slate-200 p-6">
+                  <div className="bg-white rounded-xl border border-border p-6">
                     <div className="flex justify-between items-center mb-3">
-                      <label className="block text-xs font-medium text-slate-700">
+                      <label className="block text-xs font-medium text-ink">
                         Compose Message
                       </label>
                       <button
                         onClick={saveCurrentAsTemplate}
-                        className="flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-700 rounded text-xs hover:bg-slate-200"
+                        className="flex items-center gap-1 px-3 py-1 bg-secondary text-ink rounded text-xs hover:bg-border"
                       >
                         <Save className="w-3 h-3" />
                         Save as Template
@@ -1407,30 +1362,40 @@ export function SMSCenter() {
                     <div className="relative">
                       <textarea
                         value={message}
-                        onChange={(e) => {
-                          const newMessage = e.target.value;
-                          setCharacterCount(newMessage.length);
-                          setMessage(newMessage);
-                        }}
+                        onChange={(e) => setMessage(e.target.value)}
                         rows={6}
-                        className="w-full border border-slate-300 rounded-lg p-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-xs"
+                        aria-describedby="sms-counter"
+                        className="w-full border border-border rounded-xl p-4 focus:outline-none focus:border-brand resize-none text-xs"
                         placeholder="Type your message here... (Max 160 characters)"
                         maxLength={160}
                       />
-                      <div className={`absolute bottom-2 right-2 text-xs ${characterCount > 160 ? 'text-red-500' : 'text-slate-500'
-                        }`}>
-                        {characterCount}/160
-                      </div>
                     </div>
+                    {(() => {
+                      const info = smsSegments(message);
+                      const over = info.units > info.singleLimit;
+                      return (
+                        <div id="sms-counter" className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-[10.5px]" aria-live="polite">
+                          <span className={info.encoding === 'Unicode' && info.units > 0 ? 'text-orange-text-alt font-semibold' : 'text-subtle'}>
+                            {info.encoding === 'Unicode' && info.units > 0
+                              ? 'Special characters in this message: only 70 characters fit in one SMS'
+                              : ''}
+                          </span>
+                          <span className={over ? 'text-orange-text-alt font-semibold' : 'text-subtle'}>
+                            {info.units}/{info.singleLimit}
+                            {info.segments > 0 && ` · ${info.segments} SMS${info.segments > 1 ? ' (billed per part)' : ''}`}
+                          </span>
+                        </div>
+                      );
+                    })()}
 
                     <div className="mt-4">
-                      <label className="block text-xs font-medium text-slate-700 mb-2">
+                      <label className="block text-xs font-medium text-ink mb-2">
                         Quick Templates
                       </label>
                       <select
                         value={selectedTemplate}
                         onChange={(e) => handleTemplateSelect(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
+                        className="w-full border border-border rounded-lg p-3 focus:outline-none focus:border-brand text-xs"
                       >
                         <option value="">Select a template...</option>
                         {templates.map(template => (
@@ -1442,16 +1407,16 @@ export function SMSCenter() {
                     </div>
 
                     {selectedTemplate && (
-                      <div className="mt-4 p-3 bg-slate-50 rounded-lg">
-                        <p className="text-xs font-medium text-slate-700 mb-2">Template Variables:</p>
+                      <div className="mt-4 p-3 bg-background rounded-lg">
+                        <p className="text-xs font-medium text-ink mb-2">Template Variables:</p>
                         <div className="flex flex-wrap gap-1">
                           {templates.find(t => t.id === selectedTemplate)?.variables.map(variable => (
-                            <span key={variable} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                            <span key={variable} className="px-2 py-1 bg-green-tint text-brand-dark rounded text-xs">
                               {variable}
                             </span>
                           ))}
                         </div>
-                        <p className="text-xs text-slate-600 mt-2">
+                        <p className="text-xs text-muted-foreground mt-2">
                           Variables like <strong>name</strong>, <strong>department</strong>, <strong>town</strong> will be automatically filled from employee data.
                           {getAdditionalVariablesNeeded(templates.find(t => t.id === selectedTemplate)!).length > 0 && (
                             <span className="text-orange-600"> Some variables need additional input.</span>
@@ -1463,25 +1428,25 @@ export function SMSCenter() {
                 </div>
 
                 <div className="space-y-4">
-                  <div className="bg-white rounded-xl border border-slate-200 p-6">
+                  <div className="bg-white rounded-xl border border-border p-6">
                     <div className="flex justify-between items-center mb-4">
-                      <label className="block text-xs font-medium text-slate-700">
+                      <label className="block text-xs font-medium text-ink">
                         Select Recipients ({filteredEmployees.length} of {employees.length} with valid phones)
                       </label>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-subtle">
                         {selectedEmployees.length} selected
                       </span>
                     </div>
 
                     <div className="space-y-3 mb-4">
                       <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-subtle w-4 h-4" />
                         <input
                           type="text"
                           placeholder="Search employees by name, ID, department, or town..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
+                          className="w-full pl-10 pr-4 py-2.5 border border-border rounded-lg focus:outline-none focus:border-brand text-xs"
                         />
                       </div>
 
@@ -1489,7 +1454,7 @@ export function SMSCenter() {
                         <select
                           value={selectedDepartment}
                           onChange={(e) => setSelectedDepartment(e.target.value)}
-                          className="w-full border border-slate-300 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
+                          className="w-full border border-border rounded-lg p-2.5 focus:outline-none focus:border-brand text-xs"
                         >
                           {departments.map(dept => (
                             <option key={dept} value={dept}>
@@ -1501,7 +1466,7 @@ export function SMSCenter() {
                         <select
                           value={selectedTown}
                           onChange={(e) => setSelectedTown(e.target.value)}
-                          className="w-full border border-slate-300 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
+                          className="w-full border border-border rounded-lg p-2.5 focus:outline-none focus:border-brand text-xs"
                         >
                           {towns.map(town => (
                             <option key={town} value={town}>
@@ -1516,7 +1481,7 @@ export function SMSCenter() {
                         <select
                           value={selectedJobTitle}
                           onChange={(e) => setSelectedJobTitle(e.target.value)}
-                          className="w-full border border-slate-300 rounded-lg p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
+                          className="w-full border border-border rounded-lg p-2.5 focus:outline-none focus:border-brand text-xs"
                         >
                           {jobTitles.map(title => (
                             <option key={title} value={title}>
@@ -1527,8 +1492,8 @@ export function SMSCenter() {
                       </div>
 
                       {/* Personalization Options */}
-                      <div className="mt-3 bg-slate-50 rounded-lg p-3">
-                        <label className="block text-xs font-medium text-slate-700 mb-2">
+                      <div className="mt-3 bg-background rounded-lg p-3">
+                        <label className="block text-xs font-medium text-ink mb-2">
                           Message Personalization
                         </label>
                         <div className="space-y-2">
@@ -1541,7 +1506,7 @@ export function SMSCenter() {
                               onChange={(e) => setPersonalizationType(e.target.value as any)}
                               className="mr-2"
                             />
-                            <span className="text-xs text-slate-700">No personalization</span>
+                            <span className="text-xs text-ink">No personalization</span>
                           </label>
                           <label className="flex items-center cursor-pointer">
                             <input
@@ -1552,8 +1517,8 @@ export function SMSCenter() {
                               onChange={(e) => setPersonalizationType(e.target.value as any)}
                               className="mr-2"
                             />
-                            <span className="text-xs text-slate-700">
-                              First name only <span className="text-slate-500">(e.g., "Hi John")</span>
+                            <span className="text-xs text-ink">
+                              First name only <span className="text-subtle">(e.g., "Hi John")</span>
                             </span>
                           </label>
                           <label className="flex items-center cursor-pointer">
@@ -1565,8 +1530,8 @@ export function SMSCenter() {
                               onChange={(e) => setPersonalizationType(e.target.value as any)}
                               className="mr-2"
                             />
-                            <span className="text-xs text-slate-700">
-                              Full name <span className="text-slate-500">(e.g., "Hi John Doe")</span>
+                            <span className="text-xs text-ink">
+                              Full name <span className="text-subtle">(e.g., "Hi John Doe")</span>
                             </span>
                           </label>
                         </div>
@@ -1578,63 +1543,63 @@ export function SMSCenter() {
                       </div>
 
                       {/* Recipient Count */}
-                      <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <div className="mt-3 bg-green-tint border border-border rounded-lg p-3">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-xs font-medium text-blue-900">
+                            <p className="text-xs font-medium text-brand-dark">
                               {filteredEmployees.length} Recipients Filtered
                             </p>
-                            <p className="text-xs text-blue-700">
+                            <p className="text-xs text-brand-dark">
                               {selectedEmployees.length} selected
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm font-bold text-blue-900">
+                            <p className="text-sm font-bold text-brand-dark">
                               KES {(selectedEmployees.length * 1).toFixed(2)}
                             </p>
-                            <p className="text-xs text-blue-700">Est. cost</p>
+                            <p className="text-xs text-brand-dark">Est. cost</p>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="border border-slate-200 rounded-lg max-h-80 overflow-y-auto">
+                    <div className="border border-border rounded-lg max-h-80 overflow-y-auto">
                       {isLoadingEmployees ? (
                         <div className="flex items-center justify-center p-8">
-                          <Loader className="w-4 h-4 animate-spin text-blue-500" />
-                          <span className="ml-2 text-xs text-slate-600">Loading employees...</span>
+                          <Loader className="w-4 h-4 animate-spin text-brand" />
+                          <span className="ml-2 text-xs text-muted-foreground">Loading employees...</span>
                         </div>
                       ) : filteredEmployees.length === 0 ? (
-                        <div className="p-4 text-center text-slate-500 text-xs">
+                        <div className="p-4 text-center text-subtle text-xs">
                           No employees found with valid phone numbers
                         </div>
                       ) : (
                         <div className="p-2">
-                          <div className="flex items-center p-2 border-b border-slate-100">
+                          <div className="flex items-center p-2 border-b border-[#F1F5F2]">
                             <input
                               type="checkbox"
                               checked={selectedEmployees.length === filteredEmployees.length && filteredEmployees.length > 0}
                               onChange={handleSelectAll}
-                              className="mr-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                              className="mr-3 rounded border-border text-brand focus:ring-blue-500"
                             />
-                            <span className="text-xs font-medium text-slate-700">Select All</span>
+                            <span className="text-xs font-medium text-ink">Select All</span>
                           </div>
                           {filteredEmployees.map(employee => (
                             <div
                               key={employee.id}
-                              className="flex items-center p-3 hover:bg-slate-50 rounded-lg transition-colors"
+                              className="flex items-center p-3 hover:bg-background rounded-lg transition-colors"
                             >
                               <input
                                 type="checkbox"
                                 checked={selectedEmployees.includes(employee.id)}
                                 onChange={() => handleEmployeeSelect(employee.id)}
-                                className="mr-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                className="mr-3 rounded border-border text-brand focus:ring-blue-500"
                               />
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-slate-900 truncate">
+                                <p className="text-xs font-medium text-ink truncate">
                                   {employee.employee_name}
                                 </p>
-                                <p className="text-xs text-slate-500 truncate">
+                                <p className="text-xs text-subtle truncate">
                                   {employee.department} • {employee.town} • {employee.phone_number}
                                 </p>
                               </div>
@@ -1646,14 +1611,14 @@ export function SMSCenter() {
                   </div>
 
                   {isSending && sendingProgress.total > 0 && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="bg-green-tint border border-border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-medium text-blue-800">Sending Progress</span>
-                        <span className="text-xs text-blue-600">
+                        <span className="text-xs font-medium text-brand-dark">Sending Progress</span>
+                        <span className="text-xs text-brand">
                           {sendingProgress.current} / {sendingProgress.total}
                         </span>
                       </div>
-                      <div className="w-full bg-blue-200 rounded-full h-2">
+                      <div className="w-full bg-border rounded-full h-2">
                         <div
                           className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                           style={{
@@ -1661,7 +1626,7 @@ export function SMSCenter() {
                           }}
                         ></div>
                       </div>
-                      <p className="text-xs text-blue-600 mt-2">
+                      <p className="text-xs text-brand mt-2">
                         Sending personalized messages to each employee...
                       </p>
                     </div>
@@ -1671,7 +1636,7 @@ export function SMSCenter() {
                     <button
                       onClick={() => handleSendSMS(true)}
                       disabled={!message.trim() || selectedEmployees.length === 0 || isSending}
-                      className="flex-1 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-3 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2"
+                      className="flex-1 text-xs bg-brand hover:bg-brand-dark disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-3 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2"
                     >
                       {isSending ? (
                         <Loader className="w-4 h-4 animate-spin" />
@@ -1684,16 +1649,16 @@ export function SMSCenter() {
                     <button
                       onClick={() => handleSendSMS(false)}
                       disabled={!message.trim() || selectedEmployees.length === 0 || isSending}
-                      className="flex-1 text-xs bg-green-600 hover:bg-green-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-3 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2"
+                      className="flex-1 text-xs bg-brand hover:bg-brand-dark disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-3 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2"
                     >
                       <Clock className="w-4 h-4" />
                       Schedule
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <div className="grid grid-cols-2 gap-3 p-4 bg-background rounded-lg border border-border">
                     <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">
+                      <label className="block text-xs font-medium text-ink mb-1">
                         Date
                       </label>
                       <input
@@ -1701,18 +1666,18 @@ export function SMSCenter() {
                         value={scheduleDate}
                         onChange={(e) => setScheduleDate(e.target.value)}
                         min={new Date().toISOString().split('T')[0]}
-                        className="w-full border border-slate-300 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full border border-border rounded-lg p-2 text-xs focus:outline-none focus:border-brand"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-1">
+                      <label className="block text-xs font-medium text-ink mb-1">
                         Time
                       </label>
                       <input
                         type="time"
                         value={scheduleTime}
                         onChange={(e) => setScheduleTime(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full border border-border rounded-lg p-2 text-xs focus:outline-none focus:border-brand"
                       />
                     </div>
                   </div>
@@ -1724,7 +1689,7 @@ export function SMSCenter() {
           {activeTab === 'templates' && (
             <div className="space-y-6">
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-slate-900">SMS Templates</h3>
+                <h3 className="text-lg font-semibold text-ink">SMS Templates</h3>
                 <button
                   onClick={() => setShowNewTemplateModal(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-medium"
@@ -1736,41 +1701,41 @@ export function SMSCenter() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {templates.map(template => (
-                  <div key={template.id} className="bg-white border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div key={template.id} className="bg-white border border-border rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-start mb-3">
                       <div>
-                        <h4 className="text-sm font-medium text-slate-900">{template.name}</h4>
-                        <span className="inline-block px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs mt-1">
+                        <h4 className="text-sm font-medium text-ink">{template.name}</h4>
+                        <span className="inline-block px-2 py-1 bg-secondary text-muted-foreground rounded text-xs mt-1">
                           {template.category}
                         </span>
                       </div>
                       <div className="flex gap-1">
-                        <button className="p-1 hover:bg-slate-100 rounded">
-                          <FileEdit className="w-4 h-4 text-slate-600" />
+                        <button className="p-1 hover:bg-secondary rounded">
+                          <FileEdit className="w-4 h-4 text-muted-foreground" />
                         </button>
                         <button
                           onClick={() => deleteTemplate(template.id)}
-                          className="p-1 hover:bg-slate-100 rounded"
+                          className="p-1 hover:bg-secondary rounded"
                         >
                           <Trash2 className="w-4 h-4 text-red-600" />
                         </button>
                       </div>
                     </div>
-                    <p className="text-xs text-slate-600 mb-3 line-clamp-3">{template.content}</p>
+                    <p className="text-xs text-muted-foreground mb-3 line-clamp-3">{template.content}</p>
                     <div className="flex flex-wrap gap-1 mb-3">
                       {template.variables.map(variable => (
-                        <span key={variable} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                        <span key={variable} className="px-2 py-1 bg-green-tint text-brand-dark rounded text-xs">
                           {variable}
                         </span>
                       ))}
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-subtle">
                         {template.variables.length} variables
                       </span>
                       <button
                         onClick={() => handleTemplateSelect(template.id)}
-                        className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                        className="text-xs text-brand hover:text-brand-dark font-medium"
                       >
                         Use Template
                       </button>
@@ -1783,18 +1748,18 @@ export function SMSCenter() {
 
           {activeTab === 'scheduled' && (
             <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-slate-900">Scheduled Messages</h3>
+              <h3 className="text-lg font-semibold text-ink">Scheduled Messages</h3>
 
               {scheduledMessages.length === 0 ? (
                 <div className="text-center py-12">
                   <Clock className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                  <p className="text-slate-500 text-sm">No scheduled messages</p>
-                  <p className="text-slate-400 text-xs mt-1">Schedule your first SMS from the Compose tab</p>
+                  <p className="text-subtle text-sm">No scheduled messages</p>
+                  <p className="text-subtle text-xs mt-1">Schedule your first SMS from the Compose tab</p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {scheduledMessages.map(sms => (
-                    <div key={sms.id} className="bg-white border border-slate-200 rounded-lg p-4">
+                    <div key={sms.id} className="bg-white border border-border rounded-lg p-4">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
@@ -1806,12 +1771,12 @@ export function SMSCenter() {
                               }`}>
                               {sms.status.charAt(0).toUpperCase() + sms.status.slice(1)}
                             </span>
-                            <span className="text-xs text-slate-500">
+                            <span className="text-xs text-subtle">
                               {sms.scheduledDate} at {sms.scheduledTime}
                             </span>
                           </div>
-                          <p className="text-sm text-slate-700 mb-2">{sms.message}</p>
-                          <p className="text-xs text-slate-500">
+                          <p className="text-sm text-ink mb-2">{sms.message}</p>
+                          <p className="text-xs text-subtle">
                             To: {sms.recipients.join(', ')}
                           </p>
                         </div>
@@ -1835,12 +1800,12 @@ export function SMSCenter() {
             <div className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-slate-900">Bulk SMS Upload</h3>
+                  <h3 className="text-lg font-semibold text-ink">Bulk SMS Upload</h3>
 
-                  <div className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
-                    <Upload className="w-8 h-8 text-slate-400 mx-auto mb-3" />
-                    <p className="text-sm text-slate-600 mb-2">Upload CSV file with phone numbers</p>
-                    <p className="text-xs text-slate-500 mb-4">
+                  <div className="bg-background border-2 border-dashed border-border rounded-lg p-6 text-center">
+                    <Upload className="w-8 h-8 text-subtle mx-auto mb-3" />
+                    <p className="text-sm text-muted-foreground mb-2">Upload CSV file with phone numbers</p>
+                    <p className="text-xs text-subtle mb-4">
                       Format: phone_number,message (one per line)
                     </p>
                     <input
@@ -1878,13 +1843,13 @@ export function SMSCenter() {
 
                   {bulkUploads.length > 0 && (
                     <div className="mt-6">
-                      <h4 className="text-sm font-medium text-slate-900 mb-3">Upload History</h4>
+                      <h4 className="text-sm font-medium text-ink mb-3">Upload History</h4>
                       <div className="space-y-2">
                         {bulkUploads.map(upload => (
-                          <div key={upload.id} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                          <div key={upload.id} className="flex justify-between items-center p-3 bg-background rounded-lg">
                             <div>
-                              <p className="text-xs font-medium text-slate-900">{upload.filename}</p>
-                              <p className="text-xs text-slate-500">
+                              <p className="text-xs font-medium text-ink">{upload.filename}</p>
+                              <p className="text-xs text-subtle">
                                 {upload.processed}/{upload.totalRecipients} recipients
                               </p>
                             </div>
@@ -1904,15 +1869,15 @@ export function SMSCenter() {
                 </div>
 
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-slate-900">SMS Packages</h3>
+                  <h3 className="text-lg font-semibold text-ink">SMS Packages</h3>
 
                   <div className="space-y-3">
                     {smsPackages.map(pkg => (
                       <div
                         key={pkg.id}
                         className={`bg-white border rounded-lg p-4 cursor-pointer transition-all ${selectedPackage === pkg.id
-                          ? 'border-blue-500 ring-2 ring-blue-100'
-                          : 'border-slate-200 hover:border-slate-300'
+                          ? 'border-brand ring-2 ring-blue-100'
+                          : 'border-border hover:border-border'
                           } ${pkg.popular ? 'relative' : ''}`}
                         onClick={() => setSelectedPackage(pkg.id)}
                       >
@@ -1922,13 +1887,13 @@ export function SMSCenter() {
                           </span>
                         )}
                         <div className="flex justify-between items-start mb-2">
-                          <h4 className="text-sm font-medium text-slate-900">{pkg.name}</h4>
+                          <h4 className="text-sm font-medium text-ink">{pkg.name}</h4>
                           <div className="text-right">
-                            <p className="text-lg font-bold text-slate-900">KSh {pkg.cost.toLocaleString()}</p>
-                            <p className="text-xs text-slate-500">KSh {pkg.costPerSMS} per SMS</p>
+                            <p className="text-lg font-bold text-ink">KSh {pkg.cost.toLocaleString()}</p>
+                            <p className="text-xs text-subtle">KSh {pkg.costPerSMS} per SMS</p>
                           </div>
                         </div>
-                        <p className="text-xs text-slate-600 mb-3">
+                        <p className="text-xs text-muted-foreground mb-3">
                           {pkg.smsCount.toLocaleString()} SMS
                         </p>
                         <button
@@ -1952,11 +1917,11 @@ export function SMSCenter() {
             <div className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-slate-900">Sender ID Settings</h3>
+                  <h3 className="text-lg font-semibold text-ink">Sender ID Settings</h3>
 
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-xs font-medium text-slate-700 mb-2">
+                      <label className="block text-xs font-medium text-ink mb-2">
                         Sender ID Type
                       </label>
                       <div className="space-y-2">
@@ -1994,7 +1959,7 @@ export function SMSCenter() {
                     {senderIdConfig.sender_id_type === 'custom' && (
                       <>
                         <div>
-                          <label className="block text-xs font-medium text-slate-700 mb-1">
+                          <label className="block text-xs font-medium text-ink mb-1">
                             Custom Sender ID
                           </label>
                           <input
@@ -2004,14 +1969,14 @@ export function SMSCenter() {
                               ...prev,
                               custom_sender_id: e.target.value
                             }))}
-                            className="w-full border border-slate-300 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full border border-border rounded-lg p-2 text-xs focus:outline-none focus:border-brand"
                             placeholder="Enter your custom sender ID (max 11 characters)"
                             maxLength={11}
                           />
                         </div>
 
                         <div>
-                          <label className="block text-xs font-medium text-slate-700 mb-2">
+                          <label className="block text-xs font-medium text-ink mb-2">
                             Mobile Provider
                           </label>
                           <select
@@ -2020,7 +1985,7 @@ export function SMSCenter() {
                               ...prev,
                               provider: e.target.value as 'safaricom' | 'airtel' | 'orange'
                             }))}
-                            className="w-full border border-slate-300 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full border border-border rounded-lg p-2 text-xs focus:outline-none focus:border-brand"
                           >
                             <option value="safaricom">Safaricom (KSh 10,000)</option>
                             <option value="airtel">Airtel (KSh 10,000)</option>
@@ -2030,26 +1995,26 @@ export function SMSCenter() {
 
                         <div className="space-y-3">
                           <div>
-                            <label className="block text-xs font-medium text-slate-700 mb-1">
+                            <label className="block text-xs font-medium text-ink mb-1">
                               Business Certificate of Registration
                             </label>
                             <input
                               type="file"
                               accept=".pdf,.jpg,.jpeg,.png"
                               onChange={(e) => setBusinessCertificate(e.target.files?.[0] || null)}
-                              className="w-full border border-slate-300 rounded-lg p-2 text-xs"
+                              className="w-full border border-border rounded-lg p-2 text-xs"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-xs font-medium text-slate-700 mb-1">
+                            <label className="block text-xs font-medium text-ink mb-1">
                               Letter of Consent (Company Letterhead)
                             </label>
                             <input
                               type="file"
                               accept=".pdf,.jpg,.jpeg,.png"
                               onChange={(e) => setConsentLetter(e.target.files?.[0] || null)}
-                              className="w-full border border-slate-300 rounded-lg p-2 text-xs"
+                              className="w-full border border-border rounded-lg p-2 text-xs"
                             />
                           </div>
                         </div>
@@ -2088,20 +2053,20 @@ export function SMSCenter() {
                 </div>
 
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-slate-900">Current Configuration</h3>
+                  <h3 className="text-lg font-semibold text-ink">Current Configuration</h3>
 
-                  <div className="bg-slate-50 rounded-lg p-4">
+                  <div className="bg-background rounded-lg p-4">
                     <div className="space-y-3">
                       <div>
-                        <p className="text-xs text-slate-600">Sender ID Type</p>
-                        <p className="text-sm font-medium text-slate-900 capitalize">
+                        <p className="text-xs text-muted-foreground">Sender ID Type</p>
+                        <p className="text-sm font-medium text-ink capitalize">
                           {senderIdConfig.sender_id_type}
                         </p>
                       </div>
 
                       <div>
-                        <p className="text-xs text-slate-600">Current Sender ID</p>
-                        <p className="text-sm font-medium text-slate-900">
+                        <p className="text-xs text-muted-foreground">Current Sender ID</p>
+                        <p className="text-sm font-medium text-ink">
                           {getCurrentShortcode()}
                         </p>
                       </div>
@@ -2109,14 +2074,14 @@ export function SMSCenter() {
                       {senderIdConfig.sender_id_type === 'custom' && (
                         <>
                           <div>
-                            <p className="text-xs text-slate-600">Provider</p>
-                            <p className="text-sm font-medium text-slate-900 capitalize">
+                            <p className="text-xs text-muted-foreground">Provider</p>
+                            <p className="text-sm font-medium text-ink capitalize">
                               {senderIdConfig.provider}
                             </p>
                           </div>
 
                           <div>
-                            <p className="text-xs text-slate-600">Status</p>
+                            <p className="text-xs text-muted-foreground">Status</p>
                             <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${senderIdConfig.status === 'approved'
                               ? 'bg-green-100 text-green-800'
                               : senderIdConfig.status === 'pending'
@@ -2132,12 +2097,12 @@ export function SMSCenter() {
                   </div>
 
                   {senderIdConfig.sender_id_type === 'custom' && senderIdConfig.status === 'pending' && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="bg-green-tint border border-border rounded-lg p-4">
                       <div className="flex items-start gap-3">
-                        <Clock className="w-5 h-5 text-blue-600 mt-0.5" />
+                        <Clock className="w-5 h-5 text-brand mt-0.5" />
                         <div>
-                          <p className="text-sm font-medium text-blue-800">Pending Approval</p>
-                          <p className="text-xs text-blue-700 mt-1">
+                          <p className="text-sm font-medium text-brand-dark">Pending Approval</p>
+                          <p className="text-xs text-brand-dark mt-1">
                             Your custom sender ID application is under review. You can continue using the default sender ID in the meantime.
                           </p>
                         </div>
@@ -2156,23 +2121,23 @@ export function SMSCenter() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-slate-900">Additional Information Needed</h3>
+              <h3 className="text-lg font-semibold text-ink">Additional Information Needed</h3>
               <button
                 onClick={() => setShowAdditionalVariablesModal(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-subtle hover:text-muted-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="space-y-4">
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-muted-foreground">
                 The selected template requires some additional information that will be used for all recipients:
               </p>
 
               {Object.keys(additionalVariables).map(variable => (
                 <div key={variable}>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                  <label className="block text-xs font-medium text-ink mb-1">
                     {variable.charAt(0).toUpperCase() + variable.slice(1)}
                   </label>
                   <input
@@ -2182,7 +2147,7 @@ export function SMSCenter() {
                       ...prev,
                       [variable]: e.target.value
                     }))}
-                    className="w-full border border-slate-300 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full border border-border rounded-lg p-2 text-xs focus:outline-none focus:border-brand"
                     placeholder={`Enter ${variable}`}
                   />
                 </div>
@@ -2191,7 +2156,7 @@ export function SMSCenter() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowAdditionalVariablesModal(false)}
-                  className="flex-1 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50"
+                  className="flex-1 py-2 border border-border text-ink rounded-lg text-sm font-medium hover:bg-background"
                 >
                   Cancel
                 </button>
@@ -2212,10 +2177,10 @@ export function SMSCenter() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-slate-900">Create New Template</h3>
+              <h3 className="text-lg font-semibold text-ink">Create New Template</h3>
               <button
                 onClick={() => setShowNewTemplateModal(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-subtle hover:text-muted-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2223,26 +2188,26 @@ export function SMSCenter() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label className="block text-xs font-medium text-ink mb-1">
                   Template Name
                 </label>
                 <input
                   type="text"
                   value={newTemplate.name}
                   onChange={(e) => setNewTemplate(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full border border-slate-300 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full border border-border rounded-lg p-2 text-xs focus:outline-none focus:border-brand"
                   placeholder="Enter template name"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label className="block text-xs font-medium text-ink mb-1">
                   Category
                 </label>
                 <select
                   value={newTemplate.category}
                   onChange={(e) => setNewTemplate(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full border border-slate-300 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full border border-border rounded-lg p-2 text-xs focus:outline-none focus:border-brand"
                 >
                   <option value="Business">Business</option>
                   <option value="Holiday">Holiday</option>
@@ -2251,17 +2216,17 @@ export function SMSCenter() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label className="block text-xs font-medium text-ink mb-1">
                   Template Content
                 </label>
                 <textarea
                   value={newTemplate.content}
                   onChange={(e) => setNewTemplate(prev => ({ ...prev, content: e.target.value }))}
                   rows={4}
-                  className="w-full border border-slate-300 rounded-lg p-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                  className="w-full border border-border rounded-lg p-2 text-xs focus:outline-none focus:border-brand resize-none"
                   placeholder="Enter template content (use {variable} for dynamic fields)"
                 />
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-subtle mt-1">
                   Use {'{variable}'} for dynamic fields. Employee data: {'{name}'}, {'{department}'}, {'{position}'}, {'{town}'}, {'{phone}'}
                 </p>
               </div>
@@ -2281,34 +2246,34 @@ export function SMSCenter() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-slate-900">Purchase SMS Package</h3>
+              <h3 className="text-lg font-semibold text-ink">Purchase SMS Package</h3>
               <button
                 onClick={() => setShowPackageModal(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-subtle hover:text-muted-foreground"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="space-y-4">
-              <div className="bg-slate-50 rounded-lg p-4">
-                <h4 className="font-medium text-slate-900 text-sm">
+              <div className="bg-background rounded-lg p-4">
+                <h4 className="font-medium text-ink text-sm">
                   {smsPackages.find(p => p.id === selectedPackage)?.name}
                 </h4>
-                <p className="text-slate-600 text-sm mt-1">
+                <p className="text-muted-foreground text-sm mt-1">
                   {smsPackages.find(p => p.id === selectedPackage)?.smsCount.toLocaleString()} SMS
                 </p>
-                <p className="text-lg font-bold text-slate-900 mt-2">
+                <p className="text-lg font-bold text-ink mt-2">
                   KSh {smsPackages.find(p => p.id === selectedPackage)?.cost.toLocaleString()}
                 </p>
               </div>
 
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                  <label className="block text-xs font-medium text-ink mb-1">
                     Payment Method
                   </label>
-                  <select className="w-full border border-slate-300 rounded-lg p-2 text-xs">
+                  <select className="w-full border border-border rounded-lg p-2 text-xs">
                     <option>MPESA</option>
                     <option>Credit Card</option>
                     <option>Bank Transfer</option>
