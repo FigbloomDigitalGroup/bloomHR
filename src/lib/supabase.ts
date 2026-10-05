@@ -1,17 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Validate environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// The site is built with these (VITE_ values are read at build time). If they are missing, main.tsx shows a
+// "not set up" page instead of the app, so this client is never used; it just must not crash on import.
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 if (!supabaseUrl || !supabaseKey) {
-  throw new Error(
-    'Supabase URL and/or Anon Key are missing. Please check your environment variables.'
-  );
+  console.error('Supabase URL and/or Anon Key are missing. Please check your environment variables.');
 }
 
 // Create and export Supabase client
-export const supabase = createClient(supabaseUrl, supabaseKey, {
+export const supabase = createClient(supabaseUrl || 'https://not-configured.invalid', supabaseKey || 'not-configured', {
   auth: {
     persistSession: true,
     autoRefreshToken: true
