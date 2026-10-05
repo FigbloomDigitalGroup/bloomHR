@@ -15,5 +15,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      # Existing type errors are recorded in scripts/types-baseline.json; this fails only if a change adds more.
+      - run: npm run typecheck
       - run: npm run build
       - run: npm test

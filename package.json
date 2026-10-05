@@ -9,6 +9,8 @@
     "backend": "node safaricom.js",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives",
+    "typecheck": "node scripts/check-types.mjs",
+    "typecheck:update": "node scripts/check-types.mjs --update",
     "preview": "vite preview",
     "test": "vitest run",
     "start": "node safaricom.js",
