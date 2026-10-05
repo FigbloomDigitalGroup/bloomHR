@@ -99,4 +99,23 @@ describe('EmployeePicker', () => {
     expect(names.join(' ')).toContain('Wanjiru');
     expect(names.join(' ')).toContain('Michael');
   });
+
+  it('does not let a click on the list reach outside-click handlers (e.g. a modal that closes on outside click)', async () => {
+    const outside = vi.fn();
+    document.addEventListener('mousedown', outside);
+    try {
+      render(<EmployeePicker label="Employee" value="" onChange={() => {}} />);
+      const input = screen.getByRole('combobox');
+      fireEvent.focus(input);
+      fireEvent.change(input, { target: { value: 'mike' } });
+      const option = await screen.findByRole('option');
+
+      fireEvent.mouseDown(screen.getByRole('listbox')); // e.g. the scrollbar or a gap between rows
+      fireEvent.mouseDown(option); // picking closes the list, so this goes second
+
+      expect(outside).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener('mousedown', outside);
+    }
+  });
 });

@@ -178,6 +178,9 @@ export default function EmployeePicker({
             role="listbox"
             aria-label={label || 'Employees'}
             style={{ position: 'fixed', left: rect.left, top: rect.top, width: rect.width, zIndex: 70 }}
+            // The list lives in a portal outside whatever modal holds the field. Keep clicks on it from reaching
+            // document-level "click outside to close" handlers, which would otherwise close that modal.
+            onMouseDown={(ev) => ev.nativeEvent.stopPropagation()}
             className="m-0 p-1 list-none max-h-64 overflow-y-auto bg-white border border-border rounded-xl shadow-lg"
           >
             {loading && <li className="px-3 py-2 text-xs text-muted-foreground">Loading employees...</li>}
