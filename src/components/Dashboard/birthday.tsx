@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { sendSingleSms } from '../../lib/smsApi';
 import { Cake, Send, Phone, Calendar, CheckCircle, Loader, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
@@ -36,24 +37,15 @@ const sendSMS = async (phone: string, message: string) => {
       throw new Error(`Invalid phone number: ${phone}`);
     }
 
-    // Celcom Africa API - SIMPLE VERSION
-    const apiKey = CELCOM_AFRICA_CONFIG.apiKey;
-    const partnerID = CELCOM_AFRICA_CONFIG.partnerID;
-    const shortcode = CELCOM_AFRICA_CONFIG.defaultShortcode;
-    const encodedMessage = encodeURIComponent(message);
-    
-    // Create the URL
-    const url = `https://isms.celcomafrica.com/api/services/sendsms/?apikey=${apiKey}&partnerID=${partnerID}&message=${encodedMessage}&shortcode=${shortcode}&mobile=${formattedPhone}`;
-    
-    console.log('Sending birthday SMS to:', formattedPhone);
-    
-    // Send request - no-cors mode like your system
-    await fetch(url, {
-      method: 'GET',
-      mode: 'no-cors'
+    // Sent by the backend (needs the SMS permission); the provider key never reaches the browser.
+    const result = await sendSingleSms(formattedPhone, message, {
+      purpose: 'birthday',
+      senderId: CELCOM_AFRICA_CONFIG.defaultShortcode || undefined,
     });
-    
-    console.log('Birthday SMS request sent successfully');
+    if (!result.success) {
+      throw new Error(result.error || 'The SMS provider did not accept the message');
+    }
+
     return { success: true, message: 'SMS sent' };
     
   } catch (error) {

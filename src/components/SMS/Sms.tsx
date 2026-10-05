@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { smsSegments } from '../../lib/smsSegments';
+import { getSmsBalance, sendSingleSms } from '../../lib/smsApi';
 import { Card, Button, TabBar } from '../UI';
 import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
 import toast from 'react-hot-toast';
@@ -124,27 +125,17 @@ export const SMSService = {
         throw new Error('Message cannot be empty');
       }
 
-      // URL encode the message as per documentation
-      const encodedMessage = encodeURIComponent(message.trim());
-
-      // Construct GET URL - using the exact format from Celcom Africa docs
-      const endpoint = `${CELCOM_AFRICA_CONFIG.baseUrl}/?apikey=${CELCOM_AFRICA_CONFIG.apiKey}&partnerID=${CELCOM_AFRICA_CONFIG.partnerID}&message=${encodedMessage}&shortcode=${shortcode}&mobile=${formattedPhone}`;
-
-      console.log('🚀 Sending SMS via Celcom Africa...');
-
-      // Use fetch with no-cors mode - this will send the request but we can't read response
-      // This is fine since we know the API works and we just need to fire the request
-      await fetch(endpoint, {
-        method: 'GET',
-        mode: 'no-cors', // This prevents CORS errors but we can't read response
+      // Sent by the backend (the provider key never reaches the browser). The result is the provider's real answer.
+      const result = await sendSingleSms(formattedPhone, message.trim(), {
+        purpose: 'sms-center',
+        senderId: shortcode || undefined,
       });
-
-      // Since we're using no-cors, response will be opaque and we can't read it
-      // But the request is sent successfully to Celcom Africa
-      console.log('✅ SMS request sent successfully');
+      if (!result.success) {
+        throw new Error(result.error || 'The SMS provider did not accept the message');
+      }
 
       // Log the SMS to database as sent
-      const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const messageId = result.messageId || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       await this.logSMS(
         formattedPhone,
@@ -156,7 +147,6 @@ export const SMSService = {
         0
       );
 
-      // Return success since we know the API works
       return {
         success: true,
         message: 'SMS sent successfully',
@@ -184,37 +174,13 @@ export const SMSService = {
     }
   },
 
-  // Send SMS with retry logic - SIMPLIFIED and FASTER
+  // One attempt. The server reports real failures, and retrying after a timeout could send the same text twice.
   async sendSMSWithRetry(
     phoneNumber: string,
     message: string,
-    shortcode: string,
-    _maxRetries = 1 // Only 1 retry since we're using no-cors
+    shortcode: string
   ): Promise<{ success: boolean; error?: string; messageId?: string; cost?: number }> {
-
-    console.log(`📤 Sending SMS to ${phoneNumber}`);
-
-    // Just send once - no-cors mode is reliable
-    const result = await this.sendSMS(phoneNumber, message, shortcode);
-
-    if (result.success) {
-      console.log(`✅ SMS sent successfully to ${phoneNumber}`);
-      return result;
-    }
-
-    // If first attempt fails, wait 1 second and try once more
-    console.log('🔄 First attempt failed, retrying...');
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    const retryResult = await this.sendSMS(phoneNumber, message, shortcode);
-
-    if (retryResult.success) {
-      console.log(`✅ SMS sent successfully on retry to ${phoneNumber}`);
-    } else {
-      console.log(`❌ SMS failed after retry to ${phoneNumber}`);
-    }
-
-    return retryResult;
+    return this.sendSMS(phoneNumber, message, shortcode);
   },
 
   // Bulk send SMS - OPTIMIZED for speed
@@ -414,13 +380,14 @@ export const SMSService = {
   }
 };
 
-// Balance check function for Celcom Africa
+// Balance from the SMS provider, via the backend.
 const checkSMSBalance = async (): Promise<string> => {
   try {
-    return 'KSh 5,000'; // Placeholder balance
+    const balance = await getSmsBalance();
+    return balance === null ? 'Unavailable' : balance.toLocaleString('en-KE', { maximumFractionDigits: 2 });
   } catch (error) {
     console.error('Balance check error:', error);
-    return 'Service unavailable';
+    return 'Unavailable';
   }
 };
 
