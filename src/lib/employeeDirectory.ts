@@ -80,12 +80,18 @@ export const loadEmployeeDirectory = (force = false): Promise<DirectoryEmployee[
   if (!force && cache && Date.now() - cache.at < TTL_MS) return cache.promise;
 
   const promise = (async () => {
-    const { data, error } = await supabase
-      .from('employee_directory')
-      .select(COLUMNS)
-      .order('First Name', { ascending: true })
-      .limit(5000);
+    // employee_directory is the intended source (any role, tenant-scoped). If this database does not have it
+    // yet, or the request fails, fall back to the employees table, which roles that manage staff can read.
+    const read = (table: string) =>
+      supabase.from(table).select(COLUMNS).order('First Name', { ascending: true }).limit(5000);
+
+    let { data, error } = await read('employee_directory');
+    if (error) {
+      console.warn('employee_directory could not be read, trying employees:', error);
+      ({ data, error } = await read('employees'));
+    }
     if (error) throw error;
+
     return ((data || []) as unknown as DirectoryRow[])
       .map(toDirectoryEmployee)
       .filter((e) => e.employeeNumber);
@@ -97,6 +103,16 @@ export const loadEmployeeDirectory = (force = false): Promise<DirectoryEmployee[
     if (cache?.promise === promise) cache = null;
   });
   return promise;
+};
+
+/** Supabase errors are plain objects, not Error instances, so pull out the useful text. */
+export const describeLoadError = (err: unknown): string => {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object') {
+    const e = err as { message?: string; details?: string; hint?: string; code?: string };
+    return [e.message, e.details, e.hint, e.code && `(${e.code})`].filter(Boolean).join(' - ') || 'Unknown error';
+  }
+  return typeof err === 'string' ? err : 'Unknown error';
 };
 
 export const clearEmployeeDirectoryCache = () => {

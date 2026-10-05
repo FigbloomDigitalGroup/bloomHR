@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { DirectoryEmployee, loadEmployeeDirectory } from '../lib/employeeDirectory';
+import { DirectoryEmployee, describeLoadError, loadEmployeeDirectory } from '../lib/employeeDirectory';
 
 export function useEmployeeDirectory() {
   const [employees, setEmployees] = useState<DirectoryEmployee[]>([]);
@@ -13,7 +13,8 @@ export function useEmployeeDirectory() {
         if (!cancelled) setEmployees(list);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load employees');
+        console.error('Could not load employees for the picker:', err);
+        if (!cancelled) setError(describeLoadError(err));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
