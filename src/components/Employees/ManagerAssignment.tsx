@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, Save, UserCog, ArrowLeft, Filter, Users, MapPin, Building2, Settings, ShieldAlert, Trash2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Save, UserCog, ArrowLeft, Filter, Users, MapPin, Building2, Settings, ShieldAlert, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Database } from '../../types/supabase';
-import GlowButton from '../UI/GlowButton';
+import { Card, Button, TabBar, SearchInput, StatusPill, EmptyState } from '../UI';
 import SearchableDropdown from '../UI/SearchableDropdown';
 
 type Employee = Database['public']['Tables']['employees']['Row'];
@@ -238,278 +237,262 @@ const ManagerAssignment = () => {
         }
     };
 
-    return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6 min-h-screen bg-gray-50/50">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                        <div className="p-2 bg-green-100 rounded-lg text-green-600">
-                            <UserCog size={24} />
-                        </div>
-                        Manager Appointment Portal
-                    </h1>
-                    <p className="text-gray-500 text-sm mt-1 ml-12">
-                        Appoint Branch and Regional Managers for specific locations
-                    </p>
-                </div>
-                <button
-                    onClick={() => navigate(-1)}
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
-                >
-                    <ArrowLeft size={16} />
-                    Back to Dashboard
-                </button>
-            </div>
+    const inputClass =
+        'w-full px-3 py-2 text-xs border border-border rounded-tile bg-white text-ink outline-none focus:border-brand transition-colors';
 
-            {/* Tabs */}
-            <div className="flex gap-4 border-b border-gray-200">
-                <button
-                    onClick={() => setActiveTab('appoint')}
-                    className={`pb-3 px-1 text-sm font-medium transition-all border-b-2 ${activeTab === 'appoint'
-                        ? 'border-green-500 text-green-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                        }`}
-                >
-                    Appoint Manager
-                </button>
-                <button
-                    onClick={() => setActiveTab('list')}
-                    className={`pb-3 px-1 text-sm font-medium transition-all border-b-2 ${activeTab === 'list'
-                        ? 'border-green-500 text-green-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                        }`}
-                >
-                    Assigned Managers List
-                </button>
-            </div>
+    return (
+        <div>
+            {/* Header */}
+            <Card className="flex items-center justify-between mb-[18px]">
+                <div className="flex items-center gap-3">
+                    <div className="w-[42px] h-[42px] rounded-xl bg-green-tint text-brand flex items-center justify-center">
+                        <UserCog className="w-[19px] h-[19px]" strokeWidth={1.8} />
+                    </div>
+                    <div>
+                        <h1 className="m-0 text-[15px] font-bold text-ink">Manager Appointment Portal</h1>
+                        <div className="text-xs text-muted-foreground">Appoint Branch and Regional Managers for specific locations</div>
+                    </div>
+                </div>
+                <Button variant="secondary" onClick={() => navigate(-1)} icon={<ArrowLeft className="w-3 h-3" strokeWidth={2} />}>
+                    Back to Dashboard
+                </Button>
+            </Card>
+
+            <TabBar
+                items={[
+                    { id: 'appoint', label: 'Appoint Manager' },
+                    { id: 'list', label: 'Assigned Managers List' },
+                ]}
+                activeId={activeTab}
+                onChange={(id) => setActiveTab(id as 'appoint' | 'list')}
+                className="border-b border-border mb-3.5"
+            />
 
             {/* APPOINT TAB */}
             {activeTab === 'appoint' && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    {/* Left: Search & Select */}
-                    <div className="lg:col-span-8 space-y-4">
-                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[700px]">
-                            {/* Filters */}
-                            <div className="p-4 border-b border-gray-100 space-y-4 bg-white sticky top-0 z-10">
-                                <div className="flex flex-col sm:flex-row gap-3">
-                                    <div className="relative flex-1">
-                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                        <input
-                                            type="text"
-                                            className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all bg-gray-50/50"
-                                            placeholder="Search Employee..."
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="min-w-[200px]">
-                                        <SearchableDropdown
-                                            options={locations}
-                                            value={selectedLocation}
-                                            onChange={setSelectedLocation}
-                                            placeholder="Select Location"
-                                            icon={Filter}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="text-xs text-gray-500 px-1">
-                                    Showing {filteredEmployees.length} employees
-                                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] gap-4 items-start">
+                    {/* Left: search & select */}
+                    <Card padding="sm" className="!p-4 flex flex-col h-[700px]">
+                        <div className="flex flex-col sm:flex-row gap-2 mb-3">
+                            <div className="flex-1">
+                                <SearchInput
+                                    placeholder="Search Employee..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="!bg-white !border-border"
+                                />
                             </div>
+                            <div className="min-w-[200px]">
+                                <SearchableDropdown
+                                    options={locations}
+                                    value={selectedLocation}
+                                    onChange={setSelectedLocation}
+                                    placeholder="Select Location"
+                                    icon={Filter}
+                                />
+                            </div>
+                        </div>
+                        <div className="text-[11px] text-muted-foreground mb-2.5">
+                            Showing {filteredEmployees.length} employees
+                        </div>
 
-                            {/* List */}
-                            <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
-                                {loading ? (
-                                    <div className="flex justify-center p-8"><div className="animate-spin w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full" /></div>
-                                ) : filteredEmployees.map(emp => {
+                        <div className="flex-1 overflow-y-auto">
+                            {loading ? (
+                                <div className="flex justify-center p-8">
+                                    <div className="animate-spin w-6 h-6 border-2 border-brand border-t-transparent rounded-full" />
+                                </div>
+                            ) : (
+                                filteredEmployees.map(emp => {
                                     const isSelected = selectedEmployeeId === emp['Employee Number'];
                                     const isManager = emp.manager_email || emp.regional_manager;
                                     return (
-                                        <div
+                                        <button
+                                            type="button"
                                             key={emp['Employee Number']}
                                             onClick={() => setSelectedEmployeeId(emp['Employee Number'])}
-                                            className={`
-                         p-3 rounded-xl border cursor-pointer transition-all flex items-center gap-3
-                         ${isSelected ? 'bg-green-50 border-green-200 ring-1 ring-green-200' : 'bg-white border-gray-100 hover:bg-gray-50'}
-                       `}
+                                            aria-pressed={isSelected}
+                                            className={`w-full flex items-center gap-2.5 px-1.5 py-[9px] border-b border-[#F1F5F2] text-left transition-colors ${
+                                                isSelected ? 'bg-green-tint' : 'hover:bg-background'
+                                            }`}
                                         >
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isSelected ? 'bg-green-200 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                            <div className="w-[30px] h-[30px] shrink-0 rounded-full bg-brand text-white flex items-center justify-center text-[10.5px] font-bold">
                                                 {emp['First Name']?.[0]}{emp['Last Name']?.[0]}
                                             </div>
-                                            <div className="flex-1">
-                                                <h3 className={`text-sm font-semibold ${isSelected ? 'text-green-900' : 'text-gray-900'}`}>{emp['First Name']} {emp['Last Name']}</h3>
-                                                <div className="flex items-center gap-3 mt-1">
-                                                    <span className="text-[10px] text-gray-500 flex items-center gap-1"><Building2 size={10} /> {emp.Town || 'No Town'}</span>
-                                                    <span className="text-[10px] text-gray-500 flex items-center gap-1"><MapPin size={10} /> {emp.Branch || 'No Region'}</span>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-xs font-bold text-ink truncate">{emp['First Name']} {emp['Last Name']}</div>
+                                                <div className="text-[10.5px] text-subtle truncate">
+                                                    {emp.Town || 'No Town'}{emp.Branch ? ` · ${emp.Branch}` : ''}
                                                 </div>
                                             </div>
                                             {isManager && (
-                                                <span className="text-[10px] px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
-                                                    {emp.manager_email ? 'Branch Mgr' : 'Regional Mgr'}
-                                                </span>
+                                                <StatusPill
+                                                    label={emp.manager_email ? 'Branch Mgr' : 'Regional Mgr'}
+                                                    tone={emp.manager_email ? 'info' : 'purple'}
+                                                />
                                             )}
-                                        </div>
+                                        </button>
                                     );
-                                })}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right: Appointment Form */}
-                    <div className="lg:col-span-4 space-y-6">
-                        <div className="bg-white rounded-2xl border border-gray-200 shadow-lg sticky top-6">
-                            <div className="p-5 border-b border-gray-100 bg-gray-50/50 rounded-t-2xl">
-                                <h2 className="font-bold text-gray-900 flex items-center gap-2">
-                                    <Settings size={18} className="text-green-600" />
-                                    Role Appointment
-                                </h2>
-                            </div>
-
-                            {selectedEmployeeId ? (
-                                <form onSubmit={handleAppoint} className="p-6 space-y-6">
-
-                                    {/* Location Details Editor */}
-                                    <div className="bg-gray-50 p-4 rounded-xl space-y-3">
-                                        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 flex items-center gap-2">
-                                            <MapPin size={12} /> Location Details
-                                        </h3>
-                                        <div className="space-y-2">
-                                            <div>
-                                                <label className="text-xs text-gray-700 font-semibold">User Home Branch</label>
-                                                <input
-                                                    value={editTown}
-                                                    onChange={e => setEditTown(e.target.value)}
-                                                    className="w-full text-sm border-gray-200 rounded-md focus:ring-green-500 py-1.5 px-3"
-                                                    placeholder="Edit Branch Name (Town)"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-gray-700 font-semibold">User Home Region</label>
-                                                <input
-                                                    value={editRegion}
-                                                    onChange={e => setEditRegion(e.target.value)}
-                                                    className="w-full text-sm border-gray-200 rounded-md focus:ring-green-500 py-1.5 px-3"
-                                                    placeholder="Edit Region Name"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="text-sm font-medium text-gray-900 mb-3">2. Select Role Type (Optional)</h3>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleRoleSelect('branch')}
-                                                className={`p-3 rounded-xl border text-sm font-medium transition-all ${roleType === 'branch'
-                                                    ? 'bg-green-50 border-green-200 text-green-700 ring-1 ring-green-200'
-                                                    : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
-                                                    }`}
-                                            >
-                                                Branch Manager
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleRoleSelect('regional')}
-                                                className={`p-3 rounded-xl border text-sm font-medium transition-all ${roleType === 'regional'
-                                                    ? 'bg-purple-50 border-purple-200 text-purple-700 ring-1 ring-purple-200'
-                                                    : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
-                                                    }`}
-                                            >
-                                                Regional Manager
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <AnimatePresence mode='wait'>
-                                        {roleType && (
-                                            <motion.div
-                                                initial={{ opacity: 0, y: 10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, y: -10 }}
-                                                className="space-y-4"
-                                            >
-                                                <div>
-                                                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                                                        {roleType === 'branch' ? 'Branch Manager Email' : 'Regional Manager Email'}
-                                                    </label>
-                                                    <input
-                                                        type="email"
-                                                        required
-                                                        value={emailInput}
-                                                        onChange={(e) => setEmailInput(e.target.value)}
-                                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                                                        placeholder={`e.g. name@company.com`}
-                                                    />
-                                                    <p className="text-[10px] text-gray-400 mt-1">
-                                                        Must be a unique email address.
-                                                    </p>
-                                                </div>
-
-                                                <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-100 flex gap-2">
-                                                    <ShieldAlert size={14} className="text-yellow-600 flex-shrink-0 mt-0.5" />
-                                                    <p className="text-xs text-yellow-700">
-                                                        <strong>Rule:</strong> Only one {roleType === 'branch' ? 'manager per Town' : 'regional manager per Region'}.
-                                                        Assigning will fail if the location is already occupied.
-                                                    </p>
-                                                </div>
-
-                                                <GlowButton
-                                                    type="submit"
-                                                    disabled={saving}
-                                                    className="w-full justify-center"
-                                                    icon={Save}
-                                                >
-                                                    {saving ? 'Saving...' : 'Confirm Appointment'}
-                                                </GlowButton>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-
-                                    {!roleType && (
-                                        <div className="text-center py-8 text-gray-400 text-sm">
-                                            Select a role type above to proceed.
-                                        </div>
-                                    )}
-                                </form>
-                            ) : (
-                                <div className="p-8 text-center text-gray-400">
-                                    <Users size={32} className="mx-auto mb-2 opacity-50" />
-                                    <p className="text-sm">Select an employee from the list to appoint a role.</p>
-                                </div>
+                                })
                             )}
                         </div>
-                    </div>
+                    </Card>
+
+                    {/* Right: appointment panel */}
+                    <Card className="lg:sticky lg:top-6">
+                        {selectedEmployeeId ? (
+                            <form onSubmit={handleAppoint} className="space-y-5">
+                                <div className="flex items-center gap-2">
+                                    <Settings size={16} className="text-brand" />
+                                    <h2 className="m-0 text-[13px] font-bold text-ink">Role Appointment</h2>
+                                </div>
+
+                                {/* Location details */}
+                                <div className="bg-background p-3.5 rounded-xl space-y-3">
+                                    <h3 className="m-0 text-[10px] font-bold uppercase text-subtle flex items-center gap-1.5">
+                                        <MapPin size={12} /> Location Details
+                                    </h3>
+                                    <div>
+                                        <label htmlFor="mgr-home-branch" className="block text-[11px] font-semibold text-ink mb-1">User Home Branch</label>
+                                        <input
+                                            id="mgr-home-branch"
+                                            value={editTown}
+                                            onChange={e => setEditTown(e.target.value)}
+                                            className={inputClass}
+                                            placeholder="Edit Branch Name (Town)"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="mgr-home-region" className="block text-[11px] font-semibold text-ink mb-1">User Home Region</label>
+                                        <input
+                                            id="mgr-home-region"
+                                            value={editRegion}
+                                            onChange={e => setEditRegion(e.target.value)}
+                                            className={inputClass}
+                                            placeholder="Edit Region Name"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h3 className="m-0 text-xs font-semibold text-ink mb-2.5">Select Role Type (Optional)</h3>
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRoleSelect('branch')}
+                                            aria-pressed={roleType === 'branch'}
+                                            className={`p-2.5 rounded-xl border text-xs font-semibold transition-colors ${
+                                                roleType === 'branch'
+                                                    ? 'bg-green-tint border-brand text-brand-dark'
+                                                    : 'bg-white border-border text-muted-foreground hover:bg-secondary'
+                                            }`}
+                                        >
+                                            Branch Manager
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRoleSelect('regional')}
+                                            aria-pressed={roleType === 'regional'}
+                                            className={`p-2.5 rounded-xl border text-xs font-semibold transition-colors ${
+                                                roleType === 'regional'
+                                                    ? 'bg-status-purple-tint border-status-purple text-status-purple'
+                                                    : 'bg-white border-border text-muted-foreground hover:bg-secondary'
+                                            }`}
+                                        >
+                                            Regional Manager
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {roleType ? (
+                                    <div className="space-y-3.5">
+                                        <div>
+                                            <label htmlFor="mgr-email" className="block text-[11px] font-semibold text-ink mb-1">
+                                                {roleType === 'branch' ? 'Branch Manager Email' : 'Regional Manager Email'}
+                                            </label>
+                                            <input
+                                                id="mgr-email"
+                                                type="email"
+                                                required
+                                                value={emailInput}
+                                                onChange={(e) => setEmailInput(e.target.value)}
+                                                className={inputClass}
+                                                placeholder="e.g. name@company.com"
+                                            />
+                                            <p className="m-0 text-[10px] text-subtle mt-1">Must be a unique email address.</p>
+                                        </div>
+
+                                        <div className="bg-orange-tint border border-[#F6DCC7] p-3 rounded-lg flex gap-2">
+                                            <ShieldAlert size={14} className="text-orange-text-alt flex-shrink-0 mt-0.5" />
+                                            <p className="m-0 text-xs text-orange-text">
+                                                <strong>Rule:</strong> Only one {roleType === 'branch' ? 'manager per Town' : 'regional manager per Region'}.
+                                                Assigning will fail if the location is already occupied.
+                                            </p>
+                                        </div>
+
+                                        <Button
+                                            type="submit"
+                                            disabled={saving}
+                                            className="w-full justify-center"
+                                            icon={<Save className="w-3.5 h-3.5" />}
+                                        >
+                                            {saving ? 'Saving...' : 'Confirm Appointment'}
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div className="text-center text-subtle text-xs">
+                                            Select a role type above to appoint, or save to update the location only.
+                                        </div>
+                                        <Button
+                                            type="submit"
+                                            variant="secondary"
+                                            disabled={saving}
+                                            className="w-full justify-center"
+                                            icon={<Save className="w-3.5 h-3.5" />}
+                                        >
+                                            {saving ? 'Saving...' : 'Save Location'}
+                                        </Button>
+                                    </div>
+                                )}
+                            </form>
+                        ) : (
+                            <EmptyState
+                                className="py-10"
+                                icon={<Users size={18} />}
+                                title="Role Appointment"
+                                description="Select an employee from the list to appoint a role."
+                            />
+                        )}
+                    </Card>
                 </div>
             )}
 
             {/* ASSIGNED LIST TAB */}
             {activeTab === 'list' && (
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                <Card padding="none" className="overflow-hidden">
+                    <div className="px-4 py-3.5 border-b border-border flex justify-between items-center">
                         <div>
-                            <h2 className="text-lg font-bold text-gray-900">Current Assignments</h2>
-                            <p className="text-sm text-gray-500">List of all active Branch and Regional Managers</p>
+                            <h2 className="m-0 text-[13px] font-bold text-ink">Current Assignments</h2>
+                            <p className="m-0 text-[11.5px] text-muted-foreground">List of all active Branch and Regional Managers</p>
                         </div>
-                        <div className="text-sm text-gray-500">
-                            Total Assigned: <span className="font-bold text-gray-900">{assignedManagers.length}</span>
+                        <div className="text-xs text-muted-foreground">
+                            Total Assigned: <span className="font-bold text-ink">{assignedManagers.length}</span>
                         </div>
                     </div>
 
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm text-gray-600">
-                            <thead className="bg-gray-50 text-gray-900 font-semibold border-b border-gray-100">
-                                <tr>
-                                    <th className="px-4 py-4 w-12 text-center">#</th>
-                                    <th className="px-6 py-4">Employee</th>
-                                    <th className="px-6 py-4">Role</th>
-                                    <th className="px-6 py-4">Assigned Email</th>
-                                    <th className="px-6 py-4">Location (Town/Region)</th>
-                                    <th className="px-6 py-4 text-right">Actions</th>
+                        <table className="w-full text-left text-xs">
+                            <thead className="bg-[#FAFBFA] border-b border-border">
+                                <tr className="text-[10px] font-bold uppercase text-subtle">
+                                    <th className="px-4 py-2.5 w-12 text-center">#</th>
+                                    <th className="px-4 py-2.5">Employee</th>
+                                    <th className="px-4 py-2.5">Role</th>
+                                    <th className="px-4 py-2.5">Assigned Email</th>
+                                    <th className="px-4 py-2.5">Location (Town/Region)</th>
+                                    <th className="px-4 py-2.5 text-right">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody>
                                 {assignedManagers.length > 0 ? (
                                     assignedManagers
                                         .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
@@ -520,32 +503,31 @@ const ManagerAssignment = () => {
                                             const globalIndex = (currentPage - 1) * itemsPerPage + index + 1;
 
                                             return (
-                                                <tr key={mgr['Employee Number']} className="hover:bg-gray-50/50">
-                                                    <td className="px-4 py-4 text-center text-xs text-gray-400 font-mono">
+                                                <tr key={mgr['Employee Number']} className="border-b border-[#F1F5F2] hover:bg-background text-ink">
+                                                    <td className="px-4 py-3 text-center text-[11px] text-subtle font-mono">
                                                         {globalIndex.toString().padStart(2, '0')}
                                                     </td>
-                                                    <td className="px-6 py-4 font-medium text-gray-900">
-                                                        {mgr['First Name']} {mgr['Last Name']}
-                                                        <div className="text-xs text-gray-400 font-normal">{mgr['Employee Number']}</div>
+                                                    <td className="px-4 py-3">
+                                                        <div className="font-bold">{mgr['First Name']} {mgr['Last Name']}</div>
+                                                        <div className="text-[10px] text-subtle">{mgr['Employee Number']}</div>
                                                     </td>
-                                                    <td className="px-6 py-4">
-                                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${role === 'Branch Manager' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'
-                                                            }`}>
-                                                            {role}
-                                                        </span>
+                                                    <td className="px-4 py-3">
+                                                        <StatusPill label={role} tone={role === 'Branch Manager' ? 'success' : 'purple'} />
                                                     </td>
-                                                    <td className="px-6 py-4 font-mono text-xs">{email}</td>
-                                                    <td className="px-6 py-4">
+                                                    <td className="px-4 py-3 font-mono text-[11px]">{email}</td>
+                                                    <td className="px-4 py-3">
                                                         <div className="flex items-center gap-1.5">
-                                                            {role === 'Branch Manager' ? <Building2 size={14} className="text-gray-400" /> : <MapPin size={14} className="text-gray-400" />}
+                                                            {role === 'Branch Manager' ? <Building2 size={14} className="text-subtle" /> : <MapPin size={14} className="text-subtle" />}
                                                             {location || 'N/A'}
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-4 text-right">
+                                                    <td className="px-4 py-3 text-right">
                                                         <button
+                                                            type="button"
                                                             onClick={() => handleUnassign(mgr['Employee Number'])}
-                                                            className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-lg transition-colors"
+                                                            className="p-2 hover:bg-orange-tint text-subtle hover:text-status-danger rounded-lg transition-colors"
                                                             title="Unassign Role"
+                                                            aria-label={`Unassign ${mgr['First Name']} ${mgr['Last Name']}`}
                                                         >
                                                             <Trash2 size={16} />
                                                         </button>
@@ -555,37 +537,42 @@ const ManagerAssignment = () => {
                                         })
                                 ) : (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
-                                            No managers assigned yet.
+                                        <td colSpan={6}>
+                                            <EmptyState
+                                                className="py-10"
+                                                icon={<Users size={18} />}
+                                                title="No managers assigned yet"
+                                                description="Appointed Branch and Regional Managers will appear here."
+                                            />
                                         </td>
                                     </tr>
                                 )}
                             </tbody>
                         </table>
                     </div>
-                    {/* Pagination Controls */}
+
                     {assignedManagers.length > itemsPerPage && (
-                        <div className="p-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
-                            <button
+                        <div className="px-4 py-3 border-t border-border flex items-center justify-between">
+                            <Button
+                                variant="secondary"
                                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                                 disabled={currentPage === 1}
-                                className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-all"
                             >
                                 Previous
-                            </button>
-                            <span className="text-sm text-gray-600 font-medium">
+                            </Button>
+                            <span className="text-xs text-muted-foreground font-medium">
                                 Page {currentPage} of {Math.ceil(assignedManagers.length / itemsPerPage)}
                             </span>
-                            <button
+                            <Button
+                                variant="secondary"
                                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(assignedManagers.length / itemsPerPage)))}
                                 disabled={currentPage === Math.ceil(assignedManagers.length / itemsPerPage)}
-                                className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-all"
                             >
                                 Next
-                            </button>
+                            </Button>
                         </div>
                     )}
-                </div>
+                </Card>
             )}
         </div>
     );
