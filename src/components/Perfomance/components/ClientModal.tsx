@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import EmployeePicker from '../../UI/EmployeePicker';
 import { Users, X, Check, Calendar as CalendarIcon } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import Select from 'react-select';
@@ -93,11 +94,6 @@ const ClientModal = ({ client, onClose, onSave, employees, branches }: ClientMod
     { value: 'Blacklisted', label: 'Blacklisted' }
   ];
 
-  const employeeOptions = employees.map(emp => ({
-    value: emp["Employee Number"],
-    label: `${emp["First Name"]} ${emp["Last Name"]}`,
-    employee: emp
-  }));
 
   const branchOptions = branches.map(branch => ({
     value: branch.id,
@@ -109,7 +105,6 @@ const ClientModal = ({ client, onClose, onSave, employees, branches }: ClientMod
   const selectedGender = genderOptions.find(opt => opt.value === formData.gender) || genderOptions[0];
   const selectedMaritalStatus = maritalStatusOptions.find(opt => opt.value === formData.marital_status) || maritalStatusOptions[0];
   const selectedStatus = statusOptions.find(opt => opt.value === formData.status) || statusOptions[0];
-  const selectedEmployee = employeeOptions.find(opt => opt.value === formData.loan_officer) || null;
   const selectedBranch = branchOptions.find(opt => opt.value === formData.branch_id) || null;
 
   // Handle input changes
@@ -453,14 +448,11 @@ const ClientModal = ({ client, onClose, onSave, employees, branches }: ClientMod
               
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Loan Officer</label>
-                <Select
-                  options={employeeOptions}
-                  value={selectedEmployee}
-                  onChange={(option) => handleSelectChange('loan_officer', option?.value || '')}
-                  styles={selectStyles}
-                  className="text-xs"
-                  isClearable
+                <EmployeePicker
+                  value={formData.loan_officer}
+                  allowedNumbers={employees.map(emp => emp["Employee Number"])}
                   placeholder="Select Loan Officer"
+                  onChange={emp => handleSelectChange('loan_officer', emp?.employeeNumber ?? '')}
                 />
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import EmployeePicker from '../../UI/EmployeePicker';
 import { CreditCard, X, Check, Calendar as CalendarIcon } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import Select from 'react-select';
@@ -107,11 +108,6 @@ const LoanModal: React.FC<LoanModalProps> = ({ loan, onClose, onSave, clients, e
     client: client
   }));
 
-  const employeeOptions = employees.map(emp => ({
-    value: emp["Employee Number"],
-    label: `${emp["First Name"]} ${emp["Last Name"]}`,
-    employee: emp
-  }));
 
   const branchOptions = branches.map(branch => ({
     value: branch.id,
@@ -143,7 +139,6 @@ const LoanModal: React.FC<LoanModalProps> = ({ loan, onClose, onSave, clients, e
   ];
 
   const selectedClient = clientOptions.find(opt => opt.value === formData.client_id) || null;
-  const selectedEmployee = employeeOptions.find(opt => opt.value === formData.loan_officer) || null;
   const selectedBranch = branchOptions.find(opt => opt.value === formData.branch_id) || null;
   const selectedProductType = productTypeOptions.find(opt => opt.value === formData.product_type) || productTypeOptions[0];
   const selectedRepaymentFrequency = repaymentFrequencyOptions.find(opt => opt.value === formData.repayment_frequency) || repaymentFrequencyOptions[2];
@@ -291,15 +286,12 @@ const LoanModal: React.FC<LoanModalProps> = ({ loan, onClose, onSave, clients, e
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Loan Officer*</label>
-              <Select
-                options={employeeOptions}
-                value={selectedEmployee}
-                onChange={(option) => handleSelectChange('loan_officer', option)}
-                styles={selectStyles}
-                className="text-xs"
+              <EmployeePicker
+                value={formData.loan_officer}
+                allowedNumbers={employees.map(emp => emp["Employee Number"])}
                 placeholder="Select Loan Officer"
-                isSearchable
                 required
+                onChange={emp => handleSelectChange('loan_officer', emp ? { value: emp.employeeNumber } : null)}
               />
             </div>
             

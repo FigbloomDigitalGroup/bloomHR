@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import EmployeePicker from '../../UI/EmployeePicker';
 import { Wallet, X, Check, Calendar as CalendarIcon } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import Select from 'react-select';
@@ -100,10 +101,6 @@ const LoanPaymentModal: React.FC<LoanPaymentModalProps> = ({
     { value: 'cheque', label: 'Cheque' }
   ];
 
-  const employeeOptions = employees.map(emp => ({
-    value: emp["Employee Number"],
-    label: `${emp["First Name"]} ${emp["Last Name"]}`
-  }));
 
   const branchOptions = branches.map(branch => ({
     value: branch.id,
@@ -118,7 +115,6 @@ const LoanPaymentModal: React.FC<LoanPaymentModalProps> = ({
   // Get current selected values for react-select components
   const selectedLoan = loanOptions.find(opt => opt.value === formData.loan_id) || null;
   const selectedPaymentMethod = paymentMethodOptions.find(opt => opt.value === formData.payment_method) || paymentMethodOptions[0];
-  const selectedEmployee = employeeOptions.find(opt => opt.value === formData.received_by) || null;
   const selectedBranch = branchOptions.find(opt => opt.value === formData.branch_id) || null;
   const selectedIsOnTime = booleanOptions.find(opt => opt.value === formData.is_on_time) || null;
 
@@ -355,14 +351,11 @@ const LoanPaymentModal: React.FC<LoanPaymentModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Received By</label>
-              <Select
-                options={employeeOptions}
-                value={selectedEmployee}
-                onChange={(option) => handleSelectChange('received_by', option)}
-                styles={selectStyles}
-                className="text-xs"
+              <EmployeePicker
+                value={formData.received_by}
+                allowedNumbers={employees.map(emp => emp["Employee Number"])}
                 placeholder="Select Employee"
-                isSearchable
+                onChange={emp => handleSelectChange('received_by', emp ? { value: emp.employeeNumber } : null)}
               />
             </div>
             

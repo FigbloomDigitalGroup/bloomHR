@@ -80,4 +80,21 @@ describe('EmployeePicker', () => {
     fireEvent.change(input, { target: { value: 'wanjiru' } });
     await waitFor(() => expect(screen.queryAllByRole('option')).toHaveLength(0));
   });
+
+  it('only offers the employees a screen was scoped to (allowedNumbers)', async () => {
+    render(<EmployeePicker label="Employee" value="" onChange={() => {}} allowedNumbers={['001', '012']} />);
+    const input = screen.getByRole('combobox');
+    fireEvent.focus(input);
+
+    // Mike (005) is in the directory but outside the allowed list
+    fireEvent.change(input, { target: { value: 'mike' } });
+    await screen.findByText(/No employees match "mike"/);
+
+    // with no query, only the two allowed people are listed
+    fireEvent.change(input, { target: { value: '' } });
+    const names = (await screen.findAllByRole('option')).map((o) => o.textContent || '');
+    expect(names).toHaveLength(2);
+    expect(names.join(' ')).toContain('Wanjiru');
+    expect(names.join(' ')).toContain('Michael');
+  });
 });

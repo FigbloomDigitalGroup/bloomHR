@@ -19,6 +19,11 @@ interface EmployeePickerProps {
   clearable?: boolean;
   /** Restrict which employees can be chosen (e.g. exclude people already assigned). */
   filter?: (employee: DirectoryEmployee) => boolean;
+  /**
+   * Only these employee numbers can be chosen. Pass the list a screen already scoped to the user's
+   * region/town so the picker never offers anyone that screen would not have. Omit for everyone.
+   */
+  allowedNumbers?: Array<string | number>;
   /** Shown when `value` is set but that person is not in the directory (older records). */
   fallbackLabel?: string;
   className?: string;
@@ -41,6 +46,7 @@ export default function EmployeePicker({
   required = false,
   clearable = true,
   filter,
+  allowedNumbers,
   fallbackLabel,
   className = '',
 }: EmployeePickerProps) {
@@ -58,7 +64,16 @@ export default function EmployeePicker({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
-  const pool = useMemo(() => (filter ? employees.filter(filter) : employees), [employees, filter]);
+  // joined so a fresh array with the same contents each render does not rebuild the list
+  const allowedKey = allowedNumbers ? allowedNumbers.map(String).join('|') : null;
+  const pool = useMemo(() => {
+    let list = employees;
+    if (allowedKey !== null) {
+      const allowed = new Set(allowedKey.split('|'));
+      list = list.filter((e) => allowed.has(e.employeeNumber));
+    }
+    return filter ? list.filter(filter) : list;
+  }, [employees, filter, allowedKey]);
   const selected = useMemo(
     () => (value ? employees.find((e) => e.employeeNumber === String(value)) || null : null),
     [employees, value]
