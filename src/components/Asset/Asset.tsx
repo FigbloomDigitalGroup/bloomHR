@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import EmployeePicker from '../UI/EmployeePicker';
 import { 
   Search, Plus, Eye, Edit, Trash2, Download, 
   PrinterIcon, ChevronLeft, ChevronRight, X, Settings,
@@ -511,19 +512,18 @@ const AssetManagement: React.FC = () => {
                 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Assigned To</label>
-                  <select
-                    name="assigned_to"
-                    value={newAsset.assigned_to || ''}
-                    onChange={handleInputChange}
-                    className="w-full h-[38px] bg-gray-50 border border-gray-300 rounded-lg px-3 py-1.5 text-xs text-gray-900 focus:outline-none focus:border-green-500 focus:shadow-[0_0_10px_rgba(34,197,94,0.3)] transition-all duration-200"
-                  >
-                    <option value="">Select Employee</option>
-                    {employees.map(emp => (
-                      <option key={emp['Employee Number']} value={`${emp['First Name']} ${emp['Last Name']} (${emp['Employee Number']})`}>
-                        {emp['First Name']} {emp['Last Name']} - {emp['Employee Number']}
-                      </option>
-                    ))}
-                  </select>
+                  <EmployeePicker
+                    // assigned_to is stored as "First Last (EmpNo)"; the picker wants just the number
+                    value={newAsset.assigned_to?.match(/\(([^()]+)\)\s*$/)?.[1] ?? ''}
+                    fallbackLabel={newAsset.assigned_to || undefined}
+                    placeholder="Select Employee"
+                    onChange={emp =>
+                      setNewAsset((prev: Partial<Asset>) => ({
+                        ...prev,
+                        assigned_to: emp ? `${emp.firstName} ${emp.lastName} (${emp.employeeNumber})` : '',
+                      }))
+                    }
+                  />
                 </div>
                 
                 <div>

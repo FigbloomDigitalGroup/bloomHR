@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
+import EmployeePicker from '../UI/EmployeePicker';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Search, X, Loader2, CheckCircle,
-    Eye, TrendingUp, RefreshCw, Briefcase,
+    Eye, TrendingUp, RefreshCw,
     Download, ChevronLeft, ChevronRight,
     ArrowUpRight, Plus, MapPin
 } from 'lucide-react';
@@ -37,7 +38,7 @@ interface Employee {
 
 export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () => void }) {
     const [advances, setAdvances] = useState<Advance[]>([]);
-    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [, setEmployees] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
@@ -400,21 +401,8 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
                             <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
-                                    <div className="relative">
-                                        <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                        <select
-                                            value={form.employeeNumber}
-                                            onChange={e => setForm(f => ({ ...f, employeeNumber: e.target.value }))}
-                                            className="w-full pl-9 pr-8 py-2 bg-white border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-primary focus:border-primary transition-colors appearance-none"
-                                        >
-                                            <option value="">Select Employee...</option>
-                                            {employees.map(e => (
-                                                <option key={e['Employee Number']} value={e['Employee Number']}>
-                                                    {e['Employee Number']} - {e['First Name']} {e['Last Name']}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
+                                    <EmployeePicker value={form.employeeNumber}
+                                        onChange={emp => setForm(f => ({ ...f, employeeNumber: emp?.employeeNumber ?? '' }))} />
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">

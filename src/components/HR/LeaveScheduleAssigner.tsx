@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import EmployeePicker from '../UI/EmployeePicker';
 import { motion } from 'framer-motion';
 import { Calendar, Plus, Search, X, Loader2, CheckCircle, Bell } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -31,7 +32,7 @@ const LEAVE_TYPES = ['Annual Leave', 'Sick Leave', 'Maternity Leave', 'Paternity
 
 export default function LeaveScheduleAssigner({ onRefresh }: { onRefresh?: () => void }) {
     const [schedules, setSchedules] = useState<LeaveSchedule[]>([]);
-    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [, setEmployees] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
@@ -226,15 +227,8 @@ export default function LeaveScheduleAssigner({ onRefresh }: { onRefresh?: () =>
                         <div className="space-y-3">
                             <div>
                                 <label className="text-xs font-medium text-gray-700 block mb-1">Employee *</label>
-                                <select value={form.employeeNumber} onChange={e => setForm(f => ({ ...f, employeeNumber: e.target.value }))}
-                                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500">
-                                    <option value="">Select employee...</option>
-                                    {employees.map(e => (
-                                        <option key={e['Employee Number']} value={e['Employee Number']}>
-                                            {e['First Name']} {e['Last Name']} ({e['Employee Number']})
-                                        </option>
-                                    ))}
-                                </select>
+                                <EmployeePicker value={form.employeeNumber}
+                                    onChange={emp => setForm(f => ({ ...f, employeeNumber: emp?.employeeNumber ?? '' }))} />
                             </div>
                             <div>
                                 <label className="text-xs font-medium text-gray-700 block mb-1">Leave Type *</label>
