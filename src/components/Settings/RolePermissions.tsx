@@ -17,6 +17,7 @@ import {
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { Card, Button, SearchInput } from '../UI';
+import { queryClient, queryKeys } from '../../lib/queryClient';
 
 interface Permission {
     id: string;
@@ -143,6 +144,8 @@ export default function RolePermissions() {
             if (error) throw error;
 
             setSavedPermissions(prev => ({ ...prev, [selectedRole]: toSave }));
+            // the sidebar reads the signed-in user's permissions from the shared cache: refresh them now
+            queryClient.invalidateQueries({ queryKey: queryKeys.myPermissions });
             toast.success(`Permissions saved for ${selectedRole}`);
             setHasChanges(false);
         } catch (error) {
