@@ -1,28 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { DirectoryEmployee, describeLoadError, loadEmployeeDirectory } from '../lib/employeeDirectory';
+import { queryKeys } from '../lib/queryClient';
 
+const NO_EMPLOYEES: DirectoryEmployee[] = [];
+
+/** The company staff directory, shared by every screen that needs it (one request, cached for five minutes). */
 export function useEmployeeDirectory() {
-  const [employees, setEmployees] = useState<DirectoryEmployee[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const query = useQuery({
+    queryKey: queryKeys.employeeDirectory,
+    queryFn: loadEmployeeDirectory,
+  });
 
   useEffect(() => {
-    let cancelled = false;
-    loadEmployeeDirectory()
-      .then((list) => {
-        if (!cancelled) setEmployees(list);
-      })
-      .catch((err) => {
-        console.error('Could not load employees for the picker:', err);
-        if (!cancelled) setError(describeLoadError(err));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (query.error) console.error('Could not load employees for the picker:', query.error);
+  }, [query.error]);
 
-  return { employees, loading, error };
+  return {
+    employees: query.data ?? NO_EMPLOYEES,
+    loading: query.isLoading,
+    error: query.error ? describeLoadError(query.error) : null,
+  };
 }

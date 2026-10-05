@@ -72,37 +72,26 @@ export const matchEmployees = (list: DirectoryEmployee[], query: string): Direct
     .map((s) => s.e);
 };
 
-const TTL_MS = 5 * 60 * 1000;
-let cache: { at: number; promise: Promise<DirectoryEmployee[]> } | null = null;
+/**
+ * Fetches the directory. Caching and sharing between screens is done by React Query
+ * (see src/hooks/useEmployeeDirectory.ts and src/lib/queryClient.ts), so this stays a plain request.
+ */
+export const loadEmployeeDirectory = async (): Promise<DirectoryEmployee[]> => {
+  // employee_directory is the intended source (any role, tenant-scoped). If this database does not have it
+  // yet, or the request fails, fall back to the employees table, which roles that manage staff can read.
+  const read = (table: string) =>
+    supabase.from(table).select(COLUMNS).order('First Name', { ascending: true }).limit(5000);
 
-/** One shared fetch for every picker on screen; refreshed after a few minutes or on demand. */
-export const loadEmployeeDirectory = (force = false): Promise<DirectoryEmployee[]> => {
-  if (!force && cache && Date.now() - cache.at < TTL_MS) return cache.promise;
+  let { data, error } = await read('employee_directory');
+  if (error) {
+    console.warn('employee_directory could not be read, trying employees:', error);
+    ({ data, error } = await read('employees'));
+  }
+  if (error) throw error;
 
-  const promise = (async () => {
-    // employee_directory is the intended source (any role, tenant-scoped). If this database does not have it
-    // yet, or the request fails, fall back to the employees table, which roles that manage staff can read.
-    const read = (table: string) =>
-      supabase.from(table).select(COLUMNS).order('First Name', { ascending: true }).limit(5000);
-
-    let { data, error } = await read('employee_directory');
-    if (error) {
-      console.warn('employee_directory could not be read, trying employees:', error);
-      ({ data, error } = await read('employees'));
-    }
-    if (error) throw error;
-
-    return ((data || []) as unknown as DirectoryRow[])
-      .map(toDirectoryEmployee)
-      .filter((e) => e.employeeNumber);
-  })();
-
-  cache = { at: Date.now(), promise };
-  // a failed load must not be served from cache next time
-  promise.catch(() => {
-    if (cache?.promise === promise) cache = null;
-  });
-  return promise;
+  return ((data || []) as unknown as DirectoryRow[])
+    .map(toDirectoryEmployee)
+    .filter((e) => e.employeeNumber);
 };
 
 /** Supabase errors are plain objects, not Error instances, so pull out the useful text. */
@@ -115,6 +104,3 @@ export const describeLoadError = (err: unknown): string => {
   return typeof err === 'string' ? err : 'Unknown error';
 };
 
-export const clearEmployeeDirectoryCache = () => {
-  cache = null;
-};

@@ -13,13 +13,12 @@ vi.mock('./supabase', () => ({
   },
 }));
 
-import { clearEmployeeDirectoryCache, describeLoadError, loadEmployeeDirectory } from './employeeDirectory';
+import { describeLoadError, loadEmployeeDirectory } from './employeeDirectory';
 
 const row = { 'Employee Number': '005', 'First Name': 'Mike', 'Last Name': 'Otieno', 'Job Title': 'Accountant' };
 
 beforeEach(() => {
   calls.length = 0;
-  clearEmployeeDirectoryCache();
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
@@ -39,7 +38,7 @@ describe('loadEmployeeDirectory', () => {
     expect(calls).toEqual(['employee_directory', 'employees']);
   });
 
-  it('reports the real error when both fail, and does not cache the failure', async () => {
+  it('reports the real error when both fail, and recovers on the next call', async () => {
     results.employee_directory = { data: null, error: { message: 'permission denied', code: '42501' } };
     results.employees = { data: null, error: { message: 'permission denied for table employees', code: '42501' } };
     await expect(loadEmployeeDirectory()).rejects.toMatchObject({ code: '42501' });
