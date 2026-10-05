@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Users, Search, Clock, Filter, BarChart2, Target, PieChart, UserCheck, Coins,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Mail, Send,
-  MapPin
+  Users, Clock, Filter, BarChart2, Target, PieChart, UserCheck, Coins,
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Mail, Send
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
@@ -15,6 +14,7 @@ import {
 } from './components/Table';
 import Select from 'react-select';
 import ChatFloater from '../AI/AIFloatingWidget';
+import { Card, Button, TabBar, SearchInput } from '../UI';
 
 type EmployeePerformance = {
   id: string;
@@ -135,16 +135,16 @@ const GlowButton: React.FC<{
   onClick,
   disabled = false
 }) => {
-    const baseClasses = "inline-flex items-center gap-2 rounded-lg font-medium transition-all duration-300 border";
+    const baseClasses = "inline-flex items-center gap-2 rounded-tile font-semibold transition-colors border";
     const sizeClasses = {
       sm: "px-3 py-1.5 text-xs",
       md: "px-4 py-2 text-xs",
       lg: "px-6 py-3 text-base"
     };
     const variantClasses = {
-      primary: "bg-primary/10 border-primary/30 text-primary hover:bg-primary/20 hover:border-primary hover:text-primary hover:shadow-[0_0_20px_rgba(23,64,42,0.5)] focus:shadow-[0_0_25px_rgba(23,64,42,0.6)]",
-      secondary: "bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-300 hover:border-gray-400",
-      danger: "bg-red-50 border-red-500 text-red-600 hover:bg-red-100 hover:border-red-600 hover:text-red-700 hover:shadow-[0_0_20px_rgba(239,68,68,0.5)]"
+      primary: "bg-brand border-brand text-white hover:bg-brand-dark",
+      secondary: "bg-white hover:bg-secondary text-ink border-border",
+      danger: "bg-orange-tint border-[#F6DCC7] text-status-danger hover:bg-orange-tint-alt"
     };
     return (
       <button
@@ -159,10 +159,10 @@ const GlowButton: React.FC<{
   };
 const StatusBadge: React.FC<{ status: string; value?: number }> = ({ status, value }) => {
   const statusClasses = {
-    'Excellent': 'bg-green-100 text-green-800',
-    'Good': 'bg-green-100 text-green-800',
-    'Fair': 'bg-yellow-100 text-yellow-800',
-    'Poor': 'bg-red-100 text-red-800',
+    'Excellent': 'bg-green-tint text-brand-dark',
+    'Good': 'bg-green-tint text-brand-dark',
+    'Fair': 'bg-orange-tint-alt text-orange-text-alt',
+    'Poor': 'bg-orange-tint-alt text-status-danger',
   };
   let performanceStatus = 'Excellent';
   if (status === 'PAR') {
@@ -173,7 +173,7 @@ const StatusBadge: React.FC<{ status: string; value?: number }> = ({ status, val
     performanceStatus = value! > 95 ? 'Excellent' : value! > 90 ? 'Good' : value! > 85 ? 'Fair' : 'Poor';
   }
   return (
-    <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${statusClasses[performanceStatus as keyof typeof statusClasses]}`}>
+    <span className={`text-[10px] font-bold px-2 py-[3px] rounded-pill ${statusClasses[performanceStatus as keyof typeof statusClasses]}`}>
       {value ? `${value}%` : performanceStatus}
     </span>
   );
@@ -200,14 +200,14 @@ const Pagination: React.FC<{
         <button
           onClick={() => onPageChange(1)}
           disabled={currentPage === 1}
-          className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="p-2 rounded-lg border border-border bg-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <ChevronsLeft className="w-4 h-4" />
         </button>
         <button
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage === 1}
-          className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="p-2 rounded-lg border border-border bg-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -220,7 +220,7 @@ const Pagination: React.FC<{
           <button
             key={page}
             onClick={() => onPageChange(page)}
-            className={`w-10 h-10 rounded-lg border ${currentPage === page ? 'bg-primary/10 border-primary text-primary' : 'border-gray-200'}`}
+            className={`w-10 h-10 rounded-lg border ${currentPage === page ? 'bg-green-tint border-brand text-brand font-semibold' : 'border-border bg-white'}`}
           >
             {page}
           </button>
@@ -233,14 +233,14 @@ const Pagination: React.FC<{
         <button
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
           disabled={currentPage === totalPages}
-          className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="p-2 rounded-lg border border-border bg-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
         <button
           onClick={() => onPageChange(totalPages)}
           disabled={currentPage === totalPages}
-          className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="p-2 rounded-lg border border-border bg-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <ChevronsRight className="w-4 h-4" />
         </button>
@@ -1458,52 +1458,38 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange 
     );
   }
   return (
-    <div className="p-2 space-y-3 bg-gray-50 min-h-screen max-w-screen-2xl mx-auto">
-      {/* Enhanced Header with Town Display */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Performance Dashboard</h1>
-            <p className="text-xs text-gray-600 mt-1 flex items-center">
-              Monitor and manage employee and branch performance
-              <span className="flex items-center ml-4 text-primary font-medium">
-                <MapPin className="w-4 h-4 mr-1" />
-                {getDisplayName()}
-              </span>
-            </p>
-
-            {/* Enhanced Debug info with branch coverage */}
-            <div className="text-xs text-gray-400 mt-2 space-y-1">
-              <div>Coverage: {filteredEmployees.length} employees, {filteredBranches.length} branches</div>
-
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 w-full md:w-auto">
-            <GlowButton
-              variant="secondary"
-              icon={Filter}
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              {showFilters ? 'Hide Filters' : 'Show Filters'}
-            </GlowButton>
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="m-0 text-[21px] font-bold text-ink">Performance Dashboard</h1>
+          <div className="text-xs text-muted-foreground mt-1">
+            Monitor and manage employee and branch performance &middot; Coverage: {filteredEmployees.length} employees, {filteredBranches.length} branches
           </div>
         </div>
+        <Button
+          variant="secondary"
+          onClick={() => setShowFilters(!showFilters)}
+          icon={<Filter className="w-[13px] h-[13px]" strokeWidth={2} />}
+        >
+          {showFilters ? 'Hide Filters' : 'Show Filters'}
+        </Button>
       </div>
       {/* Filters Section */}
       {showFilters && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Performance Filters</h2>
+        <Card>
+          <h2 className="m-0 text-sm font-bold text-ink mb-3.5">Performance Filters</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Branch Location</label>
+              <label htmlFor="perf-branch" className="block text-[10px] font-bold text-subtle uppercase mb-1">Branch Location</label>
               <select
+                id="perf-branch"
                 value={selectedBranch}
                 onChange={(e) => {
                   setSelectedBranch(e.target.value);
                   setEmployeePage(1);
                 }}
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full bg-white border border-border rounded-tile px-3 py-2 text-xs text-ink outline-none focus:border-brand"
               >
                 <option value="all">All Branches</option>
                 {filteredBranchesByTown.map(branch => {
@@ -1520,14 +1506,15 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange 
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Employee Role</label>
+              <label htmlFor="perf-role" className="block text-[10px] font-bold text-subtle uppercase mb-1">Employee Role</label>
               <select
+                id="perf-role"
                 value={selectedRole}
                 onChange={(e) => {
                   setSelectedRole(e.target.value);
                   setEmployeePage(1);
                 }}
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full bg-white border border-border rounded-tile px-3 py-2 text-xs text-ink outline-none focus:border-brand"
               >
                 {roles.map(role => (
                   <option key={role} value={role}>{role}</option>
@@ -1535,11 +1522,12 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange 
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Rows per page</label>
+              <label htmlFor="perf-rows" className="block text-[10px] font-bold text-subtle uppercase mb-1">Rows per page</label>
               <select
+                id="perf-rows"
                 value={rowsPerPage}
                 onChange={handleRowsPerPageChange}
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full bg-white border border-border rounded-tile px-3 py-2 text-xs text-ink outline-none focus:border-brand"
               >
                 {[5, 10, 20, 50].map(num => (
                   <option key={num} value={num}>{num}</option>
@@ -1547,26 +1535,20 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange 
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Search</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-4 w-4 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  placeholder={selectedTab === 'individual' ? "Search employees..." : "Search branches..."}
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setEmployeePage(1);
-                    setBranchPage(1);
-                  }}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs"
-                />
-              </div>
+              <span className="block text-[10px] font-bold text-subtle uppercase mb-1">Search</span>
+              <SearchInput
+                placeholder={selectedTab === 'individual' ? "Search employees..." : "Search branches..."}
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setEmployeePage(1);
+                  setBranchPage(1);
+                }}
+                className="!bg-white !border-border"
+              />
             </div>
           </div>
-        </div>
+        </Card>
       )}
       {/* Email Modal */}
       {showEmailModal && (
@@ -1647,85 +1629,58 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange 
         </div>
       )}
       {/* Tabs Navigation */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="border-b border-gray-200 bg-white">
-          <div className="flex items-center">
-            <nav className="flex overflow-x-auto [&::-webkit-scrollbar]:hidden flex-1">
-              {[
-                { key: "individual", label: "Individual Performance" },
-                { key: "branch", label: "Branch Performance" },
-                { key: "employeePerformance", label: "Employee Performance Table" },
-                { key: "branchPerformance", label: "Branch Performance Table" },
-              ].map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setSelectedTab(tab.key as any)}
-                  className={`py-4 px-6 whitespace-nowrap text-center border-b-2 font-medium text-xs transition-colors duration-200 border-r border-gray-200 last:border-r-0
-                    ${selectedTab === tab.key
-                      ? "border-b-primary text-primary bg-primary/5"
-                      : "border-b-transparent text-gray-500 hover:text-gray-700 hover:border-b-gray-300 bg-transparent hover:bg-gray-50"}`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
-            {/* View Mode Capsule - Only for Individual Performance */}
-            {selectedTab === "individual" && (
-              <div className="flex-shrink-0 px-6 py-2">
-                <div className="inline-flex rounded-full bg-gray-100 p-1">
-                  <button
-                    onClick={() => setViewMode("summary")}
-                    className={`px-4 py-2 rounded-full text-xs font-medium transition-all duration-200 ${viewMode === "summary"
-                      ? "bg-white text-primary shadow-sm"
-                      : "text-gray-600 hover:text-gray-800"
-                      }`}
-                  >
-                    Summary
-                  </button>
-                  <button
-                    onClick={() => setViewMode("detailed")}
-                    className={`px-4 py-2 rounded-full text-xs font-medium transition-all duration-200 ${viewMode === "detailed"
-                      ? "bg-white text-primary shadow-sm"
-                      : "text-gray-600 hover:text-gray-800"
-                      }`}
-                  >
-                    Detailed
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+      <div className="flex items-center justify-between flex-wrap gap-3 border-b border-border">
+        <TabBar
+          items={[
+            { id: 'individual', label: 'Individual Performance' },
+            { id: 'branch', label: 'Branch Performance' },
+            { id: 'employeePerformance', label: 'Employee Table' },
+            { id: 'branchPerformance', label: 'Branch Table' },
+          ]}
+          activeId={selectedTab}
+          onChange={(id) => setSelectedTab(id as typeof selectedTab)}
+        />
+        {/* Summary / Detailed - only for Individual Performance */}
+        {selectedTab === 'individual' && (
+          <TabBar
+            variant="pill"
+            className="mb-2"
+            items={[
+              { id: 'summary', label: 'Summary' },
+              { id: 'detailed', label: 'Detailed' },
+            ]}
+            activeId={viewMode}
+            onChange={(id) => setViewMode(id as 'summary' | 'detailed')}
+          />
+        )}
       </div>
       {/* Enhanced Individual Performance View */}
       {selectedTab === 'individual' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-4 md:p-6 border-b border-gray-200 flex justify-between items-center">
+        <Card padding="none" className="overflow-hidden">
+          <div className="p-[18px] pb-3.5 flex justify-between items-center">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Staff Performance Metrics</h2>
-              <p className="text-gray-600 text-xs">
-                Showing {paginatedEmployees.length} of {filteredEmployees.length} employees
-                <span className="text-xs font-normal text-gray-500 ml-2">
-                  in {getDisplayName()}
-                </span>
+              <h2 className="m-0 text-sm font-bold text-ink">Staff Performance Metrics</h2>
+              <p className="m-0 text-[11px] text-muted-foreground">
+                Showing {paginatedEmployees.length} of {filteredEmployees.length} employees in {getDisplayName()}
               </p>
             </div>
-            <GlowButton
-              icon={Mail}
+            <Button
+              variant="secondary"
+              icon={<Mail className="w-3 h-3" strokeWidth={2} />}
               onClick={() => {
                 setEmailType('individual');
                 setShowEmailModal(true);
               }}
             >
               Send Reports
-            </GlowButton>
+            </Button>
           </div>
 
           {viewMode === 'summary' ? (
             <>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+                  <thead className="bg-[#FAFBFA] border-y border-border">
                     <tr>
                       <th className="text-left py-3 px-4 text-gray-700 font-semibold">Employee</th>
                       <th className="text-left py-3 px-4 text-gray-700 font-semibold">Role</th>
@@ -1744,7 +1699,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange 
 
                       return (
                         <React.Fragment key={employee.id}>
-                          <tr className="border-b border-gray-300 hover:bg-gray-50">
+                          <tr className="border-b border-[#F1F5F2] hover:bg-background">
                             <td className="py-4 px-4">
                               <div className="space-y-1">
                                 <p className="text-gray-900 font-semibold">{employee.name}</p>
@@ -2076,7 +2031,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange 
               </div>
             </>
           )}
-        </div>
+        </Card>
       )}
       {/* Branch Performance View */}
       {selectedTab === 'branch' && (
@@ -2201,7 +2156,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange 
 
                     return (
                       <React.Fragment key={branch["Branch Office"] || branch.id}>
-                        <tr className="border-b border-gray-300 hover:bg-gray-50">
+                        <tr className="border-b border-[#F1F5F2] hover:bg-background">
                           <td className="py-4 px-4">
                             <p className="text-gray-900 font-semibold">
                               {branch?.["Branch Office"] || ""}
