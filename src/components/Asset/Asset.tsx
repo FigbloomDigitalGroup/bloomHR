@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import EmployeePicker from '../UI/EmployeePicker';
+import { PageHeader, Card, Button, StatusPill, EmptyState, SearchInput } from '../UI';
+import type { StatusTone } from '../UI';
 import { 
-  Search, Plus, Eye, Edit, Trash2, Download, 
+  Plus, Eye, Edit, Trash2, Download, 
   PrinterIcon, ChevronLeft, ChevronRight, X, Settings,
   HardDrive, Smartphone, Monitor, Camera, Car, Wrench, 
   Server, Headphones, Cpu, CheckCircle, AlertCircle,
-  Clock, Archive, MoreVertical, QrCode, MapPin, User,
+  Archive, MoreVertical, QrCode, MapPin, User,
   Tag, Building, Briefcase, CircleOff, ChevronDown
 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -206,27 +208,6 @@ const AssetManagement: React.FC = () => {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'active': return <CheckCircle className="w-3 h-3" />;
-      case 'maintenance': return <Wrench className="w-3 h-3" />;
-      case 'retired': return <Archive className="w-3 h-3" />;
-      case 'lost': return <AlertCircle className="w-3 h-3" />;
-      default: return <Clock className="w-3 h-3" />;
-    }
-  };
-
-  const getConditionColor = (condition: string) => {
-    switch (condition) {
-      case 'excellent': return 'text-green-600 bg-green-500/10';
-      case 'good': return 'text-blue-600 bg-blue-500/10';
-      case 'fair': return 'text-yellow-600 bg-yellow-500/10';
-      case 'poor': return 'text-orange-600 bg-orange-500/10';
-      case 'damaged': return 'text-red-600 bg-red-500/10';
-      default: return 'text-gray-600 bg-gray-500/10';
-    }
-  };
-
   // Handle functions
   const handleAddAsset = async () => {
     try {
@@ -353,6 +334,27 @@ const AssetManagement: React.FC = () => {
   }
   
   if (error) return <div className="p-6 text-center text-red-500 text-xs">Error: {error}</div>;
+
+  const assetStatusTone = (status: string): StatusTone => {
+    switch (status) {
+      case 'active': return 'success';
+      case 'maintenance': return 'warning';
+      case 'retired': return 'neutral';
+      case 'lost': return 'danger';
+      default: return 'info';
+    }
+  };
+
+  const assetConditionTone = (condition: string): StatusTone => {
+    switch (condition) {
+      case 'excellent': return 'success';
+      case 'good': return 'info';
+      case 'fair':
+      case 'poor': return 'warning';
+      case 'damaged': return 'danger';
+      default: return 'neutral';
+    }
+  };
 
   return (
     <div className="p-6 space-y-6 text-xs">
@@ -584,50 +586,35 @@ const AssetManagement: React.FC = () => {
       )}
       
       {/* Header */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Asset Management</h1>
-          <p className="text-gray-600 mt-0.5">
-            Track and manage all company assets
-          </p>
-        </div>
-        
-        <div className="flex flex-wrap gap-2">
-          <GlowButton 
-            variant="secondary" 
-            icon={QrCode}
-            size="sm"
-            onClick={() => navigate('/asset/scan')}
-          >
-            Scan QR
-          </GlowButton>
-          
-          <GlowButton 
-            icon={Plus} 
-            size="sm"
-            onClick={() => setIsAddModalOpen(true)}
-          >
-            Add Asset
-          </GlowButton>
-          
-          {/* Bulk Actions Dropdown */}
-          <div className="relative" ref={bulkActionsRef}>
-            <GlowButton 
-              variant="secondary"
-              icon={MoreVertical}
-              size="sm"
-              onClick={() => setIsBulkActionsOpen(!isBulkActionsOpen)}
-            >
-              Bulk Actions
-            </GlowButton>
-            
-            {isBulkActionsOpen && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="absolute right-0 mt-1 w-40 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-10 text-xs"
+      <PageHeader
+        title="Asset Management"
+        subtitle="Track and manage all company assets"
+        actions={
+          <>
+            <Button variant="secondary" icon={<QrCode className="w-[13px] h-[13px]" strokeWidth={1.8} />} onClick={() => navigate('/asset/scan')}>
+              Scan QR
+            </Button>
+            <Button icon={<Plus className="w-[13px] h-[13px]" strokeWidth={2.2} />} onClick={() => setIsAddModalOpen(true)}>
+              Add Asset
+            </Button>
+
+            {/* Bulk Actions Dropdown */}
+            <div className="relative" ref={bulkActionsRef}>
+              <Button
+                variant="secondary"
+                icon={<MoreVertical className="w-[13px] h-[13px]" />}
+                aria-haspopup="menu"
+                aria-expanded={isBulkActionsOpen}
+                onClick={() => setIsBulkActionsOpen(!isBulkActionsOpen)}
               >
-                <div className="py-1">
+                Bulk Actions
+              </Button>
+
+              {isBulkActionsOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-1 w-44 origin-top-right rounded-xl bg-white border border-border shadow-lg z-10 py-1"
+                >
                   {[
                     { id: 'export', label: 'Export to Excel', icon: <Download className="w-3 h-3 mr-1.5" /> },
                     { id: 'print', label: 'Print Report', icon: <PrinterIcon className="w-3 h-3 mr-1.5" /> },
@@ -636,248 +623,113 @@ const AssetManagement: React.FC = () => {
                   ].map((action) => (
                     <button
                       key={action.id}
+                      type="button"
+                      role="menuitem"
                       onClick={() => handleBulkAction(action.id)}
-                      className="flex items-center w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                      className="flex items-center w-full px-3 py-1.5 text-left text-xs text-ink hover:bg-background"
                     >
                       {action.icon}
                       {action.label}
                     </button>
                   ))}
                 </div>
-              </motion.div>
-            )}
-          </div>
-        </div>
+              )}
+            </div>
+          </>
+        }
+      />
+
+      {/* Stat tiles */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+        {[
+          { label: 'Total Assets', value: stats.total, icon: <HardDrive className="w-4 h-4 text-muted-foreground" strokeWidth={1.8} />, sub: `Value: KES ${stats.totalValue.toLocaleString()}`, valueClass: 'text-ink' },
+          { label: 'Active', value: stats.active, icon: <CheckCircle className="w-4 h-4 text-status-success" strokeWidth={1.8} />, sub: `${stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0}% of assets`, valueClass: 'text-ink' },
+          { label: 'Maintenance', value: stats.maintenance, icon: <Wrench className="w-4 h-4 text-orange" strokeWidth={1.8} />, sub: 'Needs attention', valueClass: 'text-ink' },
+          { label: 'Retired', value: stats.retired, icon: <Archive className="w-4 h-4 text-subtle" strokeWidth={1.8} />, sub: 'Out of service', valueClass: 'text-ink' },
+          { label: 'Lost', value: stats.lost, icon: <AlertCircle className="w-4 h-4 text-status-danger" strokeWidth={1.8} />, sub: 'Missing assets', valueClass: 'text-status-danger' },
+        ].map((tile) => (
+          <Card key={tile.label} padding="sm" className="!p-4">
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] font-semibold text-muted-foreground">{tile.label}</div>
+              {tile.icon}
+            </div>
+            <div className={`text-xl font-bold mt-1 ${tile.valueClass}`}>{tile.value}</div>
+            <div className="text-[10.5px] text-subtle mt-0.5">{tile.sub}</div>
+          </Card>
+        ))}
       </div>
-      
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-white backdrop-blur-sm border border-gray-200 rounded-lg p-3 hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all duration-300"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500">Total Assets</p>
-              <p className="text-lg font-bold text-gray-900">{stats.total}</p>
-            </div>
-            <div className="w-8 h-8 bg-blue-500/10 rounded-full flex items-center justify-center">
-              <HardDrive className="w-4 h-4 text-blue-600" />
-            </div>
-          </div>
-          <div className="mt-1 text-gray-500">
-            Value: KES {stats.totalValue.toLocaleString()}
-          </div>
-        </motion.div>
-        
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="bg-white backdrop-blur-sm border border-gray-200 rounded-lg p-3 hover:shadow-[0_0_15px_rgba(34,197,94,0.2)] transition-all duration-300"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500">Active</p>
-              <p className="text-lg font-bold text-gray-900">{stats.active}</p>
-            </div>
-            <div className="w-8 h-8 bg-green-500/10 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-4 h-4 text-green-600" />
-            </div>
-          </div>
-          <div className="mt-1 text-green-600">
-            {stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0}%
-          </div>
-        </motion.div>
-        
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white backdrop-blur-sm border border-gray-200 rounded-lg p-3 hover:shadow-[0_0_15px_rgba(234,179,8,0.2)] transition-all duration-300"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500">Maintenance</p>
-              <p className="text-lg font-bold text-gray-900">{stats.maintenance}</p>
-            </div>
-            <div className="w-8 h-8 bg-yellow-500/10 rounded-full flex items-center justify-center">
-              <Wrench className="w-4 h-4 text-yellow-600" />
-            </div>
-          </div>
-          <div className="mt-1 text-yellow-600">
-            Needs attention
-          </div>
-        </motion.div>
-        
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-          className="bg-white backdrop-blur-sm border border-gray-200 rounded-lg p-3 hover:shadow-[0_0_15px_rgba(107,114,128,0.2)] transition-all duration-300"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500">Retired</p>
-              <p className="text-lg font-bold text-gray-900">{stats.retired}</p>
-            </div>
-            <div className="w-8 h-8 bg-gray-500/10 rounded-full flex items-center justify-center">
-              <Archive className="w-4 h-4 text-gray-600" />
-            </div>
-          </div>
-          <div className="mt-1 text-gray-500">
-            Out of service
-          </div>
-        </motion.div>
-        
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="bg-white backdrop-blur-sm border border-gray-200 rounded-lg p-3 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] transition-all duration-300"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500">Lost</p>
-              <p className="text-lg font-bold text-gray-900">{stats.lost}</p>
-            </div>
-            <div className="w-8 h-8 bg-red-500/10 rounded-full flex items-center justify-center">
-              <AlertCircle className="w-4 h-4 text-red-600" />
-            </div>
-          </div>
-          <div className="mt-1 text-red-600">
-            Missing assets
-          </div>
-        </motion.div>
-      </div>
-      
-      {/* Category Tabs - Like in employee component */}
-      <div className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-lg p-4">
-        <h3 className="text-xs font-semibold text-gray-700 mb-3">Asset Categories</h3>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setSelectedCategory('all')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 flex items-center gap-1.5 ${
-              selectedCategory === 'all' 
-                ? 'bg-green-500 text-white border border-green-500' 
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
-            }`}
-          >
-            <HardDrive className="w-3 h-3" />
-            All Categories ({stats.total})
-          </button>
-          
-          {assetCategories.map(category => (
+
+      {/* Category pills */}
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by category">
+        {[
+          { id: 'all', label: `All Categories (${stats.total})`, icon: <HardDrive className="w-3 h-3" /> },
+          ...assetCategories.map(c => ({ id: c.id, label: `${c.name} (${c.count})`, icon: c.icon })),
+        ].map((cat) => {
+          const active = selectedCategory === cat.id;
+          return (
             <button
-              key={category.id}
-              onClick={() => setSelectedCategory(category.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200 ${
-                selectedCategory === category.id 
-                  ? `${category.color} text-white border ${category.color.replace('bg-', 'border-')}` 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+              key={cat.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => {
+                setSelectedCategory(cat.id);
+                setCurrentPage(1);
+              }}
+              className={`flex items-center gap-1.5 px-3.5 py-[7px] rounded-pill text-[11.5px] font-semibold transition-colors ${
+                active ? 'bg-brand text-white' : 'bg-secondary text-ink hover:bg-border'
               }`}
             >
-              {category.icon}
-              {category.name} ({category.count})
+              {cat.icon}
+              {cat.label}
             </button>
-          ))}
-        </div>
+          );
+        })}
       </div>
-      
+
       {/* Filters */}
-      <div className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-lg p-4">
+      <Card padding="sm" className="!p-3.5">
         <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-center">
-          {/* Search Input */}
-          <div className="relative md:col-span-2">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-3 h-3" />
-            <input
-              type="text"
+          <div className="md:col-span-2">
+            <SearchInput
               placeholder="Search assets..."
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full h-[34px] bg-gray-50 border border-gray-300 rounded-lg pl-8 pr-3 py-1.5 text-xs text-gray-900 placeholder-gray-500 focus:outline-none focus:border-green-500 focus:shadow-[0_0_10px_rgba(34,197,94,0.3)] transition-all duration-200"
+              className="!bg-white !border-border"
             />
           </div>
-          
-          {/* Category Filter */}
-          <div className="relative">
-            <select
-              value={selectedCategory}
-              onChange={(e) => {
-                setSelectedCategory(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full h-[34px] bg-gray-50 border border-gray-300 rounded-lg pl-3 pr-8 py-1.5 text-xs text-gray-900 appearance-none focus:outline-none focus:border-green-500 focus:shadow-[0_0_10px_rgba(34,197,94,0.3)] transition-all duration-200"
-            >
-              <option value="all">All Categories</option>
-              {categories.filter(c => c !== 'all').map(category => (
-                <option key={category} value={category}>{category}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 w-3 h-3 pointer-events-none" />
-          </div>
-          
-          {/* Status Filter */}
-          <div className="relative">
-            <select
-              value={selectedStatus}
-              onChange={(e) => {
-                setSelectedStatus(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full h-[34px] bg-gray-50 border border-gray-300 rounded-lg pl-3 pr-8 py-1.5 text-xs text-gray-900 appearance-none focus:outline-none focus:border-green-500 focus:shadow-[0_0_10px_rgba(34,197,94,0.3)] transition-all duration-200"
-            >
-              <option value="all">All Status</option>
-              {statuses.filter(s => s !== 'all').map(status => (
-                <option key={status} value={status}>{status}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 w-3 h-3 pointer-events-none" />
-          </div>
-          
-          {/* Department Filter */}
-          <div className="relative">
-            <select
-              value={selectedDepartment}
-              onChange={(e) => {
-                setSelectedDepartment(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full h-[34px] bg-gray-50 border border-gray-300 rounded-lg pl-3 pr-8 py-1.5 text-xs text-gray-900 appearance-none focus:outline-none focus:border-green-500 focus:shadow-[0_0_10px_rgba(34,197,94,0.3)] transition-all duration-200"
-            >
-              <option value="all">All Departments</option>
-              {departments.filter(d => d !== 'all').map(dept => (
-                <option key={dept} value={dept}>{dept}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 w-3 h-3 pointer-events-none" />
-          </div>
-          
-          {/* Location Filter */}
-          <div className="relative">
-            <select
-              value={selectedLocation}
-              onChange={(e) => {
-                setSelectedLocation(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full h-[34px] bg-gray-50 border border-gray-300 rounded-lg pl-3 pr-8 py-1.5 text-xs text-gray-900 appearance-none focus:outline-none focus:border-green-500 focus:shadow-[0_0_10px_rgba(34,197,94,0.3)] transition-all duration-200"
-            >
-              <option value="all">All Locations</option>
-              {locations.filter(l => l !== 'all').map(location => (
-                <option key={location} value={location}>{location}</option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 w-3 h-3 pointer-events-none" />
-          </div>
-          
-          {/* Reset Filters Button */}
-          <button
+
+          {[
+            { label: 'Category', value: selectedCategory, set: setSelectedCategory, all: 'All Categories', options: categories },
+            { label: 'Status', value: selectedStatus, set: setSelectedStatus, all: 'All Status', options: statuses },
+            { label: 'Department', value: selectedDepartment, set: setSelectedDepartment, all: 'All Departments', options: departments },
+            { label: 'Location', value: selectedLocation, set: setSelectedLocation, all: 'All Locations', options: locations },
+          ].map((f) => (
+            <div className="relative" key={f.label}>
+              <select
+                aria-label={`Filter by ${f.label.toLowerCase()}`}
+                value={f.value}
+                onChange={(e) => {
+                  f.set(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full appearance-none rounded-tile border border-border bg-white pl-3 pr-8 py-2 text-xs text-ink outline-none focus:border-brand"
+              >
+                <option value="all">{f.all}</option>
+                {f.options.filter((o: string) => o !== 'all').map((o: string) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-subtle w-3 h-3 pointer-events-none" />
+            </div>
+          ))}
+
+          <Button
+            variant="secondary"
+            className="justify-center"
+            icon={<CircleOff className="w-3 h-3" />}
             onClick={() => {
               setSearchTerm('');
               setSelectedCategory('all');
@@ -886,189 +738,181 @@ const AssetManagement: React.FC = () => {
               setSelectedLocation('all');
               setCurrentPage(1);
             }}
-            className="h-[34px] px-3 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-xs text-gray-700 transition-colors flex items-center justify-center gap-1"
           >
-            <CircleOff className="w-3 h-3" />
             Reset
-          </button>
+          </Button>
         </div>
-      </div>
-      
-      {/* Asset Cards */}
+      </Card>
+
+      {/* Asset cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {currentAssets.map((asset, index) => (
-          <motion.div
-            key={asset.id}
-            className="bg-white backdrop-blur-sm border border-gray-200 rounded-lg p-4 hover:border-green-500/50 hover:shadow-[0_0_15px_rgba(34,197,94,0.2)] shadow-md transition-all duration-300"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05 }}
-            whileHover={{ scale: 1.02, y: -2 }}
-          >
-            {/* Asset Header */}
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center space-x-2">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${getCategoryColor(asset.category || 'other')}`}>
+        {currentAssets.map((asset) => (
+          <Card key={asset.id} padding="sm" className="!p-4 hover:border-brand/40 transition-colors">
+            {/* Asset header */}
+            <div className="flex items-start justify-between mb-3 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-white ${getCategoryColor(asset.category || 'other')}`}>
                   {getCategoryIcon(asset.category || 'other')}
                 </div>
-                <div>
-                  <h3 className="text-gray-900 font-semibold line-clamp-1 text-xs">
-                    {asset.asset_name}
-                  </h3>
-                  <p className="text-gray-600">{asset.asset_tag || 'No Tag'}</p>
+                <div className="min-w-0">
+                  <h3 className="m-0 text-xs font-bold text-ink truncate">{asset.asset_name}</h3>
+                  <p className="m-0 text-[11px] text-muted-foreground">{asset.asset_tag || 'No Tag'}</p>
                 </div>
               </div>
-              <div className={`px-1.5 py-0.5 rounded-full flex items-center gap-1 ${getStatusColor(asset.status || 'active')}`}>
-                {getStatusIcon(asset.status || 'active')}
-                <span className="text-xs">{asset.status?.charAt(0).toUpperCase()}</span>
-              </div>
+              <StatusPill
+                label={asset.status ? asset.status.charAt(0).toUpperCase() + asset.status.slice(1) : 'Active'}
+                tone={assetStatusTone(asset.status || 'active')}
+              />
             </div>
-            
-            {/* Asset Details */}
-            <div className="space-y-1.5 mb-3">
+
+            {/* Asset details */}
+            <div className="space-y-1.5 mb-3 text-[11px]">
               <div className="flex items-center justify-between">
-                <span className="text-gray-500">Serial:</span>
-                <span className="font-medium text-gray-900 truncate ml-2 max-w-[120px]">{asset.serial_number || 'N/A'}</span>
+                <span className="text-subtle">Serial</span>
+                <span className="font-semibold text-ink truncate ml-2 max-w-[120px]">{asset.serial_number || 'N/A'}</span>
               </div>
-              
+
               <div className="flex items-center justify-between">
-                <span className="text-gray-500">Value:</span>
-                <span className="font-medium text-green-700">
+                <span className="text-subtle">Value</span>
+                <span className="font-semibold text-brand-dark">
                   KES {asset.purchase_value ? asset.purchase_value.toLocaleString() : 'N/A'}
                 </span>
               </div>
-              
-              <div className="flex items-center gap-1">
-                <Building className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                <span className="text-gray-700 truncate">{asset.location || 'Unassigned'}</span>
+
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Building className="w-3 h-3 text-subtle shrink-0" />
+                <span className="truncate">{asset.location || 'Unassigned'}</span>
               </div>
-              
+
               {asset.assigned_to && (
-                <div className="flex items-center gap-1">
-                  <User className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                  <span className="text-gray-700 truncate">{asset.assigned_to}</span>
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                  <User className="w-3 h-3 text-subtle shrink-0" />
+                  <span className="truncate">{asset.assigned_to}</span>
                 </div>
               )}
-              
+
               <div className="flex items-center justify-between pt-1">
-                <span className={`px-1.5 py-0.5 rounded text-xs ${getConditionColor(asset.condition || 'good')}`}>
-                  {asset.condition?.charAt(0).toUpperCase() + asset.condition?.slice(1) || 'Good'}
-                </span>
-                <span className="text-gray-500 text-xs">
+                <StatusPill
+                  label={asset.condition ? asset.condition.charAt(0).toUpperCase() + asset.condition.slice(1) : 'Good'}
+                  tone={assetConditionTone(asset.condition || 'good')}
+                />
+                <span className="text-subtle">
                   {asset.purchase_date ? new Date(asset.purchase_date).toLocaleDateString('en-GB') : 'N/A'}
                 </span>
               </div>
             </div>
-            
-            {/* Action Buttons */}
-            <div className="flex space-x-1.5">
-              <GlowButton 
-                variant="primary" 
-                size="xs"
-                icon={Eye}
+
+            {/* Actions */}
+            <div className="flex gap-1.5">
+              <Button
+                className="!px-2.5 !py-1.5 !text-[11px]"
+                icon={<Eye className="w-3 h-3" />}
                 onClick={() => {
                   setSelectedAsset(asset);
                   setIsViewModalOpen(true);
                 }}
               >
                 View
-              </GlowButton>
-              
-              <GlowButton 
-                variant="secondary" 
-                size="xs"
-                icon={Edit}
+              </Button>
+
+              <Button
+                variant="secondary"
+                className="!px-2.5 !py-1.5 !text-[11px]"
+                icon={<Edit className="w-3 h-3" />}
                 onClick={() => navigate(`/asset/edit/${asset.id}`)}
               >
                 Edit
-              </GlowButton>
-              
+              </Button>
+
               <RoleButtonWrapper allowedRoles={['ADMIN', 'IT']}>
-                <GlowButton 
-                  variant="danger" 
-                  size="xs"
-                  icon={Trash2}
+                <Button
+                  variant="secondary"
+                  className="!px-2.5 !py-1.5 !text-[11px] !text-status-danger !border-[#F6DCC7]"
+                  icon={<Trash2 className="w-3 h-3" />}
                   onClick={() => handleDeleteAsset(asset.id)}
                 >
                   Delete
-                </GlowButton>
+                </Button>
               </RoleButtonWrapper>
             </div>
-          </motion.div>
+          </Card>
         ))}
       </div>
 
       {/* Pagination */}
       {filteredAssets.length > 0 && (
         <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-3">
-          <div className="text-gray-600">
+          <div className="text-muted-foreground">
             Showing {indexOfFirstAsset + 1} to {Math.min(indexOfLastAsset, filteredAssets.length)} of {filteredAssets.length} assets
           </div>
           <div className="flex gap-1">
             <button
+              type="button"
+              aria-label="Previous page"
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="w-7 h-7 border rounded disabled:opacity-50 hover:bg-gray-50 transition-colors flex items-center justify-center"
+              className="w-7 h-7 border border-border bg-white rounded-lg disabled:opacity-50 hover:bg-secondary transition-colors flex items-center justify-center"
             >
               <ChevronLeft className="w-3 h-3" />
             </button>
-            
-            {/* Pagination numbers */}
+
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
               const page = i + 1;
               return (
                 <button
+                  type="button"
                   key={page}
                   onClick={() => setCurrentPage(page)}
-                  className={`w-7 h-7 border rounded hover:bg-gray-50 transition-colors flex items-center justify-center ${
-                    currentPage === page ? 'bg-green-100 border-green-500 text-green-800' : ''
+                  className={`w-7 h-7 border rounded-lg transition-colors flex items-center justify-center ${
+                    currentPage === page ? 'bg-green-tint border-brand text-brand font-semibold' : 'bg-white border-border hover:bg-secondary'
                   }`}
                 >
                   {page}
                 </button>
               );
             })}
-            
+
             {totalPages > 5 && currentPage < totalPages - 2 && (
               <>
                 <span className="w-7 h-7 flex items-center justify-center">...</span>
                 <button
+                  type="button"
                   onClick={() => setCurrentPage(totalPages)}
-                  className="w-7 h-7 border rounded hover:bg-gray-50 transition-colors flex items-center justify-center"
+                  className="w-7 h-7 border border-border bg-white rounded-lg hover:bg-secondary transition-colors flex items-center justify-center"
                 >
                   {totalPages}
                 </button>
               </>
             )}
-            
+
             <button
+              type="button"
+              aria-label="Next page"
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="w-7 h-7 border rounded disabled:opacity-50 hover:bg-gray-50 transition-colors flex items-center justify-center"
+              className="w-7 h-7 border border-border bg-white rounded-lg disabled:opacity-50 hover:bg-secondary transition-colors flex items-center justify-center"
             >
               <ChevronRight className="w-3 h-3" />
             </button>
           </div>
         </div>
       )}
-      
+
       {/* Empty state */}
       {filteredAssets.length === 0 && (
-        <div className="mt-8 text-center">
-          <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-            <HardDrive className="text-gray-400 w-6 h-6" />
-          </div>
-          <h3 className="text-sm font-medium text-gray-700">No assets found</h3>
-          <p className="text-gray-500 mt-0.5">Try adjusting your search or add a new asset</p>
-          <GlowButton 
-            icon={Plus} 
-            size="sm"
-            onClick={() => setIsAddModalOpen(true)}
-            className="mt-3"
-          >
-            Add First Asset
-          </GlowButton>
-        </div>
+        <Card>
+          <EmptyState
+            className="py-12"
+            icon={<HardDrive size={20} />}
+            title="No assets found"
+            description="Try adjusting your search or add a new asset"
+            action={
+              <Button icon={<Plus className="w-3 h-3" />} onClick={() => setIsAddModalOpen(true)}>
+                Add First Asset
+              </Button>
+            }
+          />
+        </Card>
       )}
 
       {/* View Asset Modal */}
