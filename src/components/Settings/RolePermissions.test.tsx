@@ -43,9 +43,10 @@ vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() 
 import RolePermissions from './RolePermissions';
 import { queryClient, queryKeys } from '../../lib/queryClient';
 
-let invalidate: ReturnType<typeof vi.spyOn>;
+const invalidateSpy = () => vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined);
+let invalidate: ReturnType<typeof invalidateSpy>;
 beforeEach(() => {
-  invalidate = vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined);
+  invalidate = invalidateSpy();
   db.upserts = [];
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
