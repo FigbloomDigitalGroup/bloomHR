@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import EmployeePicker from '../../UI/EmployeePicker';
 import { UserCheck, X, Check, MapPin } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import Select from 'react-select';
@@ -57,10 +58,6 @@ const ClientVisitModal: React.FC<ClientVisitModalProps> = ({
     { value: 'other', label: 'Other' }
   ];
 
-  const employeeOptions = employees.map(emp => ({
-    value: emp["Employee Number"],
-    label: `${emp["First Name"]} ${emp["Last Name"]}`
-  }));
 
   const clientOptions = clients.map(client => ({
     value: client.client_id,
@@ -166,14 +163,12 @@ const ClientVisitModal: React.FC<ClientVisitModalProps> = ({
           
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Employee</label>
-            <Select
-              options={employeeOptions}
-              value={employeeOptions.find(opt => opt.value === formData.employee_id) || null}
-              onChange={(selected) => handleSelectChange('employee_id', selected)}
-              className="basic-single"
-              classNamePrefix="select"
+            <EmployeePicker
+              value={formData.employee_id}
+              allowedNumbers={employees.map(emp => emp["Employee Number"])}
               placeholder="Select Employee"
               required
+              onChange={emp => handleSelectChange('employee_id', emp ? { value: emp.employeeNumber } : null)}
             />
           </div>
           

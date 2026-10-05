@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import EmployeePicker from '../UI/EmployeePicker';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Users, Clock, AlertTriangle, CheckCircle,
@@ -492,11 +493,6 @@ export default function EmploymentStatusModule({ onRefresh, initialSearch = '' }
         });
     };
 
-    const empOptions = allEmployees.map(e => ({
-        label: `${e['First Name'] || ''} ${e['Last Name'] || ''} (${e['Employee Number']})`.trim(),
-        value: e['Employee Number']
-    }));
-
     return (
         <div className="space-y-4">
             {/* Header */}
@@ -751,9 +747,10 @@ export default function EmploymentStatusModule({ onRefresh, initialSearch = '' }
                             <div className="space-y-4">
                                 <div>
                                     <label className="text-xs font-semibold text-gray-700 block mb-1.5">Employee *</label>
-                                    <PremiumSelect
+                                    <EmployeePicker
                                         value={addForm.employeeNumber}
-                                        onChange={v => {
+                                        onChange={emp => {
+                                            const v = emp?.employeeNumber ?? '';
                                             setAddForm(f => ({ ...f, employeeNumber: v }));
                                             // Auto-fill form from existing record if active
                                             const existing = statusList.find(s => s['Employee Number'] === v && s.id > 0);
@@ -766,9 +763,6 @@ export default function EmploymentStatusModule({ onRefresh, initialSearch = '' }
                                                 }));
                                             }
                                         }}
-                                        options={empOptions}
-                                        placeholder="Select employee..."
-                                        icon={Users}
                                     />
                                 </div>
                                 <div>

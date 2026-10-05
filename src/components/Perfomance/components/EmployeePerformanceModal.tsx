@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import EmployeePicker from '../../UI/EmployeePicker';
 import { BarChart2, X, Check } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import Select from 'react-select';
@@ -72,10 +73,6 @@ const EmployeePerformanceModal: React.FC<EmployeePerformanceModalProps> = ({
   }, []);
 
   // Prepare options for react-select components
-  const employeeOptions = employees.map(emp => ({
-    value: emp["Employee Number"],
-    label: `${emp["First Name"]} ${emp["Last Name"]} (${emp["Employee Number"]})`
-  }));
 
   const periodOptions = [
     { value: 'daily', label: 'Daily' },
@@ -86,7 +83,6 @@ const EmployeePerformanceModal: React.FC<EmployeePerformanceModalProps> = ({
   ];
 
   // Get current selected values for react-select components
-  const selectedEmployee = employeeOptions.find(opt => opt.value === formData.employee_id) || null;
   const selectedPeriod = periodOptions.find(opt => opt.value === formData.period) || periodOptions[0];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -205,15 +201,12 @@ const EmployeePerformanceModal: React.FC<EmployeePerformanceModalProps> = ({
           
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Employee*</label>
-            <Select
-              options={employeeOptions}
-              value={selectedEmployee}
-              onChange={(option) => handleSelectChange('employee_id', option)}
-              styles={selectStyles}
-              className="text-xs"
+            <EmployeePicker
+              value={formData.employee_id}
+              allowedNumbers={employees.map(emp => emp["Employee Number"])}
               placeholder="Select Employee"
-              isSearchable
               required
+              onChange={emp => handleSelectChange('employee_id', emp ? { value: emp.employeeNumber } : null)}
             />
           </div>
           

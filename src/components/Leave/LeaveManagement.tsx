@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import EmployeePicker from '../UI/EmployeePicker';
 import {
   Calendar,
   Clock,
@@ -1171,16 +1172,12 @@ const LeaveApplicationFormModal = ({
 
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <PremiumSearchableDropdown
+            <EmployeePicker
               label="Select Employee"
               placeholder="Find a staff member..."
-              icon={User}
-              options={employees.map(emp => ({
-                label: `${emp["First Name"]} ${emp["Last Name"]} (${emp["Employee Number"]})`,
-                value: emp["Employee Number"]
-              }))}
               value={newLeaveApplication["Employee Number"]}
-              onChange={handleEmployeeChange}
+              allowedNumbers={employees.map(emp => emp["Employee Number"])}
+              onChange={emp => handleEmployeeChange(emp?.employeeNumber ?? '')}
             />
 
             <PremiumSearchableDropdown

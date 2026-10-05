@@ -17,6 +17,7 @@ import {
   ThumbsUp
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import EmployeePicker from '../UI/EmployeePicker';
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 import { PageHeader, Card, Button, StatusPill, EmptyState, SearchInput } from '../UI';
 import type { StatusTone } from '../UI';
@@ -1373,31 +1374,21 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                     />
                   </div>
 
-                  <div>
+                  <div className="md:col-span-2">
                     <label className="block text-xs font-medium text-gray-700 mb-2">
-                      Employee ID
+                      Employee
                     </label>
-                    <input
-                      type="text"
+                    <EmployeePicker
+                      required
                       value={newExpense.employeeId}
-                      onChange={(e) => setNewExpense({...newExpense, employeeId: e.target.value})}
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent text-xs"
-                      placeholder=""
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-2">
-                      Employee Full Name
-                    </label>
-                    <input
-                      type="text"
-                      value={newExpense.employeeFullName}
-                      onChange={(e) => setNewExpense({...newExpense, employeeFullName: e.target.value})}
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent text-xs"
-                      placeholder=""
-                      required
+                      fallbackLabel={newExpense.employeeFullName}
+                      onChange={(emp) =>
+                        setNewExpense({
+                          ...newExpense,
+                          employeeId: emp?.employeeNumber ?? '',
+                          employeeFullName: emp?.fullName ?? '',
+                        })
+                      }
                     />
                   </div>
                 </div>

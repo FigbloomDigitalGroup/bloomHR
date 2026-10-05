@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import EmployeePicker from '../UI/EmployeePicker';
 import { supabase } from '../../lib/supabase';
 import { Button, EmptyState } from '../UI';
 import {
@@ -315,101 +316,34 @@ const MicrofinanceFormSelect = ({ label, value, onChange, options, icon: Icon, h
   </div>
 );
 
-// Enhanced Employee Select Component
-const EmployeeSelect = ({ label, value, onChange, employees, loading, helperText }: any) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const selectedEmployee = employees.find((emp: any) => emp.id === value);
-
-  if (loading) {
-    return (
-      <div>
-        <label className="block text-xs font-medium text-slate-700 mb-2">{label}</label>
-        <div className="relative">
-          <div className="w-full px-3 py-2 bg-slate-100 border border-slate-300 rounded-lg text-xs text-slate-500">
-            Loading employees...
-          </div>
-        </div>
-      </div>
-    );
-  }
+// Employee select: search by name/ID/job title, plus the two special assignments tasks support
+const EmployeeSelect = ({ label, value, onChange, helperText }: any) => {
+  const isPerson = !!value && value !== 'current-user';
+  const chip = (active: boolean) =>
+    `px-2.5 py-1 rounded-pill text-[11px] font-semibold border transition-colors ${
+      active ? 'bg-green-tint border-brand text-brand-dark' : 'bg-white border-border text-slate-600 hover:bg-slate-50'
+    }`;
 
   return (
-    <div className="relative">
-      <label className="block text-xs font-medium text-slate-700 mb-2">{label}</label>
-      <div className="relative">
+    <div>
+      <EmployeePicker
+        label={label}
+        value={isPerson ? value : ''}
+        placeholder={value === 'current-user' ? 'Assigned to me' : 'Unassigned - search to assign'}
+        onChange={(emp) => onChange(emp?.employeeNumber ?? '')}
+      />
+      <div className="flex gap-2 mt-2">
+        <button type="button" aria-pressed={!value} onClick={() => onChange('')} className={chip(!value)}>
+          Unassigned
+        </button>
         <button
           type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all text-xs text-left flex justify-between items-center hover:bg-slate-50"
+          aria-pressed={value === 'current-user'}
+          onClick={() => onChange('current-user')}
+          className={chip(value === 'current-user')}
         >
-          <span className="truncate">
-            {selectedEmployee 
-              ? `${selectedEmployee.name} (${selectedEmployee.employeeNumber})`
-              : value === 'current-user' 
-                ? 'Assign to me' 
-                : 'Unassigned'
-            }
-          </span>
-          <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          Assign to me
         </button>
-
-        {isOpen && (
-          <div className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-            <div className="p-2 space-y-1">
-              <button
-                type="button"
-                onClick={() => {
-                  onChange('');
-                  setIsOpen(false);
-                }}
-                className={`w-full text-left px-2 py-1.5 rounded text-xs hover:bg-slate-100 ${
-                  value === '' ? 'bg-green-tint text-brand-dark' : 'text-slate-700'
-                }`}
-              >
-                <div className="font-medium">Unassigned</div>
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => {
-                  onChange('current-user');
-                  setIsOpen(false);
-                }}
-                className={`w-full text-left px-2 py-1.5 rounded text-xs hover:bg-slate-100 ${
-                  value === 'current-user' ? 'bg-green-tint text-brand-dark' : 'text-slate-700'
-                }`}
-              >
-                <div className="font-medium">Assign to me</div>
-              </button>
-
-              {employees.length > 0 && (
-                <div className="border-t border-slate-200 pt-1 mt-1">
-                  <div className="px-2 py-1 text-xs font-semibold text-slate-500 bg-slate-50 rounded">
-                    Employees ({employees.length})
-                  </div>
-                  {employees.map((emp: any) => (
-                    <button
-                      key={emp.id}
-                      type="button"
-                      onClick={() => {
-                        onChange(emp.id);
-                        setIsOpen(false);
-                      }}
-                      className={`w-full text-left px-2 py-1.5 rounded text-xs hover:bg-slate-100 flex flex-col ${
-                        value === emp.id ? 'bg-green-tint text-brand-dark' : 'text-slate-700'
-                      }`}
-                    >
-                      <span className="font-medium truncate">{emp.name}</span>
-                      <span className="text-slate-500 text-xs truncate">
-                        {emp.employeeNumber} • {emp.town} • {emp.email}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
       {helperText && <p className="mt-1 text-xs text-slate-500">{helperText}</p>}
     </div>
@@ -516,7 +450,7 @@ const TimerDisplay = ({ timeSpent, isRunning }: { timeSpent: number; isRunning: 
 // Main Component
 export function MicrofinanceTodoList() {
   const { userId, loading: authLoading } = useAuth();
-  const { employees, loading: employeesLoading } = useEmployees();
+  const { employees } = useEmployees();
   const [todos, setTodos] = useState<MicrofinanceTodo[]>([]);
   const [filteredTodos, setFilteredTodos] = useState<MicrofinanceTodo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1251,9 +1185,7 @@ export function MicrofinanceTodoList() {
                       label="Assign To"
                       value={formData.assigned_to}
                       onChange={(value: string) => setFormData(prev => ({ ...prev, assigned_to: value }))}
-                      employees={employees}
-                      loading={employeesLoading}
-                      helperText="Select employee from database"
+                      helperText="Search by name, ID or job title"
                     />
                   </div>
                 </div>

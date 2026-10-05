@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import EmployeePicker from '../UI/EmployeePicker';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ShieldOff, Search, X, Loader2, CheckCircle,
     AlertTriangle, RefreshCw, Calendar, ChevronLeft,
-    ChevronRight, ChevronDown, Users, Building2, MapPin
+    ChevronRight, ChevronDown, Building2, MapPin
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
@@ -304,11 +305,6 @@ export default function SuspensionModule({ onRefresh }: { onRefresh?: () => void
         }
     };
 
-    const empOptions = employees.map(e => ({
-        label: `${e['First Name'] || ''} ${e['Last Name'] || ''} (${e['Employee Number']})`.trim(),
-        value: e['Employee Number']
-    }));
-
     return (
         <div className="space-y-4">
             {/* Header */}
@@ -461,9 +457,8 @@ export default function SuspensionModule({ onRefresh }: { onRefresh?: () => void
                             <div className="space-y-4">
                                 <div>
                                     <label className="text-xs font-semibold text-gray-700 block mb-1.5">Employee *</label>
-                                    <PremiumSelect value={form.employeeNumber}
-                                        onChange={v => setForm(f => ({ ...f, employeeNumber: v }))}
-                                        options={empOptions} placeholder="Select employee..." icon={Users} />
+                                    <EmployeePicker value={form.employeeNumber}
+                                        onChange={emp => setForm(f => ({ ...f, employeeNumber: emp?.employeeNumber ?? '' }))} />
                                 </div>
                                 <div>
                                     <label className="text-xs font-semibold text-gray-700 block mb-1.5">Suspension Date *</label>

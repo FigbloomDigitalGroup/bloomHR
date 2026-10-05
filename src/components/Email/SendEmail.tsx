@@ -1,7 +1,8 @@
 
 import { useState, useEffect } from 'react';
+import EmployeePicker from '../UI/EmployeePicker';
 import { supabase } from '../../lib/supabase';
-import { Loader2, Send, Filter, Users, User, X, Check, Paperclip } from 'lucide-react';
+import { Loader2, Send, Filter, Users, X, Check, Paperclip } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import SearchableDropdown from '../UI/SearchableDropdown';
@@ -324,15 +325,11 @@ export default function SendEmail() {
           {mode === 'single' ? (
             <div className="w-full max-w-md">
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Select Employee</label>
-              <SearchableDropdown
-                options={employees.map(e => ({
-                  label: `${e['First Name']} ${e['Last Name']} (${e['Work Email']})`,
-                  value: e['Employee Number']
-                }))}
+              <EmployeePicker
                 value={selectedEmployeeId}
-                onChange={setSelectedEmployeeId}
+                allowedNumbers={employees.map(e => e['Employee Number'])}
                 placeholder="Search employee..."
-                icon={User}
+                onChange={emp => setSelectedEmployeeId(emp?.employeeNumber ?? '')}
               />
             </div>
           ) : (
