@@ -9,7 +9,6 @@ import {
   EyeOff,
   Edit,
   Trash2,
-  Search,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -24,6 +23,8 @@ import { supabase } from '../../lib/supabase';
 import { assertEmployeeForStaffLogin } from '../../lib/staffEmployee';
 import { adminApi } from '../../lib/adminApi';
 import toast from 'react-hot-toast';
+import { Card, Button, SearchInput, StatusPill, EmptyState } from '../UI';
+import type { StatusTone } from '../UI';
 
 // Role definitions
 const ROLES = {
@@ -71,33 +72,32 @@ const ROLES = {
   }
 };
 
-const StatusBadge = ({ status }: { status: string }) => {
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
-      status === 'SUSPENDED' ? 'bg-orange-100 text-orange-800' :
-        'bg-red-100 text-red-800'
-      }`}>
-      {status === 'ACTIVE' ? 'Active' : status === 'SUSPENDED' ? 'Suspended' : 'Deactivated'}
-    </span>
-  );
+const STATUS_TONE: Record<string, StatusTone> = {
+  ACTIVE: 'success',
+  SUSPENDED: 'warning',
+  DEACTIVATED: 'danger'
 };
+
+const ROLE_TONE: Record<string, StatusTone> = {
+  ADMIN: 'purple',
+  REGIONAL: 'purple',
+  MANAGER: 'info',
+  CHECKER: 'warning',
+  OPERATIONS: 'info',
+  STAFF: 'success',
+  HR: 'neutral'
+};
+
+const StatusBadge = ({ status }: { status: string }) => (
+  <StatusPill
+    label={status === 'ACTIVE' ? 'Active' : status === 'SUSPENDED' ? 'Suspended' : 'Deactivated'}
+    tone={STATUS_TONE[status] || 'neutral'}
+  />
+);
 
 const RoleBadge = ({ role }: { role: keyof typeof ROLES }) => {
   const roleInfo = ROLES[role] || ROLES.STAFF;
-
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${role === 'ADMIN' ? 'bg-purple-100 text-purple-800' :
-      role === 'REGIONAL' ? 'bg-violet-100 text-violet-800' :
-        role === 'MANAGER' ? 'bg-blue-100 text-blue-800' :
-          role === 'CHECKER' ? 'bg-orange-100 text-orange-800' :
-            role === 'OPERATIONS' ? 'bg-indigo-100 text-indigo-800' :
-              role === 'STAFF' ? 'bg-green-100 text-green-800' :
-                'bg-gray-100 text-gray-800'
-      }`}>
-      {roleInfo.icon}
-      {roleInfo.label}
-    </span>
-  );
+  return <StatusPill label={roleInfo.label} tone={ROLE_TONE[role] || 'neutral'} />;
 };
 
 const UserCard = ({
@@ -114,87 +114,77 @@ const UserCard = ({
   const [showDropdown, setShowDropdown] = useState(false);
 
   return (
-    <div className="bg-white rounded-lg border p-4 shadow-sm hover:shadow-md transition-shadow border-gray-200">
-      <div className="flex justify-between items-start">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="bg-gray-100 rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0">
-            <User className="w-5 h-5 text-gray-500" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="font-medium text-gray-900 text-xs truncate">
-              {user.email}
-            </h3>
-            <p className="text-xs text-gray-500 truncate">
-              {user.last_sign_in_at ? `Last active: ${new Date(user.last_sign_in_at).toLocaleDateString()}` : 'Never active'}
-            </p>
-          </div>
+    <Card padding="sm" className="!p-4">
+      <div className="flex justify-between items-start gap-2">
+        <div className="min-w-0">
+          <h3 className="m-0 text-xs font-bold text-ink truncate" title={user.email}>
+            {user.email}
+          </h3>
+          <p className="m-0 text-[10.5px] text-subtle truncate">
+            {user.last_sign_in_at ? `Last active: ${new Date(user.last_sign_in_at).toLocaleDateString()}` : 'Never active'}
+          </p>
         </div>
 
         <div className="relative flex-shrink-0">
           <button
+            type="button"
+            aria-label={`Actions for ${user.email}`}
+            aria-haspopup="menu"
+            aria-expanded={showDropdown}
             onClick={() => setShowDropdown(!showDropdown)}
-            className="text-gray-400 hover:text-gray-500 p-1"
+            className="text-subtle hover:text-ink p-1 rounded"
           >
-            <MoreVertical className="w-5 h-5" />
+            <MoreVertical className="w-4 h-4" />
           </button>
 
           {showDropdown && (
-            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
-              <div className="py-1">
-                <button
-                  onClick={() => {
-                    onEdit(user);
-                    setShowDropdown(false);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 text-xs text-gray-700 hover:bg-gray-100 w-full text-left"
-                >
-                  <Edit className="w-4 h-4" />
-                  Edit User
-                </button>
-                <button
-                  onClick={() => {
-                    onResetPassword(user);
-                    setShowDropdown(false);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 text-xs text-blue-600 hover:bg-blue-50 w-full text-left"
-                >
-                  <Key className="w-4 h-4" />
-                  Reset Password
-                </button>
-                <button
-                  onClick={() => {
-                    onDelete(user);
-                    setShowDropdown(false);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 text-xs text-red-600 hover:bg-red-50 w-full text-left"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete User
-                </button>
-              </div>
+            <div role="menu" className="absolute right-0 mt-1 w-44 bg-white rounded-xl shadow-lg z-10 border border-border py-1">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onEdit(user);
+                  setShowDropdown(false);
+                }}
+                className="flex items-center gap-2 px-3 py-2 text-xs text-ink hover:bg-background w-full text-left"
+              >
+                <Edit className="w-3.5 h-3.5" />
+                Edit User
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onResetPassword(user);
+                  setShowDropdown(false);
+                }}
+                className="flex items-center gap-2 px-3 py-2 text-xs text-status-info hover:bg-status-info-tint w-full text-left"
+              >
+                <Key className="w-3.5 h-3.5" />
+                Reset Password
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  onDelete(user);
+                  setShowDropdown(false);
+                }}
+                className="flex items-center gap-2 px-3 py-2 text-xs text-status-danger hover:bg-orange-tint w-full text-left"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete User
+              </button>
             </div>
           )}
         </div>
       </div>
 
-      <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-2 gap-3">
-        <div>
-          <p className="text-xs text-gray-500 mb-1">Status</p>
-          <StatusBadge status={user.account_status} />
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-1">Role</p>
-          <RoleBadge role={user.role || 'STAFF'} />
-        </div>
+      <div className="flex flex-wrap gap-2 mt-3">
+        <StatusBadge status={user.account_status} />
+        <RoleBadge role={user.role || 'STAFF'} />
       </div>
-
-      <div className="mt-3 pt-3 border-t border-gray-200">
-        <p className="text-xs text-gray-500 mb-1">Created</p>
-        <p className="text-xs text-gray-700">
-          {new Date(user.created_at).toLocaleDateString()}
-        </p>
-      </div>
-    </div>
+    </Card>
   );
 };
 
@@ -233,107 +223,46 @@ const Pagination = ({
   const pages = getPageNumbers();
 
   return (
-    <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6">
-      <div className="flex flex-1 justify-between sm:hidden">
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <p className="m-0 text-xs text-muted-foreground">
+        Page <span className="font-semibold text-ink">{currentPage}</span> of <span className="font-semibold text-ink">{totalPages}</span>
+      </p>
+      <nav className="inline-flex items-center gap-1" aria-label="Pagination">
         <button
+          type="button"
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage === 1}
-          className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+          className="p-1.5 rounded-lg border border-border bg-white text-muted-foreground hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Previous
+          <span className="sr-only">Previous</span>
+          <ChevronLeft className="h-4 w-4" aria-hidden="true" />
         </button>
+
+        {pages.map((page) => (
+          <button
+            type="button"
+            key={page}
+            onClick={() => onPageChange(page)}
+            aria-current={currentPage === page ? 'page' : undefined}
+            className={`min-w-[2rem] px-2.5 py-1.5 text-xs rounded-lg border ${currentPage === page
+              ? 'bg-green-tint border-brand text-brand font-semibold'
+              : 'bg-white border-border text-ink hover:bg-secondary'
+              }`}
+          >
+            {page}
+          </button>
+        ))}
+
         <button
+          type="button"
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
           disabled={currentPage === totalPages}
-          className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+          className="p-1.5 rounded-lg border border-border bg-white text-muted-foreground hover:bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Next
+          <span className="sr-only">Next</span>
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
         </button>
-      </div>
-      <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs text-gray-700">
-            Showing page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{totalPages}</span>
-          </p>
-        </div>
-        <div>
-          <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-            <button
-              onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
-            >
-              <span className="sr-only">Previous</span>
-              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-            </button>
-
-            {pages.map((page) => (
-              <button
-                key={page}
-                onClick={() => onPageChange(page)}
-                className={`relative inline-flex items-center px-3 py-1.5 text-xs font-semibold ${currentPage === page
-                  ? 'bg-primary text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
-                  : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'
-                  }`}
-              >
-                {page}
-              </button>
-            ))}
-
-            <button
-              onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
-            >
-              <span className="sr-only">Next</span>
-              <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </nav>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const RoleToggle = ({
-  role,
-  active,
-  onChange
-}: {
-  role: keyof typeof ROLES;
-  active: boolean;
-  onChange: (role: keyof typeof ROLES, active: boolean) => void
-}) => {
-  const roleInfo = ROLES[role];
-
-  return (
-    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-lg ${role === 'ADMIN' ? 'bg-purple-100 text-purple-600' :
-          role === 'REGIONAL' ? 'bg-violet-100 text-violet-600' :
-            role === 'MANAGER' ? 'bg-blue-100 text-blue-600' :
-              role === 'CHECKER' ? 'bg-orange-100 text-orange-600' :
-                role === 'OPERATIONS' ? 'bg-indigo-100 text-indigo-600' :
-                  role === 'STAFF' ? 'bg-green-100 text-green-600' :
-                    'bg-gray-100 text-gray-600'
-          }`}>
-          {roleInfo.icon}
-        </div>
-        <div>
-          <h4 className="font-medium text-gray-900 text-xs">{roleInfo.label}</h4>
-          <p className="text-xs text-gray-500">{roleInfo.description}</p>
-        </div>
-      </div>
-
-      <label className="relative inline-flex items-center cursor-pointer">
-        <input
-          type="checkbox"
-          checked={active}
-          onChange={() => onChange(role, !active)}
-          className="sr-only peer"
-        />
-        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-      </label>
+      </nav>
     </div>
   );
 };
@@ -798,7 +727,6 @@ export default function UserRolesSettings() {
   useEffect(() => {
     const fetchUsers = async () => {
       setLoading(true);
-      toast.error(null);
       try {
         const users = await adminApi.listUsers();
 
@@ -932,177 +860,97 @@ export default function UserRolesSettings() {
   }, [searchTerm, selectedRole, selectedStatus]);
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="max-w-screen-2xl mx-auto space-y-6">
+    <div>
+      <div className="space-y-5">
 
-        {/* MFA Security Settings Card */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Lock className="w-4 h-4 text-primary" />
+        {/* MFA */}
+        <Card className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-[38px] h-[38px] shrink-0 rounded-tile flex items-center justify-center transition-colors ${mfaEnabled ? 'bg-green-tint text-brand' : 'bg-secondary text-muted-foreground'}`}>
+              <Lock className="w-[17px] h-[17px]" strokeWidth={1.8} />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-gray-900">Security Settings</h2>
-              <p className="text-xs text-gray-500">Control authentication requirements for admin and checker accounts</p>
+              <h2 id="mfa-title" className="m-0 text-[13.5px] font-bold text-ink">Two-Factor Authentication (MFA)</h2>
+              <p className="m-0 text-[11.5px] text-muted-foreground max-w-[520px]">
+                When enabled, Admin and Checker users must verify their identity via SMS code on every login.
+                Disable temporarily if you are experiencing SMS delivery issues.
+              </p>
+              <p className={`m-0 mt-1 text-[11px] font-semibold ${mfaEnabled ? 'text-brand' : 'text-subtle'}`} role="status">
+                {mfaFetched ? (mfaEnabled ? 'Active: SMS verification required on login' : 'Inactive: users skip SMS verification') : 'Loading...'}
+              </p>
             </div>
           </div>
-          <div className="px-6 py-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-start gap-4">
-                <div className={`mt-0.5 p-2 rounded-lg transition-colors ${mfaEnabled ? 'bg-green-100' : 'bg-gray-100'
-                  }`}>
-                  <Shield className={`w-5 h-5 transition-colors ${mfaEnabled ? 'text-green-600' : 'text-gray-400'
-                    }`} />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Two-Factor Authentication (MFA)</p>
-                  <p className="text-xs text-gray-500 mt-0.5 max-w-lg">
-                    When enabled, Admin and Checker users must verify their identity via SMS code on every login.
-                    Disable temporarily if you are experiencing SMS delivery issues.
-                  </p>
-                  <div className={`mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${mfaEnabled
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-gray-100 text-gray-500'
-                    }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${mfaEnabled ? 'bg-green-500' : 'bg-gray-400'
-                      }`} />
-                    {mfaFetched ? (mfaEnabled ? 'Active — SMS verification required on login' : 'Inactive — Users skip SMS verification') : 'Loading...'}
-                  </div>
-                </div>
-              </div>
-              <button
-                id="mfa-toggle-btn"
-                onClick={handleMfaToggle}
-                disabled={mfaLoading || !mfaFetched}
-                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${mfaEnabled ? 'bg-primary' : 'bg-gray-200'
-                  }`}
-                role="switch"
-                aria-checked={mfaEnabled}
-              >
-                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${mfaEnabled ? 'translate-x-5' : 'translate-x-0'
-                  }`} />
-              </button>
-            </div>
-          </div>
-        </div>
+          <button
+            id="mfa-toggle-btn"
+            type="button"
+            onClick={handleMfaToggle}
+            disabled={mfaLoading || !mfaFetched}
+            role="switch"
+            aria-checked={mfaEnabled}
+            aria-labelledby="mfa-title"
+            className={`relative inline-flex h-[22px] w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${mfaEnabled ? 'bg-brand' : 'bg-border'}`}
+          >
+            <span className={`pointer-events-none absolute top-0.5 left-0.5 h-[18px] w-[18px] rounded-full bg-white shadow transition-transform duration-200 ${mfaEnabled ? 'translate-x-[18px]' : 'translate-x-0'}`} />
+          </button>
+        </Card>
 
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        {/* Users */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">User Roles & Permissions</h1>
-            <p className="text-gray-600 text-xs">Manage user access and permissions across your organization</p>
+            <h1 className="m-0 text-base font-bold text-ink">User Roles &amp; Permissions</h1>
+            <p className="m-0 text-xs text-muted-foreground">
+              Manage user access across your organization &middot; {users.length} users, {users.filter(u => u.account_status === 'ACTIVE').length} active
+            </p>
           </div>
+          <Button onClick={() => setShowAddUserModal(true)} icon={<UserPlus className="w-3 h-3" strokeWidth={2.2} />}>
+            Add New User
+          </Button>
+        </div>
 
-          <div className="flex flex-col sm:flex-row gap-2">
-            <button
-              onClick={() => setShowAddUserModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-medium"
+        <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-2.5">
+          <SearchInput
+            placeholder="Search by email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="!bg-white !border-border"
+          />
+          <label className="relative block">
+            <select
+              aria-label="Filter by role"
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              className="w-full appearance-none rounded-tile border border-border bg-white pl-3 pr-8 py-2 text-xs text-ink outline-none focus:border-brand"
             >
-              <UserPlus className="w-4 h-4" />
-              Add New User
-            </button>
-          </div>
+              <option value="ALL">All Roles</option>
+              {(Object.keys(ROLES) as Array<keyof typeof ROLES>).map((role) => (
+                <option key={role} value={role}>{ROLES[role].label}</option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-subtle" strokeWidth={2} />
+          </label>
+          <label className="relative block">
+            <select
+              aria-label="Filter by status"
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="w-full appearance-none rounded-tile border border-border bg-white pl-3 pr-8 py-2 text-xs text-ink outline-none focus:border-brand"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="ACTIVE">Active</option>
+              <option value="SUSPENDED">Suspended</option>
+              <option value="DEACTIVATED">Deactivated</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-subtle" strokeWidth={2} />
+          </label>
         </div>
 
-
-
-        {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Search */}
-            <div className="md:col-span-1">
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">Search Users</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-4 w-4 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search by email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs"
-                />
-              </div>
-            </div>
-
-            {/* Role Filter */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">Filter by Role</label>
-              <div className="relative">
-                <select
-                  value={selectedRole}
-                  onChange={(e) => setSelectedRole(e.target.value)}
-                  className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs appearance-none"
-                >
-                  <option value="ALL">All Roles</option>
-                  {(Object.keys(ROLES) as Array<keyof typeof ROLES>).map((role) => (
-                    <option key={role} value={role}>{ROLES[role].label}</option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <ChevronDown className="w-4 h-4" />
-                </div>
-              </div>
-            </div>
-
-            {/* Status Filter */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1">Filter by Status</label>
-              <div className="relative">
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs appearance-none"
-                >
-                  <option value="ALL">All Statuses</option>
-                  <option value="ACTIVE">Active</option>
-                  <option value="SUSPENDED">Suspended</option>
-                  <option value="DEACTIVATED">Deactivated</option>
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <ChevronDown className="w-4 h-4" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Users</p>
-                <p className="text-xl font-bold text-gray-900">{users.length}</p>
-              </div>
-              <div className="p-2 rounded-lg bg-gray-100 text-gray-600">
-                <Users className="w-5 h-5" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Active Users</p>
-                <p className="text-xl font-bold text-gray-900">{users.filter(u => u.account_status === 'ACTIVE').length}</p>
-              </div>
-              <div className="p-2 rounded-lg bg-green-100 text-green-600">
-                <Eye className="w-5 h-5" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Users Grid */}
         {loading ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-8 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
+          <Card className="flex items-center justify-center !p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand"></div>
+          </Card>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
               {currentUsers.length > 0 ? (
                 currentUsers.map(user => (
                   <UserCard
@@ -1114,41 +962,28 @@ export default function UserRolesSettings() {
                   />
                 ))
               ) : (
-                <div className="col-span-full bg-white rounded-xl border border-gray-200 p-8 text-center">
-                  <p className="text-gray-500 text-xs">No users found matching your criteria</p>
-                </div>
+                <Card className="col-span-full">
+                  <EmptyState
+                    className="py-8"
+                    icon={<Users size={20} />}
+                    title="No users found"
+                    description="No users match your search or filters."
+                  />
+                </Card>
               )}
             </div>
 
-            {/* Pagination */}
             {filteredUsers.length > usersPerPage && (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <Card padding="none" className="overflow-hidden">
                 <Pagination
                   currentPage={currentPage}
                   totalPages={totalPages}
                   onPageChange={setCurrentPage}
                 />
-              </div>
+              </Card>
             )}
           </>
         )}
-
-        {/* Role Permissions Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Role Permissions</h2>
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {(Object.keys(ROLES) as Array<keyof typeof ROLES>).map((role) => (
-                <RoleToggle
-                  key={role}
-                  role={role}
-                  active={true} // This would come from your permissions config
-                  onChange={(r, a) => console.log(`Role ${r} active: ${a}`)}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Modals */}
