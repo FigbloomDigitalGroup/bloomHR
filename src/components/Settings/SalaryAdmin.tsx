@@ -1,5 +1,6 @@
 // SalaryAdmin - UI Refresh: white containers, compact inputs & buttons
 import { useState, useEffect } from 'react';
+import { Card, Button, SearchInput } from '../UI';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
@@ -4811,31 +4812,31 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   const getApprovalBadgeColor = (status: string) => {
     switch (status) {
       case 'Processing Payment...':
-        return 'bg-amber-100 text-amber-800 animate-pulse';
+        return 'bg-orange-tint-alt text-orange-text-alt animate-pulse';
       case 'Fully Approved':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-tint text-brand-dark';
       case 'Pending Admin Approval':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-status-purple-tint text-status-purple';
       case 'Pending Regional Manager':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-orange-tint text-orange-text';
       case 'Pending Branch Manager':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-orange-tint text-orange-text';
       case 'Rejected':
-        return 'bg-red-100 text-red-800';
+        return 'bg-orange-tint-alt text-status-danger';
       case 'Paid':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-status-info-tint text-status-info';
       case 'BM: Recommend Current':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-tint text-brand-dark';
       case 'BM: Recommend Adjusted':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-status-info-tint text-status-info';
       case 'BM: Recommend Reject':
-        return 'bg-red-100 text-red-800';
+        return 'bg-orange-tint-alt text-status-danger';
       case 'RM: Recommend Current':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-tint text-brand-dark';
       case 'RM: Recommend Adjusted':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-status-info-tint text-status-info';
       case 'RM: Recommend Reject':
-        return 'bg-red-100 text-red-800';
+        return 'bg-orange-tint-alt text-status-danger';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -5366,151 +5367,159 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   const pendingCount = paymentRequests.filter(p => p.status === 'pending').length;
 
   return (
-    <div className="p-6 min-h-screen">
-      <div className="max-w-7xl mx-auto">
+    <div>
+      <div>
 
-
-        {/* ── Action Bar ────────────────────────────────── */}
-        <div className="bg-white border border-gray-200 rounded-[10px] p-4 mb-6">
-          <div className="flex flex-col gap-4">
-            {/* Row 1: Tabs + key actions */}
-            <div className="flex flex-wrap justify-between items-center gap-3">
-              {/* Tab buttons */}
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setActiveTab('applications')}
-                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-[25px] text-xs font-medium transition-colors border ${activeTab === 'applications'
-                    ? 'bg-green-100 text-green-800 border-green-200'
-                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-800'
-                    }`}
-                >
+        {/* ── Tabs + key actions ────────────────────────── */}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          {(() => {
+            const tabClass = (tab: string) =>
+              `inline-flex items-center gap-1.5 px-3.5 py-2 rounded-tile text-xs border transition-colors ${activeTab === tab
+                ? 'bg-brand text-white border-brand font-bold'
+                : 'bg-white text-ink border-border font-semibold hover:bg-secondary'
+              }`;
+            return (
+              <>
+                <button type="button" aria-pressed={activeTab === 'applications'} onClick={() => setActiveTab('applications')} className={tabClass('applications')}>
                   <Activity className="w-3 h-3" /> Applications
                 </button>
 
                 <RoleButtonWrapper allowedRoles={['ADMIN', 'CHECKER']}>
-                  <button
-                    onClick={() => setActiveTab('callbacks')}
-                    className={`inline-flex items-center gap-2 px-3 py-2 rounded-[25px] text-xs font-medium transition-colors border ${activeTab === 'callbacks'
-                      ? 'bg-green-100 text-green-800 border-green-200'
-                      : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-800'
-                      }`}
-                  >
+                  <button type="button" aria-pressed={activeTab === 'callbacks'} onClick={() => setActiveTab('callbacks')} className={tabClass('callbacks')}>
                     <Smartphone className="w-3 h-3" /> M-Pesa Results
                   </button>
-                  <button
-                    onClick={() => setActiveTab('transaction_status')}
-                    className={`inline-flex items-center gap-2 px-3 py-2 rounded-[25px] text-xs font-medium transition-colors border ${activeTab === 'transaction_status'
-                      ? 'bg-green-100 text-green-800 border-green-200'
-                      : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-800'
-                      }`}
-                  >
+                  <button type="button" aria-pressed={activeTab === 'transaction_status'} onClick={() => setActiveTab('transaction_status')} className={tabClass('transaction_status')}>
                     <RefreshCw className="w-3 h-3" /> Transaction Status
                   </button>
                 </RoleButtonWrapper>
 
                 <RoleButtonWrapper allowedRoles={['ADMIN']}>
-                  <button
-                    onClick={() => setActiveTab('settings')}
-                    className={`inline-flex items-center gap-2 px-3 py-2 rounded-[25px] text-xs font-medium transition-colors border ${activeTab === 'settings'
-                      ? 'bg-green-100 text-green-800 border-green-200'
-                      : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-800'
-                      }`}
-                  >
+                  <button type="button" aria-pressed={activeTab === 'settings'} onClick={() => setActiveTab('settings')} className={tabClass('settings')}>
                     <Settings className="w-3 h-3" /> Settings
                   </button>
                 </RoleButtonWrapper>
-              </div>
+              </>
+            );
+          })()}
 
-              {/* Right: action buttons */}
-              <div className="flex flex-wrap items-center gap-3">
+          <div className="flex-1" />
 
-                {(isChecker || isAdmin) && pendingCount > 0 && (
-                  <button
-                    onClick={() => setShowApprovalQueue(true)}
-                    className="inline-flex items-center gap-2 px-3 py-2 bg-white text-orange-600 border border-orange-200 hover:bg-orange-50 rounded-[25px] text-xs font-medium transition-colors"
-                  >
-                    <AlertTriangle className="w-3 h-3 text-orange-600" /> {pendingCount} Pending Approvals
-                  </button>
-                )}
+          {(isChecker || isAdmin) && pendingCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowApprovalQueue(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-tile border border-[#F6DCC7] bg-orange-tint text-orange-text text-xs font-semibold hover:bg-orange-tint-alt transition-colors"
+            >
+              <AlertTriangle className="w-3 h-3" /> {pendingCount} Pending Approvals
+            </button>
+          )}
 
-                {fullyApprovedApplications.length > 0 && (
-                  <button
-                    onClick={() => setShowBulkPaymentModal(true)}
-                    className="inline-flex items-center gap-2 px-3 py-2 bg-white text-green-700 border border-green-200 hover:bg-green-50 rounded-[25px] text-xs font-medium transition-colors"
-                  >
-                    <img src="M-PESA_LOGO-01.svg.png" className="w-6 h-auto" alt="mpesa" />
-                    {isMaker ? 'Create Payment Request' : `Process Payments (${getSelectedStaffCount()})`}
-                  </button>
-                )}
+          {fullyApprovedApplications.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowBulkPaymentModal(true)}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-tile border border-brand bg-brand text-white text-xs font-bold hover:bg-brand-dark transition-colors"
+            >
+              <img src="M-PESA_LOGO-01.svg.png" className="w-6 h-auto" alt="" />
+              {isMaker ? 'Create Payment Request' : `Process Payments (${getSelectedStaffCount()})`}
+            </button>
+          )}
 
-                {(fullyApprovedApplications.length > 0 || ((isChecker || isAdmin) && pendingCount > 0)) && (
-                  <div className="w-[1px] h-5 bg-[#d4e4ff] hidden sm:block"></div>
-                )}
+          <button
+            type="button"
+            onClick={() => setShowExportModal(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-tile border border-border bg-white text-ink text-xs font-semibold hover:bg-secondary transition-colors"
+          >
+            <Download className="w-3 h-3" strokeWidth={2} /> Export
+          </button>
 
-                <button
-                  onClick={() => setShowExportModal(true)}
-                  className="inline-flex items-center gap-2 px-3 py-2 bg-white text-blue-600 border border-blue-200 hover:bg-blue-50 rounded-[25px] text-xs font-medium transition-colors"
-                >
-                  <Download className="w-3 h-3 text-blue-600" /> Export
-                </button>
+          <button
+            type="button"
+            onClick={() => setShowImportModal(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-tile border border-border bg-white text-ink text-xs font-semibold hover:bg-secondary transition-colors"
+          >
+            <Upload className="w-3 h-3" strokeWidth={2} /> Import
+          </button>
 
-                <button
-                  onClick={() => setShowImportModal(true)}
-                  className="inline-flex items-center gap-2 px-3 py-2 bg-white text-purple-600 border border-purple-200 hover:bg-purple-50 rounded-[25px] text-xs font-medium transition-colors"
-                >
-                  <Upload className="w-3 h-3 text-purple-600" /> Import
-                </button>
-
-                {/* Admin Bypass Toggle */}
-                {isAdmin && (
-                  <div className={`flex items-center gap-2 px-3 py-2 rounded-[25px] text-xs font-medium transition-colors ${adminBypassMode
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : 'bg-white text-gray-600 border border-gray-200'
-                    }`}>
-                    <ShieldCheck className={`w-3.5 h-3.5 ${adminBypassMode ? 'text-emerald-600' : 'text-gray-400'}`} />
-                    <span>Bypass System</span>
-                    <button
-                      onClick={() => setAdminBypassMode(!adminBypassMode)}
-                      className={`text-xs relative w-10 h-5 rounded-full transition-colors duration-300 focus:outline-none ${adminBypassMode ? 'bg-emerald-500' : 'bg-gray-300'
-                        }`}
-                    >
-                      <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-300 ${adminBypassMode ? 'translate-x-5' : 'translate-x-0'
-                        }`} />
-                    </button>
-                  </div>
-                )}
-              </div>
+          {/* Admin Bypass Toggle */}
+          {isAdmin && (
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-tile text-xs font-semibold border ${adminBypassMode
+              ? 'bg-green-tint text-brand-dark border-brand/30'
+              : 'bg-white text-muted-foreground border-border'
+              }`}>
+              <ShieldCheck className={`w-3.5 h-3.5 ${adminBypassMode ? 'text-brand' : 'text-subtle'}`} />
+              <span id="bypass-label">Bypass System</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={adminBypassMode}
+                aria-labelledby="bypass-label"
+                onClick={() => setAdminBypassMode(!adminBypassMode)}
+                className={`relative w-9 h-5 rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand ${adminBypassMode ? 'bg-brand' : 'bg-gray-300'}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${adminBypassMode ? 'translate-x-4' : 'translate-x-0'}`} />
+              </button>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Bypass mode warning banner */}
         {adminBypassMode && (
-          <div className="mb-6 p-3 bg-emerald-50 border border-emerald-300 rounded-[10px] flex items-center gap-2 text-xs text-emerald-700 font-medium shadow-sm">
+          <div className="mb-4 p-3 bg-orange-tint border border-[#F6DCC7] rounded-card flex items-center gap-2 text-xs text-orange-text font-medium">
             <ShieldCheck className="w-4 h-4 shrink-0" />
             <span><strong>Bypass Mode Active:</strong> Normal approval requirements are bypassed. Use with caution — all bypass payments are logged.</span>
           </div>
         )}
 
-        {/* Row 2: Search + filter — only for applications tab */}
+        {/* ── Summary tiles — applications tab only ─────── */}
         {activeTab === 'applications' && (
-          <div className="mb-6 p-4 bg-white border border-gray-200 rounded-[10px]">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Search */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-[18px]">
+            <Card>
+              <div className="text-[11px] font-semibold text-muted-foreground">Total Applications</div>
+              <div className="text-xl font-bold text-ink">{filteredApplications.length}</div>
+            </Card>
+            <Card>
+              <div className="text-[11px] font-semibold text-muted-foreground">Total Disbursed</div>
+              <div className="text-xl font-bold text-brand-dark">
+                {formatKES(filteredApplications.filter(a => ['paid'].includes(a.status?.toLowerCase())).reduce((s, a) => s + Number(a["Amount Requested"] || 0), 0))}
+              </div>
+            </Card>
+            <Card>
+              <div className="text-[11px] font-semibold text-muted-foreground">Pending Liability</div>
+              <div className="text-xl font-bold text-orange">
+                {formatKES(filteredApplications.filter(a => !['paid', 'rejected'].includes(a.status?.toLowerCase())).reduce((s, a) => s + Number(a["Amount Requested"] || 0), 0))}
+              </div>
+              <div className="text-[10.5px] text-subtle">{filteredApplications.filter(a => !['paid', 'rejected'].includes(a.status?.toLowerCase())).length} active</div>
+            </Card>
+            <Card>
+              <div className="text-[11px] font-semibold text-muted-foreground">Approval Queue</div>
+              <div className="text-xl font-bold text-ink">{pendingCount}</div>
+              {(isChecker || isAdmin) && pendingCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowApprovalQueue(!showApprovalQueue)}
+                  className="text-[11px] text-brand hover:underline font-semibold mt-0.5 flex items-center gap-1"
+                >
+                  {showApprovalQueue ? 'Hide' : 'View'} queue <ChevronRight className="w-3 h-3" />
+                </button>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* Search + filter — applications tab only */}
+        {activeTab === 'applications' && (
+          <Card padding="sm" className="mb-4 !p-3.5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-center">
               <div className="lg:col-span-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search by name or employee number..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 rounded-[25px] text-xs focus:ring-2 focus:ring-violet-400 focus:border-violet-400 bg-white border border-indigo-100 h-[38px]"
-                  />
-                </div>
+                <SearchInput
+                  placeholder="Search by name or employee number..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="!bg-white !border-border"
+                />
               </div>
 
-              {/* Enhanced Filter */}
               <div>
                 <EnhancedFilter
                   selectedTown={selectedTown}
@@ -5532,9 +5541,10 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                 />
               </div>
 
-              {/* Reset */}
-              <div className="flex items-end">
-                <button
+              <div>
+                <Button
+                  variant="secondary"
+                  className="w-full justify-center"
                   onClick={() => {
                     setSearchTerm('');
                     setSelectedStatus('all');
@@ -5542,30 +5552,31 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                     setSelectedDateRange('all');
                     handleTownChange('');
                   }}
-                  className="w-full px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 rounded-[25px] bg-white border border-gray-200 hover:bg-gray-50 transition-colors h-[38px]"
                 >
                   Reset All Filters
-                </button>
+                </Button>
               </div>
             </div>
 
             {/* Custom date range */}
             {selectedDateRange === 'custom' && (
-              <div className="mt-3 flex items-center gap-4 p-3 bg-[#f3f4f6] rounded-[10px]">
-                <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
-                <span className="text-xs font-medium text-blue-800">Custom Range:</span>
+              <div className="mt-3 flex items-center gap-3 p-3 bg-background rounded-xl">
+                <Calendar className="w-4 h-4 text-status-info shrink-0" />
+                <span className="text-xs font-semibold text-ink">Custom Range:</span>
                 <input
                   type="date"
+                  aria-label="Start date"
                   value={customStartDate}
                   onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="border border-[#9ab8e8] rounded px-2 py-1 text-xs bg-white"
+                  className="border border-border rounded-lg px-2 py-1 text-xs bg-white"
                 />
-                <span className="text-xs text-gray-500">to</span>
+                <span className="text-xs text-muted-foreground">to</span>
                 <input
                   type="date"
+                  aria-label="End date"
                   value={customEndDate}
                   onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="border border-[#9ab8e8] rounded px-2 py-1 text-xs bg-white"
+                  className="border border-border rounded-lg px-2 py-1 text-xs bg-white"
                 />
               </div>
             )}
@@ -5573,54 +5584,17 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
             {/* Active town filter badge */}
             {!isBranchManager && !isRegionalManager && selectedTown && (
               <div className="mt-3 flex items-center gap-2">
-                <span className="text-xs text-gray-600">Active filter:</span>
-                <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                <span className="text-xs text-muted-foreground">Active filter:</span>
+                <span className="inline-flex items-center gap-1 bg-status-info-tint text-status-info text-xs font-semibold px-2.5 py-1 rounded-pill">
                   <MapPin className="w-3 h-3" />
                   Town/Region: {getDisplayName(selectedTown)}
-                  <button onClick={() => handleTownChange('')} className="text-xs text-blue-600 hover:text-blue-800 ml-1">
+                  <button type="button" aria-label="Clear town filter" onClick={() => handleTownChange('')} className="ml-1">
                     <X className="w-3 h-3" />
                   </button>
                 </span>
               </div>
             )}
-          </div>
-        )}
-
-        {/* ── Summary Cards — applications tab only ─────── */}
-        {activeTab === 'applications' && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
-            <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-gray-200">
-              <p className="text-xs font-medium text-gray-600">Total Applications</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{filteredApplications.length}</p>
-              <p className="text-xs text-gray-500 mt-1">Across all locations</p>
-            </div>
-            <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-gray-200">
-              <p className="text-xs font-medium text-gray-600">Total Disbursed</p>
-              <p className="text-xl font-bold text-green-700 mt-1">
-                {formatKES(filteredApplications.filter(a => ['paid'].includes(a.status?.toLowerCase())).reduce((s, a) => s + Number(a["Amount Requested"] || 0), 0))}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">Amount paid out</p>
-            </div>
-            <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-gray-200">
-              <p className="text-xs font-medium text-gray-600">Pending Liability</p>
-              <p className="text-xl font-bold text-amber-700 mt-1">
-                {formatKES(filteredApplications.filter(a => !['paid', 'rejected'].includes(a.status?.toLowerCase())).reduce((s, a) => s + Number(a["Amount Requested"] || 0), 0))}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">{filteredApplications.filter(a => !['paid', 'rejected'].includes(a.status?.toLowerCase())).length} active</p>
-            </div>
-            <div className="bg-white p-4 rounded-[10px] border border-indigo-100 shadow-sm transition-colors hover:border-gray-200">
-              <p className="text-xs font-medium text-gray-600">Approval Queue</p>
-              <p className="text-2xl font-bold text-blue-700 mt-1">{pendingCount}</p>
-              {(isChecker || isAdmin) && pendingCount > 0 && (
-                <button
-                  onClick={() => setShowApprovalQueue(!showApprovalQueue)}
-                  className="text-xs text-blue-600 hover:text-blue-800 font-medium mt-1 flex items-center gap-1 transition-colors"
-                >
-                  {showApprovalQueue ? 'Hide' : 'View'} queue <ChevronRight className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          </div>
+          </Card>
         )}
 
         {/* ── Main Content ──────────────────────────────── */}
@@ -5682,20 +5656,20 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
 
             {/* Applications table */}
-            <div className="bg-[#f3f4f6] rounded-[5px] overflow-hidden">
+            <div className="bg-white border border-border rounded-card overflow-hidden">
               {isLoading ? (
                 <div className="flex items-center justify-center py-16">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600" />
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-brand" />
                 </div>
               ) : filteredApplications.length === 0 ? (
                 <div className="text-center py-16">
                   <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
                     <Search className="w-8 h-8 text-gray-400" />
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Records Found</h3>
-                  <p className="text-gray-600 text-sm">No applications match your current filters.</p>
+                  <h3 className="text-lg font-medium text-ink mb-2">No Records Found</h3>
+                  <p className="text-muted-foreground text-sm">No applications match your current filters.</p>
                   {selectedTown && (
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-subtle mt-1">
                       No applications found for {isRegionalManager ? 'region' : 'town'} "{getDisplayName(selectedTown)}".
                     </p>
                   )}
@@ -5703,21 +5677,21 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
               ) : (
                 <>
                   <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-300">
-                      <thead className="bg-gray-200 border-b border-gray-300">
+                    <table className="min-w-full">
+                      <thead className="bg-[#FAFBFA] border-b border-border">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">Employee</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">Mobile</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">{isRegionalManager ? 'Region' : 'Branch'}</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">Amount</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">Reason</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">Approval status</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">Notes</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">Date</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">Actions</th>
+                          <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase text-subtle">Employee</th>
+                          <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase text-subtle">Mobile</th>
+                          <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase text-subtle">{isRegionalManager ? 'Region' : 'Branch'}</th>
+                          <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase text-subtle">Amount</th>
+                          <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase text-subtle">Reason</th>
+                          <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase text-subtle">Approval status</th>
+                          <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase text-subtle">Notes</th>
+                          <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase text-subtle">Date</th>
+                          <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase text-subtle">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
+                      <tbody className="bg-white">
                         {currentItems.map((app) => {
                           const appDate = parseApplicationDate(app);
                           const now = new Date();
@@ -5727,12 +5701,12 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                           return (
                             <tr
                               key={app.id}
-                              className={`hover:bg-gray-50 transition-colors ${!isCurrentMonth ? 'opacity-60 grayscale pointer-events-none' : ''}`}
+                              className={`border-b border-[#F1F5F2] hover:bg-background transition-colors ${!isCurrentMonth ? 'opacity-60 grayscale pointer-events-none' : ''}`}
                             >
                               {/* Employee */}
-                              <td className="px-4 py-3 border-r border-gray-300">
-                                <div className="text-xs font-semibold text-gray-900">{app["Full Name"]}</div>
-                                <div className="text-xs text-gray-500 font-mono">{app["Employee Number"]}</div>
+                              <td className="px-4 py-3">
+                                <div className="text-xs font-semibold text-ink">{app["Full Name"]}</div>
+                                <div className="text-xs text-subtle font-mono">{app["Employee Number"]}</div>
                                 <ManagerBadge
                                   isBranchManager={isBranchManagerMap[app["Employee Number"]] || false}
                                   isRegionalManager={false}
@@ -5740,17 +5714,17 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                               </td>
 
                               {/* Mobile */}
-                              <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-600">
+                              <td className="px-4 py-3 text-xs text-muted-foreground">
                                 {employeeMobileNumbers[app["Employee Number"]] || 'N/A'}
                               </td>
 
                               {/* Branch */}
-                              <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-600">
+                              <td className="px-4 py-3 text-xs text-muted-foreground">
                                 {employeeBranches[app["Employee Number"]] || app['Office Branch'] || app.Office_Branch || app.office_branch || 'N/A'}
                               </td>
 
                               {/* Amount */}
-                              <td className="px-4 py-3 border-r border-gray-300">
+                              <td className="px-4 py-3">
                                 {editingId === app.id ? (
                                   <div className="flex items-center gap-1">
                                     <input
@@ -5759,12 +5733,12 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                       onChange={(e) => setEditedAmount(e.target.value)}
                                       className="w-20 px-1 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-blue-600"
                                     />
-                                    <button onClick={() => handleAmountSave(app.id)} className="text-xs bg-green-600 text-white px-2 py-1 rounded-[25px] border border-green-700 hover:bg-green-700 transition-colors">Save</button>
-                                    <button onClick={() => setEditingId(null)} className="text-xs bg-white text-gray-600 px-2 py-1 rounded-[25px] border border-gray-300 hover:bg-gray-50 transition-colors">✕</button>
+                                    <button onClick={() => handleAmountSave(app.id)} className="text-xs bg-green-600 text-white px-2 py-1 rounded-[7px] border border-green-700 hover:bg-green-700 transition-colors">Save</button>
+                                    <button onClick={() => setEditingId(null)} className="text-xs bg-white text-muted-foreground px-2 py-1 rounded-[7px] border border-gray-300 hover:bg-gray-50 transition-colors">✕</button>
                                   </div>
                                 ) : (
                                   <div
-                                    className="text-xs font-bold text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
+                                    className="text-xs font-bold text-ink cursor-pointer hover:text-blue-600 transition-colors"
                                     onClick={() => handleAmountEdit(app.id, app["Amount Requested"])}
                                   >
                                     {formatKES(Number(app["Amount Requested"]))}
@@ -5773,21 +5747,21 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                               </td>
 
                               {/* Reason */}
-                              <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-500 max-w-[160px] truncate">
+                              <td className="px-4 py-3 text-xs text-subtle max-w-[160px] truncate">
                                 {app["Reason for Advance"] || '—'}
                               </td>
 
                               {/* Approval Status */}
-                              <td className="px-4 py-3 border-r border-gray-300">
+                              <td className="px-4 py-3">
                                 <div className="space-y-1">
-                                  <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium border ${getApprovalBadgeColor(approvalStatus)}`}>
+                                  <span className={`inline-flex items-center px-2.5 py-1 rounded-pill text-[10px] font-bold ${getApprovalBadgeColor(approvalStatus)}`}>
                                     {approvalStatus}
                                   </span>
-                                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                                  <div className="flex items-center gap-1 text-xs text-subtle">
                                     <UserCheck className="h-3 w-3" />
                                     BM: {app.branch_manager_approval ? '✓' : (app.branch_manager_recommendation ? 'Rec.' : 'Pending')}
                                   </div>
-                                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                                  <div className="flex items-center gap-1 text-xs text-subtle">
                                     <ShieldCheck className="h-3 w-3" />
                                     RM: {app.regional_manager_approval ? '✓' : (app.regional_manager_recommendation ? 'Rec.' : 'Pending')}
                                   </div>
@@ -5801,10 +5775,10 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                               </td>
 
                               {/* Notes */}
-                              <td className="px-4 py-3 border-r border-gray-300 relative">
+                              <td className="px-4 py-3 relative">
                                 <button
                                   onClick={() => setShowNotesDropdown(showNotesDropdown === app.id ? null : app.id)}
-                                  className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded-[25px] bg-white border border-gray-200 transition-colors"
+                                  className="inline-flex items-center gap-1 text-xs text-subtle hover:text-gray-700 px-2 py-1 rounded-[7px] bg-white border border-gray-200 transition-colors"
                                 >
                                   Notes <ChevronDown className="h-3 w-3" />
                                 </button>
@@ -5818,17 +5792,17 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                       rows={3}
                                     />
                                     <div className="flex justify-end gap-2">
-                                      <button onClick={() => setShowNotesDropdown(null)} className="text-xs bg-white text-gray-700 px-2 py-1 rounded-[25px] border border-gray-200 hover:bg-gray-50 transition-colors">Cancel</button>
-                                      <button onClick={() => saveNotes(app.id)} className="text-xs bg-blue-600 text-white px-2 py-1 rounded-[25px] border border-blue-700 hover:bg-blue-700 transition-colors">Save</button>
+                                      <button onClick={() => setShowNotesDropdown(null)} className="text-xs bg-white text-gray-700 px-2 py-1 rounded-[7px] border border-gray-200 hover:bg-gray-50 transition-colors">Cancel</button>
+                                      <button onClick={() => saveNotes(app.id)} className="text-xs bg-blue-600 text-white px-2 py-1 rounded-[7px] border border-blue-700 hover:bg-blue-700 transition-colors">Save</button>
                                     </div>
                                   </div>
                                 )}
                               </td>
 
                               {/* Date */}
-                              <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-600">
-                                <div className="text-xs font-medium text-gray-900">{appDate.toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
-                                <div className="text-xs text-gray-500">{appDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                              <td className="px-4 py-3 text-xs text-muted-foreground">
+                                <div className="text-xs font-medium text-ink">{appDate.toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                                <div className="text-xs text-subtle">{appDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                               </td>
 
                               {/* Actions */}
@@ -5838,15 +5812,15 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                   {canBranchManagerApprove(app) && (
                                     <>
                                       <button onClick={() => openRecommendationModal(app, 'bm-recommend-current')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 hover:bg-green-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-brand-dark bg-green-tint border border-transparent hover:bg-[#d3e6d9] rounded-[7px] transition-colors">
                                         <CheckCircle className="w-3 h-3" /> Recommend
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'bm-recommend-adjusted')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-200 hover:bg-blue-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-status-info bg-status-info-tint border border-transparent hover:bg-[#dbe7f1] rounded-[7px] transition-colors">
                                         <Edit3 className="w-3 h-3" /> Adjusted
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'bm-recommend-reject')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 hover:bg-red-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-status-danger bg-orange-tint-alt border border-transparent hover:bg-[#fbdcc5] rounded-[7px] transition-colors">
                                         <XCircleIcon className="w-3 h-3" /> Reject
                                       </button>
                                     </>
@@ -5856,15 +5830,15 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                   {canRegionalManagerApprove(app) && (
                                     <>
                                       <button onClick={() => openRecommendationModal(app, 'rm-recommend-current')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 hover:bg-green-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-brand-dark bg-green-tint border border-transparent hover:bg-[#d3e6d9] rounded-[7px] transition-colors">
                                         <CheckCircle className="w-3 h-3" /> Recommend
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'rm-recommend-adjusted')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-200 hover:bg-blue-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-status-info bg-status-info-tint border border-transparent hover:bg-[#dbe7f1] rounded-[7px] transition-colors">
                                         <Edit3 className="w-3 h-3" /> Adjusted
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'rm-recommend-reject')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 hover:bg-red-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-status-danger bg-orange-tint-alt border border-transparent hover:bg-[#fbdcc5] rounded-[7px] transition-colors">
                                         <XCircleIcon className="w-3 h-3" /> Reject
                                       </button>
                                     </>
@@ -5873,7 +5847,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                   {/* RM comment */}
                                   {canRegionalManagerComment(app) && (
                                     <button onClick={() => openCommentModal(app)}
-                                      className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-white hover:bg-blue-100 rounded-[25px] transition-colors">
+                                      className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-white hover:bg-blue-100 rounded-[7px] transition-colors">
                                       <Smartphone className="w-3 h-3" /> Comment
                                     </button>
                                   )}
@@ -5882,15 +5856,15 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                   {canAdminApprove(app) && (
                                     <>
                                       <button onClick={() => openRecommendationModal(app, 'admin-approve-current')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-green-700 bg-green-50 border border-green-200 hover:bg-green-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-brand-dark bg-green-tint border border-transparent hover:bg-[#d3e6d9] rounded-[7px] transition-colors">
                                         <CheckCircle className="w-3 h-3" /> Approve
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'admin-approve-adjusted')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-200 hover:bg-blue-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-status-info bg-status-info-tint border border-transparent hover:bg-[#dbe7f1] rounded-[7px] transition-colors">
                                         <Edit3 className="w-3 h-3" /> Adjusted
                                       </button>
                                       <button onClick={() => openRecommendationModal(app, 'admin-reject')}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 hover:bg-red-100 rounded-[25px] transition-colors">
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-status-danger bg-orange-tint-alt border border-transparent hover:bg-[#fbdcc5] rounded-[7px] transition-colors">
                                         <XCircleIcon className="w-3 h-3" /> Reject
                                       </button>
                                     </>
@@ -5903,7 +5877,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                       <button
                                         disabled={isLoading || isBypassLoading}
                                         onClick={() => handleIndividualBypassPayment(app)}
-                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-[25px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-brand-dark bg-green-tint hover:bg-[#d3e6d9] rounded-[7px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                       >
                                         <ShieldCheck className="w-3 h-3" /> Bypass & Pay Now
                                       </button>
@@ -5936,7 +5910,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                                   {!canBranchManagerApprove(app) && !canRegionalManagerApprove(app) && !canRegionalManagerComment(app) && !canAdminApprove(app) &&
                                     !['paid', 'approved', 'fully approved', 'rejected', 'processing'].includes(app.status?.toLowerCase()) &&
                                     !checkIfSelfApproval(app) && !(isAdmin && adminBypassMode) && (
-                                      <span className="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded border border-gray-200">
+                                      <span className="inline-flex items-center gap-1 text-xs text-subtle bg-gray-50 px-2 py-1 rounded border border-gray-200">
                                         <Clock className="w-3 h-3" /> Awaiting approval
                                       </span>
                                     )}
@@ -5951,7 +5925,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
                   {/* Pagination */}
                   {totalPages > 1 && (
-                    <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-3 border-t border-gray-300 bg-gray-50">
+                    <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-3 border-t border-border bg-[#FAFBFA]">
                       <div className="text-sm text-gray-700 mb-3 sm:mb-0">
                         Showing <strong>{indexOfFirstItem + 1}</strong> to{' '}
                         <strong>{Math.min(indexOfLastItem, filteredApplications.length)}</strong> of{' '}
@@ -5961,7 +5935,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                         <button
                           onClick={() => paginate(currentPage - 1)}
                           disabled={currentPage === 1}
-                          className="text-xs p-1 rounded-[25px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                          className="text-xs p-1 rounded-[7px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
                         >
                           <ChevronLeft className="w-4 h-4" />
                         </button>
@@ -5974,9 +5948,9 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                             <button
                               key={page}
                               onClick={() => paginate(page)}
-                              className={`min-w-[2rem] px-2 py-1 text-xs rounded-[25px] transition-colors ${currentPage === page
-                                ? 'bg-blue-600 text-white'
-                                : 'text-gray-700 hover:bg-gray-100'
+                              className={`min-w-[2rem] px-2 py-1 text-xs rounded-[7px] transition-colors ${currentPage === page
+                                ? 'bg-brand text-white'
+                                : 'text-ink hover:bg-secondary'
                                 }`}
                             >
                               {page}
@@ -5986,7 +5960,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                         <button
                           onClick={() => paginate(currentPage + 1)}
                           disabled={currentPage === totalPages}
-                          className="text-xs p-1 rounded-[25px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
+                          className="text-xs p-1 rounded-[7px] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 transition-colors"
                         >
                           <ChevronRight className="w-4 h-4" />
                         </button>
