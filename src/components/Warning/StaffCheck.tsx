@@ -688,51 +688,13 @@ Make sure to incorporate the severity level (${severity}) and be specific about 
 
           <form onSubmit={sendWarning} className="space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="relative">
-                <label htmlFor="warn-employee" className="block text-[11px] font-semibold text-ink mb-1.5">Select Employee</label>
-                <input
-                  id="warn-employee"
-                  type="text"
-                  autoComplete="off"
-                  placeholder="Search employee by name, department or ID..."
-                  value={employeeSearchTerm}
-                  onChange={(e) => {
-                    setEmployeeSearchTerm(e.target.value);
-                    setShowEmployeeDropdown(true);
-                  }}
-                  onFocus={() => setShowEmployeeDropdown(true)}
-                  className={inputClass}
+              <div>
+                <EmployeePicker
+                  label="Select Employee"
+                  value={selectedEmployee}
+                  allowedNumbers={employees.map(emp => emp.employeeNumber)}
+                  onChange={emp => setSelectedEmployee(emp?.employeeNumber ?? '')}
                 />
-
-                {showEmployeeDropdown && employeeSearchTerm && (
-                  <ul className="absolute z-10 w-full mt-1 p-0 list-none bg-white border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                    {employees
-                      .filter((emp) => {
-                        const search = employeeSearchTerm.toLowerCase();
-                        return (
-                          emp.fullName.toLowerCase().includes(search) ||
-                          emp.department.toLowerCase().includes(search) ||
-                          emp.employeeNumber.toString().toLowerCase().includes(search)
-                        );
-                      })
-                      .map((emp) => (
-                        <li key={emp.employeeNumber}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const displayValue = `${emp.fullName} - ${emp.department} (ID: ${emp.employeeNumber})`;
-                              setSelectedEmployee(emp.employeeNumber);
-                              setEmployeeSearchTerm(displayValue);
-                              setShowEmployeeDropdown(false);
-                            }}
-                            className="w-full text-left px-3 py-2 hover:bg-background text-xs text-ink"
-                          >
-                            {emp.fullName} - {emp.department} (ID: {emp.employeeNumber})
-                          </button>
-                        </li>
-                      ))}
-                  </ul>
-                )}
               </div>
 
               <div className="relative">
