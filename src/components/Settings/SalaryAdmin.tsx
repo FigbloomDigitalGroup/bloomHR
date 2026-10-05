@@ -1,5 +1,6 @@
 // SalaryAdmin - UI Refresh: white containers, compact inputs & buttons
 import { useState, useEffect } from 'react';
+import { sendSingleSms } from '../../lib/smsApi';
 import { Card, Button, SearchInput } from '../UI';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
@@ -80,20 +81,17 @@ const SMSService = {
         throw new Error('Message cannot be empty');
       }
 
-      const encodedMessage = encodeURIComponent(message.trim());
-      const endpoint = `${CELCOM_AFRICA_CONFIG.baseUrl}/?apikey=${CELCOM_AFRICA_CONFIG.apiKey}&partnerID=${CELCOM_AFRICA_CONFIG.partnerID}&message=${encodedMessage}&shortcode=${shortcode}&mobile=${formattedPhone}`;
-
-      console.log('🚀 Sending SMS via Celcom Africa to:', formattedPhone);
-
-      await fetch(endpoint, {
-        method: 'GET',
-        mode: 'no-cors',
+      // Sent by the backend; the provider key never reaches the browser and the provider's real answer comes back.
+      const result = await sendSingleSms(formattedPhone, message.trim(), {
+        purpose: 'salary-advance',
+        senderId: shortcode || undefined,
       });
-
-      console.log('✅ SMS request sent successfully to:', formattedPhone);
+      if (!result.success) {
+        throw new Error(result.error || 'The SMS provider did not accept the message');
+      }
 
       // Log the SMS to database as sent
-      const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const messageId = result.messageId || `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       await this.logSMS(
         formattedPhone,

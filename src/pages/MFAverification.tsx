@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { sendSingleSms } from '../lib/smsApi';
 import { supabase } from '../lib/supabase';
 import { CELCOM_AFRICA_CONFIG } from '../config/sms';
 import toast from 'react-hot-toast';
@@ -331,20 +332,15 @@ export default function MFAVerification() {
 
       if (storeError) throw storeError;
 
-      // 3. Send SMS via Celcom directly (reverted to original working method)
+      // 3. Send the code through the backend. It only sends to the number registered for this login.
       const message = `Your Figbloom HR verification code is: ${mfaCode}. This code expires in 10 minutes.`;
-      const encodedMessage = encodeURIComponent(message);
-      const url = `${CELCOM_AFRICA_CONFIG.baseUrl}/?apikey=${CELCOM_AFRICA_CONFIG.apiKey}&partnerID=${CELCOM_AFRICA_CONFIG.partnerID}&message=${encodedMessage}&shortcode=${CELCOM_AFRICA_CONFIG.defaultShortcode}&mobile=${formattedPhone}`;
-
-      console.log(`📡 Sending SMS to ${formattedPhone}...`);
-
-      // Use no-cors as before to avoid CORS errors (opaque response)
-      await fetch(url, {
-        method: 'GET',
-        mode: 'no-cors'
+      const sms = await sendSingleSms(formattedPhone, message, {
+        purpose: 'mfa',
+        senderId: CELCOM_AFRICA_CONFIG.defaultShortcode || undefined,
       });
-
-      console.log(`✅ MFA SMS sent request initiated to ${formattedPhone}`);
+      if (!sms.success) {
+        throw new Error(sms.error || 'Could not send the verification code');
+      }
 
       setCountdown(30);
       const countdownInterval = setInterval(() => {
