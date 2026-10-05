@@ -42,6 +42,7 @@ import html2pdf from "html2pdf.js";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import SearchableDropdown from "../UI/SearchableDropdown";
+import { Card, SearchInput } from "../UI";
 import MPesaSpreadsheetFullPage from "./MpesaSpreadSheet";
 import useStatutorySettings from "../../hooks/useStatutorySettings";
 import StatutorySettingsModal from "./statutorySettingsModule";
@@ -2445,7 +2446,6 @@ export default function PayrollDashboard() {
   const [payrollRecords, setPayrollRecords] = useState<any[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [showSummary, setShowSummary] = useState(true);
   const [companyInfo, setCompanyInfo] = useState<any>(null);
 
   const [showSingleMpesaModal, setShowSingleMpesaModal] = useState(false);
@@ -4016,406 +4016,271 @@ export default function PayrollDashboard() {
         </div>
       )}
 
-      <div className="bg-white border border-indigo-100 rounded-[10px] px-4 py-2.5">
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Pay Period */}
-          <DatePicker
-            selected={selectedPeriod ?? null}
-            onChange={(date) => setSelectedPeriod(date)}
-            dateFormat="MMMM yyyy"
-            showMonthYearPicker
-            customInput={
-              <button className="w-40 h-[32px] bg-gray-50/50 border border-gray-300 rounded-md px-2.5 py-1.5 text-gray-900 focus:outline-none focus:border-primary hover:bg-white transition-all duration-200 flex items-center justify-between text-left group">
-                <div className="flex items-center gap-2 truncate flex-1">
-                  <Calendar size={13} className="text-gray-400 group-hover:text-primary transition-colors flex-shrink-0" />
-                  <span className="truncate text-xs text-gray-900 font-medium">
-                    {selectedPeriod ? selectedPeriod.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : "Pay Period"}
-                  </span>
-                </div>
-                <ChevronDown size={14} className="text-gray-400 group-hover:text-primary transition-transform ml-1" />
-              </button>
-            }
-          />
+      {/* ── TOOLBAR (FIG-544): pay period, statutory override, reports, bulk pay ── */}
+      <div className="flex items-center gap-2.5 flex-wrap">
+        <DatePicker
+          selected={selectedPeriod ?? null}
+          onChange={(date) => setSelectedPeriod(date)}
+          dateFormat="MMMM yyyy"
+          showMonthYearPicker
+          customInput={
+            <button
+              type="button"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-tile border border-border bg-white text-xs font-semibold text-ink hover:bg-secondary transition-colors"
+            >
+              Pay Period &middot;{" "}
+              {selectedPeriod
+                ? selectedPeriod.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+                : "Select"}
+              <ChevronDown className="w-3 h-3 text-subtle" strokeWidth={2} />
+            </button>
+          }
+        />
 
-          {/* Branch */}
-          <div className="w-36">
-            <SearchableDropdown
-              options={branches}
-              value={selectedBranch}
-              onChange={setSelectedBranch}
-              placeholder="Select Branch"
-              icon={MapPin}
-            />
-          </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={overrideStatutoryChecks}
+          onClick={toggleStatutoryOverride}
+          className={`flex items-center gap-2 px-3 py-2 rounded-tile text-[11.5px] font-bold border transition-colors ${
+            overrideStatutoryChecks
+              ? "bg-brand text-white border-brand"
+              : "bg-white text-ink border-border hover:bg-secondary"
+          }`}
+        >
+          Statutory Override
+          <span className="text-[10px] font-semibold opacity-80">{overrideStatutoryChecks ? "On" : "Off"}</span>
+        </button>
 
-          {/* Department */}
-          <div className="w-40">
-            <SearchableDropdown
-              options={departments.map((dept) => ({
-                label: dept === "all" ? "All Departments" : dept,
-                value: dept,
-              }))}
-              value={selectedDepartment}
-              onChange={setSelectedDepartment}
-              placeholder="Select Department"
-              icon={Briefcase}
-            />
-          </div>
+        <button
+          type="button"
+          onClick={() => setShowP9Modal(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-tile border border-border bg-white text-[11.5px] font-semibold text-ink hover:bg-secondary transition-colors"
+        >
+          <FileText className="w-3 h-3" strokeWidth={2} />
+          P9
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowP10Modal(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-tile border border-border bg-white text-[11.5px] font-semibold text-ink hover:bg-secondary transition-colors"
+        >
+          <FileText className="w-3 h-3" strokeWidth={2} />
+          P10
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowExportModal(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-tile border border-border bg-white text-[11.5px] font-semibold text-ink hover:bg-secondary transition-colors"
+        >
+          <Download className="w-3 h-3" strokeWidth={2} />
+          Export
+        </button>
 
-          {/* Payment Method */}
-          <div className="w-36">
-            <SearchableDropdown
-              options={paymentMethods.map((method) => ({
-                label: method === "all" ? "All Methods" : method,
-                value: method,
-              }))}
-              value={selectedPaymentMethod}
-              onChange={setSelectedPaymentMethod}
-              placeholder="Select Method"
-              icon={CreditCard}
-            />
-          </div>
+        <div className="flex-1" />
 
-          {/* Make Bulk Pay */}
-          <button
-            onClick={handleBulkMpesaPayment}
-            disabled={finalFilteredRecords.length === 0}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white hover:bg-primary/90 rounded-[25px] text-xs font-medium transition-colors disabled:opacity-50"
-          >
-            <TabletSmartphone className="w-3 h-3" />
-            {userRole === "credit_analyst_officer" ? "M-PESA Bulk Pay" : "Make Bulk Pay"}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleBulkMpesaPayment}
+          disabled={finalFilteredRecords.length === 0}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-tile bg-brand text-white text-xs font-bold hover:bg-brand-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <TabletSmartphone className="w-3.5 h-3.5" />
+          {userRole === "credit_analyst_officer" ? "M-PESA Bulk Pay" : "Make Bulk Pay"}
+        </button>
       </div>
 
-      {/* ── TOOLBAR: Summary + Report actions + Search ──────── */}
-      <div className="bg-white border border-indigo-100 rounded-[10px] px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap">
-        {/* Left side: Show Summary + action buttons */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <button
-            onClick={() => setShowSummary(!showSummary)}
-            className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 text-gray-600 hover:text-violet-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors border border-gray-200"
-          >
-            {showSummary ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            {showSummary ? "Hide Summary" : "Show Summary"}
-          </button>
-
-          {/* Divider */}
-          <div className="w-px h-4 bg-gray-200 mx-1" />
-
-          {/* Statutory Override inline toggle */}
-          <button
-            onClick={toggleStatutoryOverride}
-            className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-[25px] text-xs font-medium transition-colors border ${overrideStatutoryChecks
-              ? "bg-primary/10 text-primary border-primary/20"
-              : "bg-white text-gray-600 border-gray-200 hover:text-violet-700 hover:bg-violet-50"
-              }`}
-          >
-            <span className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${overrideStatutoryChecks ? "bg-primary" : "bg-gray-300"
-              }`}>
-              <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${overrideStatutoryChecks ? "translate-x-3.5" : "translate-x-0.5"
-                }`} />
-            </span>
-            Statutory Override
-          </button>
-
-          {/* Divider */}
-
-          <button
-            onClick={() => setCurrentView("mpesa-spreadsheet")}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-gray-600 hover:text-violet-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors border border-gray-200"
-          >
-            <FileSpreadsheet className="w-3 h-3" />
-            M-PESA Spreadsheet
-          </button>
-          <button
-            onClick={() => setShowP9Modal(true)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-gray-600 hover:text-violet-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors border border-gray-200"
-          >
-            <FileText className="w-3 h-3" />
-            P9
-          </button>
-          <button
-            onClick={() => setShowP10Modal(true)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-gray-600 hover:text-violet-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors border border-gray-200"
-          >
-            <FileSpreadsheet className="w-3 h-3" />
-            P10
-          </button>
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-gray-600 hover:text-violet-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors border border-gray-200"
-          >
-            <Download className="w-3 h-3" />
-            Export
-          </button>
-          <button
-            onClick={() => setShowStatutorySettings(true)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-gray-600 hover:text-violet-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors border border-gray-200"
-          >
-            <Settings className="w-3 h-3" />
-            Statutory
-          </button>
-          <button
-            onClick={handleSaveToHistory}
-            disabled={isSavingHistory || finalFilteredRecords.length === 0}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-violet-50 text-violet-700 hover:bg-violet-100 rounded-[25px] text-xs font-medium transition-colors border border-violet-200 disabled:opacity-50"
-          >
-            {isSavingHistory ? <Loader className="w-3 h-3 animate-spin" /> : <Box className="w-3 h-3" />}
-            Save History
-          </button>
-          <button
-            onClick={() => setShowBulkUploadModal(true)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-gray-600 hover:text-violet-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors border border-gray-200"
-          >
-            <Upload className="w-3 h-3" />
-            Upload History
-          </button>
-          {(userRole === "checker" || userRole === "credit_analyst_officer") && (
-            <button
-              onClick={() => setShowApprovalQueue(true)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white text-gray-600 hover:text-violet-700 hover:bg-violet-50 rounded-[25px] text-xs font-medium transition-colors border border-gray-200"
-            >
-              <Clock className="w-3 h-3" />
-              Approvals ({pendingCount})
-            </button>
-          )}
+      {/* Filters, search and the less-used payroll tools */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="w-36">
+          <SearchableDropdown
+            options={branches}
+            value={selectedBranch}
+            onChange={setSelectedBranch}
+            placeholder="Select Branch"
+            icon={MapPin}
+          />
         </div>
-
-        {/* Right side: search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
-          <input
-            type="text"
+        <div className="w-40">
+          <SearchableDropdown
+            options={departments.map((dept) => ({
+              label: dept === "all" ? "All Departments" : dept,
+              value: dept,
+            }))}
+            value={selectedDepartment}
+            onChange={setSelectedDepartment}
+            placeholder="Select Department"
+            icon={Briefcase}
+          />
+        </div>
+        <div className="w-36">
+          <SearchableDropdown
+            options={paymentMethods.map((method) => ({
+              label: method === "all" ? "All Methods" : method,
+              value: method,
+            }))}
+            value={selectedPaymentMethod}
+            onChange={setSelectedPaymentMethod}
+            placeholder="Select Method"
+            icon={CreditCard}
+          />
+        </div>
+        <div className="w-64">
+          <SearchInput
             placeholder="Search by name or employee ID"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="bg-gray-50 border border-gray-200 rounded-[25px] pl-8 pr-4 py-1.5 text-xs placeholder-gray-400 focus:ring-2 focus:ring-violet-300 focus:outline-none w-64"
+            className="!bg-white !border-border"
           />
         </div>
+
+        <div className="flex-1" />
+
+        <button
+          type="button"
+          onClick={() => setCurrentView("mpesa-spreadsheet")}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-ink transition-colors"
+        >
+          <FileSpreadsheet className="w-3 h-3" />
+          M-PESA Spreadsheet
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowStatutorySettings(true)}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-ink transition-colors"
+        >
+          <Settings className="w-3 h-3" />
+          Statutory Settings
+        </button>
+        <button
+          type="button"
+          onClick={handleSaveToHistory}
+          disabled={isSavingHistory || finalFilteredRecords.length === 0}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-ink transition-colors disabled:opacity-50"
+        >
+          {isSavingHistory ? <Loader className="w-3 h-3 animate-spin" /> : <Box className="w-3 h-3" />}
+          Save History
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowBulkUploadModal(true)}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-ink transition-colors"
+        >
+          <Upload className="w-3 h-3" />
+          Upload History
+        </button>
+        {(userRole === "checker" || userRole === "credit_analyst_officer") && (
+          <button
+            type="button"
+            onClick={() => setShowApprovalQueue(true)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-ink transition-colors"
+          >
+            <Clock className="w-3 h-3" />
+            Approvals ({pendingCount})
+          </button>
+        )}
       </div>
-
-
 
       {/* ── PAYROLL REPORT ──────────────────────────────────── */}
       <div>
-        {/* Stats cards - always visible */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-4">
-          <div className="bg-white p-3 rounded-[10px] border border-gray-200 shadow-sm">
-            <div className="flex items-center gap-1.5 mb-1">
-              <Users className="w-3 h-3 text-gray-400" />
-              <span className="text-[10px] font-medium text-gray-500">Employees</span>
-            </div>
-            <p className="text-lg font-bold text-gray-900">{finalFilteredRecords.length}</p>
-            <p className="text-[10px] text-gray-400">On payroll</p>
-          </div>
-          <div className="bg-white p-3 rounded-[10px] border border-gray-200 shadow-sm">
-            <div className="flex items-center gap-1.5 mb-1">
-              <TrendingUp className="w-3 h-3 text-blue-400" />
-              <span className="text-[10px] font-medium text-gray-500">Gross pay</span>
-            </div>
-            <p className="text-xs font-bold text-blue-700">KSh {totalGrossPay.toLocaleString()}</p>
-            <p className="text-[10px] text-gray-400">Before deductions</p>
-          </div>
-          <div className="bg-white p-3 rounded-[10px] border border-gray-200 shadow-sm">
-            <div className="flex items-center gap-1.5 mb-1">
-              <DollarSign className="w-3 h-3 text-green-400" />
-              <span className="text-[10px] font-medium text-gray-500">Net pay</span>
-            </div>
-            <p className="text-xs font-bold text-green-700">KSh {totalNetPay.toLocaleString()}</p>
-            <p className="text-[10px] text-gray-400">Take-home</p>
-          </div>
-          <div className="bg-white p-3 rounded-[10px] border border-gray-200 shadow-sm">
-            <div className="flex items-center gap-1.5 mb-1">
-              <Calculator className="w-3 h-3 text-red-400" />
-              <span className="text-[10px] font-medium text-gray-500">Deductions</span>
-            </div>
-            <p className="text-xs font-bold text-red-600">KSh {totalDeductions.toLocaleString()}</p>
-            <p className="text-[10px] text-gray-400">Statutory + others</p>
-          </div>
-          <div className="bg-white p-3 rounded-[10px] border border-gray-200 shadow-sm">
-            <div className="flex items-center gap-1.5 mb-1">
-              <FileText className="w-3 h-3 text-orange-400" />
-              <span className="text-[10px] font-medium text-gray-500">PAYE</span>
-            </div>
-            <p className="text-xs font-bold text-orange-600">KSh {totalPAYE.toLocaleString()}</p>
-            <p className="text-[10px] text-gray-400">Income tax</p>
-          </div>
-          <div className="bg-white p-3 rounded-[10px] border border-gray-200 shadow-sm">
-            <div className="flex items-center gap-1.5 mb-1">
-              <TrendingUp className="w-3 h-3 text-purple-400" />
-              <span className="text-[10px] font-medium text-gray-500">SHIF</span>
-            </div>
-            <p className="text-xs font-bold text-purple-600">KSh {totalNHIF.toLocaleString()}</p>
-            <p className="text-[10px] text-gray-400">Health fund</p>
-          </div>
-          <div className="bg-white p-3 rounded-[10px] border border-gray-200 shadow-sm">
-            <div className="flex items-center gap-1.5 mb-1">
-              <Calculator className="w-3 h-3 text-indigo-400" />
-              <span className="text-[10px] font-medium text-gray-500">NSSF</span>
-            </div>
-            <p className="text-xs font-bold text-indigo-600">KSh {totalNSSF.toLocaleString()}</p>
-            <p className="text-[10px] text-gray-400">Social security</p>
-          </div>
-          <div className="bg-white p-3 rounded-[10px] border border-gray-200 shadow-sm">
-            <div className="flex items-center gap-1.5 mb-1">
-              <DollarSign className="w-3 h-3 text-yellow-500" />
-              <span className="text-[10px] font-medium text-gray-500">Housing levy</span>
-            </div>
-            <p className="text-xs font-bold text-yellow-600">KSh {totalHousingLevy.toLocaleString()}</p>
-            <p className="text-[10px] text-gray-400">1.5% of gross</p>
-          </div>
+        {/* Summary tiles: totals are over every filtered record, not just the visible page */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 mb-4">
+          {[
+            { label: "Employees", value: String(finalFilteredRecords.length), color: "text-ink" },
+            { label: "Gross pay", value: `KSh ${totalGrossPay.toLocaleString()}`, color: "text-ink" },
+            { label: "Net pay", value: `KSh ${totalNetPay.toLocaleString()}`, color: "text-brand-dark" },
+            { label: "Deductions", value: `KSh ${totalDeductions.toLocaleString()}`, color: "text-status-danger" },
+            { label: "PAYE", value: `KSh ${totalPAYE.toLocaleString()}`, color: "text-orange-text" },
+            { label: "SHIF", value: `KSh ${totalNHIF.toLocaleString()}`, color: "text-status-purple" },
+            { label: "NSSF", value: `KSh ${totalNSSF.toLocaleString()}`, color: "text-status-info" },
+            { label: "Housing levy", value: `KSh ${totalHousingLevy.toLocaleString()}`, color: "text-orange-text-alt" },
+          ].map((tile) => (
+            <Card key={tile.label} padding="sm" className="!rounded-xl">
+              <div className="text-[9.5px] font-bold uppercase text-subtle">{tile.label}</div>
+              <div className={`text-[14.5px] font-bold mt-0.5 truncate ${tile.color}`}>{tile.value}</div>
+            </Card>
+          ))}
         </div>
 
-
-
-        <div className="bg-[#f3f4f6] rounded-[5px] overflow-hidden">
+        <Card padding="none" className="overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-300 text-xs">
-              <thead className="bg-gray-200 border-b border-gray-300">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
-                    Employee
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
-                    Region
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
-                    Gross pay
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
-                    Per diem
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
-                    PAYE
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
-                    SHIF
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
-                    NSSF
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
-                    AHL
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
-                    Advance
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
-                    Total deductions
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 border-r border-gray-300">
-                    Net pay
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700">
-                    Actions
-                  </th>
+            <table className="min-w-full text-xs">
+              <thead className="bg-[#FAFBFA] border-b border-border">
+                <tr className="text-left text-[10px] font-bold uppercase text-subtle">
+                  <th className="px-4 py-2.5">Employee</th>
+                  <th className="px-4 py-2.5">Gross Pay</th>
+                  <th className="px-4 py-2.5">PAYE</th>
+                  <th className="px-4 py-2.5">Net Pay</th>
+                  <th className="px-4 py-2.5">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-[#f3f4f6] divide-y divide-gray-200">
+              <tbody>
                 {currentItems.map((record, index) => {
                   const isExpanded = expandedRows.has(record.id);
                   const smsStatus = (smsSendingStatus as Record<string, any>)[record.employee_id];
 
                   return (
                     <React.Fragment key={record.id}>
-                      <tr className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3 border-r border-gray-300">
+                      <tr className="border-b border-[#F1F5F2] hover:bg-background transition-colors text-ink">
+                        <td className="px-4 py-3">
                           <div className="flex items-start">
                             <button
+                              type="button"
+                              aria-label={isExpanded ? "Hide breakdown" : "Show breakdown"}
                               onClick={(e) => toggleRowExpand(record.id, e)}
-                              className="mr-2 mt-0.5 text-gray-500 hover:text-gray-700 shrink-0"
+                              className="mr-2 mt-0.5 text-subtle hover:text-ink shrink-0"
                             >
-                              {isExpanded ? (
-                                <ChevronUp className="w-4 h-4" />
-                              ) : (
-                                <ChevronDown className="w-4 h-4" />
-                              )}
+                              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                             </button>
-                            <div className="flex flex-col">
-                              <span className="text-sm font-semibold text-gray-900 leading-tight uppercase">
-                                {record.employee_name}
-                              </span>
-                              <span className="text-xs text-gray-500 font-mono mt-0.5">
-                                {record.employee_id}
-                              </span>
-                              <span className="text-xs text-gray-500 font-mono">
-                                {record.employeeNu}
-                              </span>
-                              <span className="text-xs text-gray-400 mt-1 uppercase">
-                                {record.position} •{" "}
-                                {record.department === "Branch Staff"
-                                  ? record.branch
-                                  : record.department}
-                              </span>
+                            <div>
+                              <div className="font-bold">{record.employee_name}</div>
+                              <div className="text-[10px] text-subtle">
+                                {record.employeeNu || record.employee_id} &middot; {record.position}
+                                {" "}&middot;{" "}
+                                {record.department === "Branch Staff" ? record.branch : record.department}
+                              </div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 truncate max-w-[80px]">
-                          {record.branch}
-                        </td>
-                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 whitespace-nowrap">
-                          KSh {record.gross_pay.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 whitespace-nowrap">
-                          KSh {record.per_diem?.toLocaleString() || "0"}
-                        </td>
-                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 whitespace-nowrap">
-                          KSh {Math.round(record.paye_tax).toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 whitespace-nowrap">
-                          KSh {record.nhif_deduction.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 whitespace-nowrap">
-                          KSh {record.nssf_deduction.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 whitespace-nowrap">
-                          KSh {record.housing_levy.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 whitespace-nowrap">
-                          KSh{" "}
-                          {record.advance_deduction?.toLocaleString() || "0"}
-                        </td>
-                        <td className="px-4 py-3 border-r border-gray-300 text-xs text-gray-700 font-medium whitespace-nowrap">
-                          KSh {record.total_deductions.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3 border-r border-gray-300 text-sm font-bold text-green-700 whitespace-nowrap bg-green-50/30">
+                        <td className="px-4 py-3 whitespace-nowrap">KSh {record.gross_pay.toLocaleString()}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">KSh {Math.round(record.paye_tax).toLocaleString()}</td>
+                        <td className="px-4 py-3 whitespace-nowrap font-bold text-brand-dark">
                           KSh {Math.round(record.net_pay).toLocaleString()}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <button
+                              type="button"
                               onClick={() => handleSingleMpesaPayment(record)}
-                              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-white bg-primary hover:bg-primary/90 rounded-[25px] transition-colors"
+                              className="px-2.5 py-1 rounded-[7px] bg-green-tint text-brand-dark text-[10.5px] font-bold hover:bg-[#d3e6d9] transition-colors"
                             >
-                              <Smartphone className="w-3 h-3" />
-                              {userRole === "credit_analyst_officer"
-                                ? "M-Pesa"
-                                : "pay"}
+                              {userRole === "credit_analyst_officer" ? "M-Pesa" : "Pay"}
                             </button>
                             <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleViewPayslip(record, index);
                               }}
-                              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-blue-700 bg-white hover:bg-blue-100 rounded-[25px] transition-colors border border-gray-200"
+                              className="px-2.5 py-1 rounded-[7px] bg-status-info-tint text-status-info text-[10.5px] font-semibold hover:bg-[#dbe7f1] transition-colors"
                             >
-                              <FileText className="w-3 h-3" />
                               Payslip
                             </button>
                             {record.employeeNu && (
                               <button
+                                type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   sendPayslipNotification(record);
                                 }}
                                 disabled={sendingSMS || smsStatus === "sending"}
-                                className={`inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-[25px] transition-colors ${smsStatus === "success"
-                                  ? "bg-green-50 text-green-700"
-                                  : smsStatus === "failed"
-                                    ? "bg-red-50 text-red-700"
-                                    : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-                                  } disabled:opacity-50`}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[7px] text-[10.5px] font-semibold transition-colors disabled:opacity-50 ${
+                                  smsStatus === "success"
+                                    ? "bg-green-tint text-brand-dark"
+                                    : smsStatus === "failed"
+                                      ? "bg-orange-tint text-status-danger"
+                                      : "bg-secondary text-muted-foreground hover:bg-border"
+                                }`}
                               >
                                 {smsStatus === "sending" ? (
                                   <Loader className="w-3 h-3 animate-spin" />
@@ -4440,10 +4305,10 @@ export default function PayrollDashboard() {
                       </tr>
 
                       {isExpanded && (
-                        <tr className="bg-[#f3f4f6]">
+                        <tr className="bg-background">
                           <td
-                            colSpan={12}
-                            className="px-4 py-4 border-t border-gray-200"
+                            colSpan={5}
+                            className="px-4 py-4 border-t border-border"
                           >
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
                               <div className="space-y-2">
@@ -4568,7 +4433,7 @@ export default function PayrollDashboard() {
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
 
         <Pagination
           currentPage={currentPage}
