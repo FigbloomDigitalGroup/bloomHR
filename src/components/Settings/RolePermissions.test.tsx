@@ -41,8 +41,11 @@ vi.mock('../../lib/supabase', () => {
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
 import RolePermissions from './RolePermissions';
+import { queryClient, queryKeys } from '../../lib/queryClient';
 
+let invalidate: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
+  invalidate = vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined);
   db.upserts = [];
   vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
@@ -76,6 +79,8 @@ describe('RolePermissions', () => {
     fireEvent.click(screen.getByRole('button', { name: /Save Changes/ }));
     await waitFor(() => expect(db.upserts).toHaveLength(1));
     expect(db.upserts[0]).toMatchObject({ role_name: 'HR', permissions: ['dashboard', 'sms'] });
+    // the sidebar's cached permissions are refreshed so the change shows without a reload
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.myPermissions });
     await waitFor(() => expect(screen.queryByText('Unsaved changes')).toBeNull());
   });
 
@@ -94,6 +99,7 @@ describe('RolePermissions', () => {
     fireEvent.click(role('Human Resources'));
     expect(smsSwitch().getAttribute('aria-checked')).toBe('false');
     expect(db.upserts).toHaveLength(0);
+    expect(invalidate).not.toHaveBeenCalled(); // nothing was saved, so nothing to refresh
   });
 
   it('stays on the role when you decline to discard', async () => {
