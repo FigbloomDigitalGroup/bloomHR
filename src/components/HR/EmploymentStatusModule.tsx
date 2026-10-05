@@ -193,12 +193,12 @@ function PremiumDatePicker({ value, onChange, label }: { value: string; onChange
 }
 
 // ── Main Component ────────────────────────────────────────────────────────
-export default function EmploymentStatusModule({ onRefresh }: { onRefresh?: () => void }) {
+export default function EmploymentStatusModule({ onRefresh, initialSearch = '' }: { onRefresh?: () => void; initialSearch?: string }) {
     const [statusList, setStatusList] = useState<(EmploymentStatus & { employee?: Employee })[]>([]);
     const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<EmploymentType | 'all' | 'missing_date' | 'overdue'>('all');
-    const [search, setSearch] = useState('');
+    const [search, setSearch] = useState(initialSearch);
     const [branchFilter, setBranchFilter] = useState('');
     const [regionFilter, setRegionFilter] = useState('');
     const [page, setPage] = useState(1);
