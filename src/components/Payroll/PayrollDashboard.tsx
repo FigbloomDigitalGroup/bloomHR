@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import EmployeePicker from '../UI/EmployeePicker';
 import {
   DollarSign,
   Calculator,
@@ -1406,15 +1407,11 @@ const P9FormGenerator = ({
             <label className="block text-xs font-medium text-gray-700 mb-1">
               Select Employee
             </label>
-            <SearchableDropdown
-              options={records.map((r) => ({
-                label: `${r.employee_name} (${r.employee_id})`,
-                value: r.employee_id,
-              }))}
+            <EmployeePicker
               value={selectedEmployee}
-              onChange={setSelectedEmployee}
+              allowedNumbers={records.map((r) => r.employee_id)}
               placeholder="Select Employee"
-              icon={Users}
+              onChange={(emp) => setSelectedEmployee(emp?.employeeNumber ?? "")}
             />
           </div>
         </div>

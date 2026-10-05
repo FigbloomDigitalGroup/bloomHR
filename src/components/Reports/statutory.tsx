@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import EmployeePicker from '../UI/EmployeePicker';
 import { 
   Filter, 
   Download, 
@@ -1036,13 +1037,6 @@ const StatutoryDeductionsReport: React.FC<BaseReportProps> = ({
     ...towns.map(town => ({ value: town, label: town }))
   ];
 
-  const employeeOptions = [
-    { value: '', label: 'All Employees' },
-    ...filteredEmployees.map(employee => ({
-      value: employee['Employee Number'],
-      label: `${employee['First Name']} ${employee['Last Name']} (${employee['Employee Number']})`
-    }))
-  ];
 
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
@@ -1155,11 +1149,11 @@ const StatutoryDeductionsReport: React.FC<BaseReportProps> = ({
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Employee
                   </label>
-                  <SearchableDropdown
-                    options={employeeOptions}
+                  <EmployeePicker
                     value={filters.employeeNumber}
-                    onChange={(value) => handleFilterChange('employeeNumber', value)}
-                    placeholder="Select Employee"
+                    allowedNumbers={filteredEmployees.map(employee => employee['Employee Number'])}
+                    placeholder="All Employees"
+                    onChange={emp => handleFilterChange('employeeNumber', emp?.employeeNumber ?? '')}
                   />
                 </div>
               </div>
