@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { queryKeys } from '../lib/queryClient';
 
 interface UsePermissionsReturn {
     permissions: string[];
@@ -10,65 +12,71 @@ interface UsePermissionsReturn {
     userRole: string | null;
 }
 
+interface MyPermissions {
+    role: string | null;
+    permissions: string[];
+}
+
+const NOBODY: MyPermissions = { role: null, permissions: [] };
+
+async function loadMyPermissions(): Promise<MyPermissions> {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NOBODY;
+
+    // Get user's role from user_metadata (not from employees table)
+    // Normalize to uppercase to match database role_name
+    const rawRole = user.user_metadata?.role;
+    const role = rawRole ? rawRole.toUpperCase() : null;
+    if (!role) return NOBODY;
+
+    // Get role permissions from database
+    const { data: rolePermData, error: permError } = await supabase
+        .from('role_permissions')
+        .select('permissions')
+        .eq('role_name', role)
+        .single();
+
+    if (permError) {
+        // fail closed: the role is known, but nothing is granted
+        console.error('Error fetching permissions:', permError);
+        return { role, permissions: [] };
+    }
+    return { role, permissions: rolePermData?.permissions || [] };
+}
+
 /**
- * Hook to check user permissions dynamically
+ * Hook to check user permissions dynamically.
+ *
+ * The permissions are held in the shared query cache (key: my-permissions), so every component that asks gets
+ * the same answer from one request, and saving a role on the Role & Permissions page can refresh them
+ * everywhere (see RolePermissions.tsx).
+ *
  * @returns Object with permission checking utilities
  */
 export function usePermissions(): UsePermissionsReturn {
-    const [permissions, setPermissions] = useState<string[]>([]);
-    const [userRole, setUserRole] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
+    const query = useQuery({
+        queryKey: queryKeys.myPermissions,
+        queryFn: loadMyPermissions,
+    });
 
+    // A different person signing in (or out) must never see the previous person's permissions
     useEffect(() => {
-        fetchUserPermissions();
-    }, []);
-
-    const fetchUserPermissions = async () => {
-        try {
-            setLoading(true);
-
-            // Get current user
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) {
-                setPermissions([]);
-                setUserRole(null);
-                setLoading(false);
-                return;
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+            if (event === 'SIGNED_OUT') {
+                // reset (not remove): mounted components must drop the old answer and ask again straight away
+                queryClient.resetQueries({ queryKey: queryKeys.myPermissions });
+            } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+                queryClient.invalidateQueries({ queryKey: queryKeys.myPermissions });
             }
+        });
+        return () => subscription.unsubscribe();
+    }, [queryClient]);
 
-            // Get user's role from user_metadata (not from employees table)
-            // Normalize to uppercase to match database role_name
-            const rawRole = user.user_metadata?.role;
-            const role = rawRole ? rawRole.toUpperCase() : null;
-            setUserRole(role);
-
-            if (!role) {
-                setPermissions([]);
-                setLoading(false);
-                return;
-            }
-
-            // Get role permissions from database
-            const { data: rolePermData, error: permError } = await supabase
-                .from('role_permissions')
-                .select('permissions')
-                .eq('role_name', role)
-                .single();
-
-            if (permError) {
-                console.error('Error fetching permissions:', permError);
-                setPermissions([]);
-            } else {
-                setPermissions(rolePermData?.permissions || []);
-            }
-        } catch (error) {
-            console.error('Error in fetchUserPermissions:', error);
-            setPermissions([]);
-            setUserRole(null);
-        } finally {
-            setLoading(false);
-        }
-    };
+    // an error reading the user is treated like nobody being signed in (fail closed)
+    const { role: userRole, permissions } = query.data ?? NOBODY;
+    const loading = query.isLoading;
 
     const hasPermission = (permission: string): boolean => {
         if (userRole === 'ADMIN') return true;
