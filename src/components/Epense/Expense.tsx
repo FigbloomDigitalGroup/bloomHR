@@ -1,8 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   Plus,
-  Search,
-  Calendar,
   Receipt,
   MapPin,
   CheckCircle,
@@ -13,7 +11,6 @@ import {
   Grid3X3,
   List,
   Building,
-  Users,
   Loader,
   Check,
   Ban,
@@ -21,6 +18,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
+import { PageHeader, Card, Button, StatusPill, EmptyState, SearchInput } from '../UI';
+import type { StatusTone } from '../UI';
 import { TownProps } from '../../types/supabase';
 
 interface Expense {
@@ -919,14 +918,16 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-KE', {
-      style: 'currency',
-      currency: 'KES',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
+  const statusTone = (status: string): StatusTone => {
+    switch (status) {
+      case 'approved': return 'success';
+      case 'rejected': return 'danger';
+      case 'recommended': return 'info';
+      default: return 'warning';
+    }
   };
+
+  const formatCurrency = (amount: number) => `Ksh ${Math.round(amount).toLocaleString('en-KE')}`;
 
   // Enhanced display name function with better coverage info
   const getDisplayName = () => {
@@ -959,444 +960,281 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Enhanced Header with Better Coverage Display */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold text-gray-900">Expense Management</h1>
-              <p className="text-xs text-gray-600 mt-1 flex items-center">
-                Track expenses across branches, departments, rent, and petty cash
-                <span className="flex items-center ml-4 text-indigo-600 font-medium">
-                  <MapPin className="w-4 h-4 mr-1" />
-                  {getDisplayName()}
-                </span>
-                
-              </p>
-              
-              {/* Enhanced Debug info with branch coverage */}
-              <div className="text-xs text-gray-400 mt-2 space-y-1">
-                
-                
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={() => setShowAddForm(true)}
-                className="flex items-center space-x-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg transition-colors text-xs font-medium"
-              >
-                <Plus className="w-4 h-4" />
-                <span>New Expense</span>
-              </button>
-            </div>
-          </div>
+    <div>
+      <PageHeader
+        title="Expense Management"
+        subtitle={
+          <>
+            Track expenses across branches, departments, rent, and petty cash
+            <span className="flex items-center ml-3 text-brand font-semibold">
+              <MapPin className="w-3.5 h-3.5 mr-1" />
+              {getDisplayName()}
+            </span>
+          </>
+        }
+        actions={
+          <Button onClick={() => setShowAddForm(true)} icon={<Plus className="w-3.5 h-3.5" strokeWidth={2.2} />}>
+            New Expense
+          </Button>
+        }
+      />
+
+      {/* Summary tiles: all derived from the town-filtered expenses */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
+        {[
+          { label: 'Total', value: summaryStats.total, sub: `${summaryStats.count} expenses`, color: 'text-ink' },
+          { label: 'Pending', value: summaryStats.pending, sub: `${summaryStats.pendingCount} items`, color: 'text-orange' },
+          { label: 'Recommended', value: summaryStats.recommended, sub: `${summaryStats.recommendedCount} items`, color: 'text-status-info' },
+          { label: 'Travel', value: summaryStats.employee, sub: null, color: 'text-ink' },
+          { label: 'Rent & Utilities', value: summaryStats.rent, sub: null, color: 'text-ink' },
+          { label: 'Petty Cash', value: summaryStats.pettyCash, sub: null, color: 'text-ink' },
+        ].map((tile) => (
+          <Card key={tile.label} padding="sm" className="!p-4">
+            <div className="text-[11px] font-semibold text-muted-foreground">{tile.label}</div>
+            <div className={`text-xl font-bold ${tile.color}`}>{formatCurrency(tile.value)}</div>
+            {tile.sub && <div className="text-[10.5px] text-subtle">{tile.sub}</div>}
+          </Card>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex-1 min-w-[220px]">
+          <SearchInput
+            placeholder="Search expenses, employees..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="!bg-white !border-border"
+          />
+        </div>
+
+        {[
+          {
+            label: 'Filter by status', value: statusFilter, set: setStatusFilter,
+            options: [['all', 'All Status'], ['pending', 'Pending'], ['approved', 'Approved'], ['recommended', 'Recommended'], ['rejected', 'Rejected']],
+          },
+          {
+            label: 'Filter by type', value: expenseTypeFilter, set: setExpenseTypeFilter,
+            options: [['all', 'All Types'], ...EXPENSE_TYPES.map(t => [t.id, t.name])],
+          },
+          {
+            label: 'Filter by branch', value: branchFilter, set: setBranchFilter,
+            options: [['all', 'All Branches'], ...branches.map(b => [b, b])],
+          },
+          {
+            label: 'Filter by department', value: departmentFilter, set: setDepartmentFilter,
+            options: [['all', 'All Departments'], ...departments.map(d => [d, d])],
+          },
+          {
+            label: 'Filter by category', value: categoryFilter, set: setCategoryFilter,
+            options: [['all', 'All Categories'], ...EXPENSE_CATEGORIES.map(c => [c.id, c.name])],
+          },
+        ].map((f) => (
+          <select
+            key={f.label}
+            aria-label={f.label}
+            value={f.value}
+            onChange={(e) => f.set(e.target.value)}
+            className="rounded-tile border border-border bg-white px-3 py-2 text-xs font-semibold text-ink outline-none focus:border-brand cursor-pointer"
+          >
+            {f.options.map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        ))}
+
+        <div className="flex items-center bg-secondary rounded-tile p-1">
+          <button
+            type="button"
+            aria-label="List view"
+            aria-pressed={viewMode === 'list'}
+            onClick={() => setViewMode('list')}
+            className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white text-ink shadow-sm' : 'text-subtle hover:text-ink'}`}
+          >
+            <List className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            aria-label="Grid view"
+            aria-pressed={viewMode === 'grid'}
+            onClick={() => setViewMode('grid')}
+            className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white text-ink shadow-sm' : 'text-subtle hover:text-ink'}`}
+          >
+            <Grid3X3 className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
-      <div className="px-8 py-8 space-y-8">
-        {/* Enhanced Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-600">Total</p>
-                <p className="text-2xl font-semibold text-gray-900 mt-1">{formatCurrency(summaryStats.total)}</p>
-                <p className="text-xs text-gray-500 mt-1">{summaryStats.count} expenses</p>
-              </div>
-              <div className="w-2 h-2 bg-gray-900 rounded-full"></div>
-            </div>
-          </div>
+      <div className="text-xs text-muted-foreground mb-3">
+        <span className="font-bold text-ink">{filteredExpenses.length} expenses</span> in {getDisplayName()}
+      </div>
 
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-600">Rent & Utilities</p>
-                <p className="text-2xl font-semibold text-gray-900 mt-1">{formatCurrency(summaryStats.rent)}</p>
-              </div>
-              <div className="w-2 h-2 bg-cyan-500 rounded-full"></div>
-            </div>
-          </div>
+      {filteredExpenses.length === 0 ? (
+        <Card>
+          <EmptyState
+            className="py-10"
+            icon={<Receipt size={20} />}
+            title="No expenses found"
+            description={`No expenses found for ${getDisplayName()}. Try adjusting your search or filter criteria.`}
+          />
+        </Card>
+      ) : (
+        <div className={viewMode === 'grid' ? 'grid grid-cols-1 lg:grid-cols-2 gap-3' : 'flex flex-col gap-2.5'}>
+          {filteredExpenses.map((expense) => {
+            const categoryInfo = getCategoryInfo(expense.category);
 
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-600">Petty Cash</p>
-                <p className="text-2xl font-semibold text-gray-900 mt-1">{formatCurrency(summaryStats.pettyCash)}</p>
-              </div>
-              <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-600">Travel</p>
-                <p className="text-2xl font-semibold text-gray-900 mt-1">{formatCurrency(summaryStats.employee)}</p>
-              </div>
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-600">Pending</p>
-                <p className="text-2xl font-semibold text-gray-900 mt-1">{formatCurrency(summaryStats.pending)}</p>
-                <p className="text-xs text-gray-500 mt-1">{summaryStats.pendingCount} items</p>
-              </div>
-              <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-gray-600">Recommended</p>
-                <p className="text-2xl font-semibold text-gray-900 mt-1">{formatCurrency(summaryStats.recommended)}</p>
-                <p className="text-xs text-gray-500 mt-1">{summaryStats.recommendedCount} items</p>
-              </div>
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-            </div>
-          </div>
-        </div>
-
-        {/* Enhanced Filters */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex flex-col space-y-4">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-              <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Search expenses, employees..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 pr-4 py-2 w-full sm:w-80 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent text-xs"
-                  />
-                </div>
-
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent text-xs"
-                >
-                  <option value="all">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="recommended">Recommended</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-
-                <select
-                  value={expenseTypeFilter}
-                  onChange={(e) => setExpenseTypeFilter(e.target.value)}
-                  className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent text-xs"
-                >
-                  <option value="all">All Types</option>
-                  {EXPENSE_TYPES.map(type => (
-                    <option key={type.id} value={type.id}>{type.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center bg-gray-100 rounded-lg p-1">
-                  <button
-                    onClick={() => setViewMode('list')}
-                    className={`p-1.5 rounded-md transition-colors text-xs ${
-                      viewMode === 'list' 
-                        ? 'bg-white shadow-sm text-gray-900' 
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <List className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode('grid')}
-                    className={`p-1.5 rounded-md transition-colors text-xs ${
-                      viewMode === 'grid' 
-                        ? 'bg-white shadow-sm text-gray-900' 
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <Grid3X3 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Secondary Filters */}
-            <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
-              <select
-                value={branchFilter}
-                onChange={(e) => setBranchFilter(e.target.value)}
-                className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent text-xs"
-              >
-                <option value="all">All Branches</option>
-                {branches.map(branch => (
-                  <option key={branch} value={branch}>{branch}</option>
-                ))}
-              </select>
-
-              <select
-                value={departmentFilter}
-                onChange={(e) => setDepartmentFilter(e.target.value)}
-                className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent text-xs"
-              >
-                <option value="all">All Departments</option>
-                {departments.map(department => (
-                  <option key={department} value={department}>{department}</option>
-                ))}
-              </select>
-
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent text-xs"
-              >
-                <option value="all">All Categories</option>
-                {EXPENSE_CATEGORIES.map(category => (
-                  <option key={category.id} value={category.id}>{category.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Enhanced Expense List */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium text-gray-900">
-              {filteredExpenses.length} expenses
-              <span className="text-xs font-normal text-gray-500 ml-2">
-                in {getDisplayName()}
-              </span>
-            </h2>
-          </div>
-
-          {filteredExpenses.length === 0 ? (
-            <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-              <Receipt className="w-8 h-8 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No expenses found</h3>
-              <p className="text-gray-600 mb-4">
-                No expenses found for {getDisplayName()}. Try adjusting your search or filter criteria.
-              </p>
-            </div>
-          ) : (
-            <div className={viewMode === 'grid' 
-              ? "grid grid-cols-1 lg:grid-cols-2 gap-4" 
-              : "space-y-3"
-            }>
-              {filteredExpenses.map((expense) => {
-                const categoryInfo = getCategoryInfo(expense.category);
-                
-                return (
-                  <div
-                    key={expense.id}
-                    className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
-                  >
-                    <div className="p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-start space-x-4 flex-1 min-w-0">
-                          <div className={`w-2 h-2 ${categoryInfo.color} rounded-full mt-2 flex-shrink-0`}></div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center space-x-3 mb-2">
-                              <h3 className="text-base font-medium text-gray-900 truncate">
-                                {expense.title}
-                              </h3>
-                              <span className={`px-2 py-1 rounded-md text-xs font-medium ${getStatusColor(expense.status)}`}>
-                                {expense.status}
-                              </span>
-                              {expense.status === 'approved' && !expense.receiptUploaded && (
-                                <span className="px-2 py-1 rounded-md text-xs font-medium text-orange-600 bg-orange-50">
-                                  Receipt Pending
-                                </span>
-                              )}
-                              {expense.recommendationReason && (
-                                <span className="px-2 py-1 rounded-md text-xs font-medium text-blue-600 bg-blue-50">
-                                  Has Recommendation
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-gray-600 line-clamp-2 mb-3">
-                              {expense.description}
-                            </p>
-                            {/* Enhanced Details */}
-                            <div className="flex items-center space-x-4 text-xs text-gray-500">
-                              <div className="flex items-center space-x-1">
-                                <Building className="w-3 h-3" />
-                                <span>{expense.branch}</span>
-                              </div>
-                              <div className="flex items-center space-x-1">
-                                <Users className="w-3 h-3" />
-                                <span>{expense.department}</span>
-                              </div>
-                              <div className="flex items-center space-x-1">
-                                <span className="text-gray-400">Type:</span>
-                                <span>{getExpenseTypeName(expense.expenseType)}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="text-right ml-4">
-                          <div className="text-lg font-semibold text-gray-900">
-                            {formatCurrency(expense.amount)}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {categoryInfo.name}
-                          </div>
-                        </div>
+            return (
+              <Card key={expense.id} padding="none" className="!rounded-xl px-4 py-3.5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <span className={`w-2 h-2 mt-1.5 rounded-full shrink-0 ${categoryInfo.color}`} aria-hidden="true" />
+                    <div className="min-w-0">
+                      <div className="flex items-center flex-wrap gap-1.5">
+                        <h3 className="m-0 text-[13px] font-bold text-ink truncate">{expense.title}</h3>
+                        <StatusPill label={expense.status} tone={statusTone(expense.status)} className="capitalize" />
+                        {expense.status === 'approved' && !expense.receiptUploaded && (
+                          <StatusPill label="Receipt Pending" tone="warning" />
+                        )}
+                        {expense.recommendationReason && (
+                          <StatusPill label="Has Recommendation" tone="info" />
+                        )}
                       </div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                        {expense.submittedBy}
+                        {expense.employeeId ? ` (${expense.employeeId})` : ''} &middot; {expense.branch} &middot; {new Date(expense.date).toLocaleDateString('en-GB')}
+                      </div>
+                      {expense.description && (
+                        <p className="m-0 text-xs text-muted-foreground line-clamp-2 mt-1.5">{expense.description}</p>
+                      )}
+                      <div className="flex items-center flex-wrap gap-x-4 gap-y-1 text-[11px] text-subtle mt-1.5">
+                        <span className="flex items-center gap-1"><Building className="w-3 h-3" />{expense.department}</span>
+                        <span>{getExpenseTypeName(expense.expenseType)}</span>
+                        <span>{categoryInfo.name}</span>
+                      </div>
+                    </div>
+                  </div>
 
-                      <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                        <div className="flex items-center space-x-6 text-xs text-gray-600">
-                          <div className="flex items-center space-x-2">
-                            <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium text-gray-700">
-                              {expense.avatar}
-                            </div>
-                            <div className="flex flex-col">
-                              <span>{expense.submittedBy}</span>
-                              <div className="flex space-x-2 text-gray-400">
-                                {expense.employeeId && <span>ID: {expense.employeeId}</span>}
-                                {expense.employeeFullName && <span>({expense.employeeFullName})</span>}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <Calendar className="w-3 h-3" />
-                            <span>{new Date(expense.date).toLocaleDateString('en-GB')}</span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <MapPin className="w-3 h-3" />
-                            <span>{expense.branch}</span>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          {canTakeAction(expense) && (
-                            <div className="flex items-center space-x-2">
-                              <RoleButtonWrapper allowedRoles={['ADMIN','OPERATIONS']}>
-                              <button
-                                onClick={() => {
-                                  setApprovalExpense(expense);
-                                  setApprovalAction('approve');
-                                  setShowApprovalModal(true);
-                                }}
-                                className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 transition-colors text-xs font-medium"
-                              >
-                                <Check className="w-3 h-3" />
-                                <span>Approve</span>
-                              </button>
-                              </RoleButtonWrapper>
-                               <RoleButtonWrapper allowedRoles={['ADMIN','OPERATIONS']}>
-                              <button
-                                onClick={() => {
-                                  setApprovalExpense(expense);
-                                  setApprovalAction('recommend');
-                                  setShowApprovalModal(true);
-                                }}
-                                className="flex items-center space-x-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-xs font-medium"
-                              >
-                                <ThumbsUp className="w-3 h-3" />
-                                <span>Recommend</span>
-                              </button>
-                              </RoleButtonWrapper>
-                               <RoleButtonWrapper allowedRoles={['ADMIN','OPERATIONS']}>
-                              <button
-                                onClick={() => {
-                                  setApprovalExpense(expense);
-                                  setApprovalAction('reject');
-                                  setShowApprovalModal(true);
-                                }}
-                                className="flex items-center space-x-1 px-3 py-1.5 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors text-xs font-medium"
-                              >
-                                <Ban className="w-3 h-3" />
-                                <span>Reject</span>
-                              </button>
-                              </RoleButtonWrapper>
-                            </div>
-                          )}
-                          
-                          {expense.status === 'approved' && !expense.receiptUploaded && (
-                            <button
-                              onClick={() => {
-                                setReceiptUploadExpense(expense);
-                                setShowReceiptUpload(true);
-                              }}
-                              className="flex items-center space-x-1 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-xs font-medium"
-                            >
-                              <Upload className="w-3 h-3" />
-                              <span>Upload Receipt</span>
-                            </button>
-                          )}
-                          
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="text-sm font-bold text-ink">{formatCurrency(expense.amount)}</div>
+                    {canTakeAction(expense) && (
+                      <div className="flex items-center gap-1.5">
+                        <RoleButtonWrapper allowedRoles={['ADMIN', 'OPERATIONS']}>
                           <button
-                            onClick={() => setSelectedExpense(expense)}
-                            className="text-xs font-medium text-gray-900 hover:text-gray-700 transition-colors"
+                            type="button"
+                            aria-label={`Approve ${expense.title}`}
+                            title="Approve"
+                            onClick={() => {
+                              setApprovalExpense(expense);
+                              setApprovalAction('approve');
+                              setShowApprovalModal(true);
+                            }}
+                            className="w-[26px] h-[26px] rounded-lg bg-green-tint text-brand-dark flex items-center justify-center hover:bg-[#d3e6d9] transition-colors"
                           >
-                            View Details
+                            <Check className="w-[13px] h-[13px]" strokeWidth={2} />
                           </button>
-                        </div>
+                        </RoleButtonWrapper>
+                        <RoleButtonWrapper allowedRoles={['ADMIN', 'OPERATIONS']}>
+                          <button
+                            type="button"
+                            aria-label={`Recommend ${expense.title}`}
+                            title="Recommend"
+                            onClick={() => {
+                              setApprovalExpense(expense);
+                              setApprovalAction('recommend');
+                              setShowApprovalModal(true);
+                            }}
+                            className="w-[26px] h-[26px] rounded-lg bg-status-info-tint text-status-info flex items-center justify-center hover:bg-[#dbe7f1] transition-colors"
+                          >
+                            <ThumbsUp className="w-[13px] h-[13px]" strokeWidth={2} />
+                          </button>
+                        </RoleButtonWrapper>
+                        <RoleButtonWrapper allowedRoles={['ADMIN', 'OPERATIONS']}>
+                          <button
+                            type="button"
+                            aria-label={`Reject ${expense.title}`}
+                            title="Reject"
+                            onClick={() => {
+                              setApprovalExpense(expense);
+                              setApprovalAction('reject');
+                              setShowApprovalModal(true);
+                            }}
+                            className="w-[26px] h-[26px] rounded-lg bg-orange-tint-alt text-status-danger flex items-center justify-center hover:bg-[#fbdcc5] transition-colors"
+                          >
+                            <Ban className="w-[13px] h-[13px]" strokeWidth={2} />
+                          </button>
+                        </RoleButtonWrapper>
                       </div>
+                    )}
+                  </div>
+                </div>
 
-                      {expense.status === 'rejected' && expense.rejectionReason && (
-                        <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-lg">
-                          <div className="flex items-start space-x-2">
-                            <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                            <div>
-                              <p className="text-xs font-medium text-red-800 mb-1">Rejection Reason</p>
-                              <p className="text-xs text-red-700">{expense.rejectionReason}</p>
-                            </div>
-                          </div>
-                        </div>
+                <div className="flex items-center justify-end gap-3 mt-2.5 text-xs">
+                  {expense.status === 'approved' && !expense.receiptUploaded && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReceiptUploadExpense(expense);
+                        setShowReceiptUpload(true);
+                      }}
+                      className="flex items-center gap-1 font-semibold text-status-info hover:underline"
+                    >
+                      <Upload className="w-3 h-3" />
+                      Upload Receipt
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedExpense(expense)}
+                    className="font-semibold text-brand hover:underline"
+                  >
+                    View Details
+                  </button>
+                </div>
+
+                {expense.status === 'rejected' && expense.rejectionReason && (
+                  <div className="mt-3 p-3 bg-orange-tint border border-[#F6DCC7] rounded-lg flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-status-danger flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="m-0 text-xs font-bold text-status-danger mb-0.5">Rejection Reason</p>
+                      <p className="m-0 text-xs text-orange-text">{expense.rejectionReason}</p>
+                    </div>
+                  </div>
+                )}
+
+                {expense.recommendationReason && (
+                  <div className="mt-3 p-3 bg-status-info-tint border border-border rounded-lg flex items-start gap-2">
+                    <ThumbsUp className="w-4 h-4 text-status-info flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="m-0 text-xs font-bold text-status-info mb-0.5">Recommendation</p>
+                      <p className="m-0 text-xs text-ink">{expense.recommendationReason}</p>
+                      {expense.recommendedBy && expense.recommendedDate && (
+                        <p className="m-0 text-[11px] text-muted-foreground mt-1">
+                          Recommended on {new Date(expense.recommendedDate).toLocaleDateString('en-GB')}
+                        </p>
                       )}
-
-                      {expense.recommendationReason && (
-                        <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
-                          <div className="flex items-start space-x-2">
-                            <ThumbsUp className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                            <div>
-                              <p className="text-xs font-medium text-blue-800 mb-1">Recommendation</p>
-                              <p className="text-xs text-blue-700 mb-2">{expense.recommendationReason}</p>
-                              {expense.recommendedBy && expense.recommendedDate && (
-                                <p className="text-xs text-blue-600">
-                                  Recommended on{' '}
-                                  {new Date(expense.recommendedDate).toLocaleDateString('en-GB')}
-                                </p>
-                              )}
-                              {canTakeAction(expense) && (
-                                <p className="text-xs text-blue-600 mt-1 font-medium">
-                                  This expense can still be approved or rejected
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {expense.status === 'approved' && expense.approvedBy && (
-                        <div className="mt-4 p-3 bg-emerald-50 border border-emerald-100 rounded-lg">
-                          <div className="flex items-center space-x-2 text-xs text-emerald-800">
-                            <CheckCircle className="w-4 h-4" />
-                            <span>
-                              Approved by <strong>{expense.approvedBy}</strong> on{' '}
-                              {expense.approvedDate && new Date(expense.approvedDate).toLocaleDateString('en-GB')}
-                            </span>
-                          </div>
-                        </div>
+                      {canTakeAction(expense) && (
+                        <p className="m-0 text-[11px] text-status-info mt-1 font-semibold">
+                          This expense can still be approved or rejected
+                        </p>
                       )}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                )}
+
+                {expense.status === 'approved' && expense.approvedBy && (
+                  <div className="mt-3 p-3 bg-green-tint rounded-lg flex items-center gap-2 text-xs text-brand-dark">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>
+                      Approved by <strong>{expense.approvedBy}</strong> on{' '}
+                      {expense.approvedDate && new Date(expense.approvedDate).toLocaleDateString('en-GB')}
+                    </span>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
         </div>
-      </div>
+      )}
       
       {showAddForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
