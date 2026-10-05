@@ -8,6 +8,8 @@ const staff = [
   toDirectoryEmployee({ 'Employee Number': '012', 'First Name': 'Michael', 'Last Name': 'Mwangi', 'Job Title': 'HR Manager', Town: 'Nakuru' }),
 ];
 
+vi.mock('../../lib/supabase', () => ({ supabase: {} }));
+
 vi.mock('../../hooks/useEmployeeDirectory', () => ({
   useEmployeeDirectory: () => ({ employees: staff, loading: false, error: null }),
 }));

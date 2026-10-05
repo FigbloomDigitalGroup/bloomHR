@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// the pure helpers under test never touch the database; keep the real client (which needs env keys) out
+vi.mock('./supabase', () => ({ supabase: {} }));
+
 import { employeeDetail, employeeLabel, matchEmployees, toDirectoryEmployee } from './employeeDirectory';
 
 const emp = (no: string, first: string, last: string, extra: Record<string, string> = {}) =>
