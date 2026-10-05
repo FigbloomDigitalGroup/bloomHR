@@ -1,19 +1,19 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect, useMemo } from 'react';
 import {
     AlertTriangle,
-    Search,
     Eye,
     CheckCircle2,
     XCircle,
-    Clock,
     Shield,
     User,
     Calendar,
-    MapPin
+    MapPin,
+    ChevronDown
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
+import { Card, Button, SearchInput, StatusPill, EmptyState } from '../UI';
+import type { StatusTone } from '../UI';
 
 interface IncidentReport {
     id: string;
@@ -61,15 +61,35 @@ const STATUS_OPTIONS = [
 
 const SEVERITY_LEVELS = [
     { value: 'all', label: 'All Severity' },
-    { value: 'low', label: 'Low', color: 'bg-blue-100 text-blue-800 border-blue-300' },
-    { value: 'medium', label: 'Medium', color: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-    { value: 'high', label: 'High', color: 'bg-orange-100 text-orange-800 border-orange-300' },
-    { value: 'critical', label: 'Critical', color: 'bg-red-100 text-red-800 border-red-300' }
+    { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' },
+    { value: 'critical', label: 'Critical' }
 ];
+
+const SEVERITY_TONE: Record<string, StatusTone> = {
+    low: 'info',
+    medium: 'neutral',
+    high: 'warning',
+    critical: 'danger'
+};
+
+const STATUS_TONE: Record<string, StatusTone> = {
+    new: 'info',
+    under_review: 'purple',
+    investigating: 'warning',
+    resolved: 'success',
+    closed: 'neutral',
+    dismissed: 'danger'
+};
+
+const humanize = (value: string) => value.replace(/_/g, ' ');
+
+const fieldClass =
+    'w-full px-3 py-2 border border-border rounded-tile text-xs text-ink bg-white outline-none focus:border-brand transition-colors';
 
 const IncidentReportsManagement = () => {
     const [reports, setReports] = useState<IncidentReport[]>([]);
-    const [filteredReports, setFilteredReports] = useState<IncidentReport[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
@@ -84,10 +104,6 @@ const IncidentReportsManagement = () => {
         fetchReports();
     }, []);
 
-    useEffect(() => {
-        filterReports();
-    }, [reports, searchTerm, statusFilter, typeFilter, severityFilter]);
-
     const fetchReports = async () => {
         try {
             setIsLoading(true);
@@ -99,31 +115,35 @@ const IncidentReportsManagement = () => {
 
             if (error) throw error;
 
-            // Fetch reporter names for non-anonymous reports
-            const reportsWithNames = await Promise.all(
-                (reportsData || []).map(async (report) => {
-                    if (!report.is_anonymous && report.employee_number) {
-                        const { data: employeeData } = await supabase
-                            .from('employees')
-                            .select('"First Name", "Last Name"')
-                            .eq('"Employee Number"', report.employee_number)
-                            .single();
+            // One lookup for every named reporter (anonymous reports carry no employee number).
+            // employee_directory exposes names only, and works for every role that can open this page.
+            const numbers = [
+                ...new Set(
+                    (reportsData || [])
+                        .filter((r) => !r.is_anonymous && r.employee_number)
+                        .map((r) => r.employee_number as string)
+                )
+            ];
+            const names = new Map<string, string>();
+            if (numbers.length > 0) {
+                const { data: people } = await supabase
+                    .from('employee_directory')
+                    .select('"Employee Number", "First Name", "Last Name"')
+                    .in('"Employee Number"', numbers);
+                (people || []).forEach((p: any) => {
+                    names.set(p['Employee Number'], `${p['First Name'] || ''} ${p['Last Name'] || ''}`.trim());
+                });
+            }
 
-                        return {
-                            ...report,
-                            reporter_name: employeeData
-                                ? `${employeeData['First Name']} ${employeeData['Last Name']}`
-                                : 'Unknown'
-                        };
-                    }
-                    return {
-                        ...report,
-                        reporter_name: 'Anonymous Reporter'
-                    };
-                })
+            setReports(
+                (reportsData || []).map((report) => ({
+                    ...report,
+                    reporter_name:
+                        !report.is_anonymous && report.employee_number
+                            ? names.get(report.employee_number) || 'Unknown'
+                            : 'Anonymous Reporter'
+                }))
             );
-
-            setReports(reportsWithNames);
         } catch (error) {
             console.error('Error fetching reports:', error);
             toast.error('Failed to load incident reports');
@@ -132,34 +152,29 @@ const IncidentReportsManagement = () => {
         }
     };
 
-    const filterReports = () => {
-        let filtered = reports;
-
-        // Filter by status
-        if (statusFilter !== 'all') {
-            filtered = filtered.filter(r => r.status === statusFilter);
-        }
-
-        // Filter by type
-        if (typeFilter !== 'all') {
-            filtered = filtered.filter(r => r.incident_type === typeFilter);
-        }
-
-        // Filter by severity
-        if (severityFilter !== 'all') {
-            filtered = filtered.filter(r => r.severity === severityFilter);
-        }
-
-        // Filter by search term
-        if (searchTerm) {
-            filtered = filtered.filter(r =>
-                r.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                r.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                r.reporter_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredReports = useMemo(() => {
+        const q = searchTerm.toLowerCase();
+        return reports.filter((r) => {
+            if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+            if (typeFilter !== 'all' && r.incident_type !== typeFilter) return false;
+            if (severityFilter !== 'all' && r.severity !== severityFilter) return false;
+            if (!q) return true;
+            return (
+                r.title.toLowerCase().includes(q) ||
+                r.description.toLowerCase().includes(q) ||
+                !!r.reporter_name?.toLowerCase().includes(q)
             );
-        }
+        });
+    }, [reports, searchTerm, statusFilter, typeFilter, severityFilter]);
 
-        setFilteredReports(filtered);
+    // Header badges count every report, not just the filtered ones
+    const highPriorityCount = reports.filter((r) => r.severity === 'critical' || r.severity === 'high').length;
+    const newCount = reports.filter((r) => r.status === 'new').length;
+
+    const closeDetails = () => {
+        setSelectedReport(null);
+        setAdminNotes('');
+        setResolution('');
     };
 
     const updateReportStatus = async (reportId: string, newStatus: string) => {
@@ -207,9 +222,7 @@ const IncidentReportsManagement = () => {
             }
 
             toast.success('Report status updated successfully');
-            setSelectedReport(null);
-            setAdminNotes('');
-            setResolution('');
+            closeDetails();
             await fetchReports();
         } catch (error) {
             console.error('Error updating report:', error);
@@ -243,278 +256,239 @@ const IncidentReportsManagement = () => {
         }
     };
 
-    const getSeverityBadge = (severity: string) => {
-        const level = SEVERITY_LEVELS.find(s => s.value === severity);
-        return (
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${level?.color || 'bg-gray-100 text-gray-800'}`}>
-                {severity.toUpperCase()}
-            </span>
-        );
-    };
+    const severityPill = (severity: string) => (
+        <StatusPill label={severity.toUpperCase()} tone={SEVERITY_TONE[severity] || 'neutral'} />
+    );
 
-    const getStatusBadge = (status: string) => {
-        const styles = {
-            new: 'bg-blue-100 text-blue-800 border-blue-300',
-            under_review: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-            investigating: 'bg-orange-100 text-orange-800 border-orange-300',
-            resolved: 'bg-green-100 text-green-800 border-green-300',
-            closed: 'bg-gray-100 text-gray-800 border-gray-300',
-            dismissed: 'bg-red-100 text-red-800 border-red-300'
-        };
+    const statusPill = (status: string) => (
+        <StatusPill label={humanize(status).toUpperCase()} tone={STATUS_TONE[status] || 'neutral'} />
+    );
 
-        return (
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${styles[status as keyof typeof styles]}`}>
-                {status.replace('_', ' ').toUpperCase()}
-            </span>
-        );
-    };
+    const select = (
+        label: string,
+        value: string,
+        onChange: (v: string) => void,
+        options: { value: string; label: string }[]
+    ) => (
+        <label className="relative inline-block">
+            <select
+                aria-label={label}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                className="appearance-none rounded-tile border border-border bg-white pl-3.5 pr-8 py-2.5 text-xs font-semibold text-ink outline-none focus:border-brand cursor-pointer"
+            >
+                {options.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-subtle" strokeWidth={2} />
+        </label>
+    );
 
     if (isLoading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand"></div>
             </div>
         );
     }
 
     return (
-        <div className="p-6">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                {/* Header */}
-                <div className="p-6 border-b border-gray-200">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h2 className="text-xl font-semibold text-gray-900">Incident Reports Management</h2>
-                            <p className="text-sm text-gray-600 mt-1">Review and manage workplace incident reports</p>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                            <div className="flex items-center space-x-2 px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
-                                <AlertTriangle className="h-3 w-3" />
-                                <span>{filteredReports.filter(r => r.severity === 'critical' || r.severity === 'high').length} High Priority</span>
-                            </div>
-                            <div className="flex items-center space-x-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                                <Clock className="h-3 w-3" />
-                                <span>{filteredReports.filter(r => r.status === 'new').length} New</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Filters */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Search reports..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                            />
-                        </div>
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                        >
-                            {STATUS_OPTIONS.map(option => (
-                                <option key={option.value} value={option.value}>{option.label}</option>
-                            ))}
-                        </select>
-                        <select
-                            value={typeFilter}
-                            onChange={(e) => setTypeFilter(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                        >
-                            {INCIDENT_TYPES.map(option => (
-                                <option key={option.value} value={option.value}>{option.label}</option>
-                            ))}
-                        </select>
-                        <select
-                            value={severityFilter}
-                            onChange={(e) => setSeverityFilter(e.target.value)}
-                            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                        >
-                            {SEVERITY_LEVELS.map(option => (
-                                <option key={option.value} value={option.value}>{option.label}</option>
-                            ))}
-                        </select>
-                    </div>
+        <div>
+            <div className="flex items-start justify-between flex-wrap gap-3 mb-[18px]">
+                <div>
+                    <h1 className="m-0 text-[21px] font-bold text-ink">Incident Reports Management</h1>
+                    <div className="text-xs text-muted-foreground mt-1">Review and manage workplace incident reports</div>
                 </div>
-
-                {/* Reports List */}
-                <div className="divide-y divide-gray-200">
-                    {filteredReports.length === 0 ? (
-                        <div className="p-12 text-center">
-                            <AlertTriangle className="mx-auto h-12 w-12 text-gray-400" />
-                            <h3 className="mt-2 text-sm font-medium text-gray-900">No reports found</h3>
-                            <p className="mt-1 text-sm text-gray-500">
-                                {statusFilter === 'new'
-                                    ? 'There are no new incident reports.'
-                                    : 'Try adjusting your filters.'}
-                            </p>
-                        </div>
-                    ) : (
-                        filteredReports.map((report) => (
-                            <motion.div
-                                key={report.id}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className="p-6 hover:bg-gray-50 transition-colors cursor-pointer"
-                                onClick={() => setSelectedReport(report)}
-                            >
-                                <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                        <div className="flex items-center space-x-3 mb-2">
-                                            {report.is_anonymous && (
-                                                <span className="inline-flex items-center px-2 py-1 rounded-md bg-purple-100 text-purple-800 text-xs font-medium">
-                                                    <Shield className="h-3 w-3 mr-1" />
-                                                    Anonymous
-                                                </span>
-                                            )}
-                                            {getSeverityBadge(report.severity)}
-                                            {getStatusBadge(report.status)}
-                                            <span className="text-xs text-gray-500 capitalize">
-                                                {report.incident_type.replace('_', ' ')}
-                                            </span>
-                                        </div>
-
-                                        <h3 className="text-sm font-medium text-gray-900 mb-1">{report.title}</h3>
-                                        <p className="text-sm text-gray-600 mb-2 line-clamp-2">{report.description}</p>
-
-                                        <div className="flex items-center text-xs text-gray-500 space-x-4">
-                                            <span className="flex items-center">
-                                                <User className="h-3 w-3 mr-1" />
-                                                {report.reporter_name}
-                                            </span>
-                                            <span className="flex items-center">
-                                                <Calendar className="h-3 w-3 mr-1" />
-                                                {new Date(report.created_at).toLocaleDateString()}
-                                            </span>
-                                            {report.location && (
-                                                <span className="flex items-center">
-                                                    <MapPin className="h-3 w-3 mr-1" />
-                                                    {report.location}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setSelectedReport(report);
-                                        }}
-                                        className="ml-4 px-3 py-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
-                                    >
-                                        <Eye className="h-4 w-4" />
-                                    </button>
-                                </div>
-                            </motion.div>
-                        ))
-                    )}
+                <div className="flex gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-[7px] rounded-pill bg-orange-tint-alt text-status-danger text-[11px] font-bold">
+                        <AlertTriangle className="w-3 h-3" />
+                        {highPriorityCount} High Priority
+                    </span>
+                    <span className="inline-flex items-center px-3 py-[7px] rounded-pill bg-status-info-tint text-status-info text-[11px] font-bold">
+                        {newCount} New
+                    </span>
                 </div>
             </div>
 
-            {/* Report Details Modal */}
-            {selectedReport && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
-                    >
-                        <div className="p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-semibold text-gray-900">Incident Report Details</h3>
-                                <button
-                                    onClick={() => {
-                                        setSelectedReport(null);
-                                        setAdminNotes('');
-                                        setResolution('');
-                                    }}
-                                    className="text-gray-400 hover:text-gray-600"
-                                >
-                                    <XCircle className="h-5 w-5" />
-                                </button>
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-2.5 mb-[18px]">
+                <div className="flex-1 min-w-[220px]">
+                    <SearchInput
+                        placeholder="Search reports..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="!bg-white !border-border"
+                    />
+                </div>
+                {select('Filter by status', statusFilter, setStatusFilter, STATUS_OPTIONS)}
+                {select('Filter by type', typeFilter, setTypeFilter, INCIDENT_TYPES)}
+                {select('Filter by severity', severityFilter, setSeverityFilter, SEVERITY_LEVELS)}
+            </div>
+
+            {/* Reports list */}
+            {filteredReports.length === 0 ? (
+                <Card>
+                    <EmptyState
+                        className="py-12"
+                        icon={<AlertTriangle size={20} />}
+                        title="No reports found"
+                        description={
+                            statusFilter === 'new'
+                                ? 'There are no new incident reports.'
+                                : 'Try adjusting your filters.'
+                        }
+                    />
+                </Card>
+            ) : (
+                <div className="flex flex-col gap-2.5">
+                    {filteredReports.map((report) => (
+                        <Card key={report.id} padding="none" className="!rounded-xl hover:border-brand/40 transition-colors">
+                            <div
+                                role="button"
+                                tabIndex={0}
+                                aria-label={`Open report: ${report.title}`}
+                                className="p-4 cursor-pointer flex items-start justify-between gap-4 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                                onClick={() => setSelectedReport(report)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        setSelectedReport(report);
+                                    }
+                                }}
+                            >
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center flex-wrap gap-2 mb-2">
+                                        {report.is_anonymous && (
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-pill bg-status-purple-tint text-status-purple text-[11px] font-semibold leading-none">
+                                                <Shield className="h-3 w-3" />
+                                                Anonymous
+                                            </span>
+                                        )}
+                                        {severityPill(report.severity)}
+                                        {statusPill(report.status)}
+                                        <span className="text-[11px] text-subtle capitalize">{humanize(report.incident_type)}</span>
+                                    </div>
+
+                                    <h3 className="m-0 text-[13px] font-bold text-ink mb-1">{report.title}</h3>
+                                    <p className="m-0 text-xs text-muted-foreground mb-2 line-clamp-2">{report.description}</p>
+
+                                    <div className="flex flex-wrap items-center text-[11px] text-subtle gap-x-4 gap-y-1">
+                                        <span className="flex items-center">
+                                            <User className="h-3 w-3 mr-1" />
+                                            {report.reporter_name}
+                                        </span>
+                                        <span className="flex items-center">
+                                            <Calendar className="h-3 w-3 mr-1" />
+                                            {new Date(report.created_at).toLocaleDateString()}
+                                        </span>
+                                        {report.location && (
+                                            <span className="flex items-center">
+                                                <MapPin className="h-3 w-3 mr-1" />
+                                                {report.location}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <Eye className="h-4 w-4 text-brand shrink-0 mt-1" aria-hidden="true" />
                             </div>
+                        </Card>
+                    ))}
+                </div>
+            )}
+
+            {/* Report details */}
+            {selectedReport && (
+                <div
+                    className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="incident-details-title"
+                >
+                    <div className="bg-white rounded-card border border-border shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="px-6 py-4 border-b border-border sticky top-0 bg-white z-10 flex items-center justify-between">
+                            <h3 id="incident-details-title" className="m-0 text-base font-bold text-ink">Incident Report Details</h3>
+                            <button type="button" aria-label="Close" onClick={closeDetails} className="text-subtle hover:text-ink">
+                                <XCircle className="h-5 w-5" />
+                            </button>
                         </div>
 
-                        <div className="p-6 space-y-6">
-                            {/* Report Info */}
+                        <div className="p-6 space-y-5">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Reporter</label>
+                                    <div className="text-[10px] font-bold uppercase text-subtle mb-1">Reporter</div>
                                     <div className="flex items-center">
-                                        {selectedReport.is_anonymous && <Shield className="h-4 w-4 mr-2 text-purple-600" />}
-                                        <p className="text-sm text-gray-900">{selectedReport.reporter_name}</p>
+                                        {selectedReport.is_anonymous && <Shield className="h-4 w-4 mr-2 text-status-purple" />}
+                                        <p className="m-0 text-xs text-ink">{selectedReport.reporter_name}</p>
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Report ID</label>
-                                    <p className="text-sm text-gray-900 font-mono">{selectedReport.id.substring(0, 8)}...</p>
+                                    <div className="text-[10px] font-bold uppercase text-subtle mb-1">Report ID</div>
+                                    <p className="m-0 text-xs text-ink font-mono">{selectedReport.id.substring(0, 8)}...</p>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Incident Type</label>
-                                    <p className="text-sm text-gray-900 capitalize">{selectedReport.incident_type.replace('_', ' ')}</p>
+                                    <div className="text-[10px] font-bold uppercase text-subtle mb-1">Incident Type</div>
+                                    <p className="m-0 text-xs text-ink capitalize">{humanize(selectedReport.incident_type)}</p>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Severity</label>
-                                    {getSeverityBadge(selectedReport.severity)}
+                                    <div className="text-[10px] font-bold uppercase text-subtle mb-1">Severity</div>
+                                    {severityPill(selectedReport.severity)}
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                                    {getStatusBadge(selectedReport.status)}
+                                    <div className="text-[10px] font-bold uppercase text-subtle mb-1">Status</div>
+                                    {statusPill(selectedReport.status)}
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Submitted</label>
-                                    <p className="text-sm text-gray-900">{new Date(selectedReport.created_at).toLocaleString()}</p>
+                                    <div className="text-[10px] font-bold uppercase text-subtle mb-1">Submitted</div>
+                                    <p className="m-0 text-xs text-ink">{new Date(selectedReport.created_at).toLocaleString()}</p>
                                 </div>
                             </div>
 
-                            {/* Incident Details */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                                <p className="text-sm text-gray-900">{selectedReport.title}</p>
+                                <div className="text-[10px] font-bold uppercase text-subtle mb-1">Title</div>
+                                <p className="m-0 text-[13px] font-semibold text-ink">{selectedReport.title}</p>
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                                <p className="text-sm text-gray-900 whitespace-pre-wrap">{selectedReport.description}</p>
+                                <div className="text-[10px] font-bold uppercase text-subtle mb-1">Description</div>
+                                <p className="m-0 text-xs text-ink whitespace-pre-wrap">{selectedReport.description}</p>
                             </div>
 
                             {selectedReport.incident_date && (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Incident Date</label>
-                                    <p className="text-sm text-gray-900">{new Date(selectedReport.incident_date).toLocaleDateString()}</p>
+                                    <div className="text-[10px] font-bold uppercase text-subtle mb-1">Incident Date</div>
+                                    <p className="m-0 text-xs text-ink">{new Date(selectedReport.incident_date).toLocaleDateString()}</p>
                                 </div>
                             )}
 
                             {selectedReport.location && (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                                    <p className="text-sm text-gray-900">{selectedReport.location}</p>
+                                    <div className="text-[10px] font-bold uppercase text-subtle mb-1">Location</div>
+                                    <p className="m-0 text-xs text-ink">{selectedReport.location}</p>
                                 </div>
                             )}
 
                             {selectedReport.witnesses && (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Witnesses</label>
-                                    <p className="text-sm text-gray-900">{selectedReport.witnesses}</p>
+                                    <div className="text-[10px] font-bold uppercase text-subtle mb-1">Witnesses</div>
+                                    <p className="m-0 text-xs text-ink">{selectedReport.witnesses}</p>
                                 </div>
                             )}
 
-                            {/* Admin Section */}
-                            <div className="border-t border-gray-200 pt-6">
-                                <h4 className="text-sm font-medium text-gray-900 mb-4">Admin Actions</h4>
+                            {/* Admin section */}
+                            <div className="border-t border-border pt-5">
+                                <h4 className="m-0 text-[13px] font-bold text-ink mb-4">Admin Actions</h4>
 
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Update Status</label>
+                                        <label htmlFor="incident-status" className="block text-[11px] font-semibold text-ink mb-1.5">Update Status</label>
                                         <select
+                                            id="incident-status"
                                             value={selectedReport.status}
                                             onChange={(e) => updateReportStatus(selectedReport.id, e.target.value)}
                                             disabled={isUpdating}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                            className={fieldClass}
                                         >
                                             {STATUS_OPTIONS.filter(s => s.value !== 'all').map(option => (
                                                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -523,31 +497,33 @@ const IncidentReportsManagement = () => {
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Admin Notes</label>
+                                        <label htmlFor="incident-notes" className="block text-[11px] font-semibold text-ink mb-1.5">Admin Notes</label>
                                         <textarea
+                                            id="incident-notes"
                                             value={adminNotes || selectedReport.admin_notes || ''}
                                             onChange={(e) => setAdminNotes(e.target.value)}
                                             rows={3}
                                             placeholder="Add investigation notes or comments..."
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                            className={fieldClass}
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Resolution</label>
+                                        <label htmlFor="incident-resolution" className="block text-[11px] font-semibold text-ink mb-1.5">Resolution</label>
                                         <textarea
+                                            id="incident-resolution"
                                             value={resolution || selectedReport.resolution || ''}
                                             onChange={(e) => setResolution(e.target.value)}
                                             rows={3}
                                             placeholder="Document the resolution..."
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                                            className={fieldClass}
                                         />
                                     </div>
 
                                     {selectedReport.reviewed_by && (
-                                        <div className="bg-gray-50 p-3 rounded-lg">
-                                            <p className="text-xs text-gray-600">
-                                                Last reviewed by <strong>{selectedReport.reviewed_by}</strong> on{' '}
+                                        <div className="bg-background p-3 rounded-xl">
+                                            <p className="m-0 text-[11px] text-muted-foreground">
+                                                Last reviewed by <strong className="text-ink">{selectedReport.reviewed_by}</strong> on{' '}
                                                 {new Date(selectedReport.reviewed_at!).toLocaleString()}
                                             </p>
                                         </div>
@@ -556,37 +532,25 @@ const IncidentReportsManagement = () => {
                             </div>
                         </div>
 
-                        <div className="p-6 border-t border-gray-200 bg-gray-50 flex justify-end space-x-3">
-                            <button
-                                onClick={() => {
-                                    setSelectedReport(null);
-                                    setAdminNotes('');
-                                    setResolution('');
-                                }}
-                                disabled={isUpdating}
-                                className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                            >
+                        <div className="px-6 py-4 border-t border-border bg-[#FAFBFA] flex justify-end gap-2.5">
+                            <Button variant="secondary" onClick={closeDetails} disabled={isUpdating}>
                                 Close
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 onClick={() => updateReportStatus(selectedReport.id, selectedReport.status)}
                                 disabled={isUpdating}
-                                className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center"
+                                icon={
+                                    isUpdating ? (
+                                        <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white" />
+                                    ) : (
+                                        <CheckCircle2 className="h-3.5 w-3.5" />
+                                    )
+                                }
                             >
-                                {isUpdating ? (
-                                    <>
-                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                        Saving...
-                                    </>
-                                ) : (
-                                    <>
-                                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                                        Save Changes
-                                    </>
-                                )}
-                            </button>
+                                {isUpdating ? 'Saving...' : 'Save Changes'}
+                            </Button>
                         </div>
-                    </motion.div>
+                    </div>
                 </div>
             )}
         </div>
