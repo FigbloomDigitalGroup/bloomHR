@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { Routes, Route, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from './lib/supabase';
@@ -18,7 +18,7 @@ import AuthCallback from './pages/AuthCallback';
 import React from 'react';
 import { UserProvider } from '../src/components/ProtectedRoutes/UserContext';
 import MFAVerification from './pages/MFAverification';
-import { useCompanyProfile } from './hooks/useCompanyProfile';
+import { useCompanyProfile, withProfileRole } from './hooks/useCompanyProfile';
 import CompanyGate from './components/Company/CompanyGate';
 
 // Route-level code splitting: each page is fetched when first visited.
@@ -165,12 +165,13 @@ const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
 
 function App() {
   // All hooks at the top level
-  const [user, setUser] = useState<User | null>(null);
+  const [authUser, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   // The role shown in the app comes from user_profiles (the company the person is working in), never from the
   // editable user_metadata; see useCompanyProfile.
   const companyState = useCompanyProfile(session?.user?.id);
+  const user = useMemo(() => withProfileRole(authUser, companyState), [authUser, companyState]);
   const [selectedTown, setSelectedTown] = useState<string>('');
   const [selectedRegion, setSelectedRegion] = useState('All Regions');
 
@@ -927,7 +928,25 @@ function App() {
             <Route path="/update-password" element={<UpdatePasswordPage />} />
             <Route
               path="/staff"
-              element={session ? <CompanyGate userId={session.user.id}><StaffPortalLanding /></CompanyGate> : <Login onLoginSuccess={handleLoginSuccess} />}
+              element={
+                !session ? (
+                  <Login onLoginSuccess={handleLoginSuccess} />
+                ) : companyState.status === 'none' ? (
+                  // someone who belongs to no company yet must set one up, not be shown a staff portal
+                  <NoCompany email={session.user.email ?? ''} />
+                ) : companyState.status === 'ready' ? (
+                  <CompanyGate userId={session.user.id}><StaffPortalLanding /></CompanyGate>
+                ) : companyState.status === 'error' ? (
+                  <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-center px-4">
+                    <p className="text-sm text-gray-700">We could not load your account: {companyState.message}</p>
+                    <button type="button" className="px-4 py-2 rounded bg-gray-900 text-white text-sm font-semibold" onClick={() => window.location.reload()}>
+                      Try again
+                    </button>
+                  </div>
+                ) : (
+                  <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">Loading your workspace…</div>
+                )
+              }
             />
 
             <Route
@@ -944,7 +963,7 @@ function App() {
                       Try again
                     </button>
                   </div>
-                ) : companyState.status === 'loading' || user.role !== companyState.profile.role ? (
+                ) : companyState.status === 'loading' ? (
                   <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">Loading your workspace…</div>
                 ) : user.role === 'STAFF' ? (
                   <CompanyGate userId={session.user.id}>
