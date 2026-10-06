@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
-import { companyApi } from '../lib/companyApi';
+import { companyApi, PendingInvitation } from '../lib/companyApi';
 import AuthShell, { AuthButton, Field } from '../components/Company/AuthShell';
 import { tokenFromInput } from '../lib/inviteToken';
 import { clearPendingCompany, readPendingCompany } from '../lib/pendingCompany';
@@ -15,6 +15,33 @@ export default function NoCompany({ email }: { email: string }) {
   const [link, setLink] = useState('');
   const [busy, setBusy] = useState(false);
   const [settingUp, setSettingUp] = useState(!!pending.current);
+  const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
+  const [joining, setJoining] = useState<string | null>(null);
+
+  // invitations sent to this address that have not been used: join in one click, no link to paste
+  useEffect(() => {
+    let cancelled = false;
+    companyApi
+      .myPendingInvitations()
+      .then((list) => !cancelled && setInvitations(list))
+      .catch(() => {
+        /* the form below still works */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const joinInvited = async (inv: PendingInvitation) => {
+    setJoining(inv.id);
+    try {
+      await companyApi.acceptMyInvitation(inv.id);
+      window.location.assign('/dashboard');
+    } catch (err) {
+      toast.error((err as Error).message);
+      setJoining(null);
+    }
+  };
 
   useEffect(() => {
     const wanted = pending.current;
@@ -58,7 +85,24 @@ export default function NoCompany({ email }: { email: string }) {
   }
 
   return (
-    <AuthShell title="You are not in a company yet" subtitle={`Signed in as ${email}. Create a company, or open the invitation link you were sent.`}>
+    <AuthShell
+      title={invitations.length > 0 ? 'You have been invited' : 'You are not in a company yet'}
+      subtitle={
+        invitations.length > 0
+          ? `Signed in as ${email}. Join the company that invited you, or start your own below.`
+          : `Signed in as ${email}. Create a company, or open the invitation link you were sent.`
+      }
+    >
+      {invitations.length > 0 && (
+        <div className="space-y-3 mb-8">
+          {invitations.map((inv) => (
+            <AuthButton key={inv.id} onClick={() => joinInvited(inv)} disabled={joining !== null}>
+              {joining === inv.id ? 'Joining…' : `Join ${inv.company_name} as ${inv.role.charAt(0)}${inv.role.slice(1).toLowerCase()}`}
+            </AuthButton>
+          ))}
+          <div className="border-t border-gray-100 pt-6" />
+        </div>
+      )}
       <form onSubmit={create} className="space-y-4">
         <Field label="Create a company" value={name} onChange={setName} placeholder="Company name" />
         <AuthButton type="submit" disabled={busy || !name.trim()}>

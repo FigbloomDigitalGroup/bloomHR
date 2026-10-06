@@ -237,3 +237,75 @@ describe('joining by link', () => {
     });
   });
 });
+
+describe('invitations waiting for the signed-in person (no pasting links)', () => {
+  const P_USER = '00000000-0000-0000-0000-00000000e0b1';
+  const P_UNCONFIRMED = '00000000-0000-0000-0000-00000000e0b2';
+  const P_OTHER = '00000000-0000-0000-0000-00000000e0b3';
+  const P_LATE = '00000000-0000-0000-0000-00000000e0b4';
+
+  beforeAll(async () => {
+    await db.exec(`
+      insert into auth.users (id, email) values ('${P_USER}', 'waiting@gmail.com'), ('${P_OTHER}', 'someone.else@gmail.com'), ('${P_LATE}', 'late.joiner@gmail.com');
+      insert into auth.users (id, email, email_confirmed_at) values ('${P_UNCONFIRMED}', 'unconfirmed@gmail.com', null);
+    `);
+  });
+
+  it('lists the open invitations sent to my address, whatever the letter case', async () => {
+    const inv = await invite(OWNER, 'Waiting@Gmail.com', 'HR');
+    await asUser(db, P_USER, async () => {
+      const r = await rows<{ id: string; company_name: string; role: string }>(`select id, company_name, role from my_pending_invitations()`);
+      expect(r).toEqual([{ id: inv.invitation_id, company_name: 'Figbloom HR', role: 'HR' }]);
+    });
+  });
+
+  it('shows nobody else’s invitations', async () => {
+    await asUser(db, P_OTHER, async () => {
+      expect(await rows(`select 1 from my_pending_invitations()`)).toEqual([]);
+    });
+  });
+
+  it('joins from the list in one step, ending up in that company with that role', async () => {
+    const [{ id }] = await asUser(db, P_USER, async () => rows<{ id: string }>(`select id from my_pending_invitations()`));
+    const tenant = await asUser(db, P_USER, async () => (await db.query<{ accept_my_invitation: string }>(`select accept_my_invitation('${id}')`)).rows[0].accept_my_invitation);
+    expect(tenant).toBe(DEFAULT);
+    expect(await profile(P_USER)).toMatchObject({ tenant_id: DEFAULT, role: 'HR' });
+    await asUser(db, P_USER, async () => {
+      expect(await rows(`select 1 from my_pending_invitations()`)).toEqual([]); // used up
+    });
+  });
+
+  it('cannot join an invitation meant for someone else', async () => {
+    const inv = await invite(OWNER, 'intended.only@gmail.com', 'ADMIN');
+    await asUser(db, P_OTHER, async () => {
+      await expect(db.query(`select accept_my_invitation('${inv.invitation_id}')`)).rejects.toThrow(/not valid any more/);
+    });
+    expect(await rows(`select 1 from memberships where user_id = '${P_OTHER}'`)).toEqual([]);
+  });
+
+  it('does nothing for an address that has not been confirmed, so a squatter cannot claim invitations', async () => {
+    await invite(OWNER, 'unconfirmed@gmail.com', 'ADMIN');
+    await asUser(db, P_UNCONFIRMED, async () => {
+      expect(await rows(`select 1 from my_pending_invitations()`)).toEqual([]);
+    });
+    const [{ id }] = await rows<{ id: string }>(`select id from invitations where email = 'unconfirmed@gmail.com' and status = 'pending'`);
+    await asUser(db, P_UNCONFIRMED, async () => {
+      await expect(db.query(`select accept_my_invitation('${id}')`)).rejects.toThrow(/Confirm your email/);
+    });
+    expect(await rows(`select 1 from memberships where user_id = '${P_UNCONFIRMED}'`)).toEqual([]);
+  });
+
+  it('refuses a cancelled or expired invitation, and a signed-out caller', async () => {
+    const inv = await invite(OWNER, 'late.joiner@gmail.com', 'STAFF');
+    await asUser(db, OWNER, async () => {
+      await db.query(`select revoke_invitation('${inv.invitation_id}')`);
+    });
+    await asUser(db, P_LATE, async () => {
+      await expect(db.query(`select accept_my_invitation('${inv.invitation_id}')`)).rejects.toThrow(/not valid any more/);
+    });
+    await expect(db.query(`select accept_my_invitation('${inv.invitation_id}')`)).rejects.toThrow(/Not signed in/);
+    await asAnon(db, async () => {
+      await expect(db.query(`select * from my_pending_invitations()`)).rejects.toThrow(/permission denied/);
+    });
+  });
+});

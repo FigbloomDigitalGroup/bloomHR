@@ -18,6 +18,14 @@ export interface InvitePreview {
   role: string;
 }
 
+/** An open invitation sent to the signed-in person's own address. */
+export interface PendingInvitation {
+  id: string;
+  company_name: string;
+  role: string;
+  expires_at: string;
+}
+
 export interface Invitation {
   id: string;
   email: string;
@@ -96,6 +104,11 @@ export const companyApi = {
   },
 
   acceptInvitation: (token: string) => call<string>('accept_invitation', { p_token: token }),
+
+  /** Invitations waiting for the signed-in person (so they need not paste a link from their email). */
+  myPendingInvitations: async (): Promise<PendingInvitation[]> => (await call<PendingInvitation[] | null>('my_pending_invitations', undefined)) ?? [],
+
+  acceptMyInvitation: (id: string) => call<string>('accept_my_invitation', { p_id: id }),
 
   listInvitations: async (): Promise<Invitation[]> => {
     const { data, error } = await supabase
