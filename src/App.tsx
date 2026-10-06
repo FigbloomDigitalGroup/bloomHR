@@ -5,7 +5,6 @@ import { supabase } from './lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import toast, { Toaster } from 'react-hot-toast';
 import { CSSProperties } from 'react';
-import { UpdateNotification } from '../src/components/Settings/update';
 import Sidebar from './components/Layout/Sidebar';
 import Header from './components/Layout/Header';
 import Footer from './components/Layout/Footer';
@@ -924,7 +923,6 @@ function App() {
     <UserProvider>
       <ErrorBoundary>
         <div className="min-h-screen bg-white overflow-x-hidden">
-          <UpdateNotification />
           <Suspense fallback={<Loader />}>
           <Routes>
             <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
