@@ -20,6 +20,7 @@ import { UserProvider } from '../src/components/ProtectedRoutes/UserContext';
 import MFAVerification from './pages/MFAverification';
 import { useCompanyProfile, withProfileRole } from './hooks/useCompanyProfile';
 import CompanyGate from './components/Company/CompanyGate';
+import { isStaleChunkError, reloadOnceForStaleChunk } from './lib/staleChunk';
 import { welcomeMessage } from './lib/welcome';
 
 // Route-level code splitting: each page is fetched when first visited.
@@ -133,6 +134,8 @@ class ErrorBoundaryClass extends React.Component<
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('App Error:', error, errorInfo);
+    // an old tab asking for page files a newer deploy replaced: a reload fetches the new ones
+    if (isStaleChunkError(error)) reloadOnceForStaleChunk();
   }
 
   render() {
@@ -142,6 +145,9 @@ class ErrorBoundaryClass extends React.Component<
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Something went wrong</h1>
             <p className="text-gray-600 mb-4">Please refresh the page to continue</p>
+            {this.state.error?.message && (
+              <p className="text-xs text-gray-400 mb-4 max-w-md mx-auto break-words">{this.state.error.message}</p>
+            )}
             <button
               onClick={() => {
                 this.setState({ hasError: false, error: null });

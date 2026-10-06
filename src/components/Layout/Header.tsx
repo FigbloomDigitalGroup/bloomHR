@@ -7,6 +7,8 @@ import { toast } from 'react-hot-toast';
 import { useHRNotifications, fetchAdminHRNotifications, markAdminNotificationRead, type HRNotification } from '../../hooks/useHRNotifications';
 import { SearchInput } from '../UI';
 import CompanySwitcher from '../Company/CompanySwitcher';
+import { useMyCompanies } from '../../hooks/useMyCompanies';
+import { OPEN_COMPANY_PROFILE } from '../Dashboard/GetStarted';
 
 interface HeaderProps {
   user?: { email: string; role: string };
@@ -119,6 +121,9 @@ const HeaderDropdown = ({ value, options, onChange, placeholder, icon: Icon }: {
 };
 // ...
 export default function Header({ selectedTown, onTownChange, selectedRegion, onRegionChange, towns, regions }: HeaderProps) {
+  // the company the person is working in: its name stands in until a company profile has been set up
+  const { data: myCompanies } = useMyCompanies();
+  const currentCompanyName = myCompanies?.find((c) => c.is_current)?.name;
   const [notifications, setNotifications] = useState<NotificationState>({
     staff: 0,
     leave: 0,
@@ -440,6 +445,13 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
     };
   }, [checkAndNotify]);
 
+  // "Get started" on the dashboard asks for the company profile to open
+  useEffect(() => {
+    const open = () => setProfileModalOpen(true);
+    window.addEventListener(OPEN_COMPANY_PROFILE, open);
+    return () => window.removeEventListener(OPEN_COMPANY_PROFILE, open);
+  }, []);
+
   // Clean up preview URLs when component unmounts
   useEffect(() => {
     return () => {
@@ -535,12 +547,12 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
               />
             ) : (
               <div className="w-[26px] h-[26px] bg-brand rounded-[7px] flex items-center justify-center text-white font-bold text-xs">
-                {companyProfile?.company_name?.[0] || 'F'}
+                {(companyProfile?.company_name || currentCompanyName || 'F')[0]}
               </div>
             )}
           </div>
           <span className="text-[13.5px] font-bold text-ink tracking-tight leading-tight truncate max-w-[180px]">
-            {companyProfile?.company_name || 'Figbloom Digital Group'}
+            {companyProfile?.company_name || currentCompanyName || 'Figbloom HR'}
           </span>
           <ChevronDown className="w-3 h-3 text-subtle flex-shrink-0" strokeWidth={2.2} />
         </motion.button>
