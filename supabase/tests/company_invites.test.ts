@@ -1,6 +1,8 @@
 // @vitest-environment node
 //
 // Creating a company, inviting people and joining by link. Real migrations on a real Postgres (PGlite).
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { PGlite } from '@electric-sql/pglite';
 import { asAnon, asUser, bootLiveDb } from './db';
@@ -307,5 +309,42 @@ describe('invitations waiting for the signed-in person (no pasting links)', () =
     await asAnon(db, async () => {
       await expect(db.query(`select * from my_pending_invitations()`)).rejects.toThrow(/permission denied/);
     });
+  });
+});
+
+describe('every company has a chat channel', () => {
+  const CHAN_USER = '00000000-0000-0000-0000-00000000e0c1';
+  const MEMBER = '00000000-0000-0000-0000-00000000e0c2';
+  const OPS = '00000000-0000-0000-0000-0000000000c9';
+
+  beforeAll(async () => {
+    await db.exec(`insert into tenants (id, name, slug) values ('${OPS}', 'Ops Co', 'ops-co')`);
+    await db.exec(`insert into auth.users (id, email) values ('${CHAN_USER}', 'founder@chan.co'), ('${MEMBER}', 'member@chan.co')`);
+  });
+
+  it('a new company starts with a public "general" channel its members can see', async () => {
+    const company = await asUser(db, CHAN_USER, async () => (await db.query<{ create_company: string }>(`select create_company('Chatty Ltd')`)).rows[0].create_company);
+    const channels = await rows<{ name: string; is_private: boolean; type: string }>(`select name, is_private, type from channels where tenant_id = '${company}'`);
+    expect(channels).toEqual([{ name: 'general', is_private: false, type: 'channel' }]);
+    await asUser(db, CHAN_USER, async () => {
+      expect((await rows(`select 1 from channels`)).length).toBe(1);
+    });
+    // a person invited later sees it too
+    const inv = await asUser(db, CHAN_USER, async () => (await db.query<{ token: string }>(`select * from create_invitation('member@chan.co', 'STAFF')`)).rows[0]);
+    await asUser(db, MEMBER, async () => {
+      await db.query(`select accept_invitation('${inv.token}')`);
+      expect((await rows<{ name: string }>(`select name from channels`)).map((r) => r.name)).toEqual(['general']);
+    });
+  });
+
+  it('the backfill gives a company with no channel one, and leaves companies that have channels alone', async () => {
+    const migration = readFileSync(join(__dirname, '..', 'migrations', '20261006000600_default_general_channel.sql'), 'utf8');
+    await db.exec(`delete from channels where tenant_id = '${DEFAULT}'`);
+    await db.exec(`insert into channels (tenant_id, name, type, is_private) values ('${OPS}', 'ops', 'channel', false)`);
+    await db.exec(migration);
+    expect((await rows<{ name: string }>(`select name from channels where tenant_id = '${DEFAULT}'`)).map((r) => r.name)).toEqual(['general']);
+    expect((await rows<{ name: string }>(`select name from channels where tenant_id = '${OPS}'`)).map((r) => r.name)).toEqual(['ops']); // untouched
+    await db.exec(migration); // running it again adds nothing
+    expect((await rows(`select 1 from channels where tenant_id = '${DEFAULT}'`)).length).toBe(1);
   });
 });

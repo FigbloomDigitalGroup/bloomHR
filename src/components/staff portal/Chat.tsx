@@ -412,6 +412,11 @@ const ChatComponent = ({ onMessagesRead }: ChatComponentProps) => {
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
               Channels
             </h3>
+            {channels.length === 0 && (
+              <p className="px-3 py-2 text-xs text-gray-500">
+                No channels yet. An administrator or manager creates them in Teams, and they will appear here.
+              </p>
+            )}
             <div className="space-y-1">
               {channels.map((channel) => {
                 const unreadCount = unreadByChannel[channel.id] || 0;
@@ -605,7 +610,7 @@ const ChatComponent = ({ onMessagesRead }: ChatComponentProps) => {
                 value={newMessage}
                 onChange={handleInputChange}
                 onKeyPress={handleKeyPress}
-                placeholder={`Message #${currentChannelData?.name}`}
+                placeholder={currentChannelData ? `Message #${currentChannelData.name}` : 'Select a channel to start chatting'}
                 rows={1}
                 className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none bg-white placeholder-gray-500"
                 style={{ minHeight: '44px', maxHeight: '120px' }}
