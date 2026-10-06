@@ -78,8 +78,11 @@ export function useAppUpdate(): {
 
   // 2. Service Worker update detection
   useEffect(() => {
+    // A first-time visitor has no controller yet; the worker taking control on that first visit is an install, not
+    // an update, so only a hand-over from an existing worker counts.
+    const hadController = 'serviceWorker' in navigator && !!navigator.serviceWorker.controller;
     const handleControllerChange = () => {
-      setUpdateAvailable(true);
+      if (hadController) setUpdateAvailable(true);
     };
 
     if ('serviceWorker' in navigator) {
