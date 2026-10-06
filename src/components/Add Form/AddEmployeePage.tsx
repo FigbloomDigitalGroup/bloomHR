@@ -4,6 +4,7 @@ import { useUser } from '../ProtectedRoutes/UserContext';
 import { X, Plus, ArrowLeft, User, Briefcase, Phone, CreditCard, MapPin, Upload, AlertCircle, Users, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
+import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import SearchableDropdown from '../UI/SearchableDropdown';
@@ -462,21 +463,7 @@ const AddEmployeePage = () => {
 
       let imageUrl = null;
       if (profileImage) {
-        const fileExt = profileImage.name.split('.').pop();
-        const fileName = `${newEmployee['Employee Number'] || `MCL-${Date.now().toString().slice(-6)}`}.${fileExt}`;
-        const filePath = `profile_images/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('employeeavatar')
-          .upload(filePath, profileImage);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('employeeavatar')
-          .getPublicUrl(filePath);
-
-        imageUrl = publicUrl;
+        imageUrl = await uploadEmployeeAvatar(profileImage, String(newEmployee['Employee Number'] || `MCL-${Date.now().toString().slice(-6)}`));
       }
 
       // Prepare statutory deductions data for employee table

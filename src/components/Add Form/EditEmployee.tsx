@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { X, Save, ArrowLeft, Plus, Upload, AlertCircle, Users, Check, PencilLine } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
+import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import { User, Briefcase, CreditCard, Phone, MapPin } from 'lucide-react';
@@ -460,33 +461,7 @@ const EditEmployeePage = () => {
 
       let imageUrl = employee['Profile Image'] || null;
       if (profileImage) {
-        const fileExt = profileImage.name.split('.').pop();
-        const fileName = `${employee['Employee Number']}.${fileExt}`;
-        const filePath = `profile_images/${fileName}`;
-
-        // First delete existing image if it exists
-        if (employee['Profile Image']) {
-          const { error: deleteError } = await supabase.storage
-            .from('employeeavatar')
-            .remove([filePath]);
-
-          if (deleteError && deleteError.message !== 'Object not found') {
-            throw deleteError;
-          }
-        }
-
-        // Upload new image
-        const { error: uploadError } = await supabase.storage
-          .from('employeeavatar')
-          .upload(filePath, profileImage);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('employeeavatar')
-          .getPublicUrl(filePath);
-
-        imageUrl = publicUrl;
+        imageUrl = await uploadEmployeeAvatar(profileImage, String(employee['Employee Number']));
       }
 
       // Update employee data
