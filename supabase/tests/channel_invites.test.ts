@@ -85,3 +85,46 @@ describe('add_channel_members', () => {
     await expect(add(MANAGER, '00000000-0000-0000-0000-00000000dd99', [ANNA])).rejects.toThrow(/cannot add people/);
   });
 });
+
+describe('adding yourself to a channel', () => {
+  let secret: string;
+  let open: string;
+  beforeAll(async () => {
+    await asUser(db, MANAGER, async () => {
+      secret = (await db.query<{ id: string }>(`insert into channels (name, type, is_private, created_by) values ('secret', 'channel', true, '${MANAGER}') returning id`)).rows[0].id;
+      open = (await db.query<{ id: string }>(`insert into channels (name, type, is_private, created_by) values ('open', 'channel', false, '${MANAGER}') returning id`)).rows[0].id;
+    });
+  });
+  const selfJoin = (as: string, ch: string) =>
+    asUser(db, as, async () => {
+      try {
+        await db.query(`insert into channel_members (channel_id, user_id) values ('${ch}', '${as}')`);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+  it('a staff member cannot join a private channel they cannot see, even knowing its id', async () => {
+    expect(await selfJoin(ANNA, secret)).toBe(false);
+    expect(await visibleTo(ANNA)).toBe(1); // still only the channel they were invited to
+    await asUser(db, ANNA, async () => {
+      expect((await db.query(`select 1 from messages where channel_id = '${secret}'`)).rows).toHaveLength(0);
+    });
+  });
+
+  it('they can join a public channel', async () => {
+    expect(await selfJoin(ANNA, open)).toBe(true);
+  });
+
+  it('an administrator can still add anyone, and the invite function still works for the creator', async () => {
+    await asUser(db, ADMIN, async () => {
+      await expect(db.query(`insert into channel_members (channel_id, user_id) values ('${secret}', '${BEN}')`)).resolves.toBeTruthy();
+    });
+    expect(await add(MANAGER, secret, [ANNA])).toBe(1);
+  });
+
+  it('nobody can add themselves to a direct message', async () => {
+    expect(await selfJoin(BEN, '00000000-0000-0000-0000-00000000dd99')).toBe(false);
+  });
+});

@@ -87,6 +87,7 @@ vi.mock('node-fetch', () => ({
 process.env.SUPABASE_URL = 'http://fake';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake-service-key';
 process.env.RESEND_API_KEY = 're_test_key';
+process.env.EMAIL_LOGS_TENANT_ID = TENANT; // the operator's company: the only one that may read the shared sending history
 process.env.SMTP_FROM = 'HR <hr@example.org>';
 process.env.CPANEL_USER = 'hr@example.org';
 process.env.CPANEL_PASSWORD = 'cpanel-pass';
@@ -282,6 +283,19 @@ describe('limits', () => {
 });
 
 describe('sent-mail log', () => {
+  it('is closed to every company except the operator company, since the history mixes all mail', async () => {
+    process.env.EMAIL_LOGS_TENANT_ID = 'some-other-tenant';
+    try {
+      expect((await call('GET', '/logs', who('admin'))).status).toBe(403);
+      expect((await call('GET', '/logs/e1', who('admin'))).status).toBe(403);
+      process.env.EMAIL_LOGS_TENANT_ID = '';
+      expect((await call('GET', '/logs', who('admin'))).status).toBe(403);
+      expect(state.logCalls).toHaveLength(0);
+    } finally {
+      process.env.EMAIL_LOGS_TENANT_ID = TENANT;
+    }
+  });
+
   it('reads the log with the server-side key and validates the paging inputs', async () => {
     const res = await call('GET', '/logs?limit=5&cursor=abc_123', who('admin'));
     expect(res.status).toBe(200);
