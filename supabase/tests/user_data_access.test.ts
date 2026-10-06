@@ -65,6 +65,9 @@ beforeAll(async () => {
     insert into employees ("Employee Number", "First Name", "Work Email", "Job Title", tenant_id) values
       ('E-ME', 'Me', 'me@a.co', 'Clerk', '${A}'), ('E-THEM', 'Them', 'them@a.co', 'Manager', '${A}');
 
+    -- these tests define their own channels: clear the default 'general' every company gets (see 20261006000600)
+    delete from channels;
+
     insert into channels (id, name, is_private, job_title, created_by, tenant_id) values
       ('${CH.general}', 'General', false, null, '${U.ADMIN}', '${A}'),
       ('${CH.clerks}',  'Clerks',  true, 'Clerk', '${U.ADMIN}', '${A}'),
