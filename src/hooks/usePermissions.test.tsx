@@ -5,6 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 
 const getUser = vi.fn();
 const single = vi.fn();
+const profileRole = vi.fn();
 const onAuthStateChange = vi.fn();
 const unsubscribe = vi.fn();
 
@@ -17,7 +18,15 @@ vi.mock('../lib/supabase', () => ({
         return { data: { subscription: { unsubscribe } } };
       },
     },
-    from: () => ({ select: () => ({ eq: () => ({ single: () => single() }) }) }),
+    from: (table: string) => ({
+      select: () => ({
+        eq: () => ({
+          single: () => single(),
+          // the trusted role: user_profiles, not the editable user_metadata
+          maybeSingle: () => (table === 'user_profiles' ? profileRole() : Promise.reject(new Error('unexpected table ' + table))),
+        }),
+      }),
+    }),
   },
 }));
 
@@ -35,8 +44,11 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={client}>{children}</QueryClientProvider>
 );
 
-const loginAs = (role?: string) =>
-  getUser.mockResolvedValue({ data: { user: role === undefined ? null : { user_metadata: { role } } } });
+// the user's metadata deliberately says something else: only the profile's role may count
+const loginAs = (role?: string) => {
+  getUser.mockResolvedValue({ data: { user: role === undefined ? null : { id: 'u1', user_metadata: { role: 'STAFF' } } } });
+  profileRole.mockResolvedValue({ data: role === undefined ? null : { role }, error: null });
+};
 
 const load = async () => {
   const hook = renderHook(() => usePermissions(), { wrapper });
@@ -51,6 +63,15 @@ beforeEach(() => {
 });
 
 describe('usePermissions', () => {
+  it('ignores a role the user wrote into their own metadata', async () => {
+    getUser.mockResolvedValue({ data: { user: { id: 'u1', user_metadata: { role: 'ADMIN' } } } });
+    profileRole.mockResolvedValue({ data: { role: 'STAFF' }, error: null });
+    single.mockResolvedValue({ data: { permissions: ['dashboard'] }, error: null });
+    const p = await load();
+    expect(p.userRole).toBe('STAFF');
+    expect(p.hasPermission('payroll')).toBe(false);
+  });
+
   it('grants nothing when nobody is signed in', async () => {
     loginAs(undefined);
     const p = await load();
@@ -58,8 +79,9 @@ describe('usePermissions', () => {
     expect(p.hasPermission('dashboard')).toBe(false);
   });
 
-  it('grants nothing when the user has no role metadata', async () => {
-    getUser.mockResolvedValue({ data: { user: { user_metadata: {} } } });
+  it('grants nothing when the user is in no company (no profile)', async () => {
+    getUser.mockResolvedValue({ data: { user: { id: 'u1', user_metadata: { role: 'ADMIN' } } } });
+    profileRole.mockResolvedValue({ data: null, error: null });
     const p = await load();
     expect(p.userRole).toBeNull();
     expect(p.hasAnyPermission(['dashboard'])).toBe(false);

@@ -23,6 +23,7 @@ import { supabase } from '../../lib/supabase';
 import { assertEmployeeForStaffLogin } from '../../lib/staffEmployee';
 import { adminApi } from '../../lib/adminApi';
 import toast from 'react-hot-toast';
+import { Link } from 'react-router-dom';
 import { Card, Button, SearchInput, StatusPill, EmptyState } from '../UI';
 import type { StatusTone } from '../UI';
 
@@ -902,9 +903,16 @@ export default function UserRolesSettings() {
               Manage user access across your organization &middot; {users.length} users, {users.filter(u => u.account_status === 'ACTIVE').length} active
             </p>
           </div>
-          <Button onClick={() => setShowAddUserModal(true)} icon={<UserPlus className="w-3 h-3" strokeWidth={2.2} />}>
-            Add New User
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link to="/invite-people">
+              <Button variant="secondary" icon={<UserPlus className="w-3 h-3" strokeWidth={2.2} />}>
+                Invite people
+              </Button>
+            </Link>
+            <Button onClick={() => setShowAddUserModal(true)} icon={<UserPlus className="w-3 h-3" strokeWidth={2.2} />}>
+              Add New User
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr] gap-2.5">

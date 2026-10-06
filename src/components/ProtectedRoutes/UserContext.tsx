@@ -1,6 +1,7 @@
 // context/UserContext.tsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { fetchTrustedRole } from '../../lib/trustedRole';
 
 interface User {
   email: string | undefined;
@@ -29,11 +30,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        const userRole = session.user.user_metadata?.role;
+        // The role in the company the person is working in (user_metadata is editable and not per company)
+        const userRole = await fetchTrustedRole(session.user.id);
 
         // Validate that the role is one of your expected roles
         const validRoles = ['ADMIN', 'MANAGER', 'STAFF', 'HR', 'OPERATIONS', 'REGIONAL', 'CHECKER'];
-        const role = validRoles.includes(userRole) ? userRole : 'STAFF';
+        const role = validRoles.includes(userRole ?? '') ? (userRole as string) : 'STAFF';
 
         setUser({
           email: session.user.email,
@@ -49,22 +51,27 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (session?.user) {
-          const userRole = session.user.user_metadata?.role;
-          const validRoles = ['ADMIN', 'MANAGER', 'STAFF', 'HR', 'OPERATIONS', 'REGIONAL', 'CHECKER'];
-          const role = validRoles.includes(userRole) ? userRole : 'STAFF';
+          const authUser = session.user;
+          // Look the role up outside this callback: calling supabase from inside it can deadlock the client
+          setTimeout(async () => {
+            const userRole = await fetchTrustedRole(authUser.id);
+            const validRoles = ['ADMIN', 'MANAGER', 'STAFF', 'HR', 'OPERATIONS', 'REGIONAL', 'CHECKER'];
+            const role = validRoles.includes(userRole ?? '') ? (userRole as string) : 'STAFF';
 
-          setUser({
-            email: session.user.email,
-            role: role,
-            id: session.user.id,
-            town: session.user.user_metadata?.town || ''
-          });
+            setUser({
+              email: authUser.email,
+              role: role,
+              id: authUser.id,
+              town: authUser.user_metadata?.town || ''
+            });
+            setLoading(false);
+          }, 0);
         } else {
           setUser(null);
+          setLoading(false);
         }
-        setLoading(false);
       }
     );
 
