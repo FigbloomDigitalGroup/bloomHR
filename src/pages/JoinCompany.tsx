@@ -3,8 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { companyApi, InvitePreview } from '../lib/companyApi';
-import AuthShell, { Field } from '../components/Company/AuthShell';
-import Button from '../components/UI/Button';
+import AuthShell, { AuthButton, Field, authLinkClass } from '../components/Company/AuthShell';
 import { useSessionEmail } from '../components/Company/useSessionEmail';
 
 const roleLabel = (role: string) => role.charAt(0) + role.slice(1).toLowerCase();
@@ -79,7 +78,7 @@ export default function JoinCompany() {
   if (preview === undefined || sessionEmail === undefined) {
     return (
       <AuthShell title="Opening your invitation…">
-        <p className="text-[13px] text-muted-foreground">One moment.</p>
+        <p className="text-xs text-gray-500">One moment.</p>
       </AuthShell>
     );
   }
@@ -87,7 +86,7 @@ export default function JoinCompany() {
   if (!preview) {
     return (
       <AuthShell title="This invitation is not valid" subtitle="The link may have expired, been used already, or been cancelled. Ask the person who invited you to send a new one.">
-        <a href="/login" className="text-[13px] font-semibold text-brand">
+        <a href="/login" className={authLinkClass}>
           Go to sign in
         </a>
       </AuthShell>
@@ -100,7 +99,7 @@ export default function JoinCompany() {
   if (checkEmail) {
     return (
       <AuthShell title="Check your email" subtitle={`We sent a confirmation link to ${preview.email}. Open it to finish joining ${preview.company_name}.`}>
-        <p className="text-[12.5px] text-muted-foreground">You can close this page.</p>
+        <p className="text-xs text-gray-500">You can close this page.</p>
       </AuthShell>
     );
   }
@@ -110,17 +109,17 @@ export default function JoinCompany() {
     return (
       <AuthShell title={heading} subtitle={about}>
         {matches ? (
-          <Button onClick={join} disabled={busy} className="w-full justify-center">
+          <AuthButton onClick={join} disabled={busy}>
             {busy ? 'Joining…' : `Join ${preview.company_name}`}
-          </Button>
+          </AuthButton>
         ) : (
-          <div className="space-y-3">
-            <p className="text-[13px] text-ink">
+          <div className="space-y-4">
+            <p className="text-xs text-gray-700">
               You are signed in as <strong>{sessionEmail}</strong>, but this invitation was sent to <strong>{preview.email}</strong>.
             </p>
-            <Button variant="secondary" onClick={() => supabase.auth.signOut()} className="w-full justify-center">
+            <AuthButton variant="secondary" onClick={() => supabase.auth.signOut()}>
               Sign out and use {preview.email}
-            </Button>
+            </AuthButton>
           </div>
         )}
       </AuthShell>
@@ -129,7 +128,7 @@ export default function JoinCompany() {
 
   return (
     <AuthShell title={heading} subtitle={`${about} ${mode === 'create' ? 'Create your account to join.' : 'Sign in to join.'}`}>
-      <form onSubmit={authenticate} className="space-y-3.5">
+      <form onSubmit={authenticate} className="space-y-6">
         <Field label="Email" type="email" value={preview.email} onChange={() => undefined} readOnly autoComplete="email" />
         <Field
           label={mode === 'create' ? 'Choose a password' : 'Password'}
@@ -138,11 +137,11 @@ export default function JoinCompany() {
           onChange={setPassword}
           autoComplete={mode === 'create' ? 'new-password' : 'current-password'}
         />
-        <Button type="submit" disabled={busy || !password} className="w-full justify-center">
+        <AuthButton type="submit" disabled={busy || !password}>
           {busy ? 'Please wait…' : mode === 'create' ? 'Create account' : 'Sign in'}
-        </Button>
+        </AuthButton>
       </form>
-      <button type="button" onClick={() => setMode(mode === 'create' ? 'signin' : 'create')} className="mt-4 text-[12.5px] font-semibold text-brand">
+      <button type="button" onClick={() => setMode(mode === 'create' ? 'signin' : 'create')} className={`mt-8 pt-8 border-t border-gray-100 w-full text-center ${authLinkClass}`}>
         {mode === 'create' ? 'I already have an account' : 'I need to create an account'}
       </button>
     </AuthShell>

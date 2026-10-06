@@ -3,8 +3,7 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { companyApi } from '../lib/companyApi';
-import AuthShell, { Field } from '../components/Company/AuthShell';
-import Button from '../components/UI/Button';
+import AuthShell, { AuthButton, Field, authLinkClass } from '../components/Company/AuthShell';
 import { useSessionEmail } from '../components/Company/useSessionEmail';
 
 const PENDING_KEY = 'pending_company_name';
@@ -89,7 +88,7 @@ export default function CreateCompany() {
   if (checkEmail) {
     return (
       <AuthShell title="Check your email" subtitle={`We sent a confirmation link to ${email}. Open it, and your company is created when you come back.`}>
-        <Link to="/login" className="text-[13px] font-semibold text-brand">
+        <Link to="/login" className={authLinkClass}>
           Back to sign in
         </Link>
       </AuthShell>
@@ -101,7 +100,7 @@ export default function CreateCompany() {
       title="Create your company"
       subtitle={sessionEmail ? `Signed in as ${sessionEmail}. You will be its administrator.` : 'Set up a company and invite your team. You will be its administrator.'}
     >
-      <form onSubmit={submit} className="space-y-3.5">
+      <form onSubmit={submit} className="space-y-6">
         <Field label="Company name" value={companyName} onChange={setCompanyName} placeholder="Acme Ltd" autoComplete="organization" />
         {sessionEmail === null && (
           <>
@@ -109,14 +108,14 @@ export default function CreateCompany() {
             <Field label="Password" type="password" value={password} onChange={setPassword} autoComplete="new-password" />
           </>
         )}
-        <Button type="submit" disabled={busy || sessionEmail === undefined || !companyName.trim() || (sessionEmail === null && (!email || !password))} className="w-full justify-center">
+        <AuthButton type="submit" disabled={busy || sessionEmail === undefined || !companyName.trim() || (sessionEmail === null && (!email || !password))}>
           {busy ? 'Creating…' : 'Create company'}
-        </Button>
+        </AuthButton>
       </form>
       {sessionEmail === null && (
-        <p className="mt-4 text-[12.5px] text-muted-foreground">
+        <p className="mt-8 pt-8 border-t border-gray-100 text-center text-gray-500 text-xs font-medium">
           Already have an account?{' '}
-          <Link to="/login" className="font-semibold text-brand">
+          <Link to="/login" className={authLinkClass}>
             Sign in
           </Link>
         </p>
