@@ -168,3 +168,34 @@ describe('keeping the current company usable', () => {
     expect(await profile(ONLY_A)).toMatchObject({ tenant_id: A });
   });
 });
+
+describe('leftovers from deleted logins', () => {
+  const OLD = '00000000-0000-0000-0000-00000000f101'; // a login that was deleted
+  const NEW = '00000000-0000-0000-0000-00000000f102'; // the same person registering again
+  const GONE = '00000000-0000-0000-0000-00000000f103';
+
+  it('registering again with the email of a deleted login works: the leftover profile is removed', async () => {
+    // the old login's profile survived its deletion (this is what the dashboard did before the clean-up trigger)
+    await db.exec(`
+      insert into user_profiles (user_id, email, role, tenant_id) values ('${OLD}', 'again@x.co', 'ADMIN', '${A}');
+      insert into auth.users (id, email) values ('${NEW}', 'again@x.co');
+    `);
+    await db.exec(`insert into memberships (user_id, tenant_id, role) values ('${NEW}', '${B}', 'ADMIN')`);
+    expect(await profile(NEW)).toMatchObject({ tenant_id: B, role: 'ADMIN' });
+    expect(await profile(OLD)).toBeUndefined();
+  });
+
+  it('a profile of a login that still exists is never removed, even with the same email', async () => {
+    await db.exec(`insert into auth.users (id, email) values ('${GONE}', 'taken@x.co')`);
+    await db.exec(`insert into user_profiles (user_id, email, role, tenant_id) values ('${GONE}', 'taken@x.co', 'STAFF', '${A}')`);
+    // a different, real login whose email differs only by letter case cannot exist in auth, so a clash here would be a real conflict
+    expect(await profile(GONE)).toMatchObject({ tenant_id: A });
+  });
+
+  it('deleting a login removes its profile and memberships with it', async () => {
+    await db.exec(`insert into memberships (user_id, tenant_id, role) values ('${GONE}', '${B}', 'HR')`);
+    await db.exec(`delete from auth.users where id = '${GONE}'`);
+    expect(await profile(GONE)).toBeUndefined();
+    expect(await rows(`select 1 from memberships where user_id = '${GONE}'`)).toEqual([]);
+  });
+});
