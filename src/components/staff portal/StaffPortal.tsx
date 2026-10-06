@@ -26,6 +26,7 @@ import {
 import {
   X,
   ChevronRight,
+  ChevronLeft,
   Trash2,
   Bell,
   Menu,
@@ -2612,7 +2613,6 @@ const StaffPortal = () => {
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   // New Sidebar States
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const sidebarVariants = {
@@ -2625,7 +2625,8 @@ const StaffPortal = () => {
       transition: { type: "spring", stiffness: 300, damping: 30 }
     }
   };
-  const isExpanded = isHovered || !isCollapsed;
+  // collapsed stays collapsed (the mouse is always over the bar when the toggle is clicked, so hover must not re-open it)
+  const isExpanded = !isCollapsed;
 
   const [loginStatus, setLoginStatus] = useState({
     isLoggedIn: false,
@@ -2971,8 +2972,6 @@ const StaffPortal = () => {
             animate={isExpanded ? "expanded" : "collapsed"}
             variants={sidebarVariants}
             className="relative flex flex-col h-full border-r border-shell-fg/5 shadow-2xl overflow-hidden font-lexend bg-shell"
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
           >
             {/* Glowy Background: Brand Accents */}
             <div className="absolute inset-0 bg-black/10 z-[-2] backdrop-blur-2xl" />
@@ -3009,14 +3008,19 @@ const StaffPortal = () => {
                 </AnimatePresence>
               </div>
 
-              {/* Hamburger Toggle */}
+              {/* Collapse/Expand Toggle: chevron when open, hamburger when collapsed (same as the main sidebar) */}
               <motion.button
                 onClick={() => setIsCollapsed(!isCollapsed)}
+                aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
                 className={`p-2 rounded-xl hover:bg-shell-fg/10 transition-all duration-300 group border border-transparent hover:border-shell-fg/10 hover:shadow-sm ${!isExpanded ? 'bg-shell-fg/5' : ''}`}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <Menu className={`w-4 h-4 transition-colors ${isExpanded ? 'text-shell-fg/50 group-hover:text-orange' : 'text-orange'}`} />
+                {isExpanded ? (
+                  <ChevronLeft className="w-4 h-4 transition-colors text-shell-fg/50 group-hover:text-orange" />
+                ) : (
+                  <Menu className="w-4 h-4 transition-colors text-orange" />
+                )}
               </motion.button>
             </div>
 
@@ -3142,7 +3146,7 @@ const StaffPortal = () => {
                                 </AnimatePresence>
 
                                 {/* Tooltip (Collapsed) */}
-                                {!isExpanded && !isHovered && (
+                                {!isExpanded && (
                                   <div className="absolute left-full ml-5 px-2.5 py-1.5 bg-slate-800 text-white text-[10px] font-semibold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 whitespace-nowrap shadow-xl translate-x-2 group-hover:translate-x-0">
                                     {item.label}
                                     {item.id === 'leave' && unreadLeaveCount > 0 && ` (${unreadLeaveCount})`}
