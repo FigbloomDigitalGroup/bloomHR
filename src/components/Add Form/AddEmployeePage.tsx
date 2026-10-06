@@ -715,7 +715,7 @@ const AddEmployeePage = () => {
                 <div className="w-full md:w-auto">
                   <div className="relative group">
                     <div
-                      className="relative w-40 h-40 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden border-2 border-gray-200 shadow-sm cursor-pointer transition-all duration-300 hover:border-emerald-300 hover:shadow-md"
+                      className="relative w-40 h-40 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden border-2 border-gray-200 shadow-sm cursor-pointer transition-all duration-300 hover:border-brand/40 hover:shadow-md"
                       onClick={triggerFileInput}
                     >
                       {previewImage ? (
@@ -1290,7 +1290,7 @@ const AddEmployeePage = () => {
                         <div className="flex items-center">
                           <button
                             type="button"
-                            className={`w-6 h-6 rounded flex items-center justify-center border ${deduction.isActive ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300'}`}
+                            className={`w-6 h-6 rounded flex items-center justify-center border ${deduction.isActive ? 'bg-brand border-brand' : 'border-gray-300'}`}
                             onClick={() => handleStatutoryDeductionChange(index, 'isActive', !deduction.isActive)}
                           >
                             {deduction.isActive && <Check className="w-4 h-4 text-white" />}
@@ -1303,7 +1303,7 @@ const AddEmployeePage = () => {
                               type="text"
                               value={deduction.number}
                               onChange={(e) => handleStatutoryDeductionChange(index, 'number', e.target.value)}
-                              className="w-full h-11 bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm"
+                              className="w-full h-11 bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm"
                               placeholder={`Enter ${deduction.name}`}
                               onBlur={() => validateField(deduction.columnName, deduction.number)}
                             />
@@ -1348,7 +1348,7 @@ const AddEmployeePage = () => {
                             type="text"
                             value={contact.name}
                             onChange={(e) => handleEmergencyContactChange(index, 'name', e.target.value)}
-                            className="w-full h-11 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm"
+                            className="w-full h-11 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm"
                             placeholder="Full Name"
                             onBlur={() => {
                               if (!contact.name) {
@@ -1369,7 +1369,7 @@ const AddEmployeePage = () => {
                             type="text"
                             value={contact.relationship}
                             onChange={(e) => handleEmergencyContactChange(index, 'relationship', e.target.value)}
-                            className="w-full h-11 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm"
+                            className="w-full h-11 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm"
                             placeholder="Relationship"
                             onBlur={() => {
                               if (!contact.relationship) {
@@ -1390,7 +1390,7 @@ const AddEmployeePage = () => {
                             type="tel"
                             value={contact.phone}
                             onChange={(e) => handleEmergencyContactChange(index, 'phone', e.target.value)}
-                            className="w-full h-11 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm"
+                            className="w-full h-11 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm"
                             placeholder="Phone Number"
                             onBlur={() => validateField(`emergencyContactPhone${index}`, contact.phone)}
                           />
@@ -1403,7 +1403,7 @@ const AddEmployeePage = () => {
                             type="email"
                             value={contact.email || ''}
                             onChange={(e) => handleEmergencyContactChange(index, 'email', e.target.value)}
-                            className="w-full h-11 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm"
+                            className="w-full h-11 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm"
                             placeholder="Email (Optional)"
                             onBlur={() => {
                               if (contact.email) {
@@ -1422,7 +1422,7 @@ const AddEmployeePage = () => {
 
                 <button
                   onClick={addEmergencyContact}
-                  className="mt-4 flex items-center text-emerald-600 hover:text-emerald-800 transition-colors"
+                  className="mt-4 flex items-center text-brand hover:text-brand-dark transition-colors"
                 >
                   <Plus className="w-4 h-4 mr-1" />
                   Add Another Emergency Contact
@@ -1458,21 +1458,21 @@ const AddEmployeePage = () => {
                           type="text"
                           value={dependent.name}
                           onChange={(e) => handleDependentChange(index, 'name', e.target.value)}
-                          className="w-full h-11 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm"
+                          className="w-full h-11 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm"
                           placeholder="Full Name"
                         />
                         <input
                           type="text"
                           value={dependent.relationship}
                           onChange={(e) => handleDependentChange(index, 'relationship', e.target.value)}
-                          className="w-full h-11 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm"
+                          className="w-full h-11 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm"
                           placeholder="Relationship"
                         />
                         <input
                           type="date"
                           value={dependent.dateOfBirth || ''}
                           onChange={(e) => handleDependentChange(index, 'dateOfBirth', e.target.value)}
-                          className="w-full h-11 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm"
+                          className="w-full h-11 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm"
                           placeholder="Date of Birth (Optional)"
                         />
                       </div>
@@ -1482,7 +1482,7 @@ const AddEmployeePage = () => {
 
                 <button
                   onClick={addDependent}
-                  className="mt-4 flex items-center text-emerald-600 hover:text-emerald-800 transition-colors"
+                  className="mt-4 flex items-center text-brand hover:text-brand-dark transition-colors"
                 >
                   <Plus className="w-4 h-4 mr-1" />
                   Add Another Dependent
@@ -1539,7 +1539,7 @@ const AddEmployeePage = () => {
             <GlowButton
               onClick={handleAddEmployee}
               icon={Plus}
-              className="bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white"
+              className="bg-brand hover:bg-brand-dark text-white"
             >
               {loading ? 'Adding Employee...' : 'Add Employee'}
             </GlowButton>
@@ -1612,7 +1612,7 @@ const FormField = ({
         required={required}
         disabled={disabled}
         placeholder={placeholder}
-        className={`w-full h-11 bg-gray-50 border ${error ? 'border-red-300' : 'border-gray-300'} rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm ${disabled ? 'opacity-70 cursor-not-allowed' : ''}`}
+        className={`w-full h-11 bg-gray-50 border ${error ? 'border-red-300' : 'border-gray-300'} rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm ${disabled ? 'opacity-70 cursor-not-allowed' : ''}`}
       />
     )}
     {error && (

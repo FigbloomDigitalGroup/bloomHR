@@ -633,7 +633,7 @@ Company Name
       >
         <div className="text-center">
           <div className="animate-pulse flex flex-col items-center">
-            <div className="w-16 h-16 bg-gradient-to-r from-green-50 to-green-200 rounded-full mb-6"></div>
+            <div className="w-16 h-16 bg-green-tint rounded-full mb-6"></div>
             <div className="h-5 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full w-64 mb-4"></div>
             <div className="h-4 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full w-48"></div>
           </div>
@@ -649,7 +649,7 @@ Company Name
         animate={{ opacity: 1 }}
         className="p-6 max-w-6xl mx-auto flex justify-center items-center min-h-[60vh] text-xs"
       >
-        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center border border-green-100">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center border border-brand/20">
           <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
             <X className="w-8 h-8 text-red-600" />
           </div>
@@ -676,7 +676,7 @@ Company Name
       >
         <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center border border-red-100">
           <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-            <X className="w-8 h-8 text-green-600" />
+            <X className="w-8 h-8 text-brand" />
           </div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">Employee Not Found</h2>
           <p className="text-gray-600 mb-6">The requested employee could not be found.</p>
@@ -746,12 +746,12 @@ Company Name
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-300 overflow-hidden">
         {/* Header */}
-        <div className={`p-6 md:p-8 border-b border-gray-300 ${employee['Termination Date'] ? 'bg-red-50' : 'bg-gradient-to-r from-green-50 to-emerald-50'}`}>
+        <div className={`p-6 md:p-8 border-b border-gray-300 ${employee['Termination Date'] ? 'bg-red-50' : 'bg-green-tint'}`}>
           <div className="flex flex-col md:flex-row md:items-start justify-between">
             <div className="flex items-start space-x-4">
               <div className={`w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold ${employee['Termination Date']
                 ? 'bg-red-100 text-red-800'
-                : 'bg-gradient-to-br from-green-100 to-emerald-200 text-emerald-800'
+                : 'bg-green-tint text-brand-dark'
                 }`}>
                 {employee['First Name']?.[0]}{employee['Last Name']?.[0]}
               </div>
@@ -782,7 +782,7 @@ Company Name
         <div className="p-6 md:p-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Termination Form / Details */}
-            <div className={`bg-gray-50 rounded-lg p-5 border ${employee['Termination Date'] ? 'border-red-200' : 'border-green-200'}`}>
+            <div className={`bg-gray-50 rounded-lg p-5 border ${employee['Termination Date'] ? 'border-red-200' : 'border-brand/20'}`}>
               <h3 className="font-semibold text-gray-800 flex items-center mb-4">
                 {employee['Termination Date'] ? (
                   <>
@@ -791,7 +791,7 @@ Company Name
                   </>
                 ) : (
                   <>
-                    <Trash2 className="mr-3 text-green-600" size={18} />
+                    <Trash2 className="mr-3 text-brand" size={18} />
                     <span>Terminate Employee</span>
                   </>
                 )}
@@ -851,7 +851,7 @@ Company Name
                           value={terminationDate}
                           onChange={(e) => setTerminationDate(e.target.value)}
                           min={format(new Date(), 'yyyy-MM-dd')}
-                          className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm shadow-sm transition-all duration-200 hover:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                          className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm shadow-sm transition-all duration-200 hover:border-brand/60 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand"
                         />
                       </div>
 
@@ -882,7 +882,7 @@ Company Name
                           value={exitInterview}
                           onChange={(e) => setExitInterview(e.target.value)}
                           placeholder="Optional notes from exit interview..."
-                          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm shadow-sm transition-all duration-200 hover:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-y"
+                          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm shadow-sm transition-all duration-200 hover:border-brand/60 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand resize-y"
                         />
                       </div>
 
@@ -893,7 +893,7 @@ Company Name
                           value={returnedPropertyNotes}
                           onChange={(e) => setReturnedPropertyNotes(e.target.value)}
                           placeholder="List returned company property (e.g., MacBook, office keys)..."
-                          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm shadow-sm transition-all duration-200 hover:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-y"
+                          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg text-sm shadow-sm transition-all duration-200 hover:border-brand/60 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand resize-y"
                         />
                       </div>
 
@@ -935,7 +935,7 @@ Company Name
             {/* Employee Information */}
             <div className="bg-gray-50 rounded-lg p-5 border border-gray-300">
               <h3 className="font-semibold text-gray-800 flex items-center mb-4">
-                <User className="mr-3 text-emerald-600" size={18} />
+                <User className="mr-3 text-brand" size={18} />
                 <span>Employee Summary</span>
               </h3>
 
@@ -1013,7 +1013,7 @@ Company Name
             {/* Termination Checklist */}
             <div className="bg-gray-50 rounded-lg p-5 border border-gray-300">
               <h3 className="font-semibold text-gray-800 flex items-center mb-4">
-                <FileText className="mr-3 text-emerald-600" size={18} />
+                <FileText className="mr-3 text-brand" size={18} />
                 <span>Termination Checklist</span>
               </h3>
 
@@ -1057,7 +1057,7 @@ Company Name
                     <h4 className="font-medium text-gray-700">Email Notification</h4>
                     <button
                       onClick={() => setShowEmailOptions(!showEmailOptions)}
-                      className="text-sm text-emerald-600 hover:text-emerald-700"
+                      className="text-sm text-brand hover:text-brand-dark"
                     >
                       {showEmailOptions ? 'Hide Options' : 'Customize'}
                     </button>
@@ -1105,7 +1105,7 @@ Company Name
             {employee['Termination Date'] && (
               <div className="bg-gray-50 rounded-lg p-5 border border-gray-300">
                 <h3 className="font-semibold text-gray-800 flex items-center mb-4">
-                  <FileText className="mr-3 text-emerald-600" size={18} />
+                  <FileText className="mr-3 text-brand" size={18} />
                   <span>Termination Letter Preview</span>
                 </h3>
 
@@ -1184,7 +1184,7 @@ Company Name
               <div className="mt-5 sm:mt-6 grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  className="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 sm:text-xs"
+                  className="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand sm:text-xs"
                   onClick={() => setShowConfirm(false)}
                 >
                   Cancel
@@ -1238,7 +1238,7 @@ const ChecklistItem = ({ label, checked, onClick }: { label: string; checked: bo
     disabled={!onClick}
     className={`flex items-start w-full text-left transition-colors ${onClick ? 'hover:bg-gray-100 p-1.5 rounded-md -ml-1.5 cursor-pointer' : ''}`}
   >
-    <div className={`flex-shrink-0 h-5 w-5 rounded border flex items-center justify-center mt-0.5 mr-2 transition-colors ${checked ? 'bg-green-100 border-green-500 text-green-600' : 'bg-gray-100 border-gray-300'}`}>
+    <div className={`flex-shrink-0 h-5 w-5 rounded border flex items-center justify-center mt-0.5 mr-2 transition-colors ${checked ? 'bg-green-tint border-brand text-brand' : 'bg-gray-100 border-gray-300'}`}>
       {checked && (
         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
