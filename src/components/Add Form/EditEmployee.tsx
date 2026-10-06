@@ -575,7 +575,7 @@ const EditEmployeePage = () => {
       >
         <div className="text-center">
           <div className="animate-pulse flex flex-col items-center">
-            <div className="w-16 h-16 bg-gradient-to-r from-green-50 to-green-200 rounded-full mb-6"></div>
+            <div className="w-16 h-16 bg-green-tint rounded-full mb-6"></div>
             <div className="h-5 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full w-64 mb-4"></div>
             <div className="h-4 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full w-48"></div>
           </div>
@@ -667,7 +667,7 @@ const EditEmployeePage = () => {
                 onClick={handleSave}
                 icon={Save}
                 loading={saving}
-                className="bg-green-200 hover:green-100 text-black"
+                className="bg-green-tint hover:bg-green-tint/70 text-black"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
               </GlowButton>
@@ -677,7 +677,7 @@ const EditEmployeePage = () => {
               <GlowButton
                 onClick={handleEditToggle}
                 icon={PencilLine}
-                className="bg-green-600 hover:blue-100 text-white"
+                className="bg-brand hover:bg-brand-dark text-white"
               >
                 Edit Employee
               </GlowButton>
@@ -688,13 +688,13 @@ const EditEmployeePage = () => {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-300 overflow-hidden">
         {/* Header */}
-        <div className="bg-green-500 p-6 md:p-8 border-b border-gray-300">
+        <div className="bg-brand p-6 md:p-8 border-b border-gray-300">
           <div className="flex flex-col md:flex-row md:items-start justify-between">
             <div className="flex items-start space-x-4">
               <div className="relative">
                 {isEditMode ? (
                   <div
-                    className="bg-gradient-to-br from-green-100 to-emerald-200 w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-emerald-800 cursor-pointer"
+                    className="bg-green-tint w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-brand-dark cursor-pointer"
                     onClick={triggerFileInput}
                   >
                     {previewImage ? (
@@ -758,42 +758,42 @@ const EditEmployeePage = () => {
           <nav className="flex overflow-x-auto">
             <button
               onClick={() => setActiveTab('personal')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'personal' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'personal' ? 'text-brand border-b-2 border-brand' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <User className="w-4 h-4 mr-2" />
               Personal
             </button>
             <button
               onClick={() => setActiveTab('employment')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'employment' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'employment' ? 'text-brand border-b-2 border-brand' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <Briefcase className="w-4 h-4 mr-2" />
               Employment
             </button>
             <button
               onClick={() => setActiveTab('contact')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'contact' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'contact' ? 'text-brand border-b-2 border-brand' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <Phone className="w-4 h-4 mr-2" />
               Contact
             </button>
             <button
               onClick={() => setActiveTab('financial')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'financial' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'financial' ? 'text-brand border-b-2 border-brand' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <CreditCard className="w-4 h-4 mr-2" />
               Financial
             </button>
             <button
               onClick={() => setActiveTab('emergency')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'emergency' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'emergency' ? 'text-brand border-b-2 border-brand' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <AlertCircle className="w-4 h-4 mr-2" />
               Emergency
             </button>
             <button
               onClick={() => setActiveTab('dependents')}
-              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'dependents' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 font-medium text-xs flex items-center ${activeTab === 'dependents' ? 'text-brand border-b-2 border-brand' : 'text-gray-500 hover:text-gray-700'}`}
             >
               <Users className="w-4 h-4 mr-2" />
               Dependents
@@ -818,7 +818,7 @@ const EditEmployeePage = () => {
                     <div className="w-full md:w-auto">
                       <div className="relative group">
                         <div
-                          className="relative w-40 h-40 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden border-2 border-gray-200 shadow-sm cursor-pointer transition-all duration-300 hover:border-emerald-300 hover:shadow-md"
+                          className="relative w-40 h-40 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden border-2 border-gray-200 shadow-sm cursor-pointer transition-all duration-300 hover:border-brand/40 hover:shadow-md"
                           onClick={triggerFileInput}
                         >
                           {previewImage ? (
@@ -830,7 +830,7 @@ const EditEmployeePage = () => {
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-400">
                               <div className="relative">
-                                <div className="bg-gradient-to-br from-green-100 to-emerald-200 w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-emerald-800">
+                                <div className="bg-green-tint w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-brand-dark">
                                   {employee['First Name']?.[0]}{employee['Last Name']?.[0]}
                                 </div>
                               </div>
@@ -1392,14 +1392,14 @@ const EditEmployeePage = () => {
                         {isEditMode ? (
                           <button
                             type="button"
-                            className={`w-6 h-6 rounded flex items-center justify-center border ${deduction.isActive ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300'}`}
+                            className={`w-6 h-6 rounded flex items-center justify-center border ${deduction.isActive ? 'bg-brand border-brand' : 'border-gray-300'}`}
                             onClick={() => handleStatutoryDeductionChange(index, 'isActive', !deduction.isActive)}
                           >
                             {deduction.isActive && <Check className="w-4 h-4 text-white" />}
                           </button>
                         ) : (
-                          <div className={`w-6 h-6 rounded flex items-center justify-center border ${deduction.isActive ? 'bg-emerald-100 border-emerald-300' : 'border-gray-200 bg-gray-50'}`}>
-                            {deduction.isActive && <Check className="w-4 h-4 text-emerald-600" />}
+                          <div className={`w-6 h-6 rounded flex items-center justify-center border ${deduction.isActive ? 'bg-green-tint border-brand/40' : 'border-gray-200 bg-gray-50'}`}>
+                            {deduction.isActive && <Check className="w-4 h-4 text-brand" />}
                           </div>
                         )}
                         <span className="ml-2 font-medium min-w-[100px]">{deduction.name}</span>
@@ -1411,7 +1411,7 @@ const EditEmployeePage = () => {
                               type="text"
                               value={deduction.number}
                               onChange={(e) => handleStatutoryDeductionChange(index, 'number', e.target.value)}
-                              className={`w-full h-11 bg-gray-50 border-gray-300 border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+                              className={`w-full h-11 bg-gray-50 border-gray-300 border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm`}
                               placeholder={`Enter ${deduction.name}`}
                               disabled={!isEditMode}
                               onBlur={() => validateField(`deduction${deduction.name}`, deduction.number)}
@@ -1450,7 +1450,7 @@ const EditEmployeePage = () => {
                       type="text"
                       value={emergencyContact.name}
                       onChange={(e) => handleEmergencyContactChange('name', e.target.value)}
-                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm`}
                       placeholder="Full Name"
                       disabled={!isEditMode}
                     />
@@ -1461,7 +1461,7 @@ const EditEmployeePage = () => {
                       type="text"
                       value={emergencyContact.relationship}
                       onChange={(e) => handleEmergencyContactChange('relationship', e.target.value)}
-                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm`}
                       placeholder="Relationship"
                       disabled={!isEditMode}
                     />
@@ -1472,7 +1472,7 @@ const EditEmployeePage = () => {
                       type="tel"
                       value={emergencyContact.phone}
                       onChange={(e) => handleEmergencyContactChange('phone', e.target.value)}
-                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm`}
                       placeholder="Phone Number"
                       disabled={!isEditMode}
                       onBlur={() => validateField('emergencyContactPhone', emergencyContact.phone)}
@@ -1487,7 +1487,7 @@ const EditEmployeePage = () => {
                       type="email"
                       value={emergencyContact.email || ''}
                       onChange={(e) => handleEmergencyContactChange('email', e.target.value)}
-                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm`}
                       placeholder="Email"
                       disabled={!isEditMode}
                       onBlur={() => {
@@ -1535,7 +1535,7 @@ const EditEmployeePage = () => {
                           type="text"
                           value={dependent.name}
                           onChange={(e) => handleDependentChange(index, 'name', e.target.value)}
-                          className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+                          className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm`}
                           placeholder="Full Name"
                           disabled={!isEditMode}
                         />
@@ -1546,7 +1546,7 @@ const EditEmployeePage = () => {
                           type="text"
                           value={dependent.relationship}
                           onChange={(e) => handleDependentChange(index, 'relationship', e.target.value)}
-                          className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+                          className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm`}
                           placeholder="Relationship"
                           disabled={!isEditMode}
                         />
@@ -1557,7 +1557,7 @@ const EditEmployeePage = () => {
                           type="date"
                           value={dependent.dateOfBirth || ''}
                           onChange={(e) => handleDependentChange(index, 'dateOfBirth', e.target.value)}
-                          className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 shadow-sm`}
+                          className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm`}
                           disabled={!isEditMode}
                         />
                       </div>
@@ -1569,7 +1569,7 @@ const EditEmployeePage = () => {
               {isEditMode && (
                 <button
                   onClick={addDependent}
-                  className="mt-4 flex items-center text-emerald-600 hover:text-emerald-800 transition-colors"
+                  className="mt-4 flex items-center text-brand hover:text-brand-dark transition-colors"
                 >
                   <Plus className="w-4 h-4 mr-1" />
                   Add Another Dependent
@@ -1609,7 +1609,7 @@ const EditEmployeePage = () => {
                 onClick={handleSave}
                 icon={Save}
                 loading={saving}
-                className="bg-green-600 hover:bg-green-400 text-white"
+                className="bg-brand hover:bg-brand-dark text-white"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
               </GlowButton>
@@ -1684,7 +1684,7 @@ const FormField = ({
         required={required}
         disabled={disabled}
         placeholder={placeholder}
-        className={`w-full h-10 bg-gray-50 border ${error ? 'border-red-300' : 'border-gray-200'} rounded-lg px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all duration-200 ${disabled ? 'opacity-70 cursor-not-allowed bg-gray-100' : ''}`}
+        className={`w-full h-10 bg-gray-50 border ${error ? 'border-red-300' : 'border-gray-200'} rounded-lg px-4 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all duration-200 ${disabled ? 'opacity-70 cursor-not-allowed bg-gray-100' : ''}`}
       />
     )}
     {error && (
