@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { requireUpdatedRows, saveFailureMessage } from '../../lib/requireUpdated';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Briefcase,
@@ -210,18 +211,20 @@ const JobApplications = () => {
         if (!confirm('Are you sure you want to withdraw this application?')) return;
 
         try {
-            const { error } = await supabase
+            const { data: savedRows, error } = await supabase
                 .from('job_applications')
                 .update({ status: 'withdrawn' })
-                .eq('id', applicationId);
+                .eq('id', applicationId)
+                .select('id');
 
             if (error) throw error;
+            requireUpdatedRows(savedRows, 'The application was not withdrawn: it could not be found, or it is not yours to change.');
 
             toast.success('Application withdrawn');
             await fetchMyApplications();
         } catch (error) {
             console.error('Error withdrawing application:', error);
-            toast.error('Failed to withdraw application');
+            toast.error(saveFailureMessage(error, 'Failed to withdraw application'));
         }
     };
 
