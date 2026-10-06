@@ -27,3 +27,31 @@ describe('shouldShowUpdate', () => {
     expect(shouldShowUpdate('1.0.3', '1.0.1', '1.0.2')).toBe(true);
   });
 });
+
+describe('useAppUpdate service worker hand-over', () => {
+  const setup = async (controller: unknown) => {
+    const { renderHook, act } = await import('@testing-library/react');
+    const { useAppUpdate } = await import('./sw');
+    let listener: (() => void) | undefined;
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        controller,
+        addEventListener: (_: string, fn: () => void) => { listener = fn; },
+        removeEventListener: () => {},
+        ready: Promise.resolve({ update: () => {} }),
+      },
+    });
+    const hook = renderHook(() => useAppUpdate());
+    act(() => listener?.());
+    return hook.result.current.updateAvailable;
+  };
+
+  it('does not show the popup when the worker takes control on a first visit', async () => {
+    expect(await setup(null)).toBe(false);
+  });
+
+  it('shows the popup when a new worker replaces one already in control', async () => {
+    expect(await setup({})).toBe(true);
+  });
+});
