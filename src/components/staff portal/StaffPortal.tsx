@@ -3082,6 +3082,8 @@ const StaffPortal = () => {
                         {filteredItems.map((item) => {
                           const isActive = activeTab === item.id;
                           const isMenuExpanded = expandedMenu === item.id;
+                          // the row is drawn as the light "active" pill when it is the page or its submenu is open: its text must follow
+                          const highlighted = isActive || (item.hasSubmenu && isMenuExpanded);
 
                           return (
                             <div key={item.id}>
@@ -3124,7 +3126,7 @@ const StaffPortal = () => {
                                         initial={{ opacity: 0, x: -10 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         exit={{ opacity: 0, x: -10 }}
-                                        className={`ml-3 text-xs truncate font-sans relative z-10 tracking-wide font-normal flex-1 text-left ${isActive ? 'text-shell-active-fg' : 'text-shell-fg/80'}`}
+                                        className={`ml-3 text-xs truncate font-sans relative z-10 tracking-wide font-normal flex-1 text-left ${highlighted ? 'text-shell-active-fg' : 'text-shell-fg/80'}`}
                                       >
                                         {item.label}
                                       </motion.span>
@@ -3139,7 +3141,7 @@ const StaffPortal = () => {
                                         </span>
                                       )}
                                       {item.hasSubmenu && (
-                                        <ChevronRight className={`w-3.5 h-3.5 ml-2 ${isActive || isMenuExpanded ? 'text-shell-fg/80' : 'text-shell-fg/40'} transition-transform duration-200 ${isMenuExpanded ? 'rotate-90' : ''}`} />
+                                        <ChevronRight className={`w-3.5 h-3.5 ml-2 ${highlighted ? 'text-shell-active-fg/80' : 'text-shell-fg/40'} transition-transform duration-200 ${isMenuExpanded ? 'rotate-90' : ''}`} />
                                       )}
                                     </>
                                   )}
@@ -3184,7 +3186,7 @@ const StaffPortal = () => {
                                         }}
                                         className={`w-full flex items-center px-3 py-2 rounded-lg text-xs font-normal transition-all ${activeTab === subItem.id ? 'text-shell-fg bg-shell-fg/10' : 'text-shell-fg/60 hover:text-shell-fg hover:bg-shell-fg/5'}`}
                                       >
-                                        <span className={`w-1.5 h-1.5 rounded-full mr-2 ${activeTab === subItem.id ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'bg-shell-fg/20'}`}></span>
+                                        <span className={`w-1.5 h-1.5 rounded-full mr-2 ${activeTab === subItem.id ? 'bg-orange shadow-[0_0_8px_rgb(var(--highlight)/0.5)]' : 'bg-shell-fg/20'}`}></span>
                                         {subItem.label}
                                         {/* Per-source breakdown under "Communication" (FIG-578): Chat's
                                             own count, so "Communication"'s badge reads as the total of
