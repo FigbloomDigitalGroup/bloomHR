@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isValidPhone, summarizeErrors } from './formValidation';
+import { describeSaveError, isValidPhone, summarizeErrors } from './formValidation';
 
 describe('isValidPhone', () => {
   it.each(['0712345678', '+254712345678', '0712 345 678', '+254-712-345-678', '(0712) 345678', '254712345678', '0712.345.678'])('accepts %s', (v) => {
@@ -28,5 +28,18 @@ describe('summarizeErrors', () => {
   it('copes with an empty or message-less set', () => {
     expect(summarizeErrors({})).toBe('Please check the form.');
     expect(summarizeErrors({ a: '' })).toBe('Please check the form.');
+  });
+});
+
+describe('describeSaveError', () => {
+  it('reads the reason from Error objects and from Supabase’s plain error objects', () => {
+    expect(describeSaveError(new Error('Your changes were not saved'))).toBe('Your changes were not saved');
+    expect(describeSaveError({ message: 'new row violates row-level security policy' })).toBe('new row violates row-level security policy');
+  });
+
+  it('falls back to a generic message when there is nothing to read', () => {
+    expect(describeSaveError(null)).toBe('Failed to save your changes');
+    expect(describeSaveError({})).toBe('Failed to save your changes');
+    expect(describeSaveError({ message: '  ' }, 'Could not save')).toBe('Could not save');
   });
 });

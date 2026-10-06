@@ -30,3 +30,16 @@ export function summarizeErrors(errors: Record<string, string>): string {
   const shown = lines.slice(0, 4).join('. ');
   return `Cannot save yet. ${shown}${lines.length > 4 ? ` (and ${lines.length - 4} more)` : ''}`;
 }
+
+/**
+ * A readable reason for a failed save. Supabase errors are plain objects rather than Error instances, so reading
+ * `.message` only from real Errors turned every database refusal into a vague "Failed to update".
+ */
+export function describeSaveError(error: unknown, fallback = 'Failed to save your changes'): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = String((error as { message: unknown }).message || '').trim();
+    if (message) return message;
+  }
+  return fallback;
+}

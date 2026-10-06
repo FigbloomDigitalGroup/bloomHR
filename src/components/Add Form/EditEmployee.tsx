@@ -4,7 +4,8 @@ import { X, Save, ArrowLeft, Plus, Upload, AlertCircle, Users, Check, PencilLine
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
-import { isValidPhone, summarizeErrors } from '../../lib/formValidation';
+import { describeSaveError, isValidPhone, summarizeErrors } from '../../lib/formValidation';
+import { NOT_SAVED_NO_ACCESS, requireUpdatedRows } from '../../lib/requireUpdated';
 import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
@@ -474,7 +475,7 @@ const EditEmployeePage = () => {
       }
 
       // Update employee data
-      const { error: employeeError } = await supabase
+      const { data: savedRows, error: employeeError } = await supabase
         .from('employees')
         .update({
           ...employee,
@@ -485,9 +486,11 @@ const EditEmployeePage = () => {
           'NITA': statutoryDeductions.find(d => d.name === 'NITA')?.number || null,
           'HELB': statutoryDeductions.find(d => d.name === 'HELB')?.number || null
         })
-        .eq('"Employee Number"', id);
+        .eq('"Employee Number"', id)
+        .select('"Employee Number"');
 
       if (employeeError) throw employeeError;
+      requireUpdatedRows(savedRows, NOT_SAVED_NO_ACCESS);
 
       // Update emergency contact (single contact using upsert)
       if (emergencyContact.name.trim()) {
@@ -544,7 +547,8 @@ const EditEmployeePage = () => {
       setIsEditMode(false);
       navigate(`/employees`, { state: { success: true } });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update employee');
+      // a message over the form: the page used to be replaced by an error screen, losing what was typed
+      toast.error(describeSaveError(err, 'Failed to update employee'));
     } finally {
       setSaving(false);
     }
