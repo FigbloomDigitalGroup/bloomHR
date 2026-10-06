@@ -78,6 +78,14 @@ export const companyApi = {
   /** Asks the backend to email the invitation the token belongs to (it writes the email itself). */
   emailInvitation: (token: string) => apiRequest<{ ok: true; sentTo: string }>('POST', '/invites/send', { token }),
 
+  /**
+   * For someone with no account yet: the invitation link is the proof of their address, so the account is created
+   * already confirmed, in the inviting company. Rejects with code "account_exists" when the address has an account
+   * (they sign in and join instead).
+   */
+  createAccountAndJoin: (token: string, password: string, fullName: string) =>
+    apiRequest<{ ok: true; email: string }>('POST', '/invites/accept', { token, password, fullName }, { auth: false }),
+
   revokeInvitation: async (id: string): Promise<void> => {
     await call<null>('revoke_invitation', { p_id: id });
   },

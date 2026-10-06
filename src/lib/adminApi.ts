@@ -41,11 +41,24 @@ export interface UpdateUserInput {
   branch?: string | null;
 }
 
-/** A call to the backend (`path` includes the area, e.g. /admin/users or /invites/send), signed in as the current person. */
-export async function apiRequest<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
-  if (!token) throw new Error('You are not signed in');
+/** An error from the backend, with its HTTP status and the machine-readable `code` it may send (e.g. account_exists). */
+export class ApiError extends Error {
+  constructor(message: string, public status: number, public code?: string) {
+    super(message);
+  }
+}
+
+/**
+ * A call to the backend (`path` includes the area, e.g. /admin/users or /invites/send), signed in as the current
+ * person. `auth: false` is for the few calls made before anyone has an account (accepting an invitation).
+ */
+export async function apiRequest<T>(method: string, path: string, body?: unknown, { auth = true }: { auth?: boolean } = {}): Promise<T> {
+  let token: string | undefined;
+  if (auth) {
+    const { data } = await supabase.auth.getSession();
+    token = data.session?.access_token;
+    if (!token) throw new Error('You are not signed in');
+  }
 
   let response: Response;
   try {
@@ -53,7 +66,7 @@ export async function apiRequest<T>(method: string, path: string, body?: unknown
       method,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
@@ -63,7 +76,7 @@ export async function apiRequest<T>(method: string, path: string, body?: unknown
 
   // Where no backend is deployed, the website itself answers (its home page, status 200): that is not JSON
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error((payload && payload.error) || `Request failed (${response.status})`);
+  if (!response.ok) throw new ApiError((payload && payload.error) || `Request failed (${response.status})`, response.status, payload?.code);
   if (payload === null || typeof payload !== 'object') throw new Error(BACKEND_UNAVAILABLE);
   return payload as T;
 }
