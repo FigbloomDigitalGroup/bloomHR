@@ -282,7 +282,7 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: () => void } =
     }
   };
 
-  const handleChannelCreate = async (name: string, isPrivate: boolean = false, jobTitle?: string) => {
+  const handleChannelCreate = async (name: string, isPrivate: boolean = false, jobTitle?: string, inviteeIds: string[] = []) => {
     if (!currentUser) {
       setError('You must be logged in to create a channel');
       throw new Error('You must be logged in to create a channel');
@@ -291,6 +291,16 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: () => void } =
     try {
       console.log("🆕 Creating channel:", name, "isPrivate:", isPrivate, "jobTitle:", jobTitle);
       const newChannel = await chatService.createChannel(name, currentUser.id, isPrivate, jobTitle);
+
+      // the people chosen in the dialog; the channel exists either way, so a failure here is a message, not an undo
+      if (inviteeIds.length > 0) {
+        try {
+          const added = await chatService.addChannelMembers(newChannel.id, inviteeIds);
+          toast.success(added === 1 ? 'Added 1 person to the channel' : `Added ${added} people to the channel`);
+        } catch (inviteError: any) {
+          toast.error(`The channel was created, but people could not be added: ${inviteError?.message || 'unknown error'}`);
+        }
+      }
 
       // Add the new channel to state immediately
       setChannels(prev => [...prev, newChannel]);
