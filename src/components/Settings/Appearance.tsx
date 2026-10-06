@@ -3,6 +3,8 @@ import { Card, PageHeader, Button } from '../UI';
 import { applyTheme, clearStoredTheme, currentChoice, resetTheme, saveStoredTheme } from '../../theme/applyTheme';
 import { DEFAULT_PRESET, PRESETS, ThemeChoice, ThemePreset, choiceFromPreset, deriveVars, presetFor } from '../../theme/themes';
 import { rgbToHex } from '../../theme/color';
+import ProfilePicture from './ProfilePicture';
+import { saveMyTheme } from '../../lib/preferences';
 import AccessibilityPanel from '../Accessibility/AccessibilityPanel';
 
 const toRgb = (triplet: string) => triplet.split(' ').map(Number) as [number, number, number];
@@ -57,11 +59,13 @@ export default function Appearance() {
     if (!applyTheme(next)) return;
     saveStoredTheme(next);
     setChoice(next);
+    void saveMyTheme(next); // also on the account, so it follows this person to other devices
   };
 
   const restoreDefault = () => {
     resetTheme();
     clearStoredTheme();
+    void saveMyTheme(null);
     setChoice(choiceFromPreset(DEFAULT_PRESET));
   };
 
@@ -76,6 +80,8 @@ export default function Appearance() {
           </Button>
         }
       />
+
+      <ProfilePicture />
 
       <Card className="mb-4">
         <h2 className="m-0 text-[14px] font-bold text-ink">Themes</h2>

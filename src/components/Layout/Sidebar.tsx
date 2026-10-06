@@ -28,6 +28,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
+import { useMyPreferences } from '../../hooks/useMyPreferences';
 import { useLocation, useNavigate } from 'react-router-dom';
 import solo from '../../../public/solo.png';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -104,6 +105,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
 
   // Use permissions hook for dynamic access control
   const { hasPermission, loading: permissionsLoading } = usePermissions();
+  const { data: myPreferences } = useMyPreferences(user?.email);
 
   // Badge on "Time Off" (FIG-575): count of pending leave applications that
   // need action from the logged-in user specifically - not a global count,
@@ -201,6 +203,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
 
   const isExpanded = !isCollapsed;
   const userRole = user?.role || 'Admin';
+  const avatarUrl = myPreferences?.avatarUrl ?? null;
   const userInitial = user?.email?.[0]?.toUpperCase() || 'A';
 
   return (
@@ -374,9 +377,13 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
           <div className="relative overflow-hidden rounded-xl bg-shell-fg/5 border border-shell-fg/10 p-2.5 backdrop-blur-sm">
             <div className="flex items-center gap-3 relative z-10">
               <div className="relative flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-inner ring-1 ring-shell-fg/50">
-                  <span className="font-bold text-brand text-xs">{userInitial}</span>
-                </div>
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover ring-1 ring-shell-fg/50" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-inner ring-1 ring-shell-fg/50">
+                    <span className="font-bold text-brand text-xs">{userInitial}</span>
+                  </div>
+                )}
               </div>
 
               <AnimatePresence>
