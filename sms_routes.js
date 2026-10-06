@@ -9,6 +9,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import { authenticate, HttpError, admin } from "./admin_routes.js";
+import { callerHasModule, createBudget } from "./authz.js";
 
 dotenv.config({ path: process.env.ENV_FILE || ".env" });
 
@@ -31,26 +32,10 @@ const PURPOSES = {
 };
 
 // Per-user budgets (in recipients) so a stolen session cannot be used to drain the account.
-// In-memory: fine for one server process; move to a shared store if this is ever scaled out.
-const BUDGETS = {
+const takeBudget = createBudget({
   default: { limit: 3000, windowMs: 60 * 60 * 1000 },
   mfa: { limit: 5, windowMs: 10 * 60 * 1000 },
-};
-const spent = new Map();
-
-const takeBudget = (userId, kind, cost, now = Date.now()) => {
-  const { limit, windowMs } = BUDGETS[kind] || BUDGETS.default;
-  const key = `${kind}:${userId}`;
-  const recent = (spent.get(key) || []).filter((e) => now - e.at < windowMs);
-  const used = recent.reduce((n, e) => n + e.cost, 0);
-  if (used + cost > limit) {
-    spent.set(key, recent);
-    return false;
-  }
-  recent.push({ at: now, cost });
-  spent.set(key, recent);
-  return true;
-};
+});
 
 // 07XXXXXXXX / 7XXXXXXXX / +254... / 254... -> 2547XXXXXXXX (12 digits), or '' when it is not a Kenyan mobile.
 export const formatPhone = (phone) => {
@@ -110,20 +95,6 @@ async function sendOne({ apiKey, partnerId }, shortcode, mobile, message) {
   } catch (err) {
     return { success: false, confirmed: true, error: err?.name === "AbortError" ? "SMS provider timed out" : "Could not reach the SMS provider" };
   }
-}
-
-// Does the caller's role include one of these modules? ADMIN always does.
-async function callerHasModule(caller, modules) {
-  if (caller.role === "ADMIN") return true;
-  const { data, error } = await admin
-    .from("role_permissions")
-    .select("permissions")
-    .eq("tenant_id", caller.tenantId)
-    .eq("role_name", caller.role)
-    .maybeSingle();
-  if (error) throw new HttpError(500, "Could not verify permissions");
-  const granted = Array.isArray(data?.permissions) ? data.permissions : [];
-  return modules.some((m) => granted.includes(m));
 }
 
 const handler = (fn) => async (req, res) => {

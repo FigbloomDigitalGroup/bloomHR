@@ -12,11 +12,8 @@
  */
 
 import { useCallback } from 'react';
+import { sendEmailViaServer } from '../lib/emailApi';
 import { supabase } from '../lib/supabase';
-
-const API_URL =
-    import.meta.env.VITE_API_URL ||
-    (import.meta.env.MODE === 'production' ? '/api' : 'http://localhost:3002/api');
 
 export interface HRNotification {
     id: number;
@@ -44,12 +41,8 @@ export interface HRNotification {
 
 async function sendReminderEmail(to: string, subject: string, htmlBody: string) {
     try {
-        const res = await fetch(`${API_URL}/email/send`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to, subject, html: htmlBody, provider: 'resend' }),
-        });
-        return res.ok;
+        await sendEmailViaServer({ to, subject, html: htmlBody, provider: 'resend' }, { purpose: 'hr-reminder' });
+        return true;
     } catch {
         return false;
     }

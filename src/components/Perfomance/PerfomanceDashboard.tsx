@@ -680,7 +680,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange 
         to: email,
         subject: subject,
         html: htmlContent
-      });
+      }, 'performance');
       return { success: true };
     } catch (error) {
       console.error('Email sending error:', error);
