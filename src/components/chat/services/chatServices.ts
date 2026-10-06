@@ -178,7 +178,7 @@ class ChatService {
     }
 
     if (!data || data.length === 0) {
-      return await this.createDefaultChannels();
+      return [];
     }
 
     const unreadCounts = await this.getUnreadCountsByChannel(userId, data.map(c => c.id));
@@ -246,43 +246,6 @@ class ChatService {
         createdAt: new Date().toISOString()
       }
     ];
-  }
-
-  private async createDefaultChannels(): Promise<Channel[]> {
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-      const currentUserId = userData.user?.id;
-
-      if (!currentUserId) {
-        return this.getDefaultChannels();
-      }
-
-      const defaultChannels = [
-        { name: 'general', description: 'Company-wide announcements and chat', is_private: false },
-        { name: 'engineering', description: 'Engineering team discussions', is_private: false, job_title: 'Software Engineer' },
-        { name: 'design', description: 'Design team collaboration', is_private: false, job_title: 'Designer' },
-        { name: 'product', description: 'Product management discussions', is_private: false, job_title: 'Product Manager' }
-      ];
-
-      const channels: Channel[] = [];
-
-      for (const channelData of defaultChannels) {
-        const channel = await this.createChannel(
-          channelData.name, 
-          currentUserId,
-          channelData.is_private, 
-          channelData.job_title
-        );
-        if (channel) {
-          channels.push(channel);
-        }
-      }
-
-      return channels;
-    } catch (error) {
-      console.error('Error creating default channels:', error);
-      return this.getDefaultChannels();
-    }
   }
 
   async getChannelMessages(channelId: string): Promise<Message[]> {
