@@ -8,7 +8,7 @@ import { useHRNotifications, fetchAdminHRNotifications, markAdminNotificationRea
 import { SearchInput } from '../UI';
 import CompanySwitcher from '../Company/CompanySwitcher';
 import { useMyCompanies } from '../../hooks/useMyCompanies';
-import { OPEN_COMPANY_PROFILE } from '../Dashboard/GetStarted';
+import { OPEN_COMPANY_PROFILE, COMPANY_PROFILE_SAVED } from '../Dashboard/GetStarted';
 
 interface HeaderProps {
   user?: { email: string; role: string };
@@ -332,6 +332,7 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
       }
 
       setCompanyProfile(updatedProfile);
+      window.dispatchEvent(new Event(COMPANY_PROFILE_SAVED)); // the "Get started" checklist ticks it off
       toast.success('Profile updated successfully!');
       return updatedProfile;
     } catch (error) {
