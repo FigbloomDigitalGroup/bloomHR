@@ -3,6 +3,8 @@ import { useEffect, useState, useRef } from 'react';
 import { X, Save, ArrowLeft, Plus, Upload, AlertCircle, Users, Check, PencilLine } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
+import toast from 'react-hot-toast';
+import { isValidPhone, summarizeErrors } from '../../lib/formValidation';
 import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
@@ -48,7 +50,6 @@ type StatutoryDeduction = {
   isActive: boolean;
 };
 
-const phoneRegex = /^[+]{0,1}[\s0-9]{8,15}$/;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const idNumberRegex = /^[0-9]{6,12}$/;
 const passportRegex = /^[A-Za-z0-9]{6,12}$/;
@@ -300,7 +301,7 @@ const EmployeeBioPage = () => {
         case 'Work Mobile':
         case 'Personal Mobile':
         case 'Alternative Mobile Number':
-          if (value && !phoneRegex.test(String(value))) {
+          if (value && !isValidPhone(String(value))) {
             error = 'Invalid phone number format';
           }
           break;
@@ -442,7 +443,7 @@ const EmployeeBioPage = () => {
     if (!employee['Mobile Number']) {
       newErrors['Mobile Number'] = 'Mobile Number is required';
       isValid = false;
-    } else if (!phoneRegex.test(employee['Mobile Number'])) {
+    } else if (!isValidPhone(employee['Mobile Number'])) {
       newErrors['Mobile Number'] = 'Invalid phone number format';
       isValid = false;
     }
@@ -458,7 +459,7 @@ const EmployeeBioPage = () => {
     if (emergencyContact.name && !emergencyContact.phone) {
       newErrors['emergencyContactPhone'] = 'Emergency contact phone is required';
       isValid = false;
-    } else if (emergencyContact.phone && !phoneRegex.test(emergencyContact.phone)) {
+    } else if (emergencyContact.phone && !isValidPhone(emergencyContact.phone)) {
       newErrors['emergencyContactPhone'] = 'Invalid emergency contact phone format';
       isValid = false;
     }
@@ -505,6 +506,7 @@ const EmployeeBioPage = () => {
     });
 
     setErrors(newErrors);
+    if (!isValid) toast.error(summarizeErrors(newErrors));
     return isValid;
   };
 

@@ -4,6 +4,8 @@ import { useUser } from '../ProtectedRoutes/UserContext';
 import { X, Plus, ArrowLeft, User, Briefcase, Phone, CreditCard, MapPin, Upload, AlertCircle, Users, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
+import toast from 'react-hot-toast';
+import { isValidPhone, summarizeErrors } from '../../lib/formValidation';
 import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
@@ -50,7 +52,6 @@ type StatutoryDeduction = {
   columnName: string;
 };
 
-const phoneRegex = /^[+]{0,1}[\s0-9]{8,15}$/;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const idNumberRegex = /^[0-9]{6,12}$/;
 const passportRegex = /^[A-Za-z0-9]{6,12}$/;
@@ -177,7 +178,7 @@ const AddEmployeePage = () => {
         case 'Work Mobile':
         case 'Personal Mobile':
         case 'Alternative Mobile Number':
-          if (value && !phoneRegex.test(String(value))) {
+          if (value && !isValidPhone(String(value))) {
             error = 'Invalid phone number format';
           }
           break;
@@ -247,7 +248,7 @@ const AddEmployeePage = () => {
     if (!newEmployee['Mobile Number']) {
       newErrors['Mobile Number'] = 'Mobile Number is required';
       isValid = false;
-    } else if (!phoneRegex.test(newEmployee['Mobile Number'])) {
+    } else if (!isValidPhone(newEmployee['Mobile Number'])) {
       newErrors['Mobile Number'] = 'Invalid phone number format';
       isValid = false;
     }
@@ -272,7 +273,7 @@ const AddEmployeePage = () => {
       if (!contact.phone) {
         newErrors[`emergencyContactPhone${index}`] = 'Phone is required';
         isValid = false;
-      } else if (!phoneRegex.test(contact.phone)) {
+      } else if (!isValidPhone(contact.phone)) {
         newErrors[`emergencyContactPhone${index}`] = 'Invalid phone format';
         isValid = false;
       }
@@ -312,6 +313,7 @@ const AddEmployeePage = () => {
     });
 
     setErrors(newErrors);
+    if (!isValid) toast.error(summarizeErrors(newErrors));
     return isValid;
   };
 
