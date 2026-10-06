@@ -14,7 +14,7 @@ const ADMIN_A = '00000000-0000-0000-0000-00000000a0ad';
 const ADMIN_B = '00000000-0000-0000-0000-00000000b0ad';
 
 // Keep in sync with the "exempt" arrays in the migrations.
-const NOT_TENANT_OWNED = ['tenants', 'permissions', 'user_profiles', 'Employee_Records_Duplicate', 'kenya_branches_duplicate'];
+const NOT_TENANT_OWNED = ['tenants', 'permissions', 'user_profiles', 'memberships', 'Employee_Records_Duplicate', 'kenya_branches_duplicate'];
 
 let db: PGlite;
 

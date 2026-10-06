@@ -11,44 +11,55 @@ const TENANT_A = 'tenant-a';
 const TENANT_B = 'tenant-b';
 
 type Profile = { user_id: string; email: string; role: string; account_status: string; tenant_id: string | null };
+type Membership = { user_id: string; tenant_id: string; role: string; account_status: string };
 
 const state = vi.hoisted(() => ({
   profiles: [] as Profile[],
+  memberships: [] as Membership[],
+  updates: [] as Record<string, unknown>[],
   authUsers: [] as { id: string; email: string; user_metadata: Record<string, unknown> }[],
   calls: [] as string[],
 }));
 
 vi.mock('@supabase/supabase-js', () => {
-  // Minimal query builder over state.profiles: select / eq / maybeSingle / upsert / delete.
-  const profilesTable = () => {
+  // Minimal query builder over state[table]: select / eq / maybeSingle / upsert / delete.
+  // user_profiles is read-only here (authenticate); the database mirrors memberships into it.
+  const makeTable = (name: 'profiles' | 'memberships') => {
     const filters: [string, unknown][] = [];
-    let columns = '*';
-    const run = () => state.profiles.filter((p) => filters.every(([k, v]) => (p as Record<string, unknown>)[k] === v));
+    const rowsOf = () => state[name] as Record<string, unknown>[];
+    const run = () => rowsOf().filter((p) => filters.every(([k, v]) => p[k] === v));
     const builder: Record<string, unknown> = {
-      select: (cols: string) => {
-        columns = cols;
-        return builder;
-      },
+      select: () => builder,
       eq: (k: string, v: unknown) => {
         filters.push([k, v]);
         return builder;
       },
       maybeSingle: async () => ({ data: run()[0] ?? null, error: null }),
-      then: (resolve: (v: unknown) => void) => resolve({ data: run(), error: null, columns }),
-      upsert: async (row: Profile) => {
-        state.calls.push(`upsert:${row.user_id}:${row.tenant_id}`);
-        const i = state.profiles.findIndex((p) => p.user_id === row.user_id);
-        if (i >= 0) state.profiles[i] = { ...state.profiles[i], ...row };
-        else state.profiles.push(row);
+      then: (resolve: (v: unknown) => void) => resolve({ data: run(), error: null }),
+      upsert: async (row: Record<string, unknown>) => {
+        state.calls.push(`upsert:${name}:${row.user_id}:${row.tenant_id}`);
+        state.updates.push(row);
+        const keys = name === 'memberships' ? ['user_id', 'tenant_id'] : ['user_id'];
+        const i = rowsOf().findIndex((p) => keys.every((k) => p[k] === row[k]));
+        if (i >= 0) rowsOf()[i] = { ...rowsOf()[i], ...row };
+        else rowsOf().push(row);
         return { error: null };
       },
-      delete: () => ({
-        eq: async (k: string, v: unknown) => {
-          state.calls.push(`delete-profile:${v}`);
-          state.profiles = state.profiles.filter((p) => (p as Record<string, unknown>)[k] !== v);
-          return { error: null };
-        },
-      }),
+      delete: () => {
+        const del: Record<string, unknown> = {
+          eq: (k: string, v: unknown) => {
+            filters.push([k, v]);
+            return del;
+          },
+          then: (resolve: (v: unknown) => void) => {
+            state.calls.push(`delete:${name}:${filters.map(([, v]) => v).join(':')}`);
+            const doomed = new Set(run());
+            (state[name] as unknown[]) = rowsOf().filter((r) => !doomed.has(r));
+            resolve({ error: null });
+          },
+        };
+        return del;
+      },
     };
     return builder;
   };
@@ -70,8 +81,8 @@ vi.mock('@supabase/supabase-js', () => {
           state.calls.push(`createUser:${email}`);
           return { data: { user }, error: null };
         },
-        updateUserById: async (id: string) => {
-          state.calls.push(`updateUser:${id}`);
+        updateUserById: async (id: string, update: Record<string, unknown>) => {
+          state.calls.push(`updateUser:${id}${update?.ban_duration ? `:ban=${update.ban_duration}` : ''}`);
           return { data: { user: state.authUsers.find((u) => u.id === id) }, error: null };
         },
         deleteUser: async (id: string) => {
@@ -81,8 +92,9 @@ vi.mock('@supabase/supabase-js', () => {
       },
     },
     from: (table: string) => {
-      if (table !== 'user_profiles') throw new Error(`unexpected table ${table}`);
-      return profilesTable();
+      if (table === 'user_profiles') return makeTable('profiles');
+      if (table === 'memberships') return makeTable('memberships');
+      throw new Error(`unexpected table ${table}`);
     },
   };
   return { createClient: () => client };
@@ -124,6 +136,8 @@ beforeEach(() => {
     { user_id: 'admin-b', email: 'admin@b.co', role: 'ADMIN', account_status: 'ACTIVE', tenant_id: TENANT_B },
     { user_id: 'staff-b', email: 'staff@b.co', role: 'STAFF', account_status: 'ACTIVE', tenant_id: TENANT_B },
   ];
+  state.memberships = state.profiles.map((p) => ({ user_id: p.user_id, tenant_id: p.tenant_id as string, role: p.role, account_status: p.account_status }));
+  state.updates = [];
 });
 
 const call = (method: string, path: string, as: string, body?: unknown) =>
@@ -149,20 +163,20 @@ describe('admin API tenant isolation', () => {
   it('creates new logins inside the caller’s tenant', async () => {
     const res = await call('POST', '/users', 'admin-a', { email: 'New@A.co', password: 'secret1', role: 'STAFF' });
     expect(res.status).toBe(201);
-    expect(state.calls).toContain(`upsert:new-new@a.co:${TENANT_A}`);
+    expect(state.calls).toContain(`upsert:memberships:new-new@a.co:${TENANT_A}`);
   });
 
   it('cannot change a user in another tenant', async () => {
     const res = await call('PATCH', '/users/staff-b', 'admin-a', { role: 'ADMIN' });
     expect(res.status).toBe(404);
     expect(state.calls.filter((c) => c.startsWith('updateUser'))).toEqual([]);
-    expect(state.profiles.find((p) => p.user_id === 'staff-b')?.role).toBe('STAFF');
+    expect(state.memberships.find((m) => m.user_id === 'staff-b')?.role).toBe('STAFF');
   });
 
   it('can change a user in its own tenant, which stays in that tenant', async () => {
     const res = await call('PATCH', '/users/staff-a', 'admin-a', { account_status: 'SUSPENDED' });
     expect(res.status).toBe(200);
-    expect(state.profiles.find((p) => p.user_id === 'staff-a')).toMatchObject({ tenant_id: TENANT_A, account_status: 'SUSPENDED' });
+    expect(state.memberships.find((m) => m.user_id === 'staff-a')).toMatchObject({ tenant_id: TENANT_A, account_status: 'SUSPENDED' });
   });
 
   it('cannot delete a user in another tenant', async () => {
@@ -181,5 +195,63 @@ describe('admin API tenant isolation', () => {
     state.profiles.push({ user_id: 'orphan', email: 'orphan@x.co', role: 'ADMIN', account_status: 'ACTIVE', tenant_id: null });
     const res = await call('GET', '/users', 'orphan');
     expect(res.status).toBe(403);
+  });
+
+  it('never writes a membership for any company but the caller’s', async () => {
+    await call('POST', '/users', 'admin-a', { email: 'x@a.co', password: 'secret1', role: 'STAFF' });
+    await call('PATCH', '/users/staff-a', 'admin-a', { role: 'HR' });
+    expect(state.updates.length).toBeGreaterThan(0);
+    expect(state.updates.every((u) => u.tenant_id === TENANT_A)).toBe(true);
+  });
+});
+
+describe('a person in several companies', () => {
+  // dual works in A as STAFF and in B as HR; their login is shared, their roles and statuses are not
+  beforeEach(() => {
+    state.authUsers.push({ id: 'dual', email: 'dual@x.co', user_metadata: {} });
+    state.profiles.push({ user_id: 'dual', email: 'dual@x.co', role: 'STAFF', account_status: 'ACTIVE', tenant_id: TENANT_A });
+    state.memberships.push(
+      { user_id: 'dual', tenant_id: TENANT_A, role: 'STAFF', account_status: 'ACTIVE' },
+      { user_id: 'dual', tenant_id: TENANT_B, role: 'HR', account_status: 'ACTIVE' }
+    );
+  });
+
+  it('shows up in both companies, with the role they have in each', async () => {
+    const a = (await (await call('GET', '/users', 'admin-a')).json()).users;
+    const b = (await (await call('GET', '/users', 'admin-b')).json()).users;
+    expect(a.find((u: { id: string }) => u.id === 'dual').role).toBe('STAFF');
+    expect(b.find((u: { id: string }) => u.id === 'dual').role).toBe('HR');
+  });
+
+  it('can be managed by the other company’s admin even while working in the first company', async () => {
+    // profile (current company) is A, but admin-b can still see and change their B membership
+    const res = await call('PATCH', '/users/dual', 'admin-b', { role: 'MANAGER' });
+    expect(res.status).toBe(200);
+    expect(state.memberships.find((m) => m.user_id === 'dual' && m.tenant_id === TENANT_B)?.role).toBe('MANAGER');
+    expect(state.memberships.find((m) => m.user_id === 'dual' && m.tenant_id === TENANT_A)?.role).toBe('STAFF');
+  });
+
+  it('suspending them in one company does not ban the login they use for the other', async () => {
+    await call('PATCH', '/users/dual', 'admin-a', { account_status: 'SUSPENDED' });
+    expect(state.calls).toContain('updateUser:dual:ban=none'); // explicitly not banned
+    expect(state.calls.some((c) => c.includes(':ban=876000h'))).toBe(false);
+  });
+
+  it('suspending someone whose only company this is still bans the login', async () => {
+    await call('PATCH', '/users/staff-a', 'admin-a', { account_status: 'SUSPENDED' });
+    expect(state.calls).toContain('updateUser:staff-a:ban=876000h');
+  });
+
+  it('removing them from one company keeps their login and their other company', async () => {
+    const res = await call('DELETE', '/users/dual', 'admin-a');
+    expect(res.status).toBe(200);
+    expect(state.memberships.filter((m) => m.user_id === 'dual').map((m) => m.tenant_id)).toEqual([TENANT_B]);
+    expect(state.calls.filter((c) => c.startsWith('deleteUser'))).toEqual([]);
+  });
+
+  it('removing someone from their only company deletes the login', async () => {
+    await call('DELETE', '/users/staff-a', 'admin-a');
+    expect(state.calls).toContain('deleteUser:staff-a');
+    expect(state.memberships.some((m) => m.user_id === 'staff-a')).toBe(false);
   });
 });
