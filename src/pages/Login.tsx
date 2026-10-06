@@ -2,72 +2,23 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import Select from 'react-select';
 import { useAppUpdate } from '../sw';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   EnvelopeSimple,
   LockKey,
-  Buildings,
   ArrowRight,
-  CircleNotch,
-  CheckCircle
+  CircleNotch
 } from '@phosphor-icons/react';
 
 interface LoginProps {
   onLoginSuccess: (userData: any) => void;
 }
 
-interface Branch {
-  Town: string;
-}
-
-interface SuccessPopupProps {
-  show: boolean;
-  onClose: () => void;
-  message: string;
-}
-
-// End of helper functions
-
-function SuccessPopup({ show, onClose, message }: SuccessPopupProps) {
-  if (!show) return null;
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white/10 backdrop-blur-3xl border border-white/20 p-8 rounded-lg shadow-2xl max-w-sm w-full text-center"
-      >
-        <div className="w-20 h-20 bg-gray-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
-          <CheckCircle size={40} className="text-gray-900" weight="fill" />
-        </div>
-        <h3 className="text-2xl font-bold text-white mb-2">Request Sent!</h3>
-        <p className="text-gray-200 text-xs mb-8">{message}</p>
-        <button
-          onClick={onClose}
-          className="w-full py-4 bg-gray-900 hover:bg-gray-800 text-white text-xs font-bold rounded-lg shadow-lg transition-all"
-        >
-          Got it
-        </button>
-      </motion.div>
-    </div>
-  );
-}
-
 export default function Login({ onLoginSuccess }: LoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedBranch, setSelectedBranch] = useState('');
   const [loading, setLoading] = useState(false);
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [isFetchingBranches, setIsFetchingBranches] = useState(true);
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
-  const [isBranchAutoPopulated, setIsBranchAutoPopulated] = useState(false);
-  const [isRegionalManager, setIsRegionalManager] = useState(false);
-  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
-  const [emailExists, setEmailExists] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
@@ -92,130 +43,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     };
     checkSession();
   }, [navigate, searchParams]);
-
-  useEffect(() => {
-    const fetchTowns = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('kenya_branches_duplicate')
-          .select('Town')
-          .order('Town', { ascending: true });
-        if (error) throw error;
-        setBranches(data || []);
-      } catch {
-        toast.error('Failed to load towns');
-      } finally {
-        setIsFetchingBranches(false);
-      }
-    };
-    fetchTowns();
-  }, []);
-
-  const checkEmailExists = async (email: string) => {
-    if (!email) return false;
-    setIsCheckingEmail(true);
-    try {
-      const { data: authData } = await supabase
-        .from('users')
-        .select('email')
-        .eq('email', email)
-        .single();
-      if (authData) {
-        setEmailExists(true);
-        return true;
-      }
-      const { data: signupData } = await supabase
-        .from('staff_signup_requests')
-        .select('email')
-        .eq('email', email)
-        .eq('status', 'pending')
-        .single();
-      if (signupData) {
-        setEmailExists(true);
-        return true;
-      }
-      setEmailExists(false);
-      return false;
-    } catch {
-      return false;
-    } finally {
-      setIsCheckingEmail(false);
-    }
-  };
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (email && isSignUp) checkEmailExists(email);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [email, isSignUp]);
-
-  useEffect(() => {
-    const detectTown = async () => {
-      // Nothing to detect until an email is entered
-      if (!email) {
-        setIsBranchAutoPopulated(false);
-        setIsRegionalManager(false);
-        return;
-      }
-
-      const searchEmail = email.trim();
-      if (searchEmail.length < 5) return; // Wait for more characters
-
-      try {
-        // 1. Check regional managers first
-        const { data: managerData } = await supabase
-          .from('regional_managers')
-          .select('email')
-          .ilike('email', searchEmail)
-          .maybeSingle();
-
-        if (managerData) {
-          setIsRegionalManager(true);
-          setIsBranchAutoPopulated(false);
-          return;
-        }
-
-        // 2. Check main employees table (current source of truth)
-        const { data: mainEmpData } = await supabase
-          .from('employees')
-          .select('Town')
-          .ilike('"Work Email"', searchEmail)
-          .maybeSingle();
-
-        if (mainEmpData?.Town) {
-          setSelectedBranch(mainEmpData.Town);
-          setIsBranchAutoPopulated(true);
-          setIsRegionalManager(false);
-          return;
-        }
-
-        // 3. Fallback to duplicate records table
-        const { data: employeeData } = await supabase
-          .from('Employee_Records_Duplicate')
-          .select('Town')
-          .ilike('"Official Email"', searchEmail)
-          .maybeSingle();
-
-        if (employeeData && employeeData.Town) {
-          setSelectedBranch(employeeData.Town);
-          setIsBranchAutoPopulated(true);
-          setIsRegionalManager(false);
-        } else {
-          setIsBranchAutoPopulated(false);
-          setIsRegionalManager(false);
-        }
-      } catch (err) {
-        console.error('Branch detection error:', err);
-      }
-    };
-
-    const timer = setTimeout(() => {
-      detectTown();
-    }, 600); // 600ms debounce
-
-    return () => clearTimeout(timer);
-  }, [email]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -264,30 +91,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     }
   };
 
-  const handleStaffSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (emailExists) return;
-    setLoading(true);
-    try {
-      const { error } = await supabase
-        .from('staff_signup_requests')
-        .insert([{
-          email,
-          branch: selectedBranch,
-          status: 'pending'
-        }]);
-      if (error) throw error;
-      setShowSuccessPopup(true);
-      setEmail('');
-      setSelectedBranch('');
-      setIsBranchAutoPopulated(false);
-    } catch (error: any) {
-      toast.error(error.message || 'Request failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setResetLoading(true);
@@ -302,11 +105,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       setResetLoading(false);
     }
   };
-
-  const branchOptions = branches.map(branch => ({
-    value: branch.Town,
-    label: branch.Town
-  }));
 
   return (
     <div className="flex min-h-screen bg-gray-50 font-sans [&_h1]:font-sans [&_h2]:font-sans [&_h3]:font-sans [&_h4]:font-sans [&_button]:font-sans [&_input]:font-sans [&_label]:font-sans">
@@ -379,7 +177,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
           <AnimatePresence mode='wait'>
             <motion.div
-              key={isSignUp ? 'signup' : 'login'}
+              key="login"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -388,16 +186,14 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             >
               <div className="space-y-2">
                 <h2 className="text-3xl font-bold text-gray-900">
-                  {isSignUp ? 'Apply for Account' : 'Welcome Back'}
+                  Welcome Back
                 </h2>
                 <p className="text-gray-500 text-xs font-medium">
-                  {isSignUp
-                    ? 'Submit your details to join the organization.'
-                    : 'Enter your credentials to access your dashboard.'}
+                  Enter your credentials to access your dashboard.
                 </p>
               </div>
 
-              <form className="space-y-6" onSubmit={isSignUp ? handleStaffSignUp : handleLogin}>
+              <form className="space-y-6" onSubmit={handleLogin}>
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-gray-500 ml-1">Email address</label>
                   <div className="relative group">
@@ -407,21 +203,15 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                     <input
                       type="email"
                       required
-                      className={`block w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 transition-all ${emailExists && isSignUp ? 'border-red-300 focus:border-red-500' : 'hover:border-gray-300'
-                        }`}
+                      className={`block w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 transition-all hover:border-gray-300`}
                       placeholder="name@company.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                     />
-                    {isCheckingEmail && (
-                      <div className="absolute inset-y-0 right-4 flex items-center">
-                        <CircleNotch size={18} className="animate-spin text-gray-900" />
-                      </div>
-                    )}
                   </div>
                 </div>
 
-                {!isSignUp && (
+                {(
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center ml-1">
                       <label className="text-xs font-bold text-gray-500">Password</label>
@@ -449,81 +239,13 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                   </div>
                 )}
 
-                {!isRegionalManager && (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-gray-500 ml-1 flex items-center gap-2">
-                      Town office
-                      {isBranchAutoPopulated && (
-                        <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-gray-900 text-[10px] font-bold border border-gray-200 bg-gray-100">
-                          <CheckCircle size={10} weight="fill" /> AUTO
-                        </span>
-                      )}
-                    </label>
-                    <div className="relative group">
-                      <div className="absolute z-10 top-[14px] left-4 pointer-events-none">
-                        <Buildings size={20} className="text-gray-400 group-focus-within:text-gray-900 transition-colors" />
-                      </div>
-                      <div className="relative">
-                        {isBranchAutoPopulated ? (
-                          <input
-                            type="text"
-                            className="block w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-900 font-medium cursor-not-allowed"
-                            value={selectedBranch}
-                            readOnly
-                          />
-                        ) : (
-                          <Select
-                            id="branch"
-                            name="branch"
-                            options={branchOptions}
-                            placeholder="Select branch..."
-                            isSearchable
-                            isLoading={isFetchingBranches}
-                            styles={{
-                              control: (base: any, state: any) => ({
-                                ...base,
-                                minHeight: '48px',
-                                backgroundColor: '#f9fafb',
-                                borderRadius: '0.5rem',
-                                paddingLeft: '32px',
-                                fontSize: '0.75rem',
-                                borderColor: state.isFocused ? '#111827' : '#e5e7eb',
-                                boxShadow: 'none',
-                                '&:hover': {
-                                  borderColor: state.isFocused ? '#111827' : '#d1d5db'
-                                }
-                              }),
-                              menu: (base: any) => ({
-                                ...base,
-                                borderRadius: '0.5rem',
-                                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                                padding: '0.5rem',
-                                fontSize: '0.75rem'
-                              }),
-                              option: (base: any, state: any) => ({
-                                ...base,
-                                borderRadius: '0.25rem',
-                                backgroundColor: state.isSelected ? '#111827' : state.isFocused ? '#f3f4f6' : 'transparent',
-                                color: state.isSelected ? 'white' : '#374151'
-                              })
-                            }}
-                            value={selectedBranch ? { value: selectedBranch, label: selectedBranch } : null}
-                            onChange={(selectedOption: any) => setSelectedBranch(selectedOption?.value || '')}
-                            components={{ IndicatorSeparator: () => null }}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 <div className="pt-2">
                   <motion.button
                     type="submit"
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.98 }}
-                    disabled={loading || isFetchingBranches || (isSignUp && emailExists)}
-                    className={`w-full flex justify-center items-center gap-2 py-4 px-4 rounded-lg text-xs font-bold text-white shadow-lg transition-all ${loading || isFetchingBranches || (isSignUp && emailExists)
+                    disabled={loading}
+                    className={`w-full flex justify-center items-center gap-2 py-4 px-4 rounded-lg text-xs font-bold text-white shadow-lg transition-all ${loading
                       ? 'bg-gray-300 cursor-not-allowed shadow-none'
                       : 'bg-gray-900 hover:bg-gray-800 shadow-gray-900/20'
                       }`}
@@ -535,7 +257,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                       </>
                     ) : (
                       <>
-                        <span>{isSignUp ? 'Request Access' : 'Sign In'}</span>
+                        <span>Sign In</span>
                         <ArrowRight size={18} weight="bold" />
                       </>
                     )}
@@ -544,17 +266,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               </form>
 
               <div className="text-center pt-8 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setIsSignUp(!isSignUp)}
-                  className="text-gray-500 text-xs font-medium hover:text-gray-900 transition-colors"
-                >
-                  {isSignUp ? 'Already have an account?' : 'Need an account?'}
-                  <span className="ml-1 text-gray-900 font-bold underline decoration-gray-200 underline-offset-4">
-                    {isSignUp ? 'Sign In' : 'Apply Now'}
-                  </span>
-                </button>
-                <div className="mt-3">
+                <div>
                   <Link to="/create-company" className="text-gray-500 text-xs font-medium hover:text-gray-900 transition-colors">
                     Starting a new company?
                     <span className="ml-1 text-gray-900 font-bold underline decoration-gray-200 underline-offset-4">Create one</span>
@@ -565,15 +277,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           </AnimatePresence>
         </div>
       </div>
-
-      <SuccessPopup
-        show={showSuccessPopup}
-        onClose={() => {
-          setShowSuccessPopup(false);
-          setIsSignUp(false);
-        }}
-        message="Your account request has been submitted successfully."
-      />
 
       {showForgotPassword && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
