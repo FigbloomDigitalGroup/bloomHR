@@ -123,4 +123,82 @@ router.post("/send", async (req, res) => {
   }
 });
 
+// POST /api/invites/accept  { token, password, fullName? }  (no login: the invitation link is the proof)
+//
+// For someone with no account yet. Only the person who received the email can have the token, so the invitation
+// itself proves they own that address and no confirmation email is needed. The account is created already
+// confirmed, in the inviting company, with the role chosen in the invitation. If the address already has an
+// account (for example from another company), the answer is 409 / account_exists: they sign in and join instead.
+router.post("/accept", async (req, res) => {
+  let claimedId = null;
+  let createdUserId = null;
+  const undo = async () => {
+    if (createdUserId) await admin.auth.admin.deleteUser(createdUserId).catch(() => {});
+    if (claimedId) await admin.from("invitations").update({ status: "pending", accepted_at: null }).eq("id", claimedId);
+  };
+  try {
+    if (!admin) throw new HttpError(500, "Admin API is not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
+
+    const { token, password } = req.body || {};
+    const fullName = typeof req.body?.fullName === "string" ? req.body.fullName.trim().slice(0, 100) : "";
+    if (typeof token !== "string" || token.length < 20 || token.length > 200) throw new HttpError(400, "A valid invitation token is required");
+    if (typeof password !== "string" || password.length < 8 || password.length > 72) throw new HttpError(400, "Password must be 8 to 72 characters");
+
+    const { data: invitation, error } = await admin
+      .from("invitations")
+      .select("id, tenant_id, email, role, status, expires_at")
+      .eq("token_hash", hashToken(token))
+      .maybeSingle();
+    if (error) throw error;
+    if (!invitation || invitation.status !== "pending" || new Date(invitation.expires_at) < new Date()) {
+      throw new HttpError(404, "This invitation is not valid any more");
+    }
+
+    // claim it first, so two requests with the same link cannot both create an account
+    const { data: claimed, error: claimError } = await admin
+      .from("invitations")
+      .update({ status: "accepted", accepted_at: new Date().toISOString() })
+      .eq("id", invitation.id)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+    if (claimError) throw claimError;
+    if (!claimed) throw new HttpError(404, "This invitation is not valid any more");
+    claimedId = invitation.id;
+
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email: invitation.email,
+      password,
+      email_confirm: true,
+      user_metadata: fullName ? { full_name: fullName } : {},
+    });
+    if (createError || !created?.user) {
+      const exists = createError?.status === 422 || /already (been )?registered|already exists/i.test(createError?.message || "");
+      if (exists) {
+        await undo();
+        claimedId = null;
+        return res.status(409).json({ error: "You already have an account with this email. Sign in to join.", code: "account_exists" });
+      }
+      throw createError || new Error("Could not create the account");
+    }
+    createdUserId = created.user.id;
+
+    const { error: memberError } = await admin
+      .from("memberships")
+      .insert({ user_id: createdUserId, tenant_id: invitation.tenant_id, role: invitation.role, account_status: "ACTIVE" });
+    if (memberError) throw memberError;
+
+    // best effort: keep the name on the profile too
+    if (fullName) await admin.from("user_profiles").update({ full_name: fullName }).eq("user_id", createdUserId);
+    await admin.from("invitations").update({ accepted_by: createdUserId }).eq("id", invitation.id);
+
+    res.json({ ok: true, email: invitation.email });
+  } catch (err) {
+    await undo();
+    const status = err instanceof HttpError ? err.status : 500;
+    if (status >= 500) console.error("[invites] accept failed:", err);
+    res.status(status).json({ error: err instanceof HttpError ? err.message : "Could not create your account. Please try again." });
+  }
+});
+
 export default router;

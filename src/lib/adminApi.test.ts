@@ -41,3 +41,20 @@ describe('adminApi', () => {
     await expect(adminApi.listUsers()).rejects.toThrow(/Could not reach the server/);
   });
 });
+
+describe('apiRequest for people without an account yet', () => {
+  it('can call without a login: no Authorization header, and no session is needed', async () => {
+    const { apiRequest } = await import('./adminApi');
+    const spy = respond(JSON.stringify({ ok: true }));
+    await apiRequest('POST', '/invites/accept', { token: 't' }, { auth: false });
+    expect((spy.mock.calls[0][1]?.headers as Record<string, string>).Authorization).toBeUndefined();
+  });
+
+  it('carries the server’s status and machine-readable code on the error', async () => {
+    const { apiRequest, ApiError } = await import('./adminApi');
+    respond(JSON.stringify({ error: 'You already have an account', code: 'account_exists' }), { status: 409 });
+    const err = await apiRequest('POST', '/invites/accept', {}, { auth: false }).catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err).toMatchObject({ message: 'You already have an account', status: 409, code: 'account_exists' });
+  });
+});
