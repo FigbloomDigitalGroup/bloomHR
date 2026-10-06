@@ -5,6 +5,7 @@ import { supabase } from "../../lib/supabase"
 import { TownProps } from '../../types/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageHeader, StatCard, Card, TabBar, EmptyState, Button } from '../UI';
+import GetStarted from './GetStarted';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 const LEAVE_STATUS_COLORS: Record<string, string> = {
@@ -592,6 +593,8 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
             </Button>
           }
         />
+
+        <GetStarted />
 
         {/* Filters & Tabs */}
         <div className="flex items-center justify-between">

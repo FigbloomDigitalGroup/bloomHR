@@ -9,6 +9,7 @@ import { BrowserRouter } from 'react-router-dom';
 import ThemedConfigProvider from './theme/ThemedConfigProvider';
 import './index.css'
 import { applyStoredTheme } from './theme/applyTheme';
+import { reloadOnceForStaleChunk } from './lib/staleChunk';
 
 
 if ('serviceWorker' in navigator) {
@@ -20,6 +21,12 @@ if ('serviceWorker' in navigator) {
       console.log('SW registration failed:', error);
     });
 }
+// Vite fires this when a page file it needs is gone (a new version was deployed): load the new version once
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault();
+  reloadOnceForStaleChunk();
+});
+
 applyStoredTheme(); // before the first render, so the page never flashes the default colours
 const missing = missingConfig(import.meta.env);
 
