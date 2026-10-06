@@ -3,6 +3,7 @@ import { X, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRig
 import { supabase } from '../../lib/supabase';
 import { TownProps } from '../../types/supabase';
 import * as XLSX from 'xlsx';
+import { readEmployeeRows } from '../../lib/employeeSheet';
 import toast from 'react-hot-toast';
 
 type Employee = {
@@ -445,11 +446,8 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet);
-          resolve(jsonData);
+          // read as typed: keeps CSV dates as 1984-03-14 and phone numbers with their leading zero (see employeeSheet.ts)
+          resolve(readEmployeeRows(e.target?.result as ArrayBuffer));
         } catch (error) {
           reject(error);
         }
