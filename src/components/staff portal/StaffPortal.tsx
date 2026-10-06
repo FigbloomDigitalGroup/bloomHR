@@ -2720,7 +2720,7 @@ const StaffPortal = () => {
 
       const hrNotifs = await fetchStaffHRNotifications(empNumber);
       const leaveItems = hrNotifs
-        .filter(n => n.notification_type === 'leave_approved' || n.notification_type === 'leave_rejected')
+        .filter(n => n.notification_type === 'leave_approved' || n.notification_type === 'leave_rejected' || n.notification_type === 'leave_year_end_reminder')
         .map(n => ({
           id: `hr-${n.id}`,
           type: 'leave',

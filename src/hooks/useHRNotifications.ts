@@ -23,7 +23,7 @@ export interface HRNotification {
     // CHECK constraint) - this type was never updated to match, so every
     // filter against those values silently compiled as "always false"
     // (TS2367) without the strict, real tsconfig catching it.
-    notification_type: 'contract_expiring' | 'probation_expiring' | 'leave_recommended' | 'leave_approved' | 'leave_rejected';
+    notification_type: 'contract_expiring' | 'probation_expiring' | 'leave_recommended' | 'leave_approved' | 'leave_rejected' | 'leave_year_end_reminder';
     title: string;
     message: string;
     // Nullable for leave notifications - only contract/probation reminders
