@@ -20,6 +20,7 @@ import { UserProvider } from '../src/components/ProtectedRoutes/UserContext';
 import MFAVerification from './pages/MFAverification';
 import { useCompanyProfile, withProfileRole } from './hooks/useCompanyProfile';
 import CompanyGate from './components/Company/CompanyGate';
+import { welcomeMessage } from './lib/welcome';
 
 // Route-level code splitting: each page is fetched when first visited.
 const AdminVideoUpload = lazy(() => import('./components/training/Training'));
@@ -849,7 +850,7 @@ function App() {
 
 
           // Show welcome toast only if not in MFA process
-          toast.success(`Welcome back, ${userData.email}!`);
+          toast.success(welcomeMessage(session?.user?.id, userData.email));
 
           if (publicPaths.includes(currentPath)) {
             // If MFA is required but not completed, stay on current page (should be /mfa)
