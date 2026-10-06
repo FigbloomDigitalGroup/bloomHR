@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import { isValidPhone, summarizeErrors } from '../../lib/formValidation';
+import { canEditEmployeeField, isHrOrAdmin, normalizeRole } from '../../lib/employeeFieldAccess';
 import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
@@ -131,17 +132,8 @@ const EmployeeBioPage = () => {
   // Phone number change request state
 
   // Check if a field should be editable based on user role
-  const canEditField = (fieldName: string): boolean => {
-    // HR/Admin can edit everything
-    if (userRole === 'hr' || userRole === 'admin') return true;
-
-    // Employees can only edit non-read-only fields
-    if (isEditMode) {
-      return !READ_ONLY_FIELDS.includes(fieldName);
-    }
-
-    return false;
-  };
+  const canEditField = (fieldName: string): boolean =>
+    canEditEmployeeField(fieldName, { role: userRole, isEditMode, readOnlyFields: READ_ONLY_FIELDS, currentValue: employee[fieldName as keyof typeof employee] });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -160,7 +152,7 @@ const EmployeeBioPage = () => {
           .single();
 
         if (userProfile?.role) {
-          setUserRole(userProfile.role);
+          setUserRole(normalizeRole(userProfile.role));
         }
 
         const { data: employeeData } = await supabase
@@ -349,7 +341,7 @@ const EmployeeBioPage = () => {
     const { name, value } = e.target;
 
     // Only allow editing if field is editable for this user
-    if (!canEditField(name) && userRole !== 'hr' && userRole !== 'admin') {
+    if (!canEditField(name) && !isHrOrAdmin(userRole)) {
       return;
     }
 
@@ -364,7 +356,7 @@ const EmployeeBioPage = () => {
 
   const handleDateChange = (name: string, value: string) => {
     // Only allow editing if field is editable for this user
-    if (!canEditField(name) && userRole !== 'hr' && userRole !== 'admin') {
+    if (!canEditField(name) && !isHrOrAdmin(userRole)) {
       return;
     }
 
@@ -440,12 +432,16 @@ const EmployeeBioPage = () => {
       newErrors['Last Name'] = 'Last Name is required';
       isValid = false;
     }
-    if (!employee['Mobile Number']) {
-      newErrors['Mobile Number'] = 'Mobile Number is required';
-      isValid = false;
-    } else if (!isValidPhone(employee['Mobile Number'])) {
-      newErrors['Mobile Number'] = 'Invalid phone number format';
-      isValid = false;
+    // only asked of people who can change it: a staff member cannot type here (HR sets it), so requiring it would
+    // stop them saving anything at all
+    if (canEditField('Mobile Number')) {
+      if (!employee['Mobile Number']) {
+        newErrors['Mobile Number'] = 'Mobile Number is required';
+        isValid = false;
+      } else if (!isValidPhone(employee['Mobile Number'])) {
+        newErrors['Mobile Number'] = 'Invalid phone number format';
+        isValid = false;
+      }
     }
     if (!employee['Personal Email']) {
       newErrors['Personal Email'] = 'Personal Email is required';
@@ -528,7 +524,7 @@ const EmployeeBioPage = () => {
       const updateData = { ...employee };
 
       // If user is not HR/Admin, don't update read-only fields
-      if (userRole !== 'hr' && userRole !== 'admin') {
+      if (!isHrOrAdmin(userRole)) {
         READ_ONLY_FIELDS.forEach(field => {
           delete updateData[field];
         });
@@ -803,7 +799,7 @@ const EmployeeBioPage = () => {
                 </h1>
                 <p className="text-white mt-1">
                   <span className="font-medium">Employee ID:</span> {employee['Employee Number']}
-                  {userRole === 'hr' || userRole === 'admin' ? ' (HR/Admin View)' : ' (Employee View)'}
+                  {isHrOrAdmin(userRole) ? ' (HR/Admin View)' : ' (Employee View)'}
                 </p>
               </div>
             </div>
@@ -1316,9 +1312,11 @@ const EmployeeBioPage = () => {
                     value={employee['Mobile Number'] || ''}
                     onChange={handleInputChange}
                     error={errors['Mobile Number']}
-                    required={isEditMode}
-                    disabled={!isEditMode}
-                    placeholder="e.g., +254712345678"
+                    required={isEditMode && canEditField('Mobile Number')}
+                    disabled={!isEditMode || !canEditField('Mobile Number')}
+                    readOnly={!canEditField('Mobile Number')}
+                    isReadOnly={!canEditField('Mobile Number')}
+                    placeholder={canEditField('Mobile Number') ? 'e.g., +254712345678' : 'Set by HR'}
                   />
                   <FormField
                     label="Work Mobile Number"
