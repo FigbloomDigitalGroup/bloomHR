@@ -6,6 +6,7 @@ import { TownProps } from '../../types/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageHeader, StatCard, Card, TabBar, EmptyState, Button } from '../UI';
 import GetStarted from './GetStarted';
+import { findBirthdays } from '../../lib/birthdays';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 const LEAVE_STATUS_COLORS: Record<string, string> = {
@@ -80,70 +81,20 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
         return;
       }
 
-      // Filter employees with birthdays today
-      const todaysBirthdays = employees?.filter(employee => {
-        if (!employee['Date of Birth']) return false;
+      const { today: todaysBirthdays, upcoming: upcomingBirthdays } = findBirthdays(employees ?? [], today);
+      const names = (people: { name: string }[]) =>
+        `${people.slice(0, 3).map((p) => p.name).join(', ')}${people.length > 3 ? ` and ${people.length - 3} others` : ''}`;
 
-        try {
-          const birthDate = new Date(employee['Date of Birth']);
-          const birthMonth = birthDate.getMonth() + 1;
-          const birthDay = birthDate.getDate();
+      // only groups with people in them: a new company with no employees yet has nothing to announce
+      const items: NewsItem[] = [];
+      if (todaysBirthdays.length > 0) {
+        items.push({ id: 1, type: 'birthday', title: "Today's Birthdays", description: names(todaysBirthdays), date: 'Today', time: 'All day', people: todaysBirthdays });
+      }
+      if (upcomingBirthdays.length > 0) {
+        items.push({ id: 2, type: 'birthday', title: 'Upcoming Birthdays', description: names(upcomingBirthdays), date: 'Next 7 days', people: upcomingBirthdays });
+      }
 
-          return birthMonth === currentMonth && birthDay === currentDay;
-        } catch {
-          return false;
-        }
-      }) || [];
-
-      // Create birthday news item
-      const birthdayNewsItem: NewsItem = {
-        id: 1,
-        type: 'birthday',
-        title: 'Today\'s Birthdays',
-        description: todaysBirthdays.length > 0
-          ? `${todaysBirthdays.slice(0, 3).map(emp => `${emp['First Name']} ${emp['Last Name']}`).join(', ')}${todaysBirthdays.length > 3 ? ` and ${todaysBirthdays.length - 3} others` : ''}`
-          : 'No birthdays today',
-        date: 'Today',
-        time: 'All day',
-        people: todaysBirthdays.map(emp => ({ name: `${emp['First Name']} ${emp['Last Name']}`.trim() }))
-      };
-
-      // Check for upcoming birthdays (next 7 days)
-      const upcomingBirthdays = (employees || [])
-        .map(employee => {
-          if (!employee['Date of Birth']) return null;
-          try {
-            const birthDate = new Date(employee['Date of Birth']);
-            const nextWeek = new Date();
-            nextWeek.setDate(today.getDate() + 7);
-            const birthDateThisYear = new Date(today.getFullYear(), birthDate.getMonth(), birthDate.getDate());
-
-            if (birthDateThisYear > today && birthDateThisYear <= nextWeek) {
-              return { employee, birthDateThisYear };
-            }
-            return null;
-          } catch {
-            return null;
-          }
-        })
-        .filter((entry): entry is { employee: typeof employees[number]; birthDateThisYear: Date } => entry !== null)
-        .sort((a, b) => a.birthDateThisYear.getTime() - b.birthDateThisYear.getTime());
-
-      const upcomingNewsItem: NewsItem = {
-        id: 2,
-        type: 'birthday',
-        title: 'Upcoming Birthdays',
-        description: upcomingBirthdays.length > 0
-          ? `${upcomingBirthdays.slice(0, 3).map(({ employee }) => `${employee['First Name']} ${employee['Last Name']}`).join(', ')}${upcomingBirthdays.length > 3 ? ` and ${upcomingBirthdays.length - 3} others` : ''}`
-          : 'No upcoming birthdays',
-        date: 'Next 7 days',
-        people: upcomingBirthdays.map(({ employee, birthDateThisYear }) => ({
-          name: `${employee['First Name']} ${employee['Last Name']}`.trim(),
-          date: birthDateThisYear.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-        }))
-      };
-
-      setNewsItems([birthdayNewsItem, upcomingNewsItem]);
+      setNewsItems(items);
 
     } catch (error) {
       console.error('Error in fetchBirthdayNews:', error);
@@ -765,6 +716,12 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
                         </div>
                       ))}
                     </div>
+                  ) : newsItems.length === 0 ? (
+                    <EmptyState
+                      icon={<Calendar className="w-4 h-4" />}
+                      title="No company updates yet"
+                      description="Birthdays appear here once your employees' dates of birth are entered. Events come from the company calendar."
+                    />
                   ) : (
                     newsItems.slice(0, 4).map((news) => (
                       <div key={news.id} className="flex gap-2.5 items-start">
