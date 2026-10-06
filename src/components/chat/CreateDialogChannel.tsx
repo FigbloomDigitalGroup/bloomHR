@@ -1,5 +1,5 @@
 // components/CreateChannelDialog.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -8,11 +8,14 @@ import { Switch } from "./ui/switch";
 import { Hash, Lock, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { supabase } from "../../lib/supabase";
+import { chatService } from "./services/chatServices";
+import { InvitePicker } from "./InvitePicker";
+import { buildGroups, notJoinedCount, resolveInvitees, type DirectoryPerson, type Member } from "./lib/groups";
 
 interface CreateChannelDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreateChannel: (name: string, isPrivate: boolean, jobTitle?: string) => void;
+  onCreateChannel: (name: string, isPrivate: boolean, jobTitle?: string, inviteeIds?: string[]) => void | Promise<void>;
 }
 
 export function CreateChannelDialog({
@@ -27,6 +30,23 @@ export function CreateChannelDialog({
   const [loading, setLoading] = useState(false);
   const [loadingJobTitles, setLoadingJobTitles] = useState(false);
   const [error, setError] = useState("");
+  const [members, setMembers] = useState<Member[]>([]);
+  const [people, setPeople] = useState<DirectoryPerson[]>([]);
+  const [groupIds, setGroupIds] = useState<string[]>([]);
+  const [userIds, setUserIds] = useState<string[]>([]);
+  const groups = useMemo(() => buildGroups(people, members), [people, members]);
+
+  // who can be invited (the colleagues who have joined, and the groups from the employee directory)
+  useEffect(() => {
+    if (!open) return;
+    chatService.getInviteOptions().then(
+      (o) => {
+        setMembers(o.members);
+        setPeople(o.people);
+      },
+      () => undefined // the rest of the dialog works without it
+    );
+  }, [open]);
 
   // Fetch job titles from employees table
   useEffect(() => {
@@ -77,10 +97,12 @@ export function CreateChannelDialog({
 
     try {
       const selectedJobTitle = jobTitle === "all" ? undefined : jobTitle;
-      await onCreateChannel(name.trim(), isPrivate, selectedJobTitle);
+      await onCreateChannel(name.trim(), isPrivate, selectedJobTitle, resolveInvitees(groups, groupIds, userIds));
       setName("");
       setIsPrivate(false);
       setJobTitle("all");
+      setGroupIds([]);
+      setUserIds([]);
     } catch (err: any) {
       setError(err.message || "Failed to create channel");
     } finally {
@@ -94,6 +116,8 @@ export function CreateChannelDialog({
       setName("");
       setIsPrivate(false);
       setJobTitle("all");
+      setGroupIds([]);
+      setUserIds([]);
       setError("");
     }
     onOpenChange(newOpen);
@@ -176,6 +200,24 @@ export function CreateChannelDialog({
             />
           </div>
           
+          <div className="space-y-2">
+            <Label>Add people (optional)</Label>
+            <InvitePicker
+              groups={groups}
+              members={members}
+              people={people}
+              selectedGroupIds={groupIds}
+              selectedUserIds={userIds}
+              onGroupsChange={setGroupIds}
+              onUsersChange={setUserIds}
+              notJoined={notJoinedCount(groups, groupIds)}
+              disabled={loading}
+            />
+            <p className="text-xs text-muted-foreground">
+              {isPrivate ? "Only you, the people you add, administrators and anyone matching the job title will see this channel." : "Everyone can find this channel; people you add are added as members."}
+            </p>
+          </div>
+
           <div className="flex justify-end gap-2">
             <Button
               type="button"

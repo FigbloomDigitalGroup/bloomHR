@@ -28,7 +28,7 @@ interface AppSidebarProps {
   directMessages: DirectMessage[];
   activeChannel: Channel | DirectMessage | null;
   onChannelSelect: (channel: Channel | DirectMessage) => void;
-  onChannelCreate: (name: string, isPrivate?: boolean) => void;
+  onChannelCreate: (name: string, isPrivate?: boolean, jobTitle?: string, inviteeIds?: string[]) => void | Promise<void>;
   onDMCreate: (userId: string) => void;
   currentUser: User | null;
   users: User[];
@@ -75,8 +75,9 @@ export function AppSidebar({
     setShowSettings(true);
   };
 
-  const handleChannelCreate = (name: string, isPrivate: boolean = false) => {
-    onChannelCreate(name, isPrivate);
+  // the dialog stays open (showing the error) if creating the channel fails
+  const handleChannelCreate = async (name: string, isPrivate: boolean = false, jobTitle?: string, inviteeIds: string[] = []) => {
+    await onChannelCreate(name, isPrivate, jobTitle, inviteeIds);
     setShowCreateChannel(false);
   };
 

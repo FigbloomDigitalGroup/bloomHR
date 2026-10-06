@@ -3,6 +3,7 @@ import { supabase } from "../../../lib/supabase";
 import { databaseService } from "./databaseService";
 import type { Channel, Message, Employee, DirectMessage } from "../types/types";
 import { AvatarService } from './avatar';
+import type { DirectoryPerson, Member } from '../lib/groups';
 import { chatDisplayName, directMessageId, initialsOf, isDirectMessageId, realChannelId } from '../lib/names';
 
 class ChatService {
@@ -145,6 +146,27 @@ class ChatService {
     const { data: conversation, error } = await supabase.rpc('start_direct_message', { p_other: person.user_id });
     if (error || !conversation) throw new Error(error?.message || 'Could not start the conversation');
     return directMessageId(conversation as string);
+  }
+
+  /** Who can be invited to a channel: the colleagues who have joined, and the employee directory the groups come from. */
+  async getInviteOptions(): Promise<{ members: Member[]; people: DirectoryPerson[] }> {
+    const [membersResult, peopleResult] = await Promise.all([
+      supabase.rpc('company_members'),
+      supabase.from('employee_directory').select('"Work Email", "First Name", "Last Name", "Job Level", "Job Title", "Town"'),
+    ]);
+    if (membersResult.error) throw new Error(membersResult.error.message || 'Could not load your colleagues');
+    return {
+      members: (membersResult.data || []) as Member[],
+      people: (peopleResult.error ? [] : peopleResult.data || []) as unknown as DirectoryPerson[],
+    };
+  }
+
+  /** Adds colleagues to a channel (its creator or an administrator only). Returns how many were added. */
+  async addChannelMembers(channelId: string, userIds: string[]): Promise<number> {
+    if (userIds.length === 0) return 0;
+    const { data, error } = await supabase.rpc('add_channel_members', { p_channel: channelId, p_users: userIds });
+    if (error) throw new Error(error.message || 'Could not add people to the channel');
+    return Number(data) || 0;
   }
 
   private async getRegularChannels(userId: string): Promise<Channel[]> {

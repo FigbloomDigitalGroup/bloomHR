@@ -167,3 +167,22 @@ describe('ordinary channels are unchanged', () => {
     expect(insert.channel_id).toBe('chan-1');
   });
 });
+
+describe('inviting people to a channel', () => {
+  it('asks the database to add them, and says how many were added', async () => {
+    const added = await chatService.addChannelMembers('chan-1', ['user-ben']);
+    expect(mock.rpcs.find((r) => r.name === 'add_channel_members')?.args).toEqual({ p_channel: 'chan-1', p_users: ['user-ben'] });
+    expect(added).toBe(0); // the mock returns no count
+  });
+
+  it('does nothing when no one was chosen', async () => {
+    expect(await chatService.addChannelMembers('chan-1', [])).toBe(0);
+    expect(mock.rpcs.some((r) => r.name === 'add_channel_members')).toBe(false);
+  });
+
+  it('lists who can be invited: the colleagues who joined, and the directory', async () => {
+    const options = await chatService.getInviteOptions();
+    expect(options.members.map((m) => m.user_id)).toEqual(['user-ben', 'user-me']);
+    expect(callsTo('employee_directory', 'select')).toHaveLength(1);
+  });
+});
