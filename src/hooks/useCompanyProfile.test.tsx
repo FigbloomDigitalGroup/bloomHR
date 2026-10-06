@@ -20,7 +20,7 @@ vi.mock('../lib/supabase', () => ({
   },
 }));
 
-import { useCompanyProfile } from './useCompanyProfile';
+import { useCompanyProfile, withProfileRole } from './useCompanyProfile';
 
 beforeEach(() => {
   eq.mockClear();
@@ -56,5 +56,27 @@ describe('useCompanyProfile', () => {
     result.value = { data: { role: 'ADMIN', tenant_id: 't2', account_status: 'ACTIVE' }, error: null };
     rerender({ id: 'u4', key: 1 });
     await waitFor(() => expect(hook.current).toMatchObject({ status: 'ready', profile: { role: 'ADMIN', tenantId: 't2' } }));
+  });
+});
+
+describe('withProfileRole', () => {
+  const ready = (role: string) => ({ status: 'ready' as const, profile: { role, tenantId: 't1', accountStatus: 'ACTIVE' } });
+
+  it('gives the user the role from their company profile, whatever their auth metadata said', () => {
+    // a company founder: the profile says ADMIN, but their auth metadata has no role so the app defaulted to STAFF
+    const user = { email: 'a@b.co', role: 'STAFF' };
+    expect(withProfileRole(user, ready('ADMIN'))).toEqual({ email: 'a@b.co', role: 'ADMIN' });
+  });
+
+  it('leaves the user untouched (the same object) when the role already matches, so nothing re-renders', () => {
+    const user = { email: 'a@b.co', role: 'HR' };
+    expect(withProfileRole(user, ready('HR'))).toBe(user);
+  });
+
+  it('changes nothing until the profile is known, and handles no user', () => {
+    const user = { email: 'a@b.co', role: 'STAFF' };
+    expect(withProfileRole(user, { status: 'loading' })).toBe(user);
+    expect(withProfileRole(user, { status: 'none' })).toBe(user);
+    expect(withProfileRole(null, ready('ADMIN'))).toBeNull();
   });
 });

@@ -46,3 +46,12 @@ export function useCompanyProfile(userId: string | undefined, reloadKey: number 
 
   return state;
 }
+
+/**
+ * The signed-in user as the app should see them: same person, but with the role from the trusted company profile
+ * once it is known. (The auth session only carries the role in user_metadata, which is editable and not per company.)
+ */
+export function withProfileRole<U extends { role: string }>(user: U | null, state: CompanyProfileState): U | null {
+  if (!user || state.status !== 'ready' || user.role === state.profile.role) return user;
+  return { ...user, role: state.profile.role };
+}
