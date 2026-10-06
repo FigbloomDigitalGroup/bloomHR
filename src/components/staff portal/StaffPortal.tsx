@@ -53,7 +53,7 @@ import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import TrainingModule from './Training';
 import Profile from './Profile';
-import ChatComponent from './Chat';
+import { ChatLayout } from '../chat/ChatLayout';
 import VideoConferenceComponent from './VideoConf';
 import UserProfileDropdown from './UserProfile';
 import PasswordResetModal from './PasswordRestModal';
@@ -3380,7 +3380,7 @@ const StaffPortal = () => {
               {activeTab === 'appearance' && <Appearance />}
               {activeTab === 'incident-report' && <IncidentReport />}
               {activeTab === 'job-applications' && <JobApplications />}
-              {activeTab === 'chat' && <div className="relative h-screen"><ChatComponent onMessagesRead={fetchUnreadMessageCount} /></div>}
+              {activeTab === 'chat' && <div className="relative h-screen"><ChatLayout onMessagesRead={fetchUnreadMessageCount} /></div>}
               {activeTab === 'VideoConf' && <VideoConferenceComponent />}
             </motion.div>
           </div>
