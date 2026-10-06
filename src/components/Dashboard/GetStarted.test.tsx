@@ -21,7 +21,7 @@ vi.mock('../../lib/companyApi', () => ({ companyApi: { listInvitations: () => Pr
 vi.mock('../../hooks/useMyCompanies', () => ({ useMyCompanies: () => ({ data: state.companies }) }));
 vi.mock('../../hooks/usePermissions', () => ({ usePermissions: () => ({ userRole: state.role }) }));
 
-import GetStarted, { OPEN_COMPANY_PROFILE } from './GetStarted';
+import GetStarted, { OPEN_COMPANY_PROFILE, COMPANY_PROFILE_SAVED } from './GetStarted';
 
 const open = () =>
   render(
@@ -64,6 +64,22 @@ describe('GetStarted', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Open profile' }));
     expect(opened).toHaveBeenCalledTimes(1);
     window.removeEventListener(OPEN_COMPANY_PROFILE, opened);
+  });
+
+  it('ticks the profile step as soon as the profile is saved, without reloading the page', async () => {
+    open();
+    expect(await screen.findByText('0 of 4 done')).toBeTruthy();
+    state.profileCount = 1; // the person saves their company profile in the top bar
+    window.dispatchEvent(new Event(COMPANY_PROFILE_SAVED));
+    expect(await screen.findByText('1 of 4 done')).toBeTruthy();
+  });
+
+  it('looks again when the person comes back to the tab (for example after inviting someone)', async () => {
+    open();
+    expect(await screen.findByText('0 of 4 done')).toBeTruthy();
+    state.invitations = [{ id: 'i1' }];
+    window.dispatchEvent(new Event('focus'));
+    expect(await screen.findByText('1 of 4 done')).toBeTruthy();
   });
 
   it('can be hidden, and stays hidden for that company', async () => {

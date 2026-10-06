@@ -8,6 +8,8 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { Card } from '../UI';
 
 export const OPEN_COMPANY_PROFILE = 'open-company-profile';
+/** Fired after the company profile is saved, so the checklist can tick it off straight away. */
+export const COMPANY_PROFILE_SAVED = 'company-profile-saved';
 
 interface Step {
   id: string;
@@ -29,6 +31,7 @@ export default function GetStarted() {
   const [dismissed, setDismissed] = useState(true); // hidden until we know
   const [done, setDone] = useState({ profile: false, invited: false, employees: false });
   const [loaded, setLoaded] = useState(false);
+  const [checkCount, setCheckCount] = useState(0); // bumped to look at the data again
 
   useEffect(() => {
     if (!current) return;
@@ -59,7 +62,23 @@ export default function GetStarted() {
     return () => {
       cancelled = true;
     };
-  }, [current?.tenant_id, dismissed, userRole]);
+  }, [current?.tenant_id, dismissed, userRole, checkCount]);
+
+  // look again after the profile is saved, and when the person comes back to this tab (e.g. after inviting someone)
+  useEffect(() => {
+    const again = () => setCheckCount((n) => n + 1);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') again();
+    };
+    window.addEventListener(COMPANY_PROFILE_SAVED, again);
+    window.addEventListener('focus', again);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener(COMPANY_PROFILE_SAVED, again);
+      window.removeEventListener('focus', again);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
 
   if (!current || dismissed || !loaded || userRole !== 'ADMIN') return null;
 
