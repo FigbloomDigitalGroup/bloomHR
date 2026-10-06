@@ -8,6 +8,7 @@ export function applyTheme(choice: ThemeChoice, root: HTMLElement = document.doc
   if (!vars) return false;
   for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, value);
   root.dataset.shell = vars['--shell-fg'] === '255 255 255' ? 'dark' : 'light';
+  notifyThemeChanged();
   return true;
 }
 
@@ -17,6 +18,13 @@ export function resetTheme(root: HTMLElement = document.documentElement): void {
     root.style.removeProperty(name);
   }
   delete root.dataset.shell;
+  notifyThemeChanged();
+}
+
+export const THEME_CHANGED = 'figbloom-theme-changed';
+/** Lets parts of the app that cannot read CSS variables (the antd components) re-read the colours. */
+function notifyThemeChanged(): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(THEME_CHANGED));
 }
 
 /** The theme saved in this browser, or null. (Storage can be unavailable or hold rubbish: both mean "none".) */

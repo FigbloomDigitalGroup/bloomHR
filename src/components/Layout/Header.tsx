@@ -78,7 +78,7 @@ const HeaderDropdown = ({ value, options, onChange, placeholder, icon: Icon }: {
         className={`flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all duration-200 hover:bg-white hover:shadow-sm ${isOpen ? 'bg-white shadow-sm' : 'bg-transparent'}`}
       >
         <div className="flex items-center gap-2 max-w-[120px]">
-          {Icon && <Icon className={`w-3.5 h-3.5 ${isOpen ? 'text-[#17402A]' : 'text-gray-400'}`} />}
+          {Icon && <Icon className={`w-3.5 h-3.5 ${isOpen ? 'text-brand' : 'text-gray-400'}`} />}
           <span className={`text-xs font-bold truncate ${selected ? 'text-gray-900' : 'text-gray-400'}`}>
             {selected ? selected.label : placeholder}
           </span>
@@ -104,10 +104,10 @@ const HeaderDropdown = ({ value, options, onChange, placeholder, icon: Icon }: {
                     onChange(opt.value);
                     setIsOpen(false);
                   }}
-                  className={`w-full text-left px-4 py-2 text-xs transition-colors hover:bg-[#E3EFE7]/50 hover:text-[#17402A] flex items-center justify-between group ${value === opt.value ? 'bg-[#E3EFE7] text-[#17402A] font-bold' : 'text-gray-600'}`}
+                  className={`w-full text-left px-4 py-2 text-xs transition-colors hover:bg-green-tint/50 hover:text-brand flex items-center justify-between group ${value === opt.value ? 'bg-green-tint text-brand font-bold' : 'text-gray-600'}`}
                 >
                   <span>{opt.label}</span>
-                  {value === opt.value && <CheckCircle className="w-3.5 h-3.5 text-[#17402A]" />}
+                  {value === opt.value && <CheckCircle className="w-3.5 h-3.5 text-brand" />}
                 </button>
               ))}
             </div>

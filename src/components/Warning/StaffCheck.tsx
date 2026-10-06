@@ -738,7 +738,7 @@ Make sure to incorporate the severity level (${severity}) and be specific about 
                       value={level}
                       checked={severity === level}
                       onChange={() => setSeverity(level)}
-                      className="h-4 w-4 accent-[#17402A]"
+                      className="h-4 w-4 accent-brand"
                     />
                     {level}
                   </label>
@@ -798,7 +798,7 @@ The AI will determine the warning type and generate a professional message."
                         type="checkbox"
                         checked={useCustomMessage}
                         onChange={() => setUseCustomMessage(!useCustomMessage)}
-                        className="h-4 w-4 accent-[#17402A]"
+                        className="h-4 w-4 accent-brand"
                       />
                       Custom message
                     </label>
