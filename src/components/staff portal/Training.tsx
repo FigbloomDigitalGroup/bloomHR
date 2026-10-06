@@ -295,13 +295,18 @@ const TrainingModule = () => {
 
   // Handle document progress updates
   const updateDocumentProgress = async (documentId: string, newProgress: number) => {
+    let previous: (typeof progress)[string] | undefined;
     try {
-      if (!employeeNumber) return;
+      if (!employeeNumber) {
+        toast.error('Your progress cannot be saved: we could not find your employee record. Ask HR to check your work email.');
+        return;
+      }
 
       const isCompleted = newProgress >= 95;
       const currentTime = new Date().toISOString();
 
-      // Update local state first for immediate feedback
+      // Update local state first for immediate feedback (and keep what it was, to put back if saving fails)
+      previous = progress[documentId];
       setProgress(prev => ({
         ...prev,
         [documentId]: {
@@ -334,6 +339,13 @@ const TrainingModule = () => {
 
     } catch (error) {
       console.error('Error updating progress:', error);
+      // the screen must not show progress that was not saved
+      setProgress(prev => {
+        const next = { ...prev };
+        if (previous) next[documentId] = previous;
+        else delete next[documentId];
+        return next;
+      });
       toast.error('Failed to update progress');
     }
   };
@@ -382,10 +394,13 @@ const TrainingModule = () => {
   const handleDocumentComplete = () => {
     if (!currentDocument) return;
     
-    updateDocumentProgress(currentDocument.id, 100);
-    
-    // For required documents, show quiz if required
-    if (currentDocument.required && currentDocument.quiz_required) {
+    // A document with a required quiz is NOT complete until the quiz is passed (handleQuizSubmit marks it): marking it
+    // complete here would unlock the next required document for anyone who simply closes the quiz.
+    const needsQuiz = currentDocument.required && currentDocument.quiz_required;
+    const alreadyDone = !!progress[currentDocument.id]?.completed;
+    updateDocumentProgress(currentDocument.id, needsQuiz && !alreadyDone ? 90 : 100);
+
+    if (needsQuiz) {
       setShowQuiz(true);
     } else {
       toast.success(`Completed: ${currentDocument.title}`);

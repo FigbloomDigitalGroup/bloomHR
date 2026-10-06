@@ -547,11 +547,13 @@ const DocumentsManager = () => {
     setDeleting(prev => ({ ...prev, [doc.name]: true }));
 
     try {
-      const { error } = await supabase.storage
+      const { data: removed, error } = await supabase.storage
         .from('documents')
         .remove([doc.fullPath]);
 
       if (error) throw error;
+      // storage reports success even when it removed nothing (the file is not yours, or it is already gone)
+      if (!removed || removed.length === 0) throw new Error('nothing removed');
 
       await fetchDocuments();
       alert('File deleted successfully');

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Loader2, User, UploadCloud, Edit, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
+import { NOT_SAVED_NOT_LINKED, requireUpdatedRows, saveFailureMessage } from '../../lib/requireUpdated';
 import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
 
 const Profile = () => {
@@ -64,18 +65,20 @@ const Profile = () => {
       const publicUrl = await uploadEmployeeAvatar(file, String(employeeData["Employee Number"]));
 
       // Update employee record with new image URL
-      const { error: updateError } = await supabase
+      const { data: savedRows, error: updateError } = await supabase
         .from('employees')
         .update({ "Profile Image": publicUrl })
-        .eq('"Employee Number"', employeeData["Employee Number"]);
+        .eq('"Employee Number"', employeeData["Employee Number"])
+        .select('"Employee Number"');
 
       if (updateError) throw updateError;
+      requireUpdatedRows(savedRows, NOT_SAVED_NOT_LINKED);
 
       setProfileImage(publicUrl);
       toast.success('Profile image updated successfully');
     } catch (error) {
       console.error('Error uploading image:', error);
-      toast.error('Failed to upload profile image');
+      toast.error(saveFailureMessage(error, 'Failed to upload profile image'));
     } finally {
       setImageUploading(false);
     }
@@ -114,18 +117,20 @@ const Profile = () => {
         "WIBA": employeeData["WIBA"]
       };
 
-      const { error } = await supabase
+      const { data: savedRows, error } = await supabase
         .from('employees')
         .update(updateData)
-        .eq('"Employee Number"', employeeData["Employee Number"]);
+        .eq('"Employee Number"', employeeData["Employee Number"])
+        .select('"Employee Number"');
 
       if (error) throw error;
+      requireUpdatedRows(savedRows, NOT_SAVED_NOT_LINKED);
 
       toast.success('Deductions updated successfully');
       setIsEditing(false); // Exit edit mode after successful update
     } catch (error) {
       console.error('Error updating deductions:', error);
-      toast.error('Failed to update deductions');
+      toast.error(saveFailureMessage(error, 'Failed to update deductions'));
     } finally {
       setIsUpdating(false);
     }

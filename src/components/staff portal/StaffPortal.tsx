@@ -60,6 +60,7 @@ import PasswordResetModal from './PasswordRestModal';
 import DocumentsUploadPage from './Documents';
 import Appearance from '../Settings/Appearance';
 import MyContract from './MyContract';
+import { leaveDays, NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
 import CompleteProfileCard from './CompleteProfileCard';
 import PayslipViewer from './PayslipViewer';
 import EmployeeBioPage from './Bio';
@@ -466,14 +467,6 @@ const LeaveApplicationForm = () => {
     }
   };
 
-  const calculateDays = (startDate: string, endDate: string) => {
-    if (!startDate || !endDate) return 0;
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-  };
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -482,9 +475,9 @@ const LeaveApplicationForm = () => {
     }));
 
     if (name === "Start Date" || name === "End Date") {
-      const days = calculateDays(
+      const days = leaveDays(
         name === "Start Date" ? value : formData["Start Date"],
-        name === "End Date" ? value : formData["Start Date"]
+        name === "End Date" ? value : formData["End Date"]
       );
       setFormData(prev => ({
         ...prev,
@@ -503,8 +496,14 @@ const LeaveApplicationForm = () => {
 
     setIsSubmitting(true);
 
+    if (!formData["Employee Number"]) {
+      toast.error(NO_EMPLOYEE_RECORD_MESSAGE);
+      setIsSubmitting(false);
+      return;
+    }
+
     if (formData["Days"] <= 0) {
-      toast.error('End date must be after start date');
+      toast.error('Choose a start date, and an end date that is the same day or later');
       setIsSubmitting(false);
       return;
     }
@@ -1953,6 +1952,12 @@ const LoanRequestForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+
+    if (!formData["Employee Number"]) {
+      toast.error(NO_EMPLOYEE_RECORD_MESSAGE);
+      setIsSubmitting(false);
+      return;
+    }
 
     if (!formData["Loan Amount"] || isNaN(Number(formData["Loan Amount"]))) {
       toast.error('Please enter a valid loan amount');
