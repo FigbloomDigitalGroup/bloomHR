@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { apiRequest } from './adminApi';
 
 // Client for the company functions in 20261006000000_company_memberships.sql and
 // 20261006000100_company_signup_and_invites.sql. They run in the database with the person's own session.
@@ -73,6 +74,9 @@ export const companyApi = {
     if (!created?.token) throw new Error('Could not create the invitation. Please try again.');
     return created;
   },
+
+  /** Asks the backend to email the invitation the token belongs to (it writes the email itself). */
+  emailInvitation: (token: string) => apiRequest<{ ok: true; sentTo: string }>('POST', '/invites/send', { token }),
 
   revokeInvitation: async (id: string): Promise<void> => {
     await call<null>('revoke_invitation', { p_id: id });
