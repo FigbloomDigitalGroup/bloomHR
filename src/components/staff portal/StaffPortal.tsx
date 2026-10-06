@@ -14,6 +14,7 @@ import {
   CalendarBlank as PhCalendarBlank,
   File as PhFile,
   Upload as PhUpload,
+  Palette as PhPalette,
   Phone as PhPhone,
   Briefcase as PhBriefcase,
   Clock as PhClock,
@@ -57,6 +58,7 @@ import VideoConferenceComponent from './VideoConf';
 import UserProfileDropdown from './UserProfile';
 import PasswordResetModal from './PasswordRestModal';
 import DocumentsUploadPage from './Documents';
+import Appearance from '../Settings/Appearance';
 import PayslipViewer from './PayslipViewer';
 import EmployeeBioPage from './Bio';
 import IncidentReport from './IncidentReport';
@@ -2616,6 +2618,7 @@ const staffMenuGroups: MenuGroup[] = [
       { id: 'details', label: 'Profile', icon: PhUserCircle },
       { id: 'biodata', label: 'Bio Data', icon: PhBriefcase },
       { id: 'documents', label: 'Documents', icon: PhUpload },
+      { id: 'appearance', label: 'Appearance', icon: PhPalette },
     ]
   }
 ];
@@ -2986,14 +2989,14 @@ const StaffPortal = () => {
             initial="expanded"
             animate={isExpanded ? "expanded" : "collapsed"}
             variants={sidebarVariants}
-            className="relative flex flex-col h-full border-r border-white/5 shadow-2xl overflow-hidden font-lexend bg-brand"
+            className="relative flex flex-col h-full border-r border-shell-fg/5 shadow-2xl overflow-hidden font-lexend bg-shell"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
           >
             {/* Glowy Background: Brand Accents */}
-            <div className="absolute inset-0 bg-brand-dark/50 z-[-2] backdrop-blur-2xl" />
-            <div className="absolute top-0 left-0 w-96 h-96 bg-brand-dark/20 rounded-full blur-[100px] pointer-events-none z-[-1]" />
-            <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-[100px] pointer-events-none z-[-1]" />
+            <div className="absolute inset-0 bg-black/10 z-[-2] backdrop-blur-2xl" />
+            <div className="absolute top-0 left-0 w-96 h-96 bg-black/10 rounded-full blur-[100px] pointer-events-none z-[-1]" />
+            <div className="absolute bottom-0 right-0 w-96 h-96 bg-shell-fg/5 rounded-full blur-[100px] pointer-events-none z-[-1]" />
 
 
 
@@ -3006,7 +3009,7 @@ const StaffPortal = () => {
                   whileHover={{ rotate: 5, scale: 1.05 }}
                   onClick={() => !isExpanded && setIsCollapsed(false)}
                 >
-                  <img src={solo} alt="Logo" className="relative w-10 h-10 object-contain brightness-0 invert drop-shadow-md" />
+                  <img src={solo} alt="Logo" className="relative w-10 h-10 object-contain shell-logo drop-shadow-md" />
                 </motion.div>
 
                 <AnimatePresence>
@@ -3017,8 +3020,8 @@ const StaffPortal = () => {
                       exit={{ opacity: 0, x: -10 }}
                       className="flex flex-col"
                     >
-                      <h1 className="font-lexend font-bold text-xl text-white tracking-tight flex items-center">
-                        Figbloom<span className="text-white font-light ml-0.5">HR</span>
+                      <h1 className="font-lexend font-bold text-xl text-shell-fg tracking-tight flex items-center">
+                        Figbloom<span className="text-shell-fg font-light ml-0.5">HR</span>
                       </h1>
                     </motion.div>
                   )}
@@ -3028,11 +3031,11 @@ const StaffPortal = () => {
               {/* Hamburger Toggle */}
               <motion.button
                 onClick={() => setIsCollapsed(!isCollapsed)}
-                className={`p-2 rounded-xl hover:bg-white/10 transition-all duration-300 group border border-transparent hover:border-white/10 hover:shadow-sm ${!isExpanded ? 'bg-white/5' : ''}`}
+                className={`p-2 rounded-xl hover:bg-shell-fg/10 transition-all duration-300 group border border-transparent hover:border-shell-fg/10 hover:shadow-sm ${!isExpanded ? 'bg-shell-fg/5' : ''}`}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <Menu className={`w-4 h-4 transition-colors ${isExpanded ? 'text-white/50 group-hover:text-orange' : 'text-orange'}`} />
+                <Menu className={`w-4 h-4 transition-colors ${isExpanded ? 'text-shell-fg/50 group-hover:text-orange' : 'text-orange'}`} />
               </motion.button>
             </div>
 
@@ -3046,13 +3049,13 @@ const StaffPortal = () => {
                   className="px-5 mb-4 overflow-hidden"
                 >
                   <div className="relative group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/45 transition-colors" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-shell-fg/45 transition-colors" />
                     <input
                       type="text"
                       placeholder="Search..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full bg-white/10 border border-white/10 rounded-xl py-2 pl-9 pr-3 text-xs text-white placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-white/30 focus:border-white/30 transition-all font-normal"
+                      className="w-full bg-shell-fg/10 border border-shell-fg/10 rounded-xl py-2 pl-9 pr-3 text-xs text-shell-fg placeholder-shell-fg/40 focus:outline-none focus:ring-1 focus:ring-shell-fg/30 focus:border-shell-fg/30 transition-all font-normal"
                     />
                   </div>
                 </motion.div>
@@ -3082,7 +3085,7 @@ const StaffPortal = () => {
                             exit={{ opacity: 0 }}
                             className="px-3 mb-2"
                           >
-                            <span className="text-[10px] font-normal text-white/40 tracking-wider font-sans pl-1">
+                            <span className="text-[10px] font-normal text-shell-fg/40 tracking-wider font-sans pl-1">
                               {group.title}
                             </span>
                           </motion.div>
@@ -3107,24 +3110,24 @@ const StaffPortal = () => {
                                   }
                                 }}
                                 className={`relative w-full flex items-center px-3 py-2.5 rounded-xl transition-all duration-300 group overflow-hidden ${!isExpanded && 'justify-center px-0'} ${isActive || (item.hasSubmenu && isMenuExpanded)
-                                  ? 'bg-white text-brand font-semibold border border-white/20 ring-1 ring-white/10'
-                                  : 'text-white/80 hover:bg-white/10 hover:text-white'}`}
+                                  ? 'bg-shell-active text-shell-active-fg font-semibold border border-shell-fg/20 ring-1 ring-shell-fg/10'
+                                  : 'text-shell-fg/80 hover:bg-shell-fg/10 hover:text-shell-fg'}`}
                                 whileTap={{ scale: 0.98 }}
                               >
                                 {/* Icon */}
                                 <div className="relative z-10 flex items-center justify-center">
                                   <item.icon
                                     className={`w-4 h-4 transition-all duration-300 ${isActive || (item.hasSubmenu && isMenuExpanded)
-                                      ? 'text-brand'
-                                      : 'text-white/80 group-hover:text-white group-hover:scale-110'
+                                      ? 'text-shell-active-fg'
+                                      : 'text-shell-fg/80 group-hover:text-shell-fg group-hover:scale-110'
                                       }`}
                                     weight={isActive ? "fill" : "duotone"}
                                   />
                                   {item.id === 'leave' && unreadLeaveCount > 0 && !isExpanded && (
-                                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange border border-brand"></span>
+                                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange border border-shell"></span>
                                   )}
                                   {item.id === 'communication' && unreadMessageCount > 0 && !isExpanded && (
-                                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange border border-brand"></span>
+                                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange border border-shell"></span>
                                   )}
                                 </div>
 
@@ -3136,7 +3139,7 @@ const StaffPortal = () => {
                                         initial={{ opacity: 0, x: -10 }}
                                         animate={{ opacity: 1, x: 0 }}
                                         exit={{ opacity: 0, x: -10 }}
-                                        className={`ml-3 text-xs truncate font-sans relative z-10 tracking-wide font-normal flex-1 text-left ${isActive ? 'text-brand' : 'text-white/80'}`}
+                                        className={`ml-3 text-xs truncate font-sans relative z-10 tracking-wide font-normal flex-1 text-left ${isActive ? 'text-shell-active-fg' : 'text-shell-fg/80'}`}
                                       >
                                         {item.label}
                                       </motion.span>
@@ -3151,7 +3154,7 @@ const StaffPortal = () => {
                                         </span>
                                       )}
                                       {item.hasSubmenu && (
-                                        <ChevronRight className={`w-3.5 h-3.5 ml-2 ${isActive || isMenuExpanded ? 'text-white/80' : 'text-white/40'} transition-transform duration-200 ${isMenuExpanded ? 'rotate-90' : ''}`} />
+                                        <ChevronRight className={`w-3.5 h-3.5 ml-2 ${isActive || isMenuExpanded ? 'text-shell-fg/80' : 'text-shell-fg/40'} transition-transform duration-200 ${isMenuExpanded ? 'rotate-90' : ''}`} />
                                       )}
                                     </>
                                   )}
@@ -3175,7 +3178,7 @@ const StaffPortal = () => {
                                     initial={{ height: 0, opacity: 0 }}
                                     animate={{ height: 'auto', opacity: 1 }}
                                     exit={{ height: 0, opacity: 0 }}
-                                    className="overflow-hidden ml-4 pl-3 border-l border-white/10 space-y-1 mt-1"
+                                    className="overflow-hidden ml-4 pl-3 border-l border-shell-fg/10 space-y-1 mt-1"
                                   >
                                     {item.submenu?.map((subItem: any) => (
                                       <button
@@ -3194,9 +3197,9 @@ const StaffPortal = () => {
                                             if (window.innerWidth < 768) setSidebarOpen(false);
                                           }
                                         }}
-                                        className={`w-full flex items-center px-3 py-2 rounded-lg text-xs font-normal transition-all ${activeTab === subItem.id ? 'text-white bg-white/10' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                                        className={`w-full flex items-center px-3 py-2 rounded-lg text-xs font-normal transition-all ${activeTab === subItem.id ? 'text-shell-fg bg-shell-fg/10' : 'text-shell-fg/60 hover:text-shell-fg hover:bg-shell-fg/5'}`}
                                       >
-                                        <span className={`w-1.5 h-1.5 rounded-full mr-2 ${activeTab === subItem.id ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'bg-white/20'}`}></span>
+                                        <span className={`w-1.5 h-1.5 rounded-full mr-2 ${activeTab === subItem.id ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'bg-shell-fg/20'}`}></span>
                                         {subItem.label}
                                         {/* Per-source breakdown under "Communication" (FIG-578): Chat's
                                             own count, so "Communication"'s badge reads as the total of
@@ -3223,16 +3226,16 @@ const StaffPortal = () => {
             </div>
 
             {/* Profile Section */}
-            <div className="relative z-10 p-3 mt-auto border-t border-white/10">
+            <div className="relative z-10 p-3 mt-auto border-t border-shell-fg/10">
               <div
-                className={`flex items-center gap-3 p-2 rounded-xl transition-all duration-300 hover:bg-white/5 cursor-pointer ${!isExpanded ? 'justify-center' : ''}`}
+                className={`flex items-center gap-3 p-2 rounded-xl transition-all duration-300 hover:bg-shell-fg/5 cursor-pointer ${!isExpanded ? 'justify-center' : ''}`}
                 onClick={() => setActiveTab('details')}
               >
                 <div className="relative">
                   <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand to-brand-dark flex items-center justify-center text-white font-bold text-xs shadow-lg shadow-brand/20">
                     {userName[0]?.toUpperCase() || 'S'}
                   </div>
-                  <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-status-success border-2 border-brand rounded-full"></div>
+                  <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-status-success border-2 border-shell rounded-full"></div>
                 </div>
                 <AnimatePresence>
                   {isExpanded && (
@@ -3242,8 +3245,8 @@ const StaffPortal = () => {
                       exit={{ opacity: 0, width: 0 }}
                       className="flex-1 overflow-hidden"
                     >
-                      <p className="text-xs font-semibold text-white truncate">{userName}</p>
-                      <p className="text-[10px] text-white/40 truncate">Staff Member</p>
+                      <p className="text-xs font-semibold text-shell-fg truncate">{userName}</p>
+                      <p className="text-[10px] text-shell-fg/40 truncate">Staff Member</p>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -3371,6 +3374,7 @@ const StaffPortal = () => {
               {activeTab === 'contract' && <ComingSoon title="Contracts" />}
               {activeTab === 'details' && <Profile />}
               {activeTab === 'documents' && <DocumentsUploadPage />}
+              {activeTab === 'appearance' && <Appearance />}
               {activeTab === 'incident-report' && <IncidentReport />}
               {activeTab === 'job-applications' && <JobApplications />}
               {activeTab === 'chat' && <div className="relative h-screen"><ChatComponent onMessagesRead={fetchUnreadMessageCount} /></div>}

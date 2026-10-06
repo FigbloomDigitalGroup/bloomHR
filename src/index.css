@@ -3,6 +3,16 @@
 @tailwind utilities;
 
 :root {
+  /* Theme palette (the default is Forest). src/theme/applyTheme.ts overrides these per person. RGB triplets. */
+  --brand: 23 64 42;
+  --brand-dark: 27 77 46;
+  --tint: 227 239 231;
+  --highlight: 242 106 27;
+  --shell: 23 64 42;
+  --shell-fg: 255 255 255;
+  --shell-active: 255 255 255;
+  --shell-active-fg: 23 64 42;
+
   /* Figbloom brand — forest green + orange (see figbloom-schools/packages/shared/src/tokens.ts) */
   --background: 120 12% 97%;
   /* surface.page #F6F8F6 */
@@ -251,4 +261,11 @@ h6 {
 
 .react-datepicker__triangle {
   display: none !important;
+}
+/* The logo on the sidebar: white on dark sidebars, dark on light ones (set by src/theme/applyTheme.ts). */
+.shell-logo {
+  filter: brightness(0) invert(1);
+}
+:root[data-shell='light'] .shell-logo {
+  filter: brightness(0);
 }

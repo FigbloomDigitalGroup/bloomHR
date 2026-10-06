@@ -60,6 +60,7 @@ const SMSCenter = lazy(() => import('./components/SMS/Sms').then((m) => ({ defau
 const JoinCompany = lazy(() => import('./pages/JoinCompany'));
 const CreateCompany = lazy(() => import('./pages/CreateCompany'));
 const NoCompany = lazy(() => import('./pages/NoCompany'));
+const Appearance = lazy(() => import('./components/Settings/Appearance'));
 const InvitePeople = lazy(() => import('./components/Settings/InvitePeople'));
 const ChatLayout = lazy(() => import('./components/chat/ChatLayout').then((m) => ({ default: m.ChatLayout })));
 
@@ -1131,6 +1132,7 @@ function App() {
                                 } />
 
                                 <Route path="/role-permissions" element={<RolePermissions />} />
+                                <Route path="/appearance" element={<Appearance />} />
 
                                 <Route
                                   path="/hr-lifecycle"

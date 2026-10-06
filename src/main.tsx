@@ -9,6 +9,7 @@ import { missingConfig } from './lib/requiredConfig';
 import { BrowserRouter } from 'react-router-dom';
 import { antdTheme } from './theme/antdTheme';
 import './index.css'
+import { applyStoredTheme } from './theme/applyTheme';
 
 
 if ('serviceWorker' in navigator) {
@@ -20,6 +21,7 @@ if ('serviceWorker' in navigator) {
       console.log('SW registration failed:', error);
     });
 }
+applyStoredTheme(); // before the first render, so the page never flashes the default colours
 const missing = missingConfig(import.meta.env);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
