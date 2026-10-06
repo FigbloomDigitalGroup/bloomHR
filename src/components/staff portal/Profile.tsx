@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Loader2, User, UploadCloud, Edit, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
+import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
 
 const Profile = () => {
   const [employeeData, setEmployeeData] = useState<any>(null);
@@ -59,21 +60,8 @@ const Profile = () => {
     setImageUploading(true);
     
     try {
-      // Upload file to Supabase Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${employeeData["Employee Number"]}-${Date.now()}.${fileExt}`;
-      const filePath = `profile-images/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('employeeavatar')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('employeeavatar')
-        .getPublicUrl(filePath);
+      // saved in the company's folder, named after the employee (see avatarStorage.ts)
+      const publicUrl = await uploadEmployeeAvatar(file, String(employeeData["Employee Number"]));
 
       // Update employee record with new image URL
       const { error: updateError } = await supabase
