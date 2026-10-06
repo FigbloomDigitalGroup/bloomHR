@@ -3341,8 +3341,8 @@ const StaffPortal = () => {
         </motion.header>
 
         {/* Main Scrollable Area */}
-        <main className="flex-1 overflow-y-auto bg-transparent p-4 pt-0 md:p-6 md:pt-0 scrollbar-hide">
-          <div className="max-w-7xl mx-auto pb-10">
+        <main className={`flex-1 min-h-0 bg-transparent p-4 pt-0 md:p-6 md:pt-0 scrollbar-hide ${activeTab === 'chat' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}>
+          <div className={`max-w-7xl mx-auto ${activeTab === 'chat' ? 'w-full flex-1 min-h-0 flex flex-col' : 'pb-10'}`}>
             {/* Warnings */}
 
 
@@ -3352,6 +3352,7 @@ const StaffPortal = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
+              className={activeTab === 'chat' ? 'flex-1 min-h-0' : undefined}
             >
               {employeeLinked === false && (
                 <div className="m-6 mb-0 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -3380,7 +3381,7 @@ const StaffPortal = () => {
               {activeTab === 'appearance' && <Appearance />}
               {activeTab === 'incident-report' && <IncidentReport />}
               {activeTab === 'job-applications' && <JobApplications />}
-              {activeTab === 'chat' && <div className="relative h-screen"><ChatLayout onMessagesRead={fetchUnreadMessageCount} /></div>}
+              {activeTab === 'chat' && <div className="relative h-full"><ChatLayout onMessagesRead={fetchUnreadMessageCount} /></div>}
               {activeTab === 'VideoConf' && <VideoConferenceComponent />}
             </motion.div>
           </div>
