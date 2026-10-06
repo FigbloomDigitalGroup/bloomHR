@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Users, CalendarDays, Wallet, NotepadText, Phone, AlertCircle, MapPin, RefreshCw, Cake, Video, BookOpen, FileText, TrendingUp, ChevronRight } from "lucide-react";
+import { Users, CalendarDays, Calendar, Wallet, NotepadText, Phone, AlertCircle, MapPin, RefreshCw, Cake, Video, BookOpen, FileText, TrendingUp, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase"
 import { TownProps } from '../../types/supabase';
@@ -69,8 +69,6 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
     setIsNewsLoading(true);
     try {
       const today = new Date();
-      const currentMonth = today.getMonth() + 1;
-      const currentDay = today.getDate();
 
       const { data: employees, error } = await supabase
         .from('employees')
