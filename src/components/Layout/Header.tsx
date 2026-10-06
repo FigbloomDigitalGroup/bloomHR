@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { AccessibilityButton } from '../Accessibility/AccessibilityModal';
 import { Bell, X, Trash2, CheckCircle, UserPlus, Calendar, Image, Upload, MapPin, ChevronDown, AlertTriangle, Clock, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -589,6 +590,8 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
               <div className="w-px h-[18px] bg-border mx-1 hidden lg:block"></div>
             </>
           )}
+
+          <AccessibilityButton className="w-[30px] h-[30px] rounded-pill flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors" />
 
           <motion.button
             type="button"

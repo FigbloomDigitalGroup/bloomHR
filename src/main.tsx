@@ -10,6 +10,8 @@ import ThemedConfigProvider from './theme/ThemedConfigProvider';
 import './index.css'
 import { applyStoredTheme } from './theme/applyTheme';
 import { reloadOnceForStaleChunk } from './lib/staleChunk';
+import { applyA11y, loadA11y } from './lib/a11y';
+import A11yMotion from './components/Accessibility/A11yMotion';
 
 
 if ('serviceWorker' in navigator) {
@@ -27,6 +29,7 @@ window.addEventListener('vite:preloadError', (event) => {
   reloadOnceForStaleChunk();
 });
 
+applyA11y(loadA11y()); // text size, bolder text, contrast: also before the first render
 applyStoredTheme(); // before the first render, so the page never flashes the default colours
 const missing = missingConfig(import.meta.env);
 
@@ -38,7 +41,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <ThemedConfigProvider>
           <BrowserRouter>
-            <App />
+            <A11yMotion>
+              <App />
+            </A11yMotion>
           </BrowserRouter>
         </ThemedConfigProvider>
       </QueryClientProvider>

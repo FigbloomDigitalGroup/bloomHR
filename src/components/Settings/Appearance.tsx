@@ -3,6 +3,7 @@ import { Card, PageHeader, Button } from '../UI';
 import { applyTheme, clearStoredTheme, currentChoice, resetTheme, saveStoredTheme } from '../../theme/applyTheme';
 import { DEFAULT_PRESET, PRESETS, ThemeChoice, ThemePreset, choiceFromPreset, deriveVars, presetFor } from '../../theme/themes';
 import { rgbToHex } from '../../theme/color';
+import AccessibilityPanel from '../Accessibility/AccessibilityPanel';
 
 const toRgb = (triplet: string) => triplet.split(' ').map(Number) as [number, number, number];
 
@@ -115,6 +116,12 @@ export default function Appearance() {
           <Swatch choice={choice} />
           <p className="mt-1.5 text-[11.5px] text-muted-foreground">{selectedPreset ? selectedPreset.name : 'Custom'}</p>
         </div>
+      </Card>
+
+      <Card className="mt-4">
+        <h2 className="m-0 text-[14px] font-bold text-ink">Accessibility</h2>
+        <p className="mt-0.5 mb-3.5 text-[12px] text-muted-foreground">Text size, bolder text, higher contrast and less motion. Saved on this device only.</p>
+        <AccessibilityPanel />
       </Card>
     </div>
   );

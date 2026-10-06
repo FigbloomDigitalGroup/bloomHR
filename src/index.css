@@ -269,3 +269,35 @@ h6 {
 :root[data-shell='light'] .shell-logo {
   filter: brightness(0);
 }
+
+/* ---- Accessibility preferences (src/lib/a11y.ts) ---- */
+:root { --ui-zoom: 1; --screen-h: calc(100vh / var(--ui-zoom)); }
+/* #root is zoomed, and zoom also scales vh: undo that so full-height layouts still fit the real screen */
+html .h-screen { height: var(--screen-h); }
+html .min-h-screen { min-height: var(--screen-h); }
+html .max-h-screen { max-height: var(--screen-h); }
+
+html[data-a11y-bold] .font-normal { font-weight: 500; }
+html[data-a11y-bold] .font-medium { font-weight: 600; }
+html[data-a11y-bold] .font-semibold { font-weight: 700; }
+html[data-a11y-bold] .font-bold { font-weight: 800; }
+html[data-a11y-bold] body { font-weight: 500; }
+
+html[data-a11y-contrast] .text-muted-foreground,
+html[data-a11y-contrast] .text-subtle,
+html[data-a11y-contrast] .text-gray-400,
+html[data-a11y-contrast] .text-gray-500 { color: #374039 !important; }
+html[data-a11y-contrast] .border-border,
+html[data-a11y-contrast] .border-gray-200,
+html[data-a11y-contrast] .border-gray-100 { border-color: #9aa59d !important; }
+html[data-a11y-contrast] ::placeholder { color: #4f5a53 !important; opacity: 1; }
+html[data-a11y-contrast] main a { text-decoration: underline; }
+
+html[data-a11y-reduce-motion] *,
+html[data-a11y-reduce-motion] *::before,
+html[data-a11y-reduce-motion] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
