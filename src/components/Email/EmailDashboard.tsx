@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { listEmailLogs, getEmailLog } from '../../lib/emailApi';
 import { Loader2, RefreshCw, CheckCircle, XCircle, Clock, Search, ChevronLeft, ChevronRight, Eye, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -34,17 +35,7 @@ export default function EmailDashboard() {
     const fetchLogs = async (page: number = 1) => {
         setLoading(true);
         try {
-            // Use same API URL logic as other components
-            const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? '/api' : "http://localhost:3001/api");
-            const url = `${API_URL}/email/logs?limit=${itemsPerPage}`;
-            const response = await fetch(url);
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to fetch email logs from Resend');
-            }
-
-            const resendData = await response.json();
+            const resendData = await listEmailLogs(itemsPerPage);
             // Resend API returns { object: 'list', data: [...], has_more: boolean }
             const emails = resendData.data || [];
             setHasMore(resendData.has_more || false);
@@ -78,15 +69,7 @@ export default function EmailDashboard() {
     const fetchEmailDetails = async (emailId: string) => {
         setLoadingDetails(true);
         try {
-            const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? '/api' : "http://localhost:3001/api");
-            const response = await fetch(`${API_URL}/email/logs/${emailId}`);
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to fetch email details');
-            }
-
-            const details = await response.json();
+            const details = await getEmailLog(emailId);
             setSelectedEmail(details);
         } catch (error) {
             console.error('Error fetching email details:', error);

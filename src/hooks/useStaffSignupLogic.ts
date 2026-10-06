@@ -483,7 +483,7 @@ export function useStaffSignupLogic() {
                 to: email,
                 subject: subject,
                 html: htmlContent
-            });
+            }, 'staff-signup');
 
             await trackEmailSend(
                 email,

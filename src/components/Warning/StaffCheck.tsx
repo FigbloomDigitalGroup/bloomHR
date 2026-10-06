@@ -472,7 +472,7 @@ Make sure to incorporate the severity level (${severity}) and be specific about 
           to: employee.email,
           subject: subject,
           html: htmlContent
-        });
+        }, 'warning');
       }
 
       toast.success(`Warning sent to ${employee.fullName}`);

@@ -1,4 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
+import { sendEmailViaServer } from '../../lib/emailApi';
 import { useEffect, useState } from 'react';
 import { X, ArrowLeft, Clock, FileText, AlertTriangle, Shield, CheckCircle, UserCheck, Mail, Trash2, PrinterIcon, User } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -409,7 +410,6 @@ const ViewEmployeePage = () => {
     try {
       setSendingEmail(true);
 
-      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? '/api' : "http://localhost:3001/api");
 
       const terminationLetter = generateTerminationLetter();
       const htmlBody = `
@@ -419,22 +419,15 @@ const ViewEmployeePage = () => {
         </div>
       `;
 
-      const response = await fetch(`${API_URL}/email/send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to: employee['Email Address'] || employee['Work Email'] || employee['Personal Email'],
+      await sendEmailViaServer(
+        {
+          to: employee['Email Address'] || employee['Work Email'] || employee['Personal Email'] || '',
           subject: emailContent.subject,
           html: htmlBody,
           provider: 'resend'
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to send email via API');
-      }
+        },
+        { purpose: 'termination' }
+      );
 
       await supabase
         .from('email_logs')

@@ -1,3 +1,5 @@
+import { sendEmailViaServer, type EmailPurpose } from '../lib/emailApi';
+
 
 export interface EmailData {
   to: string;
@@ -5,34 +7,13 @@ export interface EmailData {
   html: string;
 }
 
-// Point to the local proxy which forwards to the backend
-
-
-export const sendEmail = async (data: EmailData) => {
+// Email goes through our own backend (src/lib/emailApi.ts -> email_routes.js), which checks the signed-in user's
+// permission for this kind of mail and sends from the company address. It used to call a separate Supabase function with
+// the public anon key.
+export const sendEmail = async (data: EmailData, purpose: EmailPurpose) => {
   try {
-    const response = await fetch(import.meta.env.VITE_SUPABASE_FUNCTION_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-      },
-      body: JSON.stringify({
-        to_email: data.to,
-        subject: data.subject,
-        html_content: data.html,
-        from_email: "support@zirahrapp.com",
-        track_opens: true,
-        track_clicks: true
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Failed to send email");
-    }
-
-    const result = await response.json();
-    return { id: result.id || result.messageId || result.resend_id };
+    const result = await sendEmailViaServer({ to: data.to, subject: data.subject, html: data.html }, { purpose });
+    return { id: result.id };
   } catch (error) {
     console.error("Email service error:", error);
     throw error;
@@ -63,9 +44,12 @@ export const sendScheduleEmail = async (to: string, data: {
     </div>
   `;
 
-  return sendEmail({
-    to,
-    subject: `Interview Scheduled for ${data.position}`,
-    html,
-  });
+  return sendEmail(
+    {
+      to,
+      subject: `Interview Scheduled for ${data.position}`,
+      html,
+    },
+    'recruitment'
+  );
 };

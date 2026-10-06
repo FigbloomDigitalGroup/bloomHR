@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { sendEmailViaServer } from '../../lib/emailApi';
 import EmployeePicker from '../UI/EmployeePicker';
 import { supabase } from '../../lib/supabase';
 import { Loader2, Send, Filter, Users, X, Check, Paperclip } from 'lucide-react';
@@ -165,7 +166,6 @@ export default function SendEmail() {
       // Let's loop for now to be safe and ensure privacy, although it might be slower.
       // Alternatively, we can batch them.
 
-      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? '/api' : "http://localhost:3001/api");
 
       let successCount = 0;
       let failCount = 0;
@@ -175,20 +175,17 @@ export default function SendEmail() {
 
       const sendEmailToRecipient = async (recipient: Employee) => {
         try {
-          const response = await fetch(`${API_URL}/email/send`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+          await sendEmailViaServer(
+            {
               to: recipient['Work Email'],
               subject: subject,
               html: body,
               attachments: attachments.length > 0 ? attachments : undefined,
               provider, // Pass selected provider
-              cpanelUser: provider === 'cpanel' ? cpanelUser : undefined // Pass dynamic user
-            })
-          });
-
-          if (!response.ok) throw new Error('Failed');
+              cpanelUser: provider === 'cpanel' ? cpanelUser : undefined // The server only allows the mailboxes it is set up for
+            },
+            { purpose: 'email-portal' }
+          );
           return true;
         } catch {
           return false;

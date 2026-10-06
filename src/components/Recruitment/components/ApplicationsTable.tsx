@@ -92,7 +92,7 @@ export const ApplicationsTable = ({ applications, setSelectedApplication }: Appl
         to: selectedApplicationForSchedule.email,
         subject: `Interview Scheduled for ${selectedApplicationForSchedule.position}`,
         html: emailContent,
-      });
+      }, 'recruitment');
 
       toast.success('Interview scheduled and email sent!');
       setShowScheduleModal(false);
