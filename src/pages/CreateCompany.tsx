@@ -5,24 +5,7 @@ import { supabase } from '../lib/supabase';
 import { companyApi } from '../lib/companyApi';
 import AuthShell, { AuthButton, Field, authLinkClass } from '../components/Company/AuthShell';
 import { useSessionEmail } from '../components/Company/useSessionEmail';
-
-const PENDING_KEY = 'pending_company_name';
-
-const readPending = () => {
-  try {
-    return localStorage.getItem(PENDING_KEY);
-  } catch {
-    return null;
-  }
-};
-const writePending = (name: string | null) => {
-  try {
-    if (name) localStorage.setItem(PENDING_KEY, name);
-    else localStorage.removeItem(PENDING_KEY);
-  } catch {
-    /* storage unavailable: the person simply enters the name again */
-  }
-};
+import { clearPendingCompany, readPendingCompany, writePendingCompany } from '../lib/pendingCompany';
 
 /** Create a company: new people sign up and create it in one step; people already signed in just name it. */
 export default function CreateCompany() {
@@ -35,14 +18,14 @@ export default function CreateCompany() {
 
   const create = async (name: string) => {
     await companyApi.createCompany(name);
-    writePending(null);
+    clearPendingCompany();
     // a full load so every screen starts from the new company
     window.location.assign('/dashboard');
   };
 
   // came back from the confirmation email with a company name waiting
   useEffect(() => {
-    const pending = readPending();
+    const pending = readPendingCompany();
     if (sessionEmail && pending) {
       setBusy(true);
       create(pending).catch((e: Error) => {
@@ -75,7 +58,7 @@ export default function CreateCompany() {
       if (data.session) {
         await create(companyName);
       } else {
-        writePending(companyName);
+        writePendingCompany(companyName);
         setCheckEmail(true);
       }
     } catch (err) {

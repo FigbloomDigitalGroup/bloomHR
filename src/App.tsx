@@ -926,7 +926,25 @@ function App() {
             <Route path="/update-password" element={<UpdatePasswordPage />} />
             <Route
               path="/staff"
-              element={session ? <CompanyGate userId={session.user.id}><StaffPortalLanding /></CompanyGate> : <Login onLoginSuccess={handleLoginSuccess} />}
+              element={
+                !session ? (
+                  <Login onLoginSuccess={handleLoginSuccess} />
+                ) : companyState.status === 'none' ? (
+                  // someone who belongs to no company yet must set one up, not be shown a staff portal
+                  <NoCompany email={session.user.email ?? ''} />
+                ) : companyState.status === 'ready' ? (
+                  <CompanyGate userId={session.user.id}><StaffPortalLanding /></CompanyGate>
+                ) : companyState.status === 'error' ? (
+                  <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-center px-4">
+                    <p className="text-sm text-gray-700">We could not load your account: {companyState.message}</p>
+                    <button type="button" className="px-4 py-2 rounded bg-gray-900 text-white text-sm font-semibold" onClick={() => window.location.reload()}>
+                      Try again
+                    </button>
+                  </div>
+                ) : (
+                  <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">Loading your workspace…</div>
+                )
+              }
             />
 
             <Route
