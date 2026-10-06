@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { useHRNotifications, fetchAdminHRNotifications, markAdminNotificationRead, type HRNotification } from '../../hooks/useHRNotifications';
 import { SearchInput } from '../UI';
+import CompanySwitcher from '../Company/CompanySwitcher';
 
 interface HeaderProps {
   user?: { email: string; role: string };
@@ -517,7 +518,8 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
       >
-        {/* Company switcher */}
+        {/* Company name (opens the company profile) and, for people in several companies, the switcher */}
+        <div className="flex items-center gap-2.5 justify-self-start min-w-0">
         <motion.button
           type="button"
           className="flex items-center gap-2 group justify-self-start"
@@ -542,6 +544,8 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
           </span>
           <ChevronDown className="w-3 h-3 text-subtle flex-shrink-0" strokeWidth={2.2} />
         </motion.button>
+        <CompanySwitcher />
+        </div>
 
         {/* Search */}
         <SearchInput placeholder="Search Figbloom HR" />

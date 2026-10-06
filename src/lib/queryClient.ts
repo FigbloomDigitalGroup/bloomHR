@@ -28,4 +28,5 @@ export const queryClient = createQueryClient();
 export const queryKeys = {
   employeeDirectory: ['employee-directory'] as const,
   myPermissions: ['my-permissions'] as const,
+  myCompanies: ['my-companies'] as const,
 };
