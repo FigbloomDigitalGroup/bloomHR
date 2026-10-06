@@ -83,3 +83,21 @@ describe('helpers', () => {
     expect(describeCompanyError(null)).toMatch(/try again/);
   });
 });
+
+describe('emailInvitation', () => {
+  it('asks the backend to email the invitation for this token, signed in as the current person', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ ok: true, sentTo: 'a@b.co' }), { status: 200 }));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    // the auth session comes from the mocked supabase client
+    const { supabase } = await import('./supabase');
+    (supabase as unknown as { auth: unknown }).auth = { getSession: () => Promise.resolve({ data: { session: { access_token: 'tok' } } }) };
+    expect(await companyApi.emailInvitation('t'.repeat(40))).toEqual({ ok: true, sentTo: 'a@b.co' });
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(String(url)).toMatch(/\/invites\/send$/);
+    expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer tok');
+    expect(JSON.parse(String(init?.body))).toEqual({ token: 't'.repeat(40) });
+    fetchSpy.mockRestore();
+  });
+});

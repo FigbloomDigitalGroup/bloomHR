@@ -5,6 +5,7 @@ const api = vi.hoisted(() => ({
   listInvitations: vi.fn(),
   createInvitation: vi.fn(),
   revokeInvitation: vi.fn(),
+  emailInvitation: vi.fn(),
 }));
 
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
@@ -24,11 +25,45 @@ beforeEach(() => {
   api.listInvitations.mockReset().mockResolvedValue([]);
   api.createInvitation.mockReset();
   api.revokeInvitation.mockReset().mockResolvedValue(undefined);
+  api.emailInvitation.mockReset().mockResolvedValue({ ok: true, sentTo: 'x' });
   vi.mocked(toast.error).mockClear();
 });
 afterEach(() => cleanup());
 
 describe('InvitePeople', () => {
+  it('emails the invitation straight away and says so', async () => {
+    api.createInvitation.mockResolvedValue({ invitation_id: 'i1', token: 'tok123', expires_at: future });
+    render(<InvitePeople />);
+    await screen.findByText('No invitations yet');
+    fireEvent.change(screen.getByPlaceholderText('name@gmail.com'), { target: { value: 'new@gmail.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /Create invitation/ }));
+    await waitFor(() => expect(api.emailInvitation).toHaveBeenCalledWith('tok123'));
+    expect(await screen.findByText(/We emailed the invitation to/)).toBeTruthy();
+    expect((screen.getByLabelText('Invitation link') as HTMLInputElement).value).toMatch(/tok123$/); // the link is still there as a backup
+  });
+
+  it('if the email cannot be sent, says why and keeps the link to send by hand', async () => {
+    api.createInvitation.mockResolvedValue({ invitation_id: 'i1', token: 'tok123', expires_at: future });
+    api.emailInvitation.mockRejectedValue(new Error('Email is not set up yet (RESEND_API_KEY)'));
+    render(<InvitePeople />);
+    await screen.findByText('No invitations yet');
+    fireEvent.change(screen.getByPlaceholderText('name@gmail.com'), { target: { value: 'new@gmail.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /Create invitation/ }));
+    expect(await screen.findByText(/We could not email the invitation .Email is not set up yet/)).toBeTruthy();
+    expect((screen.getByLabelText('Invitation link') as HTMLInputElement).value).toMatch(/tok123$/);
+  });
+
+  it('resends a waiting invitation with a fresh link, and emails it', async () => {
+    api.listInvitations.mockResolvedValue([
+      { id: 'w', email: 'waiting@x.co', role: 'HR', status: 'pending', created_at: past, expires_at: future, accepted_at: null },
+    ]);
+    api.createInvitation.mockResolvedValue({ invitation_id: 'i2', token: 'fresh-token', expires_at: future });
+    render(<InvitePeople />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Resend' }));
+    await waitFor(() => expect(api.createInvitation).toHaveBeenCalledWith('waiting@x.co', 'HR'));
+    await waitFor(() => expect(api.emailInvitation).toHaveBeenCalledWith('fresh-token'));
+  });
+
   it('creates an invitation and shows a link to send, containing the token', async () => {
     api.createInvitation.mockResolvedValue({ invitation_id: 'i1', token: 'tok123', expires_at: future });
     render(<InvitePeople />);
@@ -66,6 +101,7 @@ describe('InvitePeople', () => {
     expect(screen.getByText('Expired')).toBeTruthy();
     expect(screen.getByText('Joined')).toBeTruthy();
 
+    expect(screen.getAllByRole('button', { name: 'Resend' })).toHaveLength(2); // waiting and expired ones can be resent
     const cancels = screen.getAllByRole('button', { name: 'Cancel' });
     expect(cancels).toHaveLength(1);
     fireEvent.click(cancels[0]);

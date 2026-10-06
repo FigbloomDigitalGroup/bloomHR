@@ -26,7 +26,7 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
   const [busy, setBusy] = useState(false);
   const [invitations, setInvitations] = useState<Invitation[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [latest, setLatest] = useState<{ email: string; link: string } | null>(null);
+  const [latest, setLatest] = useState<{ email: string; link: string; mail: 'sending' | 'sent' | 'failed'; reason?: string } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -50,18 +50,39 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
     }
   };
 
+  /** Creates the invitation and emails it. If the email cannot go out, the link is still there to send by hand. */
+  const invite = async (to: string, inviteRole: string) => {
+    const created = await companyApi.createInvitation(to, inviteRole);
+    const entry = { email: to.trim().toLowerCase(), link: inviteLink(created.token) };
+    setLatest({ ...entry, mail: 'sending' });
+    await load();
+    try {
+      await companyApi.emailInvitation(created.token);
+      setLatest({ ...entry, mail: 'sent' });
+    } catch (err) {
+      setLatest({ ...entry, mail: 'failed', reason: (err as Error).message });
+    }
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
     try {
-      const created = await companyApi.createInvitation(email, role);
-      setLatest({ email: email.trim().toLowerCase(), link: inviteLink(created.token) });
+      await invite(email, role);
       setEmail('');
-      await load();
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  // a new invitation replaces the old link, so "resend" makes a fresh one and emails it
+  const resend = async (inv: Invitation) => {
+    try {
+      await invite(inv.email, inv.role);
+    } catch (err) {
+      toast.error((err as Error).message);
     }
   };
 
@@ -76,7 +97,7 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
 
   return (
     <div>
-      <PageHeader title="Invite people" subtitle="They get a link that creates their account in this company. Works with company or personal email." />
+      <PageHeader title="Invite people" subtitle="We email them a link that creates their account in this company. Works with company or personal email." />
 
       <Card className="mb-4">
         <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
@@ -112,9 +133,17 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
 
         {latest && (
           <div className="mt-4 p-3 rounded-tile bg-green-tint border border-border">
-            <p className="text-[12.5px] text-ink">
-              Send this link to <strong>{latest.email}</strong>. It works once, only for that address, and expires in 7 days.
-            </p>
+            {latest.mail === 'sending' && <p className="text-[12.5px] text-ink">Emailing the invitation to <strong>{latest.email}</strong>…</p>}
+            {latest.mail === 'sent' && (
+              <p className="text-[12.5px] text-ink">
+                We emailed the invitation to <strong>{latest.email}</strong>. The link works once, only for that address, and expires in 7 days. You can also copy it:
+              </p>
+            )}
+            {latest.mail === 'failed' && (
+              <p className="text-[12.5px] text-ink">
+                We could not email the invitation ({latest.reason}). Send this link to <strong>{latest.email}</strong> yourself. It works once, only for that address, and expires in 7 days.
+              </p>
+            )}
             <div className="mt-2 flex gap-2">
               <input readOnly value={latest.link} onFocus={(e) => e.currentTarget.select()} className="flex-1 px-3 py-2 rounded-tile border border-border bg-white text-[12px] text-ink" aria-label="Invitation link" />
               <Button variant="secondary" onClick={() => copy(latest.link)}>
@@ -155,6 +184,11 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
                     </td>
                     <td className="px-4 py-2.5 text-muted-foreground">{new Date(inv.created_at).toLocaleDateString()}</td>
                     <td className="px-4 py-2.5 text-right">
+                      {(status.label === 'Waiting' || status.label === 'Expired') && (
+                        <button type="button" onClick={() => resend(inv)} className="mr-3 text-[12px] font-semibold text-brand">
+                          Resend
+                        </button>
+                      )}
                       {status.label === 'Waiting' && (
                         <button type="button" onClick={() => cancel(inv.id)} className="text-[12px] font-semibold text-status-danger">
                           Cancel

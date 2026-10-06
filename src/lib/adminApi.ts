@@ -41,14 +41,15 @@ export interface UpdateUserInput {
   branch?: string | null;
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+/** A call to the backend (`path` includes the area, e.g. /admin/users or /invites/send), signed in as the current person. */
+export async function apiRequest<T>(method: string, path: string, body?: unknown): Promise<T> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new Error('You are not signed in');
 
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/admin${path}`, {
+    response = await fetch(`${API_URL}${path}`, {
       method,
       headers: {
         'Content-Type': 'application/json',
@@ -66,6 +67,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (payload === null || typeof payload !== 'object') throw new Error(BACKEND_UNAVAILABLE);
   return payload as T;
 }
+
+const request = <T>(method: string, path: string, body?: unknown) => apiRequest<T>(method, `/admin${path}`, body);
 
 export const BACKEND_UNAVAILABLE =
   'The user-management service is not available yet (the backend is not deployed or VITE_API_URL is not set).';

@@ -5,6 +5,7 @@ import cors from "cors";
 import emailRouter from "./email_routes.js";
 import smsRouter from "./sms_routes.js";
 import adminRouter from "./admin_routes.js";
+import inviteRouter from "./invite_routes.js";
 
 /**
  * @param {{ mpesaRouter?: import("express").Router }} options
@@ -23,6 +24,7 @@ export function buildApp({ mpesaRouter } = {}) {
   app.use("/api/email", emailRouter);
   app.use("/api/sms", smsRouter);
   app.use("/api/admin", adminRouter);
+  app.use("/api/invites", inviteRouter);
 
   // anything else under /api is an API 404 in JSON, never the website's home page
   app.use("/api", (_req, res) => res.status(404).json({ error: "Not found" }));
