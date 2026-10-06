@@ -59,6 +59,7 @@ import UserProfileDropdown from './UserProfile';
 import PasswordResetModal from './PasswordRestModal';
 import DocumentsUploadPage from './Documents';
 import Appearance from '../Settings/Appearance';
+import CompleteProfileCard from './CompleteProfileCard';
 import PayslipViewer from './PayslipViewer';
 import EmployeeBioPage from './Bio';
 import IncidentReport from './IncidentReport';
@@ -2442,6 +2443,8 @@ const DashboardHome = ({ setActiveTab, userName }: { setActiveTab: (tab: string)
           </motion.button>
         </div>
       </motion.div>
+
+      <CompleteProfileCard onOpen={() => setActiveTab('biodata')} />
 
       {/* Services Grid */}
       <div className="space-y-4">

@@ -18,6 +18,7 @@ import { TownProps } from '../../types/supabase';
 import { supabase } from '../../lib/supabase';
 import { Database } from '../../types/supabase';
 import { PageHeader, Card, Button, StatusPill, EmptyState, SearchInput } from '../UI';
+import { profileItems, profileScore } from '../../lib/profileCompleteness';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
@@ -29,6 +30,9 @@ interface AreaTownMapping {
 }
 
 
+
+const INCOMPLETE = 'Incomplete profiles';
+const COMPLETE = 'Complete profiles';
 
 const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
   const navigate = useNavigate();
@@ -54,6 +58,26 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [selectedEmploymentType, setSelectedEmploymentType] = useState('all');
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  // how complete each person's own information is (they fill most of it in themselves)
+  const [selectedProfile, setSelectedProfile] = useState('all');
+  const [emergencyContacts, setEmergencyContacts] = useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from('emergency_contact')
+      .select('"Employee Number"')
+      .then(({ data, error }) => {
+        if (cancelled || error || !data) return; // unknown: the emergency contact is then left out of the score
+        setEmergencyContacts(new Set(data.map((r: Record<string, unknown>) => String(r['Employee Number']))));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const scoreOf = (employee: Employee) =>
+    profileScore(profileItems(employee as unknown as Record<string, unknown>, emergencyContacts ? emergencyContacts.has(String(employee['Employee Number'])) : null));
 
   // Bulk Edit State
   const [selectionAction, setSelectionAction] = useState<'relocate' | 'terminate' | null>(null);
@@ -187,8 +211,10 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
     const matchesDepartment = selectedDepartment === 'all' || employee['Employee Type'] === selectedDepartment;
     const matchesBranch = selectedBranch === 'all' || employee.Branch === selectedBranch;
     const matchesEmploymentType = selectedEmploymentType === 'all' || employee.Town === selectedEmploymentType;
+    const matchesProfile =
+      selectedProfile === 'all' || (selectedProfile === INCOMPLETE ? !scoreOf(employee).complete : scoreOf(employee).complete);
 
-    return matchesSearch && matchesDepartment && matchesBranch && matchesEmploymentType;
+    return matchesSearch && matchesDepartment && matchesBranch && matchesEmploymentType && matchesProfile;
   });
 
   // Get display name for current selection
@@ -332,6 +358,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
         {renderPillSelect(departments, selectedDepartment, setSelectedDepartment, 'All Departments', 'Filter by department')}
         {renderPillSelect(branches, selectedBranch, setSelectedBranch, 'All Branches', 'Filter by branch')}
         {renderPillSelect(employmentTypes, selectedEmploymentType, setSelectedEmploymentType, 'Town Office', 'Filter by town office')}
+        {renderPillSelect(['all', INCOMPLETE, COMPLETE], selectedProfile, setSelectedProfile, 'All profiles', 'Filter by profile completeness')}
 
         {selectionAction ? (
           <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
@@ -451,6 +478,21 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                 <Phone className="w-3 h-3 shrink-0" strokeWidth={2} />
                 <span className="truncate">{employee['Mobile Number'] || '—'}</span>
               </div>
+
+              {(() => {
+                const score = scoreOf(employee);
+                return (
+                  <div className="mb-3" title={score.complete ? 'Profile complete' : `Still to add: ${score.missing.map((m) => m.label).join(', ')}`}>
+                    <div className="flex items-center justify-between text-[10px] font-semibold text-subtle mb-1">
+                      <span>Profile</span>
+                      <span className={score.complete ? 'text-status-success' : ''}>{score.percent}% complete</span>
+                    </div>
+                    <div className="h-1 rounded-full bg-secondary overflow-hidden">
+                      <div className={`h-full rounded-full ${score.complete ? 'bg-status-success' : 'bg-brand'}`} style={{ width: `${score.percent}%` }} />
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className={`flex gap-2 ${selectionAction ? 'opacity-40 pointer-events-none' : ''}`}>
                 <RoleButtonWrapper allowedRoles={['ADMIN', 'HR', 'MANAGER', 'REGIONAL']}>
