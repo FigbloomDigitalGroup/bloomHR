@@ -4,8 +4,9 @@ import { X, Save, ArrowLeft, Plus, Upload, AlertCircle, Users, Check, PencilLine
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
-import { isValidPhone, summarizeErrors } from '../../lib/formValidation';
+import { describeSaveError, isValidPhone, summarizeErrors } from '../../lib/formValidation';
 import { canEditEmployeeField, isHrOrAdmin, normalizeRole } from '../../lib/employeeFieldAccess';
+import { NOT_SAVED_NOT_LINKED, requireUpdatedRows } from '../../lib/requireUpdated';
 import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
@@ -541,7 +542,7 @@ const EmployeeBioPage = () => {
       const helb = statutoryDeductions.find(d => d.name === 'HELB')?.number || null;
 
       // Update employee data
-      const { error: employeeError } = await supabase
+      const { data: savedRows, error: employeeError } = await supabase
         .from('employees')
         .update({
           ...updateData,
@@ -551,9 +552,12 @@ const EmployeeBioPage = () => {
           'NITA': nita,
           'HELB': helb
         })
-        .eq('"Employee Number"', id);
+        .eq('"Employee Number"', id)
+        .select('"Employee Number"');
 
       if (employeeError) throw employeeError;
+      // an update that matches no row is silent: without this the page looked saved while nothing was
+      requireUpdatedRows(savedRows, NOT_SAVED_NOT_LINKED);
 
       // Update emergency contact (single contact using upsert)
       if (emergencyContact.name.trim()) {
@@ -610,7 +614,8 @@ const EmployeeBioPage = () => {
       setIsEditMode(false);
       navigate(`/staff`, { state: { success: true } });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update employee');
+      // a message over the form: the page used to be replaced by an error screen, losing what was typed
+      toast.error(describeSaveError(err, 'Failed to update employee'));
     } finally {
       setSaving(false);
     }
