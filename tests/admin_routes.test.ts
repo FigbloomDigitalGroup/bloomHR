@@ -231,6 +231,19 @@ describe('a person in several companies', () => {
     expect(state.memberships.find((m) => m.user_id === 'dual' && m.tenant_id === TENANT_A)?.role).toBe('STAFF');
   });
 
+  it('an admin of one company cannot change the password or email of a login that also belongs to another company', async () => {
+    for (const body of [{ password: 'takeover1' }, { email: 'attacker@x.co' }, { role: 'HR', password: 'takeover1' }]) {
+      const res = await call('PATCH', '/users/dual', 'admin-a', body);
+      expect(res.status, JSON.stringify(body)).toBe(409);
+    }
+    expect(state.calls.filter((c) => c.startsWith('updateUser:dual'))).toEqual([]);
+  });
+
+  it('can still change the role or status of that login, and the password of a login that is only theirs', async () => {
+    expect((await call('PATCH', '/users/dual', 'admin-a', { role: 'MANAGER' })).status).toBe(200);
+    expect((await call('PATCH', '/users/staff-a', 'admin-a', { password: 'newsecret1' })).status).toBe(200);
+  });
+
   it('suspending them in one company does not ban the login they use for the other', async () => {
     await call('PATCH', '/users/dual', 'admin-a', { account_status: 'SUSPENDED' });
     expect(state.calls).toContain('updateUser:dual:ban=none'); // explicitly not banned

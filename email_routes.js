@@ -45,6 +45,15 @@ const PURPOSES = {
 };
 const LOG_MODULES = ["email-portal", "adminconfirm"];
 
+// The sending history comes from the one Resend account every company shares, so it mixes all companies' mail
+// (including invitation links). It is shown only to the company named in EMAIL_LOGS_TENANT_ID (the operator's own);
+// with the variable unset nobody can read it.
+async function assertMayReadLogs(caller) {
+    if (!(await callerHasModule(caller, LOG_MODULES))) throw new HttpError(403, "Forbidden");
+    const operator = (process.env.EMAIL_LOGS_TENANT_ID || "").trim();
+    if (!operator || operator !== caller.tenantId) throw new HttpError(403, "Forbidden");
+}
+
 const MAX_RECIPIENTS = 50; // per request
 const MAX_SUBJECT = 200;
 const MAX_HTML = 1_000_000; // characters
@@ -89,7 +98,7 @@ const asRecipients = (to) => {
 router.get(
     "/logs",
     handler(async (req, res, caller) => {
-        if (!(await callerHasModule(caller, LOG_MODULES))) throw new HttpError(403, "Forbidden");
+        await assertMayReadLogs(caller);
         if (!process.env.RESEND_API_KEY) throw new HttpError(503, "Email logs are not configured on the server");
 
         const limit = req.query.limit === undefined ? 20 : Number(req.query.limit);
@@ -116,7 +125,7 @@ router.get(
 router.get(
     "/logs/:id",
     handler(async (req, res, caller) => {
-        if (!(await callerHasModule(caller, LOG_MODULES))) throw new HttpError(403, "Forbidden");
+        await assertMayReadLogs(caller);
         if (!process.env.RESEND_API_KEY) throw new HttpError(503, "Email logs are not configured on the server");
         if (!ID_RE.test(req.params.id)) throw new HttpError(400, "Invalid email id");
 

@@ -122,6 +122,14 @@ async function hasOtherActiveMembership(userId, tenantId) {
   return data.some((m) => m.tenant_id !== tenantId);
 }
 
+// True when the login also belongs to a company other than `tenantId` (any status). Its email and password belong
+// to the whole login, so one company's admin must not change them.
+async function belongsToOtherCompany(userId, tenantId) {
+  const { data, error } = await admin.from("memberships").select("tenant_id").eq("user_id", userId);
+  if (error) throw error;
+  return data.some((m) => m.tenant_id !== tenantId);
+}
+
 // The target of a by-id operation must belong to the caller's tenant. A user in another tenant
 // is reported as "not found" so the endpoint does not reveal that they exist.
 async function loadTenantProfile(userId, caller) {
@@ -258,6 +266,10 @@ router.patch(
       }
     }
     if (branch !== undefined) user_metadata.branch = branch || null;
+
+    if ((email !== undefined || password !== undefined) && (await belongsToOtherCompany(id, caller.tenantId))) {
+      throw new HttpError(409, "This person also belongs to another company, so their email and password can only be changed by themselves (use Forgot password).");
+    }
 
     const update = { user_metadata };
     if (email !== undefined) update.email = email;
