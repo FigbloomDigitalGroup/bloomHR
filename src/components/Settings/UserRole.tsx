@@ -731,7 +731,7 @@ export default function UserRolesSettings() {
       try {
         const users = await adminApi.listUsers();
 
-        setUsers(users);
+        setUsers(users ?? []);
       } catch (err: any) {
         console.error('Error fetching users:', err);
         toast.error(err.message || 'Failed to load users');

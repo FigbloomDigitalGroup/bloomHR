@@ -60,14 +60,25 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     throw new Error('Could not reach the server. Is the backend running?');
   }
 
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
+  // Where no backend is deployed, the website itself answers (its home page, status 200): that is not JSON
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error((payload && payload.error) || `Request failed (${response.status})`);
+  if (payload === null || typeof payload !== 'object') throw new Error(BACKEND_UNAVAILABLE);
   return payload as T;
 }
 
+export const BACKEND_UNAVAILABLE =
+  'The user-management service is not available yet (the backend is not deployed or VITE_API_URL is not set).';
+
+/** The list a response should carry, or a clear error instead of an undefined that crashes the screen. */
+function listOf<T>(value: unknown): T[] {
+  if (!Array.isArray(value)) throw new Error(BACKEND_UNAVAILABLE);
+  return value as T[];
+}
+
 export const adminApi = {
-  listUsers: () => request<{ users: AdminUser[] }>('GET', '/users').then((r) => r.users),
-  listAuthUsers: () => request<{ users: AuthUserSummary[] }>('GET', '/auth-users').then((r) => r.users),
+  listUsers: () => request<{ users: AdminUser[] }>('GET', '/users').then((r) => listOf<AdminUser>(r.users)),
+  listAuthUsers: () => request<{ users: AuthUserSummary[] }>('GET', '/auth-users').then((r) => listOf<AuthUserSummary>(r.users)),
   createUser: (input: CreateUserInput) => request<{ user: AdminUser }>('POST', '/users', input).then((r) => r.user),
   updateUser: (id: string, input: UpdateUserInput) =>
     request<{ user: AdminUser }>('PATCH', `/users/${id}`, input).then((r) => r.user),
