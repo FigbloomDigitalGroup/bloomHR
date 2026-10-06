@@ -100,31 +100,46 @@ const toUserView = (user, profile) => ({
   user_metadata: user.user_metadata,
 });
 
-// Keeps user_profiles (the trusted role source) in step with the auth user.
-async function syncProfile(userId, email, role, accountStatus, tenantId) {
+// Records the person's role and status in ONE company. memberships is the source of truth (a login can belong to
+// several companies); a database trigger mirrors it into user_profiles, the row the access rules read, when this
+// is the company the person is currently working in (or their first). Never writes another company's membership.
+async function syncProfile(userId, role, accountStatus, tenantId) {
   const { error } = await admin
-    .from("user_profiles")
-    .upsert({ user_id: userId, email, role, account_status: accountStatus, tenant_id: tenantId }, { onConflict: "user_id" });
+    .from("memberships")
+    .upsert({ user_id: userId, tenant_id: tenantId, role, account_status: accountStatus }, { onConflict: "user_id,tenant_id" });
   if (error) throw error;
+}
+
+// True when the person is an active member of some company other than `tenantId`: suspending them in one
+// company must not ban the login they still use for another.
+async function hasOtherActiveMembership(userId, tenantId) {
+  const { data, error } = await admin
+    .from("memberships")
+    .select("tenant_id")
+    .eq("user_id", userId)
+    .eq("account_status", "ACTIVE");
+  if (error) throw error;
+  return data.some((m) => m.tenant_id !== tenantId);
 }
 
 // The target of a by-id operation must belong to the caller's tenant. A user in another tenant
 // is reported as "not found" so the endpoint does not reveal that they exist.
 async function loadTenantProfile(userId, caller) {
   const { data, error } = await admin
-    .from("user_profiles")
+    .from("memberships")
     .select("role, account_status, tenant_id")
     .eq("user_id", userId)
+    .eq("tenant_id", caller.tenantId)
     .maybeSingle();
   if (error) throw error;
-  if (!data || data.tenant_id !== caller.tenantId) throw new HttpError(404, "User not found");
+  if (!data) throw new HttpError(404, "User not found");
   return data;
 }
 
 // Ids of every login in the caller's tenant, with their profile.
 async function tenantProfiles(caller) {
   const { data, error } = await admin
-    .from("user_profiles")
+    .from("memberships")
     .select("user_id, role, account_status")
     .eq("tenant_id", caller.tenantId);
   if (error) throw error;
@@ -195,7 +210,7 @@ router.post(
       throw new HttpError(exists ? 409 : 400, error.message);
     }
     try {
-      await syncProfile(data.user.id, email, role, account_status, caller.tenantId);
+      await syncProfile(data.user.id, role, account_status, caller.tenantId);
     } catch (profileErr) {
       // Don't leave a login that can never pass the role check.
       await admin.auth.admin.deleteUser(data.user.id);
@@ -247,11 +262,15 @@ router.patch(
     const update = { user_metadata };
     if (email !== undefined) update.email = email;
     if (password !== undefined) update.password = password;
-    if (account_status !== undefined) update.ban_duration = banDuration(account_status);
+    // A ban applies to the whole login, so only ban when this was their last active company.
+    if (account_status !== undefined) {
+      const keepsLoginElsewhere = account_status !== "ACTIVE" && (await hasOtherActiveMembership(id, caller.tenantId));
+      update.ban_duration = keepsLoginElsewhere ? "none" : banDuration(account_status);
+    }
 
     const { data, error } = await admin.auth.admin.updateUserById(id, update);
     if (error) throw new HttpError(error.status === 422 ? 409 : 400, error.message);
-    await syncProfile(id, data.user.email, nextRole, nextStatus, caller.tenantId);
+    await syncProfile(id, nextRole, nextStatus, caller.tenantId);
     res.json({ user: toUserView(data.user, { role: nextRole, account_status: nextStatus }) });
   })
 );
@@ -262,9 +281,16 @@ router.delete(
   guard(["ADMIN"], async (req, res, caller) => {
     if (req.params.id === caller.id) throw new HttpError(400, "You cannot delete your own account");
     await loadTenantProfile(req.params.id, caller);
-    const { error } = await admin.auth.admin.deleteUser(req.params.id);
-    if (error) throw new HttpError(error.status === 404 ? 404 : 400, error.message);
-    await admin.from("user_profiles").delete().eq("user_id", req.params.id);
+    // Leave this company; the login itself goes only when it belongs to no other company.
+    const { error: leaveError } = await admin.from("memberships").delete().eq("user_id", req.params.id).eq("tenant_id", caller.tenantId);
+    if (leaveError) throw leaveError;
+    const { data: remaining, error: remainingError } = await admin.from("memberships").select("tenant_id").eq("user_id", req.params.id);
+    if (remainingError) throw remainingError;
+    if (remaining.length === 0) {
+      const { error } = await admin.auth.admin.deleteUser(req.params.id);
+      if (error) throw new HttpError(error.status === 404 ? 404 : 400, error.message);
+      await admin.from("user_profiles").delete().eq("user_id", req.params.id);
+    }
     res.json({ ok: true });
   })
 );
