@@ -220,7 +220,7 @@ const EmployeeBioPage = () => {
         const { data: contacts } = await supabase
           .from('emergency_contact')
           .select('*')
-          .eq('Employee Number', id)
+          .eq('Employee Number', employeeData["Employee Number"])
           .limit(1)
           .single();
 
@@ -228,7 +228,7 @@ const EmployeeBioPage = () => {
         const { data: deps } = await supabase
           .from('dependents')
           .select('*')
-          .eq('Employee Number', id);
+          .eq('Employee Number', employeeData["Employee Number"]);
 
         // Set default statutory deductions
         const defaultDeductions = [
@@ -516,6 +516,10 @@ const EmployeeBioPage = () => {
       setSaving(true);
       setError(null);
 
+      // the employee this page loaded (found by the login's email). The web address of the staff portal carries no
+      // employee number, so `id` from useParams() is empty there and every save matched nobody.
+      const employeeNumber = String(employee['Employee Number']);
+
       let imageUrl = employee['Profile Image'] || null;
       if (profileImage) {
         imageUrl = await uploadEmployeeAvatar(profileImage, String(employee['Employee Number']));
@@ -552,7 +556,7 @@ const EmployeeBioPage = () => {
           'NITA': nita,
           'HELB': helb
         })
-        .eq('"Employee Number"', id)
+        .eq('"Employee Number"', employeeNumber)
         .select('"Employee Number"');
 
       if (employeeError) throw employeeError;
@@ -564,7 +568,7 @@ const EmployeeBioPage = () => {
         const { error: contactsError } = await supabase
           .from('emergency_contact')
           .upsert({
-            "Employee Number": id,
+            "Employee Number": employeeNumber,
             full_name: emergencyContact.name,
             relationship: emergencyContact.relationship,
             phone_number: emergencyContact.phone,
@@ -580,7 +584,7 @@ const EmployeeBioPage = () => {
         const { error: deleteContactsError } = await supabase
           .from('emergency_contact')
           .delete()
-          .eq('Employee Number', id);
+          .eq('Employee Number', employeeNumber);
 
         if (deleteContactsError) throw deleteContactsError;
       }
@@ -590,7 +594,7 @@ const EmployeeBioPage = () => {
       const { error: deleteDependentsError } = await supabase
         .from('dependents')
         .delete()
-        .eq('Employee Number', id);
+        .eq('Employee Number', employeeNumber);
 
       if (deleteDependentsError) throw deleteDependentsError;
 
@@ -598,7 +602,7 @@ const EmployeeBioPage = () => {
       const validDependents = dependents.filter(dependent => dependent.name.trim());
       if (validDependents.length > 0) {
         const dependentsToInsert = validDependents.map(dependent => ({
-          "Employee Number": id,
+          "Employee Number": employeeNumber,
           full_name: dependent.name,
           relationship: dependent.relationship,
           date_birth: dependent.dateOfBirth || null
