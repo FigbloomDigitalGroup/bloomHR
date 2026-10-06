@@ -1,11 +1,16 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+const saveMyTheme = vi.hoisted(() => vi.fn());
+vi.mock('../../lib/preferences', () => ({ saveMyTheme }));
+vi.mock('./ProfilePicture', () => ({ default: () => null }));
+
 import Appearance from './Appearance';
 import { loadStoredTheme, resetTheme } from '../../theme/applyTheme';
 
 const rootVar = (name: string) => document.documentElement.style.getPropertyValue(name);
 
 beforeEach(() => {
+  saveMyTheme.mockReset();
   localStorage.clear();
   resetTheme();
 });
@@ -24,6 +29,7 @@ describe('Appearance', () => {
     expect(screen.getByRole('button', { name: /Ocean/ }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByRole('button', { name: /Forest/ }).getAttribute('aria-pressed')).toBe('false');
     expect(loadStoredTheme()?.sidebar).toBe('#0B2545');
+    expect(saveMyTheme).toHaveBeenCalledWith(expect.objectContaining({ sidebar: '#0B2545' })); // and on the account
   });
 
   it('a light two-tone theme switches the sidebar text to dark', () => {
@@ -57,6 +63,7 @@ describe('Appearance', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reset to default' }));
     expect(rootVar('--shell')).toBe('');
     expect(loadStoredTheme()).toBeNull();
+    expect(saveMyTheme).toHaveBeenLastCalledWith(null);
     expect(screen.getByRole('button', { name: /Forest/ }).getAttribute('aria-pressed')).toBe('true');
   });
 });

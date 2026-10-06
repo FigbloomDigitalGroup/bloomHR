@@ -19,6 +19,7 @@ import React from 'react';
 import { UserProvider } from '../src/components/ProtectedRoutes/UserContext';
 import MFAVerification from './pages/MFAverification';
 import { useCompanyProfile, withProfileRole } from './hooks/useCompanyProfile';
+import { syncThemeWithAccount } from './lib/preferences';
 import CompanyGate from './components/Company/CompanyGate';
 import { isStaleChunkError, reloadOnceForStaleChunk } from './lib/staleChunk';
 import { welcomeMessage } from './lib/welcome';
@@ -179,6 +180,10 @@ function App() {
   // editable user_metadata; see useCompanyProfile.
   const companyState = useCompanyProfile(session?.user?.id);
   const user = useMemo(() => withProfileRole(authUser, companyState), [authUser, companyState]);
+  // the colour theme saved on the account applies on every device the person signs in on
+  useEffect(() => {
+    if (session?.user?.id) void syncThemeWithAccount();
+  }, [session?.user?.id]);
   const [selectedTown, setSelectedTown] = useState<string>('');
   const [selectedRegion, setSelectedRegion] = useState('All Regions');
 
