@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { queryKeys } from '../lib/queryClient';
+import { fetchTrustedRole } from '../lib/trustedRole';
 
 interface UsePermissionsReturn {
     permissions: string[];
@@ -24,10 +25,9 @@ async function loadMyPermissions(): Promise<MyPermissions> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NOBODY;
 
-    // Get user's role from user_metadata (not from employees table)
-    // Normalize to uppercase to match database role_name
-    const rawRole = user.user_metadata?.role;
-    const role = rawRole ? rawRole.toUpperCase() : null;
+    // The role in the company the person is working in, from user_profiles (user_metadata is editable by the
+    // user and does not follow the company). Uppercase to match database role_name.
+    const role = await fetchTrustedRole(user.id);
     if (!role) return NOBODY;
 
     // Get role permissions from database

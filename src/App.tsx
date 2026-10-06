@@ -18,6 +18,7 @@ import AuthCallback from './pages/AuthCallback';
 import React from 'react';
 import { UserProvider } from '../src/components/ProtectedRoutes/UserContext';
 import MFAVerification from './pages/MFAverification';
+import { useCompanyProfile } from './hooks/useCompanyProfile';
 
 // Route-level code splitting: each page is fetched when first visited.
 const AdminVideoUpload = lazy(() => import('./components/training/Training'));
@@ -55,6 +56,10 @@ const CompanyCalendar = lazy(() => import('./components/Calendar/CompanyCalendar
 const AIAssistantPage = lazy(() => import('./components/AI/AIAssistantPage').then((m) => ({ default: m.AIAssistantPage })));
 const MicrofinanceTodoList = lazy(() => import('./components/Task Manager/TaskManager').then((m) => ({ default: m.MicrofinanceTodoList })));
 const SMSCenter = lazy(() => import('./components/SMS/Sms').then((m) => ({ default: m.SMSCenter })));
+const JoinCompany = lazy(() => import('./pages/JoinCompany'));
+const CreateCompany = lazy(() => import('./pages/CreateCompany'));
+const NoCompany = lazy(() => import('./pages/NoCompany'));
+const InvitePeople = lazy(() => import('./components/Settings/InvitePeople'));
 const ChatLayout = lazy(() => import('./components/chat/ChatLayout').then((m) => ({ default: m.ChatLayout })));
 
 interface User {
@@ -161,6 +166,9 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  // The role shown in the app comes from user_profiles (the company the person is working in), never from the
+  // editable user_metadata; see useCompanyProfile.
+  const companyState = useCompanyProfile(session?.user?.id);
   const [selectedTown, setSelectedTown] = useState<string>('');
   const [selectedRegion, setSelectedRegion] = useState('All Regions');
 
@@ -192,7 +200,7 @@ function App() {
 
   // Check if current route should be excluded from inactivity timer
   const shouldExcludeFromInactivityTimer = useCallback(() => {
-    const excludedRoutes = ['/login', '/mfa', '/update-password'];
+    const excludedRoutes = ['/login', '/mfa', '/update-password', '/join', '/create-company'];
     const isExcludedRoute = excludedRoutes.includes(location.pathname);
     const isAuthProcess = sessionStorage.getItem('isMFAProcess') === 'true';
 
@@ -699,7 +707,7 @@ function App() {
         } else {
           setUser(null);
           const currentPath = location.pathname;
-          const publicPaths = ['/login', '/update-password', '/mfa'];
+          const publicPaths = ['/login', '/update-password', '/mfa', '/join', '/create-company'];
 
           const urlHasRecoveryToken = window.location.href.includes('type=recovery') ||
             window.location.hash.includes('type=recovery');
@@ -819,7 +827,7 @@ function App() {
           hasShownWelcomeToast.current = true;
 
           const currentPath = location.pathname;
-          const publicPaths = ['/login', '/update-password', '/mfa'];
+          const publicPaths = ['/login', '/update-password', '/mfa', '/join', '/create-company'];
 
           // Check if MFA is required for this user
           const requiresMFA = MFA_ENABLED && (userData.role === 'ADMIN' || userData.role === 'CHECKER');
@@ -912,6 +920,8 @@ function App() {
               }
             />
             <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/join" element={<JoinCompany />} />
+            <Route path="/create-company" element={<CreateCompany />} />
             <Route path="/update-password" element={<UpdatePasswordPage />} />
             <Route
               path="/staff"
@@ -923,6 +933,17 @@ function App() {
               element={
                 !session || !user ? (
                   <Login onLoginSuccess={handleLoginSuccess} />
+                ) : companyState.status === 'none' ? (
+                  <NoCompany email={user.email} />
+                ) : companyState.status === 'error' ? (
+                  <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-center px-4">
+                    <p className="text-sm text-gray-700">We could not load your account: {companyState.message}</p>
+                    <button type="button" className="px-4 py-2 rounded bg-brand text-white text-sm font-semibold" onClick={() => window.location.reload()}>
+                      Try again
+                    </button>
+                  </div>
+                ) : companyState.status === 'loading' || user.role !== companyState.profile.role ? (
+                  <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">Loading your workspace…</div>
                 ) : user.role === 'STAFF' ? (
                   <StaffPortalLanding />
                 ) : (
@@ -984,6 +1005,14 @@ function App() {
                                 <Route path="/view-employee/:employeeId" element={<ViewEmployeePage />} />
                                 <Route path="/edit-employee/:id" element={<EditEmployeePage />} />
                                 <Route path="/assign-managers" element={<ManagerAssignment />} />
+                                <Route
+                                  path="/invite-people"
+                                  element={
+                                    <AuthRoute allowedRoles={['ADMIN', 'HR']}>
+                                      <InvitePeople callerRole={user.role} />
+                                    </AuthRoute>
+                                  }
+                                />
                                 <Route path="/employee-added" element={<SuccessPage />} />
                                 <Route path="/loanadmin" element={<LoanRequestsAdmin />} />
                                 <Route path="/asset" element={<AssetManagement />} />

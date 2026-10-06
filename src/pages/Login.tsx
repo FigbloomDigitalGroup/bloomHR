@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Select from 'react-select';
 import { useAppUpdate } from '../sw';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -554,6 +554,12 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                     {isSignUp ? 'Sign In' : 'Apply Now'}
                   </span>
                 </button>
+                <div className="mt-3">
+                  <Link to="/create-company" className="text-gray-500 text-xs font-medium hover:text-gray-900 transition-colors">
+                    Starting a new company?
+                    <span className="ml-1 text-gray-900 font-bold underline decoration-gray-200 underline-offset-4">Create one</span>
+                  </Link>
+                </div>
               </div>
             </motion.div>
           </AnimatePresence>

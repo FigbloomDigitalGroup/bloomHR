@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { fetchTrustedRole } from '../../lib/trustedRole';
 
 interface AuthRouteProps {
   children: React.ReactNode;
@@ -27,7 +28,7 @@ export default function AuthRoute({ children, allowedRoles }: AuthRouteProps) {
         return;
       }
 
-      const userRole = user.user_metadata?.role || 'STAFF';
+      const userRole = (await fetchTrustedRole(user.id)) || 'STAFF';
 
       if (allowedRoles && !allowedRoles.includes(userRole)) {
         // Redirect based on role

@@ -18,6 +18,7 @@ import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 import AdvanceApplicationManager from './staffSetting';
 import SearchableDropdown from '../UI/SearchableDropdown';
 import TransactionStatusChecker from './TransactionStatusChecker';
+import { fetchTrustedRole } from '../../lib/trustedRole';
 
 
 // SMS Service Functions
@@ -3448,7 +3449,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       console.log('🚀 SalaryAdmin v2.2 - Schema & Query Fixes Applied');
       setUserEmail(user.email || '');
 
-      const actualRole = user.user_metadata?.role || 'STAFF';
+      const actualRole = (await fetchTrustedRole(user.id)) || 'STAFF';
       const mappedRole = ROLE_MAPPING[actualRole] || 'maker';
 
       let userTown = '';
