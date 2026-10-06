@@ -6,10 +6,13 @@ import { chatService } from "./services/chatServices";
 import { supabase } from "../../lib/supabase";
 import toast from "react-hot-toast";
 import { initialsOf } from "./lib/names";
+import { canCreateChannels } from "./lib/permissions";
+import { usePermissions } from "../../hooks/usePermissions";
 import type { Employee, User, Channel, DirectMessage, Message } from "../chat/types/types";
 
 /** `onMessagesRead` lets the staff portal refresh its unread badge when a conversation is opened. */
 export function ChatLayout({ onMessagesRead }: { onMessagesRead?: () => void } = {}) {
+  const { userRole } = usePermissions();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -299,7 +302,11 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: () => void } =
       console.log("✅ Channel created successfully:", newChannel.id);
     } catch (error: any) {
       console.error('❌ Error creating channel:', error);
-      setError(error.message || 'Failed to create channel');
+      toast.error(
+        /row-level security/i.test(error?.message || '')
+          ? 'Only administrators, HR and managers can create channels.'
+          : error?.message || 'Failed to create channel'
+      );
       throw error;
     }
   };
@@ -506,6 +513,7 @@ const handleDMCreate = async (userId: string) => {
           activeChannel={activeChannel}
           onChannelSelect={handleChannelSelect}
           onChannelCreate={handleChannelCreate}
+          canCreateChannels={canCreateChannels(userRole)}
           onDMCreate={handleDMCreate}
           currentUser={getSafeUserData()}
           users={getUsersForSidebar()}

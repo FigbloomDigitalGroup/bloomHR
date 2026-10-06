@@ -32,6 +32,8 @@ interface AppSidebarProps {
   onDMCreate: (userId: string) => void;
   currentUser: User | null;
   users: User[];
+  /** Only administrators, HR and managers create channels; for everyone else the "+" is not shown. */
+  canCreateChannels?: boolean;
 }
 
 export function AppSidebar({
@@ -42,7 +44,8 @@ export function AppSidebar({
   onChannelCreate,
   onDMCreate,
   currentUser,
-  users = []
+  users = [],
+  canCreateChannels = true
 }: AppSidebarProps) {
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showCreateDM, setShowCreateDM] = useState(false);
@@ -163,14 +166,17 @@ export function AppSidebar({
                   {channels.length}
                 </Badge>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                onClick={handleAddChannel}
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
+              {canCreateChannels && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Create a channel"
+                  className="h-6 w-6 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                  onClick={handleAddChannel}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </SidebarGroupLabel>
 
             {/* Channel Search */}

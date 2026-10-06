@@ -123,10 +123,13 @@ describe('chat', () => {
       }
     });
   });
-  it('an employee creates channels as themselves only, and manages only their own', async () => {
+  it('an employee cannot create channels (administrators, HR and managers do), and manages none of the company’s', async () => {
+    await asUser(db, U.ADMIN, async () => {
+      expect(await attempt(`insert into channels (name, created_by) values ('By admin', '${U.ADMIN}')`)).toBe(true);
+      expect(await attempt(`insert into channels (name, created_by) values ('Forged', '${U.STAFF}')`)).toBe(false);
+    });
     await asUser(db, U.STAFF, async () => {
-      expect(await attempt(`insert into channels (name, created_by) values ('Mine', '${U.STAFF}')`)).toBe(true);
-      expect(await attempt(`insert into channels (name, created_by) values ('Forged', '${U.ADMIN}')`)).toBe(false);
+      expect(await attempt(`insert into channels (name, created_by) values ('Mine', '${U.STAFF}')`)).toBe(false);
       expect(await count(`update channels set name = 'hacked' where id = '${CH.general}' returning 1`)).toBe(0);
       expect(await count(`delete from channels where id = '${CH.general}' returning 1`)).toBe(0);
     });
