@@ -2,10 +2,10 @@ import type { ThemeConfig } from 'antd';
 
 // Mirrors the Tailwind tokens in tailwind.config.js (see FIG-527) so antd
 // components (DatePicker, Select, Table, etc.) match the rest of the app.
-export const antdTheme: ThemeConfig = {
+export const buildAntdTheme = (brandHex: string = '#17402A'): ThemeConfig => ({
   token: {
-    colorPrimary: '#17402A',
-    colorLink: '#17402A',
+    colorPrimary: brandHex,
+    colorLink: brandHex,
     colorSuccess: '#2E7D4F',
     colorWarning: '#F26A1B',
     colorError: '#C0392B',
@@ -43,4 +43,7 @@ export const antdTheme: ThemeConfig = {
       borderRadiusSM: 999,
     },
   },
-};
+});
+
+/** The default (Forest) look; see ThemedConfigProvider for the one that follows each person's chosen theme. */
+export const antdTheme = buildAntdTheme();

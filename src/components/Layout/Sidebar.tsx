@@ -4,6 +4,7 @@ import {
   CalendarRange,
   Target,
   Settings,
+  Palette,
   Wand2,
   Menu,
   ChevronLeft,
@@ -82,6 +83,7 @@ const menuGroups = [
       { id: 'incident-reports', label: 'Incidents', icon: ShieldAlert, path: '/incident-reports', permission: 'incident-reports' },
       { id: 'settings', label: 'Settings', icon: Settings, path: '/settings', permission: 'settings' },
       { id: 'role-permissions', label: 'Role Permissions', icon: ShieldHalf, path: '/role-permissions', permission: 'role-permissions' },
+      { id: 'appearance', label: 'Appearance', icon: Palette, path: '/appearance' },
     ]
   }
 ];
@@ -207,7 +209,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
         initial="expanded"
         animate={isExpanded ? "expanded" : "collapsed"}
         variants={sidebarVariants}
-        className="relative flex flex-col h-full border-r border-white/5 shadow-2xl overflow-hidden bg-brand"
+        className="relative flex flex-col h-full border-r border-shell-fg/5 shadow-2xl overflow-hidden bg-shell"
       >
         {/* Brand Section */}
         {/* Brand Section */}
@@ -219,7 +221,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
               whileHover={{ rotate: 5, scale: 1.05 }}
               onClick={() => !isExpanded && onToggle(false)}
             >
-              <img src={solo} alt="Logo" className="relative w-10 h-10 object-contain brightness-0 invert drop-shadow-md" />
+              <img src={solo} alt="Logo" className="relative w-10 h-10 object-contain shell-logo drop-shadow-md" />
             </motion.div>
 
             <AnimatePresence>
@@ -230,8 +232,8 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
                   exit={{ opacity: 0, x: -10 }}
                   className="flex flex-col"
                 >
-                  <h1 className="font-bold text-xl text-white tracking-tight flex items-center">
-                    Figbloom<span className="text-white/70 font-normal ml-0.5">HR</span>
+                  <h1 className="font-bold text-xl text-shell-fg tracking-tight flex items-center">
+                    Figbloom<span className="text-shell-fg/70 font-normal ml-0.5">HR</span>
                   </h1>
                 </motion.div>
               )}
@@ -242,14 +244,14 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
           <motion.button
             onClick={() => onToggle(!isCollapsed)}
             aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
-            className={`p-2 rounded-xl hover:bg-white/10 transition-all duration-300 group border border-transparent hover:border-white/10 hover:shadow-sm ${!isExpanded ? 'bg-white/5' : ''}`}
+            className={`p-2 rounded-xl hover:bg-shell-fg/10 transition-all duration-300 group border border-transparent hover:border-shell-fg/10 hover:shadow-sm ${!isExpanded ? 'bg-shell-fg/5' : ''}`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
             {isExpanded ? (
-              <ChevronLeft className="w-4 h-4 transition-colors text-white/50 group-hover:text-[#F26A1B]" />
+              <ChevronLeft className="w-4 h-4 transition-colors text-shell-fg/50 group-hover:text-orange" />
             ) : (
-              <Menu className="w-4 h-4 transition-colors text-[#F26A1B]" />
+              <Menu className="w-4 h-4 transition-colors text-orange" />
             )}
           </motion.button>
         </div>
@@ -287,7 +289,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
                       exit={{ opacity: 0 }}
                       className="px-3 mb-2"
                     >
-                      <span className="text-[9.5px] font-semibold text-white/40 uppercase tracking-[0.08em] pl-1">
+                      <span className="text-[9.5px] font-semibold text-shell-fg/40 uppercase tracking-[0.08em] pl-1">
                         {group.title}
                       </span>
                     </motion.div>
@@ -311,8 +313,8 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
                         onClick={() => navigate(item.path)}
                         className={`relative w-full flex items-center min-h-9 px-3 rounded-[9px] transition-all duration-300 group overflow-hidden ${!isExpanded && 'justify-center px-0'
                           } ${isActive
-                            ? 'bg-white text-brand font-semibold shadow-sm'
-                            : 'text-white/80 hover:bg-white/10 hover:text-white'}`}
+                            ? 'bg-shell-active text-shell-active-fg font-semibold shadow-sm'
+                            : 'text-shell-fg/80 hover:bg-shell-fg/10 hover:text-shell-fg'}`}
                         whileTap={{ scale: 0.98 }}
                       >
 
@@ -320,13 +322,13 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
                         <div className="relative z-10 flex items-center justify-center">
                           <item.icon
                             className={`w-[15px] h-[15px] transition-all duration-300 ${isActive
-                              ? 'text-brand'
-                              : 'text-white/80 group-hover:text-white group-hover:scale-110'
+                              ? 'text-shell-active-fg'
+                              : 'text-shell-fg/80 group-hover:text-shell-fg group-hover:scale-110'
                               }`}
                             strokeWidth={isActive ? 2.2 : 1.8}
                           />
                           {item.id === 'leaves' && pendingLeaveCount > 0 && !isExpanded && (
-                            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange border border-brand"></span>
+                            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange border border-shell"></span>
                           )}
                         </div>
 
@@ -337,7 +339,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
                               initial={{ opacity: 0, x: -10 }}
                               animate={{ opacity: 1, x: 0 }}
                               exit={{ opacity: 0, x: -10 }}
-                              className={`ml-[9px] text-[12.5px] truncate relative z-10 flex-1 flex items-center ${isActive ? 'text-brand font-semibold' : 'text-white/80 font-normal'}`}
+                              className={`ml-[9px] text-[12.5px] truncate relative z-10 flex-1 flex items-center ${isActive ? 'text-shell-active-fg font-semibold' : 'text-shell-fg/80 font-normal'}`}
                             >
                               {item.label}
                               {item.id === 'leaves' && pendingLeaveCount > 0 && (
@@ -368,12 +370,12 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
         </div>
 
         {/* User Profile */}
-        <div className="relative z-10 p-3 mt-auto border-t border-white/10">
-          <div className="relative overflow-hidden rounded-xl bg-white/5 border border-white/10 p-2.5 backdrop-blur-sm">
+        <div className="relative z-10 p-3 mt-auto border-t border-shell-fg/10">
+          <div className="relative overflow-hidden rounded-xl bg-shell-fg/5 border border-shell-fg/10 p-2.5 backdrop-blur-sm">
             <div className="flex items-center gap-3 relative z-10">
               <div className="relative flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-inner ring-1 ring-white/50">
-                  <span className="font-bold text-[#17402A] text-xs">{userInitial}</span>
+                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-inner ring-1 ring-shell-fg/50">
+                  <span className="font-bold text-brand text-xs">{userInitial}</span>
                 </div>
               </div>
 
@@ -385,10 +387,10 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
                     exit={{ opacity: 0, width: 0 }}
                     className="flex-1 overflow-hidden"
                   >
-                    <p className="text-xs font-bold text-white truncate font-lexend capitalize">
+                    <p className="text-xs font-bold text-shell-fg truncate font-lexend capitalize">
                       {userRole.toLowerCase()}
                     </p>
-                    <p className="text-[10px] text-white/40 truncate">Admin Workspace</p>
+                    <p className="text-[10px] text-shell-fg/40 truncate">Admin Workspace</p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -399,18 +401,18 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
                     type="button"
                     onClick={() => navigate('/settings')}
                     aria-label="Settings"
-                    className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-shell-fg/10 transition-colors"
                   >
-                    <Settings className="w-3.5 h-3.5 text-white/40 hover:text-[#F26A1B] transition-colors" />
+                    <Settings className="w-3.5 h-3.5 text-shell-fg/40 hover:text-orange transition-colors" />
                   </button>
                   {onLogout && (
                     <button
                       type="button"
                       onClick={onLogout}
                       aria-label="Log out"
-                      className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-shell-fg/10 transition-colors"
                     >
-                      <LogOut className="w-3.5 h-3.5 text-white/40 hover:text-[#F26A1B] transition-colors" />
+                      <LogOut className="w-3.5 h-3.5 text-shell-fg/40 hover:text-orange transition-colors" />
                     </button>
                   )}
                 </div>

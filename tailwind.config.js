@@ -40,12 +40,21 @@ export default {
         // Figbloom redesign tokens (see FIG-527) — flat palette used directly
         // as Tailwind utilities (bg-brand, text-subtle, etc.) alongside the
         // shadcn hsl() tokens above.
+        // The theme colors are variables (see src/theme): each person can choose their own palette. The values
+        // here are space-separated RGB triplets so opacity utilities (bg-brand/10) keep working.
         brand: {
-          DEFAULT: "#17402A",
-          dark: "#1B4D2E",
+          DEFAULT: "rgb(var(--brand) / <alpha-value>)",
+          dark: "rgb(var(--brand-dark) / <alpha-value>)",
+        },
+        // the app-shell sidebar: its background, the text on it, and the highlighted (active) item
+        shell: {
+          DEFAULT: "rgb(var(--shell) / <alpha-value>)",
+          fg: "rgb(var(--shell-fg) / <alpha-value>)",
+          active: "rgb(var(--shell-active) / <alpha-value>)",
+          "active-fg": "rgb(var(--shell-active-fg) / <alpha-value>)",
         },
         orange: {
-          DEFAULT: "#F26A1B",
+          DEFAULT: "rgb(var(--highlight) / <alpha-value>)",
           text: "#8A3D08",
           "text-alt": "#B8460A",
           tint: "#FDF1E8",
@@ -53,7 +62,7 @@ export default {
         },
         ink: "#16201A",
         subtle: "#9CA3A0",
-        "green-tint": "#E3EFE7",
+        "green-tint": "rgb(var(--tint) / <alpha-value>)",
         status: {
           success: "#2E7D4F",
           danger: "#C0392B",
@@ -71,10 +80,10 @@ export default {
           DEFAULT: "#ffffff",
           foreground: "#16201A",
           border: "#E2E6E2",
-          accent: "#E3EFE7",
-          "accent-foreground": "#1B4D2E",
-          ring: "#17402A",
-          primary: "#17402A",
+          accent: "rgb(var(--tint) / <alpha-value>)",
+          "accent-foreground": "rgb(var(--brand-dark) / <alpha-value>)",
+          ring: "rgb(var(--brand) / <alpha-value>)",
+          primary: "rgb(var(--brand) / <alpha-value>)",
           "primary-foreground": "#ffffff",
         },
       },
