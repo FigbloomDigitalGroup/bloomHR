@@ -45,6 +45,7 @@ export interface Channel {
   createdBy: string;
   createdAt: string;
   jobTitle?: string; // Add this for job-specific channels
+  partnerEmail?: string; // direct messages: the other person's email
 }
 
 // Update DirectMessage to include more properties for better DM handling

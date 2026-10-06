@@ -3,13 +3,14 @@ import { supabase } from "../../../lib/supabase";
 import { databaseService } from "./databaseService";
 import type { Channel, Message, Employee, DirectMessage } from "../types/types";
 import { AvatarService } from './avatar';
+import { chatDisplayName, directMessageId, initialsOf, isDirectMessageId, realChannelId } from '../lib/names';
 
 class ChatService {
   private isInitialized = false;
 
   async initialize() {
     if (this.isInitialized) return;
-    
+
     try {
       await databaseService.initializeDatabase();
       this.isInitialized = true;
@@ -21,7 +22,7 @@ class ChatService {
   async getEmployees(): Promise<Employee[]> {
     try {
       console.log("📊 Fetching employees from database...");
-      
+
       const { data, error } = await supabase
         .from('employee_directory')
         .select('*')
@@ -42,9 +43,9 @@ class ChatService {
         const lastName = emp["Last Name"] || '';
         const fullName = `${firstName} ${lastName}`.trim();
         const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
-        
+
         const avatarSeed = emp["Employee Number"] || emp["Work Email"] || fullName || `employee-${Math.random()}`;
-        
+
         const profileImage = emp["Profile Image"] || 
           AvatarService.generateAvatar(avatarSeed, 'adventurer');
 
@@ -91,10 +92,11 @@ class ChatService {
   async getUserChannels(userId: string): Promise<(Channel | DirectMessage)[]> {
     try {
       console.log("📡 Fetching channels for user:", userId);
-      
+
       const regularChannels = await this.getRegularChannels(userId);
-      const allChannels = [...regularChannels];
-      
+      const directMessages = await this.getDirectMessageChannels(userId);
+      const allChannels = [...regularChannels, ...directMessages];
+
       console.log(`✅ Loaded ${allChannels.length} channels`);
       return allChannels;
 
@@ -104,16 +106,57 @@ class ChatService {
     }
   }
 
+  /** My direct messages, as chat entries ("dm-<conversation id>") that remember who is on the other end. */
+  private async getDirectMessageChannels(userId: string): Promise<Channel[]> {
+    try {
+      const { data, error } = await supabase.rpc('my_direct_messages');
+      if (error || !data) return [];
+      const rows = data as { channel_id: string; other_user_id: string; other_email: string }[];
+      const unread = await this.getUnreadCountsByChannel(userId, rows.map((r) => r.channel_id));
+      return rows.map((row) => ({
+        id: directMessageId(row.channel_id),
+        name: `DM with ${row.other_email}`,
+        type: 'channel' as const,
+        isPrivate: true,
+        memberCount: 2,
+        unread_count: unread[row.channel_id] || 0,
+        createdBy: userId,
+        createdAt: new Date().toISOString(),
+        partnerEmail: (row.other_email || '').toLowerCase(),
+      })) as Channel[];
+    } catch (error) {
+      console.error('Error loading direct messages:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Starts (or reopens) the private conversation with a colleague and returns its chat id. The colleague must have
+   * joined the company: a message needs a login at the other end, an employee record alone is not enough.
+   */
+  async startDirectMessage(colleagueEmail: string): Promise<string> {
+    const wanted = (colleagueEmail || '').trim().toLowerCase();
+    const { data: members, error: membersError } = await supabase.rpc('company_members');
+    if (membersError) throw new Error(membersError.message || 'Could not look up your colleagues');
+    const person = ((members || []) as { user_id: string; email: string }[]).find((m) => (m.email || '').toLowerCase() === wanted);
+    if (!person) {
+      throw new Error("They haven't joined yet, so they have no login to receive messages. Invite them first (Settings > Invite people).");
+    }
+    const { data: conversation, error } = await supabase.rpc('start_direct_message', { p_other: person.user_id });
+    if (error || !conversation) throw new Error(error?.message || 'Could not start the conversation');
+    return directMessageId(conversation as string);
+  }
+
   private async getRegularChannels(userId: string): Promise<Channel[]> {
     const { data: userData } = await supabase.auth.getUser();
     const userEmail = userData.user?.email;
-    
+
     const { data: employeeData } = await supabase
       .from('employees')
       .select('"Job Title"')
       .eq('Work Email', userEmail)
       .single();
-    
+
     const userJobTitle = employeeData?.["Job Title"];
 
     let query = supabase
@@ -209,7 +252,7 @@ class ChatService {
     try {
       const { data: userData } = await supabase.auth.getUser();
       const currentUserId = userData.user?.id;
-      
+
       if (!currentUserId) {
         return this.getDefaultChannels();
       }
@@ -246,15 +289,11 @@ class ChatService {
     try {
       console.log("📨 Fetching messages for:", channelId);
 
-      // For DM channels, return welcome message
-      if (channelId.startsWith('dm-')) {
-        return this.getWelcomeMessage(channelId);
-      }
-
+      // a direct message is a real conversation, stored like any channel under its own id
       const { data, error } = await supabase
         .from('messages')
         .select('*')
-        .eq('channel_id', channelId)
+        .eq('channel_id', realChannelId(channelId))
         .order('created_at', { ascending: true });
 
       if (error) {
@@ -294,7 +333,9 @@ class ChatService {
     return [
       {
         id: 'welcome-' + channelId,
-        content: `Welcome to the channel! This is the beginning of the conversation. 👋`,
+        content: isDirectMessageId(channelId)
+          ? 'This is the start of your private conversation. Say hello! 👋'
+          : `Welcome to the channel! This is the beginning of the conversation. 👋`,
         author: {
           id: 'system',
           name: 'Figbloom Teams',
@@ -312,46 +353,9 @@ class ChatService {
   async sendMessage(channelId: string, userId: string, content: string): Promise<Message | null> {
     try {
       console.log("💬 Sending message to channel:", channelId);
-      
-      // For DM channels, create mock message
-      if (channelId.startsWith('dm-')) {
-        console.log('💬 DM message - creating local message');
-        
-        const { data: userData } = await supabase.auth.getUser();
-        const userEmail = userData.user?.email;
-        
-        const { data: employeeData } = await supabase
-          .from('employees')
-          .select('"First Name", "Last Name", "Profile Image"')
-          .eq('Work Email', userEmail)
-          .single();
 
-        const firstName = employeeData?.["First Name"] || '';
-        const lastName = employeeData?.["Last Name"] || '';
-        const fullName = `${firstName} ${lastName}`.trim() || userData.user?.user_metadata?.name || 'User';
-        const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || 'U';
-
-        const mockMessage: Message = {
-          id: `dm-msg-${Date.now()}`,
-          content: content,
-          author: {
-            id: userId,
-            name: fullName,
-            avatar: employeeData?.["Profile Image"] || '',
-            initials: initials,
-            email: userEmail || '',
-            status: 'online',
-            town: 'Unknown'
-          },
-          timestamp: new Date().toISOString(),
-          reactions: []
-        };
-
-        console.log('✅ DM message created (local)');
-        return mockMessage;
-      }
-      
-      // Regular channel message
+      // channels and direct messages are stored the same way
+      const isDirect = isDirectMessageId(channelId);
       const { data: userData } = await supabase.auth.getUser();
       const userEmail = userData.user?.email;
 
@@ -363,8 +367,9 @@ class ChatService {
 
       const firstName = employeeData?.["First Name"] || '';
       const lastName = employeeData?.["Last Name"] || '';
-      const fullName = `${firstName} ${lastName}`.trim() || userData.user?.user_metadata?.name || 'User';
-      const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || 'U';
+      // an administrator with no employee record is shown by the name they gave, or their email, never as "User"
+      const fullName = chatDisplayName({ firstName, lastName, metadata: userData.user?.user_metadata, email: userEmail });
+      const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || initialsOf(fullName);
       const town = employeeData?.["Town"] || employeeData?.["City"] || employeeData?.["Branch"] || 'Unknown';
 
       let userAvatar = employeeData?.["Profile Image"] || '';
@@ -380,7 +385,7 @@ class ChatService {
       const { data, error } = await supabase
         .from('messages')
         .insert({
-          channel_id: channelId,
+          channel_id: realChannelId(channelId),
           author_id: userId,
           content: content,
           created_at: new Date().toISOString(),
@@ -394,6 +399,8 @@ class ChatService {
 
       if (error) {
         console.error('Error sending message:', error);
+        // a private conversation must never pretend a message was delivered
+        if (isDirect) throw new Error(error.message || 'The message could not be sent');
         return this.createMockMessage(userId, fullName, initials, content, town, userAvatar);
       }
 
@@ -418,10 +425,11 @@ class ChatService {
 
     } catch (error) {
       console.error('Error sending message:', error);
+      if (isDirectMessageId(channelId)) throw error instanceof Error ? error : new Error('The message could not be sent');
       const { data: userData } = await supabase.auth.getUser();
-      const userName = userData.user?.user_metadata?.name || 'User';
-      
-      return this.createMockMessage(userId, userName, 'U', content, 'Unknown', '');
+      const userName = chatDisplayName({ metadata: userData.user?.user_metadata, email: userData.user?.email });
+
+      return this.createMockMessage(userId, userName, initialsOf(userName), content, 'Unknown', '');
     }
   }
 
@@ -453,9 +461,9 @@ class ChatService {
   async createChannel(name: string, userId: string, isPrivate: boolean = false, jobTitle?: string): Promise<Channel> {
     try {
       console.log("🆕 Creating channel:", name);
-      
+
       const channelId = crypto.randomUUID();
-      
+
       const { data, error } = await supabase
         .from('channels')
         .insert({
@@ -477,7 +485,7 @@ class ChatService {
       }
 
       console.log("✅ Channel created in DATABASE:", data.id);
-      
+
       const newChannel: Channel = {
         id: data.id,
         name: data.name,
@@ -498,17 +506,13 @@ class ChatService {
 
   async markMessagesAsRead(channelId: string, userId: string): Promise<void> {
     try {
-      if (channelId.startsWith('dm-')) {
-        return;
-      }
-
       console.log(`📖 Marking messages as read for channel ${channelId}`);
-      
+
       const { error } = await supabase
         .from('user_channel_states')
         .upsert({
           user_id: userId,
-          channel_id: channelId,
+          channel_id: realChannelId(channelId),
           last_read_at: new Date().toISOString()
         });
 
@@ -524,25 +528,22 @@ class ChatService {
   subscribeToMessages(channelId: string, callback: (message: Message) => void): any {
     try {
       console.log(`🔔 Setting up real-time subscription for channel: ${channelId}`);
-      
-      // Skip real-time for DM channels
-      if (channelId.startsWith('dm-')) {
-        return null;
-      }
+
+      const conversationId = realChannelId(channelId);
 
       const subscription = supabase
-        .channel(`messages:${channelId}`)
+        .channel(`messages:${conversationId}`)
         .on(
           'postgres_changes',
           {
             event: 'INSERT',
             schema: 'public',
             table: 'messages',
-            filter: `channel_id=eq.${channelId}`
+            filter: `channel_id=eq.${conversationId}`
           },
           async (payload) => {
             console.log('📨 New real-time message:', payload);
-            
+
             try {
               const { data: messageData } = await supabase
                 .from('messages')
@@ -566,7 +567,7 @@ class ChatService {
                   timestamp: messageData.created_at,
                   reactions: messageData.reactions || []
                 };
-                
+
                 callback(newMessage);
               }
             } catch (fetchError) {

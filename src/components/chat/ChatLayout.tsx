@@ -4,9 +4,12 @@ import { AppSidebar } from "./AppSidebar";
 import { ChatArea } from "./ChatArea";
 import { chatService } from "./services/chatServices";
 import { supabase } from "../../lib/supabase";
+import toast from "react-hot-toast";
+import { initialsOf } from "./lib/names";
 import type { Employee, User, Channel, DirectMessage, Message } from "../chat/types/types";
 
-export function ChatLayout() {
+/** `onMessagesRead` lets the staff portal refresh its unread badge when a conversation is opened. */
+export function ChatLayout({ onMessagesRead }: { onMessagesRead?: () => void } = {}) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -21,13 +24,13 @@ export function ChatLayout() {
     const initializeApp = async () => {
       try {
         console.log("🔐 ChatLayout: Initializing application...");
-        
+
         // Initialize database first
         await chatService.initialize();
-        
+
         // Get current user
         const { data: { user }, error: userError } = await supabase.auth.getUser();
-        
+
         if (userError || !user) {
           console.warn('User not authenticated');
           setAuthLoading(false);
@@ -40,7 +43,7 @@ export function ChatLayout() {
 
         // Load employees data first and get the returned data
         const employeesData = await loadEmployeesData();
-        
+
         // Find current user in employees using the returned data
         const employeeData = employeesData.find(emp => 
           emp.workEmail?.toLowerCase() === user.email?.toLowerCase()
@@ -68,7 +71,7 @@ export function ChatLayout() {
 
         setCurrentUser(userData);
         console.log("✅ Current user set:", userData.name);
-        
+
         // Load user channels and messages
         await loadUserChannels(user.id);
 
@@ -97,57 +100,55 @@ export function ChatLayout() {
     }
   };
 
+  // My direct messages as sidebar entries. Each chat entry "dm-<conversation id>" remembers the other person's email;
+  // the name, picture and status come from that person's employee record when there is one.
+  const buildDirectMessages = async (
+    userChannels: (Channel | DirectMessage)[],
+    people: Employee[] = employees
+  ): Promise<DirectMessage[]> => {
+    const dmChannels = userChannels.filter(ch => ch.id.startsWith('dm-')) as Channel[];
+    const built: DirectMessage[] = await Promise.all(
+      dmChannels.map(async (channel) => {
+        const partnerEmail = (channel.partnerEmail || '').toLowerCase();
+        const partner = people.find(emp => (emp.workEmail || '').toLowerCase() === partnerEmail);
+        const lastMessage = await getLastMessageForChannel(channel.id);
+        const name = partner?.fullName || partnerEmail.split('@')[0] || 'Colleague';
+        return {
+          id: channel.id,
+          name,
+          type: 'direct_message',
+          avatar: partner?.profileImage || '',
+          initials: partner?.initials || initialsOf(name),
+          status: partner?.status || 'online',
+          userId: partner?.id || partnerEmail,
+          unread_count: channel.unread_count,
+          lastMessage: lastMessage?.content,
+          lastMessageTime: lastMessage?.timestamp,
+          hasMessages: !!lastMessage
+        } as DirectMessage;
+      })
+    );
+
+    // conversations with messages first, then by last message time
+    return built.sort((a, b) => {
+      if (a.hasMessages && !b.hasMessages) return -1;
+      if (!a.hasMessages && b.hasMessages) return 1;
+      if (a.lastMessageTime && b.lastMessageTime) {
+        return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
+      }
+      return a.name.localeCompare(b.name);
+    });
+  };
+
   const loadUserChannels = async (userId: string) => {
     try {
       console.log("📡 Loading user channels...");
       setError(null);
       const userChannels = await chatService.getUserChannels(userId);
       console.log("✅ Loaded channels:", userChannels.length);
-      const dmChannels = userChannels.filter(ch => ch.id.startsWith('dm-')) as Channel[];
-      
       setChannels(userChannels);
-      
-      // Convert DM channels to DirectMessage objects for sidebar
-      const dmMessages: DirectMessage[] = await Promise.all(
-        dmChannels.map(async (channel) => {
-          // Extract the other user's ID from DM channel ID (format: dm-user1-user2)
-          const userIds = channel.id.split('-').slice(1);
-          const otherUserId = userIds.find(id => id !== userId) || '';
-          
-          // Find the employee data for the DM partner
-          const dmPartner = employees.find(emp => emp.id === otherUserId);
-          
-          // Get last message for this DM to show activity
-          const lastMessage = await getLastMessageForChannel(channel.id);
-          
-          return {
-            id: channel.id,
-            name: dmPartner?.fullName || channel.name.replace('DM with ', ''),
-            type: 'direct_message',
-            avatar: dmPartner?.profileImage || '',
-            initials: dmPartner?.initials || channel.name.split(' ').map(n => n[0]).join('').slice(0, 2),
-            status: dmPartner?.status || 'online',
-            userId: otherUserId,
-            unread_count: channel.unread_count,
-            lastMessage: lastMessage?.content,
-            lastMessageTime: lastMessage?.timestamp,
-            hasMessages: !!lastMessage // Flag to indicate this is an active conversation
-          };
-        })
-      );
+      setDirectMessages(await buildDirectMessages(userChannels));
 
-      // Sort DMs: ones with messages first, then by last message time
-      const sortedDMs = dmMessages.sort((a, b) => {
-        if (a.hasMessages && !b.hasMessages) return -1;
-        if (!a.hasMessages && b.hasMessages) return 1;
-        if (a.lastMessageTime && b.lastMessageTime) {
-          return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
-        }
-        return a.name.localeCompare(b.name);
-      });
-
-      setDirectMessages(sortedDMs);
-      
       if (userChannels.length > 0) {
         setActiveChannel(userChannels[0]);
         await loadMessages(userChannels[0].id);
@@ -169,7 +170,7 @@ export function ChatLayout() {
       const { data, error } = await supabase
         .from('messages')
         .select('*')
-        .eq('channel_id', channelId)
+        .eq('channel_id', channelId.replace(/^dm-/, ''))
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -232,7 +233,7 @@ export function ChatLayout() {
       console.log("❌ Cannot send message - missing requirements");
       return;
     }
-    
+
     try {
       console.log("💬 Sending message...");
       const newMessage = await chatService.sendMessage(activeChannel.id, currentUser.id, content);
@@ -250,11 +251,9 @@ export function ChatLayout() {
         // (handleChannelSelect) - without this, the broader unread-count
         // subscription below would immediately flag your own just-sent
         // message as unread in the channel you're actively looking at.
-        if (!activeChannel.id.startsWith('dm-')) {
-          chatService.markMessagesAsRead(activeChannel.id, currentUser.id).catch(err =>
-            console.error('Error marking own message as read:', err)
-          );
-        }
+        chatService.markMessagesAsRead(activeChannel.id, currentUser.id).catch(err =>
+          console.error('Error marking own message as read:', err)
+        );
 
         // Update DM activity status when a message is sent
         if (activeChannel.id.startsWith('dm-')) {
@@ -271,7 +270,7 @@ export function ChatLayout() {
             )
           );
         }
-        
+
         console.log("✅ Message sent successfully");
       }
     } catch (error: any) {
@@ -289,14 +288,14 @@ export function ChatLayout() {
     try {
       console.log("🆕 Creating channel:", name, "isPrivate:", isPrivate, "jobTitle:", jobTitle);
       const newChannel = await chatService.createChannel(name, currentUser.id, isPrivate, jobTitle);
-      
+
       // Add the new channel to state immediately
       setChannels(prev => [...prev, newChannel]);
-      
+
       // Select the new channel
       setActiveChannel(newChannel);
       await loadMessages(newChannel.id);
-      
+
       console.log("✅ Channel created successfully:", newChannel.id);
     } catch (error: any) {
       console.error('❌ Error creating channel:', error);
@@ -309,77 +308,47 @@ export function ChatLayout() {
     console.log("🎯 Channel selected:", channel.name);
     setActiveChannel(channel);
     await loadMessages(channel.id);
-    
+
     if (currentUser) {
       try {
         await chatService.markMessagesAsRead(channel.id, currentUser.id);
+        onMessagesRead?.();
       } catch (error) {
         console.error('Error marking messages as read:', error);
       }
     }
   };
 
-  // In ChatLayout.tsx - Update the handleDMCreate function
-// In ChatLayout.tsx - Replace the handleDMCreate function
+  // Starts (or reopens) the private conversation with a colleague. It is stored, so the other person receives it.
 const handleDMCreate = async (userId: string) => {
   if (!currentUser) return;
 
-  try {
-    console.log("💬 Creating DM with user:", userId);
-    
-    // Find the target employee
-    const targetEmployee = employees.find(emp => emp.id === userId);
-    if (!targetEmployee) {
-      console.error('❌ Target employee not found');
-      return;
-    }
+  const target = employees.find(emp => emp.id === userId);
+  if (!target) {
+    console.error('❌ Target employee not found');
+    return;
+  }
 
-    // Create simple DM object
-    const newDM: DirectMessage = {
-      id: `dm-${currentUser.id}-${userId}`,
-      name: targetEmployee.fullName,
+  try {
+    const conversationId = await chatService.startDirectMessage(target.workEmail);
+
+    const dm: DirectMessage = {
+      id: conversationId,
+      name: target.fullName,
       type: 'direct_message',
-      avatar: targetEmployee.profileImage || '',
-      initials: targetEmployee.initials,
-      status: targetEmployee.status,
+      avatar: target.profileImage || '',
+      initials: target.initials,
+      status: target.status,
       userId: userId,
       unread_count: 0
     };
 
-    // Add to directMessages list
-    setDirectMessages(prev => {
-      const existingDM = prev.find(dm => dm.id === newDM.id);
-      if (!existingDM) {
-        return [...prev, newDM];
-      }
-      return prev;
-    });
-
-    // Select the DM channel
-    setActiveChannel(newDM);
-    
-    // Load welcome message for DM
-    setMessages([
-      {
-        id: 'welcome-' + newDM.id,
-        content: `You started a conversation with ${targetEmployee.fullName}. Send a message to begin chatting! 👋`,
-        author: {
-          id: 'system',
-          name: 'Figbloom Teams',
-          avatar: '',
-          initials: 'FT',
-          email: 'system@figbloomteams.com',
-          status: 'online'
-        },
-        timestamp: new Date().toISOString(),
-        reactions: []
-      }
-    ]);
-
-    console.log("✅ DM created successfully");
-
+    setDirectMessages(prev => (prev.some(existing => existing.id === dm.id) ? prev : [...prev, dm]));
+    setActiveChannel(dm);
+    await loadMessages(dm.id);
   } catch (error: any) {
     console.error('❌ Error creating DM:', error);
+    toast.error(error?.message || 'Could not start the conversation');
   }
 };
 
@@ -446,7 +415,7 @@ const handleDMCreate = async (userId: string) => {
       // Someone else's message arriving while this channel is already open
       // shouldn't show as unread either - the channel is actively being
       // viewed, same reasoning as the sender's own case in handleSendMessage.
-      if (currentUser && !activeChannel.id.startsWith('dm-')) {
+      if (currentUser) {
         chatService.markMessagesAsRead(activeChannel.id, currentUser.id).catch(err =>
           console.error('Error marking incoming message as read:', err)
         );
@@ -499,6 +468,7 @@ const handleDMCreate = async (userId: string) => {
           const fresh = await chatService.getUserChannels(currentUser.id);
           const regular = fresh.filter(ch => !ch.id.startsWith('dm-')) as Channel[];
           setChannels(regular);
+          setDirectMessages(await buildDirectMessages(fresh));
         } catch (err) {
           console.error('Error refreshing channel unread counts:', err);
         }
