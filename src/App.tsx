@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { Routes, Route, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from './lib/supabase';
@@ -18,7 +18,7 @@ import AuthCallback from './pages/AuthCallback';
 import React from 'react';
 import { UserProvider } from '../src/components/ProtectedRoutes/UserContext';
 import MFAVerification from './pages/MFAverification';
-import { useCompanyProfile } from './hooks/useCompanyProfile';
+import { useCompanyProfile, withProfileRole } from './hooks/useCompanyProfile';
 import CompanyGate from './components/Company/CompanyGate';
 
 // Route-level code splitting: each page is fetched when first visited.
@@ -164,12 +164,13 @@ const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
 
 function App() {
   // All hooks at the top level
-  const [user, setUser] = useState<User | null>(null);
+  const [authUser, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   // The role shown in the app comes from user_profiles (the company the person is working in), never from the
   // editable user_metadata; see useCompanyProfile.
   const companyState = useCompanyProfile(session?.user?.id);
+  const user = useMemo(() => withProfileRole(authUser, companyState), [authUser, companyState]);
   const [selectedTown, setSelectedTown] = useState<string>('');
   const [selectedRegion, setSelectedRegion] = useState('All Regions');
 
@@ -961,7 +962,7 @@ function App() {
                       Try again
                     </button>
                   </div>
-                ) : companyState.status === 'loading' || user.role !== companyState.profile.role ? (
+                ) : companyState.status === 'loading' ? (
                   <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">Loading your workspace…</div>
                 ) : user.role === 'STAFF' ? (
                   <CompanyGate userId={session.user.id}>
