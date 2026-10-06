@@ -29,7 +29,6 @@ import {
   Trash2,
   Bell,
   Menu,
-  PartyPopper,
   Lock,
   CheckCircle2,
   Search,
@@ -59,6 +58,7 @@ import UserProfileDropdown from './UserProfile';
 import PasswordResetModal from './PasswordRestModal';
 import DocumentsUploadPage from './Documents';
 import Appearance from '../Settings/Appearance';
+import MyContract from './MyContract';
 import CompleteProfileCard from './CompleteProfileCard';
 import PayslipViewer from './PayslipViewer';
 import EmployeeBioPage from './Bio';
@@ -245,28 +245,6 @@ async function logLoginTime(employeeNumber: string): Promise<boolean> {
     console.error('Error logging login time:', error);
     return false;
   }
-}
-
-// ComingSoon Component
-function ComingSoon({ title }: { title: string }) {
-  return (
-    <div className="p-12 text-center">
-      <div className="max-w-md mx-auto bg-gray-50 p-8 rounded-lg">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-white rounded-full shadow-sm mb-4">
-          <PartyPopper className="h-8 w-8 text-gray-500" />
-        </div>
-        <h2 className="mt-2 text-xl font-medium text-gray-900">{title} Portal</h2>
-        <p className="mt-3 text-xs text-gray-500">
-          This section is currently under development and will be available soon.
-        </p>
-        <div className="mt-6">
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-            Coming soon...
-          </span>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // NotificationSidebar Component
@@ -3375,7 +3353,7 @@ const StaffPortal = () => {
               {activeTab === 'training' && <TrainingModule />}
               {activeTab === 'leave' && <LeaveApplicationForm />}
               {activeTab === 'leave-history' && <LeaveApplicationsList />}
-              {activeTab === 'contract' && <ComingSoon title="Contracts" />}
+              {activeTab === 'contract' && <MyContract />}
               {activeTab === 'details' && <Profile />}
               {activeTab === 'documents' && <DocumentsUploadPage />}
               {activeTab === 'appearance' && <Appearance />}
