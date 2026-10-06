@@ -19,6 +19,7 @@ import React from 'react';
 import { UserProvider } from '../src/components/ProtectedRoutes/UserContext';
 import MFAVerification from './pages/MFAverification';
 import { useCompanyProfile } from './hooks/useCompanyProfile';
+import CompanyGate from './components/Company/CompanyGate';
 
 // Route-level code splitting: each page is fetched when first visited.
 const AdminVideoUpload = lazy(() => import('./components/training/Training'));
@@ -925,7 +926,7 @@ function App() {
             <Route path="/update-password" element={<UpdatePasswordPage />} />
             <Route
               path="/staff"
-              element={session ? <StaffPortalLanding /> : <Login onLoginSuccess={handleLoginSuccess} />}
+              element={session ? <CompanyGate userId={session.user.id}><StaffPortalLanding /></CompanyGate> : <Login onLoginSuccess={handleLoginSuccess} />}
             />
 
             <Route
@@ -945,8 +946,11 @@ function App() {
                 ) : companyState.status === 'loading' || user.role !== companyState.profile.role ? (
                   <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">Loading your workspace…</div>
                 ) : user.role === 'STAFF' ? (
-                  <StaffPortalLanding />
+                  <CompanyGate userId={session.user.id}>
+                    <StaffPortalLanding />
+                  </CompanyGate>
                 ) : (
+                  <CompanyGate userId={session.user.id}>
                   <div className="flex flex-col min-h-screen bg-gray-50/50">
                     <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-accent/10 to-transparent pointer-events-none"></div>
                     <div className="relative flex flex-1 min-h-0 w-full overflow-x-hidden">
@@ -1147,6 +1151,7 @@ function App() {
                       </div>
                     </div>
                   </div>
+                  </CompanyGate>
                 )
               }
             />
