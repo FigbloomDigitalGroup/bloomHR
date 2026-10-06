@@ -1,15 +1,35 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import { companyApi } from '../lib/companyApi';
 import AuthShell, { AuthButton, Field } from '../components/Company/AuthShell';
 import { tokenFromInput } from '../lib/inviteToken';
+import { clearPendingCompany, readPendingCompany } from '../lib/pendingCompany';
 
 /** Shown to a signed-in person who belongs to no company yet. */
 export default function NoCompany({ email }: { email: string }) {
-  const [name, setName] = useState('');
+  // a company name typed before they confirmed their email: create it now instead of asking again
+  const pending = useRef(readPendingCompany());
+  const started = useRef(false);
+  const [name, setName] = useState(pending.current ?? '');
   const [link, setLink] = useState('');
   const [busy, setBusy] = useState(false);
+  const [settingUp, setSettingUp] = useState(!!pending.current);
+
+  useEffect(() => {
+    const wanted = pending.current;
+    if (!wanted || started.current) return;
+    started.current = true;
+    clearPendingCompany(); // before the call, so a reload cannot create it twice
+    companyApi
+      .createCompany(wanted)
+      .then(() => window.location.assign('/dashboard'))
+      .catch((err: Error) => {
+        toast.error(err.message);
+        setName(wanted);
+        setSettingUp(false);
+      });
+  }, []);
 
   const create = async (e: FormEvent) => {
     e.preventDefault();
@@ -28,6 +48,14 @@ export default function NoCompany({ email }: { email: string }) {
     const token = tokenFromInput(link);
     if (token) window.location.assign(`/join?token=${encodeURIComponent(token)}`);
   };
+
+  if (settingUp) {
+    return (
+      <AuthShell title="Setting up your company…" subtitle={`Creating ${name}. One moment.`}>
+        <p className="text-xs text-gray-500">You will land on your dashboard automatically.</p>
+      </AuthShell>
+    );
+  }
 
   return (
     <AuthShell title="You are not in a company yet" subtitle={`Signed in as ${email}. Create a company, or open the invitation link you were sent.`}>
