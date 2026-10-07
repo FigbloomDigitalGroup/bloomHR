@@ -66,7 +66,7 @@ import PayslipViewer from './PayslipViewer';
 import EmployeeBioPage from './Bio';
 import IncidentReport from './IncidentReport';
 import JobApplications from './JobApplications';
-import solo from '../../../public/solo.png';
+import bloomMark from '../../../public/bloom-mark.png';
 
 interface CompanyProfile {
   id: number;
@@ -2994,7 +2994,7 @@ const StaffPortal = () => {
                   whileHover={{ rotate: 5, scale: 1.05 }}
                   onClick={() => !isExpanded && setIsCollapsed(false)}
                 >
-                  <img src={solo} alt="Logo" className="relative w-10 h-10 object-contain shell-logo drop-shadow-md" />
+                  <img src={bloomMark} alt="Logo" className="relative w-10 h-10 object-contain shell-logo drop-shadow-md" />
                 </motion.div>
 
                 <AnimatePresence>
@@ -3256,7 +3256,7 @@ const StaffPortal = () => {
         <div className="md:hidden flex items-center justify-between p-4 bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-40">
           <div className="flex items-center space-x-3">
             <div className="relative w-8 h-8 rounded-lg bg-brand flex items-center justify-center shadow-lg shadow-brand/20">
-              <img src={solo} alt="Logo" className="w-5 h-5 object-contain brightness-0 invert" />
+              <img src={bloomMark} alt="Logo" className="w-5 h-5 object-contain brightness-0 invert" />
             </div>
             <span className="font-sans font-bold text-gray-900 tracking-tight">Staff Portal</span>
           </div>
