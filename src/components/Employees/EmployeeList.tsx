@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { employeeMatchesSearch } from '../../lib/employeeSearch';
 import {
   Search, Plus, Mail, Phone,
   ChevronLeft, ChevronRight, ChevronDown,
@@ -200,14 +201,8 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
     }
 
     // Apply other filters
-    const fullName = `${employee['First Name']} ${employee['Middle Name']} ${employee['Last Name']}`.toLowerCase();
-    const searchLower = searchTerm.toLowerCase();
-
-    // Search Fields: Name, ID, Email, Phone
-    const matchesSearch = fullName.includes(searchLower) ||
-      (employee['Employee Number'] && String(employee['Employee Number']).toLowerCase().includes(searchLower)) ||
-      (employee['Work Email'] && String(employee['Work Email']).toLowerCase().includes(searchLower)) ||
-      (employee['Mobile Number'] && String(employee['Mobile Number']).toLowerCase().includes(searchLower));
+    // Search Fields: Name, ID, Email, Phone (every word typed must match one of them)
+    const matchesSearch = employeeMatchesSearch(employee, searchTerm);
     const matchesDepartment = selectedDepartment === 'all' || employee['Employee Type'] === selectedDepartment;
     const matchesBranch = selectedBranch === 'all' || employee.Branch === selectedBranch;
     const matchesEmploymentType = selectedEmploymentType === 'all' || employee.Town === selectedEmploymentType;
