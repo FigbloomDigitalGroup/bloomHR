@@ -24,44 +24,32 @@ const SUPABASE_STUBS = `
   alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
   grant usage on schema auth to anon, authenticated, service_role;
   grant execute on all functions in schema auth to anon, authenticated, service_role;
+  -- Supabase installs extensions in their own schema; the dumped schema refers to them there.
+  create schema if not exists extensions;
+  create extension if not exists "uuid-ossp" with schema extensions;
+  grant usage on schema extensions to anon, authenticated, service_role;
 `;
 
-// The pre-timestamp migrations were applied by hand in dependency order, which is not
-// alphabetical (leave_balances needs leave_types). Replay them in that order, between
-// the earlier timestamped files and anything dated 2026-10-01 or later.
-const LEGACY_ORDER = [
-  'leave_types_policies.sql',
-  'leave_balances.sql',
-  'leave_balances_engine.sql',
-  'hr_notifications.sql',
-  'leave_notifications.sql',
-  'company_events.sql',
-  'chat_realtime.sql',
-  'chat_rls_fix.sql',
-];
-
+/** Every migration, in the order `supabase db push` applies them: the baseline of the live schema, then the rest. */
 export const migrationFiles = () => {
-  const all = readdirSync(join(root, 'supabase', 'migrations'))
-    .filter((f) => f.endsWith('.sql'))
-    .sort();
-  const stamped = all.filter((f) => /^\d{14}_/.test(f));
-  const unknown = all.filter((f) => !stamped.includes(f) && !LEGACY_ORDER.includes(f));
-  if (unknown.length) throw new Error(`Add to LEGACY_ORDER in supabase/tests/db.ts: ${unknown.join(', ')}`);
-  return [...stamped.filter((f) => f < '20261001'), ...LEGACY_ORDER, ...stamped.filter((f) => f >= '20261001')];
+  const all = readdirSync(join(root, 'supabase', 'migrations')).filter((f) => f.endsWith('.sql'));
+  const unstamped = all.filter((f) => !/^\d{14}_/.test(f));
+  if (unstamped.length) throw new Error(`Migrations need a timestamp prefix (YYYYMMDDHHMMSS_name.sql): ${unstamped.join(', ')}`);
+  return all.sort();
 };
 
-/** A throwaway Postgres (PGlite) with the repo schema + all migrations applied. */
-export async function bootDb({ upTo }: { upTo?: string } = {}) {
+/** A throwaway Postgres (PGlite) built the way a fresh project is: every migration in supabase/migrations, in order. */
+export async function bootDb() {
   const db = new PGlite({ extensions: { uuid_ossp } });
   await db.exec(SUPABASE_STUBS);
-  await db.exec(readFileSync(join(root, 'master_schema.sql'), 'utf8'));
   for (const file of migrationFiles()) {
-    if (upTo && /^\d{14}_/.test(file) && file > upTo) break;
     try {
       await db.exec(readFileSync(join(root, 'supabase', 'migrations', file), 'utf8'));
     } catch (e) {
       throw new Error(`migration ${file} failed: ${(e as Error).message}`);
     }
+    // the dumped baseline clears the session's search_path; `db push` starts each file in a fresh session
+    await db.exec('reset search_path; reset check_function_bodies; reset row_security');
   }
   return db;
 }
@@ -94,20 +82,11 @@ export async function asAnon<T>(db: PGlite, fn: () => Promise<T>): Promise<T> {
 }
 
 /**
- * Same stack, but starting from a snapshot of the real ziradev schema instead of master_schema.sql:
- * the live tables plus only the tenant migrations (everything older is already part of the snapshot).
+ * The same database without the seeded default roles, so a test can set up exactly the roles it needs (the tests
+ * written against the old schema snapshot, which had no rows, insert their own).
  */
 export async function bootLiveDb() {
-  const db = new PGlite({ extensions: { uuid_ossp } });
-  await db.exec(SUPABASE_STUBS);
-  await db.exec('create extension if not exists "uuid-ossp"');
-  await db.exec(readFileSync(join(root, 'supabase', 'tests', 'fixtures', 'live_schema.sql'), 'utf8'));
-  for (const file of migrationFiles().filter((f) => /^\d{14}_/.test(f) && f >= '20261001')) {
-    try {
-      await db.exec(readFileSync(join(root, 'supabase', 'migrations', file), 'utf8'));
-    } catch (e) {
-      throw new Error(`migration ${file} failed on the live schema: ${(e as Error).message}`);
-    }
-  }
+  const db = await bootDb();
+  await db.exec(`delete from public.role_permissions where tenant_id = '00000000-0000-0000-0000-000000000001'`);
   return db;
 }

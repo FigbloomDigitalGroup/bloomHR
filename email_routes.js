@@ -4,6 +4,10 @@
 // module permission (the same ones the app uses to show or hide screens; ADMIN always). Without that, anyone who could
 // reach this server could send mail from the company address and read its sent-mail history.
 //
+// The email provider account is shared by every company, so the log is never read from the provider's list. Each send
+// is recorded in sent_emails with the caller's company, the log lists only that company's rows, and the provider is
+// asked for one email's details only after the row has been found in the caller's company.
+//
 //   POST /api/email/send   { purpose, to, subject, html, attachments?, provider?, cpanelUser? }
 //   GET  /api/email/logs?limit=&cursor=
 //   GET  /api/email/logs/:id
@@ -45,15 +49,6 @@ const PURPOSES = {
 };
 const LOG_MODULES = ["email-portal", "adminconfirm"];
 
-// The sending history comes from the one Resend account every company shares, so it mixes all companies' mail
-// (including invitation links). It is shown only to the company named in EMAIL_LOGS_TENANT_ID (the operator's own);
-// with the variable unset nobody can read it.
-async function assertMayReadLogs(caller) {
-    if (!(await callerHasModule(caller, LOG_MODULES))) throw new HttpError(403, "Forbidden");
-    const operator = (process.env.EMAIL_LOGS_TENANT_ID || "").trim();
-    if (!operator || operator !== caller.tenantId) throw new HttpError(403, "Forbidden");
-}
-
 const MAX_RECIPIENTS = 50; // per request
 const MAX_SUBJECT = 200;
 const MAX_HTML = 1_000_000; // characters
@@ -61,7 +56,8 @@ const MAX_ATTACHMENTS = 5;
 const MAX_ATTACHMENT_TOTAL = 10_000_000; // characters of base64 across all attachments
 const PROVIDERS = ["resend", "cpanel"];
 const EMAIL_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
-const ID_RE = /^[A-Za-z0-9_-]{1,100}$/; // provider cursors / email ids
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i; // sent_emails ids
+const CURSOR_RE = /^\d{1,7}$/; // the log is paged by position
 
 // Per-user budget (recipients per hour) so a stolen session cannot be used to spam from the company address.
 const takeBudget = createBudget({ default: { limit: 1000, windowMs: 60 * 60 * 1000 } });
@@ -94,50 +90,91 @@ const asRecipients = (to) => {
     return list;
 };
 
-// Get email logs from Resend using REST API
+// Records a send in the caller's company log. The mail has already gone, so a failure here is logged, not reported.
+async function recordSend(caller, { provider, providerId, purpose, from, to, subject }) {
+    const { error } = await admin.from("sent_emails").insert({
+        tenant_id: caller.tenantId,
+        provider,
+        provider_id: providerId || null,
+        purpose,
+        sent_by: caller.id,
+        from_address: from || null,
+        to_addresses: to,
+        subject,
+    });
+    if (error) console.error("[email] could not record the send in sent_emails:", error);
+}
+
+const asLogEntry = (row) => ({
+    id: row.id,
+    from: row.from_address,
+    to: row.to_addresses,
+    subject: row.subject,
+    created_at: row.created_at,
+    last_event: "sent",
+});
+
+// The caller's company's sent mail, newest first: { object: "list", data: [...], has_more, next_cursor }
 router.get(
     "/logs",
     handler(async (req, res, caller) => {
-        await assertMayReadLogs(caller);
-        if (!process.env.RESEND_API_KEY) throw new HttpError(503, "Email logs are not configured on the server");
+        if (!(await callerHasModule(caller, LOG_MODULES))) throw new HttpError(403, "Forbidden");
 
         const limit = req.query.limit === undefined ? 20 : Number(req.query.limit);
         if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new HttpError(400, "limit must be a whole number from 1 to 100");
-        const cursor = req.query.cursor === undefined ? "" : String(req.query.cursor);
-        if (cursor && !ID_RE.test(cursor)) throw new HttpError(400, "Invalid cursor");
+        const cursor = req.query.cursor === undefined ? "0" : String(req.query.cursor);
+        if (!CURSOR_RE.test(cursor)) throw new HttpError(400, "Invalid cursor");
+        const offset = Number(cursor);
 
-        let url = `https://api.resend.com/emails?limit=${limit}`;
-        if (cursor) url += `&cursor=${cursor}`;
+        // one extra row tells us whether there is another page
+        const { data, error } = await admin
+            .from("sent_emails")
+            .select("id, from_address, to_addresses, subject, created_at")
+            .eq("tenant_id", caller.tenantId)
+            .order("created_at", { ascending: false })
+            .order("id", { ascending: false })
+            .range(offset, offset + limit);
+        if (error) throw new HttpError(500, "Could not read the email log");
 
-        const response = await fetch(url, {
-            method: "GET",
-            headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+        const rows = data || [];
+        const hasMore = rows.length > limit;
+        res.json({
+            object: "list",
+            data: rows.slice(0, limit).map(asLogEntry),
+            has_more: hasMore,
+            next_cursor: hasMore ? String(offset + limit) : null,
         });
-        if (!response.ok) {
-            console.error("[email] Resend log lookup failed:", response.status, await response.text());
-            throw new HttpError(502, "Could not read the email log from the provider");
-        }
-        res.json(await response.json());
     })
 );
 
-// Get single email details from Resend
+// One email from the caller's company's log, with the provider's details (body, delivery status) when it has them
 router.get(
     "/logs/:id",
     handler(async (req, res, caller) => {
-        await assertMayReadLogs(caller);
-        if (!process.env.RESEND_API_KEY) throw new HttpError(503, "Email logs are not configured on the server");
-        if (!ID_RE.test(req.params.id)) throw new HttpError(400, "Invalid email id");
+        if (!(await callerHasModule(caller, LOG_MODULES))) throw new HttpError(403, "Forbidden");
+        if (!UUID_RE.test(req.params.id)) throw new HttpError(400, "Invalid email id");
 
-        const response = await fetch(`https://api.resend.com/emails/${req.params.id}`, {
+        const { data: row, error } = await admin
+            .from("sent_emails")
+            .select("id, provider, provider_id, from_address, to_addresses, subject, created_at")
+            .eq("id", req.params.id)
+            .eq("tenant_id", caller.tenantId)
+            .maybeSingle();
+        if (error) throw new HttpError(500, "Could not read the email log");
+        if (!row) throw new HttpError(404, "Email not found");
+
+        if (row.provider !== "resend" || !row.provider_id || !process.env.RESEND_API_KEY) return res.json(asLogEntry(row));
+
+        const response = await fetch(`https://api.resend.com/emails/${encodeURIComponent(row.provider_id)}`, {
             method: "GET",
             headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
         });
         if (!response.ok) {
             console.error("[email] Resend email lookup failed:", response.status, await response.text());
-            throw new HttpError(response.status === 404 ? 404 : 502, response.status === 404 ? "Email not found" : "Could not read the email from the provider");
+            // the log entry is still ours to show, just without the provider's details
+            return res.json(asLogEntry(row));
         }
-        res.json(await response.json());
+        res.json({ ...(await response.json()), id: row.id });
     })
 );
 
@@ -184,10 +221,14 @@ router.post(
 
         if (!takeBudget(caller.id, "default", recipients.length)) throw new HttpError(429, "Email limit reached for now. Try again later.");
 
+        const record = (used, providerId, from) =>
+            recordSend(caller, { provider: used, providerId, purpose, from, to: recipients, subject });
+
         // 1. Send via Resend
         if (provider === "resend" && resend) {
+            const from = process.env.SMTP_FROM || "onboarding@resend.dev";
             const { data, error } = await resend.emails.send({
-                from: process.env.SMTP_FROM || "onboarding@resend.dev",
+                from,
                 to: recipients,
                 subject,
                 html,
@@ -197,6 +238,7 @@ router.post(
                 console.error("[email] Resend error:", error);
                 throw new HttpError(502, "The email provider rejected the message");
             }
+            await record("resend", data.id, from);
             return res.json({ message: "Email sent successfully", id: data.id });
         }
         if (provider === "resend") {
@@ -225,10 +267,12 @@ router.post(
                 auth: { user: cpanelUser, pass: cpanelPass },
             });
             const info = await cpanelTransporter.sendMail(mailOptions);
+            await record("cpanel", info.messageId, cpanelUser);
             return res.json({ message: "Email sent successfully via cPanel", id: info.messageId });
         }
 
         const info = await transporter.sendMail(mailOptions);
+        await record("smtp", info.messageId, mailOptions.from);
         res.json({ message: "Email sent successfully", id: info.messageId });
     })
 );

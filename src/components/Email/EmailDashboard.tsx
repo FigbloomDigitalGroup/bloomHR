@@ -57,10 +57,10 @@ export default function EmailDashboard() {
 
             setLogs(mappedLogs);
             setCurrentPage(page);
-            toast.success(`Loaded ${mappedLogs.length} emails from Resend`);
+            toast.success(`Loaded ${mappedLogs.length} emails`);
         } catch (error) {
             console.error('Error fetching logs:', error);
-            toast.error('Failed to load email logs from Resend');
+            toast.error('Failed to load the email log');
         } finally {
             setLoading(false);
         }

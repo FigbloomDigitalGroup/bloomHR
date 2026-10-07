@@ -1,0 +1,23 @@
+# Keep secrets, local installs and anything the backend does not need out of the image.
+# Secrets are set on the host (fly secrets set ...), never baked in.
+.env
+.env.*
+!.env.*.template
+node_modules
+dist
+dist-ssr
+.git
+.github
+.claude
+.bolt
+.agent
+.vscode
+.idea
+*.log
+*.tsbuildinfo
+coverage
+tests
+supabase/tests
+docs
+public
+src

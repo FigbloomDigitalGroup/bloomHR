@@ -19,6 +19,7 @@ const state = vi.hoisted(() => ({
   smtpSends: [] as Record<string, unknown>[],
   cpanelLogins: [] as string[],
   smtpError: null as Error | null,
+  sentEmails: [] as Record<string, unknown>[],
   logCalls: [] as string[],
   logReply: { ok: true, status: 200, json: { data: [{ id: 'e1' }] } } as { ok: boolean; status: number; json: unknown },
 }));
@@ -26,13 +27,20 @@ const state = vi.hoisted(() => ({
 vi.mock('@supabase/supabase-js', () => {
   const table = (rows: () => Record<string, unknown>[]) => {
     const filters: [string, unknown][] = [];
+    const matching = () => rows().filter((r) => filters.every(([k, v]) => r[k] === v));
     const b: Record<string, unknown> = {
       select: () => b,
       eq: (k: string, v: unknown) => {
         filters.push([k, v]);
         return b;
       },
-      maybeSingle: async () => ({ data: rows().find((r) => filters.every(([k, v]) => r[k] === v)) ?? null, error: null }),
+      order: () => b, // rows are kept newest first
+      range: async (from: number, to: number) => ({ data: matching().slice(from, to + 1), error: null }),
+      maybeSingle: async () => ({ data: matching()[0] ?? null, error: null }),
+      insert: async (row: Record<string, unknown>) => {
+        rows().unshift({ id: `00000000-0000-4000-8000-${String(rows().length + 1).padStart(12, '0')}`, created_at: new Date().toISOString(), ...row });
+        return { error: null };
+      },
     };
     return b;
   };
@@ -42,6 +50,7 @@ vi.mock('@supabase/supabase-js', () => {
     from: (name: string) => {
       if (name === 'user_profiles') return table(() => state.profiles);
       if (name === 'role_permissions') return table(() => state.permissions);
+      if (name === 'sent_emails') return table(() => state.sentEmails);
       throw new Error(`unexpected table ${name}`);
     },
   };
@@ -87,7 +96,6 @@ vi.mock('node-fetch', () => ({
 process.env.SUPABASE_URL = 'http://fake';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake-service-key';
 process.env.RESEND_API_KEY = 're_test_key';
-process.env.EMAIL_LOGS_TENANT_ID = TENANT; // the operator's company: the only one that may read the shared sending history
 process.env.SMTP_FROM = 'HR <hr@example.org>';
 process.env.CPANEL_USER = 'hr@example.org';
 process.env.CPANEL_PASSWORD = 'cpanel-pass';
@@ -130,6 +138,7 @@ beforeEach(() => {
   state.smtpSends = [];
   state.cpanelLogins = [];
   state.smtpError = null;
+  state.sentEmails = [];
   state.logCalls = [];
   state.logReply = { ok: true, status: 200, json: { data: [{ id: 'e1' }] } };
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -283,43 +292,78 @@ describe('limits', () => {
 });
 
 describe('sent-mail log', () => {
-  it('is closed to every company except the operator company, since the history mixes all mail', async () => {
-    process.env.EMAIL_LOGS_TENANT_ID = 'some-other-tenant';
-    try {
-      expect((await call('GET', '/logs', who('admin'))).status).toBe(403);
-      expect((await call('GET', '/logs/e1', who('admin'))).status).toBe(403);
-      process.env.EMAIL_LOGS_TENANT_ID = '';
-      expect((await call('GET', '/logs', who('admin'))).status).toBe(403);
-      expect(state.logCalls).toHaveLength(0);
-    } finally {
-      process.env.EMAIL_LOGS_TENANT_ID = TENANT;
-    }
+  const OTHER_ID = '00000000-0000-4000-8000-999999999999';
+  const otherCompanysLetter = () =>
+    state.sentEmails.push({
+      id: OTHER_ID,
+      tenant_id: 'other-tenant',
+      provider: 'resend',
+      provider_id: 're_other',
+      to_addresses: ['fired@other.co'],
+      subject: 'Termination letter',
+      created_at: '2026-01-01T00:00:00Z',
+    });
+
+  it("records every send with the caller's company, whichever provider sent it", async () => {
+    const admin = who('admin');
+    expect((await send(admin, mail)).status).toBe(200);
+    expect((await send(admin, { ...mail, provider: 'cpanel' })).status).toBe(200);
+    expect(state.sentEmails.map((r) => [r.tenant_id, r.provider, r.provider_id, r.purpose, r.sent_by])).toEqual([
+      [TENANT, 'cpanel', 'smtp-1', 'email-portal', admin],
+      [TENANT, 'resend', 're_1', 'email-portal', admin],
+    ]);
+    expect(state.sentEmails[1]).toMatchObject({ to_addresses: ['jane@example.org'], subject: 'Hello' });
   });
 
-  it('reads the log with the server-side key and validates the paging inputs', async () => {
-    const res = await call('GET', '/logs?limit=5&cursor=abc_123', who('admin'));
+  it("lists only the caller's company's mail and never reads the provider's shared list", async () => {
+    otherCompanysLetter();
+    await send(who('admin'), mail);
+    const res = await call('GET', '/logs', who('admin'));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ data: [{ id: 'e1' }] });
-    expect(state.logCalls[0]).toBe('https://api.resend.com/emails?limit=5&cursor=abc_123');
+    const body = await res.json();
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0]).toMatchObject({ to: ['jane@example.org'], subject: 'Hello' });
+    expect(JSON.stringify(body)).not.toContain('Termination letter');
+    expect(state.logCalls).toEqual([]);
+  });
+
+  it('pages through the log and validates the paging inputs', async () => {
+    for (let i = 0; i < 3; i++) await send(who('admin'), { ...mail, subject: `Mail ${i}` });
+    const first = await (await call('GET', '/logs?limit=2', who('admin'))).json();
+    expect(first.data.map((e: { subject: string }) => e.subject)).toEqual(['Mail 2', 'Mail 1']);
+    expect(first).toMatchObject({ has_more: true, next_cursor: '2' });
+    const second = await (await call('GET', `/logs?limit=2&cursor=${first.next_cursor}`, who('admin'))).json();
+    expect(second.data.map((e: { subject: string }) => e.subject)).toEqual(['Mail 0']);
+    expect(second).toMatchObject({ has_more: false, next_cursor: null });
 
     expect((await call('GET', '/logs?limit=0', who('admin'))).status).toBe(400);
     expect((await call('GET', '/logs?limit=101', who('admin'))).status).toBe(400);
     expect((await call('GET', '/logs?limit=abc', who('admin'))).status).toBe(400);
-    expect((await call('GET', '/logs?cursor=a%26limit%3D1000', who('admin'))).status).toBe(400); // cannot inject query parameters
+    expect((await call('GET', '/logs?cursor=abc', who('admin'))).status).toBe(400);
     expect((await call('GET', '/logs/..%2Fdomains', who('admin'))).status).toBe(400);
   });
 
-  it('does not pass the provider\'s error text on to the browser', async () => {
-    state.logReply = { ok: false, status: 401, json: {} };
-    const res = await call('GET', '/logs', who('admin'));
-    expect(res.status).toBe(502);
-    expect(JSON.stringify(await res.json())).not.toContain('secret internal detail');
+  it("reads one of the company's emails from the provider, but not another company's", async () => {
+    otherCompanysLetter();
+    await send(who('admin'), mail);
+    const ours = state.sentEmails.find((r) => r.tenant_id === TENANT)!;
+    state.logReply = { ok: true, status: 200, json: { id: 're_1', subject: 'Hello', html: '<p>Hi</p>', last_event: 'delivered' } };
+
+    const res = await call('GET', `/logs/${ours.id}`, who('admin'));
+    expect(await res.json()).toMatchObject({ id: ours.id, html: '<p>Hi</p>', last_event: 'delivered' });
+    expect(state.logCalls).toEqual(['https://api.resend.com/emails/re_1']);
+
+    expect((await call('GET', `/logs/${OTHER_ID}`, who('admin'))).status).toBe(404);
+    expect(state.logCalls).toHaveLength(1); // the provider was never asked about the other company's email
   });
 
-  it('reads one email, and reports a missing one as 404', async () => {
-    state.logReply = { ok: true, status: 200, json: { id: 'e1', subject: 'Hello' } };
-    expect(await (await call('GET', '/logs/e1', who('admin'))).json()).toMatchObject({ id: 'e1' });
-    state.logReply = { ok: false, status: 404, json: {} };
-    expect((await call('GET', '/logs/e2', who('admin'))).status).toBe(404);
+  it("still shows the log entry, without the provider's error text, when the provider fails", async () => {
+    await send(who('admin'), mail);
+    state.logReply = { ok: false, status: 401, json: {} };
+    const res = await call('GET', `/logs/${state.sentEmails[0].id}`, who('admin'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({ subject: 'Hello', last_event: 'sent' });
+    expect(JSON.stringify(body)).not.toContain('secret internal detail');
   });
 });

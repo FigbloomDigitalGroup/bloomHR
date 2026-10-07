@@ -1,18 +1,17 @@
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { AlertCircle, X, Download, ExternalLink } from 'lucide-react';
+
+import { signedFileUrl } from '../../../lib/privateFiles';
 
 interface PDFViewerProps {
   fileName: string;
-  isPublic?: boolean;
+  /** The stored link to the CV, when the application has one; otherwise the careers site's public/<file name>. */
+  fileUrl?: string | null;
   onClose: () => void;
 }
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-export const PDFViewer = ({ fileName, isPublic = true, onClose }: PDFViewerProps) => {
+// CVs are in a private bucket, so the viewer asks for a short-lived signed link as the signed-in recruiter.
+export const PDFViewer = ({ fileName, fileUrl, onClose }: PDFViewerProps) => {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,24 +19,9 @@ export const PDFViewer = ({ fileName, isPublic = true, onClose }: PDFViewerProps
   useEffect(() => {
     const getPdfUrl = async () => {
       try {
-        if (isPublic) {
-          const { data } = supabase.storage
-            .from('resumes')
-            .getPublicUrl(`public/${fileName}`);
-          setPdfUrl(data.publicUrl);
-        } else {
-          const { data, error } = await supabase.storage
-            .from('resumes')
-            .createSignedUrl(`private/${fileName}`, 60 * 60);
-          
-          if (error) {
-            setError('Error loading PDF: ' + error.message);
-          } else {
-            setPdfUrl(data.signedUrl);
-          }
-        }
+        setPdfUrl(await signedFileUrl('resumes', fileUrl || `public/${fileName}`));
       } catch (err) {
-        setError('Error loading PDF');
+        setError(err instanceof Error ? err.message : 'Error loading PDF');
         console.error(err);
       } finally {
         setLoading(false);
@@ -45,7 +29,7 @@ export const PDFViewer = ({ fileName, isPublic = true, onClose }: PDFViewerProps
     };
 
     getPdfUrl();
-  }, [fileName, isPublic]);
+  }, [fileName, fileUrl]);
 
   if (loading) {
     return (

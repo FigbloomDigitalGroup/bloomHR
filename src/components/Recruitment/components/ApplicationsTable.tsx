@@ -4,6 +4,7 @@ import { GlowButton } from './GlowButton';
 import { StatusBadge } from './StatusBadge';
 import { sendEmail } from '../../../services/email';
 import toast from 'react-hot-toast';
+import { openPrivateFile } from '../../../lib/privateFiles';
 
 interface ApplicationsTableProps {
   applications: any[];
@@ -203,7 +204,7 @@ export const ApplicationsTable = ({ applications, setSelectedApplication }: Appl
                     {application.resume_file_url && (
                       <div className="flex">
                         <button
-                          onClick={() => window.open(application.resume_file_url, '_blank')}
+                          onClick={() => openPrivateFile('resumes', application.resume_file_url!).catch((err) => toast.error(err.message))}
                           className="px-1.5 sm:px-2 py-1 bg-primary/10 hover:bg-primary/20 text-primary rounded text-xs flex items-center gap-1 whitespace-nowrap"
                           title="View Resume"
                         >

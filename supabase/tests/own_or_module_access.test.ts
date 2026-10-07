@@ -36,8 +36,6 @@ type Cfg = {
 };
 
 const ins = (table: string, cols: string, vals: string) => `insert into ${table} (${cols}) values (${vals})`;
-let idCounter = 1000;
-const nextId = () => ++idCounter;
 const REQ = `incident_type, severity, title, description`;
 const REQV = `'harassment', 'low', 't', 'd'`;
 
@@ -50,7 +48,7 @@ const TABLES: Record<string, Cfg> = {
   },
   payroll_records_current: {
     modules: ['payroll', 'hr-lifecycle'],
-    row: (e, t) => ins('payroll_records_current', `id, "Employee ID", tenant_id`, `${nextId()}, '${e}', '${t}'`),
+    row: (e, t) => ins('payroll_records_current', `"Employee ID", tenant_id`, `'${e}', '${t}'`),
     ownInsert: null,
     forged: () => [],
   },

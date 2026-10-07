@@ -188,7 +188,7 @@ export const ApplicationDetailModal = ({ application, onClose }: ApplicationDeta
       {showPdfViewer && (
         <PDFViewer 
           fileName={currentPdfFile}
-          isPublic={true}
+          fileUrl={application.resume_file_url}
           onClose={() => setShowPdfViewer(false)}
         />
       )}

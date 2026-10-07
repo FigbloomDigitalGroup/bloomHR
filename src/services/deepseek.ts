@@ -1,51 +1,39 @@
+import { supabase } from '../lib/supabase';
+
+// Client for the backend AI API (ai_routes.js). The model API key lives on the server; the browser authenticates
+// with the caller's own session token, and the server checks the caller may use this feature.
+const API_URL =
+  import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? '/api' : 'http://localhost:3001/api');
+
 interface DeepSeekResponse {
   response: string;
   metadata?: any;
 }
 
+/** Which feature is asking. The server ties each purpose to a permission and a fixed instruction for the model. */
+export type AIPurpose = 'hr-assistant' | 'warning' | 'meeting-summary';
+
 export const queryDeepSeek = async (
   prompt: string,
-  context: string
+  context: string,
+  purpose: AIPurpose = 'hr-assistant'
 ): Promise<DeepSeekResponse> => {
-  // Use the correct environment variable access method based on your framework
-  const apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY; // For Vite
-  // OR if using Next.js:
-  // const apiKey = process.env.NEXT_PUBLIC_DEEPSEEK_API_KEY;
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error('You are not signed in');
 
-  if (!apiKey) {
-    throw new Error('DeepSeek API key is not configured');
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/ai/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ purpose, prompt, context }),
+    });
+  } catch {
+    throw new Error('Could not reach the server. Is the backend running?');
   }
 
-  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'deepseek-chat',
-      messages: [
-        {
-          role: 'system',
-          content: `You are an HR assistant. Analyze this HR data and respond helpfully: ${context}`
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      temperature: 0.7
-    })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error?.message || 'DeepSeek API request failed');
-  }
-
-  const data = await response.json();
-  return {
-    response: data.choices[0].message.content,
-    metadata: data.usage
-  };
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `AI request failed (${response.status})`);
+  return payload as DeepSeekResponse;
 };
