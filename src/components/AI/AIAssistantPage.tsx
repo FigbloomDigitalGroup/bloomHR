@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { queryAI } from '../../services/ai'
+import { queryAI, type AIHistoryMessage } from '../../services/ai'
+import { employeeTable, upcomingDates } from '../../lib/aiEmployeeContext'
 import { supabase } from '../../lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, User, Users, Activity, BarChart2, Wand2 } from 'lucide-react'
@@ -234,32 +235,29 @@ export const AIAssistantPage = ({ selectedTown, onTownChange }: TownProps) => {
     setConversation(prev => [...prev, userMessage])
     
     try {
-      // Calculate real data statistics for AI context
+      // The records come from the employees query above, which runs with the signed-in person's session, so the AI sees
+      // exactly what they are allowed to see. Date-based facts are worked out here; models are unreliable at date maths.
+      const today = new Date()
       const realDataStats = calculateRealDataStats(filteredEmployees);
 
       const enhancedContext = `
-        DATABASE SCHEMA: employees table with columns as previously described.
+        TODAY: ${today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
 
-        ACTUAL DATA ANALYSIS CONTEXT:
-        - Total employees: ${filteredEmployees.length}
-        - Location: ${getTownContext()}
-        
-        REAL DATA STATISTICS:
+        SCOPE: ${filteredEmployees.length} employee records ${getTownContext()}. These are all the records the person asking may see.
+
+        COMING UP IN THE NEXT 30 DAYS (worked out from the records; use these rather than calculating dates yourself):
+        ${upcomingDates(filteredEmployees, today)}
+
+        SUMMARY:
         ${realDataStats}
 
-        ANALYTICAL CAPABILITIES:
-        - You have access to ${filteredEmployees.length} actual employee records
-        - Analyze real distributions by Gender, Job Title, Branch, Town, etc.
-        - Calculate actual salary statistics using Basic Salary field
-        - Perform geographic analysis using actual Town and Branch data
-        - Analyze employment types and demographics from real data
-        
+        EMPLOYEE RECORDS (one per line, fields separated by " | ", first line is the column names; empty means not recorded):
+        ${employeeTable(filteredEmployees)}
+
         RESPONSE GUIDELINES:
-        - Analyze the ACTUAL ${filteredEmployees.length} employee records
-        - Provide specific counts, percentages, and insights from real data
-        - Reference actual data fields and values from the schema
-        - Be factual and data-driven using the real employee data
-        - If data is missing for certain fields, note that in your analysis
+        - Answer from these records: name the people, give counts, percentages and dates
+        - If a field is empty for someone, say it is not recorded rather than guessing
+        - Keep answers as short as the question allows
 
         RESPONSE FORMATTING GUIDELINES:
         - Use **bold** for key metrics and important numbers
@@ -272,8 +270,18 @@ export const AIAssistantPage = ({ selectedTown, onTownChange }: TownProps) => {
         - Use [highlight]...[/highlight] for important takeaways
         - Use [card]...[/card] for summary sections
       `;
-      
-      const result = await queryAI(message, enhancedContext)
+
+      // the conversation so far (not the greeting), newest kept first when it gets long
+      const history: AIHistoryMessage[] = []
+      let historySize = 0
+      for (const m of [...conversation].reverse()) {
+        if ((m.role !== 'user' && m.role !== 'assistant') || m.id === 'welcome-message') continue
+        if (history.length === 20 || historySize + m.content.length > 60_000) break
+        history.unshift({ role: m.role, content: m.content })
+        historySize += m.content.length
+      }
+
+      const result = await queryAI(message, enhancedContext, 'hr-assistant', history)
       
       setConversation(prev => [
         ...prev,
@@ -303,15 +311,14 @@ export const AIAssistantPage = ({ selectedTown, onTownChange }: TownProps) => {
       return acc;
     }, {} as Record<string, number>);
     
-    // Job Title distribution (top 5)
+    // Job Title distribution
     const jobTitleCounts = employees.reduce((acc, emp) => {
       const title = emp['Job Title'] || 'Unknown';
       acc[title] = (acc[title] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
     const topJobTitles = Object.entries(jobTitleCounts)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 5);
+      .sort(([,a], [,b]) => b - a);
     
     // Branch distribution
     const branchCounts = employees.reduce((acc, emp) => {
@@ -330,7 +337,7 @@ export const AIAssistantPage = ({ selectedTown, onTownChange }: TownProps) => {
     
     return `
       - Gender Distribution: ${Object.entries(genderCounts).map(([gender, count]) => `${gender}: ${count}`).join(', ')}
-      - Top Job Titles: ${topJobTitles.map(([title, count]) => `${title}: ${count}`).join(', ')}
+      - Job Titles: ${topJobTitles.map(([title, count]) => `${title}: ${count}`).join(', ')}
       - Branch Distribution: ${Object.entries(branchCounts).map(([branch, count]) => `${branch}: ${count}`).join(', ')}
       ${salaryStats ? `- Salary Range: KES ${salaryStats.min.toLocaleString()} - KES ${salaryStats.max.toLocaleString()} (Avg: KES ${Math.round(salaryStats.avg).toLocaleString()})` : ''}
       - Employee Types: ${[...new Set(employees.map(emp => emp['Employee Type']).filter(Boolean))].join(', ')}

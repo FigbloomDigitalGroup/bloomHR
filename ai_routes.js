@@ -4,7 +4,8 @@
 // into the JavaScript every visitor downloads). OPENAI_MODEL picks the model. Callers must be signed in, have the
 // module the feature belongs to (ADMIN always), and stay within a per-user hourly budget.
 //
-//   POST /api/ai/chat   { purpose, prompt, context? }  ->  { response, metadata }
+//   POST /api/ai/chat   { purpose, prompt, context?, history? }  ->  { response, metadata }
+//   history: the conversation so far, oldest first, as [{ role: "user" | "assistant", content }]
 import express from "express";
 import fetch from "node-fetch";
 import { authenticate, HttpError, admin } from "./admin_routes.js";
@@ -34,6 +35,8 @@ const PURPOSES = {
 const DEFAULT_MODEL = "gpt-4.1-mini";
 const MAX_PROMPT = 50_000; // characters
 const MAX_CONTEXT = 200_000; // characters
+const MAX_HISTORY_MESSAGES = 20;
+const MAX_HISTORY = 60_000; // characters across all earlier messages
 
 const takeBudget = createBudget({ default: { limit: 100, windowMs: 60 * 60 * 1000 } });
 
@@ -49,6 +52,15 @@ router.post("/chat", async (req, res) => {
     const { prompt, context = "" } = req.body;
     if (typeof prompt !== "string" || !prompt.trim() || prompt.length > MAX_PROMPT) throw new HttpError(400, "Invalid prompt");
     if (typeof context !== "string" || context.length > MAX_CONTEXT) throw new HttpError(400, "Invalid context");
+    const history = req.body.history ?? [];
+    if (
+      !Array.isArray(history) ||
+      history.length > MAX_HISTORY_MESSAGES ||
+      history.some((m) => !["user", "assistant"].includes(m?.role) || typeof m.content !== "string") ||
+      history.reduce((n, m) => n + m.content.length, 0) > MAX_HISTORY
+    ) {
+      throw new HttpError(400, "Invalid history");
+    }
 
     if (!process.env.OPENAI_API_KEY) throw new HttpError(503, "The AI assistant is not configured on the server");
     if (!takeBudget(caller.id, "default", 1)) throw new HttpError(429, "AI limit reached for now. Try again later.");
@@ -61,6 +73,7 @@ router.post("/chat", async (req, res) => {
         model: (process.env.OPENAI_MODEL || "").trim() || DEFAULT_MODEL,
         messages: [
           { role: "system", content: rule.system(context) },
+          ...history.map((m) => ({ role: m.role, content: m.content })),
           { role: "user", content: prompt },
         ],
         ...(rule.maxTokens ? { max_completion_tokens: rule.maxTokens } : {}),
