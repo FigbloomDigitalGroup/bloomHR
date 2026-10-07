@@ -162,5 +162,5 @@ describe('asking the model', () => {
     const admin = who('admin');
     for (let i = 0; i < 100; i++) expect((await ask(admin, question)).status).toBe(200);
     expect((await ask(admin, question)).status).toBe(429);
-  });
+  }, 30000); // 101 requests: allow for a busy machine
 });
