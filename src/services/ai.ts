@@ -13,10 +13,17 @@ interface AIResponse {
 /** Which feature is asking. The server ties each purpose to a permission and a fixed instruction for the model. */
 export type AIPurpose = 'hr-assistant' | 'warning' | 'meeting-summary';
 
+/** An earlier turn of the conversation, so follow-up questions make sense. */
+export interface AIHistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export const queryAI = async (
   prompt: string,
   context: string,
-  purpose: AIPurpose = 'hr-assistant'
+  purpose: AIPurpose = 'hr-assistant',
+  history: AIHistoryMessage[] = []
 ): Promise<AIResponse> => {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -27,7 +34,7 @@ export const queryAI = async (
     response = await fetch(`${API_URL}/ai/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ purpose, prompt, context }),
+      body: JSON.stringify({ purpose, prompt, context, history }),
     });
   } catch {
     throw new Error('Could not reach the server. Is the backend running?');
