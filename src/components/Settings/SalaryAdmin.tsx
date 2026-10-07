@@ -1038,7 +1038,7 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, us
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-[10px] shadow-lg w-full max-w-4xl max-h-[90vh] overflow-auto">
-        <div className="sticky top-0 bg-[#f3f4f6] p-6 border-b border-gray-200 flex justify-between items-center">
+        <div className="sticky top-0 bg-gray-100 p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-xl font-semibold text-gray-900">Salary Advance Payment Request Details</h2>
           <button
             onClick={onClose}
@@ -1453,7 +1453,7 @@ const BypassConfirmModal = ({
               <button
                 onClick={onConfirm}
                 disabled={isLoading}
-                className="text-xs w-full py-4 bg-white text-green-600 hover:text-green-700 hover:bg-[#f3f4f6] rounded-[25px] font-bold transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
+                className="text-xs w-full py-4 bg-white text-green-600 hover:text-green-700 hover:bg-gray-100 rounded-[25px] font-bold transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
               >
                 {isLoading ? (
                   <Loader className="w-5 h-5 animate-spin" />
@@ -2582,7 +2582,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-[#f3f4f6] divide-y divide-gray-200">
+              <tbody className="bg-gray-100 divide-y divide-gray-200">
                 {currentItems.map((callback) => {
                   const transactionData = extractTransactionData(callback);
                   // Prioritize the amount we already fixed in processedData
@@ -2772,7 +2772,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
       {showDetails && selectedCallback && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[10px] shadow-lg w-full max-w-4xl max-h-[90vh] overflow-auto">
-            <div className="sticky top-0 bg-[#f3f4f6] p-6 border-b border-gray-200 flex justify-between items-center">
+            <div className="sticky top-0 bg-gray-100 p-6 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900">Callback Details</h2>
               <button
                 onClick={() => setShowDetails(false)}
@@ -5609,7 +5609,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
             {/* Approval Queue panel */}
             {showApprovalQueue && (isChecker || isAdmin) && (
-              <div className="bg-[#f3f4f6] rounded-[10px] p-6">
+              <div className="bg-gray-100 rounded-[10px] p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                     <Clock className="w-5 h-5 text-orange-600" />
@@ -5677,7 +5677,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                 <>
                   <div className="overflow-x-auto">
                     <table className="min-w-full">
-                      <thead className="bg-[#FAFBFA] border-b border-border">
+                      <thead className="bg-gray-50 border-b border-border">
                         <tr>
                           <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase text-subtle">Employee</th>
                           <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase text-subtle">Mobile</th>
@@ -5924,7 +5924,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
                   {/* Pagination */}
                   {totalPages > 1 && (
-                    <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-3 border-t border-border bg-[#FAFBFA]">
+                    <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-3 border-t border-border bg-gray-50">
                       <div className="text-sm text-gray-700 mb-3 sm:mb-0">
                         Showing <strong>{indexOfFirstItem + 1}</strong> to{' '}
                         <strong>{Math.min(indexOfLastItem, filteredApplications.length)}</strong> of{' '}

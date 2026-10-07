@@ -3671,7 +3671,7 @@ export default function PayrollDashboard() {
   }
 
   return (
-    <div className="p-4 space-y-4 bg-[#f3f4f6] min-h-screen max-w-screen-2xl mx-auto">
+    <div className="p-4 space-y-4 bg-gray-100 min-h-screen max-w-screen-2xl mx-auto">
 
 
 
@@ -4202,7 +4202,7 @@ export default function PayrollDashboard() {
         <Card padding="none" className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full text-xs">
-              <thead className="bg-[#FAFBFA] border-b border-border">
+              <thead className="bg-gray-50 border-b border-border">
                 <tr className="text-left text-[10px] font-bold uppercase text-subtle">
                   <th className="px-4 py-2.5">Employee</th>
                   <th className="px-4 py-2.5">Gross Pay</th>

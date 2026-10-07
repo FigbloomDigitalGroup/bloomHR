@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { contrast, hexToRgb, readableOn, rgbToHex, rgbToHslString, WHITE, ensureWhiteTextReadable } from './color';
-import { DEFAULT_PRESET, PRESETS, deriveVars, presetFor, sanitizeChoice, choiceFromPreset } from './themes';
+import { contrast, hexToRgb, readableOn, rgbToHex, rgbToHslString, rgbTriplet, WHITE, ensureWhiteTextReadable } from './color';
+import { DEFAULT_PAGE, DEFAULT_PRESET, PAGE_PRESETS, PRESETS, derivePageVars, deriveVars, isDarkPage, presetFor, sanitizeChoice, choiceFromPreset } from './themes';
 import { applyStoredTheme, applyTheme, clearStoredTheme, currentChoice, loadStoredTheme, resetTheme, saveStoredTheme } from './applyTheme';
 
 beforeEach(() => {
@@ -110,5 +110,77 @@ describe('saved themes', () => {
     expect(loadStoredTheme()).toBeNull();
     localStorage.setItem('figbloom_theme', JSON.stringify({ sidebar: 'red' }));
     expect(loadStoredTheme()).toBeNull();
+  });
+});
+
+describe('page colours', () => {
+  const rgb = (t: string) => t.split(' ').map(Number) as [number, number, number];
+  const INK_RGB: [number, number, number] = [22, 32, 26];
+
+  it('every page preset keeps the main and secondary text readable on the page and on cards', () => {
+    for (const p of PAGE_PRESETS) {
+      const v = derivePageVars(p.page)!;
+      for (const bg of ['--page', '--surface'] as const) {
+        expect(contrast(rgb(v[bg]), rgb(v['--ink'])), `${p.id} ${bg} main text`).toBeGreaterThanOrEqual(7);
+        expect(contrast(rgb(v[bg]), rgb(v['--text-500'])), `${p.id} ${bg} secondary text`).toBeGreaterThanOrEqual(4); // the app's grey-500 on its own default page is about 4.4
+      }
+    }
+    expect(new Set(PAGE_PRESETS.map((p) => p.id)).size).toBe(PAGE_PRESETS.length);
+  });
+
+  it('uses the picked colour itself as the page, light or dark', () => {
+    for (const hex of ['#F5EFE6', '#000000', '#1E3A8A', '#0F172A', '#FDE68A']) {
+      expect(derivePageVars(hex)!['--page'], hex).toBe(rgb(rgbTriplet(hexToRgb(hex)!)).join(' '));
+    }
+  });
+
+  it('turns the text light on a dark page, and keeps it dark on a light one', () => {
+    const dark = derivePageVars('#000000')!;
+    expect(contrast(rgb(dark['--ink']), [0, 0, 0])).toBeGreaterThanOrEqual(12);
+    expect(rgb(dark['--ink'])[0]).toBeGreaterThan(200);
+    expect(isDarkPage('#000000')).toBe(true);
+    const light = derivePageVars('#F5EFE6')!;
+    expect(light['--ink']).toBe(INK_RGB.join(' '));
+    expect(isDarkPage('#F5EFE6')).toBe(false);
+  });
+
+  it('only adjusts a colour no text reads well on (a mid grey), and just enough', () => {
+    const v = derivePageVars('#808080')!;
+    const page = rgb(v['--page']);
+    expect(page.join(' ')).not.toBe('128 128 128');
+    expect(Math.max(contrast(page, WHITE), contrast(page, INK_RGB))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('cards sit a step off the page: paler on a light page, lighter on a dark one', () => {
+    const sum = (t: string) => rgb(t).reduce((a, b) => a + b, 0);
+    const light = derivePageVars('#F5EFE6')!;
+    expect(sum(light['--surface'])).toBeGreaterThan(sum(light['--page']));
+    expect(sum(light['--line'])).toBeLessThan(sum(light['--page']));
+    const dark = derivePageVars('#121614')!;
+    expect(sum(dark['--surface'])).toBeGreaterThan(sum(dark['--page']));
+    expect(sum(dark['--line'])).toBeGreaterThan(sum(dark['--page']));
+  });
+
+  it('applies a page colour, and switching back to white restores the built-in colours exactly', () => {
+    const root = document.documentElement;
+    applyTheme({ ...choiceFromPreset(DEFAULT_PRESET), page: '#F5EFE6' });
+    expect(root.style.getPropertyValue('--page')).not.toBe('');
+    expect(root.style.getPropertyValue('--background')).not.toBe('');
+    applyTheme({ ...choiceFromPreset(DEFAULT_PRESET), page: DEFAULT_PAGE });
+    expect(root.style.getPropertyValue('--page')).toBe('');
+    expect(root.style.getPropertyValue('--surface')).toBe('');
+    applyTheme({ ...choiceFromPreset(DEFAULT_PRESET), page: '#000000' });
+    expect(root.dataset.page).toBe('dark');
+    applyTheme({ ...choiceFromPreset(DEFAULT_PRESET), page: '#ECF5EF' });
+    expect(root.dataset.page).toBeUndefined();
+    resetTheme();
+    expect(root.style.getPropertyValue('--page')).toBe('');
+  });
+
+  it('keeps the page colour when switching sidebar themes, and saves it', () => {
+    expect(choiceFromPreset(PRESETS[1], '#ECF5EF').page).toBe('#ECF5EF');
+    expect(presetFor(choiceFromPreset(PRESETS[1], '#ECF5EF'))?.id).toBe('ocean');
+    expect(sanitizeChoice({ sidebar: '#abc', accent: '#123456', highlight: '#f00', page: 'ecf5ef' })?.page).toBe('#ECF5EF');
+    expect(sanitizeChoice({ sidebar: '#abc', accent: '#123456', highlight: '#f00', page: 'nope' })).not.toHaveProperty('page');
   });
 });

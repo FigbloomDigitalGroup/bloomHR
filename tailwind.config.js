@@ -3,6 +3,41 @@ export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      // The white and light-grey backgrounds and borders follow the person's page palette (src/theme). Only background
+      // and border colours are mapped, so text-white on buttons stays white.
+      backgroundColor: {
+        white: "rgb(var(--surface) / <alpha-value>)",
+        gray: {
+          50: "rgb(var(--surface-sunken) / <alpha-value>)",
+          100: "rgb(var(--surface-muted) / <alpha-value>)",
+          200: "rgb(var(--surface-strong) / <alpha-value>)",
+          300: "rgb(var(--surface-stronger) / <alpha-value>)",
+        },
+        page: "rgb(var(--page) / <alpha-value>)",
+      },
+      borderColor: {
+        DEFAULT: "rgb(var(--line) / <alpha-value>)",
+        gray: {
+          100: "rgb(var(--line-soft) / <alpha-value>)",
+          200: "rgb(var(--line) / <alpha-value>)",
+          300: "rgb(var(--line-strong) / <alpha-value>)",
+        },
+      },
+      // the text greys turn light on a dark page colour (src/theme/themes.ts derivePageVars)
+      textColor: {
+        gray: {
+          300: "rgb(var(--text-300) / <alpha-value>)",
+          400: "rgb(var(--text-400) / <alpha-value>)",
+          500: "rgb(var(--text-500) / <alpha-value>)",
+          600: "rgb(var(--text-600) / <alpha-value>)",
+          700: "rgb(var(--text-700) / <alpha-value>)",
+          800: "rgb(var(--text-800) / <alpha-value>)",
+          900: "rgb(var(--text-900) / <alpha-value>)",
+        },
+        black: "rgb(var(--text-black) / <alpha-value>)",
+        ink: "rgb(var(--ink) / <alpha-value>)",
+        subtle: "rgb(var(--subtle) / <alpha-value>)",
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
