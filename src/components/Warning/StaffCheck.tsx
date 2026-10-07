@@ -3,7 +3,7 @@ import EmployeePicker from '../UI/EmployeePicker';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import { sendEmail } from '../../services/email';
-import { queryDeepSeek } from '../../services/deepseek';
+import { queryAI } from '../../services/ai';
 import { Card, Button, SearchInput, StatusPill, EmptyState } from '../UI';
 import {
   AlertTriangle,
@@ -281,7 +281,7 @@ MESSAGE: [professional warning message]
 
 Make sure to incorporate the severity level (${severity}) and be specific about the issues mentioned in the specificities.`;
 
-      const aiResponse = await queryDeepSeek(prompt, context, 'warning');
+      const aiResponse = await queryAI(prompt, context, 'warning');
 
       // Parse AI response to extract type and message
       const responseLines = aiResponse.response.split('\n');
@@ -348,7 +348,7 @@ Make sure to incorporate the severity level (${severity}) and be specific about 
         prompt += ` Please incorporate these specific requirements: ${aiSpecificities}`;
       }
 
-      const aiResponse = await queryDeepSeek(prompt, context, 'warning');
+      const aiResponse = await queryAI(prompt, context, 'warning');
       setCustomMessage(aiResponse.response);
       setUseCustomMessage(true);
       toast.success('AI message generated with your specificities');

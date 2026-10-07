@@ -1,8 +1,8 @@
 // ai_routes.js - the AI features (HR assistant, warning letters, meeting summaries) call the model through here.
 //
-// The model API key used to be a VITE_ variable, which Vite builds into the JavaScript every visitor downloads, so
-// anyone could have copied it. It now lives only on the server (DEEPSEEK_API_KEY). Callers must be signed in, have
-// the module the feature belongs to (ADMIN always), and stay within a per-user hourly budget.
+// The model is OpenAI's, called with OPENAI_API_KEY, which lives only on the server (a VITE_ variable would be built
+// into the JavaScript every visitor downloads). OPENAI_MODEL picks the model. Callers must be signed in, have the
+// module the feature belongs to (ADMIN always), and stay within a per-user hourly budget.
 //
 //   POST /api/ai/chat   { purpose, prompt, context? }  ->  { response, metadata }
 import express from "express";
@@ -18,22 +18,20 @@ const PURPOSES = {
   "hr-assistant": {
     modules: ["ai-assistant", "performance"],
     system: (context) => `You are an HR assistant. Analyze this HR data and respond helpfully: ${context}`,
-    temperature: 0.7,
   },
   warning: {
     modules: ["staffcheck"],
     system: (context) => `You are an HR assistant. Analyze this HR data and respond helpfully: ${context}`,
-    temperature: 0.7,
   },
   "meeting-summary": {
     modules: null,
     system: () =>
       "You are a helpful assistant that summarizes meeting transcripts. Provide concise, structured summaries that capture key decisions, action items, and important discussion points. Keep it under 200 words.",
-    temperature: 0.3,
     maxTokens: 500,
   },
 };
 
+const DEFAULT_MODEL = "gpt-4.1-mini";
 const MAX_PROMPT = 50_000; // characters
 const MAX_CONTEXT = 200_000; // characters
 
@@ -52,20 +50,20 @@ router.post("/chat", async (req, res) => {
     if (typeof prompt !== "string" || !prompt.trim() || prompt.length > MAX_PROMPT) throw new HttpError(400, "Invalid prompt");
     if (typeof context !== "string" || context.length > MAX_CONTEXT) throw new HttpError(400, "Invalid context");
 
-    if (!process.env.DEEPSEEK_API_KEY) throw new HttpError(503, "The AI assistant is not configured on the server");
+    if (!process.env.OPENAI_API_KEY) throw new HttpError(503, "The AI assistant is not configured on the server");
     if (!takeBudget(caller.id, "default", 1)) throw new HttpError(429, "AI limit reached for now. Try again later.");
 
-    const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
+    // No temperature: newer OpenAI models only accept the default. max_completion_tokens works on all of them.
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
       body: JSON.stringify({
-        model: "deepseek-chat",
+        model: (process.env.OPENAI_MODEL || "").trim() || DEFAULT_MODEL,
         messages: [
           { role: "system", content: rule.system(context) },
           { role: "user", content: prompt },
         ],
-        temperature: rule.temperature,
-        ...(rule.maxTokens ? { max_tokens: rule.maxTokens } : {}),
+        ...(rule.maxTokens ? { max_completion_tokens: rule.maxTokens } : {}),
       }),
     });
     if (!response.ok) {

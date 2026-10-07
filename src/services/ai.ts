@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 const API_URL =
   import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? '/api' : 'http://localhost:3001/api');
 
-interface DeepSeekResponse {
+interface AIResponse {
   response: string;
   metadata?: any;
 }
@@ -13,11 +13,11 @@ interface DeepSeekResponse {
 /** Which feature is asking. The server ties each purpose to a permission and a fixed instruction for the model. */
 export type AIPurpose = 'hr-assistant' | 'warning' | 'meeting-summary';
 
-export const queryDeepSeek = async (
+export const queryAI = async (
   prompt: string,
   context: string,
   purpose: AIPurpose = 'hr-assistant'
-): Promise<DeepSeekResponse> => {
+): Promise<AIResponse> => {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new Error('You are not signed in');
@@ -35,5 +35,5 @@ export const queryDeepSeek = async (
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || `AI request failed (${response.status})`);
-  return payload as DeepSeekResponse;
+  return payload as AIResponse;
 };
