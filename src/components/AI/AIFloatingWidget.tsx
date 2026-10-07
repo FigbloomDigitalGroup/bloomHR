@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { queryDeepSeek } from "../../services/deepseek";
+import { queryAI } from "../../services/ai";
 import { X, Send, User } from "lucide-react";
 
 const ChatFloater = () => {
@@ -93,8 +93,7 @@ const ChatFloater = () => {
     
     while (attempts < maxRetries) {
       try {
-        // Call DeepSeek API with string parameters
-        const result = await queryDeepSeek(currentInput, context);
+        const result = await queryAI(currentInput, context);
         
         // Handle different response formats
         let responseContent = '';
@@ -122,7 +121,7 @@ const ChatFloater = () => {
         }]);
         break;
       } catch (error) {
-        console.error("DeepSeek API Error:", error);
+        console.error("AI assistant error:", error);
         attempts++;
         
         if (attempts === maxRetries) {

@@ -61,7 +61,7 @@ vi.mock('node-fetch', () => ({
 
 process.env.SUPABASE_URL = 'http://fake';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake-service-key';
-process.env.DEEPSEEK_API_KEY = 'sk-server-only';
+process.env.OPENAI_API_KEY = 'sk-server-only';
 
 let server: Server;
 let base: string;
@@ -132,7 +132,9 @@ describe('asking the model', () => {
     const res = await ask(who('hr'), question);
     expect(await res.json()).toEqual({ response: 'An answer', metadata: { total_tokens: 7 } });
     const call = state.modelCalls[0];
-    expect(call.url).toBe('https://api.deepseek.com/v1/chat/completions');
+    expect(call.url).toBe('https://api.openai.com/v1/chat/completions');
+    expect(call.body.model).toBe('gpt-4.1-mini');
+    expect(call.body).not.toHaveProperty('temperature');
     expect(call.auth).toBe('Bearer sk-server-only');
     expect(call.body.messages).toEqual([
       { role: 'system', content: 'You are an HR assistant. Analyze this HR data and respond helpfully: {"employees":[]}' },
@@ -160,5 +162,5 @@ describe('asking the model', () => {
     const admin = who('admin');
     for (let i = 0; i < 100; i++) expect((await ask(admin, question)).status).toBe(200);
     expect((await ask(admin, question)).status).toBe(429);
-  });
+  }, 30000); // 101 requests: allow for a busy machine
 });

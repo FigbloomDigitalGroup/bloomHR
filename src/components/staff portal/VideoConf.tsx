@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../../lib/supabase'; // Adjust path to your supabase config
-import { queryDeepSeek } from '../../services/deepseek';
+import { queryAI } from '../../services/ai';
 
 const VideoConferenceComponent = () => {
   const [meetingCode, setMeetingCode] = useState('');
@@ -255,7 +255,7 @@ const VideoConferenceComponent = () => {
     setIsSomeoneTranscribing(false);
   };
 
-  // Generate summary using DeepSeek API
+  // Generate summary with the AI assistant
   const generateSummary = async () => {
     if (!transcript.trim()) {
       alert('No transcript available to summarize');
@@ -265,7 +265,7 @@ const VideoConferenceComponent = () => {
     setIsGeneratingSummary(true);
     
     try {
-      const { response: newSummary } = await queryDeepSeek(
+      const { response: newSummary } = await queryAI(
         `Please provide a comprehensive summary of this meeting transcript:\n\n${transcript}`,
         '',
         'meeting-summary'

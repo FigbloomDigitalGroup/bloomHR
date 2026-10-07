@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { queryDeepSeek } from '../../services/deepseek'
+import { queryAI } from '../../services/ai'
 import { supabase } from '../../lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, User, Users, Activity, BarChart2, Wand2 } from 'lucide-react'
@@ -273,7 +273,7 @@ export const AIAssistantPage = ({ selectedTown, onTownChange }: TownProps) => {
         - Use [card]...[/card] for summary sections
       `;
       
-      const result = await queryDeepSeek(message, enhancedContext)
+      const result = await queryAI(message, enhancedContext)
       
       setConversation(prev => [
         ...prev,
