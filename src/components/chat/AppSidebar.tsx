@@ -146,7 +146,7 @@ export function AppSidebar({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                <img src="/solo.png" alt="Figbloom Teams" className="w-6 h-6" />
+                <img src="/bloom-mark.png" alt="Figbloom Teams" className="w-6 h-6" />
               </div>
               <div>
                 <h2 className="font-bold text-white text-lg">Figbloom Teams</h2>

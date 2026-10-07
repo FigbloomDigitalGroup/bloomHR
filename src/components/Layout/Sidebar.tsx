@@ -30,7 +30,7 @@ import {
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useMyPreferences } from '../../hooks/useMyPreferences';
 import { useLocation, useNavigate } from 'react-router-dom';
-import solo from '../../../public/solo.png';
+import bloomMark from '../../../public/bloom-mark.png';
 import { usePermissions } from '../../hooks/usePermissions';
 import { supabase } from '../../lib/supabase';
 import { SearchInput } from '../UI';
@@ -224,7 +224,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
               whileHover={{ rotate: 5, scale: 1.05 }}
               onClick={() => !isExpanded && onToggle(false)}
             >
-              <img src={solo} alt="Logo" className="relative w-10 h-10 object-contain shell-logo drop-shadow-md" />
+              <img src={bloomMark} alt="Logo" className="relative w-10 h-10 object-contain shell-logo drop-shadow-md" />
             </motion.div>
 
             <AnimatePresence>

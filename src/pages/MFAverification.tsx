@@ -391,7 +391,7 @@ export default function MFAVerification() {
           <div className="flex justify-center mb-6">
             <div className="p-4 rounded-full" style={{ background: 'linear-gradient(135deg, #022c22 0%, #4ade80 100%)' }}>
               <img
-                src="/logo.png"
+                src="/bloom-mark.png"
                 alt="Company Logo"
                 className="h-12 w-12 object-contain"
               />

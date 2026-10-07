@@ -141,7 +141,7 @@ const UpdatePasswordPage = () => {
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             <div className="p-3 rounded-full" style={{ background: 'linear-gradient(135deg, #022c22 0%, #4ade80 100%)' }}>
-              <img src="/logo.png" alt="Logo" className="h-10 w-10 object-contain" />
+              <img src="/bloom-mark.png" alt="Logo" className="h-10 w-10 object-contain" />
             </div>
           </div>
           <h2 className="text-2xl font-bold text-gray-900">Set New Password</h2>

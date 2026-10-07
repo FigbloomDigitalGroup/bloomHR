@@ -13,7 +13,7 @@ function BrandPanel() {
       <div className="relative z-10 w-full flex flex-col justify-between p-16">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center shadow-lg shadow-black/20">
-            <img src="/solo.png" alt="" className="w-6 h-6 object-contain brightness-0 invert" />
+            <img src="/bloom-mark.png" alt="" className="w-6 h-6 object-contain brightness-0 invert" />
           </div>
           <span className="text-white font-bold text-2xl tracking-tight">
             Figbloom<span className="text-gray-400">HR</span>
@@ -61,7 +61,7 @@ export default function AuthShell({ title, subtitle, children }: AuthShellProps)
           <div className="lg:hidden text-center mb-10">
             <div className="inline-flex items-center gap-2 mb-2">
               <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
-                <img src="/solo.png" alt="" className="w-5 h-5 brightness-0 invert" />
+                <img src="/bloom-mark.png" alt="" className="w-5 h-5 brightness-0 invert" />
               </div>
               <span className="text-2xl font-bold text-gray-900 tracking-tight">
                 Figbloom<span className="text-gray-500">HR</span>
