@@ -46,7 +46,7 @@ describe('Appearance', () => {
     render(<Appearance />);
     fireEvent.change(screen.getByLabelText('Sidebar colour'), { target: { value: '#112233' } });
     expect(rootVar('--shell')).toBe('17 34 51');
-    expect(screen.getByText('Custom')).toBeTruthy();
+    expect(screen.getByText(/^Custom/)).toBeTruthy();
     expect(loadStoredTheme()).toMatchObject({ sidebar: '#112233' });
   });
 

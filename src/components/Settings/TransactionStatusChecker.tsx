@@ -185,7 +185,7 @@ const TransactionStatusChecker: React.FC = () => {
 
                 {/* Left Column: Input Panel */}
                 <div className="lg:col-span-5 space-y-6">
-                    <div className="bg-[#f3f4f6] rounded-[10px] p-6 flex flex-col gap-6">
+                    <div className="bg-gray-100 rounded-[10px] p-6 flex flex-col gap-6">
 
                         {/* Tabs */}
                         <div className="flex flex-wrap gap-2">
@@ -281,7 +281,7 @@ const TransactionStatusChecker: React.FC = () => {
 
                 {/* Right Column: Results List */}
                 <div className="lg:col-span-7">
-                    <div className="bg-[#f3f4f6] rounded-[10px] h-full flex flex-col min-h-[500px]">
+                    <div className="bg-gray-100 rounded-[10px] h-full flex flex-col min-h-[500px]">
                         <div className="px-6 py-5 flex items-center justify-between">
                             <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide flex items-center gap-2">
                                 <RefreshCw className="w-3.5 h-3.5 text-gray-500" /> Result History

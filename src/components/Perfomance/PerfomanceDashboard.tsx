@@ -1680,7 +1680,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange 
             <>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
-                  <thead className="bg-[#FAFBFA] border-y border-border">
+                  <thead className="bg-gray-50 border-y border-border">
                     <tr>
                       <th className="text-left py-3 px-4 text-gray-700 font-semibold">Employee</th>
                       <th className="text-left py-3 px-4 text-gray-700 font-semibold">Role</th>

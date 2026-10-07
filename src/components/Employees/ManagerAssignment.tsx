@@ -482,7 +482,7 @@ const ManagerAssignment = () => {
 
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
-                            <thead className="bg-[#FAFBFA] border-b border-border">
+                            <thead className="bg-gray-50 border-b border-border">
                                 <tr className="text-[10px] font-bold uppercase text-subtle">
                                     <th className="px-4 py-2.5 w-12 text-center">#</th>
                                     <th className="px-4 py-2.5">Employee</th>

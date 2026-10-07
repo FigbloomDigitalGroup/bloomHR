@@ -1,8 +1,31 @@
-import type { ThemeConfig } from 'antd';
+import { theme as antdThemes, type ThemeConfig } from 'antd';
 
 // Mirrors the Tailwind tokens in tailwind.config.js (see FIG-527) so antd
 // components (DatePicker, Select, Table, etc.) match the rest of the app.
-export const buildAntdTheme = (brandHex: string = '#17402A'): ThemeConfig => ({
+/** The page colours antd needs (see the page palette in src/theme/themes.ts); defaults are the built-in white. */
+export interface AntdSurfaces {
+  page: string;
+  surface: string;
+  line: string;
+  text: string;
+  textSecondary: string;
+  textTertiary: string;
+  dark: boolean;
+}
+
+const DEFAULT_SURFACES: AntdSurfaces = {
+  page: '#F6F8F6',
+  surface: '#FFFFFF',
+  line: '#E2E6E2',
+  text: '#16201A',
+  textSecondary: '#5F6B62',
+  textTertiary: '#9CA3A0',
+  dark: false,
+};
+
+export const buildAntdTheme = (brandHex: string = '#17402A', surfaces: AntdSurfaces = DEFAULT_SURFACES): ThemeConfig => ({
+  // on a dark page colour antd's own dark styling (hover states, disabled fields, shadows) is the base
+  algorithm: surfaces.dark ? antdThemes.darkAlgorithm : antdThemes.defaultAlgorithm,
   token: {
     colorPrimary: brandHex,
     colorLink: brandHex,
@@ -10,13 +33,14 @@ export const buildAntdTheme = (brandHex: string = '#17402A'): ThemeConfig => ({
     colorWarning: '#F26A1B',
     colorError: '#C0392B',
     colorInfo: '#1F4E79',
-    colorText: '#16201A',
-    colorTextSecondary: '#5F6B62',
-    colorTextTertiary: '#9CA3A0',
-    colorBorder: '#E2E6E2',
-    colorBorderSecondary: '#E2E6E2',
-    colorBgLayout: '#F6F8F6',
-    colorBgContainer: '#FFFFFF',
+    colorText: surfaces.text,
+    colorTextSecondary: surfaces.textSecondary,
+    colorTextTertiary: surfaces.textTertiary,
+    colorBorder: surfaces.line,
+    colorBorderSecondary: surfaces.line,
+    colorBgLayout: surfaces.page,
+    colorBgContainer: surfaces.surface,
+    colorBgElevated: surfaces.surface,
     borderRadius: 10,
     borderRadiusLG: 14,
     borderRadiusSM: 8,

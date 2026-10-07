@@ -532,7 +532,7 @@ const IncidentReportsManagement = () => {
                             </div>
                         </div>
 
-                        <div className="px-6 py-4 border-t border-border bg-[#FAFBFA] flex justify-end gap-2.5">
+                        <div className="px-6 py-4 border-t border-border bg-gray-50 flex justify-end gap-2.5">
                             <Button variant="secondary" onClick={closeDetails} disabled={isUpdating}>
                                 Close
                             </Button>

@@ -1,4 +1,14 @@
-import { DEFAULT_PRESET, ThemeChoice, choiceFromPreset, deriveVars, sanitizeChoice } from './themes';
+import {
+  DEFAULT_PRESET,
+  PAGE_VAR_NAMES,
+  ThemeChoice,
+  choiceFromPreset,
+  derivePageVars,
+  deriveVars,
+  hasCustomPage,
+  isDarkPage,
+  sanitizeChoice,
+} from './themes';
 
 const STORAGE_KEY = 'figbloom_theme';
 
@@ -8,16 +18,24 @@ export function applyTheme(choice: ThemeChoice, root: HTMLElement = document.doc
   if (!vars) return false;
   for (const [name, value] of Object.entries(vars)) root.style.setProperty(name, value);
   root.dataset.shell = vars['--shell-fg'] === '255 255 255' ? 'dark' : 'light';
+  // the white areas: the person's page colour, or back to the built-in white (the defaults in index.css)
+  const pageVars = hasCustomPage(choice) ? derivePageVars(choice.page as string) : null;
+  if (pageVars) for (const [name, value] of Object.entries(pageVars)) root.style.setProperty(name, value);
+  else for (const name of PAGE_VAR_NAMES) root.style.removeProperty(name);
+  // a dark page: light text is already in the variables; this tells native controls and antd to go dark too
+  if (pageVars && isDarkPage(choice.page)) root.dataset.page = 'dark';
+  else delete root.dataset.page;
   notifyThemeChanged();
   return true;
 }
 
 /** Back to the built-in colours (the defaults in index.css). */
 export function resetTheme(root: HTMLElement = document.documentElement): void {
-  for (const name of ['--brand', '--brand-dark', '--tint', '--highlight', '--shell', '--shell-fg', '--shell-active', '--shell-active-fg', '--primary', '--ring']) {
+  for (const name of ['--brand', '--brand-dark', '--tint', '--highlight', '--shell', '--shell-fg', '--shell-active', '--shell-active-fg', '--primary', '--ring', ...PAGE_VAR_NAMES]) {
     root.style.removeProperty(name);
   }
   delete root.dataset.shell;
+  delete root.dataset.page;
   notifyThemeChanged();
 }
 

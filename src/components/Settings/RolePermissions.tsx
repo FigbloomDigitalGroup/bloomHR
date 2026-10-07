@@ -391,7 +391,7 @@ export default function RolePermissions() {
                                                         aria-checked={hasPermission}
                                                         onClick={() => togglePermission(permission.module_id)}
                                                         className={`flex gap-2.5 p-3 rounded-[10px] border text-left transition-colors ${hasPermission
-                                                            ? 'border-green-tint bg-[#FAFCFA]'
+                                                            ? 'border-green-tint bg-gray-50'
                                                             : 'border-border bg-white hover:bg-background'
                                                             }`}
                                                     >
