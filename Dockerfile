@@ -1,24 +1,22 @@
-# Dockerfile
+# Backend API image (Fly.io). The frontend is built and hosted separately.
+# Secrets are never copied in (see .dockerignore); set them on the host with `fly secrets set`.
 
-# 1. Base image
 FROM node:20-alpine
 
-# 2. Workdir
 WORKDIR /app
 
-# 3. Install dependencies
+# Install exactly what package-lock.json pins; fail the build if the lockfile is out of date
 COPY package*.json ./
-RUN npm ci --omit=dev || npm install --only=production
+RUN npm ci --omit=dev
 
-# 4. Copy the rest of the code
 COPY . .
 
-# 5. Production env
 ENV NODE_ENV=production
 
-# 6. Your app ALREADY listens on port 3001
+# The app listens on 3001 (fly.toml internal_port)
 EXPOSE 3001
 
-# 7. Start exactly like you do on Render
-# (Fly logs show: npm run start -> node safaricom.js)
-CMD ["npm", "run", "start"]
+# Run as the unprivileged node user, not root
+USER node
+
+CMD ["node", "safaricom.js"]

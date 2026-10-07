@@ -80,6 +80,9 @@ create policy delete_messages on public.messages for delete to authenticated
 -- ---------------------------------------------------------------------------------------------
 -- what the chat calls
 -- ---------------------------------------------------------------------------------------------
+-- dropped first: a database that already has the later version (with avatar_url, 20261006000900) cannot have its
+-- return type changed in place; 20261006000900 recreates that version
+drop function if exists public.company_members();
 create or replace function public.company_members()
 returns table (user_id uuid, email text)
 language sql

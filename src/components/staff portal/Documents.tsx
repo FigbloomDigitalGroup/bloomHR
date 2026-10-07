@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { currentUserAndTenant } from '../../lib/privateFiles';
 import { 
   Upload, 
   FileText, 
@@ -24,7 +25,8 @@ import {
 const DocumentsManager = () => {
   const [activeTab, setActiveTab] = useState('upload');
   const [user, setUser] = useState<any>(null);
-  const [employeeNumber, setEmployeeNumber] = useState('');
+  // this login's private folder in the documents bucket: <company id>/<login id>
+  const [folder, setFolder] = useState('');
   
   // Upload states
   const [uploading, setUploading] = useState(false);
@@ -66,35 +68,25 @@ const DocumentsManager = () => {
   // Track which document types are already uploaded and their file names
   const [uploadedDocuments, setUploadedDocuments] = useState<Record<string, string>>({});
 
-  // Get current user and employee number
+  // Get current user and their documents folder
   useEffect(() => {
-    const getCurrentUser = async () => {
+    const loadFolder = async () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error) {
-          console.error('Error getting user:', error);
-        } else {
-          setUser(user);
-          
-          // For demo purposes, use email as employee number
-          if (user?.email) {
-            setEmployeeNumber(user.email.split('@')[0]);
-          }
-        }
+        const { userId, tenantId } = await currentUserAndTenant();
+        setFolder(`${tenantId}/${userId}`);
       } catch (error) {
-        console.error('Error in getCurrentUser:', error);
+        console.error('Error finding the documents folder:', error);
+        setFolder('');
       }
     };
 
-    getCurrentUser();
+    supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
+    loadFolder();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
-      
-      // For demo purposes, use email as employee number
-      if (session?.user?.email) {
-        setEmployeeNumber(session.user.email.split('@')[0]);
-      }
+      if (session?.user) loadFolder();
+      else setFolder('');
     });
 
     return () => subscription.unsubscribe();
@@ -102,10 +94,10 @@ const DocumentsManager = () => {
 
   // Fetch documents when switching to view tab or when user/employee number changes
   useEffect(() => {
-    if (employeeNumber) {
+    if (folder) {
       fetchDocuments();
     }
-  }, [employeeNumber, activeTab]);
+  }, [folder, activeTab]);
 
   // Update uploaded document types when documents change
   useEffect(() => {
@@ -199,10 +191,10 @@ const DocumentsManager = () => {
 
   // Improved upload function with retry mechanism and better error handling
   const uploadFileWithRetry = async (documentType: string, file: File, maxRetries = 3) => {
-    if (!file || !employeeNumber) return null;
+    if (!file || !folder) return null;
 
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${employeeNumber}/${documentType}_${Date.now()}.${fileExt}`;
+    const fileExt = (file.name.split('.').pop() || '').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+    const fileName = `${folder}/${documentType}_${Date.now()}.${fileExt}`;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -229,14 +221,10 @@ const DocumentsManager = () => {
           throw new Error(error.message || 'Failed to upload file to storage');
         }
 
-        const { data: urlData } = supabase.storage
-          .from('documents')
-          .getPublicUrl(fileName);
-
         // Set complete progress
         setUploadProgress(prev => ({ ...prev, [documentType]: 100 }));
 
-        return { ...data, publicUrl: urlData.publicUrl, path: fileName };
+        return { ...data, path: fileName };
 
       } catch (error: any) {
         console.error(`Upload attempt ${attempt} failed for ${documentType}:`, error);
@@ -272,7 +260,7 @@ const DocumentsManager = () => {
 
   // Parallel upload with concurrency control
   const handleUpload = async () => {
-    if (!employeeNumber) {
+    if (!folder) {
       alert('Employee information not available. Please log in again.');
       return;
     }
@@ -434,13 +422,13 @@ const DocumentsManager = () => {
 
   // VIEWER FUNCTIONS
   const fetchDocuments = async () => {
-    if (!employeeNumber) return;
+    if (!folder) return;
     
     setLoading(true);
     try {
       const { data, error } = await supabase.storage
         .from('documents')
-        .list(employeeNumber, {
+        .list(folder, {
           limit: 100,
           offset: 0,
           sortBy: { column: 'created_at', order: 'desc' }
@@ -451,28 +439,32 @@ const DocumentsManager = () => {
         return;
       }
 
-      const documentsWithUrls = await Promise.all(
-        data.map(async (doc) => {
-          const fullPath = `${employeeNumber}/${doc.name}`;
-          const { data: urlData } = supabase.storage
-            .from('documents')
-            .getPublicUrl(fullPath);
-          
-          // Extract document type from filename
-          const docType = doc.name.split('_')[0];
-          
-          return {
-            ...doc,
-            fullPath,
-            publicUrl: urlData.publicUrl,
-            type: docType,
-            label: documentLabels[docType] || docType,
-            fileType: getFileType(doc.name),
-            formattedSize: formatFileSize(doc.metadata?.size || 0),
-            uploadDate: new Date(doc.created_at).toLocaleDateString()
-          };
-        })
-      );
+      // private bucket: short-lived signed links, which storage only gives this login (or HR) for this folder
+      const files = data.filter((doc) => doc.name && doc.id);
+      const paths = files.map((doc) => `${folder}/${doc.name}`);
+      const { data: signed, error: signError } = paths.length
+        ? await supabase.storage.from('documents').createSignedUrls(paths, 60 * 60)
+        : { data: [], error: null };
+      if (signError) {
+        console.error('Error getting document links:', signError);
+        return;
+      }
+
+      const documentsWithUrls = files.map((doc, i) => {
+        // Extract document type from filename
+        const docType = doc.name.split('_')[0];
+
+        return {
+          ...doc,
+          fullPath: paths[i],
+          url: signed?.[i]?.signedUrl || '',
+          type: docType,
+          label: documentLabels[docType] || docType,
+          fileType: getFileType(doc.name),
+          formattedSize: formatFileSize(doc.metadata?.size || 0),
+          uploadDate: new Date(doc.created_at).toLocaleDateString()
+        };
+      });
 
       setDocuments(documentsWithUrls);
     } catch (error) {
@@ -587,7 +579,7 @@ const DocumentsManager = () => {
     );
   }
 
-  if (!employeeNumber) {
+  if (!folder) {
     return (
       <div className="max-w-4xl mx-auto p-6">
         <div className="bg-orange-tint-alt border border-orange/20 rounded-lg p-6 text-center">
@@ -971,13 +963,13 @@ const DocumentsManager = () => {
             <div className="p-4 overflow-auto max-h-[calc(90vh-120px)]">
               {selectedDoc.fileType === 'image' ? (
                 <img
-                  src={selectedDoc.publicUrl}
+                  src={selectedDoc.url}
                   alt={selectedDoc.name}
                   className="max-w-full h-auto mx-auto rounded-lg"
                 />
               ) : selectedDoc.fileType === 'pdf' ? (
                 <iframe
-                  src={selectedDoc.publicUrl}
+                  src={selectedDoc.url}
                   className="w-full h-[600px] border rounded-lg"
                   title={selectedDoc.name}
                 />

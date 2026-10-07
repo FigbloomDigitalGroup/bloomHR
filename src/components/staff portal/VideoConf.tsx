@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '../../lib/supabase'; // Adjust path to your supabase config
+import { queryDeepSeek } from '../../services/deepseek';
 
 const VideoConferenceComponent = () => {
   const [meetingCode, setMeetingCode] = useState('');
@@ -25,7 +26,6 @@ const VideoConferenceComponent = () => {
   // Environment variables
   const JITSI_DOMAIN = import.meta.env.VITE_JITSI_DOMAIN || 'meet.jit.si';
   const VPAAS_MAGIC_COOKIE = import.meta.env.VITE_VPAAS_MAGIC_COOKIE;
-  const DEEPSEEK_API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY;
 
   // Function to generate a deterministic code based on 5-day intervals
   const generateFiveDayCode = () => {
@@ -262,52 +262,16 @@ const VideoConferenceComponent = () => {
       return;
     }
 
-    if (!DEEPSEEK_API_KEY) {
-      alert('DeepSeek API key not configured');
-      return;
-    }
-
     setIsGeneratingSummary(true);
     
     try {
-      const response = await fetch('https://api.deepseek.com/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a helpful assistant that summarizes meeting transcripts. Provide concise, structured summaries that capture key decisions, action items, and important discussion points. Keep it under 200 words.'
-            },
-            {
-              role: 'user',
-              content: `Please provide a comprehensive summary of this meeting transcript:\n\n${transcript}`
-            }
-          ],
-          max_tokens: 500,
-          temperature: 0.3,
-          stream: false
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.choices && data.choices[0] && data.choices[0].message) {
-        const newSummary = data.choices[0].message.content;
-        setSummary(newSummary);
-        await saveToSupabase(transcript, newSummary);
-      } else {
-        throw new Error('Unexpected response format');
-      }
+      const { response: newSummary } = await queryDeepSeek(
+        `Please provide a comprehensive summary of this meeting transcript:\n\n${transcript}`,
+        '',
+        'meeting-summary'
+      );
+      setSummary(newSummary);
+      await saveToSupabase(transcript, newSummary);
     } catch (error) {
       console.error('Error generating summary:', error);
       

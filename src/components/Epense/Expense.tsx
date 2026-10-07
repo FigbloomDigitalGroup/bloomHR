@@ -17,6 +17,7 @@ import {
   ThumbsUp
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { currentUserAndTenant, openPrivateFile, randomFileName } from '../../lib/privateFiles';
 import EmployeePicker from '../UI/EmployeePicker';
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 import { PageHeader, Card, Button, StatusPill, EmptyState, SearchInput } from '../UI';
@@ -662,9 +663,9 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
       
       // Upload receipt if provided
       if (newExpense.receiptFile) {
-        const fileExt = newExpense.receiptFile.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `receipts/${fileName}`;
+        // private bucket: the record keeps the file's path, and each view gets a short-lived signed link
+        const { tenantId } = await currentUserAndTenant();
+        const filePath = `${tenantId}/receipts/${randomFileName(newExpense.receiptFile.name)}`;
 
         const { error: uploadError } = await supabase.storage
           .from('expense-receipts')
@@ -674,11 +675,7 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
           throw uploadError;
         }
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('expense-receipts')
-          .getPublicUrl(filePath);
-          
-        receiptUrl = publicUrl;
+        receiptUrl = filePath;
       }
 
       // Insert expense into database
@@ -843,9 +840,8 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
     
     setUploading(true);
     try {
-      const fileExt = receiptFile.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `receipts/${fileName}`;
+      const { tenantId } = await currentUserAndTenant();
+      const filePath = `${tenantId}/receipts/${randomFileName(receiptFile.name)}`;
 
       const { error: uploadError } = await supabase.storage
         .from('expense-receipts')
@@ -855,13 +851,9 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
         throw uploadError;
       }
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('expense-receipts')
-        .getPublicUrl(filePath);
-
       const { error } = await supabase
         .from('expenses')
-        .update({ receipt: publicUrl })
+        .update({ receipt: filePath })
         .eq('id', receiptUploadExpense.id);
 
       if (error) {
@@ -871,7 +863,7 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
       // Update local state
       setAllExpenses(allExpenses.map(expense => 
         expense.id === receiptUploadExpense.id 
-          ? { ...expense, receipt: publicUrl, receiptUploaded: true }
+          ? { ...expense, receipt: filePath, receiptUploaded: true }
           : expense
       ));
 
@@ -1698,15 +1690,16 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                     {selectedExpense.receipt && (
                       <div>
                         <p className="font-medium text-gray-700 mb-2">Receipt</p>
-                        <a
-                          href={selectedExpense.receipt}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openPrivateFile('expense-receipts', selectedExpense.receipt!).catch((err) => alert(err.message))
+                          }
                           className="text-xs text-blue-600 hover:text-blue-800 flex items-center space-x-1"
                         >
                           <Eye className="w-4 h-4" />
                           <span>View Receipt</span>
-                        </a>
+                        </button>
                       </div>
                     )}
 

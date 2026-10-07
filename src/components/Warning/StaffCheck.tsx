@@ -3,6 +3,7 @@ import EmployeePicker from '../UI/EmployeePicker';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import { sendEmail } from '../../services/email';
+import { queryDeepSeek } from '../../services/deepseek';
 import { Card, Button, SearchInput, StatusPill, EmptyState } from '../UI';
 import {
   AlertTriangle,
@@ -22,57 +23,6 @@ import {
   Brain,
   Zap
 } from 'lucide-react';
-
-// Define the DeepSeekResponse interface
-interface DeepSeekResponse {
-  response: string;
-  metadata?: any;
-}
-
-// AI query function
-const queryDeepSeek = async (
-  prompt: string,
-  context: string
-): Promise<DeepSeekResponse> => {
-  const apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
-
-  if (!apiKey) {
-    throw new Error('DeepSeek API key is not configured');
-  }
-
-  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'deepseek-chat',
-      messages: [
-        {
-          role: 'system',
-          content: `You are an HR assistant. Analyze this HR data and respond helpfully: ${context}`
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      temperature: 0.7
-    })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error?.message || 'DeepSeek API request failed');
-  }
-
-  const data = await response.json();
-  return {
-    response: data.choices[0].message.content,
-    metadata: data.usage
-  };
-};
 
 export default function WarningModule() {
   const [employees, setEmployees] = useState<any[]>([]);
@@ -331,7 +281,7 @@ MESSAGE: [professional warning message]
 
 Make sure to incorporate the severity level (${severity}) and be specific about the issues mentioned in the specificities.`;
 
-      const aiResponse = await queryDeepSeek(prompt, context);
+      const aiResponse = await queryDeepSeek(prompt, context, 'warning');
 
       // Parse AI response to extract type and message
       const responseLines = aiResponse.response.split('\n');
@@ -398,7 +348,7 @@ Make sure to incorporate the severity level (${severity}) and be specific about 
         prompt += ` Please incorporate these specific requirements: ${aiSpecificities}`;
       }
 
-      const aiResponse = await queryDeepSeek(prompt, context);
+      const aiResponse = await queryDeepSeek(prompt, context, 'warning');
       setCustomMessage(aiResponse.response);
       setUseCustomMessage(true);
       toast.success('AI message generated with your specificities');

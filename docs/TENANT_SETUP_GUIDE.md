@@ -12,10 +12,11 @@ Each tenant requires its own Supabase project:
    - **Service Role Key**
 
 ## 2. Initialize the Database Schema
-Since each tenant has a separate database, you must apply the required schema:
-1. Open the **SQL Editor** in your new Supabase project.
-2. Run the code found in **`master_schema.sql`** (located in the root of this project) to create all 70+ tables, including Employees, Payroll, M-Pesa tracking, and HR modules.
-3. If you need specific features like the Recruitment Portal or Team Chat, you can also run the corresponding scripts in the `database/` and `migrations/` folders.
+Since each tenant has a separate database, you must apply the required schema. With the [Supabase CLI](https://supabase.com/docs/guides/cli):
+1. `supabase link --project-ref <new project ref>`
+2. `supabase db push` — applies every file in `supabase/migrations/` in order: the baseline schema, the reference data (permissions and default roles), then later changes.
+
+Do not run the files in `supabase/archive/`; they are superseded by the baseline.
 
 ## 3. Configure Environment Variables
 Create a new environment file for the tenant (e.g., `.env.tenant2`).
@@ -32,7 +33,7 @@ Create a new environment file for the tenant (e.g., `.env.tenant2`).
    # Supabase Credentials
    VITE_SUPABASE_URL=https://new-tenant.supabase.co
    VITE_SUPABASE_ANON_KEY=...
-   VITE_SUPABASE_SERVICE_ROLE_KEY=...
+   SUPABASE_SERVICE_ROLE_KEY=...
    ```
 
 ## 4. Run the Application for the New Tenant
