@@ -8,11 +8,13 @@ import toast from "react-hot-toast";
 import { initialsOf } from "./lib/names";
 import { canCreateChannels } from "./lib/permissions";
 import { usePermissions } from "../../hooks/usePermissions";
+import { isOnline, useOnlinePeople } from "./lib/presence";
 import type { Employee, User, Channel, DirectMessage, Message } from "../chat/types/types";
 
 /** `onMessagesRead` lets the staff portal refresh its unread badge when a conversation is opened. */
 export function ChatLayout({ onMessagesRead }: { onMessagesRead?: () => void } = {}) {
   const { userRole } = usePermissions();
+  const onlinePeople = useOnlinePeople();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -122,8 +124,9 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: () => void } =
           type: 'direct_message',
           avatar: partner?.profileImage || '',
           initials: partner?.initials || initialsOf(name),
-          status: partner?.status || 'online',
+          status: 'offline',
           userId: partner?.id || partnerEmail,
+          email: partnerEmail,
           unread_count: channel.unread_count,
           lastMessage: lastMessage?.content,
           lastMessageTime: lastMessage?.timestamp,
@@ -357,6 +360,7 @@ const handleDMCreate = async (userId: string) => {
       initials: target.initials,
       status: target.status,
       userId: userId,
+      email: target.workEmail,
       unread_count: 0
     };
 
@@ -402,8 +406,16 @@ const handleDMCreate = async (userId: string) => {
     return currentUser;
   };
 
+  // online = has the app open right now (see lib/presence)
+  const statusOf = (email?: string | null): 'online' | 'offline' => (isOnline(onlinePeople, email) ? 'online' : 'offline');
+  const liveEmployees = employees.map(emp => ({ ...emp, status: statusOf(emp.workEmail) }));
+  const liveDirectMessages = directMessages.map(dm => ({ ...dm, status: statusOf(dm.email) }));
+  const liveActiveChannel = activeChannel?.type === 'direct_message'
+    ? { ...activeChannel, status: statusOf(activeChannel.email) }
+    : activeChannel;
+
   const getUsersForSidebar = (): User[] => {
-    return employees
+    return liveEmployees
       .filter(emp => {
         // Exclude current user
         if (!currentUser?.employeeData) return true;
@@ -519,8 +531,8 @@ const handleDMCreate = async (userId: string) => {
       <div className="flex h-full w-full bg-background">
         <AppSidebar 
           channels={channels.filter(ch => !ch.id.startsWith('dm-'))}
-          directMessages={directMessages}
-          activeChannel={activeChannel}
+          directMessages={liveDirectMessages}
+          activeChannel={liveActiveChannel}
           onChannelSelect={handleChannelSelect}
           onChannelCreate={handleChannelCreate}
           canCreateChannels={canCreateChannels(userRole)}
@@ -528,15 +540,16 @@ const handleDMCreate = async (userId: string) => {
           currentUser={getSafeUserData()}
           users={getUsersForSidebar()}
         />
-        {activeChannel ? (
+        {liveActiveChannel ? (
           <ChatArea 
-            channel={activeChannel}
+            channel={liveActiveChannel}
             messages={messages}
+            currentUserId={currentUser.id}
             onSendMessage={handleSendMessage}
             onToggleMute={(channelId) => {
               console.log("🔇 Toggle mute for channel:", channelId);
             }}
-            employees={employees}
+            employees={liveEmployees}
           />
         ) : (
           <WelcomeScreen 

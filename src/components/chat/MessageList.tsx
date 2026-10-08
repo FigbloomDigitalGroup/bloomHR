@@ -11,9 +11,10 @@ import type { Message, Channel, DirectMessage } from "../chat/types/types";
 interface MessageListProps {
   messages: Message[];
   channel: Channel | DirectMessage;
+  currentUserId: string;
 }
 
-export function MessageList({ messages, channel }: MessageListProps) {
+export function MessageList({ messages, channel, currentUserId }: MessageListProps) {
   const [activeReactionPicker, setActiveReactionPicker] = useState<string | null>(null);
 
   const handleReaction = (messageId: string, emoji: string) => {
@@ -81,115 +82,107 @@ export function MessageList({ messages, channel }: MessageListProps) {
               </div>
             </div>
             
-            {/* Messages for this date */}
+            {/* Messages for this date: mine on the right in the theme colour, others on the left (as in WhatsApp) */}
             {dateMessages.map((message, index) => {
-              const showAvatar = index === 0 || 
+              const mine = message.author.id === currentUserId;
+              const firstOfRun = index === 0 ||
                 dateMessages[index - 1].author.id !== message.author.id ||
                 new Date(message.timestamp).getTime() - new Date(dateMessages[index - 1].timestamp).getTime() > 300000; // 5 minutes
-              
+              // a name over the bubble only where it helps: others' messages in a channel
+              const showName = firstOfRun && !mine && channel.type === 'channel';
+              const showAvatar = firstOfRun && !mine;
+
               return (
                 <div
                   key={message.id}
-                  className="group hover:bg-white/50 px-6 py-2 rounded-lg transition-colors mx-2"
+                  className={`group flex items-end gap-2 px-4 sm:px-6 ${firstOfRun ? 'mt-3' : 'mt-0.5'} ${mine ? 'justify-end' : 'justify-start'}`}
                 >
-                  <div className="flex gap-4">
-                    {/* Avatar - only show if needed */}
-                    <div className="flex-shrink-0 w-12">
-                      {showAvatar ? (
+                  {!mine && (
+                    <div className="flex-shrink-0 w-8">
+                      {showAvatar && (
                         <EmployeeProfile employee={message.author as any}>
-                          <Avatar className="h-10 w-10 ring-2 ring-white shadow-sm cursor-pointer">
+                          <Avatar className="h-8 w-8 ring-2 ring-white shadow-sm cursor-pointer">
                             <AvatarImage src={message.author.avatar} />
-                            <AvatarFallback className="bg-brand text-white">
+                            <AvatarFallback className="bg-brand text-white text-xs">
                               {message.author.initials}
                             </AvatarFallback>
                           </Avatar>
                         </EmployeeProfile>
-                      ) : (
-                        <div className="h-10 w-10 flex items-center justify-center">
-                          <span className="text-xs text-gray-400">
-                            {formatTime(message.timestamp)}
-                          </span>
-                        </div>
                       )}
                     </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      {/* Author and timestamp - only show if needed */}
-                      {showAvatar && (
-                        <div className="flex items-baseline gap-3 mb-1">
-                          <span className="font-semibold text-gray-900">
-                            {message.author.name}
-                          </span>
-                          {/* Town Display - Added Here */}
+                  )}
+
+                  <div className={`flex flex-col max-w-[75%] sm:max-w-[65%] ${mine ? 'items-end' : 'items-start'}`}>
+                    <div
+                      className={`relative px-3 py-2 shadow-sm ${
+                        mine
+                          ? 'bg-brand text-white rounded-2xl rounded-br-md'
+                          : 'bg-white text-gray-900 border border-gray-200 rounded-2xl rounded-bl-md'
+                      }`}
+                    >
+                      {showName && (
+                        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                          <span className="text-xs font-semibold text-brand">{message.author.name}</span>
                           {message.author.town && message.author.town !== 'Unknown' && (
-                            <span className="text-xs text-brand bg-green-tint px-2 py-0.5 rounded-full border border-brand/20">
-                              📍 {message.author.town}
-                            </span>
+                            <span className="text-[10px] text-gray-500">📍 {message.author.town}</span>
                           )}
-                          {message.author.employeeData && (
-                            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                              {message.author.employeeData.jobTitle}
-                            </span>
-                          )}
-                          <span className="text-xs text-gray-400">
-                            {formatTime(message.timestamp)}
-                          </span>
                         </div>
                       )}
-                      
-                      {/* Message content */}
-                      <p className="text-gray-900 leading-relaxed whitespace-pre-wrap text-[15px]">
+                      <p className="leading-relaxed whitespace-pre-wrap break-words text-[15px]">
                         {message.content}
+                        {/* room for the time, so it never sits on top of the last word */}
+                        <span className="inline-block w-14" aria-hidden="true" />
                       </p>
-                      
-                      {/* Reactions */}
-                      {message.reactions && message.reactions.length > 0 && (
-                        <div className="flex items-center gap-1 mt-2 flex-wrap">
-                          {message.reactions.map((reaction, idx) => (
-                            <Button
-                              key={idx}
-                              variant="outline"
-                              size="sm"
-                              className="h-7 px-2 text-xs rounded-full bg-white/80 border-gray-200 hover:bg-gray-50"
-                            >
-                              <span className="mr-1">{reaction.emoji}</span>
-                              {reaction.count}
-                            </Button>
-                          ))}
-                        </div>
-                      )}
-                      
-                      {/* Action buttons */}
-                      <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <ReactionPicker
-                          onReactionSelect={(emoji) => handleReaction(message.id, emoji)}
-                          open={activeReactionPicker === message.id}
-                          onOpenChange={(open) => setActiveReactionPicker(open ? message.id : null)}
-                        >
-                          <Button variant="ghost" size="sm" className="h-7 px-2 text-gray-500 hover:text-gray-700">
-                            <Smile className="h-4 w-4" />
-                          </Button>
-                        </ReactionPicker>
-                        
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-7 px-2 text-gray-500 hover:text-gray-700" 
-                          onClick={() => handleReply(message.id)}
-                        >
-                          <Reply className="h-4 w-4" />
-                        </Button>
-                        
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-7 px-2 text-gray-500 hover:text-gray-700" 
-                          onClick={() => handleMoreOptions(message.id)}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <span className={`absolute bottom-1 right-2.5 text-[10px] ${mine ? 'text-white/75' : 'text-gray-400'}`}>
+                        {formatTime(message.timestamp)}
+                      </span>
                     </div>
+
+                    {/* Reactions */}
+                    {message.reactions && message.reactions.length > 0 && (
+                      <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        {message.reactions.map((reaction, idx) => (
+                          <Button
+                            key={idx}
+                            variant="outline"
+                            size="sm"
+                            className="h-6 px-2 text-xs rounded-full bg-white border-gray-200 hover:bg-gray-50"
+                          >
+                            <span className="mr-1">{reaction.emoji}</span>
+                            {reaction.count}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action buttons, on the inner side of the bubble */}
+                  <div className={`flex items-center gap-0.5 self-center opacity-0 group-hover:opacity-100 transition-opacity ${mine ? 'order-first' : ''}`}>
+                    <ReactionPicker
+                      onReactionSelect={(emoji) => handleReaction(message.id, emoji)}
+                      open={activeReactionPicker === message.id}
+                      onOpenChange={(open) => setActiveReactionPicker(open ? message.id : null)}
+                    >
+                      <Button variant="ghost" size="sm" className="h-7 px-1.5 text-gray-500 hover:text-gray-700">
+                        <Smile className="h-4 w-4" />
+                      </Button>
+                    </ReactionPicker>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-1.5 text-gray-500 hover:text-gray-700"
+                      onClick={() => handleReply(message.id)}
+                    >
+                      <Reply className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-1.5 text-gray-500 hover:text-gray-700"
+                      onClick={() => handleMoreOptions(message.id)}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               );

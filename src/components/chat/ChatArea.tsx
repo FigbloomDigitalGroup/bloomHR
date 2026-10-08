@@ -14,13 +14,14 @@ import type { Channel, DirectMessage, Employee, Message } from "../chat/types/ty
 interface ChatAreaProps {
   channel: Channel | DirectMessage;
   messages: Message[];
+  currentUserId: string;
   employees: Employee[];
   onSendMessage: (content: string) => void;
   onToggleMute: (channelId: string) => void;
   isMuted?: boolean;
 }
 
-export function ChatArea({ channel, messages, onSendMessage, onToggleMute, employees = [], isMuted = false }: ChatAreaProps) {
+export function ChatArea({ channel, messages, currentUserId, onSendMessage, onToggleMute, employees = [], isMuted = false }: ChatAreaProps) {
   const [showSearch, setShowSearch] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
 
@@ -149,7 +150,7 @@ export function ChatArea({ channel, messages, onSendMessage, onToggleMute, emplo
         </header>
 
         {/* Messages */}
-        <MessageList messages={messages} channel={channel} />
+        <MessageList messages={messages} channel={channel} currentUserId={currentUserId} />
 
         {/* Input */}
         <MessageInput 
