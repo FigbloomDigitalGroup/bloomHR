@@ -2,6 +2,7 @@ import { ReactNode, useState } from 'react';
 import { useMyCompanies } from '../../hooks/useMyCompanies';
 import { hasChosenCompany } from '../../lib/companyChoice';
 import CompanyPicker from './CompanyPicker';
+import AppSkeleton from '../Layout/AppSkeleton';
 
 interface CompanyGateProps {
   userId: string;
@@ -18,7 +19,7 @@ export default function CompanyGate({ userId, children }: CompanyGateProps) {
   const [chosen, setChosen] = useState(() => hasChosenCompany(userId));
 
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">Loading your workspace…</div>;
+    return <AppSkeleton />;
   }
   if (companies && companies.length > 1 && !chosen) {
     return <CompanyPicker userId={userId} companies={companies} onChosen={() => setChosen(true)} />;

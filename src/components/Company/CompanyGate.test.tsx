@@ -108,24 +108,39 @@ describe('CompanyGate', () => {
 });
 
 describe('CompanySwitcher', () => {
+  const onOpenProfile = vi.fn();
   const open = () =>
     render(
       <MemoryRouter>
-        <CompanySwitcher />
+        <CompanySwitcher name="Acme Ltd" onOpenProfile={onOpenProfile} />
       </MemoryRouter>
     );
+  const openMenu = () => fireEvent.click(screen.getByRole('button', { name: /Acme Ltd/ }));
 
-  it('is hidden for someone with a single company', () => {
+  it('one company: the menu has the profile and "New company", nothing to switch to', () => {
+    onOpenProfile.mockClear();
     open();
+    openMenu();
     expect(screen.queryByText('Switch company')).toBeNull();
+    expect(screen.getByRole('menuitem', { name: /New company/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('menuitem', { name: /Company profile/ }));
+    expect(onOpenProfile).toHaveBeenCalled();
+  });
+
+  it('staff in one company cannot create a company from the menu', () => {
+    state.companies = [{ ...A, role: 'STAFF' }];
+    open();
+    openMenu();
+    expect(screen.queryByRole('menuitem', { name: /New company/ })).toBeNull();
   });
 
   it('lists every company, marks the current one, and switches to another', async () => {
     state.companies = [A, B];
     open();
-    fireEvent.click(screen.getByText('Switch company'));
-    expect(screen.getByText('Current')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Create a new company' })).toBeTruthy();
+    openMenu();
+    expect(screen.getByText('Switch company')).toBeTruthy();
+    expect(screen.getByLabelText('Current')).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: /New company/ })).toBeTruthy();
 
     fireEvent.click(screen.getByRole('menuitem', { name: /Beta Co/ }));
     await waitFor(() => expect(state.switchToCompany).toHaveBeenCalledWith('u1', 'b'));
@@ -134,7 +149,7 @@ describe('CompanySwitcher', () => {
   it('does nothing when the current company is chosen', async () => {
     state.companies = [A, B];
     open();
-    fireEvent.click(screen.getByText('Switch company'));
+    openMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: /Acme Ltd/ }));
     await new Promise((r) => setTimeout(r, 20));
     expect(state.switchToCompany).not.toHaveBeenCalled();
