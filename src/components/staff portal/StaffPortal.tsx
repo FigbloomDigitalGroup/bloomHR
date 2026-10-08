@@ -55,6 +55,7 @@ import TrainingModule from './Training';
 import Profile from './Profile';
 import { ChatLayout } from '../chat/ChatLayout';
 import { useOnlinePeople } from '../chat/lib/presence';
+import CelebrationsCard from './CelebrationsCard';
 import VideoConferenceComponent from './VideoConf';
 import UserProfileDropdown from './UserProfile';
 import PasswordResetModal from './PasswordRestModal';
@@ -2430,6 +2431,8 @@ const DashboardHome = ({ setActiveTab, userName }: { setActiveTab: (tab: string)
       </motion.div>
 
       <CompleteProfileCard onOpen={() => setActiveTab('biodata')} />
+
+      <CelebrationsCard />
 
       {/* Services Grid */}
       <div className="space-y-4">
