@@ -6,6 +6,7 @@ import { companyApi } from '../lib/companyApi';
 import AuthShell, { AuthButton, Field, authLinkClass } from '../components/Company/AuthShell';
 import { useSessionEmail } from '../components/Company/useSessionEmail';
 import { clearPendingCompany, readPendingCompany, writePendingCompany } from '../lib/pendingCompany';
+import { markCompanyChosen } from '../lib/companyChoice';
 
 /** Create a company: new people sign up and create it in one step; people already signed in just name it. */
 export default function CreateCompany() {
@@ -19,6 +20,9 @@ export default function CreateCompany() {
   const create = async (name: string) => {
     await companyApi.createCompany(name);
     clearPendingCompany();
+    // the new company is already the current one: open it, not the "which company?" picker
+    const { data } = await supabase.auth.getSession();
+    if (data.session?.user?.id) markCompanyChosen(data.session.user.id);
     // a full load so every screen starts from the new company
     window.location.assign('/dashboard');
   };

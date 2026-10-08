@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase';
 
 const roleLabel = (role: string) => role.charAt(0) + role.slice(1).toLowerCase();
 
-/** A small menu in the top bar to move between the companies the person belongs to. Hidden for one company. */
+/** A small menu in the top bar to move between the companies the person belongs to, or (for one company) to add one. */
 export default function CompanySwitcher() {
   const { data: companies } = useMyCompanies();
   const [open, setOpen] = useState(false);
@@ -22,7 +22,20 @@ export default function CompanySwitcher() {
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
 
-  if (!companies || companies.length < 2) return null;
+  if (!companies || companies.length === 0) return null;
+
+  // one company: nothing to switch to, but adding another must still be one click away
+  if (companies.length === 1) {
+    if (companies[0].role === 'STAFF') return null;
+    return (
+      <Link
+        to="/create-company"
+        className="px-2.5 py-1.5 rounded-tile border border-border text-[12px] font-semibold text-ink hover:bg-secondary transition-colors whitespace-nowrap"
+      >
+        + New company
+      </Link>
+    );
+  }
 
   const choose = async (tenantId: string, isCurrent: boolean) => {
     if (isCurrent || busy) return;
