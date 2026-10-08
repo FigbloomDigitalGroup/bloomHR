@@ -9,6 +9,7 @@ import { initialsOf } from "./lib/names";
 import { canCreateChannels } from "./lib/permissions";
 import { usePermissions } from "../../hooks/usePermissions";
 import { isOnline, useOnlinePeople } from "./lib/presence";
+import { ChatPeopleContext } from "./lib/chatPeople";
 import type { Employee, User, Channel, DirectMessage, Message } from "../chat/types/types";
 
 /** `onMessagesRead` lets the staff portal refresh its unread badge when a conversation is opened. */
@@ -526,7 +527,15 @@ const handleDMCreate = async (userId: string) => {
     return <ErrorScreen error={error} onRetry={() => loadUserChannels(currentUser.id)} />;
   }
 
+  const people = {
+    employees: liveEmployees,
+    currentEmail: currentUser.email,
+    onMessage: handleDMCreate,
+    canViewRecords: !!userRole && String(userRole).toUpperCase() !== 'STAFF',
+  };
+
   return (
+    <ChatPeopleContext.Provider value={people}>
     <SidebarProvider className="h-full">
       <div className="flex h-full w-full bg-background">
         <AppSidebar 
@@ -559,6 +568,7 @@ const handleDMCreate = async (userId: string) => {
         )}
       </div>
     </SidebarProvider>
+    </ChatPeopleContext.Provider>
   );
 }
 
