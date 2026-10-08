@@ -121,3 +121,12 @@ describe('employeeavatar storage policies', () => {
     });
   });
 });
+
+describe('the bucket itself', () => {
+  it('is made public even when it already existed as private (picture addresses are public URLs)', async () => {
+    await db.exec(`update storage.buckets set public = false where id = 'employeeavatar'`);
+    await db.exec(readFileSync(join(__dirname, '..', 'migrations', '20261008100000_employee_avatar_bucket_public.sql'), 'utf8'));
+    const { rows } = await db.query<{ public: boolean }>(`select public from storage.buckets where id = 'employeeavatar'`);
+    expect(rows).toEqual([{ public: true }]);
+  });
+});
