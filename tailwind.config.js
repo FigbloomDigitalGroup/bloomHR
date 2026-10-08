@@ -110,11 +110,12 @@ export default {
         // see src/components/chat/ui/sidebar.tsx) references bg-sidebar,
         // bg-sidebar-accent etc. — these were previously undefined, so every
         // sidebar-* utility silently generated no CSS at all (active channel
-        // highlighting, background, borders). Mapped to the brand palette.
+        // highlighting, background, borders). Mapped to the brand palette, and to the page palette for its
+        // background, text and borders so it follows a dark page colour like every other white area.
         sidebar: {
-          DEFAULT: "#ffffff",
-          foreground: "#16201A",
-          border: "#E2E6E2",
+          DEFAULT: "rgb(var(--surface) / <alpha-value>)",
+          foreground: "rgb(var(--ink) / <alpha-value>)",
+          border: "rgb(var(--line) / <alpha-value>)",
           accent: "rgb(var(--tint) / <alpha-value>)",
           "accent-foreground": "rgb(var(--brand-dark) / <alpha-value>)",
           ring: "rgb(var(--brand) / <alpha-value>)",
