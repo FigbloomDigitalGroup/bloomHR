@@ -532,7 +532,7 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
       >
-        {/* Company name (opens the company profile) and, for people in several companies, the switcher */}
+        {/* Company name (opens the company profile) and the switcher (or "New company" for people in one company) */}
         <div className="flex items-center gap-2.5 justify-self-start min-w-0">
         <motion.button
           type="button"
