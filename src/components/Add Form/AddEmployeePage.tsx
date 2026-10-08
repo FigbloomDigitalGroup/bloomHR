@@ -10,6 +10,7 @@ import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import SearchableDropdown from '../UI/SearchableDropdown';
+import { employeeTypeOptions } from '../../lib/employmentTypes';
 
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'Work Mobile': string | null;
@@ -145,7 +146,7 @@ const AddEmployeePage = () => {
           .order('"First Name"', { ascending: true });
 
         setDropdownOptions({
-          employmentTypes: [...new Set(empTypes?.map(item => item['Employee Type'] as string))],
+          employmentTypes: employeeTypeOptions(empTypes?.map(item => item['Employee Type'] as string)),
           branches: [...new Set(branches?.map(item => item.Branch as string))],
           jobLevels: [...new Set(jobLevels?.map(item => item['Job Level'] as string))],
           jobGroup: [...new Set(jobGroup?.map(item => item['Job Group'] as string))],

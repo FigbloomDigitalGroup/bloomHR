@@ -11,6 +11,7 @@ import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import { User, Briefcase, CreditCard, Phone, MapPin } from 'lucide-react';
 import SearchableDropdown from '../UI/SearchableDropdown';
+import { employeeTypeOptions } from '../../lib/employmentTypes';
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 import { useUser } from '../ProtectedRoutes/UserContext';
 
@@ -177,7 +178,7 @@ const EditEmployeePage = () => {
 
         setDropdownOptions(prev => ({
           ...prev,
-          employmentTypes: [...new Set(empTypes?.map(item => item['Employee Type'] as string))],
+          employmentTypes: employeeTypeOptions(empTypes?.map(item => item['Employee Type'] as string)),
           branches: [...new Set(branches?.map(item => item.Branch as string))],
           jobLevels: [...new Set(jobLevels?.map(item => item['Job Level'] as string))],
           jobGroup: [...new Set(jobGroup?.map(item => item['Job Group'] as string))],
