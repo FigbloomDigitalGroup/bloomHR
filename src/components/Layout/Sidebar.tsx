@@ -25,7 +25,7 @@ import {
   Mails,
   ShieldHalf,
   HeartHandshake,
-  LogOut,
+  LogOut, CalendarDays
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useMyPreferences } from '../../hooks/useMyPreferences';
@@ -41,6 +41,7 @@ const menuGroups = [
     title: "Overview",
     items: [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid, path: '/dashboard', permission: 'dashboard' },
+      { id: 'calendar', label: 'Calendar', icon: CalendarDays, path: '/calendar', permission: 'dashboard' },
       { id: 'ai-assistant', label: 'AI Assistant', icon: Wand2, path: '/ai-assistant', permission: 'ai-assistant' },
     ]
   },
