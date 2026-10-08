@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import EmployeePicker from '../UI/EmployeePicker';
 import {
   DollarSign,
@@ -19,7 +19,6 @@ import {
   Send,
   FileSpreadsheet,
   Loader,
-  Box,
   CheckCircle,
   XCircle,
   X,
@@ -47,7 +46,18 @@ import { Card, SearchInput } from "../UI";
 import MPesaSpreadsheetFullPage from "./MpesaSpreadSheet";
 import useStatutorySettings from "../../hooks/useStatutorySettings";
 import StatutorySettingsModal from "./statutorySettingsModule";
-import { saveSalaryHistoryBatch } from "../../lib/salaryHistory";
+import type { SalaryHistoryRecord } from "../../lib/salaryHistory";
+import {
+  type PayrollRun,
+  type PayrollRunStatus,
+  discardDraftRun,
+  getPayrollRun,
+  getRunPayslips,
+  runErrorMessage,
+  saveDraftRun,
+  setRunStatus,
+} from "../../lib/payrollRuns";
+import PayrollRunBar from "./PayrollRunBar";
 import BulkSalaryHistoryUpload from "./BulkSalaryHistoryUpload";
 
 // SMS Service Configuration for SMS Leopard
@@ -2424,6 +2434,40 @@ const P10FormGenerator = ({
   );
 };
 
+// The employee form saves "MPESA"; the payroll filters and payslip use "M-Pesa". No method set means M-Pesa.
+const paymentMethodLabel = (method: string | null | undefined) =>
+  !method || /^m-?pesa$/i.test(method.trim()) ? "M-Pesa" : method;
+
+const PAYSLIP_AMOUNTS = [
+  "basic_salary", "gross_pay", "net_pay", "total_deductions", "nssf_deduction", "nhif_deduction", "paye_tax",
+  "housing_levy", "house_allowance", "transport_allowance", "medical_allowance", "other_allowances", "overtime_hours",
+  "overtime_rate", "commission", "bonus", "per_diem", "tax_relief", "loan_deduction", "advance_deduction",
+  "welfare_deduction", "other_deductions",
+] as const;
+
+/** A calculated payroll row as the salary_history row saved for it */
+const toSalaryHistory = (record: any): SalaryHistoryRecord => ({
+  ...(Object.fromEntries(PAYSLIP_AMOUNTS.map((k) => [k, Number(record[k]) || 0])) as Record<(typeof PAYSLIP_AMOUNTS)[number], number>),
+  employee_id: record.employee_id,
+  employee_name: record.employee_name,
+  pay_period: record.pay_period,
+  payment_method: record.payment_method || "",
+  bank_name: record.bank_name || "",
+  account_number: record.account_number || "",
+});
+
+/** A saved payslip shown like a calculated row: saved figures, plus the employee's current branch, department, phone... */
+const fromSalaryHistory = (saved: any, live: any | undefined) => ({
+  ...(live ?? { id: saved.id, branch: "", department: "", position: "" }),
+  ...Object.fromEntries(PAYSLIP_AMOUNTS.map((k) => [k, Number(saved[k]) || 0])),
+  employee_id: saved.employee_id,
+  employee_name: saved.employee_name || live?.employee_name || saved.employee_id,
+  pay_period: saved.pay_period,
+  payment_method: paymentMethodLabel(saved.payment_method),
+  bank_name: saved.bank_name || "",
+  account_number: saved.account_number || "",
+});
+
 export default function PayrollDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState<Date | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState("all");
@@ -2440,8 +2484,14 @@ export default function PayrollDashboard() {
   const [branches, setBranches] = useState([
     { value: "all", label: "All Branches" },
   ]);
-  const [payrollRecords, setPayrollRecords] = useState<any[]>([]);
-  const [filteredRecords, setFilteredRecords] = useState<any[]>([]);
+  // this month's figures worked out from current employee details; shown until the month's payroll run is started
+  const [liveRecords, setLiveRecords] = useState<any[]>([]);
+  // the month's payroll run and its saved payslips (runPeriod says which month they were loaded for)
+  const [run, setRun] = useState<PayrollRun | null>(null);
+  const [runPayslips, setRunPayslips] = useState<any[]>([]);
+  const [runPeriod, setRunPeriod] = useState<string | null>(null);
+  const [runVersion, setRunVersion] = useState(0);
+  const [runBusy, setRunBusy] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [companyInfo, setCompanyInfo] = useState<any>(null);
 
@@ -2454,7 +2504,6 @@ export default function PayrollDashboard() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showP10Modal, setShowP10Modal] = useState(false);
   const [showStatutorySettings, setShowStatutorySettings] = useState(false);
-  const [isSavingHistory, setIsSavingHistory] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
 
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
@@ -3402,15 +3451,14 @@ export default function PayrollDashboard() {
                 total_deductions: totalDeductions,
                 net_pay: netPay,
                 pay_period: actualPeriod,
-                payment_method: "MPESA",
-                bank_name: "",
-                account_number: "",
+                payment_method: paymentMethodLabel(employee.payment_method),
+                bank_name: employee.Bank || "",
+                account_number: employee["Account Number"] || "",
               };
             }),
           );
 
-          setPayrollRecords(payrollData);
-          setFilteredRecords(payrollData);
+          setLiveRecords(payrollData);
         }
       } catch (err) {
         console.error("Error:", err);
@@ -3424,6 +3472,36 @@ export default function PayrollDashboard() {
       fetchEmployees();
     }
   }, [actualPeriod, settings, overrideStatutoryChecks, salaryAdvances]);
+
+  // the month's payroll run, reloaded after each start/recalculate/approve/...
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const found = await getPayrollRun(actualPeriod);
+        const payslips = found ? await getRunPayslips(found.id) : [];
+        if (cancelled) return;
+        setRun(found);
+        setRunPayslips(payslips);
+        setRunPeriod(actualPeriod);
+      } catch (err) {
+        if (!cancelled) toast.error(runErrorMessage(err, "Could not load this month's payroll."));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [actualPeriod, runVersion]);
+
+  const runLoading = runPeriod !== actualPeriod;
+  const monthRun = runLoading ? null : run;
+
+  // once the month's run is started, everything here (table, totals, exports, payslips, bulk pay) uses its saved figures
+  const payrollRecords = useMemo(() => {
+    if (!monthRun) return liveRecords;
+    const liveByEmployee = new Map(liveRecords.map((r) => [r.employee_id, r]));
+    return runPayslips.map((saved) => fromSalaryHistory(saved, liveByEmployee.get(saved.employee_id)));
+  }, [monthRun, runPayslips, liveRecords]);
 
   const applyAdditionalFilters = (records: any[]) => {
     return records.filter((record: any) => {
@@ -3459,7 +3537,7 @@ export default function PayrollDashboard() {
     });
   };
 
-  const finalFilteredRecords = applyAdditionalFilters(filteredRecords);
+  const finalFilteredRecords = applyAdditionalFilters(payrollRecords);
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -3561,52 +3639,87 @@ export default function PayrollDashboard() {
     );
   };
 
-  // NEW: Save current payroll to Salary History
-  const handleSaveToHistory = async () => {
-    if (finalFilteredRecords.length === 0) {
-      toast.error("No records to save.");
-      return;
-    }
+  const periodLabel = new Date(`${actualPeriod}-01T00:00:00`).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
-    setIsSavingHistory(true);
+  // Start the month's run, or recalculate its draft: saves every employee's figures (whatever the filters show)
+  const handleSaveRun = async () => {
+    const unnumbered = liveRecords.filter((r) => !r.employee_id).length;
+    const records = liveRecords.filter((r) => r.employee_id).map((r) => toSalaryHistory({ ...r, pay_period: actualPeriod }));
+    setRunBusy(true);
     try {
-      const historyRecords = finalFilteredRecords.map((record: any) => ({
-        employee_id: record.employee_id,
-        employee_name: record.employee_name,
-        pay_period: actualPeriod,
-        basic_salary: record.basic_salary || 0,
-        gross_pay: record.gross_pay || 0,
-        net_pay: record.net_pay || 0,
-        total_deductions: record.total_deductions || 0,
-        nssf_deduction: record.nssf_deduction || 0,
-        nhif_deduction: record.nhif_deduction || 0,
-        paye_tax: record.paye_tax || 0,
-        housing_levy: record.housing_levy || 0,
-        house_allowance: record.house_allowance || 0,
-        transport_allowance: record.transport_allowance || 0,
-        medical_allowance: record.medical_allowance || 0,
-        other_allowances: record.other_allowances || 0,
-        overtime_hours: record.overtime_hours || 0,
-        overtime_rate: record.overtime_rate || 0,
-        commission: record.commission || 0,
-        bonus: record.bonus || 0,
-        per_diem: record.per_diem || 0,
-        tax_relief: record.tax_relief || 0,
-        loan_deduction: record.loan_deduction || 0,
-        advance_deduction: record.advance_deduction || 0,
-        welfare_deduction: record.welfare_deduction || 0,
-        other_deductions: record.other_deductions || 0,
-        payment_method: record.payment_method || "",
-        bank_name: record.bank_name || "",
-        account_number: record.account_number || "",
-      }));
-
-      await saveSalaryHistoryBatch(historyRecords);
-      toast.success(`Successfully saved ${historyRecords.length} records to history for ${actualPeriod}.`);
-    } catch {
-      toast.error("Failed to save history.");
+      await saveDraftRun(actualPeriod, records);
+      toast.success(
+        monthRun
+          ? `Recalculated ${records.length} payslips for ${periodLabel}.`
+          : `Started payroll for ${periodLabel} with ${records.length} employees.`,
+      );
+      if (unnumbered) {
+        toast.error(`${unnumbered} employee(s) have no employee number, so they were left out. Add one and recalculate.`);
+      }
+      setRunVersion((v) => v + 1);
+    } catch (err) {
+      toast.error(runErrorMessage(err, "Could not save the payroll."));
     } finally {
-      setIsSavingHistory(false);
+      setRunBusy(false);
+    }
+  };
+
+  const changeRunStatus = async (status: PayrollRunStatus, question: string, done: string) => {
+    if (!monthRun || !window.confirm(question)) return;
+    setRunBusy(true);
+    try {
+      await setRunStatus(monthRun.id, status);
+      toast.success(done);
+      setRunVersion((v) => v + 1);
+    } catch (err) {
+      toast.error(runErrorMessage(err, "Could not update the payroll."));
+    } finally {
+      setRunBusy(false);
+    }
+  };
+
+  const runNetPay = payrollRecords.reduce((sum: number, r: any) => sum + (r.net_pay || 0), 0);
+
+  const handleApproveRun = () =>
+    changeRunStatus(
+      "approved",
+      `Approve payroll for ${periodLabel}?
+
+${payrollRecords.length} employees, net pay KSh ${Math.round(runNetPay).toLocaleString()}.
+
+Payslips will be locked and staff will be able to see them.`,
+      `Payroll for ${periodLabel} approved. Staff can now see their payslips.`,
+    );
+
+  const handleReopenRun = () =>
+    changeRunStatus(
+      "draft",
+      `Reopen payroll for ${periodLabel}?
+
+Staff won't see these payslips until it is approved again.`,
+      `Payroll for ${periodLabel} reopened as a draft.`,
+    );
+
+  const handleMarkRunPaid = () =>
+    changeRunStatus(
+      "paid",
+      `Mark payroll for ${periodLabel} as paid?
+
+This can't be undone: the payslips stay locked for good.`,
+      `Payroll for ${periodLabel} marked as paid.`,
+    );
+
+  const handleDiscardRun = async () => {
+    if (!monthRun || !window.confirm(`Discard the draft payroll for ${periodLabel}? Its saved payslips are deleted.`)) return;
+    setRunBusy(true);
+    try {
+      await discardDraftRun(monthRun.id);
+      toast.success(`Draft payroll for ${periodLabel} discarded.`);
+      setRunVersion((v) => v + 1);
+    } catch (err) {
+      toast.error(runErrorMessage(err, "Could not discard the draft."));
+    } finally {
+      setRunBusy(false);
     }
   };
 
@@ -3615,6 +3728,7 @@ export default function PayrollDashboard() {
     setIsLoading(true);
     try {
       await fetchPaymentRequests();
+      setRunVersion((v) => v + 1);
 
       // Refresh SMS balance
       const balance = await checkSMSBalance();
@@ -3635,16 +3749,6 @@ export default function PayrollDashboard() {
       setIsLoading(false);
     }
   };
-
-  // NEW: Automated End-of-Month Save Trigger
-  useEffect(() => {
-    // If it's the end of the month (e.g. 27th or later) and we have filtered records ready
-    const today = new Date();
-    if (today.getDate() >= 27 && finalFilteredRecords.length > 0 && !isSavingHistory) {
-      // Auto-trigger the save to history function
-      handleSaveToHistory();
-    }
-  }, [finalFilteredRecords.length]); // Only run when records are loaded/ready
 
   if (currentView === "mpesa-spreadsheet") {
     return (
@@ -3983,19 +4087,6 @@ export default function PayrollDashboard() {
                     Approval Queue ({pendingCount})
                   </GlowButtonss>
                 )}
-              {/* NEW: Save to History Button */}
-              <GlowButtonss
-                variant="secondary"
-                icon={Box}
-                size="sm"
-                onClick={() => {
-                  handleSaveToHistory();
-                  setShowQuickActions(false);
-                }}
-                disabled={isSavingHistory}
-              >
-                {isSavingHistory ? "Saving..." : "Save to History"}
-              </GlowButtonss>
               {/* NEW: Bulk Upload History Button */}
               <GlowButtonss
                 variant="secondary"
@@ -4087,6 +4178,19 @@ export default function PayrollDashboard() {
         </button>
       </div>
 
+      <PayrollRunBar
+        periodLabel={periodLabel}
+        run={monthRun}
+        loading={runLoading}
+        busy={runBusy}
+        onStart={handleSaveRun}
+        onRecalculate={handleSaveRun}
+        onApprove={handleApproveRun}
+        onReopen={handleReopenRun}
+        onMarkPaid={handleMarkRunPaid}
+        onDiscard={handleDiscardRun}
+      />
+
       {/* Filters, search and the less-used payroll tools */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="w-36">
@@ -4148,15 +4252,6 @@ export default function PayrollDashboard() {
         >
           <Settings className="w-3 h-3" />
           Statutory Settings
-        </button>
-        <button
-          type="button"
-          onClick={handleSaveToHistory}
-          disabled={isSavingHistory || finalFilteredRecords.length === 0}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-ink transition-colors disabled:opacity-50"
-        >
-          {isSavingHistory ? <Loader className="w-3 h-3 animate-spin" /> : <Box className="w-3 h-3" />}
-          Save History
         </button>
         <button
           type="button"

@@ -13,7 +13,6 @@ dist-ssr
 *.local
 
 # Editor directories and files
-.vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
@@ -22,10 +21,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.env
 .env.tenant
-.env.*
 ! .env.tenant.template
 
 # Supabase CLI local cache (may contain pooler/connection info)
 supabase/.temp/
+config.bat
