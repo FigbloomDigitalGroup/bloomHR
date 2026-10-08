@@ -114,6 +114,7 @@ class ChatService {
       if (error || !data) return [];
       const rows = data as { channel_id: string; other_user_id: string; other_email: string }[];
       const unread = await this.getUnreadCountsByChannel(userId, rows.map((r) => r.channel_id));
+      const partners = await this.getPartnerIdentities(rows);
       return rows.map((row) => ({
         id: directMessageId(row.channel_id),
         name: `DM with ${row.other_email}`,
@@ -124,11 +125,47 @@ class ChatService {
         createdBy: userId,
         createdAt: new Date().toISOString(),
         partnerEmail: (row.other_email || '').toLowerCase(),
+        partnerName: partners[row.channel_id]?.name,
+        partnerAvatar: partners[row.channel_id]?.avatar,
       })) as Channel[];
     } catch (error) {
       console.error('Error loading direct messages:', error);
       return [];
     }
+  }
+
+  /**
+   * For people with no employee record: the name and picture their own messages carry (what they see as their name),
+   * falling back to the profile picture on their login. Keyed by conversation id.
+   */
+  private async getPartnerIdentities(
+    rows: { channel_id: string; other_user_id: string; other_email: string }[]
+  ): Promise<Record<string, { name?: string; avatar?: string }>> {
+    const result: Record<string, { name?: string; avatar?: string }> = {};
+    if (rows.length === 0) return result;
+    const [messagesResult, membersResult] = await Promise.all([
+      supabase
+        .from('messages')
+        .select('channel_id, author_id, author_name, author_avatar, created_at')
+        .in('channel_id', rows.map((r) => r.channel_id))
+        .in('author_id', rows.map((r) => r.other_user_id))
+        .order('created_at', { ascending: false })
+        .limit(200),
+      supabase.rpc('company_members'),
+    ]);
+    const avatars = new Map(
+      ((membersResult.data || []) as { user_id: string; avatar_url?: string | null }[]).map((m) => [m.user_id, m.avatar_url || undefined])
+    );
+    for (const row of rows) {
+      const latest = (messagesResult.data || []).find(
+        (m: { channel_id: string; author_id: string }) => m.channel_id === row.channel_id && m.author_id === row.other_user_id
+      ) as { author_name?: string; author_avatar?: string } | undefined;
+      result[row.channel_id] = {
+        name: latest?.author_name || undefined,
+        avatar: avatars.get(row.other_user_id) || latest?.author_avatar || undefined,
+      };
+    }
+    return result;
   }
 
   /**

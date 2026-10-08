@@ -118,12 +118,12 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: () => void } =
         const partnerEmail = (channel.partnerEmail || '').toLowerCase();
         const partner = people.find(emp => (emp.workEmail || '').toLowerCase() === partnerEmail);
         const lastMessage = await getLastMessageForChannel(channel.id);
-        const name = partner?.fullName || partnerEmail.split('@')[0] || 'Colleague';
+        const name = partner?.fullName || channel.partnerName || partnerEmail.split('@')[0] || 'Colleague';
         return {
           id: channel.id,
           name,
           type: 'direct_message',
-          avatar: partner?.profileImage || '',
+          avatar: partner?.profileImage || channel.partnerAvatar || '',
           initials: partner?.initials || initialsOf(name),
           status: 'offline',
           userId: partner?.id || partnerEmail,

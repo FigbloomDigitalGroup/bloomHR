@@ -6,6 +6,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Building2, Mail, Phone, Calendar, Users, Briefcase } from "lucide-react";
 import { findEmployee, useChatPeople, type ChatPerson } from "./lib/chatPeople";
 import { initialsOf } from "./lib/names";
+import { isOnline, useOnlinePeople } from "./lib/presence";
+import { useMyCompanies } from "../../hooks/useMyCompanies";
 
 interface EmployeeProfileProps {
   /** a message's author, a conversation or an employee: the card looks up their employee record */
@@ -17,11 +19,15 @@ export function EmployeeProfile({ employee: person, children }: EmployeeProfileP
   const { employees, currentEmail, onMessage, canViewRecords } = useChatPeople();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const onlinePeople = useOnlinePeople();
+  const { data: companies } = useMyCompanies();
+  const companyName = companies?.find((c) => c.is_current)?.name;
   const employee = findEmployee(employees, person);
 
   const name = employee?.fullName || person.fullName || person.name || 'Colleague';
   const email = employee?.workEmail || person.workEmail || person.email || '';
-  const status = employee?.status || person.status || 'offline';
+  // live presence by email, the same source as the chat header and lists; unknown without an email
+  const status = email ? (isOnline(onlinePeople, email) ? 'online' : 'offline') : null;
   const isMe = !!email && email.toLowerCase() === (currentEmail || '').toLowerCase();
   const canMessage = !!employee && !!onMessage && !isMe;
   const canView = !!employee?.employeeNumber && canViewRecords;
@@ -51,20 +57,18 @@ export function EmployeeProfile({ employee: person, children }: EmployeeProfileP
             <Avatar className="h-16 w-16 ring-4 ring-white/20 shadow-lg">
               <AvatarImage src={employee?.profileImage || person.profileImage || person.avatar} />
               <AvatarFallback className="bg-white/20 text-white font-semibold">
-                {employee?.initials || person.initials || initialsOf(name)}
+                {employee?.initials || initialsOf(name)}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
               <h3 className="font-bold text-lg truncate">{name}{isMe && <span className="font-normal text-white/70"> (you)</span>}</h3>
               {employee?.jobTitle && <p className="text-white/70 truncate">{employee.jobTitle}</p>}
-              <div className="flex items-center gap-1 mt-1">
+              {status && <div className="flex items-center gap-1 mt-1">
                 <span className={`w-2 h-2 rounded-full ${
-                  status === 'online' ? 'bg-green-400' :
-                  status === 'away' ? 'bg-yellow-400' :
-                  'bg-gray-400'
+                  status === 'online' ? 'bg-green-400' : 'bg-gray-400'
                 }`}></span>
                 <span className="text-xs text-white/70 capitalize">{status}</span>
-              </div>
+              </div>}
             </div>
           </div>
         </div>
@@ -76,12 +80,13 @@ export function EmployeeProfile({ employee: person, children }: EmployeeProfileP
               <Building2 className="h-4 w-4 text-gray-500 flex-shrink-0" />
               <div className="min-w-0">
                 <div className="font-medium text-gray-900 truncate">
-                  {employee.department || 'Not specified'}
+                  {companyName || employee.entity}
                 </div>
-                <div className="text-gray-500 text-xs truncate">
-                  {employee.entity || 'Company'}
-                  {employee.branch && ` • ${employee.branch}`}
-                </div>
+                {(employee.branch || employee.department) && (
+                  <div className="text-gray-500 text-xs truncate">
+                    {[employee.branch, employee.department !== employee.branch ? employee.department : null].filter(Boolean).join(' • ')}
+                  </div>
+                )}
               </div>
             </div>
           ) : (

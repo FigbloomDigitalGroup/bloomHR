@@ -116,8 +116,10 @@ export default {
           DEFAULT: "rgb(var(--surface) / <alpha-value>)",
           foreground: "rgb(var(--ink) / <alpha-value>)",
           border: "rgb(var(--line) / <alpha-value>)",
-          accent: "rgb(var(--tint) / <alpha-value>)",
-          "accent-foreground": "rgb(var(--brand-dark) / <alpha-value>)",
+          // the selected/hovered item: a see-through wash of the theme colour, so the page's own text colour
+          // (dark on light pages, light on dark ones) stays readable on it
+          accent: "rgb(var(--brand) / 0.16)",
+          "accent-foreground": "rgb(var(--ink) / <alpha-value>)",
           ring: "rgb(var(--brand) / <alpha-value>)",
           primary: "rgb(var(--brand) / <alpha-value>)",
           "primary-foreground": "#ffffff",
