@@ -6,6 +6,7 @@ import { TownProps } from '../../types/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageHeader, StatCard, Card, TabBar, EmptyState, Button } from '../UI';
 import GetStarted from './GetStarted';
+import { TodaysBirthdayWishes } from '../Celebrations/BirthdayWishes';
 import { findBirthdays } from '../../lib/birthdays';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -544,6 +545,7 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
         />
 
         <GetStarted />
+        <TodaysBirthdayWishes className="mb-4" />
 
         {/* Filters & Tabs */}
         <div className="flex items-center justify-between">
