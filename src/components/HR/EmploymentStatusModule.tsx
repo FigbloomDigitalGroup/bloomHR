@@ -295,7 +295,7 @@ export default function EmploymentStatusModule({ onRefresh, initialSearch = '' }
             return (s.employment_type === 'Probation' && !s.is_confirmed && s.probation_end_date && s.probation_end_date < today) ||
                 (s.employment_type === 'Contract' && s.contract_end_date && s.contract_end_date < today);
         }
-        if (filter !== 'all') return s.employment_type === filter;
+        if (filter !== 'all') return s.id > 0 && s.employment_type === filter;
         return true;
     });
 
@@ -354,7 +354,8 @@ export default function EmploymentStatusModule({ onRefresh, initialSearch = '' }
                 historyNew = { employment_type: 'Permanent' };
             }
 
-            await supabase.from('hr_employment_status').update({ ...updates, notes: actionNotes || selectedRecord.notes }).eq('id', selectedRecord.id);
+            const { error } = await supabase.from('hr_employment_status').update({ ...updates, notes: actionNotes || selectedRecord.notes }).eq('id', selectedRecord.id);
+            if (error) throw error;
             await supabase.from('hr_lifecycle_history').insert({
                 'Employee Number': selectedRecord['Employee Number'],
                 event_type: historyEvent,
@@ -402,7 +403,7 @@ export default function EmploymentStatusModule({ onRefresh, initialSearch = '' }
                 }
             }
 
-            await supabase.from('hr_employment_status').upsert({
+            const { error } = await supabase.from('hr_employment_status').upsert({
                 'Employee Number': addForm.employeeNumber,
                 employment_type: addForm.employment_type,
                 joining_date: joiningDate,
@@ -412,7 +413,8 @@ export default function EmploymentStatusModule({ onRefresh, initialSearch = '' }
                 contract_end_date: contractEndDate,
                 notes: addForm.notes,
                 is_confirmed: false,
-            }, { onConflict: '"Employee Number"' });
+            }, { onConflict: 'tenant_id,Employee Number' });
+            if (error) throw error;
 
             toast.success('Employment status saved');
             setShowAddModal(false);
@@ -433,7 +435,8 @@ export default function EmploymentStatusModule({ onRefresh, initialSearch = '' }
             const ids = Array.from(selectedIds);
             const validIds = ids.filter(id => id > 0); // Exclude unassigned mock records
             if (validIds.length > 0) {
-                await supabase.from('hr_employment_status').update({ employment_type: bulkType }).in('id', validIds);
+                const { error } = await supabase.from('hr_employment_status').update({ employment_type: bulkType }).in('id', validIds);
+                if (error) throw error;
             }
 
             // For mock records, we upsert anew
@@ -441,11 +444,12 @@ export default function EmploymentStatusModule({ onRefresh, initialSearch = '' }
             for (const id of mockIds) {
                 const rec = statusList.find(s => s.id === id);
                 if (rec) {
-                    await supabase.from('hr_employment_status').upsert({
+                    const { error } = await supabase.from('hr_employment_status').upsert({
                         'Employee Number': rec['Employee Number'],
                         employment_type: bulkType,
                         is_confirmed: false
-                    }, { onConflict: '"Employee Number"' });
+                    }, { onConflict: 'tenant_id,Employee Number' });
+                    if (error) throw error;
                 }
             }
 
@@ -603,7 +607,7 @@ export default function EmploymentStatusModule({ onRefresh, initialSearch = '' }
                                             )}
                                             <div className="flex items-center gap-2 mt-1 flex-wrap">
                                                 <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${badge.color}`}>{badge.label}</span>
-                                                <span className="text-[10px] text-gray-400">{record.employment_type}</span>
+                                                <span className="text-[10px] text-gray-400">{record.id < 0 ? 'Not set' : record.employment_type}</span>
                                                 {record.joining_date && <span className="text-[10px] text-gray-400">Joined: {record.joining_date}</span>}
                                                 {record.probation_end_date && record.employment_type === 'Probation' &&
                                                     <span className="text-[10px] text-gray-400">End: {record.probation_end_date}</span>}
