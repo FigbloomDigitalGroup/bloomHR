@@ -54,7 +54,11 @@ const TABLES: Record<string, Cfg> = {
   },
   salary_history: {
     modules: ['payroll', 'hr-lifecycle'],
-    row: (e, t) => ins('salary_history', `employee_id, pay_period, tenant_id`, `'${e}', '2026-09', '${t}'`),
+    // staff see payslips once the month's run is approved (payroll_runs.test.ts), so add each row to an approved run
+    row: (e, t) => `
+      update payroll_runs set status = 'draft' where tenant_id = '${t}' and pay_period = '2026-09';
+      ${ins('salary_history', `employee_id, pay_period, tenant_id`, `'${e}', '2026-09', '${t}'`)};
+      update payroll_runs set status = 'approved' where tenant_id = '${t}' and pay_period = '2026-09'`,
     ownInsert: null,
     forged: (e) => [ins('salary_history', `employee_id, pay_period`, `'${e}', '2026-10'`)],
   },

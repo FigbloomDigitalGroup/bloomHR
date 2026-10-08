@@ -3,6 +3,7 @@ import { Upload, FileText, CheckCircle, AlertTriangle, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import GlowButton from '../UI/GlowButton';
 import { saveSalaryHistoryBatch } from '../../lib/salaryHistory';
+import { runErrorMessage } from '../../lib/payrollRuns';
 import toast from 'react-hot-toast';
 
 interface BulkSalaryHistoryUploadProps {
@@ -114,11 +115,13 @@ const BulkSalaryHistoryUpload: React.FC<BulkSalaryHistoryUploadProps> = ({ onClo
         setIsUploading(true);
         try {
             await saveSalaryHistoryBatch(parsedData);
-            toast.success(`Successfully uploaded ${parsedData.length} historical records!`);
+            // uploaded payslips join their month's payroll run as a draft (a locked month refuses them)
+            const months = [...new Set(parsedData.map((r) => r.pay_period))].sort().join(', ');
+            toast.success(`Uploaded ${parsedData.length} payslips to the draft payroll for ${months}. Approve it on the payroll page so staff can see them.`, { duration: 8000 });
             onSuccess();
             onClose();
         } catch (error) {
-            toast.error('Failed to upload historical records. See console for details.');
+            toast.error(runErrorMessage(error, 'Failed to upload historical records. See console for details.'));
             console.error(error);
         } finally {
             setIsUploading(false);
