@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Users, Clock, FileText, ShieldOff,
-    XCircle, BarChart2, AlertTriangle, CheckCircle,
-    RefreshCw, ChevronRight, Loader2, History, Bell
+    Users, Clock, ShieldOff,
+    XCircle, AlertTriangle, CheckCircle,
+    RefreshCw, Loader2, History, Bell
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import { useSearchParams } from 'react-router-dom';
+import { Card, Button, TabBar } from '../UI';
 import EmploymentStatusModule from './EmploymentStatusModule';
 import LifecycleHistoryModule from './LifecycleHistoryModule';
 import SuspensionModule from './SuspensionModule';
@@ -25,11 +25,11 @@ interface DashboardStats {
 }
 
 const tabs = [
-    { id: 'overview', label: 'Overview', icon: BarChart2 },
-    { id: 'status', label: 'Employment Status', icon: Users },
-    { id: 'history', label: 'Lifecycle History', icon: History },
-    { id: 'suspension', label: 'Suspension', icon: ShieldOff },
-    { id: 'reports', label: 'Reports', icon: FileText },
+    { id: 'overview', label: 'Overview' },
+    { id: 'status', label: 'Employment Status' },
+    { id: 'history', label: 'Lifecycle History' },
+    { id: 'suspension', label: 'Suspension' },
+    { id: 'reports', label: 'Reports' },
 ];
 
 export default function HRLifecycleDashboard() {
@@ -114,200 +114,166 @@ export default function HRLifecycleDashboard() {
     }, [fetchDashboardStats, loadHRNotifications, checkAndNotify]);
 
     const statCards = [
-        { label: 'On Probation', value: stats.on_probation, icon: Clock, color: 'from-amber-500 to-orange-500', bg: 'bg-amber-50', text: 'text-amber-700', tab: 'status' },
-        { label: 'Contracts Expiring', value: stats.contracts_expiring, icon: AlertTriangle, color: 'from-red-500 to-rose-500', bg: 'bg-red-50', text: 'text-red-700', tab: 'status' },
-        { label: 'Suspended', value: stats.suspended, icon: ShieldOff, color: 'from-primary to-primary/80', bg: 'bg-primary/10', text: 'text-primary', tab: 'suspension' },
-        { label: 'Missing Joining Date', value: stats.missing_joining_date, icon: AlertTriangle, color: 'from-orange-500 to-red-500', bg: 'bg-orange-50', text: 'text-orange-700', tab: 'status' },
-        { label: 'Pending Confirmations', value: stats.pending_confirmations, icon: CheckCircle, color: 'from-emerald-500 to-green-600', bg: 'bg-emerald-50', text: 'text-emerald-700', tab: 'status' },
+        { label: 'On Probation', value: stats.on_probation, icon: Clock, tint: 'bg-orange-tint text-orange', tab: 'status' },
+        { label: 'Contracts Expiring', value: stats.contracts_expiring, icon: AlertTriangle, tint: 'bg-orange-tint-alt text-status-danger', tab: 'status' },
+        { label: 'Suspended', value: stats.suspended, icon: ShieldOff, tint: 'bg-green-tint text-brand', tab: 'suspension' },
+        { label: 'Missing Joining Date', value: stats.missing_joining_date, icon: AlertTriangle, tint: 'bg-orange-tint-alt text-status-danger', tab: 'status' },
+        { label: 'Pending Confirmations', value: stats.pending_confirmations, icon: CheckCircle, tint: 'bg-green-tint text-brand', tab: 'status' },
+    ];
+
+    const quickActions = [
+        { label: 'Manage Employment Status', tab: 'status', icon: Users, desc: 'Probation, Contract, Permanent' },
+        { label: 'Lifecycle History', tab: 'history', icon: History, desc: 'View complete employee timelines' },
+        { label: 'Record Suspension', tab: 'suspension', icon: ShieldOff, desc: 'Suspend or reactivate staff' },
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50/50 p-4 md:p-6">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                            <Users className="w-4 h-4 text-white" />
-                        </div>
-                        HR Lifecycle Management
-                    </h1>
-                    <p className="text-sm text-gray-500 mt-0.5">Complete HR lifecycle management — probation, contracts, leave, payroll, terminations & more</p>
+        <div>
+            <div className="flex items-start justify-between mb-[18px]">
+                <div className="flex items-center gap-3">
+                    <div className="w-[42px] h-[42px] rounded-xl bg-brand text-white flex items-center justify-center">
+                        <Users className="w-[19px] h-[19px]" strokeWidth={1.8} />
+                    </div>
+                    <div>
+                        <h1 className="m-0 text-[17px] font-bold text-ink">HR Lifecycle Management</h1>
+                        <div className="text-xs text-muted-foreground">Probation, contracts, leave, payroll, terminations &amp; more</div>
+                    </div>
                 </div>
-                <button
-                    onClick={fetchDashboardStats}
-                    className="flex items-center gap-2 px-3 py-2 text-xs bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-600"
+                <Button
+                    variant="secondary"
+                    onClick={() => { fetchDashboardStats(); loadHRNotifications(); }}
+                    icon={<RefreshCw className={`w-[13px] h-[13px] ${loading ? 'animate-spin' : ''}`} strokeWidth={2} />}
                 >
-                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                     Refresh
-                </button>
+                </Button>
             </div>
 
-            {/* Tab Navigation */}
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm mb-6 overflow-x-auto">
-                <div className="flex min-w-max">
-                    {tabs.map((tab) => {
-                        const Icon = tab.icon;
-                        const isActive = activeTab === tab.id;
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`relative flex items-center gap-2 px-4 py-3 text-xs font-medium transition-all whitespace-nowrap
-                  ${isActive
-                                        ? 'text-primary border-b-2 border-primary bg-primary/10'
-                                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-b-2 border-transparent'
-                                    }`}
-                            >
-                                <Icon className="w-3.5 h-3.5" />
-                                {tab.label}
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
+            <TabBar
+                items={tabs}
+                activeId={activeTab}
+                onChange={setActiveTab}
+                className="border-b border-border mb-[18px]"
+            />
 
-            {/* Tab Content */}
-            <AnimatePresence mode="wait">
-                <motion.div
-                    key={activeTab}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.2 }}
-                >
-                    {activeTab === 'overview' && (
-                        <div className="space-y-6">
-
-                            {/* HR Notifications Banner */}
-                            {hrNotifications.length > 0 && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="bg-amber-50 border border-amber-200 rounded-xl p-4"
-                                >
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <Bell className="w-4 h-4 text-amber-600" />
-                                        <h3 className="text-sm font-semibold text-amber-800">
-                                            {hrNotifications.length} Upcoming Expiry Alert{hrNotifications.length !== 1 ? 's' : ''}
-                                        </h3>
-                                    </div>
-                                    <div className="space-y-2">
-                                        {hrNotifications.map(n => (
-                                            <div key={n.id} className="flex items-center justify-between bg-white border border-amber-100 rounded-lg px-3 py-2">
-                                                <div className="flex items-center gap-2">
-                                                    <Clock className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                                                    <div>
-                                                        <p className="text-xs font-medium text-gray-800">{n.title}</p>
-                                                        <p className="text-[10px] text-gray-500">{n.message}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2 ml-3">
-                                                    <button
-                                                        onClick={() => setActiveTab('status')}
-                                                        className="text-[10px] font-medium text-amber-700 bg-amber-100 px-2 py-1 rounded-lg hover:bg-amber-200 transition-colors whitespace-nowrap"
-                                                    >
-                                                        View →
-                                                    </button>
-                                                    <button
-                                                        onClick={() => dismissNotification(n.id)}
-                                                        className="text-gray-400 hover:text-gray-600"
-                                                    >
-                                                        <XCircle className="w-3.5 h-3.5" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </motion.div>
-                            )}
-                            {/* Stats Grid */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                {statCards.map((card) => {
-                                    const Icon = card.icon;
-                                    return (
-                                        <motion.button
-                                            key={card.label}
-                                            onClick={() => setActiveTab(card.tab)}
-                                            whileHover={{ y: -2, scale: 1.02 }}
-                                            whileTap={{ scale: 0.98 }}
-                                            className="bg-white rounded-xl border border-gray-200 p-4 text-left shadow-sm hover:shadow-md transition-all group cursor-pointer"
-                                        >
-                                            <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${card.color} flex items-center justify-center mb-3`}>
-                                                <Icon className="w-4.5 h-4.5 text-white" />
-                                            </div>
-                                            <div className="text-2xl font-bold text-gray-900 mb-0.5">
-                                                {loading ? <Loader2 className="w-5 h-5 animate-spin text-gray-400" /> : card.value}
-                                            </div>
-                                            <p className="text-xs text-gray-500">{card.label}</p>
-                                            <div className="flex items-center gap-1 mt-2 text-[10px] text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                                                View details <ChevronRight className="w-3 h-3" />
-                                            </div>
-                                        </motion.button>
-                                    );
-                                })}
+            {activeTab === 'overview' && (
+                <div className="space-y-4">
+                    {/* Upcoming expiry alerts */}
+                    {hrNotifications.length > 0 && (
+                        <div className="bg-orange-tint border border-[#F6DCC7] rounded-card p-4">
+                            <div className="flex items-center gap-2 mb-3">
+                                <Bell className="w-4 h-4 text-orange-text-alt" />
+                                <h3 className="m-0 text-[13px] font-bold text-orange-text">
+                                    {hrNotifications.length} Upcoming Expiry Alert{hrNotifications.length !== 1 ? 's' : ''}
+                                </h3>
                             </div>
-
-                            {/* Quick Action Cards */}
-                            <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                                <h3 className="text-sm font-semibold text-gray-800 mb-4">Quick Actions</h3>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                    {[
-                                        { label: 'Manage Employment Status', tab: 'status', icon: Users, desc: 'Probation, Contract, Permanent' },
-                                        { label: 'Lifecycle History', tab: 'history', icon: History, desc: 'View complete employee timelines' },
-                                        { label: 'Record Suspension', tab: 'suspension', icon: ShieldOff, desc: 'Suspend or reactivate staff' },
-                                    ].map(action => {
-                                        const Icon = action.icon;
-                                        return (
+                            <div className="space-y-2">
+                                {hrNotifications.map(n => (
+                                    <div key={n.id} className="flex items-center justify-between bg-white border border-border rounded-lg px-3 py-2">
+                                        <div className="flex items-center gap-2">
+                                            <Clock className="w-3.5 h-3.5 text-orange flex-shrink-0" />
+                                            <div>
+                                                <p className="m-0 text-xs font-semibold text-ink">{n.title}</p>
+                                                <p className="m-0 text-[10px] text-muted-foreground">{n.message}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 ml-3">
                                             <button
-                                                key={action.tab}
-                                                onClick={() => setActiveTab(action.tab)}
-                                                className="flex flex-col items-start gap-1.5 p-3 rounded-lg border border-gray-100 hover:border-primary/30 hover:bg-primary/5 transition-all group text-left"
+                                                type="button"
+                                                onClick={() => setActiveTab('status')}
+                                                className="text-[10px] font-semibold text-orange-text bg-orange-tint-alt px-2 py-1 rounded-lg hover:bg-[#fbdcc5] transition-colors whitespace-nowrap"
                                             >
-                                                <div className="w-7 h-7 rounded-md bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                                                    <Icon className="w-3.5 h-3.5 text-primary" />
-                                                </div>
-                                                <p className="text-xs font-semibold text-gray-800">{action.label}</p>
-                                                <p className="text-[10px] text-gray-500">{action.desc}</p>
+                                                View →
                                             </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Missing Joining Date Alert */}
-                            {stats.missing_joining_date > 0 && (
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.98 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-start gap-3"
-                                >
-                                    <AlertTriangle className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
-                                    <div className="flex-1">
-                                        <p className="text-sm font-semibold text-orange-800">
-                                            {stats.missing_joining_date} employee(s) missing Joining Date
-                                        </p>
-                                        <p className="text-xs text-orange-700 mt-0.5">
-                                            Probation/Contract duration calculations are blocked until joining dates are set.
-                                        </p>
-                                        <button
-                                            onClick={() => setActiveTab('status')}
-                                            className="mt-2 text-xs font-medium text-orange-700 underline hover:text-orange-900"
-                                        >
-                                            View affected employees →
-                                        </button>
+                                            <button
+                                                type="button"
+                                                aria-label="Dismiss alert"
+                                                onClick={() => dismissNotification(n.id)}
+                                                className="text-subtle hover:text-ink"
+                                            >
+                                                <XCircle className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
                                     </div>
-                                </motion.div>
-                            )}
+                                ))}
+                            </div>
                         </div>
                     )}
 
-                    {activeTab === 'status' && <EmploymentStatusModule onRefresh={fetchDashboardStats} initialSearch={searchParams.get('q') || ''} />}
-                    {activeTab === 'history' && <LifecycleHistoryModule />}
-                    {activeTab === 'suspension' && <SuspensionModule onRefresh={fetchDashboardStats} />}
-                    {activeTab === 'reports' && <HRReportsDashboard stats={stats} />}
-                </motion.div>
-            </AnimatePresence>
+                    {/* Live stat counts; each tile opens the tab that holds the detail */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        {statCards.map((card) => {
+                            const Icon = card.icon;
+                            return (
+                                <button
+                                    key={card.label}
+                                    type="button"
+                                    onClick={() => setActiveTab(card.tab)}
+                                    className="bg-white border border-border rounded-card p-[18px] text-left hover:border-brand/40 transition-colors"
+                                >
+                                    <div className={`w-[34px] h-[34px] rounded-[10px] flex items-center justify-center mb-2.5 ${card.tint}`}>
+                                        <Icon className="w-4 h-4" strokeWidth={1.8} />
+                                    </div>
+                                    <div className="text-xl font-bold text-ink">
+                                        {loading ? <Loader2 className="w-5 h-5 animate-spin text-subtle" /> : card.value}
+                                    </div>
+                                    <div className="text-[11px] text-muted-foreground">{card.label}</div>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <Card>
+                        <div className="text-[13px] font-bold text-ink mb-3">Quick Actions</div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                            {quickActions.map(action => {
+                                const Icon = action.icon;
+                                return (
+                                    <button
+                                        key={action.tab}
+                                        type="button"
+                                        onClick={() => setActiveTab(action.tab)}
+                                        className="flex items-center gap-2.5 p-3 border border-border rounded-xl text-left hover:border-brand/40 hover:bg-background transition-colors"
+                                    >
+                                        <div className="w-8 h-8 rounded-[9px] bg-secondary flex items-center justify-center text-muted-foreground shrink-0">
+                                            <Icon className="w-[15px] h-[15px]" strokeWidth={1.8} />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-bold text-ink">{action.label}</div>
+                                            <div className="text-[10.5px] text-subtle">{action.desc}</div>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </Card>
+
+                    {stats.missing_joining_date > 0 && (
+                        <div className="bg-orange-tint border border-[#F6DCC7] rounded-card p-4 flex items-start gap-3">
+                            <AlertTriangle className="w-5 h-5 text-orange flex-shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                                <p className="m-0 text-[13px] font-bold text-orange-text">
+                                    {stats.missing_joining_date} employee(s) missing Joining Date
+                                </p>
+                                <p className="m-0 text-xs text-orange-text-alt mt-0.5">
+                                    Probation/Contract duration calculations are blocked until joining dates are set.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab('status')}
+                                    className="mt-2 text-xs font-semibold text-orange-text underline hover:text-ink"
+                                >
+                                    View affected employees →
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {activeTab === 'status' && <EmploymentStatusModule onRefresh={fetchDashboardStats} initialSearch={searchParams.get('q') || ''} />}
+            {activeTab === 'history' && <LifecycleHistoryModule />}
+            {activeTab === 'suspension' && <SuspensionModule onRefresh={fetchDashboardStats} />}
+            {activeTab === 'reports' && <HRReportsDashboard stats={stats} />}
         </div>
     );
 }
