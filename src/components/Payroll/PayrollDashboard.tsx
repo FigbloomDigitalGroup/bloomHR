@@ -58,6 +58,8 @@ import {
   setRunStatus,
 } from "../../lib/payrollRuns";
 import PayrollRunBar from "./PayrollRunBar";
+import VoluntaryDeductionsModal from "./VoluntaryDeductionsModal";
+import { deductionsForPeriod, loadDeductionSetup, payslipDeductionLines, totalOf } from "../../lib/voluntaryDeductions";
 import BulkSalaryHistoryUpload from "./BulkSalaryHistoryUpload";
 
 // SMS Service Configuration for SMS Leopard
@@ -1974,21 +1976,15 @@ const PayslipModal = ({
                       <span className="font-semibold">KSh {(record.housing_levy || 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Loan</span>
-                      <span className="font-semibold">KSh {(record.loan_deduction || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
                       <span>Advance</span>
                       <span className="font-semibold">KSh {(record.advance_deduction || 0).toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Welfare</span>
-                      <span className="font-semibold">KSh {(record.welfare_deduction || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Other</span>
-                      <span className="font-semibold">KSh {(record.other_deductions || 0).toLocaleString()}</span>
-                    </div>
+                    {payslipDeductionLines(record).map((line, i) => (
+                      <div key={`${line.name}-${i}`} className="flex justify-between">
+                        <span>{line.name}</span>
+                        <span className="font-semibold">KSh {line.amount.toLocaleString()}</span>
+                      </div>
+                    ))}
                     <div className="flex justify-between text-gray-600 mt-2 border-t border-gray-200 pt-1">
                       <span>Tax relief:</span>
                       <span className="font-semibold">KSh -2400</span>
@@ -2451,6 +2447,7 @@ const toSalaryHistory = (record: any): SalaryHistoryRecord => ({
   employee_id: record.employee_id,
   employee_name: record.employee_name,
   pay_period: record.pay_period,
+  deduction_items: record.deduction_items ?? [],
   payment_method: record.payment_method || "",
   bank_name: record.bank_name || "",
   account_number: record.account_number || "",
@@ -2463,6 +2460,7 @@ const fromSalaryHistory = (saved: any, live: any | undefined) => ({
   employee_id: saved.employee_id,
   employee_name: saved.employee_name || live?.employee_name || saved.employee_id,
   pay_period: saved.pay_period,
+  deduction_items: saved.deduction_items ?? [],
   payment_method: paymentMethodLabel(saved.payment_method),
   bank_name: saved.bank_name || "",
   account_number: saved.account_number || "",
@@ -2492,6 +2490,9 @@ export default function PayrollDashboard() {
   const [runPeriod, setRunPeriod] = useState<string | null>(null);
   const [runVersion, setRunVersion] = useState(0);
   const [runBusy, setRunBusy] = useState(false);
+  const [showDeductions, setShowDeductions] = useState(false);
+  // bumped when voluntary deductions change, so this month's figures are worked out again
+  const [deductionsVersion, setDeductionsVersion] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [companyInfo, setCompanyInfo] = useState<any>(null);
 
@@ -3294,6 +3295,11 @@ export default function PayrollDashboard() {
           return;
         }
 
+        // voluntary deductions (SACCO, welfare...) for this month; a failure stops the calculation rather than
+        // showing (and letting someone save) payslips without them
+        const deductionSetup = await loadDeductionSetup();
+        const voluntaryByEmployee = deductionsForPeriod(deductionSetup.types, deductionSetup.deductions, actualPeriod);
+
         if (data) {
           setEmployees(data);
 
@@ -3400,10 +3406,11 @@ export default function PayrollDashboard() {
                 actualPeriod,
               );
 
-              // REMOVED VOLUNTARY DEDUCTIONS - set all to 0 except advance
+              // voluntary deductions are itemised (deduction_items); loan and welfare are kept for older payslips
+              const deductionItems = voluntaryByEmployee.get(employeeId) ?? [];
               const loanDeduction = 0;
-              const welfareDeduction = 300;
-              const otherDeductions = 0;
+              const welfareDeduction = 0;
+              const otherDeductions = totalOf(deductionItems);
 
               // Total deductions include statutory and advance deduction
               const totalDeductions =
@@ -3446,8 +3453,9 @@ export default function PayrollDashboard() {
                 tax_relief: taxRelief,
                 loan_deduction: loanDeduction,
                 advance_deduction: advanceDeduction,
-                welfare_deduction: 300,
+                welfare_deduction: welfareDeduction,
                 other_deductions: otherDeductions,
+                deduction_items: deductionItems,
                 total_deductions: totalDeductions,
                 net_pay: netPay,
                 pay_period: actualPeriod,
@@ -3462,6 +3470,7 @@ export default function PayrollDashboard() {
         }
       } catch (err) {
         console.error("Error:", err);
+        toast.error(runErrorMessage(err, "Could not work out this month's payroll."));
       } finally {
         setIsLoading(false);
       }
@@ -3471,7 +3480,7 @@ export default function PayrollDashboard() {
       // Only fetch when settings are loaded
       fetchEmployees();
     }
-  }, [actualPeriod, settings, overrideStatutoryChecks, salaryAdvances]);
+  }, [actualPeriod, settings, overrideStatutoryChecks, salaryAdvances, deductionsVersion]);
 
   // the month's payroll run, reloaded after each start/recalculate/approve/...
   useEffect(() => {
@@ -4247,6 +4256,14 @@ This can't be undone: the payslips stay locked for good.`,
         </button>
         <button
           type="button"
+          onClick={() => setShowDeductions(true)}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-ink transition-colors"
+        >
+          <Users className="w-3 h-3" />
+          Deductions
+        </button>
+        <button
+          type="button"
           onClick={() => setShowStatutorySettings(true)}
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-ink transition-colors"
         >
@@ -4488,25 +4505,18 @@ This can't be undone: the payslips stay locked for good.`,
                                   Other Deductions
                                 </h4>
                                 <div className="flex justify-between">
-                                  <span>Loans:</span>
-                                  <span className="text-red-600">
-                                    KSh {record.loan_deduction.toLocaleString()}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
                                   <span>Advances:</span>
                                   <span className="text-red-600">
                                     KSh{" "}
                                     {record.advance_deduction.toLocaleString()}
                                   </span>
                                 </div>
-                                <div className="flex justify-between">
-                                  <span>Welfare:</span>
-                                  <span className="text-red-600">
-                                    KSh{" "}
-                                    {record.welfare_deduction.toLocaleString()}
-                                  </span>
-                                </div>
+                                {payslipDeductionLines(record).map((line, i) => (
+                                  <div key={`${line.name}-${i}`} className="flex justify-between">
+                                    <span>{line.name}:</span>
+                                    <span className="text-red-600">KSh {line.amount.toLocaleString()}</span>
+                                  </div>
+                                ))}
                                 <div className="flex justify-between font-medium">
                                   <span>Total Deductions:</span>
                                   <span className="text-red-600">
@@ -4672,6 +4682,20 @@ This can't be undone: the payslips stay locked for good.`,
           calculateNSSF={calculateNSSF}
           calculateNHIF={calculateNHIF}
           calculateHousingLevy={calculateHousingLevy}
+        />
+      )}
+
+      {showDeductions && (
+        <VoluntaryDeductionsModal
+          onClose={() => setShowDeductions(false)}
+          onChanged={() => setDeductionsVersion((v) => v + 1)}
+          draftNotice={
+            monthRun?.status === "draft"
+              ? `Payroll for ${periodLabel} is a draft: press Recalculate to apply deduction changes to it.`
+              : monthRun
+                ? `Payroll for ${periodLabel} is ${monthRun.status}, so changes apply from the next month you run.`
+                : null
+          }
         />
       )}
 

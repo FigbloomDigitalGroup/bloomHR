@@ -17,6 +17,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { payslipDeductionLines } from '../../lib/voluntaryDeductions';
 import html2pdf from 'html2pdf.js';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -99,8 +100,50 @@ const statutoryCalculations = {
   }
 };
 
-// UPDATED: EXACT SAME calculation logic as payroll dashboard with salary advances
+/** A saved payslip (salary_history, from an approved payroll run) exactly as payroll approved it. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- salary_history row (untyped client)
+const savedPayslipValues = (saved: Record<string, any>) => {
+  const n = (v: unknown) => Number(v) || 0;
+  const grossPay = n(saved.gross_pay);
+  const perDiem = n(saved.per_diem);
+  const nssfDeduction = n(saved.nssf_deduction);
+  const housingLevy = n(saved.housing_levy);
+  return {
+    basicSalary: n(saved.basic_salary),
+    houseAllowance: n(saved.house_allowance),
+    transportAllowance: n(saved.transport_allowance),
+    medicalAllowance: n(saved.medical_allowance),
+    otherAllowances: n(saved.other_allowances),
+    overtimeHours: n(saved.overtime_hours),
+    overtimeRate: n(saved.overtime_rate),
+    overtimePay: n(saved.overtime_hours) * n(saved.overtime_rate),
+    commission: n(saved.commission),
+    bonus: n(saved.bonus),
+    perDiem,
+    grossPay,
+    payeTax: n(saved.paye_tax),
+    nhifDeduction: n(saved.nhif_deduction),
+    nssfDeduction,
+    housingLevy,
+    taxRelief: n(saved.tax_relief),
+    loanDeduction: n(saved.loan_deduction),
+    advanceDeduction: n(saved.advance_deduction),
+    welfareDeduction: n(saved.welfare_deduction),
+    otherDeductions: n(saved.other_deductions),
+    deductionLines: payslipDeductionLines(saved),
+    totalDeductions: n(saved.total_deductions),
+    netPay: n(saved.net_pay),
+    taxableGross: grossPay - perDiem,
+    taxableIncomeForPAYE: grossPay - perDiem - nssfDeduction - housingLevy,
+    employeeId: saved.employee_id
+  };
+};
+
+// Saved payslips (salary_history rows, which carry run_id) are shown as saved. Only older records from
+// payroll_records are still worked out here, with the same calculation the payroll page used.
 const calculatePayrollValues = (employee, overrideStatutoryChecks = true, salaryAdvances = [], payPeriod = null) => {
+  if (employee.run_id !== undefined) return savedPayslipValues(employee);
+
   const basicSalary = parseFloat(employee["Basic Salary"] || employee.basic_salary || 0);
   const houseAllowance = parseFloat(employee["House Allowance"] || employee.house_allowance || 0);
   const transportAllowance = parseFloat(employee["Transport Allowance"] || employee.transport_allowance || 0);
@@ -260,6 +303,7 @@ const calculatePayrollValues = (employee, overrideStatutoryChecks = true, salary
     advanceDeduction,
     welfareDeduction,
     otherDeductions,
+    deductionLines: payslipDeductionLines({ loan_deduction: loanDeduction, welfare_deduction: welfareDeduction, other_deductions: otherDeductions }),
     totalDeductions,
     netPay,
     taxableGross,
@@ -501,10 +545,10 @@ const PayslipModal = ({
                     <div className="flex justify-between"><span>SHIF</span><span className="font-semibold">KSh {calculated.nhifDeduction.toLocaleString()}</span></div>
                     <div className="flex justify-between"><span>NSSF</span><span className="font-semibold">KSh {calculated.nssfDeduction.toLocaleString()}</span></div>
                     <div className="flex justify-between"><span>AHL</span><span className="font-semibold">KSh {calculated.housingLevy.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Loan</span><span className="font-semibold">KSh {calculated.loanDeduction.toLocaleString()}</span></div>
                     <div className="flex justify-between"><span>Advance</span><span className="font-semibold">KSh {calculated.advanceDeduction.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Welfare</span><span className="font-semibold">KSh {calculated.welfareDeduction.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Other</span><span className="font-semibold">KSh {calculated.otherDeductions.toLocaleString()}</span></div>
+                    {calculated.deductionLines.map((line, i) => (
+                      <div key={`${line.name}-${i}`} className="flex justify-between"><span>{line.name}</span><span className="font-semibold">KSh {line.amount.toLocaleString()}</span></div>
+                    ))}
                     <div className="flex justify-between text-gray-600 mt-2 border-t border-gray-200 pt-1"><span>Tax relief:</span><span className="font-semibold">KSh -2400</span></div>
                   </div>
                 </div>
@@ -1098,10 +1142,12 @@ const PayslipViewer = () => {
                                   <span>Advance Deduction:</span>
                                   <span className="text-status-danger">KSh {calculated.advanceDeduction.toLocaleString()}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                  <span>Welfare:</span>
-                                  <span className="text-status-danger">KSh {calculated.welfareDeduction.toLocaleString()}</span>
-                                </div>
+                                {calculated.deductionLines.map((line, i) => (
+                                  <div key={`${line.name}-${i}`} className="flex justify-between">
+                                    <span>{line.name}:</span>
+                                    <span className="text-status-danger">KSh {line.amount.toLocaleString()}</span>
+                                  </div>
+                                ))}
                                 <div className="flex justify-between text-status-success">
                                   <span>Tax Relief:</span>
                                   <span>KSh -{calculated.taxRelief.toLocaleString()}</span>
