@@ -20,6 +20,8 @@ import MFAVerification from './pages/MFAverification';
 import { useCompanyProfile, withProfileRole } from './hooks/useCompanyProfile';
 import { syncThemeWithAccount } from './lib/preferences';
 import CompanyGate from './components/Company/CompanyGate';
+import AppSkeleton from './components/Layout/AppSkeleton';
+import { useCompanySwitching } from './hooks/useMyCompanies';
 import { isStaleChunkError, reloadOnceForStaleChunk } from './lib/staleChunk';
 import { welcomeMessage } from './lib/welcome';
 
@@ -913,6 +915,7 @@ function App() {
   }, [location.pathname]);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const switchingCompany = useCompanySwitching();
 
   if (!authChecked || isInitializing) {
     return <Loader />;
@@ -923,6 +926,7 @@ function App() {
     <UserProvider>
       <ErrorBoundary>
         <div className="min-h-screen bg-white overflow-x-hidden">
+          {switchingCompany && <AppSkeleton label="Switching company…" />}
           <Suspense fallback={<Loader />}>
           <Routes>
             <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
@@ -954,7 +958,7 @@ function App() {
                     </button>
                   </div>
                 ) : (
-                  <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">Loading your workspace…</div>
+                  <AppSkeleton />
                 )
               }
             />
@@ -974,7 +978,7 @@ function App() {
                     </button>
                   </div>
                 ) : companyState.status === 'loading' ? (
-                  <div className="min-h-screen flex items-center justify-center text-sm text-gray-500">Loading your workspace…</div>
+                  <AppSkeleton />
                 ) : user.role === 'STAFF' ? (
                   <CompanyGate userId={session.user.id}>
                     <StaffPortalLanding />

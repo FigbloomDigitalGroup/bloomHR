@@ -14,7 +14,34 @@
 </head>
 
 <body>
-  <div id="root"></div>
+  <!-- Until the app's code has loaded: the app's shape instead of a white page (React replaces it). Signed-in
+       visits only, and not on the sign-in pages. The app's own copy is src/components/Layout/AppSkeleton.tsx. -->
+  <style>
+    .boot { position: fixed; inset: 0; display: flex; background: rgb(var(--page, 246 248 246)); }
+    .boot-side { width: 280px; flex-shrink: 0; background: rgb(var(--shell, 23 64 42)); padding: 16px; }
+    .boot-side i { display: block; height: 20px; margin: 0 0 14px; border-radius: 6px; background: rgba(255, 255, 255, .12); }
+    .boot-main { flex: 1; min-width: 0; }
+    .boot-top { height: 60px; background: rgb(var(--surface, 255 255 255)); border-bottom: 1px solid rgb(var(--line, 229 231 235)); }
+    .boot-page { padding: 32px; }
+    .boot-page i { display: block; border-radius: 12px; background: rgb(var(--surface-muted, 243 244 246)); margin-bottom: 20px; }
+    .boot i { animation: boot-pulse 1.6s ease-in-out infinite; }
+    @keyframes boot-pulse { 50% { opacity: .5; } }
+    @media (max-width: 767px) { .boot-side { display: none; } .boot-page { padding: 16px; } }
+  </style>
+  <div id="root"><div class="boot" id="boot" aria-hidden="true">
+    <div class="boot-side"><i style="width:60%;height:34px;margin-bottom:28px"></i><i></i><i style="width:70%"></i><i style="width:80%"></i><i style="width:65%"></i><i style="width:75%"></i><i style="width:60%"></i><i style="width:85%"></i></div>
+    <div class="boot-main"><div class="boot-top"></div><div class="boot-page"><i style="height:28px;width:260px;max-width:100%"></i><i style="height:110px"></i><i style="height:260px"></i></div></div>
+  </div></div>
+  <script>
+    (function () {
+      var boot = document.getElementById('boot');
+      var signedIn = false;
+      try {
+        for (var i = 0; i < localStorage.length; i++) if (/^sb-.*-auth-token$/.test(localStorage.key(i) || '')) signedIn = true;
+      } catch (e) { /* storage blocked: no skeleton */ }
+      if (!signedIn || /^\/(login|mfa|join|create-company|update-password|auth)/.test(location.pathname)) boot.remove();
+    })();
+  </script>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

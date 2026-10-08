@@ -139,6 +139,16 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
   const [showNotificationDot, setShowNotificationDot] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [locationOpen, setLocationOpen] = useState(false);
+  const locationRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!locationOpen) return;
+    const close = (e: MouseEvent) => {
+      if (locationRef.current && !locationRef.current.contains(e.target as Node)) setLocationOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [locationOpen]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile | null>(null);
   const [uploading, setUploading] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -530,48 +540,33 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
     <>
       {/* Header: company switcher, centered search, region/town filters, utilities */}
       <motion.header
-        className="z-40 relative font-sans h-[60px] px-5 bg-white border-b border-border grid grid-cols-[1fr_460px_1fr] items-center box-border"
+        className="z-40 relative font-sans h-[60px] px-3 sm:px-5 bg-white border-b border-border flex items-center gap-3 lg:gap-5 box-border"
         initial={{ y: -12, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
       >
-        {/* Company name (opens the company profile) and the switcher (or "New company" for people in one company) */}
-        <div className="flex items-center gap-2.5 justify-self-start min-w-0">
-        <motion.button
-          type="button"
-          className="flex items-center gap-2 group justify-self-start"
-          onClick={() => setProfileModalOpen(true)}
-          whileTap={{ scale: 0.99 }}
-        >
-          <div className="relative flex-shrink-0">
-            {companyProfile?.image_url ? (
-              <img
-                src={companyProfile.image_url}
-                alt="Company Logo"
-                className="w-[26px] h-[26px] rounded-[7px] object-cover"
-              />
-            ) : (
-              <div className="w-[26px] h-[26px] bg-brand rounded-[7px] flex items-center justify-center text-white font-bold text-xs">
-                {(companyProfile?.company_name || currentCompanyName || 'F')[0]}
-              </div>
-            )}
-          </div>
-          <span className="text-[13.5px] font-bold text-ink tracking-tight leading-tight truncate max-w-[180px]">
-            {companyProfile?.company_name || currentCompanyName || 'Figbloom HR'}
-          </span>
-          <ChevronDown className="w-3 h-3 text-subtle flex-shrink-0" strokeWidth={2.2} />
-        </motion.button>
-        <CompanySwitcher />
+        {/* Company menu: switch company, company profile, new company */}
+        <div className="flex items-center min-w-0 flex-shrink max-w-[38%] sm:max-w-[240px]">
+          <CompanySwitcher
+            name={companyProfile?.company_name || currentCompanyName || 'Figbloom HR'}
+            logoUrl={companyProfile?.image_url}
+            onOpenProfile={() => setProfileModalOpen(true)}
+          />
         </div>
 
-        {/* Search */}
-        <SearchInput placeholder="Search Figbloom HR" />
+        {/* Search: takes the room left between the two sides, up to 460px; hidden on phones */}
+        <div className="flex-1 min-w-0 hidden sm:flex justify-center">
+          <div className="w-full max-w-[460px]">
+            <SearchInput placeholder="Search Figbloom HR" />
+          </div>
+        </div>
 
         {/* Right utilities */}
-        <div className="flex items-center justify-end gap-1">
+        <div className="flex items-center justify-end gap-1 flex-shrink-0 ml-auto">
           {(regions && onRegionChange) && (
             <>
-              <div className="hidden lg:flex items-center gap-0.5">
+              {/* wide screens: both filters in the bar */}
+              <div className="hidden xl:flex items-center gap-0.5">
                 <HeaderDropdown
                   value={selectedRegion || ''}
                   options={regions.map(r => ({ label: r, value: r }))}
@@ -590,7 +585,44 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
                   icon={MapPin}
                 />
               </div>
-              <div className="w-px h-[18px] bg-border mx-1 hidden lg:block"></div>
+              {/* narrower screens: one location button that opens both filters */}
+              <div className="relative xl:hidden" ref={locationRef}>
+                <motion.button
+                  type="button"
+                  aria-label="Region and town"
+                  aria-expanded={locationOpen}
+                  onClick={() => setLocationOpen(o => !o)}
+                  className={`relative w-[30px] h-[30px] rounded-pill flex items-center justify-center transition-colors hover:bg-secondary ${selectedRegion || selectedTown ? 'text-brand' : 'text-muted-foreground'}`}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <MapPin className="w-[15px] h-[15px] stroke-[1.8px]" />
+                  {(selectedRegion || selectedTown) && <span className="absolute top-[5px] right-[5px] w-1.5 h-1.5 rounded-full bg-brand" />}
+                </motion.button>
+                {locationOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-[240px] max-w-[calc(100vw-24px)] bg-white border border-border rounded-card shadow-lg z-50 p-2 space-y-1">
+                    <p className="px-2 pt-1 text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">Region</p>
+                    <HeaderDropdown
+                      value={selectedRegion || ''}
+                      options={regions.map(r => ({ label: r, value: r }))}
+                      onChange={onRegionChange}
+                      placeholder="Region"
+                      icon={MapPin}
+                    />
+                    <p className="px-2 pt-1 text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">Town</p>
+                    <HeaderDropdown
+                      value={selectedTown || ''}
+                      options={[
+                        { label: 'All Towns', value: '' },
+                        ...(towns?.map(t => ({ label: t, value: t })) || [])
+                      ]}
+                      onChange={(val) => onTownChange && onTownChange(val)}
+                      placeholder="Town"
+                      icon={MapPin}
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="w-px h-[18px] bg-border mx-1 hidden sm:block"></div>
             </>
           )}
 
