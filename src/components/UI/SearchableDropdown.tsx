@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Search, X } from 'lucide-react';
+import { ChevronDown, Plus, Search, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export interface DropdownOption {
@@ -15,6 +15,8 @@ interface SearchableDropdownProps {
     className?: string;
     icon?: React.ElementType;
     disabled?: boolean;
+    /** lets the person type a value that isn't in the list ("+ Add ...") */
+    allowCreate?: boolean;
 }
 
 const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
@@ -24,7 +26,8 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
     placeholder = 'Select...',
     className = '',
     icon: Icon,
-    disabled = false
+    disabled = false,
+    allowCreate = false
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -48,9 +51,21 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    // "all" (the filters' "everything") and "" (a form field left empty) both mean nothing chosen
+    const isEmpty = value === 'all' || value === '';
+
+    // a typed-in value (or one saved earlier) that isn't among the options still shows, selected
+    if (!isEmpty && !normalizedOptions.some(o => o.value === value)) {
+        normalizedOptions.unshift({ label: value, value });
+    }
+
     const filteredOptions = normalizedOptions.filter(option =>
         option.label.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const typed = searchTerm.trim();
+    const canCreate = allowCreate && typed !== '' &&
+        !normalizedOptions.some(o => o.label.toLowerCase() === typed.toLowerCase());
 
     const handleSelect = (optionValue: string) => {
         onChange(optionValue);
@@ -64,7 +79,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
     };
 
     // Find label for current value
-    const currentLabel = value === 'all'
+    const currentLabel = isEmpty
         ? placeholder
         : normalizedOptions.find(o => o.value === value)?.label || value;
 
@@ -77,12 +92,12 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
             >
                 <div className="flex items-center gap-2 truncate flex-1">
                     {Icon && <Icon size={13} className={`text-gray-400 flex-shrink-0 ${!disabled && 'group-hover:text-green-600'} transition-colors`} />}
-                    <span className={`truncate text-xs ${value === 'all' ? 'text-gray-500' : 'text-gray-900 font-medium'}`}>
+                    <span className={`truncate text-xs ${isEmpty ? 'text-gray-500' : 'text-gray-900 font-medium'}`}>
                         {currentLabel}
                     </span>
                 </div>
                 <div className="flex items-center gap-1">
-                    {value !== 'all' && !disabled && (
+                    {!isEmpty && !disabled && (
                         <div onClick={clearSelection} className="p-0.5 hover:bg-gray-200 rounded-full text-gray-400 hover:text-red-500 transition-colors">
                             <X size={12} />
                         </div>
@@ -105,9 +120,17 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                                 <Search size={14} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                                 <input
                                     type="text"
-                                    placeholder="Search options..."
+                                    placeholder={allowCreate ? 'Search or type a new one...' : 'Search options...'}
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key !== 'Enter') return;
+                                        e.preventDefault();
+                                        const exact = normalizedOptions.find(o => o.label.toLowerCase() === typed.toLowerCase());
+                                        if (exact) handleSelect(exact.value);
+                                        else if (canCreate) handleSelect(typed);
+                                        else if (filteredOptions.length === 1) handleSelect(filteredOptions[0].value);
+                                    }}
                                     onClick={(e) => e.stopPropagation()}
                                     className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-green-500 focus:ring-4 focus:ring-green-500/10 transition-all"
                                     autoFocus
@@ -115,13 +138,23 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                             </div>
                         </div>
                         <div className="max-h-64 overflow-y-auto custom-scrollbar p-1.5 thin-scrollbar">
+                            {canCreate && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleSelect(typed)}
+                                    className="w-full text-left px-4 py-2.5 text-xs rounded-xl transition-all mb-0.5 flex items-center gap-2 font-semibold text-brand bg-green-tint hover:opacity-90"
+                                >
+                                    <Plus size={13} className="flex-shrink-0" />
+                                    <span className="truncate">Add “{typed}”</span>
+                                </button>
+                            )}
                             <button
                                 className={`w-full text-left px-4 py-2.5 text-xs rounded-xl transition-all mb-0.5 flex items-center justify-between
-                    ${value === 'all' ? 'bg-green-50 text-green-700 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}
+                    ${isEmpty ? 'bg-green-50 text-green-700 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}
                                 onClick={() => handleSelect('all')}
                             >
                                 <span>{placeholder}</span>
-                                {value === 'all' && <div className="w-1.5 h-1.5 rounded-full bg-green-600" />}
+                                {isEmpty && <div className="w-1.5 h-1.5 rounded-full bg-green-600" />}
                             </button>
                             {filteredOptions.map((option) => (
                                 option.value !== 'all' && (
@@ -136,7 +169,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                                     </button>
                                 )
                             ))}
-                            {filteredOptions.length === 0 && (
+                            {filteredOptions.length === 0 && !canCreate && (
                                 <div className="px-4 py-10 text-center text-gray-400 text-xs italic">
                                     <p>No matches found</p>
                                 </div>

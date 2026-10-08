@@ -11,6 +11,7 @@ import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import SearchableDropdown from '../UI/SearchableDropdown';
 import { employeeTypeOptions } from '../../lib/employmentTypes';
+import { STARTER_DEPARTMENTS, ensureBranchListed, optionsWithStarters } from '../../lib/employeeOptions';
 
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'Work Mobile': string | null;
@@ -147,11 +148,11 @@ const AddEmployeePage = () => {
 
         setDropdownOptions({
           employmentTypes: employeeTypeOptions(empTypes?.map(item => item['Employee Type'] as string)),
-          branches: [...new Set(branches?.map(item => item.Branch as string))],
-          jobLevels: [...new Set(jobLevels?.map(item => item['Job Level'] as string))],
-          jobGroup: [...new Set(jobGroup?.map(item => item['Job Group'] as string))],
-          office: [...new Set(office?.map(item => item.Town as string))],
-          jobTitles: [...new Set(jobTitles?.map(item => item['Job Title'] as string))],
+          branches: optionsWithStarters(branches?.map(item => item.Branch as string)),
+          jobLevels: optionsWithStarters(jobLevels?.map(item => item['Job Level'] as string), STARTER_DEPARTMENTS),
+          jobGroup: optionsWithStarters(jobGroup?.map(item => item['Job Group'] as string)),
+          office: optionsWithStarters(office?.map(item => item.Town as string)),
+          jobTitles: optionsWithStarters(jobTitles?.map(item => item['Job Title'] as string)),
           supervisors: supervisors?.map(item => `${item['First Name']} ${item['Last Name']}`) || []
         });
       } catch (err) {
@@ -491,6 +492,7 @@ const AddEmployeePage = () => {
 
       const employeeId = employeeData?.[0]?.["Employee Number"];
       if (!employeeId) throw new Error('Failed to get employee Number after creation');
+      await ensureBranchListed(newEmployee.Branch, newEmployee.Town);
 
       if (emergencyContacts.length > 0 && emergencyContacts[0].name) {
         const contactsToInsert = emergencyContacts.map(contact => ({
@@ -956,6 +958,7 @@ const AddEmployeePage = () => {
                     label="Department"
                     name="Job Level"
                     type="select"
+                    creatable
                     value={newEmployee['Job Level'] || ''}
                     onChange={handleInputChange}
                     options={dropdownOptions.jobLevels}
@@ -965,6 +968,7 @@ const AddEmployeePage = () => {
                     label="Job Title"
                     name="Job Title"
                     type="select"
+                    creatable
                     value={newEmployee['Job Title'] || ''}
                     onChange={handleInputChange}
                     options={dropdownOptions.jobTitles}
@@ -975,6 +979,7 @@ const AddEmployeePage = () => {
                     label="Branch"
                     name="Branch"
                     type="select"
+                    creatable
                     value={newEmployee.Branch || ''}
                     onChange={handleInputChange}
                     options={dropdownOptions.branches}
@@ -983,6 +988,7 @@ const AddEmployeePage = () => {
                     label="Office"
                     name="Town"
                     type="select"
+                    creatable
                     value={newEmployee.Town || ''}
                     onChange={handleInputChange}
                     options={dropdownOptions.office}
@@ -1249,6 +1255,7 @@ const AddEmployeePage = () => {
                         label="Job Group"
                         name="Job Group"
                         type="select"
+                        creatable
                         value={newEmployee['Job Group'] || ''}
                         onChange={handleInputChange}
                         options={dropdownOptions.jobGroup}
@@ -1576,6 +1583,7 @@ const FormField = ({
   disabled = false,
   error = '',
   placeholder = '',
+  creatable = false,
 }: {
   label: string;
   value: string;
@@ -1587,6 +1595,8 @@ const FormField = ({
   disabled?: boolean;
   error?: string;
   placeholder?: string;
+  /** the list can be added to by typing a new value */
+  creatable?: boolean;
 }) => (
   <div className="space-y-1">
     <label className="block font-medium text-gray-700">
@@ -1599,8 +1609,10 @@ const FormField = ({
         value={value}
         onChange={(val) => {
           // Create a synthetic event or just call onChange with the expected structure
-          onChange({ target: { name, value: val } } as any);
+          // the dropdown's "nothing chosen" is "all"; an employee field left empty is saved as ""
+          onChange({ target: { name, value: val === 'all' ? '' : val } } as any);
         }}
+        allowCreate={creatable}
         placeholder={`Select ${label}`}
         className={error ? 'border-red-300' : ''}
       />
