@@ -201,16 +201,16 @@ export function AppSidebar({
                       <SidebarMenuButton
                         onClick={() => onChannelSelect(channel)}
                         isActive={isChannelActive(channel)}
-                        className="group mx-2 rounded-lg transition-all hover:bg-green-tint hover:border-brand/30"
+                        className="group mx-2 rounded-lg transition-all hover:bg-sidebar-accent"
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           {/* Channel Avatar */}
                           {getChannelAvatar(channel)}
 
                           <span className="flex-1 truncate font-medium text-xs">{channel.name}</span>
-                          {channel.unread_count && channel.unread_count > 0 && (
+                          {(channel.unread_count ?? 0) > 0 && (
                             <Badge variant="default" className="h-5 min-w-5 px-1.5 text-xs bg-orange">
-                              {channel.unread_count > 99 ? '99+' : channel.unread_count}
+                              {(channel.unread_count ?? 0) > 99 ? '99+' : channel.unread_count}
                             </Badge>
                           )}
                         </div>
@@ -294,13 +294,13 @@ export function AppSidebar({
                           <SidebarMenuButton
                             onClick={() => onChannelSelect(dm)}
                             isActive={isChannelActive(dm)}
-                            className="group mx-2 rounded-lg transition-all hover:bg-green-tint hover:border-brand/30"
+                            className="group mx-2 rounded-lg transition-all hover:bg-sidebar-accent"
                           >
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                               <div className="relative flex-shrink-0">
                                 <Avatar className="h-6 w-6 ring-2 ring-white">
                                   <AvatarImage src={dm.avatar || ''} />
-                                  <AvatarFallback className="bg-gradient-to-br from-green-500 to-green-600 text-white text-xs">
+                                  <AvatarFallback className="bg-brand text-white text-xs">
                                     {dm.initials || 'U'}
                                   </AvatarFallback>
                                 </Avatar>
@@ -324,9 +324,9 @@ export function AppSidebar({
                                   </p>
                                 )}
                               </div>
-                              {dm.unread_count && dm.unread_count > 0 && (
-                                <Badge variant="default" className="h-5 min-w-5 px-1.5 text-xs bg-green-600">
-                                  {dm.unread_count > 99 ? '99+' : dm.unread_count}
+                              {(dm.unread_count ?? 0) > 0 && (
+                                <Badge variant="default" className="h-5 min-w-5 px-1.5 text-xs bg-brand text-white">
+                                  {(dm.unread_count ?? 0) > 99 ? '99+' : dm.unread_count}
                                 </Badge>
                               )}
                             </div>
@@ -366,13 +366,13 @@ export function AppSidebar({
                           <SidebarMenuButton
                             onClick={() => onChannelSelect(dm)}
                             isActive={isChannelActive(dm)}
-                            className="group mx-2 rounded-lg transition-all hover:bg-green-tint hover:border-brand/30"
+                            className="group mx-2 rounded-lg transition-all hover:bg-sidebar-accent"
                           >
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                               <div className="relative flex-shrink-0">
                                 <Avatar className="h-6 w-6 ring-2 ring-white">
                                   <AvatarImage src={dm.avatar || ''} />
-                                  <AvatarFallback className="bg-gradient-to-br from-green-500 to-green-600 text-white text-xs">
+                                  <AvatarFallback className="bg-brand text-white text-xs">
                                     {dm.initials || 'U'}
                                   </AvatarFallback>
                                 </Avatar>
@@ -382,9 +382,9 @@ export function AppSidebar({
                                   }`}></span>
                               </div>
                               <span className="flex-1 truncate font-medium text-xs">{dm.name || 'Unknown User'}</span>
-                              {dm.unread_count && dm.unread_count > 0 && (
-                                <Badge variant="default" className="h-5 min-w-5 px-1.5 text-xs bg-green-600">
-                                  {dm.unread_count > 99 ? '99+' : dm.unread_count}
+                              {(dm.unread_count ?? 0) > 0 && (
+                                <Badge variant="default" className="h-5 min-w-5 px-1.5 text-xs bg-brand text-white">
+                                  {(dm.unread_count ?? 0) > 99 ? '99+' : dm.unread_count}
                                 </Badge>
                               )}
                             </div>

@@ -9,6 +9,7 @@ import { initialsOf } from "./lib/names";
 import { canCreateChannels } from "./lib/permissions";
 import { usePermissions } from "../../hooks/usePermissions";
 import { isOnline, useOnlinePeople } from "./lib/presence";
+import { ChatPeopleContext } from "./lib/chatPeople";
 import type { Employee, User, Channel, DirectMessage, Message } from "../chat/types/types";
 
 /** `onMessagesRead` lets the staff portal refresh its unread badge when a conversation is opened. */
@@ -117,12 +118,12 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: () => void } =
         const partnerEmail = (channel.partnerEmail || '').toLowerCase();
         const partner = people.find(emp => (emp.workEmail || '').toLowerCase() === partnerEmail);
         const lastMessage = await getLastMessageForChannel(channel.id);
-        const name = partner?.fullName || partnerEmail.split('@')[0] || 'Colleague';
+        const name = partner?.fullName || channel.partnerName || partnerEmail.split('@')[0] || 'Colleague';
         return {
           id: channel.id,
           name,
           type: 'direct_message',
-          avatar: partner?.profileImage || '',
+          avatar: partner?.profileImage || channel.partnerAvatar || '',
           initials: partner?.initials || initialsOf(name),
           status: 'offline',
           userId: partner?.id || partnerEmail,
@@ -526,7 +527,15 @@ const handleDMCreate = async (userId: string) => {
     return <ErrorScreen error={error} onRetry={() => loadUserChannels(currentUser.id)} />;
   }
 
+  const people = {
+    employees: liveEmployees,
+    currentEmail: currentUser.email,
+    onMessage: handleDMCreate,
+    canViewRecords: !!userRole && String(userRole).toUpperCase() !== 'STAFF',
+  };
+
   return (
+    <ChatPeopleContext.Provider value={people}>
     <SidebarProvider className="h-full">
       <div className="flex h-full w-full bg-background">
         <AppSidebar 
@@ -559,6 +568,7 @@ const handleDMCreate = async (userId: string) => {
         )}
       </div>
     </SidebarProvider>
+    </ChatPeopleContext.Provider>
   );
 }
 

@@ -72,11 +72,15 @@ export function ChatArea({ channel, messages, currentUserId, onSendMessage, onTo
               ) : (
                 <EmployeeProfile employee={channel as any}>
                   <div className="relative cursor-pointer">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center ring-2 ring-white shadow-sm">
-                      <span className="text-sm font-semibold text-white">
-                        {channel.initials}
-                      </span>
-                    </div>
+                    {channel.avatar ? (
+                      <img src={channel.avatar} alt="" className="w-10 h-10 rounded-full object-cover ring-2 ring-white shadow-sm" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-brand flex items-center justify-center ring-2 ring-white shadow-sm">
+                        <span className="text-sm font-semibold text-white">
+                          {channel.initials}
+                        </span>
+                      </div>
+                    )}
                     <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 border-2 border-white rounded-full ${
                       channel.status === 'online' ? 'bg-green-500' :
                       channel.status === 'away' ? 'bg-yellow-500' :
