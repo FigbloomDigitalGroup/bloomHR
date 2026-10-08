@@ -8,6 +8,7 @@ import { toast } from 'react-hot-toast';
 import { useHRNotifications, fetchAdminHRNotifications, markAdminNotificationRead, type HRNotification } from '../../hooks/useHRNotifications';
 import { SearchInput } from '../UI';
 import CompanySwitcher from '../Company/CompanySwitcher';
+import { useOnlinePeople } from '../chat/lib/presence';
 import { useMyCompanies } from '../../hooks/useMyCompanies';
 import { OPEN_COMPANY_PROFILE, COMPANY_PROFILE_SAVED } from '../Dashboard/GetStarted';
 
@@ -125,6 +126,8 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
   // the company the person is working in: its name stands in until a company profile has been set up
   const { data: myCompanies } = useMyCompanies();
   const currentCompanyName = myCompanies?.find((c) => c.is_current)?.name;
+  // shows this person as online in Teams on every page, not only while the chat is open
+  useOnlinePeople();
   const [notifications, setNotifications] = useState<NotificationState>({
     staff: 0,
     leave: 0,

@@ -54,6 +54,7 @@ import { useNavigate } from 'react-router-dom';
 import TrainingModule from './Training';
 import Profile from './Profile';
 import { ChatLayout } from '../chat/ChatLayout';
+import { useOnlinePeople } from '../chat/lib/presence';
 import VideoConferenceComponent from './VideoConf';
 import UserProfileDropdown from './UserProfile';
 import PasswordResetModal from './PasswordRestModal';
@@ -2612,6 +2613,8 @@ const staffMenuGroups: MenuGroup[] = [
 
 // Main StaffPortal Component with Time Tracking
 const StaffPortal = () => {
+  // shows this person as online in Teams on every page of the portal
+  useOnlinePeople();
   const [activeTab, setActiveTab] = useState('home');
   const [showResetModal, setShowResetModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // For mobile
