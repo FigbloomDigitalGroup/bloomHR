@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { X, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, AlertCircle, Edit2, Save, Plus, Upload, Download, FileSpreadsheet, CheckCircle } from 'lucide-react';
+import { X, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, AlertCircle, Edit2, Save, Plus, Upload, Download, FileSpreadsheet, CheckCircle, Mail, RotateCcw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { TownProps } from '../../types/supabase';
 import * as XLSX from 'xlsx';
 import { readEmployeeRows } from '../../lib/employeeSheet';
+import { inviteEmployee, normaliseWorkEmail, sendInvitations, summariseInvites, workEmailProblem, type InviteOutcome } from '../../lib/employeeInvite';
 import toast from 'react-hot-toast';
 
 type Employee = {
@@ -150,6 +151,10 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
     success: 0,
     errors: 0
   });
+  // rows that were not saved, and why ("Row 4 (EMP-012): no work email ...")
+  const [bulkProblems, setBulkProblems] = useState<string[]>([]);
+  // invitations to join for the employees the upload created
+  const [bulkInvites, setBulkInvites] = useState<{ done: number; total: number; outcomes: InviteOutcome[] | null } | null>(null);
 
   // Fetch data from Supabase
   useEffect(() => {
@@ -338,17 +343,29 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
       setLoading(true);
       
       if (!newEmployee["Employee Number"] || !newEmployee["First Name"] || !newEmployee["Last Name"]) {
-        setError('Employee Number, First Name, and Last Name are required.');
+        toast.error('Employee Number, First Name and Last Name are required.');
         return;
       }
-      
+      // the invitation to join goes to the work email, and their login finds this record by it
+      const emailProblem = workEmailProblem(newEmployee["Work Email"]);
+      if (emailProblem) {
+        toast.error(`Cannot add the employee: ${emailProblem}.`);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('employees')
-        .insert([newEmployee])
+        .insert([{ ...newEmployee, "Work Email": normaliseWorkEmail(newEmployee["Work Email"]) }])
         .select();
-      
-      if (error) throw error;
-      
+
+      if (error) {
+        if (error.code === '23505' && /work email/i.test(error.message)) {
+          toast.error('Another employee already has this work email.');
+          return;
+        }
+        throw error;
+      }
+
       if (data && data[0]) {
         const newEmployeeWithId = {
           ...data[0],
@@ -375,10 +392,13 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
           manager_email: '',
           regional_manager: ''
         });
-        toast.success('Employee added successfully!');
+        const invite = await inviteEmployee(data[0]["Work Email"]);
+        if (invite.status === 'sent') toast.success(`Employee added. Invitation to join sent to ${invite.email}.`);
+        else if (invite.status === 'member') toast.success(`Employee added. ${invite.email} already has access to this company.`);
+        else toast.error(`Employee added, but the invitation was not sent: ${invite.reason} Send it again from Invite people.`, { duration: 8000 });
       }
     } catch (err) {
-      setError('Failed to add new employee. Please try again.');
+      toast.error('Failed to add the employee. Please try again.');
       console.error('Error adding new employee:', err);
     } finally {
       setLoading(false);
@@ -459,15 +479,18 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
 
   const generateBulkUploadPreview = async (data: any[]): Promise<BulkUploadPreview> => {
     const operations: UploadOperation[] = [];
+    const emailsInSheet = new Set<string>();
 
-    for (const row of data) {
+    for (const [index, row] of data.entries()) {
+      const line = `Row ${index + 2}`; // the header is row 1, as in Excel
       try {
         // Map Excel columns to database columns
         const employeeData: Partial<Employee> = {
           "Employee Number": row['Employee Number'] || row['employee_number'] || row['EmployeeID'],
           "First Name": row['First Name'] || row['first_name'] || row['FirstName'],
           "Last Name": row['Last Name'] || row['last_name'] || row['LastName'],
-          "Work Email": row['Work Email'] || row['work_email'] || row['Email'],
+          // saved as logins have it (lower case): the login finds the employee by this address
+          "Work Email": normaliseWorkEmail(row['Work Email'] || row['work_email'] || row['Email']) || undefined,
           Town: row['Town'] || row['town'] || row['Office'] || row['office'],
           "Job Title": row['Job Title'] || row['job_title'] || row['Position'],
           "Employee Type": row['Employee Type'] || row['employee_type'] || row['Type'],
@@ -492,10 +515,17 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
           operations.push({
             employee: employeeData,
             operation: 'error',
-            error: 'Missing required fields (Employee Number, First Name, Last Name)'
+            error: `${line}: missing Employee Number, First Name or Last Name`
           });
           continue;
         }
+
+        const workEmail = employeeData["Work Email"];
+        if (workEmail && emailsInSheet.has(workEmail)) {
+          operations.push({ employee: employeeData, operation: 'error', error: `${line} (${employeeData["Employee Number"]}): work email ${workEmail} is used by another row` });
+          continue;
+        }
+        if (workEmail) emailsInSheet.add(workEmail);
 
         // Check if employee exists using Employee Number
         const { data: existingEmployee, error } = await supabase
@@ -511,6 +541,13 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
             operation: 'error',
             error: 'Database error while checking existing record'
           });
+          continue;
+        }
+
+        // a new employee needs a work email (the invitation to join is sent there); an update may leave it blank
+        const emailProblem = existingEmployee && !workEmail ? null : workEmailProblem(workEmail);
+        if (emailProblem) {
+          operations.push({ employee: employeeData, operation: 'error', error: `${line} (${employeeData["Employee Number"]}): ${emailProblem}` });
           continue;
         }
 
@@ -532,7 +569,7 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
         operations.push({
           employee: row,
           operation: 'error',
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: `${line}: ${error instanceof Error ? error.message : 'could not be read'}`
         });
       }
     }
@@ -557,6 +594,10 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
     setIsUploading(true);
     let successCount = 0;
     let errorCount = 0;
+    const problems: string[] = previewData.operations.filter((op) => op.operation === 'error').map((op) => op.error ?? 'Could not be read');
+    const createdEmails: string[] = [];
+    setBulkProblems(problems);
+    setBulkInvites(null);
 
     try {
       for (let i = 0; i < previewData.operations.length; i++) {
@@ -604,6 +645,7 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
               console.error('Create error:', error);
               throw error;
             }
+            if (operation.employee["Work Email"]) createdEmails.push(operation.employee["Work Email"]);
             successCount++;
             setUploadProgress(prev => ({
               ...prev,
@@ -617,31 +659,43 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
             errors: prev.errors + 1
           }));
           console.error('Error processing employee:', operation.employee["Employee Number"], error);
+          const failure = error as { code?: string; message?: string } | null;
+          const message = failure?.code === '23505' && /work email/i.test(String(failure.message))
+            ? 'another employee already has this work email'
+            : String(failure?.message || 'could not be saved');
+          problems.push(`${operation.employee["Employee Number"]}: ${message}`);
+          setBulkProblems([...problems]);
         }
       }
 
       // Refresh the data
       await fetchData();
-      
-      // Show success message and auto-close modal after delay
+
+      // email everyone who was added a link to join the company
+      let invitesNotSent = 0;
+      if (createdEmails.length) {
+        setBulkInvites({ done: 0, total: createdEmails.length, outcomes: null });
+        const outcomes = await sendInvitations(
+          createdEmails.map((email) => ({ email, role: 'STAFF' })),
+          (done, total) => setBulkInvites({ done, total, outcomes: null })
+        );
+        setBulkInvites({ done: outcomes.length, total: outcomes.length, outcomes });
+        invitesNotSent = summariseInvites(outcomes).notSent.length;
+      }
+
       if (errorCount === 0) {
         toast.success(`Bulk upload completed successfully: ${successCount} records processed`);
       } else {
         toast.success(`Bulk upload completed: ${successCount} successful, ${errorCount} errors`);
       }
-      
-      // Auto-close modal after 2 seconds
-      setTimeout(() => {
-        setShowUploadModal(false);
-        setBulkUploadPreview(null);
-        setUploadProgress({
-          processed: 0,
-          total: 0,
-          success: 0,
-          errors: 0
-        });
-      }, 2000);
-      
+
+      // close by itself only when there is nothing to read or retry
+      if (errorCount === 0 && invitesNotSent === 0) {
+        setTimeout(() => {
+          closeUploadModal();
+        }, 2000);
+      }
+
     } catch (error) {
       console.error('Bulk upload execution error:', error);
       toast.error('Failed to execute bulk upload.');
@@ -655,12 +709,28 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
   const closeUploadModal = () => {
     setShowUploadModal(false);
     setBulkUploadPreview(null);
+    setBulkProblems([]);
+    setBulkInvites(null);
     setUploadProgress({
       processed: 0,
       total: 0,
       success: 0,
       errors: 0
     });
+  };
+
+  const resendFailedInvites = async () => {
+    const outcomes = bulkInvites?.outcomes;
+    if (!outcomes) return;
+    const retry = summariseInvites(outcomes).notSent.map((o) => o.email);
+    setBulkInvites({ done: 0, total: retry.length, outcomes: null });
+    const retried = await sendInvitations(retry.map((email) => ({ email, role: 'STAFF' })), (done, total) => setBulkInvites({ done, total, outcomes: null }));
+    const byEmail = new Map(retried.map((o) => [o.email, o]));
+    const merged = outcomes.map((o) => byEmail.get(o.email) ?? o);
+    setBulkInvites({ done: merged.length, total: merged.length, outcomes: merged });
+    const stillNotSent = summariseInvites(merged).notSent.length;
+    if (stillNotSent) toast.error(`${stillNotSent} invitation(s) still not sent.`);
+    else toast.success('All invitations sent.');
   };
 
   const downloadTemplate = () => {
@@ -811,19 +881,76 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
               </div>
             )}
             
+            {bulkProblems.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs font-semibold text-red-700 mb-1">Not saved:</p>
+                <ul className="max-h-28 overflow-y-auto text-xs text-red-600 list-disc pl-5 space-y-0.5">
+                  {bulkProblems.map((problem) => (
+                    <li key={problem}>{problem}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {bulkInvites && (
+              <div className="mb-4 rounded-lg border border-gray-200 p-3">
+                <p className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                  <Mail className="w-4 h-4" />
+                  Invitations to join
+                </p>
+                {!bulkInvites.outcomes ? (
+                  <p className="mt-1 text-xs text-gray-600">
+                    Sending {bulkInvites.done} of {bulkInvites.total}…
+                  </p>
+                ) : (() => {
+                  const summary = summariseInvites(bulkInvites.outcomes);
+                  return (
+                    <>
+                      <p className="mt-1 text-xs text-gray-600">
+                        {summary.sent} sent
+                        {summary.members > 0 && `, ${summary.members} already had access`}
+                        {summary.notSent.length > 0 && `, ${summary.notSent.length} not sent`}.
+                      </p>
+                      {summary.notSent.length > 0 && (
+                        <>
+                          <ul className="mt-1 max-h-24 overflow-y-auto text-xs text-amber-700 list-disc pl-5 space-y-0.5">
+                            {summary.notSent.map((o) => (
+                              <li key={o.email}>
+                                {o.email}: {o.reason}
+                              </li>
+                            ))}
+                          </ul>
+                          <button
+                            type="button"
+                            onClick={resendFailedInvites}
+                            className="mt-2 inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            Resend the {summary.notSent.length} not sent
+                          </button>
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+
             <div className="flex items-center justify-center gap-3">
               {isUploading ? (
                 <>
                   <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
                   <span className="text-sm text-gray-700">
-                    Applying changes to database...
+                    {bulkInvites && !bulkInvites.outcomes ? 'Sending invitations...' : 'Applying changes to database...'}
                   </span>
                 </>
               ) : (
                 <>
                   <CheckCircle className="w-6 h-6 text-green-500" />
                   <span className="text-sm text-gray-700">
-                    Processing completed! Closing automatically...
+                    {bulkProblems.length === 0 && (!bulkInvites?.outcomes || summariseInvites(bulkInvites.outcomes).notSent.length === 0)
+                      ? 'Processing completed! Closing automatically...'
+                      : 'Processing completed.'}
                   </span>
                 </>
               )}

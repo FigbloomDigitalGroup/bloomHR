@@ -8,7 +8,7 @@ vi.mock('./companyApi', () => ({
   inviteLink: (token: string) => `https://hr.example/join?token=${token}`,
 }));
 
-import { inviteEmployee, normaliseWorkEmail } from './employeeInvite';
+import { inviteEmployee, normaliseWorkEmail, sendInvitations, summariseInvites, workEmailProblem } from './employeeInvite';
 
 beforeEach(() => {
   createInvitation.mockReset().mockResolvedValue({ invitation_id: 'i1', token: 'tok', expires_at: '2026-10-16' });
@@ -52,5 +52,52 @@ describe('inviteEmployee', () => {
       email: 'a@b.co',
       reason: 'Only an administrator or HR can invite people',
     });
+  });
+});
+
+describe('workEmailProblem', () => {
+  it('accepts a valid address in any case', () => {
+    expect(workEmailProblem(' Jane.Doe@Co.com ')).toBeNull();
+  });
+
+  it('explains a missing or invalid address', () => {
+    expect(workEmailProblem('')).toBe('no work email (the invitation to join is sent there)');
+    expect(workEmailProblem(null)).toBe('no work email (the invitation to join is sent there)');
+    expect(workEmailProblem('jane@co')).toBe('work email "jane@co" is not a valid address');
+  });
+});
+
+describe('sendInvitations', () => {
+  it('sends each invitation with its role, one after another, and reports progress', async () => {
+    createInvitation.mockImplementation(async (email: string) => {
+      if (email === 'old@co.com') throw new Error('That person is already in this company.');
+      return { invitation_id: email, token: `tok-${email}`, expires_at: '' };
+    });
+    emailInvitation.mockImplementation(async (token: string) => {
+      if (token === 'tok-down@co.com') throw new Error('Rate limited');
+      return { ok: true };
+    });
+    const progress: string[] = [];
+    const outcomes = await sendInvitations(
+      [
+        { email: 'A@co.com', role: 'STAFF' },
+        { email: 'old@co.com', role: 'STAFF' },
+        { email: 'down@co.com', role: 'HR' },
+      ],
+      (done, total) => progress.push(`${done}/${total}`),
+      0
+    );
+    expect(createInvitation.mock.calls).toEqual([
+      ['a@co.com', 'STAFF'],
+      ['old@co.com', 'STAFF'],
+      ['down@co.com', 'HR'],
+    ]);
+    expect(progress).toEqual(['1/3', '2/3', '3/3']);
+    const summary = summariseInvites(outcomes);
+    expect(summary.sent).toBe(1);
+    expect(summary.members).toBe(1);
+    expect(summary.notSent).toEqual([
+      { status: 'not-emailed', email: 'down@co.com', link: 'https://hr.example/join?token=tok-down@co.com', reason: 'Rate limited' },
+    ]);
   });
 });

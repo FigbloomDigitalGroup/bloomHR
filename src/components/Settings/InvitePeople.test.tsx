@@ -118,6 +118,28 @@ describe('InvitePeople', () => {
     expect(screen.getAllByRole('option').length).toBe(7);
   });
 
+  it('resends every unused invitation at once, after asking', async () => {
+    api.listInvitations.mockResolvedValue([
+      { id: 'w', email: 'waiting@x.co', role: 'STAFF', status: 'pending', created_at: past, expires_at: future, accepted_at: null },
+      { id: 'e', email: 'expired@x.co', role: 'HR', status: 'pending', created_at: past, expires_at: past, accepted_at: null },
+      { id: 'j', email: 'joined@x.co', role: 'HR', status: 'accepted', created_at: past, expires_at: future, accepted_at: past },
+    ]);
+    api.createInvitation.mockImplementation(async (email: string) => ({ invitation_id: email, token: `tok-${email}`, expires_at: future }));
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.mocked(toast.success).mockClear();
+    render(<InvitePeople />);
+    expect(await screen.findByText('2 invitation(s) not used yet')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Resend all' }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('2 invitation(s) sent again.'), { timeout: 3000 });
+    expect(confirm).toHaveBeenCalled();
+    expect(api.createInvitation.mock.calls).toEqual([
+      ['waiting@x.co', 'STAFF'],
+      ['expired@x.co', 'HR'],
+    ]);
+    expect(api.emailInvitation.mock.calls).toEqual([['tok-waiting@x.co'], ['tok-expired@x.co']]);
+    confirm.mockRestore();
+  });
+
   it('says so when the list cannot be loaded', async () => {
     api.listInvitations.mockRejectedValue(new Error('boom'));
     render(<InvitePeople />);
