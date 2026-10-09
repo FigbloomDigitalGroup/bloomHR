@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalisePaymentMethod, paymentKind, paymentMethodLabel, paymentMethodOption } from './paymentMethods';
+import { isPaidByMpesa, normalisePaymentMethod, paymentKind, paymentMethodLabel, paymentMethodOption } from './paymentMethods';
 
 describe('normalisePaymentMethod', () => {
   it.each([
@@ -52,5 +52,26 @@ describe('paymentKind', () => {
     ['Cheque', 'bank'],
   ])('%s is paid by %s', (method, kind) => {
     expect(paymentKind(method)).toBe(kind);
+  });
+});
+
+describe('isPaidByMpesa', () => {
+  it('pays M-Pesa staff, including those with no method set', () => {
+    expect([{ payment_method: 'M-Pesa' }, { payment_method: 'MPESA' }, { payment_method: 'Mobile Money' }, { payment_method: null }, {}].map(isPaidByMpesa)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+    ]);
+  });
+
+  it('leaves out bank, cash and Airtel staff', () => {
+    expect([{ payment_method: 'Bank Transfer' }, { payment_method: 'Cash' }, { payment_method: 'Airtel Money' }, { payment_method: 'Cheque' }].map(isPaidByMpesa)).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 });

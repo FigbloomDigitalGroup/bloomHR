@@ -37,3 +37,9 @@ export const paymentKind = (value: unknown): PaymentKind => {
   if (label === 'Cash') return 'cash';
   return 'bank';
 };
+
+/**
+ * Whether M-Pesa bulk pay may pay this payroll record: only staff paid by M-Pesa (no method set counts, as payroll
+ * pays it by M-Pesa). Bank, cash and Airtel staff are paid another way; M-Pesa cannot pay an Airtel number.
+ */
+export const isPaidByMpesa = (record: { payment_method?: unknown } | null | undefined) => paymentMethodLabel(record?.payment_method) === 'M-Pesa';
