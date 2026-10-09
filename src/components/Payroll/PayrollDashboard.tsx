@@ -59,6 +59,8 @@ import {
 } from "../../lib/payrollRuns";
 import PayrollRunBar from "./PayrollRunBar";
 import VoluntaryDeductionsModal from "./VoluntaryDeductionsModal";
+import MissingPayrollDetailsModal from "./MissingPayrollDetailsModal";
+import { employeesMissingDetails } from "../../lib/missingPayrollDetails";
 import { deductionsForPeriod, loadDeductionSetup, payslipDeductionLines, totalOf } from "../../lib/voluntaryDeductions";
 import BulkSalaryHistoryUpload from "./BulkSalaryHistoryUpload";
 
@@ -2476,7 +2478,7 @@ export default function PayrollDashboard() {
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [currentRecordIndex, setCurrentRecordIndex] = useState<number | null>(null);
-  const [, setEmployees] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [departments, setDepartments] = useState(["all"]);
   const [branches, setBranches] = useState([
@@ -2493,6 +2495,9 @@ export default function PayrollDashboard() {
   const [showDeductions, setShowDeductions] = useState(false);
   // bumped when voluntary deductions change, so this month's figures are worked out again
   const [deductionsVersion, setDeductionsVersion] = useState(0);
+  const [showMissingDetails, setShowMissingDetails] = useState(false);
+  // bumped when payroll details (KRA PIN, bank...) are filled in, so the employees are loaded again
+  const [detailsVersion, setDetailsVersion] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [companyInfo, setCompanyInfo] = useState<any>(null);
 
@@ -3480,7 +3485,7 @@ export default function PayrollDashboard() {
       // Only fetch when settings are loaded
       fetchEmployees();
     }
-  }, [actualPeriod, settings, overrideStatutoryChecks, salaryAdvances, deductionsVersion]);
+  }, [actualPeriod, settings, overrideStatutoryChecks, salaryAdvances, deductionsVersion, detailsVersion]);
 
   // the month's payroll run, reloaded after each start/recalculate/approve/...
   useEffect(() => {
@@ -3689,13 +3694,17 @@ export default function PayrollDashboard() {
 
   const runNetPay = payrollRecords.reduce((sum: number, r: any) => sum + (r.net_pay || 0), 0);
 
+  const missingDetails = useMemo(() => employeesMissingDetails(employees), [employees]);
+
   const handleApproveRun = () =>
     changeRunStatus(
       "approved",
       `Approve payroll for ${periodLabel}?
 
 ${payrollRecords.length} employees, net pay KSh ${Math.round(runNetPay).toLocaleString()}.
-
+${missingDetails.length ? `
+${missingDetails.length} employee(s) are missing a KRA PIN, NSSF or SHA number, or payment details (see "Missing details").
+` : ""}
 Payslips will be locked and staff will be able to see them.`,
       `Payroll for ${periodLabel} approved. Staff can now see their payslips.`,
     );
@@ -4264,6 +4273,18 @@ This can't be undone: the payslips stay locked for good.`,
         </button>
         <button
           type="button"
+          onClick={() => setShowMissingDetails(true)}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border text-[11px] font-semibold transition-colors ${
+            missingDetails.length
+              ? "border-orange-text-alt/40 bg-orange-tint-alt text-orange-text-alt hover:brightness-95"
+              : "border-border bg-white text-muted-foreground hover:bg-secondary hover:text-ink"
+          }`}
+        >
+          <AlertTriangle className="w-3 h-3" />
+          Missing details{missingDetails.length ? ` (${missingDetails.length})` : ""}
+        </button>
+        <button
+          type="button"
           onClick={() => setShowStatutorySettings(true)}
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-ink transition-colors"
         >
@@ -4694,6 +4715,21 @@ This can't be undone: the payslips stay locked for good.`,
               ? `Payroll for ${periodLabel} is a draft: press Recalculate to apply deduction changes to it.`
               : monthRun
                 ? `Payroll for ${periodLabel} is ${monthRun.status}, so changes apply from the next month you run.`
+                : null
+          }
+        />
+      )}
+
+      {showMissingDetails && (
+        <MissingPayrollDetailsModal
+          employees={employees}
+          onClose={() => setShowMissingDetails(false)}
+          onChanged={() => setDetailsVersion((v) => v + 1)}
+          draftNotice={
+            monthRun?.status === "draft"
+              ? `Payroll for ${periodLabel} is a draft: press Recalculate to put the new details on its payslips.`
+              : monthRun
+                ? `Payroll for ${periodLabel} is ${monthRun.status}: its payslips keep the details they were approved with.`
                 : null
           }
         />
