@@ -16,10 +16,10 @@ const filled = (value: unknown): boolean => {
   return String(value).trim() !== '';
 };
 
-/** Paid by mobile money or cash needs no bank account; anything else needs the bank and account number. */
+/** Paid by mobile money (M-Pesa, Airtel) or cash needs no bank account; anything else needs the bank and account number. */
 function paymentDone(employee: EmployeeRecord): boolean {
   const method = String(employee['payment_method'] ?? '').toLowerCase();
-  if (/mpesa|m-pesa|mobile|cash/.test(method)) return true;
+  if (/mpesa|m-pesa|mobile|airtel|cash/.test(method)) return true;
   return filled(employee['Bank']) && filled(employee['Account Number']);
 }
 

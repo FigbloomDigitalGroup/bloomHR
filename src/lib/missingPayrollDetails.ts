@@ -2,24 +2,12 @@ import { supabase } from './supabase';
 import { isValidPhone } from './formValidation';
 import { NOT_SAVED_NO_ACCESS, requireUpdatedRows } from './requireUpdated';
 import type { EmployeeRecord } from './profileCompleteness';
+import { normalisePaymentMethod, paymentKind } from './paymentMethods';
 
 // Payroll details finance needs before paying and filing: KRA PIN, NSSF and SHA numbers, and where the salary goes.
 // The check finds who is missing what; the spreadsheet lets finance fill the gaps for many employees at once.
 
 const text = (value: unknown) => (value === null || value === undefined ? '' : String(value).trim());
-
-/**
- * How an employee is paid, read the way the payroll page reads it: no method set means M-Pesa (as payroll pays it),
- * mobile money of any spelling needs a phone number, cash needs nothing, anything else is a bank transfer.
- */
-export type PaymentKind = 'mobile' | 'cash' | 'bank';
-
-export const paymentKind = (method: unknown): PaymentKind => {
-  const m = text(method).toLowerCase();
-  if (!m || /m-?pesa|mobile|airtel/.test(m)) return 'mobile';
-  if (m === 'cash') return 'cash';
-  return 'bank';
-};
 
 /** What is missing for one employee, in the words shown on screen and in the spreadsheet. */
 export function missingDetails(employee: EmployeeRecord): string[] {
@@ -89,16 +77,6 @@ export const detailsSheetRows = (employees: EmployeeRecord[]): string[][] => {
       ...(Object.values(DETAIL_COLUMNS) as string[]).map((field) => savedValue(e, field)),
     ];
   });
-};
-
-/** The payment methods payroll understands, from whatever was typed. Undefined when it is not one of them. */
-export const normalisePaymentMethod = (value: string): string | undefined => {
-  const v = value.toLowerCase().replace(/[\s_-]/g, '');
-  if (/^(mpesa|mobilemoney|mobile|safaricom)$/.test(v)) return 'MPESA'; // the payroll page shows this as M-Pesa
-  if (/^airtel(money)?$/.test(v)) return 'Airtel Money';
-  if (/^(bank|banktransfer|eft|rtgs)$/.test(v)) return 'Bank Transfer';
-  if (v === 'cash') return 'Cash';
-  return undefined;
 };
 
 /** A phone number that lost its leading zero in Excel (722000001) gets it back. */

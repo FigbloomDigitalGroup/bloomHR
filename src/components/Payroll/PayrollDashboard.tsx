@@ -61,6 +61,7 @@ import PayrollRunBar from "./PayrollRunBar";
 import VoluntaryDeductionsModal from "./VoluntaryDeductionsModal";
 import MissingPayrollDetailsModal from "./MissingPayrollDetailsModal";
 import { employeesMissingDetails } from "../../lib/missingPayrollDetails";
+import { paymentMethodLabel } from "../../lib/paymentMethods";
 import { deductionsForPeriod, loadDeductionSetup, payslipDeductionLines, totalOf } from "../../lib/voluntaryDeductions";
 import BulkSalaryHistoryUpload from "./BulkSalaryHistoryUpload";
 
@@ -2431,10 +2432,6 @@ const P10FormGenerator = ({
     </div>
   );
 };
-
-// The employee form saves "MPESA"; the payroll filters and payslip use "M-Pesa". No method set means M-Pesa.
-const paymentMethodLabel = (method: string | null | undefined) =>
-  !method || /^m-?pesa$/i.test(method.trim()) ? "M-Pesa" : method;
 
 const PAYSLIP_AMOUNTS = [
   "basic_salary", "gross_pay", "net_pay", "total_deductions", "nssf_deduction", "nhif_deduction", "paye_tax",

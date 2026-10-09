@@ -21,6 +21,7 @@ import { payslipDeductionLines } from '../../lib/voluntaryDeductions';
 import html2pdf from 'html2pdf.js';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { paymentMethodLabel } from '../../lib/paymentMethods';
 
 // HARDCODED STATUTORY SETTINGS - Updated to match payroll dashboard
 const statutorySettings = {
@@ -507,14 +508,14 @@ const PayslipModal = ({
                 <div className="border border-gray-300 p-4">
                   <h3 className="font-bold border-b border-gray-300 pb-2 mb-3 text-gray-900 text-sm">Payment details</h3>
                   <div className="space-y-1.5 text-black">
-                    <div className="flex justify-between"><span className="font-semibold text-gray-600">Method:</span><span className="font-bold text-right">{record["Payment Method"] || record.payment_method || 'M-Pesa'}</span></div>
-                    {(record["Payment Method"] || record.payment_method) === 'Bank Transfer' && (
+                    <div className="flex justify-between"><span className="font-semibold text-gray-600">Method:</span><span className="font-bold text-right">{paymentMethodLabel(record["Payment Method"] || record.payment_method)}</span></div>
+                    {paymentMethodLabel(record["Payment Method"] || record.payment_method) === 'Bank Transfer' && (
                       <>
                         <div className="flex justify-between"><span className="font-semibold text-gray-600">Bank:</span><span className="font-bold text-right">{record["Bank Name"] || record.bank_name || 'N/A'}</span></div>
                         <div className="flex justify-between"><span className="font-semibold text-gray-600">Account:</span><span className="font-bold text-right">{record["Account Number"] || record.account_number || 'N/A'}</span></div>
                       </>
                     )}
-                    {(record["Payment Method"] || record.payment_method) === 'M-Pesa' && (
+                    {paymentMethodLabel(record["Payment Method"] || record.payment_method) === 'M-Pesa' && (
                       <div className="flex justify-between"><span className="font-semibold text-gray-600">M-Pesa no:</span><span className="font-bold text-right">{record["Phone Number"] || record.employeeNu || 'N/A'}</span></div>
                     )}
                     <div className="flex justify-between"><span className="font-semibold text-gray-600">Job group:</span><span className="font-bold text-right">{record["Job Group"] || record.jobGroup || 'N/A'}</span></div>

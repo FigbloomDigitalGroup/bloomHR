@@ -15,6 +15,7 @@ import { employeeTypeOptions } from '../../lib/employmentTypes';
 import { STARTER_DEPARTMENTS, ensureBranchListed, optionsWithStarters } from '../../lib/employeeOptions';
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 import { useUser } from '../ProtectedRoutes/UserContext';
+import { PAYMENT_METHODS, paymentMethodOption } from '../../lib/paymentMethods';
 
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'SHIF Number'?: string | null;
@@ -85,7 +86,7 @@ const EditEmployeePage = () => {
     office: [],
     jobTitles: [],
     supervisors: [],
-    paymentMethods: ['Bank Transfer', 'Cash', 'Mobile Money'],
+    paymentMethods: [...PAYMENT_METHODS],
     genders: ['Male', 'Female', 'Other']
   });
   const [activeTab, setActiveTab] = useState('personal');
@@ -188,7 +189,8 @@ const EditEmployeePage = () => {
           supervisors: supervisors?.map(item => `${item['First Name']} ${item['Last Name']}`) || [],
         }));
 
-        setEmployee(empData);
+        // older records say "Mobile Money" or "MPESA": show (and save) the spelling payroll and payslips match
+        setEmployee(empData.payment_method ? { ...empData, payment_method: paymentMethodOption(empData.payment_method) } : empData);
 
         // Set single emergency contact
         setEmergencyContact(

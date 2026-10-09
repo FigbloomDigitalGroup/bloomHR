@@ -23,9 +23,7 @@ import {
   detailsSheetRows,
   employeesMissingDetails,
   missingDetails,
-  normalisePaymentMethod,
   parseDetailsSheet,
-  paymentKind,
   saveDetailsUpdates,
 } from './missingPayrollDetails';
 
@@ -42,22 +40,6 @@ const complete = {
   'Account Number': '1100223344',
   'Mobile Number': '0712345678',
 };
-
-describe('paymentKind', () => {
-  it.each([
-    [null, 'mobile'],
-    ['', 'mobile'],
-    ['MPESA', 'mobile'],
-    ['M-Pesa', 'mobile'],
-    ['Mobile Money', 'mobile'],
-    ['Airtel Money', 'mobile'],
-    ['Cash', 'cash'],
-    ['Bank Transfer', 'bank'],
-    ['Cheque', 'bank'],
-  ])('%s is paid by %s', (method, kind) => {
-    expect(paymentKind(method)).toBe(kind);
-  });
-});
 
 describe('missingDetails', () => {
   it('finds nothing for a complete bank-paid employee', () => {
@@ -113,21 +95,6 @@ describe('detailsSheetRows', () => {
   });
 });
 
-describe('normalisePaymentMethod', () => {
-  it.each([
-    ['m-pesa', 'MPESA'],
-    ['MPESA', 'MPESA'],
-    ['Mobile Money', 'MPESA'],
-    ['airtel', 'Airtel Money'],
-    ['bank', 'Bank Transfer'],
-    ['Bank transfer', 'Bank Transfer'],
-    ['CASH', 'Cash'],
-    ['cheque', undefined],
-  ])('%s -> %s', (typed, saved) => {
-    expect(normalisePaymentMethod(typed)).toBe(saved);
-  });
-});
-
 describe('parseDetailsSheet', () => {
   const employees = new Map<string, Record<string, unknown>>([
     ['EMP-001', { ...complete, 'Tax PIN': '', 'NSSF Number': '' }],
@@ -151,7 +118,7 @@ describe('parseDetailsSheet', () => {
 
   it('switches to M-Pesa with a number whose leading zero Excel dropped', () => {
     const { updates: parsed } = parseDetailsSheet([{ 'Employee Number': 'EMP-002', 'Payment Method': 'M-Pesa', 'M-Pesa Number': 722000001 }], employees);
-    expect(parsed[0].changes).toEqual({ payment_method: 'MPESA', 'Mobile Number': '0722000001' });
+    expect(parsed[0].changes).toEqual({ payment_method: 'M-Pesa', 'Mobile Number': '0722000001' });
   });
 
   it('reports every problem on a row, numbered as in Excel', () => {
