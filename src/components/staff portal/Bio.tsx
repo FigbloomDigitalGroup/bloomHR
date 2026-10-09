@@ -12,6 +12,7 @@ import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import StatusPill from '../UI/StatusPill';
 import { User, Briefcase, CreditCard, Phone, MapPin } from 'lucide-react';
+import { PAYMENT_METHODS, paymentMethodOption } from '../../lib/paymentMethods';
 
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'SHIF Number'?: string | null;
@@ -118,7 +119,7 @@ const EmployeeBioPage = () => {
     office: [],
     jobTitles: [],
     supervisors: [],
-    paymentMethods: ['Bank Transfer', 'Cash', 'Mobile Money'],
+    paymentMethods: [...PAYMENT_METHODS],
     genders: ['Male', 'Female', 'Other']
   });
   const [activeTab, setActiveTab] = useState('personal');
@@ -1448,7 +1449,7 @@ const EmployeeBioPage = () => {
                     label="Payment Method"
                     name="payment_method"
                     type={isEditMode ? "select" : "text"}
-                    value={employee['payment_method'] || ''}
+                    value={paymentMethodOption(employee['payment_method'])}
                     onChange={handleInputChange}
                     options={dropdownOptions.paymentMethods}
                     disabled={!isEditMode || !canEditField('payment_method')}

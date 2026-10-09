@@ -1,6 +1,7 @@
 import React from 'react';
 import { Download, Printer, Share2, X, ArrowLeft, ArrowRight, Shield, Award, Building2 } from 'lucide-react';
 import GlowButton from '../UI/GlowButton';
+import { paymentMethodLabel } from '../../lib/paymentMethods';
 
 interface PayslipModalProps {
   record: any;
@@ -652,14 +653,14 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, onClose, onPrevious
                     </div>
                     <div className="card-title">Payment Details</div>
                     <div className="card-content">
-                      <div className="card-value">{record.payment_method}</div>
-                      {record.payment_method === 'Bank Transfer' && (
+                      <div className="card-value">{paymentMethodLabel(record.payment_method)}</div>
+                      {paymentMethodLabel(record.payment_method) === 'Bank Transfer' && (
                         <>
                           <div className="card-value">{record.bank_name}</div>
                           <div className="card-value">A/C: ••••{record.account_number.slice(-4)}</div>
                         </>
                       )}
-                      {record.payment_method === 'M-Pesa' && (
+                      {paymentMethodLabel(record.payment_method) === 'M-Pesa' && (
                         <div className="card-value">Phone: {record.account_number}</div>
                       )}
                       <div className="card-value">Pay Date: {new Date().toLocaleDateString()}</div>

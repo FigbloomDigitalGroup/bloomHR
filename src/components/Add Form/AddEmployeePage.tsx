@@ -12,6 +12,7 @@ import GlowButton from '../UI/GlowButton';
 import SearchableDropdown from '../UI/SearchableDropdown';
 import { employeeTypeOptions } from '../../lib/employmentTypes';
 import { STARTER_DEPARTMENTS, ensureBranchListed, optionsWithStarters } from '../../lib/employeeOptions';
+import { PAYMENT_METHODS } from '../../lib/paymentMethods';
 
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'Work Mobile': string | null;
@@ -1239,7 +1240,7 @@ const AddEmployeePage = () => {
                       type="select"
                       value={newEmployee['payment_method'] || ''}
                       onChange={handleInputChange}
-                      options={['Bank Transfer', 'Cash', 'MPESA']}
+                      options={[...PAYMENT_METHODS]}
                     />
                   </div>
                 </div>
