@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { Card, PageHeader, StatusPill, EmptyState, Button } from '../UI';
 import type { StatusTone } from '../UI';
 import { companyApi, inviteLink, Invitation, INVITABLE_ROLES } from '../../lib/companyApi';
+import { sendInvitations, summariseInvites } from '../../lib/employeeInvite';
 
 const roleLabel = (role: string) => role.charAt(0) + role.slice(1).toLowerCase();
 
@@ -27,6 +28,7 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
   const [invitations, setInvitations] = useState<Invitation[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [latest, setLatest] = useState<{ email: string; link: string; mail: 'sending' | 'sent' | 'failed'; reason?: string } | null>(null);
+  const [resending, setResending] = useState<{ done: number; total: number } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -83,6 +85,29 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
       await invite(inv.email, inv.role);
     } catch (err) {
       toast.error((err as Error).message);
+    }
+  };
+
+  // invitations nobody has used yet, including expired ones: these can be sent again
+  const due = (invitations ?? []).filter((inv) => ['Waiting', 'Expired'].includes(effectiveStatus(inv).label));
+
+  /** Sends every unused invitation again, one after another. Each gets a new link; the old links stop working. */
+  const resendAll = async () => {
+    if (due.length === 0) return;
+    if (!window.confirm(`Send ${due.length} invitation(s) again? Each person gets a new link, and their old link stops working.`)) return;
+    setResending({ done: 0, total: due.length });
+    const outcomes = await sendInvitations(
+      due.map((inv) => ({ email: inv.email, role: inv.role })),
+      (done, total) => setResending({ done, total })
+    );
+    setResending(null);
+    await load();
+    const { sent, members, notSent } = summariseInvites(outcomes);
+    const joined = members ? `, ${members} had already joined` : '';
+    if (notSent.length) {
+      toast.error(`${sent} sent${joined}. Not sent: ${notSent.map((o) => `${o.email} (${o.reason})`).join('; ')}`, { duration: 10000 });
+    } else {
+      toast.success(`${sent} invitation(s) sent again${joined}.`);
     }
   };
 
@@ -155,6 +180,16 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
       </Card>
 
       <Card padding="none">
+        {due.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-border">
+            <span className="text-[12.5px] text-muted-foreground">
+              {resending ? `Sending ${resending.done} of ${resending.total}…` : `${due.length} invitation(s) not used yet`}
+            </span>
+            <Button variant="secondary" onClick={resendAll} disabled={!!resending}>
+              {resending ? 'Sending…' : 'Resend all'}
+            </Button>
+          </div>
+        )}
         {loadError ? (
           <div className="p-4 text-[13px] text-status-danger">Could not load invitations: {loadError}</div>
         ) : invitations === null ? (
