@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Smartphone, Users, CheckSquare, Square, Send, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { IN_LIST_SIZE, chunks } from '../../lib/fetchAll';
 import toast from 'react-hot-toast';
 
 // Format phone number for M-Pesa (254 format)
@@ -305,12 +306,16 @@ const MpesaPaymentComponent = ({ payrollRecords }) => {
 
         if (employeeNumbers.length === 0) return;
 
-        const { data, error } = await supabase
-          .from('employees')
-          .select('"Employee Number", "Mobile Number"')
-          .in('"Employee Number"', employeeNumbers);
-
-        if (error) throw error;
+        // a chunk of employee numbers per request: thousands do not fit one filter
+        const data = [];
+        for (const numbers of chunks(employeeNumbers, IN_LIST_SIZE)) {
+          const { data: rows, error } = await supabase
+            .from('employees')
+            .select('"Employee Number", "Mobile Number"')
+            .in('"Employee Number"', numbers);
+          if (error) throw error;
+          data.push(...(rows ?? []));
+        }
 
         const phoneMap = {};
         data?.forEach(emp => {
