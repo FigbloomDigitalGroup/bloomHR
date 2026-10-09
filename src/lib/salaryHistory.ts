@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import type { DeductionItem } from './voluntaryDeductions';
 
 export interface SalaryHistoryRecord {
     employee_id: string;
@@ -26,6 +27,8 @@ export interface SalaryHistoryRecord {
     advance_deduction?: number;
     welfare_deduction?: number;
     other_deductions?: number;
+    /** voluntary deductions on this payslip, itemised (their total is other_deductions) */
+    deduction_items?: DeductionItem[];
     payment_method?: string;
     bank_name?: string;
     account_number?: string;
