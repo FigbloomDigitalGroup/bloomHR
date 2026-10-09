@@ -62,6 +62,7 @@ import VoluntaryDeductionsModal from "./VoluntaryDeductionsModal";
 import MissingPayrollDetailsModal from "./MissingPayrollDetailsModal";
 import { employeesMissingDetails } from "../../lib/missingPayrollDetails";
 import { isPaidByMpesa, paymentMethodLabel } from "../../lib/paymentMethods";
+import { fetchAll } from "../../lib/fetchAll";
 import { deductionsForPeriod, loadDeductionSetup, payslipDeductionLines, totalOf } from "../../lib/voluntaryDeductions";
 import BulkSalaryHistoryUpload from "./BulkSalaryHistoryUpload";
 
@@ -2204,9 +2205,11 @@ const P10FormGenerator = ({
   const generateP10Form = async () => {
     setIsLoading(true);
     try {
-      const { data: employees, error } = await supabase
-        .from("employees")
-        .select("*");
+      // every employee, a page at a time (one request returns at most 1000)
+      const { data: employees, error } = await fetchAll((from, to) => supabase.from("employees").select("*").order('"Employee Number"').order("id").range(from, to)).then(
+        (data) => ({ data, error: null }),
+        (error) => ({ data: null, error }),
+      );
 
       if (error) {
         console.error("Supabase error:", error);
@@ -2587,14 +2590,22 @@ export default function PayrollDashboard() {
       try {
         console.log("Fetching ALL salary advances...");
 
-        const { data, error } = await supabase
-          .from("salary_advance")
-          .select(
-            '"Employee Number", "Amount Requested", payment_processed, status, time_added',
-          )
-          .eq("payment_processed", "true")
-          .eq("status", "paid")
-          .order("time_added", { ascending: false });
+        // every paid advance, a page at a time (the list grows every month)
+        const { data, error } = await fetchAll((from, to) =>
+          supabase
+            .from("salary_advance")
+            .select(
+              '"Employee Number", "Amount Requested", payment_processed, status, time_added',
+            )
+            .eq("payment_processed", "true")
+            .eq("status", "paid")
+            .order("time_added", { ascending: false })
+            .order("id")
+            .range(from, to),
+        ).then(
+          (rows) => ({ data: rows, error: null }),
+          (err) => ({ data: null, error: err }),
+        );
 
         if (error) {
           console.warn("Salary advances fetch error:", error.message);
@@ -3324,7 +3335,11 @@ export default function PayrollDashboard() {
     const fetchEmployees = async () => {
       try {
         setIsLoading(true);
-        const { data, error } = await supabase.from("employees").select("*");
+        // every employee, a page at a time (one request returns at most 1000)
+        const { data, error } = await fetchAll((from, to) => supabase.from("employees").select("*").order('"Employee Number"').order("id").range(from, to)).then(
+          (rows) => ({ data: rows, error: null }),
+          (err) => ({ data: null, error: err }),
+        );
 
         if (error) {
           console.error("Error fetching employees:", error);
@@ -3784,7 +3799,7 @@ This can't be undone: the payslips stay locked for good.`,
       setSmsBalance(balance);
 
       // Refresh employees and payroll data
-      const { data } = await supabase.from("employees").select("*");
+      const data = await fetchAll((from, to) => supabase.from("employees").select("*").order('"Employee Number"').order("id").range(from, to));
 
       if (data) {
         setEmployees(data);

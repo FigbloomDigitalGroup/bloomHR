@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Download, FileText, X, Loader, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { fetchAll } from '../../lib/fetchAll';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
@@ -18,17 +19,11 @@ const P10FormGenerator: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
 
   const fetchEmployees = async () => {
     try {
-      const { data, error } = await supabase
-        .from('employees')
-        .select('*');
-      
-      if (error) {
-        throw error;
-      }
-      
-      if (data) {
-        setEmployees(data);
-      }
+      // every employee, a page at a time (one request returns at most 1000)
+      const data = await fetchAll((from, to) =>
+        supabase.from('employees').select('*').order('"Employee Number"').order('id').range(from, to)
+      );
+      setEmployees(data);
     } catch (error) {
       console.error('Error fetching employees:', error);
       toast.error('Failed to fetch employees');

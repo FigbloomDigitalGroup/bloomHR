@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { IN_LIST_SIZE, chunks, fetchAll } from './fetchAll';
 import { saveSalaryHistoryBatch, type SalaryHistoryRecord } from './salaryHistory';
 
 /**
@@ -27,14 +28,8 @@ export const getPayrollRun = async (payPeriod: string): Promise<PayrollRun | nul
   return data;
 };
 
-export const getRunPayslips = async (runId: string) => {
-  const { data, error } = await supabase.from('salary_history').select('*').eq('run_id', runId);
-  if (error) throw error;
-  return data ?? [];
-};
-
-/** PostgREST `in` list: ("a","b") with quotes and backslashes escaped */
-const inList = (values: string[]) => `(${values.map((v) => `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(',')})`;
+export const getRunPayslips = async (runId: string) =>
+  fetchAll((from, to) => supabase.from('salary_history').select('*').eq('run_id', runId).order('id').range(from, to));
 
 /**
  * Saves the month's payslips as its draft run (starting the run if needed): every record is written, and payslips of
@@ -44,12 +39,18 @@ export const saveDraftRun = async (payPeriod: string, records: SalaryHistoryReco
   if (records.length === 0) throw new Error('There are no employees to pay for this month.');
   await saveSalaryHistoryBatch(records.map((r) => ({ ...r, pay_period: payPeriod })));
 
-  const { error } = await supabase
-    .from('salary_history')
-    .delete()
-    .eq('pay_period', payPeriod)
-    .not('employee_id', 'in', inList(records.map((r) => r.employee_id)));
-  if (error) throw error;
+  // payslips of people no longer in the calculation, removed by id a chunk at a time (a filter listing thousands
+  // of employee numbers would not fit in one request)
+  const keep = new Set(records.map((r) => r.employee_id));
+  const saved = await fetchAll<{ id: string; employee_id: string }>((from, to) =>
+    supabase.from('salary_history').select('id, employee_id').eq('pay_period', payPeriod).order('id').range(from, to)
+  );
+  // (a payslip with no employee number is left alone, as before)
+  const stale = saved.filter((p) => p.employee_id != null && !keep.has(p.employee_id)).map((p) => p.id);
+  for (const ids of chunks(stale, IN_LIST_SIZE)) {
+    const { error } = await supabase.from('salary_history').delete().in('id', ids);
+    if (error) throw error;
+  }
 };
 
 export const setRunStatus = async (runId: string, status: PayrollRunStatus) => {

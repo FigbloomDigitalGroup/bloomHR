@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { WRITE_BATCH_SIZE, chunks } from './fetchAll';
 import type { DeductionItem } from './voluntaryDeductions';
 
 export interface SalaryHistoryRecord {
@@ -41,20 +42,24 @@ export const saveSalaryHistoryBatch = async (records: SalaryHistoryRecord[]) => 
     if (!records || records.length === 0) return { success: true, count: 0 };
 
     try {
-        const { error } = await supabase
-            .from('salary_history')
-            .upsert(
-                records.map(record => ({
-                    ...record,
-                    created_at: new Date().toISOString()
-                })),
-                // unique per tenant since FIG-515; tenant_id is stamped by the column default
-                { onConflict: 'tenant_id,employee_id,pay_period' }
-            );
+        const createdAt = new Date().toISOString();
+        // in batches: thousands of payslips do not fit one request
+        for (const batch of chunks(records, WRITE_BATCH_SIZE)) {
+            const { error } = await supabase
+                .from('salary_history')
+                .upsert(
+                    batch.map(record => ({
+                        ...record,
+                        created_at: createdAt
+                    })),
+                    // unique per tenant since FIG-515; tenant_id is stamped by the column default
+                    { onConflict: 'tenant_id,employee_id,pay_period' }
+                );
 
-        if (error) {
-            console.error('Error saving salary history:', error);
-            throw error;
+            if (error) {
+                console.error('Error saving salary history:', error);
+                throw error;
+            }
         }
 
         return { success: true, count: records.length };

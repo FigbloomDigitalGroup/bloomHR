@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { fetchAll } from './fetchAll';
 
 /**
  * Voluntary deductions (tables deduction_types, employee_deductions): the company's list of deductions (SACCO,
@@ -156,11 +157,17 @@ export const parseDeductionSheet = (rows: Record<string, unknown>[], employeeNum
 export const loadDeductionSetup = async () => {
   const [types, deductions] = await Promise.all([
     supabase.from('deduction_types').select('id, name, active').order('name'),
-    supabase.from('employee_deductions').select('id, employee_number, deduction_type_id, amount, start_period, end_period, notes'),
+    // every employee's deductions, a page at a time (one request returns at most 1000)
+    fetchAll<EmployeeDeduction>((from, to) =>
+      supabase
+        .from('employee_deductions')
+        .select('id, employee_number, deduction_type_id, amount, start_period, end_period, notes')
+        .order('id')
+        .range(from, to)
+    ),
   ]);
   if (types.error) throw types.error;
-  if (deductions.error) throw deductions.error;
-  return { types: (types.data ?? []) as DeductionType[], deductions: (deductions.data ?? []) as EmployeeDeduction[] };
+  return { types: (types.data ?? []) as DeductionType[], deductions };
 };
 
 export const addDeductionType = async (name: string) => {
