@@ -61,7 +61,7 @@ import PayrollRunBar from "./PayrollRunBar";
 import VoluntaryDeductionsModal from "./VoluntaryDeductionsModal";
 import MissingPayrollDetailsModal from "./MissingPayrollDetailsModal";
 import { employeesMissingDetails } from "../../lib/missingPayrollDetails";
-import { paymentMethodLabel } from "../../lib/paymentMethods";
+import { isPaidByMpesa, paymentMethodLabel } from "../../lib/paymentMethods";
 import { deductionsForPeriod, loadDeductionSetup, payslipDeductionLines, totalOf } from "../../lib/voluntaryDeductions";
 import BulkSalaryHistoryUpload from "./BulkSalaryHistoryUpload";
 
@@ -924,10 +924,13 @@ const MpesaSinglePaymentModal = ({
 };
 
 // M-PESA Bulk Payment Modal
+/** The parts of a payroll record that decide whether M-Pesa may pay it. */
+type PayRecipient = { employee_name?: string; payment_method?: unknown };
+
 const MpesaBulkPaymentModal = ({
   isOpen,
   onClose,
-  employees,
+  employees: allEmployees,
   onConfirm,
   userRole = "maker",
 }: {
@@ -941,6 +944,20 @@ const MpesaBulkPaymentModal = ({
   const [selectedStaff, setSelectedStaff] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [justification, setJustification] = useState("");
+
+  // M-Pesa can only pay staff paid by M-Pesa: bank, cash and Airtel staff are left out of the list
+  const payable = useMemo(() => allEmployees.filter(isPaidByMpesa), [allEmployees]);
+  const notPayable = useMemo(() => {
+    const counts = new Map<string, number>();
+    allEmployees
+      .filter((emp) => !isPaidByMpesa(emp))
+      .forEach((emp) => {
+        const method = paymentMethodLabel(emp.payment_method);
+        counts.set(method, (counts.get(method) ?? 0) + 1);
+      });
+    return [...counts.entries()];
+  }, [allEmployees]);
+  const employees = payable;
 
   useEffect(() => {
     const initialSelected = {};
@@ -1028,6 +1045,13 @@ const MpesaBulkPaymentModal = ({
               ? `You are creating a bulk payment request for ${getSelectedStaffCount()} selected staff members.`
               : `You are about to process M-PESA B2C payments for ${getSelectedStaffCount()} selected staff members.`}
           </p>
+
+          {notPayable.length > 0 && (
+            <p className="mt-2 text-xs text-gray-600">
+              Not included (not paid by M-Pesa):{" "}
+              {notPayable.map(([method, count]) => `${count} ${method}`).join(", ")}.
+            </p>
+          )}
 
           <div className="mt-3 flex gap-2">
             <button
@@ -3211,8 +3235,18 @@ export default function PayrollDashboard() {
     }
   };
 
-  const processBulkMpesaPayment = async (selectedEmployees: any) => {
+  const processBulkMpesaPayment = async (requested: any) => {
     const results = [];
+    const selectedEmployees = (requested ?? []).filter(isPaidByMpesa);
+    const skipped = (requested ?? []).filter((employee: PayRecipient) => !isPaidByMpesa(employee));
+    if (skipped.length) {
+      toast.error(
+        `Not paid by M-Pesa, so skipped: ${skipped
+          .map((employee: PayRecipient) => `${employee.employee_name} (${paymentMethodLabel(employee.payment_method)})`)
+          .join(", ")}`,
+        { duration: 10000 },
+      );
+    }
 
     for (const employee of selectedEmployees) {
       try {
