@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import { isValidPhone, summarizeErrors } from '../../lib/formValidation';
 import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
+import { inviteEmployee, normaliseWorkEmail } from '../../lib/employeeInvite';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import SearchableDropdown from '../UI/SearchableDropdown';
@@ -261,6 +262,14 @@ const AddEmployeePage = () => {
       newErrors['Personal Email'] = 'Invalid email format';
       isValid = false;
     }
+    // the invitation to join goes to the work email, and their login finds this record by it
+    if (!String(newEmployee['Work Email'] ?? '').trim()) {
+      newErrors['Work Email'] = 'Work Email is required: the invitation to join is sent there';
+      isValid = false;
+    } else if (!emailRegex.test(String(newEmployee['Work Email']).trim())) {
+      newErrors['Work Email'] = 'Invalid email format';
+      isValid = false;
+    }
 
     // Emergency contacts validation
     emergencyContacts.forEach((contact, index) => {
@@ -483,12 +492,20 @@ const AddEmployeePage = () => {
         .insert([{
           ...newEmployee,
           ...employeeDeductions,
+          'Work Email': normaliseWorkEmail(newEmployee['Work Email']),
           'Employee Number': newEmployee['Employee Number'] || `MCL-${Date.now().toString().slice(-6)}`,
           'Profile Image': imageUrl
         }])
         .select();
 
-      if (employeeError) throw employeeError;
+      if (employeeError) {
+        if (employeeError.code === '23505' && /work email/i.test(employeeError.message)) {
+          setErrors({ 'Work Email': 'Another employee already has this work email', form: 'Another employee already has this work email.' });
+          setActiveTab('employment');
+          return;
+        }
+        throw employeeError;
+      }
 
       const employeeId = employeeData?.[0]?.["Employee Number"];
       if (!employeeId) throw new Error('Failed to get employee Number after creation');
@@ -525,13 +542,17 @@ const AddEmployeePage = () => {
         if (dependentsError) throw dependentsError;
       }
 
+      // email them a link to join the company; the employee is saved either way, and the next page says how it went
+      const invite = await inviteEmployee(newEmployee['Work Email']);
+
       navigate('/employee-added', {
         state: {
           success: true,
           employeeNumber: employeeId,
           employeeName: `${newEmployee['First Name']} ${newEmployee['Last Name']}`,
-          workEmail: newEmployee['Work Email'],
-          personalEmail: newEmployee['Personal Email']
+          workEmail: normaliseWorkEmail(newEmployee['Work Email']),
+          personalEmail: newEmployee['Personal Email'],
+          invite
         }
       });
 
@@ -1009,6 +1030,7 @@ const AddEmployeePage = () => {
                     value={newEmployee['Work Email'] || ''}
                     onChange={handleInputChange}
                     error={errors['Work Email']}
+                    required
                   />
                 </div>
 
