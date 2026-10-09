@@ -3,12 +3,15 @@ import { Check, PartyPopper, Send } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import GlowButton from '../UI/GlowButton';
+import InviteStatus from './InviteStatus';
+import type { InviteOutcome } from '../../lib/employeeInvite';
 
 const SuccessPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const employeeNumber = location.state?.employeeNumber;
   const employeeName = location.state?.employeeName;
+  const invite = location.state?.invite as InviteOutcome | undefined;
   const [isPageLoading, setIsPageLoading] = useState(true);
 
   useEffect(() => {
@@ -117,6 +120,8 @@ const SuccessPage = () => {
             {employeeName} has been successfully added to the system with employee number{' '}
             <span className="font-semibold text-emerald-600">{employeeNumber}</span>.
           </motion.p>
+
+          {invite && <InviteStatus key={`${invite.email}:${invite.status}`} initial={invite} />}
 
           <motion.div
             initial={{ opacity: 0, y: 10 }}
