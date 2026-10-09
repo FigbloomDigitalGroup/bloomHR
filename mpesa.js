@@ -3,6 +3,7 @@ import express from "express";
 import axios from "axios";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
+import { applyB2CResult, applyB2CTimeout } from "./payroll_payments.js";
 
 dotenv.config({ path: process.env.ENV_FILE || '.env' });
 
@@ -539,6 +540,11 @@ router.get("/health", (req, res) => {
 router.post("/b2c-timeout", async (req, res) => {
   try {
     console.log("⏰ B2C Queue Timeout received:", JSON.stringify(req.body, null, 2));
+    try {
+      await applyB2CTimeout(supabase, req.body?.Result ?? req.body);
+    } catch (err) {
+      console.error("❌ Could not record the payroll payment timeout:", err.message);
+    }
 
     res.json({
       ResultCode: 0,
@@ -595,6 +601,54 @@ const initiateB2CPayment = async (paymentData) => {
     throw new Error(error.response?.data?.errorMessage || error.message || "Failed to initiate B2C payment");
   }
 };
+
+// --- Payroll payments (payroll_payments.js) ---
+
+/** True when the M-Pesa credentials and callback URLs needed to send payments are all set. */
+export const mpesaConfigured = () =>
+  ["consumerKey", "consumerSecret", "initiatorName", "securityCredential", "shortCode", "b2cResultURL", "b2cQueueTimeoutURL"].every(
+    (key) => !!MPESA_CONFIG[key]
+  );
+
+/**
+ * Sends one salary payment and returns Safaricom's response. A thrown error has `definite: true` when nothing can
+ * have been sent (no access token, or Safaricom refused the request) and `definite: false` when the call broke off
+ * or Safaricom failed on its side, so the payment may have gone through.
+ */
+export async function requestB2C(payment) {
+  let accessToken;
+  try {
+    accessToken = await generateAccessToken();
+  } catch (error) {
+    error.definite = true;
+    throw error;
+  }
+  try {
+    const response = await axios.post(
+      MPESA_URLS.b2c,
+      {
+        OriginatorConversationID: payment.originatorConversationID,
+        InitiatorName: MPESA_CONFIG.initiatorName,
+        SecurityCredential: MPESA_CONFIG.securityCredential,
+        CommandID: "SalaryPayment",
+        Amount: Math.round(payment.amount),
+        PartyA: MPESA_CONFIG.shortCode,
+        PartyB: payment.phoneNumber,
+        Remarks: payment.remarks,
+        QueueTimeOutURL: MPESA_CONFIG.b2cQueueTimeoutURL,
+        ResultURL: MPESA_CONFIG.b2cResultURL,
+        Occasion: payment.occasion,
+      },
+      { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, timeout: 45000 }
+    );
+    return response.data;
+  } catch (error) {
+    const err = new Error(error.response?.data?.errorMessage || error.message || "The payment request failed");
+    const status = error.response?.status;
+    err.definite = typeof status === "number" && status >= 400 && status < 500;
+    throw err;
+  }
+}
 
 // --- B2C Payment Endpoint ---
 router.post("/b2c", async (req, res) => {
@@ -673,6 +727,13 @@ router.post("/b2c-result", async (req, res) => {
     if (!result) {
       console.warn("⚠️ Result object missing in callback");
       return res.status(400).json({ ResultCode: 1, ResultDesc: "Result object missing" });
+    }
+
+    // a payroll payment: mark it paid or failed (other B2C payments carry on below as before)
+    try {
+      await applyB2CResult(supabase, result);
+    } catch (err) {
+      console.error("❌ Could not record the payroll payment result:", err.message);
     }
 
     const b2cParams = parseTransactionStatusParameters(result.ResultParameters?.ResultParameter);
