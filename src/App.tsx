@@ -43,6 +43,8 @@ const ManagerAssignment = lazy(() => import('./components/Employees/ManagerAssig
 const SuccessPage = lazy(() => import('./components/Add Form/SuccessPage'));
 const EmployeeDataTable = lazy(() => import('./components/Payroll/fog'));
 const EditEmployeePage = lazy(() => import('./components/Add Form/EditEmployee'));
+const OnboardingReview = lazy(() => import('./components/Onboarding/OnboardingReview'));
+const OnboardingPrint = lazy(() => import('./components/Onboarding/OnboardingPrint'));
 const UserRolesSettings = lazy(() => import('./components/Settings/UserRole'));
 const SalaryAdvanceAdmin = lazy(() => import('./components/Settings/SalaryAdmin'));
 const IncidentReportsManagement = lazy(() => import('./components/Settings/IncidentReportsManagement'));
@@ -963,6 +965,20 @@ function App() {
               }
             />
 
+            {/* the printable onboarding form, without the app's sidebar and header; the database decides who may read it */}
+            <Route
+              path="/onboarding/:id/print"
+              element={
+                !session ? (
+                  <Login onLoginSuccess={handleLoginSuccess} />
+                ) : companyState.status === 'ready' ? (
+                  <CompanyGate userId={session.user.id}><OnboardingPrint /></CompanyGate>
+                ) : (
+                  <AppSkeleton />
+                )
+              }
+            />
+
             <Route
               path="/*"
               element={
@@ -1039,6 +1055,7 @@ function App() {
                                 <Route path="/calendar" element={<CompanyCalendar />} />
                                 <Route path="/employees" element={<EmployeeList selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />} />
                                 <Route path="/add-employee" element={<AddEmployeePage />} />
+                                <Route path="/onboarding" element={<OnboardingReview />} />
                                 <Route path="/view-employee/:id" element={<ViewEmployeePage />} />
                                 <Route path="/view-employee/:employeeId" element={<ViewEmployeePage />} />
                                 <Route path="/edit-employee/:id" element={<EditEmployeePage />} />

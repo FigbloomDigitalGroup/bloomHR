@@ -121,7 +121,7 @@ export type Database = {
           "HELB option": string | null
           "House Number": string | null
           "Housing Levy Deduction": string | null
-          "ID Number": number | null
+          "ID Number": string | null
           "Internship End Date": string | null
           internship_start_date: string | null
           "Job Group": string | null
@@ -168,6 +168,37 @@ export type Database = {
           "Work Mobile": string | null
           manager_email: string | null
           regional_manager: string | null
+          preferred_name: string | null
+          nationality: string | null
+          residential_address: string | null
+          permanent_address: string | null
+          kra_employee_type: string | null
+          kra_residency: string | null
+          is_pwd: boolean | null
+          other_cash_allowances: number | null
+          car_benefit: number | null
+          meals_benefit: number | null
+          non_cash_benefit: number | null
+          housing_benefit: number | null
+          other_benefits: number | null
+          other_pension_contribution: number | null
+          post_retirement_medical_fund: number | null
+          nssf_voluntary_contribution: number | null
+          mortgage_interest: number | null
+          insurance_premium: number | null
+          bank_code: string | null
+          branch_code: string | null
+          bank_paybill: string | null
+          house_allowance: number | null
+          travel_allowance: number | null
+          hardship: number | null
+          onboarding_status: string | null
+          onboarding_submitted_at: string | null
+          onboarding_reviewed_by: string | null
+          onboarding_reviewed_at: string | null
+          onboarding_review_comment: string | null
+          id: string | null
+          tenant_id: string | null
         }
         Insert: {
           "Account Number"?: string | null
@@ -200,7 +231,7 @@ export type Database = {
           "HELB option"?: string | null
           "House Number"?: string | null
           "Housing Levy Deduction"?: string | null
-          "ID Number"?: number | null
+          "ID Number"?: string | null
           "Internship End Date"?: string | null
           internship_start_date?: string | null
           "Job Group"?: string | null
@@ -247,6 +278,37 @@ export type Database = {
           "Work Mobile"?: string | null
           manager_email?: string | null
           regional_manager?: string | null
+          preferred_name?: string | null
+          nationality?: string | null
+          residential_address?: string | null
+          permanent_address?: string | null
+          kra_employee_type?: string | null
+          kra_residency?: string | null
+          is_pwd?: boolean | null
+          other_cash_allowances?: number | null
+          car_benefit?: number | null
+          meals_benefit?: number | null
+          non_cash_benefit?: number | null
+          housing_benefit?: number | null
+          other_benefits?: number | null
+          other_pension_contribution?: number | null
+          post_retirement_medical_fund?: number | null
+          nssf_voluntary_contribution?: number | null
+          mortgage_interest?: number | null
+          insurance_premium?: number | null
+          bank_code?: string | null
+          branch_code?: string | null
+          bank_paybill?: string | null
+          house_allowance?: number | null
+          travel_allowance?: number | null
+          hardship?: number | null
+          onboarding_status?: string | null
+          onboarding_submitted_at?: string | null
+          onboarding_reviewed_by?: string | null
+          onboarding_reviewed_at?: string | null
+          onboarding_review_comment?: string | null
+          id?: string | null
+          tenant_id?: string | null
         }
         Update: {
           "Account Number"?: string | null
@@ -279,7 +341,7 @@ export type Database = {
           "HELB option"?: string | null
           "House Number"?: string | null
           "Housing Levy Deduction"?: string | null
-          "ID Number"?: number | null
+          "ID Number"?: string | null
           "Internship End Date"?: string | null
           internship_start_date?: string | null
           "Job Group"?: string | null
@@ -326,6 +388,37 @@ export type Database = {
           "Work Mobile"?: string | null
           manager_email?: string | null
           regional_manager?: string | null
+          preferred_name?: string | null
+          nationality?: string | null
+          residential_address?: string | null
+          permanent_address?: string | null
+          kra_employee_type?: string | null
+          kra_residency?: string | null
+          is_pwd?: boolean | null
+          other_cash_allowances?: number | null
+          car_benefit?: number | null
+          meals_benefit?: number | null
+          non_cash_benefit?: number | null
+          housing_benefit?: number | null
+          other_benefits?: number | null
+          other_pension_contribution?: number | null
+          post_retirement_medical_fund?: number | null
+          nssf_voluntary_contribution?: number | null
+          mortgage_interest?: number | null
+          insurance_premium?: number | null
+          bank_code?: string | null
+          branch_code?: string | null
+          bank_paybill?: string | null
+          house_allowance?: number | null
+          travel_allowance?: number | null
+          hardship?: number | null
+          onboarding_status?: string | null
+          onboarding_submitted_at?: string | null
+          onboarding_reviewed_by?: string | null
+          onboarding_reviewed_at?: string | null
+          onboarding_review_comment?: string | null
+          id?: string | null
+          tenant_id?: string | null
         }
         Relationships: []
       }

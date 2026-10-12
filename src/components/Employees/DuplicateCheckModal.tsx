@@ -23,7 +23,7 @@ const DuplicateCheckModal: React.FC<DuplicateCheckModalProps> = ({ isOpen, onClo
 
     // Calculate duplicates
     const duplicates = useMemo(() => {
-        const idMap = new Map<number, Employee[]>();
+        const idMap = new Map<string, Employee[]>();
         const emailMap = new Map<string, Employee[]>();
 
         employees.forEach(emp => {

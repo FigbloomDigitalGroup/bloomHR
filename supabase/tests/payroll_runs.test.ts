@@ -36,8 +36,10 @@ beforeAll(async () => {
     insert into role_permissions (role_name, permissions, tenant_id) values
       ('FINANCE', array['payroll'], '${A}'), ('HR', array['hr-lifecycle'], '${A}'),
       ('STAFF', array['dashboard'], '${A}'), ('FINANCE', array['payroll'], '${B}');
-    insert into employees ("Employee Number", "First Name", "Work Email", tenant_id) values
-      ('E1', 'Ann', 'e1@a.co', '${A}'), ('E2', 'Ben', 'e2@a.co', '${A}');
+    -- only employees whose onboarding is approved can be paid (20261012200000)
+    insert into employees ("Employee Number", "First Name", "Work Email", onboarding_status, tenant_id) values
+      ('E1', 'Ann', 'e1@a.co', 'approved', '${A}'), ('E2', 'Ben', 'e2@a.co', 'approved', '${A}'),
+      ('X1', 'Xan', 'x1@b.co', 'approved', '${B}');
   `);
 }, 120000);
 

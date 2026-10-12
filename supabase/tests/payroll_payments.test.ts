@@ -34,8 +34,10 @@ beforeAll(async () => {
       ('${PAY}', 'pay@a.co', 'FINANCE', '${A}'), ('${STAFF}', 'e1@a.co', 'STAFF', '${A}'), ('${OTHER}', 'pay@b.co', 'FINANCE', '${B}');
     insert into role_permissions (role_name, permissions, tenant_id) values
       ('FINANCE', array['payroll'], '${A}'), ('STAFF', array['dashboard'], '${A}'), ('FINANCE', array['payroll'], '${B}');
-    insert into employees ("Employee Number", "First Name", "Work Email", tenant_id) values
-      ('E1', 'Ann', 'e1@a.co', '${A}'), ('E2', 'Ben', 'e2@a.co', '${A}'), ('E3', 'Cy', 'e3@a.co', '${A}');
+    -- only employees whose onboarding is approved can be paid (20261012200000)
+    insert into employees ("Employee Number", "First Name", "Work Email", onboarding_status, tenant_id) values
+      ('E1', 'Ann', 'e1@a.co', 'approved', '${A}'), ('E2', 'Ben', 'e2@a.co', 'approved', '${A}'), ('E3', 'Cy', 'e3@a.co', 'approved', '${A}'),
+      ('X1', 'Xan', 'x1@b.co', 'approved', '${B}');
   `);
   // October: approved. November: a draft. Company B: approved.
   await asUser(db, PAY, () =>

@@ -20,6 +20,8 @@ import { supabase } from '../../lib/supabase';
 import { Database } from '../../types/supabase';
 import { PageHeader, Card, Button, StatusPill, EmptyState, SearchInput } from '../UI';
 import { profileItems, profileScore } from '../../lib/profileCompleteness';
+import { STATUS_LABELS, statusLabel, statusTone } from '../../lib/onboarding';
+import { ONBOARDING_STATUSES } from '../../lib/onboardingValidation';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
@@ -61,6 +63,8 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   // how complete each person's own information is (they fill most of it in themselves)
   const [selectedProfile, setSelectedProfile] = useState('all');
+  // where each person is in onboarding (only approved employees are paid)
+  const [selectedOnboarding, setSelectedOnboarding] = useState('all');
   const [emergencyContacts, setEmergencyContacts] = useState<Set<string> | null>(null);
 
   useEffect(() => {
@@ -209,7 +213,9 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
     const matchesProfile =
       selectedProfile === 'all' || (selectedProfile === INCOMPLETE ? !scoreOf(employee).complete : scoreOf(employee).complete);
 
-    return matchesSearch && matchesDepartment && matchesBranch && matchesEmploymentType && matchesProfile;
+    const matchesOnboarding = selectedOnboarding === 'all' || statusLabel(employee.onboarding_status) === selectedOnboarding;
+
+    return matchesSearch && matchesDepartment && matchesBranch && matchesEmploymentType && matchesProfile && matchesOnboarding;
   });
 
   // Get display name for current selection
@@ -354,6 +360,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
         {renderPillSelect(branches, selectedBranch, setSelectedBranch, 'All Branches', 'Filter by branch')}
         {renderPillSelect(employmentTypes, selectedEmploymentType, setSelectedEmploymentType, 'Town Office', 'Filter by town office')}
         {renderPillSelect(['all', INCOMPLETE, COMPLETE], selectedProfile, setSelectedProfile, 'All profiles', 'Filter by profile completeness')}
+        {renderPillSelect(['all', ...ONBOARDING_STATUSES.map((s) => STATUS_LABELS[s])], selectedOnboarding, setSelectedOnboarding, 'Onboarding: all', 'Filter by onboarding')}
 
         {selectionAction ? (
           <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
@@ -450,7 +457,12 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                   </div>
                 </div>
                 {!selectionAction && (
-                  <StatusPill label={isInactive ? 'Inactive' : 'Active'} tone={isInactive ? 'warning' : 'success'} />
+                  <div className="flex flex-col items-end gap-1">
+                    <StatusPill label={isInactive ? 'Inactive' : 'Active'} tone={isInactive ? 'warning' : 'success'} />
+                    {employee.onboarding_status !== 'approved' && (
+                      <StatusPill label={statusLabel(employee.onboarding_status)} tone={statusTone(employee.onboarding_status)} />
+                    )}
+                  </div>
                 )}
               </div>
 

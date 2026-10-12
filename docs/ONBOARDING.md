@@ -3,8 +3,9 @@
 An employee record must hold everything the three monthly statutory returns need: KRA PAYE (iTax P10), SHA and NSSF.
 Generating those files later is meant to be a direct mapping from the columns below.
 
-Database: `supabase/migrations/20261012100000_employee_onboarding.sql`. App-side checks (the same rules):
-`src/lib/onboardingValidation.ts`.
+Database: `supabase/migrations/20261012100000_employee_onboarding.sql` and `20261012200000_onboarding_payroll_gate.sql`.
+App-side checks (the same rules): `src/lib/onboardingValidation.ts`; the screens talk to the database through
+`src/lib/onboarding.ts`.
 
 ## Flow
 
@@ -22,7 +23,24 @@ draft ──start_onboarding──▶ invited ──submit_onboarding──▶ s
 - Only HR (the `employees` module) reviews. Nobody moves the status by editing the record.
 - Every step is kept in `employee_onboarding_reviews`. Every change to an employee, emergency contact or next of kin is
   kept in `audit_log` (only the changed fields, who, when). HR reads both, and an employee reads their own review history.
-- Only `approved` employees are paid (the payroll gate comes with the onboarding screens).
+- Only `approved` employees are paid. The database refuses a payslip for anyone else (`20261012200000`), the payroll
+  page and the P10 export only take approved employees, and "Not onboarded (N)" on the payroll page lists the rest.
+- Only the employee uploads their photo. HR may remove one (the employee uploads a new one) but never sets or replaces
+  it (`20261012200100` for storage).
+
+## Screens
+
+- **HR, Onboarding** (`/onboarding`, Team menu, `employees` module): every employee's step and what is still missing
+  (theirs and HR's), Invite / Resend invite, and a review panel with Approve, Send back (needs a comment), Edit HR
+  details and Print. The print view (`/onboarding/:id/print`) has the company, the employee's name and position and the
+  date they submitted.
+- **HR, add / edit employee**: the pay and KRA fields ("Type of employee (KRA)", allowances, benefits, pension, PRMF,
+  NSSF voluntary). Adding an employee (one by one or in bulk) emails the invitation and marks them invited. No photo
+  upload; edit has Remove photo.
+- **Employee, staff portal → Onboarding**: personal details, identity and statutory numbers, tax exemptions and
+  reliefs, bank details, emergency contact and next of kin, their photo; Save, and Submit to HR. Shows HR's comment
+  when it was sent back.
+- **Employees list**: an onboarding badge on everyone not yet approved, and an onboarding filter.
 
 ## Who enters what
 

@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../ProtectedRoutes/UserContext';
-import { X, Plus, ArrowLeft, User, Briefcase, Phone, CreditCard, MapPin, Upload, AlertCircle, Users, Check } from 'lucide-react';
+import { X, Plus, ArrowLeft, User, Briefcase, Phone, CreditCard, MapPin, AlertCircle, Users, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import { isValidPhone, summarizeErrors } from '../../lib/formValidation';
-import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
-import { inviteEmployee, normaliseWorkEmail } from '../../lib/employeeInvite';
+import { normaliseWorkEmail } from '../../lib/employeeInvite';
+import { inviteToOnboard } from '../../lib/onboarding';
+import EmployerPayFields from '../Onboarding/EmployerPayFields';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import SearchableDropdown from '../UI/SearchableDropdown';
@@ -72,8 +73,6 @@ const AddEmployeePage = () => {
   const [newEmployee, setNewEmployee] = useState<Partial<Employee>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const [profileImage, setProfileImage] = useState<File | null>(null);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [dropdownOptions, setDropdownOptions] = useState<DropdownOptions>({
     employmentTypes: [],
     branches: [],
@@ -95,7 +94,6 @@ const AddEmployeePage = () => {
   ]);
   const [isPageLoading, setIsPageLoading] = useState(true);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -172,10 +170,8 @@ const AddEmployeePage = () => {
   const validateField = (name: string, value: string | number | null | undefined) => {
     let error = '';
 
-    if (typeof value === 'string' && !value.trim() && ['First Name', 'Last Name', 'Employee Type', 'Start Date', 'Job Title', 'Job Level', 'Mobile Number', 'Personal Email', 'Work Email'].includes(name)) {
+    if (typeof value === 'string' && !value.trim() && ['First Name', 'Last Name', 'Employee Type', 'Start Date', 'Job Title', 'Job Level', 'Work Email'].includes(name)) {
       error = 'This field is required';
-    } else if (name === 'profileImage' && !profileImage) {
-      error = 'Profile image is required';
     } else {
       switch (name) {
         case 'Mobile Number':
@@ -229,10 +225,6 @@ const AddEmployeePage = () => {
     const newErrors: Record<string, string> = {};
 
     // Required fields validation
-    if (!profileImage) {
-      newErrors.profileImage = 'Profile image is required';
-      isValid = false;
-    }
     if (!newEmployee['First Name']) {
       newErrors['First Name'] = 'First Name is required';
       isValid = false;
@@ -249,17 +241,12 @@ const AddEmployeePage = () => {
       newErrors['Start Date'] = 'Start Date is required';
       isValid = false;
     }
-    if (!newEmployee['Mobile Number']) {
-      newErrors['Mobile Number'] = 'Mobile Number is required';
-      isValid = false;
-    } else if (!isValidPhone(newEmployee['Mobile Number'])) {
+    // the employee fills in their own phone and personal email during onboarding; HR may add them, if valid
+    if (newEmployee['Mobile Number'] && !isValidPhone(newEmployee['Mobile Number'])) {
       newErrors['Mobile Number'] = 'Invalid phone number format';
       isValid = false;
     }
-    if (!newEmployee['Personal Email']) {
-      newErrors['Personal Email'] = 'Personal Email is required';
-      isValid = false;
-    } else if (!emailRegex.test(newEmployee['Personal Email'])) {
+    if (newEmployee['Personal Email'] && !emailRegex.test(newEmployee['Personal Email'])) {
       newErrors['Personal Email'] = 'Invalid email format';
       isValid = false;
     }
@@ -329,22 +316,6 @@ const AddEmployeePage = () => {
     return isValid;
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      if (file.size > 5 * 1024 * 1024) {
-        setErrors(prev => ({ ...prev, profileImage: 'File size exceeds 5MB limit' }));
-        return;
-      }
-      setProfileImage(file);
-      setPreviewImage(URL.createObjectURL(file));
-      setErrors(prev => ({ ...prev, profileImage: '' }));
-    }
-  };
-
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -475,11 +446,6 @@ const AddEmployeePage = () => {
       setLoading(true);
       setErrors({});
 
-      let imageUrl = null;
-      if (profileImage) {
-        imageUrl = await uploadEmployeeAvatar(profileImage, String(newEmployee['Employee Number'] || `MCL-${Date.now().toString().slice(-6)}`));
-      }
-
       // Prepare statutory deductions data for employee table
       const employeeDeductions: Partial<Employee> = {};
       statutoryDeductions.forEach(deduction => {
@@ -494,8 +460,7 @@ const AddEmployeePage = () => {
           ...newEmployee,
           ...employeeDeductions,
           'Work Email': normaliseWorkEmail(newEmployee['Work Email']),
-          'Employee Number': newEmployee['Employee Number'] || `MCL-${Date.now().toString().slice(-6)}`,
-          'Profile Image': imageUrl
+          'Employee Number': newEmployee['Employee Number'] || `MCL-${Date.now().toString().slice(-6)}`
         }])
         .select();
 
@@ -543,8 +508,9 @@ const AddEmployeePage = () => {
         if (dependentsError) throw dependentsError;
       }
 
-      // email them a link to join the company; the employee is saved either way, and the next page says how it went
-      const invite = await inviteEmployee(newEmployee['Work Email']);
+      // email them a link to join the company and fill in their onboarding; the employee is saved either way, and the
+      // next page says how it went
+      const invite = await inviteToOnboard(String(employeeData[0].id), newEmployee['Work Email']);
 
       navigate('/employee-added', {
         state: {
@@ -732,78 +698,15 @@ const AddEmployeePage = () => {
           {activeTab === 'personal' && (
             <div className="mb-8">
               <SectionHeader
-                title="Profile Image"
+                title="Name"
                 icon={User}
               />
               <div className="mt-4 flex flex-col md:flex-row items-start gap-8">
-                {/* Photo Upload Card */}
-                <div className="w-full md:w-auto">
-                  <div className="relative group">
-                    <div
-                      className="relative w-40 h-40 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden border-2 border-gray-200 shadow-sm cursor-pointer transition-all duration-300 hover:border-brand/40 hover:shadow-md"
-                      onClick={triggerFileInput}
-                    >
-                      {previewImage ? (
-                        <img
-                          src={previewImage}
-                          alt="Profile preview"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400">
-                          <div className="relative">
-                            <img
-                              src="/avat.png"
-                              alt="Default avatar"
-                              className="w-50 h-50 opacity-70"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-br from-transparent to-white opacity-20 rounded-full" />
-                          </div>
-                        </div>
-                      )}
-                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300">
-                        <div className="flex flex-col items-center">
-                          <Upload className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 mb-1" />
-                          <span className="text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-center px-2">
-                            {previewImage ? 'Change Photo' : 'Upload Photo'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                    />
-                  </div>
-
-                  <div className="mt-4 flex flex-col sm:flex-row gap-3">
-                    <button
-                      onClick={triggerFileInput}
-                      className="flex-1 flex items-center justify-center px-4 py-2 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors shadow-sm"
-                    >
-                      <Upload className="w-4 h-4 mr-2 text-gray-500" />
-                      <span className="text-xs">{previewImage ? 'Change' : 'Upload'}</span>
-                    </button>
-                    {previewImage && (
-                      <button
-                        onClick={() => {
-                          setPreviewImage(null);
-                          setProfileImage(null);
-                        }}
-                        className="flex-1 flex items-center justify-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm text-xs text-gray-700"
-                      >
-                        <X className="w-4 h-4 mr-2" />
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                  <p className="mt-2 text-xs text-gray-500">JPG, PNG or GIF (Max 5MB)</p>
-                  {errors.profileImage && (
-                    <p className="mt-1 text-xs text-red-500">{errors.profileImage}</p>
-                  )}
+                {/* the employee uploads their own photo when they complete onboarding */}
+                <div className="w-full md:w-48 rounded-xl border border-dashed border-gray-300 p-4 text-xs text-gray-500">
+                  <User className="w-6 h-6 text-gray-400 mb-2" />
+                  The employee uploads their own photo, ID and statutory details when they accept the invitation and
+                  complete onboarding.
                 </div>
 
                 {/* Employee Number and Basic Info */}
@@ -872,13 +775,12 @@ const AddEmployeePage = () => {
                       label="National ID"
                       name="ID Number"
                       type="text"
-                      required
                       value={newEmployee['ID Number'] ? String(newEmployee['ID Number']) : ''}
                       onChange={(e) => {
-                        const numValue = e.target.value ? parseInt(e.target.value) : null;
+                        const value = e.target.value.trim() || null;
                         setNewEmployee(prev => ({
                           ...prev,
-                          "ID Number": numValue
+                          "ID Number": value
                         }));
 
                         validateField('ID Number', e.target.value);
@@ -1307,6 +1209,10 @@ const AddEmployeePage = () => {
                         options={['KES', 'USD', 'EUR', 'GBP']}
                       />
                     </div>
+                    <EmployerPayFields
+                      values={newEmployee as Record<string, unknown>}
+                      onChange={(field, value) => setNewEmployee(prev => ({ ...prev, [field]: value }))}
+                    />
                   </div>
                 )}
 
