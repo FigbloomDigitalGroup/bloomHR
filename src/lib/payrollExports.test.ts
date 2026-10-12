@@ -39,8 +39,12 @@ describe('toCsv', () => {
 describe('KRA P10', () => {
   it('has the iTax columns, in order', () => {
     expect(P10_HEADERS).toHaveLength(24);
-    expect(P10_HEADERS[0]).toBe('Employee PIN');
-    expect(P10_HEADERS[23]).toBe('Self assessed PAYE');
+    // finance's own spellings
+    expect(toCsv(P10_HEADERS, []).trim()).toBe(
+      'Employee pin,Employee name,Resident,Type of Employee,PWD,Exemption certificate No,Total cash pay,Value of Car benefit,' +
+      'Value of meals,Non cash,Housing benefit,Other benefits,Total gross pay,Social health insuarance fund,NSSF,' +
+      'other pension contribution,Post retirement medical fund,Mortgage Intrest,AHL,Taxable pay,Personal relief,' +
+      'Insuarance relief,Paye,Self assessed paye');
   });
 
   it('adds benefits to cash pay, and takes capped pension and mortgage interest, NSSF, SHIF and AHL off taxable pay', () => {
