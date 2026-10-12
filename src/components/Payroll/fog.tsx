@@ -4,7 +4,8 @@ import { supabase } from '../../lib/supabase';
 import { TownProps } from '../../types/supabase';
 import * as XLSX from 'xlsx';
 import { readEmployeeRows } from '../../lib/employeeSheet';
-import { inviteEmployee, normaliseWorkEmail, sendInvitations, summariseInvites, workEmailProblem, type InviteOutcome } from '../../lib/employeeInvite';
+import { normaliseWorkEmail, sendInvitations, summariseInvites, workEmailProblem, type InviteOutcome } from '../../lib/employeeInvite';
+import { inviteToOnboard, startOnboardingByEmail } from '../../lib/onboarding';
 import toast from 'react-hot-toast';
 
 type Employee = {
@@ -392,7 +393,8 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
           manager_email: '',
           regional_manager: ''
         });
-        const invite = await inviteEmployee(data[0]["Work Email"]);
+        // the invitation also starts their onboarding (they fill in their own details)
+        const invite = await inviteToOnboard(String(data[0].id), data[0]["Work Email"]);
         if (invite.status === 'sent') toast.success(`Employee added. Invitation to join sent to ${invite.email}.`);
         else if (invite.status === 'member') toast.success(`Employee added. ${invite.email} already has access to this company.`);
         else toast.error(`Employee added, but the invitation was not sent: ${invite.reason} Send it again from Invite people.`, { duration: 8000 });
@@ -681,6 +683,8 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
         );
         setBulkInvites({ done: outcomes.length, total: outcomes.length, outcomes });
         invitesNotSent = summariseInvites(outcomes).notSent.length;
+        // everyone whose invitation was made is now onboarding
+        await startOnboardingByEmail(outcomes.filter((o) => o.status !== 'failed').map((o) => o.email));
       }
 
       if (errorCount === 0) {

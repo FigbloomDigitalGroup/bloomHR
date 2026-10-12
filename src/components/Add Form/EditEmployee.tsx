@@ -1,12 +1,13 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useEffect, useState, useRef } from 'react';
-import { X, Save, ArrowLeft, Plus, Upload, AlertCircle, Users, Check, PencilLine } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { X, Save, ArrowLeft, Plus, AlertCircle, Users, Check, PencilLine } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import { describeSaveError, isValidPhone, summarizeErrors } from '../../lib/formValidation';
 import { NOT_SAVED_NO_ACCESS, requireUpdatedRows } from '../../lib/requireUpdated';
-import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
+import { removeEmployeePhoto } from '../../lib/onboarding';
+import EmployerPayFields from '../Onboarding/EmployerPayFields';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import { User, Briefcase, CreditCard, Phone, MapPin } from 'lucide-react';
@@ -76,7 +77,6 @@ const EditEmployeePage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [profileImage, setProfileImage] = useState<File | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [dropdownOptions, setDropdownOptions] = useState<DropdownOptions>({
     employmentTypes: [],
@@ -95,7 +95,6 @@ const EditEmployeePage = () => {
   const [statutoryDeductions, setStatutoryDeductions] = useState<StatutoryDeduction[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isEditMode, setIsEditMode] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -286,22 +285,18 @@ const EditEmployeePage = () => {
     return !error;
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      if (file.size > 5 * 1024 * 1024) {
-        setErrors(prev => ({ ...prev, profileImage: 'File size exceeds 5MB limit' }));
-        return;
-      }
-      setProfileImage(file);
-      setPreviewImage(URL.createObjectURL(file));
-      setErrors(prev => ({ ...prev, profileImage: '' }));
+  const handleRemovePhoto = async () => {
+    if (!window.confirm('Remove this photo? The employee will be asked to upload a new one.')) return;
+    try {
+      await removeEmployeePhoto(String(employee['Employee Number']));
+      setPreviewImage(null);
+      setEmployee(prev => ({ ...prev, 'Profile Image': null }));
+      toast.success('Photo removed');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'The photo was not removed');
     }
   };
 
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -473,10 +468,8 @@ const EditEmployeePage = () => {
       setSaving(true);
       setError(null);
 
-      let imageUrl = employee['Profile Image'] || null;
-      if (profileImage) {
-        imageUrl = await uploadEmployeeAvatar(profileImage, String(employee['Employee Number']));
-      }
+      // the photo is the employee's: saved unchanged (or removed above), never uploaded here
+      const imageUrl = employee['Profile Image'] || null;
 
       // Update employee data
       const { data: savedRows, error: employeeError } = await supabase
@@ -697,32 +690,7 @@ const EditEmployeePage = () => {
           <div className="flex flex-col md:flex-row md:items-start justify-between">
             <div className="flex items-start space-x-4">
               <div className="relative">
-                {isEditMode ? (
-                  <div
-                    className="bg-green-tint w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-brand-dark cursor-pointer"
-                    onClick={triggerFileInput}
-                  >
-                    {previewImage ? (
-                      <img
-                        src={previewImage}
-                        alt="Profile"
-                        className="absolute inset-0 w-16 h-16 rounded-full object-cover"
-                      />
-                    ) : (
-                      <>
-                        {employee['First Name']?.[0]}
-                        {employee['Last Name']?.[0]}
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          className="hidden"
-                          accept="image/*"
-                          onChange={handleImageUpload}
-                        />
-                      </>
-                    )}
-                  </div>
-                ) : (
+                {(
                   <div className="bg-white w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-black relative">
                     {previewImage ? (
                       <img
@@ -811,78 +779,32 @@ const EditEmployeePage = () => {
           {/* Personal Information Tab */}
           {activeTab === 'personal' && (
             <div className="space-y-8">
-              {/* Profile Image Section */}
+              {/* Photo: only the employee uploads it (staff portal); HR may remove an unsuitable one */}
               {isEditMode && (
                 <div>
                   <SectionHeader
-                    title="Profile Image"
+                    title="Photo"
                     icon={User}
                   />
-                  <div className="mt-4 flex flex-col md:flex-row items-start gap-8">
-                    {/* Photo Upload Card */}
-                    <div className="w-full md:w-auto">
-                      <div className="relative group">
-                        <div
-                          className="relative w-40 h-40 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden border-2 border-gray-200 shadow-sm cursor-pointer transition-all duration-300 hover:border-brand/40 hover:shadow-md"
-                          onClick={triggerFileInput}
-                        >
-                          {previewImage ? (
-                            <img
-                              src={previewImage}
-                              alt="Profile preview"
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400">
-                              <div className="relative">
-                                <div className="bg-green-tint w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-brand-dark">
-                                  {employee['First Name']?.[0]}{employee['Last Name']?.[0]}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300">
-                            <div className="flex flex-col items-center">
-                              <Upload className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 mb-1" />
-                              <span className="text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-center px-2">
-                                {previewImage ? 'Change Photo' : 'Upload Photo'}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          className="hidden"
-                          accept="image/*"
-                          onChange={handleImageUpload}
-                        />
+                  <div className="mt-4 flex flex-col sm:flex-row items-start gap-6">
+                    {previewImage ? (
+                      <img src={previewImage} alt="Profile" className="w-32 h-32 rounded-xl object-cover border-2 border-gray-200" />
+                    ) : (
+                      <div className="w-32 h-32 rounded-xl bg-gray-100 flex items-center justify-center text-xl font-bold text-gray-400">
+                        {employee['First Name']?.[0]}{employee['Last Name']?.[0]}
                       </div>
-
-                      <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                    )}
+                    <div className="text-xs text-gray-500 max-w-sm space-y-3">
+                      <p>The employee uploads their own photo in the staff portal. You can remove one that is unsuitable; they will be asked for a new one.</p>
+                      {previewImage && (
                         <button
-                          onClick={triggerFileInput}
-                          className="flex-1 flex items-center justify-center px-4 py-2 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors shadow-sm"
+                          type="button"
+                          onClick={handleRemovePhoto}
+                          className="flex items-center justify-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm text-xs text-gray-700"
                         >
-                          <Upload className="w-4 h-4 mr-2 text-gray-500" />
-                          <span className="text-xs">{previewImage ? 'Change' : 'Upload'}</span>
+                          <X className="w-4 h-4 mr-2" />
+                          Remove photo
                         </button>
-                        {previewImage && (
-                          <button
-                            onClick={() => {
-                              setPreviewImage(null);
-                              setProfileImage(null);
-                            }}
-                            className="flex-1 flex items-center justify-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm text-xs text-gray-700"
-                          >
-                            <X className="w-4 h-4 mr-2" />
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                      <p className="mt-2 text-xs text-gray-500">JPG, PNG or GIF (Max 5MB)</p>
-                      {errors.profileImage && (
-                        <p className="mt-1 text-xs text-red-500">{errors.profileImage}</p>
                       )}
                     </div>
                   </div>
@@ -942,13 +864,14 @@ const EditEmployeePage = () => {
                     <FormField
                       label="National ID"
                       name="ID Number"
-                      type="number"
+                      type="text"
                       value={employee['ID Number'] ? String(employee['ID Number']) : ''}
                       onChange={(e) => {
-                        const numValue = e.target.value ? parseInt(e.target.value) : null;
+                        // text: passport, alien and refugee numbers have letters
+                        const value = e.target.value.trim() || null;
                         setEmployee(prev => ({
                           ...prev,
-                          "ID Number": numValue
+                          "ID Number": value
                         }));
                       }}
                       error={errors['ID Number']}
@@ -1387,6 +1310,11 @@ const EditEmployeePage = () => {
                       disabled={!isEditMode}
                     />
                   </div>
+                  <EmployerPayFields
+                    values={employee as Record<string, unknown>}
+                    onChange={(field, value) => setEmployee(prev => ({ ...prev, [field]: value }))}
+                    disabled={!isEditMode}
+                  />
                 </div>
               )}
 

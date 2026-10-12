@@ -1,6 +1,6 @@
 // @vitest-environment node
 //
-// Profile pictures in storage. The test database has no storage schema, so a minimal stand-in (objects table, the
+// Profile pictures in storage: only the employee uploads theirs (FIG-765). The test database has no storage schema, so a minimal stand-in (objects table, the
 // foldername/filename helpers) is created and the real policy SQL from the migration is applied to it.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -32,8 +32,10 @@ beforeAll(async () => {
     grant usage on schema storage to anon, authenticated;
     grant all on storage.objects to anon, authenticated;
   `);
-  // the real policies, applied to the stand-in
-  await db.exec(readFileSync(join(__dirname, '..', 'migrations', '20261006000400_employee_avatar_storage.sql'), 'utf8'));
+  // the real policies, applied to the stand-in, in migration order
+  for (const file of ['20261006000400_employee_avatar_storage.sql', '20261012200100_employee_photo_owner_only.sql']) {
+    await db.exec(readFileSync(join(__dirname, '..', 'migrations', file), 'utf8'));
+  }
 
   await db.exec(`
     insert into tenants (id, name, slug) values ('${B}', 'Other Co', 'other-co');
@@ -69,10 +71,21 @@ describe('employeeavatar storage policies', () => {
     });
   });
 
-  it('HR can save a picture for anyone in their company', async () => {
+  it('HR cannot upload or replace a picture for an employee: only the employee does', async () => {
     await asUser(db, HR, async () => {
-      await expect(upload(`${A}/profile_images/EMP-002.jpg`)).resolves.toBeTruthy();
+      await expect(upload(`${A}/profile_images/EMP-002.jpg`)).rejects.toThrow(/row-level security/);
+      const r = await db.query(`update storage.objects set name = name where name = '${A}/profile_images/EMP-001.png' returning 1`);
+      expect(r.rows).toHaveLength(0);
     });
+  });
+
+  it('HR can remove a picture (the employee then uploads a new one)', async () => {
+    await db.exec(`insert into storage.objects (bucket_id, name) values ('employeeavatar', '${A}/profile_images/EMP-002.jpg')`);
+    await asUser(db, HR, async () => {
+      const r = await db.query(`delete from storage.objects where name = '${A}/profile_images/EMP-002.jpg' returning 1`);
+      expect(r.rows).toHaveLength(1);
+    });
+    await db.exec(`insert into storage.objects (bucket_id, name) values ('employeeavatar', '${A}/profile_images/EMP-002.jpg')`);
   });
 
   it('nobody can write into another company’s folder', async () => {

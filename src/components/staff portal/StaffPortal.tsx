@@ -19,7 +19,8 @@ import {
   Briefcase as PhBriefcase,
   Clock as PhClock,
   CurrencyDollar as PhCurrencyDollar,
-  Warning as PhWarning
+  Warning as PhWarning,
+  ClipboardText as PhClipboardText
 } from '@phosphor-icons/react';
 
 // Keep Lucide icons for UI elements only
@@ -64,6 +65,7 @@ import Appearance from '../Settings/Appearance';
 import MyContract from './MyContract';
 import { leaveDays, NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
 import CompleteProfileCard from './CompleteProfileCard';
+import OnboardingForm from '../Onboarding/OnboardingForm';
 import PayslipViewer from './PayslipViewer';
 import EmployeeBioPage from './Bio';
 import IncidentReport from './IncidentReport';
@@ -2430,7 +2432,7 @@ const DashboardHome = ({ setActiveTab, userName }: { setActiveTab: (tab: string)
         </div>
       </motion.div>
 
-      <CompleteProfileCard onOpen={() => setActiveTab('biodata')} />
+      <CompleteProfileCard onOpen={() => setActiveTab('onboarding')} />
 
       <CelebrationsCard />
 
@@ -2595,6 +2597,7 @@ const staffMenuGroups: MenuGroup[] = [
   {
     title: "Personal & HR",
     items: [
+      { id: 'onboarding', label: 'Onboarding', icon: PhClipboardText },
       {
         id: 'leave',
         label: 'Leave',
@@ -3364,6 +3367,7 @@ const StaffPortal = () => {
               {/* Render Active Tab */}
               {activeTab === 'home' && <DashboardHome setActiveTab={setActiveTab} userName={userName} />}
               {activeTab === 'salary-advance' && <div className="p-6"><SalaryAdvanceForm /></div>}
+              {activeTab === 'onboarding' && <OnboardingForm />}
               {activeTab === 'biodata' && <EmployeeBioPage />}
               {activeTab === 'payslips' && <PayslipViewer />}
               {activeTab === 'loan' && <LoanRequestForm />}

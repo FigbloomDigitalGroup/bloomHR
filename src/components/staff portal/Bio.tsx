@@ -1006,13 +1006,14 @@ const EmployeeBioPage = () => {
                     <FormField
                       label="National ID"
                       name="ID Number"
-                      type="number"
+                      type="text"
                       value={employee['ID Number'] ? String(employee['ID Number']) : ''}
                       onChange={(e) => {
-                        const numValue = e.target.value ? parseInt(e.target.value) : null;
+                        // text: passport, alien and refugee numbers have letters
+                        const value = e.target.value.trim() || null;
                         setEmployee(prev => ({
                           ...prev,
-                          "ID Number": numValue
+                          "ID Number": value
                         }));
                       }}
                       error={errors['ID Number']}

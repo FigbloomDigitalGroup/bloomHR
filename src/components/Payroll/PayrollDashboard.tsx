@@ -64,6 +64,8 @@ import RunPaymentsPanel from "./RunPaymentsPanel";
 import { employeesMissingDetails } from "../../lib/missingPayrollDetails";
 import { isPaidByMpesa, paymentMethodLabel } from "../../lib/paymentMethods";
 import { fetchAll } from "../../lib/fetchAll";
+import { isPayrollReady } from "../../lib/onboardingValidation";
+import { useNavigate } from "react-router-dom";
 import { deductionsForPeriod, loadDeductionSetup, payslipDeductionLines, totalOf } from "../../lib/voluntaryDeductions";
 import BulkSalaryHistoryUpload from "./BulkSalaryHistoryUpload";
 
@@ -2225,7 +2227,14 @@ const P10FormGenerator = ({
 
       console.log("Fetched employees:", employees.length);
 
-      const p10Data = employees.map((employee) => {
+      // only employees whose onboarding HR has approved are on payroll, so only they are in the return
+      const onPayroll = employees.filter(isPayrollReady);
+      if (onPayroll.length === 0) {
+        toast.error("No employee has finished onboarding yet, so there is no one to put in the P10");
+        return;
+      }
+
+      const p10Data = onPayroll.map((employee) => {
         const taxPin = employee["Tax PIN"] || employee.tax_pin || "PENDING";
         const employeeName =
           `${employee["First Name"] || ""} ${employee["Middle Name"] || ""} ${employee["Last Name"] || ""}`.trim() ||
@@ -2504,6 +2513,7 @@ export default function PayrollDashboard() {
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [currentRecordIndex, setCurrentRecordIndex] = useState<number | null>(null);
   const [employees, setEmployees] = useState<any[]>([]);
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [departments, setDepartments] = useState(["all"]);
   const [branches, setBranches] = useState([
@@ -3372,9 +3382,10 @@ export default function PayrollDashboard() {
             })),
           ]);
 
-          // Process each employee with salary advance deduction
+          // Process each employee with salary advance deduction. Only employees whose onboarding HR has approved are
+          // paid (the database refuses payslips for anyone else); "Not onboarded" lists the rest.
           const payrollData = await Promise.all(
-            data.map(async (employee) => {
+            data.filter(isPayrollReady).map(async (employee) => {
               const basicSalary = employee["Basic Salary"] || 0;
               const employeeId = employee["Employee Number"] || "";
               const jobGroup = employee["Job Group"] || "";
@@ -3742,6 +3753,7 @@ export default function PayrollDashboard() {
   const runNetPay = payrollRecords.reduce((sum: number, r: any) => sum + (r.net_pay || 0), 0);
 
   const missingDetails = useMemo(() => employeesMissingDetails(employees), [employees]);
+  const notOnboarded = useMemo(() => employees.filter((e) => !isPayrollReady(e)), [employees]);
 
   const handleApproveRun = () =>
     changeRunStatus(
@@ -4338,6 +4350,17 @@ This can't be undone: the payslips stay locked for good.`,
           <AlertTriangle className="w-3 h-3" />
           Missing details{missingDetails.length ? ` (${missingDetails.length})` : ""}
         </button>
+        {notOnboarded.length > 0 && (
+          <button
+            type="button"
+            onClick={() => navigate("/onboarding")}
+            title="These employees are not paid until HR approves their onboarding"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-orange-text-alt/40 bg-orange-tint-alt text-[11px] font-semibold text-orange-text-alt hover:brightness-95 transition-colors"
+          >
+            <Users className="w-3 h-3" />
+            Not onboarded ({notOnboarded.length})
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setShowStatutorySettings(true)}
