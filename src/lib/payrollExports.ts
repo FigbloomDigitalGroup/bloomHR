@@ -46,11 +46,12 @@ export interface ExportFile {
   problems: { name: string; employeeNumber: string; missing: string[] }[];
 }
 
+// Spelled exactly as in the P10 file finance uploads to iTax (FIGBLOOM SEPTEMBER 2026 PAYE), typos included.
 export const P10_HEADERS = [
-  'Employee PIN', 'Employee name', 'Resident', 'Type of Employee', 'PWD', 'Exemption certificate No', 'Total cash pay',
+  'Employee pin', 'Employee name', 'Resident', 'Type of Employee', 'PWD', 'Exemption certificate No', 'Total cash pay',
   'Value of Car benefit', 'Value of meals', 'Non cash', 'Housing benefit', 'Other benefits', 'Total gross pay',
-  'Social health insurance fund', 'NSSF', 'Other pension contribution', 'Post retirement medical fund',
-  'Mortgage interest', 'AHL', 'Taxable pay', 'Personal relief', 'Insurance relief', 'PAYE', 'Self assessed PAYE',
+  'Social health insuarance fund', 'NSSF', 'other pension contribution', 'Post retirement medical fund',
+  'Mortgage Intrest', 'AHL', 'Taxable pay', 'Personal relief', 'Insuarance relief', 'Paye', 'Self assessed paye',
 ] as const;
 
 export const SHA_HEADERS = ['PAYROLL NUMBER', 'FIRSTNAME', 'LASTNAME', 'IDENTITY TYPE', 'ID NO', 'KRA PIN', 'NHIF NO', 'CONTRIBUTION AMOUNT', 'PHONE'] as const;
