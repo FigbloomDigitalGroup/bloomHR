@@ -5,6 +5,7 @@ import { CheckCircle2, ClipboardCheck, FileCheck2, Loader2, Mail, Pencil, Printe
 import { Button, Card, EmptyState, PageHeader, SearchInput, StatusPill, TabBar } from '../UI';
 import OnboardingSummary from './OnboardingSummary';
 import DocumentsReview from './DocumentsReview';
+import HealthReview from './HealthReview';
 import RequiredDocumentsModal from './RequiredDocumentsModal';
 import {
   type OnboardingRecord,
@@ -107,6 +108,10 @@ function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: (
               <section className="border-t border-border pt-4">
                 <h3 className="text-sm font-semibold text-ink mb-3">Documents and referees</h3>
                 <DocumentsReview employeeId={row.id} onChanged={documentsChanged} />
+              </section>
+              <section className="border-t border-border pt-4">
+                <h3 className="text-sm font-semibold text-ink mb-3">Health</h3>
+                <HealthReview employeeId={row.id} />
               </section>
               {record.history.length > 0 && (
                 <section>

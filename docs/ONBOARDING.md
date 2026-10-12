@@ -148,3 +148,13 @@ deductible, capped pension, PRMF and mortgage interest); PAYE is the payslip's. 
 - **Submitting and approving:** the employee can't submit until every required document has a file that wasn't rejected. HR can't approve until each one is accepted.
 - **Referees:** as many as the employee likes (name, organisation, position, phone or email, relationship). At least one is needed.
 - **Earlier uploads:** files uploaded on the old Documents tab became documents here, waiting for HR.
+
+## Health records
+
+`20261012500000_employee_health_records.sql`, `src/lib/employeeHealth.ts`. Health data is sensitive personal data
+under the Data Protection Act, so:
+
+- **Voluntary:** never needed for onboarding. The employee first ticks a consent statement, and withdrawing consent deletes all their health records and documents.
+- **What it holds:** medical conditions (e.g. diabetes, asthma) and disability or accommodation needs, with the medical institution, date diagnosed, details, and supporting documents (in the employee's `health/` folder of the private `documents` bucket).
+- **Who sees it:** the employee keeps their own. HR and administrators (the `employees` module) see it in the review panel only after clicking **Show health information**, through `health_records_for()`. Every look, and every health document opened, is logged in `audit_log` as `VIEW`. Payroll and colleagues can't see it.
+- **The audit log:** changes are recorded without their contents, so medical details never reach the audit log, which settings users can read in full.
