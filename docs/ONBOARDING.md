@@ -98,7 +98,8 @@ Taxable pay, Personal relief, Insurance relief, PAYE, Self assessed PAYE, SHA CO
 - **ID number** by identity type: National ID 6–9 digits; Alien ID 5–12 letters/digits; Refugee ID 5–20 letters,
   digits, `/` or `-`; Passport 6–9 letters/digits. With no type given (older forms), it is taken as a National ID.
 - **Phone**: Kenyan mobile (`07…`, `01…`, `2547…`, `+2547…`) or `+` and a country code. Spaces and dashes are dropped.
-- **SHA number**: 4–20 letters, digits or dashes. **NSSF number**: 5–12 digits.
+- **SHA number**: 4–20 letters, digits or dashes. **NSSF number**: 5–12 characters, digits except that the last may be
+  X (a check character, e.g. 206593059X).
 - ID number, KRA PIN, SHA number and NSSF number are unique within a company. The same person can be on another
   company's payroll (as a secondary employee).
 - Formats are checked when a value is saved or changed, so an older malformed value does not block other edits; the

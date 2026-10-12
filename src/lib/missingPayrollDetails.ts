@@ -88,7 +88,7 @@ const CLEAN: Record<DetailColumn, (value: string) => { value: string } | { error
   'KRA PIN': (v) =>
     isValidKraPin(v) ? { value: normaliseKraPin(v) } : { error: `KRA PIN "${v}" should look like A123456789B` },
   'NSSF Number': (v) =>
-    isValidNssfNumber(v) ? { value: normaliseNssfNumber(v) } : { error: `NSSF number "${v}" should be digits only` },
+    isValidNssfNumber(v) ? { value: normaliseNssfNumber(v) } : { error: `NSSF number "${v}" should be digits (the last may be X)` },
   'SHA Number': (v) =>
     isValidShaNumber(v) ? { value: normaliseShaNumber(v) } : { error: `SHA number "${v}" should be letters and digits only` },
   'Payment Method': (v) => {

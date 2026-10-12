@@ -118,6 +118,9 @@ describe('formats', () => {
   it('checks SHA and NSSF numbers', async () => {
     expect(await saved(`"NSSF Number" = '2012-345 678'`, 'NSSF Number')).toBe('2012345678');
     expect((await save(`"NSSF Number" = 'NS12345'`)).error).toMatch(/NSSF number/);
+    // a check character X at the end is part of the number (20261012300000)
+    expect(await saved(`"NSSF Number" = '206593059x'`, 'NSSF Number')).toBe('206593059X');
+    expect((await save(`"NSSF Number" = '2065X3059'`)).error).toMatch(/NSSF number/);
     expect(await saved(`"SHIF Number" = 'cr 1234567'`, 'SHIF Number')).toBe('CR1234567');
     expect((await save(`"SHIF Number" = 'CR#1'`)).error).toMatch(/SHA number/);
   });

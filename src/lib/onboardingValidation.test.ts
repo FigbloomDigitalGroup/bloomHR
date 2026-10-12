@@ -77,6 +77,13 @@ describe('SHA and NSSF numbers', () => {
     expect(isValidNssfNumber('1234')).toBe(false);
   });
 
+  it('NSSF: the last character may be X (a check character), saved in upper case', () => {
+    expect(isValidNssfNumber('206593059X')).toBe(true); // from finance's July 2026 NSSF return
+    expect(normaliseNssfNumber('206593059x')).toBe('206593059X');
+    expect(isValidNssfNumber('2065X3059')).toBe(false);
+    expect(isValidNssfNumber('X')).toBe(false);
+  });
+
   it('SHA: letters, digits and dashes', () => {
     expect(isValidShaNumber('cr 1234567')).toBe(true);
     expect(isValidShaNumber('CR-123-4')).toBe(true);
