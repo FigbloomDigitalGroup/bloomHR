@@ -5,6 +5,7 @@ import { Button, Card, StatusPill } from '../UI';
 import { AmountField, Section, SelectField, TextField, YesNoField } from './Fields';
 import DocumentsSection from './DocumentsSection';
 import RefereesSection from './RefereesSection';
+import HealthSection from './HealthSection';
 import {
   type Contact,
   type OnboardingRecord,
@@ -283,6 +284,12 @@ export default function OnboardingForm() {
           <h3 className="text-sm font-semibold text-ink">Documents</h3>
           <p className="text-xs text-muted-foreground mt-0.5 mb-3">Upload clear copies. Files are saved as soon as you upload them.</p>
           <DocumentsSection employeeId={String(record.employee['id'])} onChanged={() => void refresh()} />
+        </section>
+
+        <section className="border-t border-border pt-5">
+          <h3 className="text-sm font-semibold text-ink">Health (optional)</h3>
+          <p className="text-xs text-muted-foreground mt-0.5 mb-3">Only if you want to share it. It is not needed to complete onboarding.</p>
+          <HealthSection employeeId={String(record.employee['id'])} />
         </section>
 
         {problem && (
