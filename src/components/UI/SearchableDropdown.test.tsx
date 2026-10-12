@@ -45,4 +45,30 @@ describe('SearchableDropdown', () => {
     render(<SearchableDropdown options={['Finance']} value="Field Officer" onChange={vi.fn()} placeholder="Select Job Title" />);
     expect(screen.getByText('Field Officer')).toBeTruthy();
   });
+
+  it('draws the list over the page, so a card that clips its contents does not hide it, and picking still works', () => {
+    const onChange = vi.fn();
+    const { container } = render(
+      <div style={{ overflow: 'hidden', height: 40 }}>
+        <SearchableDropdown options={['Kenyan Citizen', 'International']} value="" placeholder="Select Nationality" onChange={onChange} />
+      </div>
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Select Nationality/ }));
+    const option = screen.getByRole('button', { name: 'Kenyan Citizen' });
+    expect(container.contains(option)).toBe(false); // not inside the clipping card
+    fireEvent.mouseDown(option); // a press inside the list is not a click outside
+    fireEvent.click(option);
+    expect(onChange).toHaveBeenCalledWith('Kenyan Citizen');
+  });
+
+  it('opens upwards when there is not enough room below', () => {
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+      { top: window.innerHeight - 60, bottom: window.innerHeight - 28, left: 10, width: 200, right: 210, height: 32, x: 10, y: 0, toJSON: () => ({}) } as DOMRect
+    );
+    open();
+    const panel = screen.getByPlaceholderText('Search options...').closest('[style*="position: fixed"]') as HTMLElement;
+    expect(panel.style.bottom).toBe('68px');
+    expect(panel.style.top).toBe('');
+    rect.mockRestore();
+  });
 });
