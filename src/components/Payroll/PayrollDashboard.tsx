@@ -60,6 +60,7 @@ import {
 import PayrollRunBar from "./PayrollRunBar";
 import VoluntaryDeductionsModal from "./VoluntaryDeductionsModal";
 import MissingPayrollDetailsModal from "./MissingPayrollDetailsModal";
+import RunPaymentsPanel from "./RunPaymentsPanel";
 import { employeesMissingDetails } from "../../lib/missingPayrollDetails";
 import { isPaidByMpesa, paymentMethodLabel } from "../../lib/paymentMethods";
 import { fetchAll } from "../../lib/fetchAll";
@@ -4234,7 +4235,13 @@ This can't be undone: the payslips stay locked for good.`,
         <button
           type="button"
           onClick={handleBulkMpesaPayment}
-          disabled={finalFilteredRecords.length === 0}
+          // an approved month is paid with "Pay staff" below, which records every payment; never both
+          disabled={finalFilteredRecords.length === 0 || monthRun?.status === "approved" || monthRun?.status === "paid"}
+          title={
+            monthRun?.status === "approved" || monthRun?.status === "paid"
+              ? `Pay ${periodLabel}'s approved payroll with "Pay staff" below: it records every payment`
+              : undefined
+          }
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-tile bg-brand text-white text-xs font-bold hover:bg-brand-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <TabletSmartphone className="w-3.5 h-3.5" />
@@ -4254,6 +4261,8 @@ This can't be undone: the payslips stay locked for good.`,
         onMarkPaid={handleMarkRunPaid}
         onDiscard={handleDiscardRun}
       />
+
+      {monthRun && (monthRun.status === "approved" || monthRun.status === "paid") && <RunPaymentsPanel run={monthRun} />}
 
       {/* Filters, search and the less-used payroll tools */}
       <div className="flex items-center gap-2 flex-wrap">
