@@ -61,6 +61,7 @@ import PayrollRunBar from "./PayrollRunBar";
 import VoluntaryDeductionsModal from "./VoluntaryDeductionsModal";
 import MissingPayrollDetailsModal from "./MissingPayrollDetailsModal";
 import RunPaymentsPanel from "./RunPaymentsPanel";
+import PayrollExportsPanel from "./PayrollExportsPanel";
 import { employeesMissingDetails } from "../../lib/missingPayrollDetails";
 import { isPaidByMpesa, paymentMethodLabel } from "../../lib/paymentMethods";
 import { fetchAll } from "../../lib/fetchAll";
@@ -4275,6 +4276,7 @@ This can't be undone: the payslips stay locked for good.`,
       />
 
       {monthRun && (monthRun.status === "approved" || monthRun.status === "paid") && <RunPaymentsPanel run={monthRun} />}
+      {monthRun && (monthRun.status === "approved" || monthRun.status === "paid") && <PayrollExportsPanel run={monthRun} />}
 
       {/* Filters, search and the less-used payroll tools */}
       <div className="flex items-center gap-2 flex-wrap">
