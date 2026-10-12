@@ -6,6 +6,7 @@ import { AmountField, Section, SelectField, TextField, YesNoField } from './Fiel
 import DocumentsSection from './DocumentsSection';
 import RefereesSection from './RefereesSection';
 import HealthSection from './HealthSection';
+import AgreementsSection from './AgreementsSection';
 import {
   type Contact,
   type OnboardingRecord,
@@ -284,6 +285,12 @@ export default function OnboardingForm() {
           <h3 className="text-sm font-semibold text-ink">Documents</h3>
           <p className="text-xs text-muted-foreground mt-0.5 mb-3">Upload clear copies. Files are saved as soon as you upload them.</p>
           <DocumentsSection employeeId={String(record.employee['id'])} onChanged={() => void refresh()} />
+        </section>
+
+        <section className="border-t border-border pt-5">
+          <h3 className="text-sm font-semibold text-ink">Company policies and agreements</h3>
+          <p className="text-xs text-muted-foreground mt-0.5 mb-3">Read each one and tick to accept it. Your tick is recorded as your signature.</p>
+          <AgreementsSection onChanged={() => void refresh()} />
         </section>
 
         <section className="border-t border-border pt-5">
