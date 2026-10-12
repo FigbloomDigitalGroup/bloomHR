@@ -61,7 +61,7 @@ import PayrollRunBar from "./PayrollRunBar";
 import VoluntaryDeductionsModal from "./VoluntaryDeductionsModal";
 import MissingPayrollDetailsModal from "./MissingPayrollDetailsModal";
 import RunPaymentsPanel from "./RunPaymentsPanel";
-import PayrollExportsPanel from "./PayrollExportsPanel";
+import PayrollExportsPanel, { downloadP10 } from "./PayrollExportsPanel";
 import { employeesMissingDetails } from "../../lib/missingPayrollDetails";
 import { isPaidByMpesa, paymentMethodLabel } from "../../lib/paymentMethods";
 import { fetchAll } from "../../lib/fetchAll";
@@ -2186,290 +2186,6 @@ const Pagination = ({
 };
 
 // P10 Form Generator Component
-const P10FormGenerator = ({
-  isOpen,
-  onClose,
-  calculatePAYE,
-  calculateNSSF,
-  calculateNHIF,
-  calculateHousingLevy,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  calculatePAYE: (grossSalary: number, hasTaxPIN: boolean) => number;
-  calculateNSSF: (grossSalary: number) => number;
-  calculateNHIF: (grossSalary: number) => number;
-  calculateHousingLevy: (grossSalary: number, hasTaxPIN: boolean) => number;
-}) => {
-  const [selectedYear] = useState(
-    new Date().getFullYear().toString(),
-  );
-  const [isLoading, setIsLoading] = useState(false);
-
-  const generateP10Form = async () => {
-    setIsLoading(true);
-    try {
-      // every employee, a page at a time (one request returns at most 1000)
-      const { data: employees, error } = await fetchAll((from, to) => supabase.from("employees").select("*").order('"Employee Number"').order("id").range(from, to)).then(
-        (data) => ({ data, error: null }),
-        (error) => ({ data: null, error }),
-      );
-
-      if (error) {
-        console.error("Supabase error:", error);
-        toast.error("Error fetching employee data: " + error.message);
-        return;
-      }
-
-      if (!employees || employees.length === 0) {
-        toast.error("No employee data found in the system");
-        return;
-      }
-
-      console.log("Fetched employees:", employees.length);
-
-      // only employees whose onboarding HR has approved are on payroll, so only they are in the return
-      const onPayroll = employees.filter(isPayrollReady);
-      if (onPayroll.length === 0) {
-        toast.error("No employee has finished onboarding yet, so there is no one to put in the P10");
-        return;
-      }
-
-      const p10Data = onPayroll.map((employee) => {
-        const taxPin = employee["Tax PIN"] || employee.tax_pin || "PENDING";
-        const employeeName =
-          `${employee["First Name"] || ""} ${employee["Middle Name"] || ""} ${employee["Last Name"] || ""}`.trim() ||
-          employee.employee_name ||
-          "N/A";
-        const basicSalary = parseFloat(
-          employee["Basic Salary"] || employee.basic_salary || 0,
-        );
-
-        const houseAllowance = parseFloat(employee.house_allowance || 0);
-        const transportAllowance = parseFloat(employee.travel_allowance || 0);
-        const medicalAllowance = parseFloat(employee.medical_allowance || 0);
-        const otherAllowances = parseFloat(employee.other_allowances || 0);
-
-        const totalGrossPay =
-          basicSalary +
-          houseAllowance +
-          transportAllowance +
-          medicalAllowance +
-          otherAllowances;
-
-        const nhifNumber =
-          employee["NHIF Number"] || employee["SHIF Number"] || "";
-        const nssfNumber = employee["NSSF Number"] || "";
-
-        const nhifDeduction = nhifNumber ? calculateNHIF(totalGrossPay) : 0;
-        const nssfDeduction = nssfNumber ? calculateNSSF(totalGrossPay) : 0;
-        const housingLevy =
-          taxPin !== "PENDING" ? calculateHousingLevy(totalGrossPay, true) : 0;
-
-        const taxablePay = totalGrossPay - nssfDeduction - housingLevy;
-
-        const payeAmount = calculatePAYE(taxablePay, true);
-
-        return [
-          "A00000000001",
-          employeeName,
-          "Resident",
-          "Primary Employee",
-          "No",
-          "",
-          basicSalary,
-          0,
-          0,
-          houseAllowance +
-          transportAllowance +
-          medicalAllowance +
-          otherAllowances,
-          "Benefit not given",
-          houseAllowance,
-          transportAllowance + medicalAllowance + otherAllowances,
-          totalGrossPay,
-          nhifDeduction,
-          nssfDeduction,
-          0,
-          0,
-          0,
-          housingLevy,
-          taxablePay,
-          2400,
-          0,
-          "",
-          payeAmount,
-        ];
-      });
-
-      console.log("P10 data prepared for", p10Data.length, "employees");
-
-      const headers = [
-        "Employer Pin",
-        "Employee Name",
-        "Resident Status",
-        "Service Status",
-        "Disability Status",
-        "Exemption Certificate Number",
-        "Total Emoluments - Cash Pay",
-        "Value of Car Benefit",
-        "Value of Meals",
-        "Non Cash Benefits",
-        "Type of Housing",
-        "Housing Benefit",
-        "Other Benefits",
-        "Total Gross Pay",
-        "SHIF",
-        "NSSF Contribution",
-        "Other Pension Contribution",
-        "Post Retirement Medical Fund",
-        "Mortgage Interest",
-        "Affordable Housing Levy",
-        "Taxable Pay",
-        "Monthly Personal Relief",
-        "Amount of Insurance Relief",
-        "PAYE Tax",
-        "Self Assessed PAYE Tax",
-      ];
-
-      const ws = XLSX.utils.aoa_to_sheet([headers, ...p10Data]);
-
-      const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
-      for (let R = 0; R <= range.e.r; ++R) {
-        for (let C = 0; C <= range.e.c; ++C) {
-          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-          if (!ws[cellAddress]) continue;
-
-          if (R === 0) {
-            ws[cellAddress].s = {
-              font: { bold: true },
-              fill: { fgColor: { rgb: "CCCCCC" } },
-            };
-          }
-
-          if (R > 0 && C >= 6 && C !== 10) {
-            if (typeof ws[cellAddress].v === "number") {
-              ws[cellAddress].t = "n";
-              ws[cellAddress].z = "#,##0.00";
-            }
-          }
-        }
-      }
-
-      ws["!cols"] = [
-        { wch: 12 },
-        { wch: 25 },
-        { wch: 10 },
-        { wch: 15 },
-        { wch: 12 },
-        { wch: 12 },
-        { wch: 15 },
-        { wch: 12 },
-        { wch: 12 },
-        { wch: 15 },
-        { wch: 20 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 12 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 12 },
-        { wch: 15 },
-      ];
-
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "P10 EMPLOYER RETURN");
-
-      const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-      const data = new Blob([excelBuffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-
-      saveAs(data, `P10_Employer_Return_${selectedYear}.xlsx`);
-
-      toast.success(
-        `P10 Form generated successfully for ${p10Data.length} employees!`,
-      );
-      onClose();
-    } catch (error) {
-      console.error("Error generating P10 form:", error);
-      toast.error("Failed to generate P10 form: " + (error as any).message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
-            <img src="kra.png" className="w-5"></img>
-            Generate P10 Form (Employer Return)
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-            disabled={isLoading}
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div className="bg-blue-50 p-3 rounded-md border border-blue-100">
-            <div className="flex items-center gap-2 text-blue-800 mb-2">
-              <Users className="w-4 h-4" />
-              <span className="text-xs font-medium">
-                P10 Employer Return Form
-              </span>
-            </div>
-            <p className="text-xs text-blue-700">
-              This will generate the P10 form with all employee tax information
-              for KRA submission.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3 mt-6">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
-            disabled={isLoading}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={generateP10Form}
-            className="px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 flex items-center gap-2"
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <>
-                <Loader className="w-4 h-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Download size={16} />
-                Generate P10 Excel
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const PAYSLIP_AMOUNTS = [
   "basic_salary", "gross_pay", "net_pay", "total_deductions", "nssf_deduction", "nhif_deduction", "paye_tax",
@@ -2544,7 +2260,6 @@ export default function PayrollDashboard() {
 
   const [showP9Modal, setShowP9Modal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [showP10Modal, setShowP10Modal] = useState(false);
   const [showStatutorySettings, setShowStatutorySettings] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
 
@@ -3756,6 +3471,21 @@ export default function PayrollDashboard() {
   const missingDetails = useMemo(() => employeesMissingDetails(employees), [employees]);
   const notOnboarded = useMemo(() => employees.filter((e) => !isPayrollReady(e)), [employees]);
 
+  // the KRA P10 for this month, as CSV, from its approved payslips (the same file as "Statutory returns" offers)
+  const handleP10Download = async () => {
+    if (!monthRun || (monthRun.status !== "approved" && monthRun.status !== "paid")) {
+      toast.error(`Approve payroll for ${periodLabel} first: the P10 is made from the approved payslips`);
+      return;
+    }
+    try {
+      const problems = await downloadP10(monthRun);
+      if (problems.length) toast(`P10 downloaded. ${problems.length} employee(s) are missing details KRA needs (see Statutory returns below).`);
+      else toast.success("P10 downloaded");
+    } catch (err) {
+      toast.error((err as { message?: string })?.message || "The P10 could not be made");
+    }
+  };
+
   const handleApproveRun = () =>
     changeRunStatus(
       "approved",
@@ -4228,7 +3958,7 @@ This can't be undone: the payslips stay locked for good.`,
         </button>
         <button
           type="button"
-          onClick={() => setShowP10Modal(true)}
+          onClick={() => void handleP10Download()}
           className="flex items-center gap-1.5 px-3 py-2 rounded-tile border border-border bg-white text-[11.5px] font-semibold text-ink hover:bg-secondary transition-colors"
         >
           <FileText className="w-3 h-3" strokeWidth={2} />
@@ -4775,16 +4505,6 @@ This can't be undone: the payslips stay locked for good.`,
         records={finalFilteredRecords}
       />
 
-      {showP10Modal && (
-        <P10FormGenerator
-          isOpen={showP10Modal}
-          onClose={() => setShowP10Modal(false)}
-          calculatePAYE={calculatePAYE}
-          calculateNSSF={calculateNSSF}
-          calculateNHIF={calculateNHIF}
-          calculateHousingLevy={calculateHousingLevy}
-        />
-      )}
 
       {showDeductions && (
         <VoluntaryDeductionsModal
