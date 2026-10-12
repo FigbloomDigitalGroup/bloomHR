@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { CheckCircle2, ClipboardCheck, FileCheck2, Loader2, Mail, Pencil, Printer, Undo2, X } from 'lucide-react';
+import { CheckCircle2, ClipboardCheck, FileCheck2, Loader2, Mail, Pencil, Printer, ScrollText, Undo2, X } from 'lucide-react';
 import { Button, Card, EmptyState, PageHeader, SearchInput, StatusPill, TabBar } from '../UI';
 import OnboardingSummary from './OnboardingSummary';
 import DocumentsReview from './DocumentsReview';
 import HealthReview from './HealthReview';
+import AgreementsReview from './AgreementsReview';
+import PoliciesModal from './PoliciesModal';
 import RequiredDocumentsModal from './RequiredDocumentsModal';
 import {
   type OnboardingRecord,
@@ -110,6 +112,10 @@ function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: (
                 <DocumentsReview employeeId={row.id} onChanged={documentsChanged} />
               </section>
               <section className="border-t border-border pt-4">
+                <h3 className="text-sm font-semibold text-ink mb-3">Policies and agreements</h3>
+                <AgreementsReview employeeId={row.id} />
+              </section>
+              <section className="border-t border-border pt-4">
                 <h3 className="text-sm font-semibold text-ink mb-3">Health</h3>
                 <HealthReview employeeId={row.id} />
               </section>
@@ -177,6 +183,7 @@ export default function OnboardingReview() {
   const [reviewing, setReviewing] = useState<OverviewRow | null>(null);
   const [inviting, setInviting] = useState<string | null>(null);
   const [settingDocuments, setSettingDocuments] = useState(false);
+  const [settingPolicies, setSettingPolicies] = useState(false);
 
   const load = useCallback(() => {
     loadOnboardingOverview().then(setRows, (err) => {
@@ -220,7 +227,12 @@ export default function OnboardingReview() {
       <PageHeader
         title="Onboarding"
         subtitle="Employees fill in their own details; you review and approve them. Only approved employees are paid."
-        actions={<Button variant="secondary" icon={<FileCheck2 className="h-4 w-4" />} onClick={() => setSettingDocuments(true)}>Required documents</Button>}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" icon={<ScrollText className="h-4 w-4" />} onClick={() => setSettingPolicies(true)}>Policies</Button>
+            <Button variant="secondary" icon={<FileCheck2 className="h-4 w-4" />} onClick={() => setSettingDocuments(true)}>Required documents</Button>
+          </div>
+        }
       />
 
       <TabBar variant="pill" items={tabs} activeId={filter} onChange={(id) => setFilter(id as Filter)} />
@@ -271,6 +283,7 @@ export default function OnboardingReview() {
 
       {reviewing && <ReviewPanel row={reviewing} onClose={() => setReviewing(null)} onChanged={load} />}
       {settingDocuments && <RequiredDocumentsModal onClose={() => { setSettingDocuments(false); load(); }} />}
+      {settingPolicies && <PoliciesModal onClose={() => { setSettingPolicies(false); load(); }} />}
     </div>
   );
 }

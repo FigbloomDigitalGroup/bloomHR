@@ -158,3 +158,12 @@ under the Data Protection Act, so:
 - **What it holds:** medical conditions (e.g. diabetes, asthma) and disability or accommodation needs, with the medical institution, date diagnosed, details, and supporting documents (in the employee's `health/` folder of the private `documents` bucket).
 - **Who sees it:** the employee keeps their own. HR and administrators (the `employees` module) see it in the review panel only after clicking **Show health information**, through `health_records_for()`. Every look, and every health document opened, is logged in `audit_log` as `VIEW`. Payroll and colleagues can't see it.
 - **The audit log:** changes are recorded without their contents, so medical details never reach the audit log, which settings users can read in full.
+
+## Company policies and agreements
+
+`20261012600000_company_policy_agreements.sql`, `src/lib/companyPolicies.ts`.
+
+- **Publishing:** HR adds policies with **Policies** on the Onboarding page (title, wording and/or a file, required or not, in use or not). Published wording never changes; **New version** publishes a new one, which employees accept again.
+- **Signing:** the employee ticks one checkbox per policy ("I have read and agree to …"). `accept_policy()` records it as their signature: who, which version, a SHA-256 fingerprint of that version's wording, when, and their browser. An acceptance can't be changed or removed, and nobody can accept for someone else.
+- **Onboarding:** every required policy in use must be accepted before the employee can submit.
+- **HR's view:** the review panel shows each policy with the date it was accepted. The printed form lists them too.

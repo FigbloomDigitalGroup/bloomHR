@@ -4,6 +4,7 @@ import { Loader2, Printer } from 'lucide-react';
 import OnboardingSummary from './OnboardingSummary';
 import { type OnboardingRecord, errorMessage, loadOnboardingForReview, statusLabel } from '../../lib/onboarding';
 import { supabase } from '../../lib/supabase';
+import { type PolicyItem, loadPolicyChecklist } from '../../lib/companyPolicies';
 import { type ChecklistItem, DOCUMENT_STATUS_LABELS, type EmployeeDocument, type Referee, loadChecklist, loadDocuments, loadReferees } from '../../lib/employeeDocuments';
 
 // The onboarding form as a printable page: the company, the employee's name and position, the date they submitted,
@@ -28,14 +29,14 @@ export default function OnboardingPrint() {
   const [record, setRecord] = useState<OnboardingRecord | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const [docs, setDocs] = useState<{ checklist: ChecklistItem[]; files: EmployeeDocument[]; referees: Referee[] } | null>(null);
+  const [docs, setDocs] = useState<{ checklist: ChecklistItem[]; files: EmployeeDocument[]; referees: Referee[]; policies: PolicyItem[] } | null>(null);
 
   useEffect(() => {
-    Promise.all([loadOnboardingForReview(id), loadCompany(), loadChecklist(id), loadDocuments(id), loadReferees(id)]).then(
-      ([r, c, checklist, files, referees]) => {
+    Promise.all([loadOnboardingForReview(id), loadCompany(), loadChecklist(id), loadDocuments(id), loadReferees(id), loadPolicyChecklist(id)]).then(
+      ([r, c, checklist, files, referees, policies]) => {
         setRecord(r);
         setCompany(c);
-        setDocs({ checklist, files, referees });
+        setDocs({ checklist, files, referees, policies });
       },
       (err) => setProblem(errorMessage(err, 'Could not load this form.'))
     );
@@ -84,6 +85,16 @@ export default function OnboardingPrint() {
                 ))}
               </ul>
             )}
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-5 mb-2">Policies and agreements</h3>
+            <ul className="text-sm text-ink space-y-0.5">
+              {docs.policies.map((p) => (
+                <li key={p.version_id} className="flex justify-between gap-3 border-b border-border/60 py-1">
+                  <span>{p.title} (version {p.version})</span>
+                  <span className="text-right">{p.accepted_at ? `Accepted ${new Date(p.accepted_at).toLocaleString('en-KE', { dateStyle: 'medium', timeStyle: 'short' })}` : 'Not accepted'}</span>
+                </li>
+              ))}
+              {docs.policies.length === 0 && <li>—</li>}
+            </ul>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-5 mb-2">Documents</h3>
             <ul className="text-sm text-ink space-y-0.5">
               {docs.checklist.filter((c) => c.required || docs.files.some((f) => f.code === c.code)).map((c) => {
