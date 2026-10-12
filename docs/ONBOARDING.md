@@ -116,3 +116,16 @@ Seeded codes (monthly amounts): `paye_bands`, `personal_relief`, `insurance_reli
 `meals_exempt_limit`, `pwd_exempt_income`, `shif_deductible`, `ahl_deductible`, `shif_rate`, `shif_minimum`,
 `ahl_rate`, `ahl_employer_rate`, `nssf_rate`, `nssf_employer_rate`, `nssf_lower_limit`, `nssf_upper_limit`.
 Finance should confirm the seeded values, especially the NSSF limits from February 2026.
+
+## Downloads (payroll page)
+
+Once a month's run is approved, **Statutory returns and bulk payments** offers CSV files with everyone on that month's
+payroll (`src/lib/payrollExports.ts`): KRA PAYE (P10), SHA and NSSF, with the column names in the table above, and
+bulk-payment files for M-Pesa (`Phone Number` as 2547…, `Name`, `Amount`, `Reference`, `Payroll Number`) and the bank
+(`Payroll Number`, `Employee Name`, `Bank`, `Bank Code`, `Branch`, `Branch Code`, `Account Name`, `Account Number`,
+`Amount`, `Reference`). Amounts are the payslips' (net pay for bulk payments); employee details are the records'.
+Each file lists who is missing a detail it needs before you download it.
+
+The P10's taxable pay is worked out from the payslip and the rates in force that month (NSSF, SHIF and AHL when
+deductible, capped pension, PRMF and mortgage interest); PAYE is the payslip's. Until payroll itself reads
+`statutory_rates`, KRA's checker may flag a month where the two disagree.
