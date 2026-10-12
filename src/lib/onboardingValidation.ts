@@ -22,7 +22,7 @@ const text = (value: unknown) => (value === null || value === undefined ? '' : S
 export const normaliseKraPin = (value: unknown) => text(value).replace(/\s/g, '').toUpperCase();
 export const normaliseIdNumber = (value: unknown) => text(value).replace(/\s/g, '').toUpperCase();
 export const normaliseShaNumber = (value: unknown) => text(value).replace(/\s/g, '').toUpperCase();
-export const normaliseNssfNumber = (value: unknown) => text(value).replace(/[\s-]/g, '');
+export const normaliseNssfNumber = (value: unknown) => text(value).replace(/[\s-]/g, '').toUpperCase();
 export const normalisePhone = (value: unknown) => text(value).replace(/[\s().-]/g, '');
 
 // ---------------------------------------------------------------------------------------------
@@ -47,7 +47,8 @@ export const isValidIdNumber = (type: unknown, value: unknown) =>
 export const isValidOnboardingPhone = (value: unknown) =>
   /^(0[17]\d{8}|\+?254[17]\d{8}|\+[1-9]\d{7,14})$/.test(normalisePhone(value));
 
-export const isValidNssfNumber = (value: unknown) => /^\d{5,12}$/.test(normaliseNssfNumber(value));
+/** 5 to 12 characters, all digits except that the last may be X (a check character, e.g. 206593059X). */
+export const isValidNssfNumber = (value: unknown) => /^\d{4,11}[0-9X]$/.test(normaliseNssfNumber(value));
 export const isValidShaNumber = (value: unknown) => /^[A-Z0-9-]{4,20}$/.test(normaliseShaNumber(value));
 
 /** Why a value can't be saved, or null when it can (blank is fine here; `onboardingMissing` says what is required). */
@@ -65,7 +66,7 @@ export function fieldProblem(field: string, value: unknown, employee: EmployeeRe
     case 'Mobile Number':
       return isValidOnboardingPhone(value) ? null : 'Phone number should look like 0712345678, or start with + and the country code';
     case 'NSSF Number':
-      return isValidNssfNumber(value) ? null : 'NSSF number should be 5 to 12 digits';
+      return isValidNssfNumber(value) ? null : 'NSSF number should be 5 to 12 digits (the last may be X)';
     case 'SHIF Number':
       return isValidShaNumber(value) ? null : 'SHA number should be letters and digits only';
     default:
