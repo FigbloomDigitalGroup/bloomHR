@@ -3,6 +3,8 @@ import toast from 'react-hot-toast';
 import { CheckCircle2, Loader2, Send, UploadCloud, User } from 'lucide-react';
 import { Button, Card, StatusPill } from '../UI';
 import { AmountField, Section, SelectField, TextField, YesNoField } from './Fields';
+import DocumentsSection from './DocumentsSection';
+import RefereesSection from './RefereesSection';
 import {
   type Contact,
   type OnboardingRecord,
@@ -95,6 +97,16 @@ export default function OnboardingForm() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // after a document or referee changes: the status and what is still needed, without touching unsaved edits
+  const refresh = useCallback(async () => {
+    try {
+      const r = await loadMyOnboarding();
+      if (r) setRecord(r);
+    } catch {
+      // the next save or reload shows it
+    }
+  }, []);
 
   const set = (field: string) => (value: unknown) => setValues((v) => ({ ...v, [field]: value }));
   const problemOf = (field: string) => fieldProblem(field, values[field], values);
@@ -260,6 +272,18 @@ export default function OnboardingForm() {
 
         <ContactFields title="Emergency contact" value={emergency} onChange={setEmergency} />
         <ContactFields title="Next of kin" value={nextOfKin} onChange={setNextOfKin} />
+
+        <section className="border-t border-border pt-5">
+          <h3 className="text-sm font-semibold text-ink">Referees</h3>
+          <p className="text-xs text-muted-foreground mt-0.5 mb-3">People who can speak about your work. Add more than one if you can.</p>
+          <RefereesSection employeeId={String(record.employee['id'])} onChanged={() => void refresh()} />
+        </section>
+
+        <section className="border-t border-border pt-5">
+          <h3 className="text-sm font-semibold text-ink">Documents</h3>
+          <p className="text-xs text-muted-foreground mt-0.5 mb-3">Upload clear copies. Files are saved as soon as you upload them.</p>
+          <DocumentsSection employeeId={String(record.employee['id'])} onChanged={() => void refresh()} />
+        </section>
 
         {problem && (
           <p role="alert" className="rounded-lg bg-orange-tint px-3 py-2 text-sm text-status-danger">{problem}</p>

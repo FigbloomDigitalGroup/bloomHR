@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { CheckCircle2, ClipboardCheck, Loader2, Mail, Pencil, Printer, Undo2, X } from 'lucide-react';
+import { CheckCircle2, ClipboardCheck, FileCheck2, Loader2, Mail, Pencil, Printer, Undo2, X } from 'lucide-react';
 import { Button, Card, EmptyState, PageHeader, SearchInput, StatusPill, TabBar } from '../UI';
 import OnboardingSummary from './OnboardingSummary';
+import DocumentsReview from './DocumentsReview';
+import RequiredDocumentsModal from './RequiredDocumentsModal';
 import {
   type OnboardingRecord,
   type OverviewRow,
@@ -39,9 +41,17 @@ function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: (
   const [problem, setProblem] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     loadOnboardingForReview(row.id).then(setRecord, (err) => setProblem(errorMessage(err, 'Could not load the employee.')));
   }, [row.id]);
+
+  useEffect(reload, [reload]);
+
+  // a document accepted or rejected, or one asked for: what is missing changes here and in the list
+  const documentsChanged = () => {
+    reload();
+    onChanged();
+  };
 
   const decide = async (decision: 'approve' | 'back') => {
     setBusy(decision);
@@ -94,6 +104,10 @@ function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: (
                 </div>
               )}
               <OnboardingSummary record={record} />
+              <section className="border-t border-border pt-4">
+                <h3 className="text-sm font-semibold text-ink mb-3">Documents and referees</h3>
+                <DocumentsReview employeeId={row.id} onChanged={documentsChanged} />
+              </section>
               {record.history.length > 0 && (
                 <section>
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">History</h3>
@@ -157,6 +171,7 @@ export default function OnboardingReview() {
   const [search, setSearch] = useState('');
   const [reviewing, setReviewing] = useState<OverviewRow | null>(null);
   const [inviting, setInviting] = useState<string | null>(null);
+  const [settingDocuments, setSettingDocuments] = useState(false);
 
   const load = useCallback(() => {
     loadOnboardingOverview().then(setRows, (err) => {
@@ -197,7 +212,11 @@ export default function OnboardingReview() {
 
   return (
     <div className="p-4 sm:p-6 space-y-4">
-      <PageHeader title="Onboarding" subtitle="Employees fill in their own details; you review and approve them. Only approved employees are paid." />
+      <PageHeader
+        title="Onboarding"
+        subtitle="Employees fill in their own details; you review and approve them. Only approved employees are paid."
+        actions={<Button variant="secondary" icon={<FileCheck2 className="h-4 w-4" />} onClick={() => setSettingDocuments(true)}>Required documents</Button>}
+      />
 
       <TabBar variant="pill" items={tabs} activeId={filter} onChange={(id) => setFilter(id as Filter)} />
       <div className="max-w-sm">
@@ -246,6 +265,7 @@ export default function OnboardingReview() {
       )}
 
       {reviewing && <ReviewPanel row={reviewing} onClose={() => setReviewing(null)} onChanged={load} />}
+      {settingDocuments && <RequiredDocumentsModal onClose={() => { setSettingDocuments(false); load(); }} />}
     </div>
   );
 }

@@ -130,3 +130,21 @@ Each file lists who is missing a detail it needs before you download it.
 The P10's taxable pay is worked out from the payslip and the rates in force that month (NSSF, SHIF and AHL when
 deductible, capped pension, PRMF and mortgage interest); PAYE is the payslip's. Until payroll itself reads
 `statutory_rates`, KRA's checker may flag a month where the two disagree.
+
+## Documents and referees
+
+`20261012400000_onboarding_documents.sql`, `src/lib/employeeDocuments.ts`.
+
+| Section | Documents (required by default in **bold**) |
+|---|---|
+| Core attachments | **Proof of identity** (ID or passport, several files), **Passport-size photograph**, **KRA PIN certificate**, **NSSF details**, **SHA membership**, **HELB compliance certificate** |
+| Qualifications | **Updated CV**, **Academic certificates** (several), Professional certificates (several), Professional membership or practising licence, Previous employment evidence (several) |
+| Role-specific | Driving licence, Police clearance certificate, Medical fitness certificate, Dependants' documents, Beneficiary documents |
+| Tax claims | KRA PWD exemption certificate, Mortgage interest statement, Insurance policy: required only while the employee claims the exemption or relief |
+
+- **Who uploads:** only the employee, from Onboarding or the staff portal's Documents tab, into their own folder in the private `documents` bucket. Files can be PDF, Word or photos, up to 10 MB each.
+- **HR's view:** in the Onboarding review panel, HR opens each file, then accepts it or rejects it with a reason (the employee sees the reason and uploads again). The employee can remove a file that hasn't been accepted.
+- **What's required:** HR sets the company's required documents with **Required documents** on the Onboarding page, and can ask one employee for role-specific ones with **Also ask this employee for** in the review panel.
+- **Submitting and approving:** the employee can't submit until every required document has a file that wasn't rejected. HR can't approve until each one is accepted.
+- **Referees:** as many as the employee likes (name, organisation, position, phone or email, relationship). At least one is needed.
+- **Earlier uploads:** files uploaded on the old Documents tab became documents here, waiting for HR.

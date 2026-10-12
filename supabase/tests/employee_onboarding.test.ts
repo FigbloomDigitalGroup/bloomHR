@@ -69,6 +69,8 @@ beforeAll(async () => {
       ('E-ME', 'Amina', 'me@a.co', 'Accountant', 80000, 'Bank Transfer', '${A}'),
       ('E-THEM', 'Otieno', 'them@a.co', 'Driver', 40000, 'MPESA', '${A}'),
       ('E-FAR', 'Far', 'far@b.co', 'Clerk', 30000, 'MPESA', '${B}');
+    -- these tests are about the details; documents and referees are tested in onboarding_documents.test.ts
+    insert into company_document_settings (tenant_id, code, required) select '${A}', code, false from document_types;
   `);
 }, 120000);
 
@@ -251,6 +253,8 @@ describe('onboarding', () => {
     expect(await submit(U.STAFF)).toMatch(/Exemption certificate number/);
     await asUser(db, U.STAFF, () => run(`update employees set "Disability Cert No" = 'PWD/123/2024' where "Employee Number" = 'E-ME'`));
     expect(await submit(U.STAFF)).not.toMatch(/Exemption certificate/);
+    // the exemption also needs its certificate uploaded (onboarding_documents.test.ts); back to no claim
+    await asUser(db, U.STAFF, () => run(`update employees set is_pwd = false where "Employee Number" = 'E-ME'`));
   });
 
   it('needs bank details only from someone paid by bank', async () => {
@@ -262,9 +266,12 @@ describe('onboarding', () => {
   it('is submitted once the employee’s part, an emergency contact and a next of kin are in', async () => {
     expect(await asUser(db, U.STAFF, () => run(`insert into emergency_contact ("Employee Number", full_name, relationship, phone_number, alternative_phone, physical_address)
       values ('E-ME', 'Halima Wanjiru', 'Sister', '0722000000', '0733000000', 'Thika')`))).toBe('');
-    expect(await submit(U.STAFF)).toMatch(/Still missing: Next of kin$/);
+    expect(await submit(U.STAFF)).toMatch(/Still missing: Next of kin, Referee$/);
     expect(await asUser(db, U.STAFF, () => run(`insert into next_of_kin ("Employee Number", full_name, relationship, phone_number, physical_address)
       values ('E-ME', 'Juma Wanjiru', 'Brother', '0744000000', 'Nakuru')`))).toBe('');
+    expect(await submit(U.STAFF)).toMatch(/Still missing: Referee$/);
+    expect(await asUser(db, U.STAFF, async () => run(`insert into employee_referees (employee_id, full_name, phone)
+      values ('${await meId()}', 'Dr Mary Achieng', '0711000000')`))).toBe('');
     expect(await submit(U.STAFF)).toBe('');
     expect(await status()).toBe('submitted');
     expect((await me()).onboarding_submitted_at).not.toBeNull();

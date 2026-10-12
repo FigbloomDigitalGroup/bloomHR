@@ -14,8 +14,9 @@ const ADMIN_A = '00000000-0000-0000-0000-00000000a0ad';
 const ADMIN_B = '00000000-0000-0000-0000-00000000b0ad';
 
 // Keep in sync with the "exempt" arrays in the migrations.
-// statutory_rates holds platform defaults (no company) next to companies' own rates; tested in employee_onboarding.test.ts
-const NOT_TENANT_OWNED = ['tenants', 'permissions', 'user_profiles', 'memberships', 'user_preferences', 'Employee_Records_Duplicate', 'kenya_branches_duplicate', 'statutory_rates'];
+// statutory_rates holds platform defaults (no company) next to companies' own rates; tested in employee_onboarding.test.ts.
+// document_types is one catalogue every company shares (read-only).
+const NOT_TENANT_OWNED = ['tenants', 'permissions', 'user_profiles', 'memberships', 'user_preferences', 'Employee_Records_Duplicate', 'kenya_branches_duplicate', 'statutory_rates', 'document_types'];
 
 let db: PGlite;
 
