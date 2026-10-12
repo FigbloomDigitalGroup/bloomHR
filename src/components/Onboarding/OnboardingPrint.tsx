@@ -4,6 +4,7 @@ import { Loader2, Printer } from 'lucide-react';
 import OnboardingSummary from './OnboardingSummary';
 import { type OnboardingRecord, errorMessage, loadOnboardingForReview, statusLabel } from '../../lib/onboarding';
 import { supabase } from '../../lib/supabase';
+import { type ChecklistItem, DOCUMENT_STATUS_LABELS, type EmployeeDocument, type Referee, loadChecklist, loadDocuments, loadReferees } from '../../lib/employeeDocuments';
 
 // The onboarding form as a printable page: the company, the employee's name and position, the date they submitted,
 // and everything they and HR entered. Opened from HR's review panel (/onboarding/:id/print).
@@ -27,12 +28,14 @@ export default function OnboardingPrint() {
   const [record, setRecord] = useState<OnboardingRecord | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [docs, setDocs] = useState<{ checklist: ChecklistItem[]; files: EmployeeDocument[]; referees: Referee[] } | null>(null);
 
   useEffect(() => {
-    Promise.all([loadOnboardingForReview(id), loadCompany()]).then(
-      ([r, c]) => {
+    Promise.all([loadOnboardingForReview(id), loadCompany(), loadChecklist(id), loadDocuments(id), loadReferees(id)]).then(
+      ([r, c, checklist, files, referees]) => {
         setRecord(r);
         setCompany(c);
+        setDocs({ checklist, files, referees });
       },
       (err) => setProblem(errorMessage(err, 'Could not load this form.'))
     );
@@ -70,6 +73,31 @@ export default function OnboardingPrint() {
         </header>
 
         <OnboardingSummary record={record} />
+
+        {docs && (
+          <section className="mt-6 break-inside-avoid">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Referees</h3>
+            {docs.referees.length === 0 ? <p className="text-sm text-ink">—</p> : (
+              <ul className="text-sm text-ink space-y-0.5">
+                {docs.referees.map((r) => (
+                  <li key={r.id}>{r.full_name}{r.organisation ? `, ${r.organisation}` : ''}{r.position ? ` (${r.position})` : ''} · {[r.phone, r.email].filter(Boolean).join(' · ')}{r.relationship ? ` · ${r.relationship}` : ''}</li>
+                ))}
+              </ul>
+            )}
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-5 mb-2">Documents</h3>
+            <ul className="text-sm text-ink space-y-0.5">
+              {docs.checklist.filter((c) => c.required || docs.files.some((f) => f.code === c.code)).map((c) => {
+                const mine = docs.files.filter((f) => f.code === c.code);
+                return (
+                  <li key={c.code} className="flex justify-between gap-3 border-b border-border/60 py-1">
+                    <span>{c.label}{c.required ? '' : ' (optional)'}</span>
+                    <span className="text-right">{mine.length ? mine.map((f) => DOCUMENT_STATUS_LABELS[f.status]).join(', ') : 'Not uploaded'}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
         <footer className="mt-8 pt-4 border-t border-border text-xs text-muted-foreground">
           Payroll number {String(e['Payroll Number'] ?? '—')} · printed {new Date().toLocaleDateString('en-KE', { dateStyle: 'long' })}

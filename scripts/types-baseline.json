@@ -31,7 +31,6 @@
   "src/components/SMS/Sms.tsx": 3,
   "src/components/staff portal/Bio.tsx": 1,
   "src/components/staff portal/Chat.tsx": 1,
-  "src/components/staff portal/Documents.tsx": 1,
   "src/components/staff portal/pagination.tsx": 1,
   "src/components/staff portal/PayslipViewer.tsx": 57,
   "src/components/staff portal/StaffPortal.tsx": 1,

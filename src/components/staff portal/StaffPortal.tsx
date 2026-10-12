@@ -60,7 +60,7 @@ import CelebrationsCard from './CelebrationsCard';
 import VideoConferenceComponent from './VideoConf';
 import UserProfileDropdown from './UserProfile';
 import PasswordResetModal from './PasswordRestModal';
-import DocumentsUploadPage from './Documents';
+import MyDocumentsPage from '../Onboarding/MyDocumentsPage';
 import Appearance from '../Settings/Appearance';
 import MyContract from './MyContract';
 import { leaveDays, NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
@@ -3376,7 +3376,7 @@ const StaffPortal = () => {
               {activeTab === 'leave-history' && <LeaveApplicationsList />}
               {activeTab === 'contract' && <MyContract />}
               {activeTab === 'details' && <Profile />}
-              {activeTab === 'documents' && <DocumentsUploadPage />}
+              {activeTab === 'documents' && <MyDocumentsPage />}
               {activeTab === 'appearance' && <Appearance />}
               {activeTab === 'incident-report' && <IncidentReport />}
               {activeTab === 'job-applications' && <JobApplications />}
