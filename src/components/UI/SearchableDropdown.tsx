@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Plus, Search, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -19,6 +20,10 @@ interface SearchableDropdownProps {
     allowCreate?: boolean;
 }
 
+/** about the open list's height (search box plus max-h-64 of options), to decide whether it fits below */
+const PANEL_HEIGHT = 330;
+const GAP = 8;
+
 const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
     options,
     value,
@@ -32,6 +37,33 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const panelRef = useRef<HTMLDivElement>(null);
+    // The list is drawn over the page (a portal), not inside the field's container: a form card or modal with
+    // overflow hidden used to cut it off. It opens upwards when there is not enough room below.
+    const [position, setPosition] = useState<React.CSSProperties | null>(null);
+
+    useLayoutEffect(() => {
+        if (!isOpen) return;
+        const place = () => {
+            const rect = dropdownRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            const below = window.innerHeight - rect.bottom;
+            const up = below < PANEL_HEIGHT && rect.top > below;
+            setPosition({
+                position: 'fixed',
+                left: rect.left,
+                width: rect.width,
+                ...(up ? { bottom: window.innerHeight - rect.top + GAP } : { top: rect.bottom + GAP }),
+            });
+        };
+        place();
+        window.addEventListener('resize', place);
+        window.addEventListener('scroll', place, true);
+        return () => {
+            window.removeEventListener('resize', place);
+            window.removeEventListener('scroll', place, true);
+        };
+    }, [isOpen]);
 
     // Normalize options to DropdownOption format
     const normalizedOptions: DropdownOption[] = options.map(option =>
@@ -43,7 +75,8 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
     // Close when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+            const target = event.target as Node;
+            if (dropdownRef.current && !dropdownRef.current.contains(target) && !panelRef.current?.contains(target)) {
                 setIsOpen(false);
             }
         };
@@ -106,14 +139,16 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                 </div>
             </button>
 
-            <AnimatePresence>
+            {createPortal(<AnimatePresence>
                 {isOpen && (
                     <motion.div
+                        ref={panelRef}
+                        style={position ?? { position: 'fixed', visibility: 'hidden' }}
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
                         transition={{ duration: 0.15, ease: "easeOut" }}
-                        className="absolute z-[100] w-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)] overflow-hidden ring-1 ring-black/5"
+                        className="z-[1000] bg-white border border-gray-100 rounded-2xl shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)] overflow-hidden ring-1 ring-black/5"
                     >
                         <div className="p-3 border-b border-gray-100 bg-gray-50/50">
                             <div className="relative">
@@ -177,7 +212,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                         </div>
                     </motion.div>
                 )}
-            </AnimatePresence>
+            </AnimatePresence>, document.body)}
         </div>
     );
 };
