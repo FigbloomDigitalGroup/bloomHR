@@ -47,6 +47,17 @@ export async function loadExportFiles(run: PayrollRun): Promise<Files> {
   };
 }
 
+/** Saves one file as CSV, named after it and the month (kra-p10-2026-10.csv). */
+const saveCsv = (f: ExportFile, name: string, payPeriod: string) =>
+  saveAs(new Blob([toCsv(f.headers, f.rows)], { type: 'text/csv;charset=utf-8' }), `${name}-${payPeriod}.csv`);
+
+/** The payroll page's P10 button: the month's KRA P10 as CSV. Returns who is missing details the return needs. */
+export async function downloadP10(run: PayrollRun) {
+  const files = await loadExportFiles(run);
+  saveCsv(files.p10, 'kra-p10', run.pay_period);
+  return files.p10.problems;
+}
+
 export default function PayrollExportsPanel({ run }: { run: PayrollRun }) {
   const [files, setFiles] = useState<Files | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -60,8 +71,7 @@ export default function PayrollExportsPanel({ run }: { run: PayrollRun }) {
 
   const download = (key: keyof Files, name: string) => {
     if (!files) return;
-    const f = files[key];
-    saveAs(new Blob([toCsv(f.headers, f.rows)], { type: 'text/csv;charset=utf-8' }), `${name}-${run.pay_period}.csv`);
+    saveCsv(files[key], name, run.pay_period);
   };
 
   return (

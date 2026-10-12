@@ -20,7 +20,7 @@ vi.mock('../../lib/supabase', () => ({
 const saved = vi.hoisted(() => ({ files: [] as { name: string; blob: Blob }[] }));
 vi.mock('file-saver', () => ({ saveAs: (blob: Blob, name: string) => saved.files.push({ blob, name }) }));
 
-import PayrollExportsPanel from './PayrollExportsPanel';
+import PayrollExportsPanel, { downloadP10 } from './PayrollExportsPanel';
 
 // jsdom's Blob has no text(); read it the way a browser without it would
 const readBlob = (blob: Blob) =>
@@ -71,5 +71,14 @@ describe('PayrollExportsPanel', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /missing details/ })[0]);
     await waitFor(() => expect(screen.getByText('Juma Otieno')).toBeTruthy());
     expect(screen.getByText(/KRA PIN, Residency, Type of employee/)).toBeTruthy();
+  });
+
+  it('the P10 button saves the month’s P10 as CSV with each employee’s own KRA PIN', async () => {
+    const problems = await downloadP10(run);
+    expect(saved.files.map((f) => f.name)).toEqual(['kra-p10-2026-10.csv']);
+    const [header, first] = (await readBlob(saved.files[0].blob)).split('\r\n');
+    expect(header.startsWith('Employee pin,Employee name,')).toBe(true);
+    expect(first.startsWith('A012345678Z,Amina Wanjiru,')).toBe(true);
+    expect(problems.map((p) => p.employeeNumber)).toEqual(['E2']); // Juma has no KRA PIN yet
   });
 });
