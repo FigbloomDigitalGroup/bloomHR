@@ -1,7 +1,7 @@
 // @vitest-environment node
 //
-// A staff member may add their own primary mobile number once, while the record has none; after that, changing it
-// (or any other company-controlled field) still needs HR.
+// A staff member may add their own primary mobile number while the record has none, and correct it until HR approves
+// their onboarding; after that, changing it (or any other company-controlled field) needs HR.
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { PGlite } from '@electric-sql/pglite';
 import { asUser, bootLiveDb } from './db';
@@ -54,7 +54,15 @@ describe('staff and the primary mobile number', () => {
     });
   });
 
-  it('cannot change it once it is set: that needs HR', async () => {
+  it('can correct it while their record is still being onboarded', async () => {
+    await asUser(db, OLD_STAFF, async () => {
+      expect((await attempt(`update employees set "Mobile Number" = '0711000001' where "Employee Number" = 'E-OLD'`)).ok).toBe(true);
+      expect((await attempt(`update employees set "Mobile Number" = '0711000000' where "Employee Number" = 'E-OLD'`)).ok).toBe(true);
+    });
+  });
+
+  it('cannot change it once it is set and the record is approved: that needs HR', async () => {
+    await db.exec(`update employees set onboarding_status = 'approved' where "Employee Number" in ('E-NEW', 'E-OLD')`);
     await asUser(db, NEW_STAFF, async () => {
       const r = await attempt(`update employees set "Mobile Number" = '0799999999' where "Employee Number" = 'E-NEW'`);
       expect(r.ok).toBe(false);

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { isValidPhone } from './formValidation';
+import { isValidKraPin, isValidNssfNumber, isValidOnboardingPhone, isValidShaNumber, normaliseKraPin, normaliseNssfNumber, normaliseShaNumber } from './onboardingValidation';
 import { NOT_SAVED_NO_ACCESS, requireUpdatedRows } from './requireUpdated';
 import type { EmployeeRecord } from './profileCompleteness';
 import { normalisePaymentMethod, paymentKind } from './paymentMethods';
@@ -84,25 +84,20 @@ const restoreLeadingZero = (phone: string) => (/^[17]\d{8}$/.test(phone) ? `0${p
 
 /** Each value as it should be saved, or an error message for the row. */
 const CLEAN: Record<DetailColumn, (value: string) => { value: string } | { error: string }> = {
-  'KRA PIN': (v) => {
-    const pin = v.replace(/\s/g, '').toUpperCase();
-    return /^[A-Z]\d{9}[A-Z]$/.test(pin) ? { value: pin } : { error: `KRA PIN "${v}" should look like A123456789B` };
-  },
-  'NSSF Number': (v) => {
-    const n = v.replace(/[\s-]/g, '');
-    return /^\d{5,12}$/.test(n) ? { value: n } : { error: `NSSF number "${v}" should be digits only` };
-  },
-  'SHA Number': (v) => {
-    const n = v.replace(/\s/g, '').toUpperCase();
-    return /^[A-Z0-9-]{4,20}$/.test(n) ? { value: n } : { error: `SHA number "${v}" should be letters and digits only` };
-  },
+  // the same rules the database applies (onboardingValidation)
+  'KRA PIN': (v) =>
+    isValidKraPin(v) ? { value: normaliseKraPin(v) } : { error: `KRA PIN "${v}" should look like A123456789B` },
+  'NSSF Number': (v) =>
+    isValidNssfNumber(v) ? { value: normaliseNssfNumber(v) } : { error: `NSSF number "${v}" should be digits only` },
+  'SHA Number': (v) =>
+    isValidShaNumber(v) ? { value: normaliseShaNumber(v) } : { error: `SHA number "${v}" should be letters and digits only` },
   'Payment Method': (v) => {
     const method = normalisePaymentMethod(v);
     return method ? { value: method } : { error: `payment method "${v}" should be M-Pesa, Airtel Money, Bank Transfer or Cash` };
   },
   'M-Pesa Number': (v) => {
     const phone = restoreLeadingZero(v.replace(/[\s().-]/g, ''));
-    return isValidPhone(phone) ? { value: phone } : { error: `M-Pesa number "${v}" is not a phone number` };
+    return isValidOnboardingPhone(phone) ? { value: phone } : { error: `M-Pesa number "${v}" is not a phone number` };
   },
   Bank: (v) => ({ value: v }),
   'Bank Branch': (v) => ({ value: v }),

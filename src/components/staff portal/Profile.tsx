@@ -98,23 +98,14 @@ const Profile = () => {
     setIsUpdating(true);
     
     try {
+      // only what staff fill in themselves; deductions, pension and AVCs are set by HR (the database refuses the rest)
       const updateData = {
         "NSSF Number": employeeData["NSSF Number"],
         "SHIF Number": employeeData["SHIF Number"],
         "Tax PIN": employeeData["Tax PIN"],
-        "NSSF Deduction": employeeData["NSSF Deduction"],
-        "NHIF Deduction": employeeData["NHIF Deduction"],
-        "Housing Levy Deduction": employeeData["Housing Levy Deduction"],
-        "Tax Exempted": employeeData["Tax Exempted"],
         "Disability Cert No": employeeData["Disability Cert No"],
-        "NITA": employeeData["NITA"],
-        "NITA Deductions": employeeData["NITA Deductions"],
         "HELB": employeeData["HELB"],
         "HELB option": employeeData["HELB option"],
-        "Pension Deduction": employeeData["Pension Deduction"],
-        "Employee AVC": employeeData["Employee AVC"],
-        "Employer AVC": employeeData["Employer AVC"],
-        "WIBA": employeeData["WIBA"]
       };
 
       const { data: savedRows, error } = await supabase
@@ -397,9 +388,9 @@ const Profile = () => {
                         type="text"
                         name="Employee AVC"
                         value={employeeData["Employee AVC"] || ''}
-                        onChange={handleChange}
-                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded"
-                        readOnly={!isEditing}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded bg-gray-50"
+                        title="Set by HR"
+                        readOnly
                       />
                     </div>
                     <div>
@@ -408,9 +399,9 @@ const Profile = () => {
                         type="text"
                         name="Employer AVC"
                         value={employeeData["Employer AVC"] || ''}
-                        onChange={handleChange}
-                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded"
-                        readOnly={!isEditing}
+                        className="w-full px-3 py-2 text-xs border border-gray-300 rounded bg-gray-50"
+                        title="Set by HR"
+                        readOnly
                       />
                     </div>
                   </>

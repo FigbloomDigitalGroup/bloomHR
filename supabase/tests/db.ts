@@ -38,11 +38,15 @@ export const migrationFiles = () => {
   return all.sort();
 };
 
-/** A throwaway Postgres (PGlite) built the way a fresh project is: every migration in supabase/migrations, in order. */
-export async function bootDb() {
+/**
+ * A throwaway Postgres (PGlite) built the way a fresh project is: every migration in supabase/migrations, in order.
+ * `before` runs `seed` just before that migration file, to test how it treats data that already exists.
+ */
+export async function bootDb(before?: { file: string; seed: (db: PGlite) => Promise<void> }) {
   const db = new PGlite({ extensions: { uuid_ossp } });
   await db.exec(SUPABASE_STUBS);
   for (const file of migrationFiles()) {
+    if (before && file === before.file) await before.seed(db);
     try {
       await db.exec(readFileSync(join(root, 'supabase', 'migrations', file), 'utf8'));
     } catch (e) {

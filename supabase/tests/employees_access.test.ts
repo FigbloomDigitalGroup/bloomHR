@@ -54,9 +54,9 @@ beforeAll(async () => {
       ('HR',      array['employees','reports','hr-lifecycle'], '${A}'),
       ('PAYROLL', array['payroll'], '${A}');
     insert into employees ("Employee Number", "First Name", "Last Name", "Work Email", "Job Title", "Basic Salary", "Tax PIN", "Personal Mobile", tenant_id) values
-      ('E-ME',   'Me',   'Staff', 'me@a.co',   'Clerk',   1000, 'A111', '0711', '${A}'),
-      ('E-THEM', 'Them', 'Staff', 'them@a.co', 'Manager', 5000, 'A222', '0722', '${A}'),
-      ('E-OTHER-CO', 'Far', 'Away', 'far@b.co', 'CEO',   9000, 'B333', '0733', '${B}');
+      ('E-ME',   'Me',   'Staff', 'me@a.co',   'Clerk',   1000, 'A000000111B', '0711', '${A}'),
+      ('E-THEM', 'Them', 'Staff', 'them@a.co', 'Manager', 5000, 'A000000222B', '0722', '${A}'),
+      ('E-OTHER-CO', 'Far', 'Away', 'far@b.co', 'CEO',   9000, 'A000000333B', '0733', '${B}');
   `);
 }, 120000);
 
@@ -147,7 +147,7 @@ describe('writing employees', () => {
 
   it('staff can edit their own personal details', async () => {
     await asUser(db, U.STAFF, async () => {
-      const r = await attempt(`update employees set "Personal Email" = 'new@me.co', "Postal Address" = 'Box 1', "Tax PIN" = 'A999' where "Employee Number" = 'E-ME'`);
+      const r = await attempt(`update employees set "Personal Email" = 'new@me.co', "Postal Address" = 'Box 1', "Tax PIN" = 'A000000999Z' where "Employee Number" = 'E-ME'`);
       expect(r.ok).toBe(true);
     });
   });
