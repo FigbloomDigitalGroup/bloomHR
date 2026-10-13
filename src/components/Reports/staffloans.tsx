@@ -1059,7 +1059,7 @@ const StaffLoansReport: React.FC<BaseReportProps> = ({
   ];
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
+    <div className="p-6 bg-page min-h-screen">
       <div className="max-w-7xl mx-auto">
         {/* Accounting Report Header */}
         <div className="mb-6 bg-white rounded-lg border border-gray-300 p-6 shadow-sm">

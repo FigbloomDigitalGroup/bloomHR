@@ -944,7 +944,7 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-page flex items-center justify-center">
         <FigbloomLoader label="Loading expenses" />
       </div>
     );

@@ -55,7 +55,7 @@ interface AuthShellProps {
 
 export default function AuthShell({ title, subtitle, children }: AuthShellProps) {
   return (
-    <div className="flex min-h-screen bg-gray-50 font-sans [&_h1]:font-sans [&_h2]:font-sans [&_button]:font-sans [&_input]:font-sans [&_label]:font-sans">
+    <div className="flex min-h-screen bg-page font-sans [&_h1]:font-sans [&_h2]:font-sans [&_button]:font-sans [&_input]:font-sans [&_label]:font-sans">
       <BrandPanel />
       <div className="w-full lg:w-[55%] flex items-center justify-center p-6 lg:p-12 relative bg-white">
         <div className="w-full max-w-[440px]">

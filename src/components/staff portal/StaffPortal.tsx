@@ -2962,7 +2962,7 @@ const StaffPortal = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 relative flex font-sans text-gray-900 transition-colors duration-300 overflow-hidden">
+    <div className="min-h-screen bg-page relative flex font-sans text-gray-900 transition-colors duration-300 overflow-hidden">
       {/* Dynamic Background Blobs */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] rounded-full bg-gray-200/30 blur-[130px] animate-pulse" />

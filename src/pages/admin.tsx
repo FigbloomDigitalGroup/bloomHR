@@ -71,14 +71,14 @@ export default function StaffSignupRequests() {
 
   if (loading && requests.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
+      <div className="min-h-screen bg-page flex flex-col items-center justify-center">
         <FigbloomLoader label="Loading requests" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-900 p-8">
+    <div className="min-h-screen bg-page font-sans text-gray-900 p-8">
       <div className="max-w-[1200px] mx-auto space-y-8">
 
         {/* Header */}
