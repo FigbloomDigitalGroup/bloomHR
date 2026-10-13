@@ -337,8 +337,8 @@ html[data-a11y-reduce-motion] *::after {
 }
 
 /* ---------- Figbloom "Orbit" loader (components/UI/FigbloomLoader.tsx) ---------- */
-/* it takes the person's page palette: the brand green and the page's text grey, and white on a dark page */
-.fb-loader { --fb-green: rgb(var(--brand)); display: flex; flex-direction: column; align-items: center; gap: 24px; }
+/* it takes the person's palette from Appearance: the accent (white on a dark page), the highlight colour for the sweep, and the page's text grey */
+.fb-loader { --fb-green: rgb(var(--brand)); --fb-sweep: rgb(var(--highlight)); display: flex; flex-direction: column; align-items: center; gap: 24px; }
 html[data-page="dark"] .fb-loader { --fb-green: rgb(255 255 255); }
 .fb-loader svg circle, .fb-loader svg path { stroke: var(--fb-green); }
 .fb-loader .fb-leaf { stroke: none; fill: var(--fb-green); }
@@ -352,7 +352,7 @@ html[data-page="dark"] .fb-loader { --fb-green: rgb(255 255 255); }
 @keyframes fb-orbit {
   0% { transform: rotate(0deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: var(--fb-green); animation-timing-function: cubic-bezier(.55,0,.25,1); }
   12% { transform: rotate(0deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: var(--fb-green); animation-timing-function: cubic-bezier(.6,0,.4,1); }
-  45% { transform: rotate(200deg); stroke-dasharray: 190 170; stroke-dashoffset: 5; stroke: #FF8A12; animation-timing-function: cubic-bezier(.3,0,.2,1); }
+  45% { transform: rotate(200deg); stroke-dasharray: 190 170; stroke-dashoffset: 5; stroke: var(--fb-sweep); animation-timing-function: cubic-bezier(.3,0,.2,1); }
   78% { transform: rotate(360deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: var(--fb-green); }
   100% { transform: rotate(360deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: var(--fb-green); }
 }
