@@ -20,7 +20,7 @@ vi.mock('../lib/supabase', () => ({
   },
 }));
 
-import { useCompanyProfile, withProfileRole } from './useCompanyProfile';
+import { landingPathFor, landingTarget, useCompanyProfile, withProfileRole } from './useCompanyProfile';
 
 beforeEach(() => {
   eq.mockClear();
@@ -32,7 +32,7 @@ describe('useCompanyProfile', () => {
     result.value = { data: { role: 'HR', tenant_id: 't1', account_status: 'ACTIVE' }, error: null };
     const { result: hook } = renderHook(() => useCompanyProfile('u1'));
     expect(hook.current.status).toBe('loading');
-    await waitFor(() => expect(hook.current).toEqual({ status: 'ready', profile: { role: 'HR', tenantId: 't1', accountStatus: 'ACTIVE' } }));
+    await waitFor(() => expect(hook.current).toEqual({ status: 'ready', profile: { userId: 'u1', role: 'HR', tenantId: 't1', accountStatus: 'ACTIVE' } }));
     expect(eq).toHaveBeenCalledWith('user_profiles', 'user_id', 'u1');
   });
 
@@ -60,7 +60,7 @@ describe('useCompanyProfile', () => {
 });
 
 describe('withProfileRole', () => {
-  const ready = (role: string) => ({ status: 'ready' as const, profile: { role, tenantId: 't1', accountStatus: 'ACTIVE' } });
+  const ready = (role: string) => ({ status: 'ready' as const, profile: { userId: 'u1', role, tenantId: 't1', accountStatus: 'ACTIVE' } });
 
   it('gives the user the role from their company profile, whatever their auth metadata said', () => {
     // a company founder: the profile says ADMIN, but their auth metadata has no role so the app defaulted to STAFF
@@ -78,5 +78,34 @@ describe('withProfileRole', () => {
     expect(withProfileRole(user, { status: 'loading' })).toBe(user);
     expect(withProfileRole(user, { status: 'none' })).toBe(user);
     expect(withProfileRole(null, ready('ADMIN'))).toBeNull();
+  });
+});
+
+describe('landingPathFor', () => {
+  it('sends staff to the staff portal and everyone else (admin, HR, payroll...) to the dashboard', () => {
+    expect(landingPathFor('STAFF')).toBe('/staff');
+    for (const role of ['ADMIN', 'HR', 'CHECKER', 'FINANCE']) expect(landingPathFor(role), role).toBe('/dashboard');
+  });
+});
+
+describe('landingTarget (after signing in)', () => {
+  const ready = (userId: string, role: string) => ({ status: 'ready' as const, profile: { userId, role, tenantId: 't1', accountStatus: 'ACTIVE' } });
+
+  it('waits until the company profile has loaded', () => {
+    expect(landingTarget({ status: 'loading' }, 'u1')).toBeNull();
+  });
+
+  it('an admin whose login carries no role goes to the dashboard, not the staff portal', () => {
+    expect(landingTarget(ready('u1', 'ADMIN'), 'u1')).toBe('/dashboard');
+    expect(landingTarget(ready('u1', 'STAFF'), 'u1')).toBe('/staff');
+  });
+
+  it('waits while the profile is still the previous login’s', () => {
+    expect(landingTarget(ready('someone-else', 'STAFF'), 'u1')).toBeNull();
+  });
+
+  it('with no company, or a profile that could not load, goes to the main page, which says what to do', () => {
+    expect(landingTarget({ status: 'none' }, 'u1')).toBe('/dashboard');
+    expect(landingTarget({ status: 'error', message: 'x' }, 'u1')).toBe('/dashboard');
   });
 });

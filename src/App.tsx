@@ -17,7 +17,7 @@ import AuthCallback from './pages/AuthCallback';
 import React from 'react';
 import { UserProvider } from '../src/components/ProtectedRoutes/UserContext';
 import MFAVerification from './pages/MFAverification';
-import { useCompanyProfile, withProfileRole } from './hooks/useCompanyProfile';
+import { landingTarget, useCompanyProfile, withProfileRole } from './hooks/useCompanyProfile';
 import { syncThemeWithAccount } from './lib/preferences';
 import CompanyGate from './components/Company/CompanyGate';
 import AppSkeleton from './components/Layout/AppSkeleton';
@@ -183,6 +183,11 @@ function App() {
   // editable user_metadata; see useCompanyProfile.
   const companyState = useCompanyProfile(session?.user?.id);
   const user = useMemo(() => withProfileRole(authUser, companyState), [authUser, companyState]);
+  // After signing in, where to go is decided by the role in the company profile, once it has loaded for this
+  // login. The role in user_metadata is often missing (then treated as STAFF), which sent admins to the staff
+  // portal; and two sign-in handlers raced to navigate with different roles.
+  const [landingPending, setLandingPending] = useState(false);
+  const goToLanding = useCallback(() => setLandingPending(true), []);
   // the colour theme saved on the account applies on every device the person signs in on
   useEffect(() => {
     if (session?.user?.id) void syncThemeWithAccount();
@@ -210,6 +215,15 @@ function App() {
 
   const location = useLocation();
   const navigate = useNavigate();
+
+  // go to the landing page once the company profile of the login that just signed in is known
+  useEffect(() => {
+    if (!landingPending) return;
+    const target = landingTarget(companyState, session?.user?.id);
+    if (!target) return;
+    setLandingPending(false);
+    navigate(target, { replace: true });
+  }, [landingPending, companyState, session?.user?.id, navigate]);
   const [searchParams] = useSearchParams();
 
   // Inactivity timeout constants
@@ -530,11 +544,8 @@ function App() {
       }
     }
 
-    setTimeout(() => {
-      const targetPath = role === 'STAFF' ? '/staff' : '/dashboard';
-      navigate(targetPath, { replace: true });
-    }, 100);
-  }, [navigate, handleTownChange]);
+    goToLanding();
+  }, [handleTownChange, goToLanding]);
 
   // Handle email confirmation redirect
   useEffect(() => {
@@ -639,8 +650,7 @@ function App() {
             const newUrl = window.location.pathname;
             window.history.replaceState({}, '', newUrl);
 
-            const targetPath = userRole === 'STAFF' ? '/staff' : '/dashboard';
-            navigate(targetPath, { replace: true });
+            goToLanding();
           } else {
             navigate('/login', { replace: true });
           }
@@ -717,8 +727,7 @@ function App() {
             if (requiresMFA && !mfaCompleted && mfaInProgress) {
               navigate('/mfa', { replace: true });
             } else {
-              const targetPath = userData.role === 'STAFF' ? '/staff' : '/dashboard';
-              navigate(targetPath, { replace: true });
+              goToLanding();
             }
             navigationHandled.current = true;
           }
@@ -875,8 +884,7 @@ function App() {
               }
             } else {
               // Normal navigation for non-MFA users or MFA-completed users
-              const targetPath = userData.role === 'STAFF' ? '/staff' : '/dashboard';
-              navigate(targetPath, { replace: true });
+              goToLanding();
             }
           }
         }
