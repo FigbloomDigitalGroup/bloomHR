@@ -78,6 +78,19 @@ describe('KRA P10', () => {
   });
 });
 
+describe('cash pay leaves out the per diem, as payroll and finance’s returns do', () => {
+  it('P10 total cash pay and taxable pay, and NSSF gross pay', () => {
+    // basic 98,315.46 with a 33% per diem: 65,870.76 is what SHIF, NSSF, AHL and PAYE are worked on (Ian Duncan, Sept 2026)
+    const slip = payslip('E1', { gross_pay: 98315.46, per_diem: 32444.7, nhif_deduction: 1811.45, nssf_deduction: 3952.25, housing_levy: 988.06, paye_tax: 10119.05 });
+    const e = { ...amina, car_benefit: 0, housing_benefit: 0, other_pension_contribution: 0, mortgage_interest: 0, insurance_premium: 0 };
+    const f = p10Figures(slip, e, { ...rates, personal_relief: 2400 });
+    expect(f.cashPay).toBeCloseTo(65870.76, 2);
+    expect(f.taxablePay).toBeCloseTo(59119, 2);
+    expect(f.personalRelief).toBe(2400);
+    expect(nssfFile([slip], [e]).rows[0][6]).toBe('65870.76');
+  });
+});
+
 describe('SHA and NSSF', () => {
   it('SHA: names apart, identity, numbers, the contribution and phone', () => {
     const file = shaFile([payslip('E1')], [amina]);

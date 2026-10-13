@@ -44,8 +44,9 @@ import "react-datepicker/dist/react-datepicker.css";
 import SearchableDropdown from "../UI/SearchableDropdown";
 import { Card, SearchInput } from "../UI";
 import MPesaSpreadsheetFullPage from "./MpesaSpreadSheet";
-import useStatutorySettings from "../../hooks/useStatutorySettings";
-import StatutorySettingsModal from "./statutorySettingsModule";
+import useStatutoryRates from "../../hooks/useStatutoryRates";
+import StatutoryRatesModal from "./StatutoryRatesModal";
+import { employeeInputs, missingRates, statutoryFor } from "../../lib/statutoryCalc";
 import type { SalaryHistoryRecord } from "../../lib/salaryHistory";
 import {
   type PayrollRun,
@@ -62,6 +63,8 @@ import VoluntaryDeductionsModal from "./VoluntaryDeductionsModal";
 import MissingPayrollDetailsModal from "./MissingPayrollDetailsModal";
 import RunPaymentsPanel from "./RunPaymentsPanel";
 import PayrollExportsPanel, { downloadP10 } from "./PayrollExportsPanel";
+import ReturnsReadiness from "./ReturnsReadiness";
+import { returnsReadiness } from "../../lib/payrollExports";
 import { employeesMissingDetails } from "../../lib/missingPayrollDetails";
 import { isPaidByMpesa, paymentMethodLabel } from "../../lib/paymentMethods";
 import { fetchAll } from "../../lib/fetchAll";
@@ -2301,15 +2304,6 @@ export default function PayrollDashboard() {
 
   const itemsPerPage = 5;
 
-  const {
-    settings,
-    isLoading: settingsLoading,
-    calculatePAYE,
-    calculateNSSF,
-    calculateNHIF,
-    calculateHousingLevy,
-    reloadSettings,
-  } = useStatutorySettings();
 
   // Add this useEffect - fetches salary advances once when component loads
   useEffect(() => {
@@ -2589,6 +2583,11 @@ export default function PayrollDashboard() {
   };
 
   const actualPeriod = getPeriodString(selectedPeriod);
+  // the statutory rates in force this month (statutory_rates): one place for PAYE bands, reliefs, SHIF, NSSF and AHL
+  const { rates, isLoading: settingsLoading, error: ratesError, reload: reloadRates } = useStatutoryRates(actualPeriod);
+  useEffect(() => {
+    if (ratesError) toast.error(`Payroll can't be worked out: ${ratesError}`);
+  }, [ratesError]);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -3149,34 +3148,34 @@ export default function PayrollDashboard() {
               // Taxable amount EXCLUDES the per diem portion
               const taxableGross = grossPay - perDiem;
 
-              let nhifDeduction = 0;
-              let nssfDeduction = 0;
-              let housingLevy = 0;
+              // SHIF, NSSF, AHL and PAYE with this month's rates (lib/statutoryCalc): pension, PRMF and mortgage
+              // interest come off taxable pay, insurance relief and the PWD exemption apply. A deduction is left out
+              // while its number or PIN is missing, unless statutory checks are overridden.
+              const statutory = statutoryFor(
+                {
+                  cashPay: taxableGross,
+                  ...employeeInputs(employee),
+                  apply: {
+                    shif: overrideStatutoryChecks || Boolean(nhifNumber),
+                    nssf: overrideStatutoryChecks || Boolean(nssfNumber),
+                    ahl: overrideStatutoryChecks || Boolean(taxPin),
+                    paye: overrideStatutoryChecks || Boolean(taxPin),
+                  },
+                },
+                rates ?? {}, // only worked out once the month's rates are loaded (see below)
+              );
+              const nhifDeduction = statutory.shif;
+              const nssfDeduction = statutory.nssf;
+              const housingLevy = statutory.ahl;
+              const payeTax = statutory.paye;
+              // the monthly personal relief, as the P10 reports it
+              const taxRelief = statutory.personalRelief;
 
-              // Apply statutory deductions based on override setting
-              if (overrideStatutoryChecks || nhifNumber) {
-                nhifDeduction = calculateNHIF(taxableGross);
-              }
-
-              if (overrideStatutoryChecks || nssfNumber) {
-                nssfDeduction = calculateNSSF(taxableGross);
-              }
-
-              if (overrideStatutoryChecks || taxPin) {
-                housingLevy = calculateHousingLevy(taxableGross, true);
-              }
-
-              // Calculate taxable income for PAYE AFTER deducting NSSF and Housing Levy
-              const taxableIncomeForPAYE =
-                taxableGross - nhifDeduction - nssfDeduction - housingLevy;
-
-              let payeTax = 0;
-              let taxRelief = 0;
-
-              if (overrideStatutoryChecks || taxPin) {
-                payeTax = calculatePAYE(taxableIncomeForPAYE);
-                taxRelief = Math.min(payeTax, 2400);
-              }
+              // the employee's pension and post-retirement medical fund contributions come out of their pay
+              const pensionItems = [
+                { name: "Pension contribution", amount: Number(employee.other_pension_contribution) || 0 },
+                { name: "Post-retirement medical fund", amount: Number(employee.post_retirement_medical_fund) || 0 },
+              ].filter((i) => i.amount > 0);
 
               // Calculate salary advance deduction
               // Calculate salary advance deduction
@@ -3186,7 +3185,7 @@ export default function PayrollDashboard() {
               );
 
               // voluntary deductions are itemised (deduction_items); loan and welfare are kept for older payslips
-              const deductionItems = voluntaryByEmployee.get(employeeId) ?? [];
+              const deductionItems = [...pensionItems, ...(voluntaryByEmployee.get(employeeId) ?? [])];
               const loanDeduction = 0;
               const welfareDeduction = 0;
               const otherDeductions = totalOf(deductionItems);
@@ -3255,11 +3254,18 @@ export default function PayrollDashboard() {
       }
     };
 
-    if (settings) {
-      // Only fetch when settings are loaded
+    if (rates) {
+      // only with the month's rates, and never with one missing
+      const missing = missingRates(rates);
+      if (missing.length) {
+        toast.error(`Payroll for this month is missing statutory rates: ${missing.join(", ")}. Add them under Statutory rates.`);
+        setLiveRecords([]);
+        setIsLoading(false);
+        return;
+      }
       fetchEmployees();
     }
-  }, [actualPeriod, settings, overrideStatutoryChecks, salaryAdvances, deductionsVersion, detailsVersion]);
+  }, [actualPeriod, rates, overrideStatutoryChecks, salaryAdvances, deductionsVersion, detailsVersion]);
 
   // the month's payroll run, reloaded after each start/recalculate/approve/...
   useEffect(() => {
@@ -3470,6 +3476,11 @@ export default function PayrollDashboard() {
 
   const missingDetails = useMemo(() => employeesMissingDetails(employees), [employees]);
   const notOnboarded = useMemo(() => employees.filter((e) => !isPayrollReady(e)), [employees]);
+  const onPayroll = useMemo(() => employees.filter(isPayrollReady), [employees]);
+  const returnsGaps = useMemo(() => {
+    const r = returnsReadiness(onPayroll);
+    return new Set([...r.p10, ...r.sha, ...r.nssf].map((p) => p.employeeNumber)).size;
+  }, [onPayroll]);
 
   // the KRA P10 for this month, as CSV, from its approved payslips (the same file as "Statutory returns" offers)
   const handleP10Download = async () => {
@@ -3494,6 +3505,8 @@ export default function PayrollDashboard() {
 ${payrollRecords.length} employees, net pay KSh ${Math.round(runNetPay).toLocaleString()}.
 ${missingDetails.length ? `
 ${missingDetails.length} employee(s) are missing a KRA PIN, NSSF or SHA number, or payment details (see "Missing details").
+` : ""}${returnsGaps ? `
+${returnsGaps} employee(s) are missing details the P10, SHA or NSSF returns need (see "Returns check").
 ` : ""}
 Payslips will be locked and staff will be able to see them.`,
       `Payroll for ${periodLabel} approved. Staff can now see their payslips.`,
@@ -3574,7 +3587,7 @@ This can't be undone: the payslips stay locked for good.`,
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-gray-600">
             {settingsLoading
-              ? "Loading statutory settings..."
+              ? "Loading statutory rates..."
               : "Loading employee data..."}
           </p>
         </div>
@@ -3879,7 +3892,7 @@ This can't be undone: the payslips stay locked for good.`,
                   setShowQuickActions(false);
                 }}
               >
-                Statutory Settings
+                Statutory Rates
               </GlowButtonss>
               {(userRole === "checker" ||
                 userRole === "credit_analyst_officer") && (
@@ -4005,6 +4018,7 @@ This can't be undone: the payslips stay locked for good.`,
         onDiscard={handleDiscardRun}
       />
 
+      {(!monthRun || monthRun.status === "draft") && <ReturnsReadiness employees={onPayroll} />}
       {monthRun && (monthRun.status === "approved" || monthRun.status === "paid") && <RunPaymentsPanel run={monthRun} />}
       {monthRun && (monthRun.status === "approved" || monthRun.status === "paid") && <PayrollExportsPanel run={monthRun} />}
 
@@ -4099,7 +4113,7 @@ This can't be undone: the payslips stay locked for good.`,
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-ink transition-colors"
         >
           <Settings className="w-3 h-3" />
-          Statutory Settings
+          Statutory rates
         </button>
         <button
           type="button"
@@ -4535,11 +4549,13 @@ This can't be undone: the payslips stay locked for good.`,
         />
       )}
 
-      <StatutorySettingsModal
-        isOpen={showStatutorySettings}
-        onClose={() => setShowStatutorySettings(false)}
-        reloadSettings={reloadSettings}
-      />
+      {showStatutorySettings && (
+        <StatutoryRatesModal
+          payPeriod={actualPeriod}
+          onClose={() => setShowStatutorySettings(false)}
+          onChanged={() => void reloadRates()}
+        />
+      )}
 
       {/* NEW: Render Bulk Upload Modal */}
       {showBulkUploadModal && (
