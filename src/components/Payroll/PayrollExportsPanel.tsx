@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { saveAs } from 'file-saver';
-import { AlertTriangle, Download, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { AlertTriangle, Download, FileSpreadsheet } from 'lucide-react';
 import { Card } from '../UI';
 import { supabase } from '../../lib/supabase';
 import { fetchAll } from '../../lib/fetchAll';
 import { getRunPayslips, type PayrollRun } from '../../lib/payrollRuns';
 import type { EmployeeRecord } from '../../lib/profileCompleteness';
 import { type ExportFile, type Rates, bankFile, equityFile, lastDayOf, mpesaFile, nssfFile, p10File, shaFile, toCsv } from '../../lib/payrollExports';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // For an approved (or paid) month: download the KRA P10, SHA and NSSF returns and the M-Pesa and bank bulk-payment
 // files as CSV, each with everyone on that month's payroll, ready to upload. Before each one, who is missing what.
@@ -124,7 +125,7 @@ export default function PayrollExportsPanel({ run }: { run: PayrollRun }) {
       </p>
 
       {problem && <p role="alert" className="text-sm text-status-danger">{problem}</p>}
-      {!files && !problem && <Loader2 className="w-5 h-5 animate-spin text-brand" aria-label="Preparing files" />}
+      {!files && !problem && <FigbloomLoader label="Preparing files" size={48} />}
 
       {files && (
         <div className="space-y-2">

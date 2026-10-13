@@ -38,6 +38,7 @@ import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 import { useUser } from '../ProtectedRoutes/UserContext';
 import LeaveScheduler from './LeaveScheduler';
 import { PageHeader, StatCard, Card, TabBar, Button, EmptyState } from '../UI';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -3164,8 +3165,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
       {loading && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center">
-            <Loader2 className="w-8 h-8 text-brand animate-spin mb-3" />
-            <p className="text-gray-700">Loading data...</p>
+            <FigbloomLoader label="Loading leave" size={80} />
           </div>
         </div>
       )}

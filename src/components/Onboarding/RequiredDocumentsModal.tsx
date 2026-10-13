@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Loader2, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { type DocumentSection, type DocumentTypeSetting, SECTION_TITLES, loadCompanyDocumentSettings, setCompanyDocumentRequired } from '../../lib/employeeDocuments';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // Which documents every employee of the company must provide. Role-specific ones can also be asked of one employee
 // in their review panel; tax-claim documents are required whenever the employee makes the claim.
@@ -39,7 +40,7 @@ export default function RequiredDocumentsModal({ onClose }: { onClose: () => voi
           <button type="button" onClick={onClose} aria-label="Close" className="p-1 text-muted-foreground hover:text-ink"><X className="h-4 w-4" /></button>
         </div>
         <div className="overflow-y-auto px-5 py-4 space-y-4">
-          {!types && <Loader2 className="h-5 w-5 animate-spin text-brand" aria-label="Loading" />}
+          {!types && <FigbloomLoader label="Loading" size={48} />}
           {types && SECTIONS.map((section) => (
             <section key={section}>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">{SECTION_TITLES[section]}</h3>

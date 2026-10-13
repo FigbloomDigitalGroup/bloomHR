@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Loader2, Printer } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import OnboardingSummary from './OnboardingSummary';
 import { type OnboardingRecord, errorMessage, loadOnboardingForReview, statusLabel } from '../../lib/onboarding';
 import { supabase } from '../../lib/supabase';
 import { type PolicyItem, loadPolicyChecklist } from '../../lib/companyPolicies';
 import { type ChecklistItem, DOCUMENT_STATUS_LABELS, type EmployeeDocument, type Referee, loadChecklist, loadDocuments, loadReferees } from '../../lib/employeeDocuments';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // The onboarding form as a printable page: the company, the employee's name and position, the date they submitted,
 // and everything they and HR entered. Opened from HR's review panel (/onboarding/:id/print).
@@ -43,7 +44,7 @@ export default function OnboardingPrint() {
   }, [id]);
 
   if (problem) return <p className="p-8 text-sm text-status-danger">{problem}</p>;
-  if (!record || !company) return <Loader2 className="h-6 w-6 animate-spin text-brand m-8" aria-label="Loading" />;
+  if (!record || !company) return <div className="flex justify-center py-16"><FigbloomLoader label="Loading" /></div>;
 
   const e = record.employee;
   const name = [e['First Name'], e['Middle Name'], e['Last Name']].filter(Boolean).join(' ');

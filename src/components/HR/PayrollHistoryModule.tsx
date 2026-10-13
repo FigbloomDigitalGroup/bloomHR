@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { DollarSign, Search, Download, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { DollarSign, Search, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 interface PayrollRecord {
     id?: number;
@@ -121,7 +122,7 @@ export default function PayrollHistoryModule() {
 
             {loading ? (
                 <div className="flex items-center justify-center h-40">
-                    <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
+                    <FigbloomLoader label="Loading payroll history" size={64} />
                 </div>
             ) : (
                 <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">

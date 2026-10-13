@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { listEmailLogs, getEmailLog } from '../../lib/emailApi';
-import { Loader2, RefreshCw, CheckCircle, XCircle, Clock, Search, ChevronLeft, ChevronRight, Eye, X } from 'lucide-react';
+import { RefreshCw, CheckCircle, XCircle, Clock, Search, ChevronLeft, ChevronRight, Eye, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 interface EmailLog {
     id: string;
@@ -230,8 +231,7 @@ export default function EmailDashboard() {
                             {loading && logs.length === 0 ? (
                                 <tr>
                                     <td colSpan={4} className="px-6 py-12 text-center text-sm text-gray-500">
-                                        <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin text-blue-500" />
-                                        Loading email logs from Resend...
+                                        <div className="flex justify-center"><FigbloomLoader label="Loading email logs" size={64} /></div>
                                     </td>
                                 </tr>
                             ) : filteredLogs.length === 0 ? (
@@ -336,7 +336,7 @@ export default function EmailDashboard() {
                         <div className="px-6 py-4 overflow-y-auto max-h-[calc(90vh-8rem)]">
                             {loadingDetails ? (
                                 <div className="flex items-center justify-center py-12">
-                                    <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                                    <FigbloomLoader label="Loading the email" size={64} />
                                 </div>
                             ) : (
                                 <div className="space-y-4">

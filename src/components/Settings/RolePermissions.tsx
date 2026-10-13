@@ -18,6 +18,7 @@ import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { Card, Button, SearchInput } from '../UI';
 import { queryClient, queryKeys } from '../../lib/queryClient';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 interface Permission {
     id: string;
@@ -219,10 +220,7 @@ export default function RolePermissions() {
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="flex flex-col items-center">
-                    <RefreshCw className="w-8 h-8 text-brand animate-spin mb-4" />
-                    <p className="text-muted-foreground font-medium text-sm">Loading permissions...</p>
-                </div>
+                <FigbloomLoader label="Loading permissions" />
             </div>
         );
     }

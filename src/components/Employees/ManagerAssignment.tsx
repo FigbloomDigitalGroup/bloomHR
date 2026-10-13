@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { Database } from '../../types/supabase';
 import { Card, Button, TabBar, SearchInput, StatusPill, EmptyState } from '../UI';
 import SearchableDropdown from '../UI/SearchableDropdown';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 type Employee = Database['public']['Tables']['employees']['Row'];
 
@@ -299,7 +300,7 @@ const ManagerAssignment = () => {
                         <div className="flex-1 overflow-y-auto">
                             {loading ? (
                                 <div className="flex justify-center p-8">
-                                    <div className="animate-spin w-6 h-6 border-2 border-brand border-t-transparent rounded-full" />
+                                    <FigbloomLoader label="Loading employees" size={56} />
                                 </div>
                             ) : (
                                 filteredEmployees.map(emp => {

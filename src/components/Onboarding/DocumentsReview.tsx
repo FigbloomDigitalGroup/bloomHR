@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Check, Eye, FileText, Loader2, X } from 'lucide-react';
+import { Check, Eye, FileText, X } from 'lucide-react';
 import { StatusPill } from '../UI';
 import {
   type ChecklistItem,
@@ -18,6 +18,7 @@ import {
   rejectDocument,
   setEmployeeRequirement,
 } from '../../lib/employeeDocuments';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // HR's view of an employee's documents and referees (in the Onboarding review panel): open each file, accept it or
 // reject it with a reason, and ask this employee for role-specific documents.
@@ -117,7 +118,7 @@ export default function DocumentsReview({ employeeId, onChanged }: { employeeId:
     }
   };
 
-  if (!checklist) return <Loader2 className="h-5 w-5 animate-spin text-brand" aria-label="Loading documents" />;
+  if (!checklist) return <FigbloomLoader label="Loading documents" size={48} />;
 
   // role-specific types the company does not already require: HR may ask this employee for them
   const askable = checklist.filter((i) => i.section === 'role' && (!i.required || asked.includes(i.code)));

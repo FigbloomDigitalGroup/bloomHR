@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Loader2, Trash2, X } from 'lucide-react';
 import { type DeleteCheck, checkDeleteEmployee, deleteEmployee } from '../../lib/employeeDelete';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // Confirms deleting an employee: says what goes with them (or why they can't be deleted), asks for their employee
 // number to be typed, and lets an administrator also remove their login from the company.
@@ -50,7 +51,7 @@ export default function DeleteEmployeeModal({ employeeId, isAdmin, onClose }: Pr
           <button type="button" onClick={onClose} aria-label="Close" className="p-1 text-muted-foreground hover:text-ink"><X className="h-4 w-4" /></button>
         </div>
         <div className="px-5 py-4 space-y-3 text-sm text-ink">
-          {!check && !problem && <Loader2 className="h-5 w-5 animate-spin text-brand" aria-label="Checking" />}
+          {!check && !problem && <FigbloomLoader label="Checking" size={48} />}
           {check?.blocked ? (
             <p className="rounded-lg bg-orange-tint px-3 py-2">{check.blocked}</p>
           ) : check ? (

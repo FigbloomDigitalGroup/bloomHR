@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Loader2, Plus, X } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { Button } from '../UI';
 import { Field, TextField } from './Fields';
 import { ACCEPTED_FILES } from '../../lib/employeeDocuments';
 import { type PolicyAdminRow, createPolicy, loadPoliciesForAdmin, publishPolicyVersion, updatePolicy } from '../../lib/companyPolicies';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // HR's company policies and agreements: add one, publish a new version (employees accept it again), and choose which
 // are required for onboarding.
@@ -74,7 +75,7 @@ export default function PoliciesModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="overflow-y-auto px-5 py-4 space-y-3">
-          {!rows && <Loader2 className="h-5 w-5 animate-spin text-brand" aria-label="Loading" />}
+          {!rows && <FigbloomLoader label="Loading policies" size={48} />}
           {rows?.length === 0 && !draft && <p className="text-sm text-muted-foreground">No policies yet.</p>}
           {rows?.map((p) => (
             <div key={p.id} className={`rounded-lg border border-border px-3 py-2 ${p.active ? '' : 'opacity-60'}`}>

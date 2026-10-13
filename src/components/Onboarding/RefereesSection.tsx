@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../UI';
 import { TextField } from './Fields';
 import { type Referee, deleteReferee, emptyReferee, loadReferees, refereeProblem, saveReferee } from '../../lib/employeeDocuments';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // The employee's referees: as many as they like, at least one. Each has a phone number or an email.
 
@@ -53,7 +54,7 @@ export default function RefereesSection({ employeeId, onChanged }: { employeeId:
     }
   };
 
-  if (!referees) return <Loader2 className="h-5 w-5 animate-spin text-brand" aria-label="Loading referees" />;
+  if (!referees) return <FigbloomLoader label="Loading referees" size={48} />;
   const set = (key: keyof Referee) => (v: string) => setEditing((e) => (e ? { ...e, [key]: v } : e));
 
   return (

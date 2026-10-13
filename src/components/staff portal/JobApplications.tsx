@@ -21,6 +21,7 @@ import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import StatusPill from '../UI/StatusPill';
 import type { StatusTone } from '../UI/StatusPill';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 interface JobPosting {
     id: string;
@@ -244,7 +245,7 @@ const JobApplications = () => {
     if (isLoading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <FigbloomLoader label="Loading job applications" />
             </div>
         );
     }

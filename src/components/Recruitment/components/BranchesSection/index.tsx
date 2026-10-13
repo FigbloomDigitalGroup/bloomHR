@@ -6,6 +6,7 @@ import GlowButton from '../../../UI/GlowButton';
 import { Edit, Save, X, Plus } from 'lucide-react';
 import { supabase } from '../../../../lib/supabase';
 import toast from 'react-hot-toast';
+import FigbloomLoader from '../../../UI/FigbloomLoader';
 
 interface KenyaOfficeLocation {
   id: string;
@@ -142,7 +143,7 @@ export const BranchesSection = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#47d475]"></div>
+        <FigbloomLoader label="Loading branches" size={64} />
       </div>
     );
   }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { ChevronDown, ChevronUp, FileText, Loader2 } from 'lucide-react';
 import { type PolicyItem, acceptPolicy, loadPolicyChecklist, openPolicyFile } from '../../lib/companyPolicies';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // The employee's agreements: each company policy with its own checkbox. Ticking it is their signature for that
 // version; it can't be unticked. A new version of a policy is accepted again.
@@ -75,7 +76,7 @@ export default function AgreementsSection({ onChanged }: { onChanged?: () => voi
     void load();
   }, [load]);
 
-  if (!items) return <Loader2 className="h-5 w-5 animate-spin text-brand" aria-label="Loading policies" />;
+  if (!items) return <FigbloomLoader label="Loading policies" size={48} />;
   if (items.length === 0) return <p className="text-sm text-muted-foreground">Your company has no policies for you to accept.</p>;
   return (
     <ul className="space-y-2">

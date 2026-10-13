@@ -15,6 +15,7 @@ import {
   openDocument,
   uploadMyDocument,
 } from '../../lib/employeeDocuments';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // The employee's documents, by section: what is required, what they uploaded and what HR made of each file.
 // Only the employee uploads (HR reviews them in the Onboarding review panel).
@@ -120,7 +121,7 @@ export default function DocumentsSection({ employeeId, onChanged }: { employeeId
     onChanged?.();
   };
 
-  if (!checklist) return <Loader2 className="h-5 w-5 animate-spin text-brand" aria-label="Loading documents" />;
+  if (!checklist) return <FigbloomLoader label="Loading documents" size={48} />;
 
   return (
     <div className="space-y-5">

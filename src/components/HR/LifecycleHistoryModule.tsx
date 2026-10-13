@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
     History, Search, ChevronDown, ChevronUp, Calendar, User,
-    Loader2, ChevronLeft, ChevronRight, RefreshCw, Users
+    ChevronLeft, ChevronRight, RefreshCw, Users
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 interface HistoryEvent {
     id: number;
@@ -157,7 +158,7 @@ export default function LifecycleHistoryModule() {
 
             {loading ? (
                 <div className="flex items-center justify-center h-40">
-                    <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
+                    <FigbloomLoader label="Loading history" size={64} />
                 </div>
             ) : filtered.length === 0 ? (
                 <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">

@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Calendar, Plus, Search, X, Loader2, CheckCircle, Bell } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 interface LeaveSchedule {
     id: number;
@@ -161,7 +162,7 @@ export default function LeaveScheduleAssigner({ onRefresh }: { onRefresh?: () =>
             {/* List */}
             {loading ? (
                 <div className="flex items-center justify-center h-40">
-                    <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
+                    <FigbloomLoader label="Loading" size={64} />
                 </div>
             ) : filtered.length === 0 ? (
                 <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">

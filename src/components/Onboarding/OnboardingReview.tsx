@@ -94,7 +94,7 @@ function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: (
         </div>
 
         <div className="overflow-y-auto px-5 py-4 space-y-5">
-          {!record && !problem && <Loader2 className="h-5 w-5 animate-spin text-brand mx-auto" aria-label="Loading" />}
+          {!record && !problem && <FigbloomLoader label="Loading" size={48} />}
           {record && (
             <>
               {(record.missing.employee.length > 0 || record.missing.employer.length > 0) && (

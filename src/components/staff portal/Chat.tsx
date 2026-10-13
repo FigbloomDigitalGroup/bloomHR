@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { v4 as uuidv4 } from '@lukeed/uuid';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // Matches the real `messages` table (see master_schema.sql / chatServices.ts,
 // the admin Teams chat's data layer) - this component previously used
@@ -500,7 +501,7 @@ const ChatComponent = ({ onMessagesRead }: ChatComponentProps) => {
         >
           {isLoading ? (
             <div className="flex justify-center items-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <FigbloomLoader label="Loading conversations" size={56} />
             </div>
           ) : error ? (
             <div className="flex justify-center items-center h-32">

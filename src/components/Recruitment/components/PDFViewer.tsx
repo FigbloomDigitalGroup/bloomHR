@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { AlertCircle, X, Download, ExternalLink } from 'lucide-react';
 
 import { signedFileUrl } from '../../../lib/privateFiles';
+import FigbloomLoader from '../../UI/FigbloomLoader';
 
 interface PDFViewerProps {
   fileName: string;
@@ -35,10 +36,7 @@ export const PDFViewer = ({ fileName, fileUrl, onClose }: PDFViewerProps) => {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6">
-          <div className="flex items-center gap-3">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
-            <span>Loading PDF...</span>
-          </div>
+          <FigbloomLoader label="Loading the PDF" size={64} />
         </div>
       </div>
     );

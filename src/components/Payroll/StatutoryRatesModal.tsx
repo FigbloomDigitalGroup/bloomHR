@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Loader2, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { lastDayOf } from '../../lib/payrollExports';
 import { RATE_LABELS, type RateRow, ratesInForce, setCompanyRate } from '../../lib/statutoryRates';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // The statutory rates payroll uses for a month (statutory_rates), and where each comes from. Payroll can give the
 // company its own rate for a code from a date; the defaults change only with the law (by migration).
@@ -63,7 +64,7 @@ export default function StatutoryRatesModal({ payPeriod, onClose, onChanged }: {
           <button type="button" onClick={onClose} aria-label="Close" className="p-1 text-muted-foreground hover:text-ink"><X className="h-4 w-4" /></button>
         </div>
         <div className="overflow-y-auto px-5 py-4">
-          {!rows && <Loader2 className="h-5 w-5 animate-spin text-brand" aria-label="Loading" />}
+          {!rows && <FigbloomLoader label="Loading rates" size={48} />}
           {rows && (
             <table className="w-full text-xs">
               <thead>

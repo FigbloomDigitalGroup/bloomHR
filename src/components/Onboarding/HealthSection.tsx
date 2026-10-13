@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Eye, FileText, Loader2, Pencil, Plus, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
+import { Eye, FileText, Pencil, Plus, ShieldCheck, Trash2, UploadCloud } from 'lucide-react';
 import { Button } from '../UI';
 import { Field, SelectField, TextField } from './Fields';
 import { ACCEPTED_FILES } from '../../lib/employeeDocuments';
@@ -21,6 +21,7 @@ import {
   uploadHealthFile,
   withdrawHealthConsent,
 } from '../../lib/employeeHealth';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // The employee's health information: optional, after consent. Medical conditions and disability / accommodation
 // needs, with supporting documents from medical institutions.
@@ -60,7 +61,7 @@ export default function HealthSection({ employeeId }: { employeeId: string }) {
     }
   };
 
-  if (!info) return <Loader2 className="h-5 w-5 animate-spin text-brand" aria-label="Loading health information" />;
+  if (!info) return <FigbloomLoader label="Loading health information" size={48} />;
 
   if (!info.consent_given_at) {
     return (
