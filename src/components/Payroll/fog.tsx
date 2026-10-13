@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { X, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2, AlertCircle, Edit2, Save, Plus, Upload, Download, FileSpreadsheet, CheckCircle, Mail, RotateCcw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { TownProps } from '../../types/supabase';
@@ -108,6 +109,8 @@ type BulkUploadPreview = {
 };
 
 const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const addingFromSheet = searchParams.get('add') === '1';
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -749,9 +752,9 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
         'Employee Type': 'Permanent',
         'Job Group': 'JG5',
         'Basic Salary': '150000',
-        'SHIF Number': 'SHIF001',
-        'NSSF Number': 'NSSF001',
-        'NHIF Number': 'NHIF001',
+        'SHIF Number': 'CR1234567',
+        'NSSF Number': '2012345678',
+        'NHIF Number': '',
         'Tax PIN': 'A001234567B',
         'ID Number': '12345678',
         'Mobile Number': '0712345678',
@@ -1032,6 +1035,33 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
       <UploadProgressModal />
+
+      {/* opened from Employees → Bulk add: adding employees from a spreadsheet, step by step */}
+      {addingFromSheet && (
+        <div className="m-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">Add employees from a spreadsheet</h2>
+              <ol className="mt-1 list-decimal pl-5 text-xs text-gray-700 space-y-0.5">
+                <li>Download the template.</li>
+                <li>Fill in one row per employee. Employee Number, First Name, Last Name and Work Email are needed; the employee fills in their own details when they accept the invitation.</li>
+                <li>Upload it, check the preview, and confirm. Each new employee is emailed an invitation to join and complete their onboarding. A row whose Employee Number already exists updates that employee instead.</li>
+              </ol>
+            </div>
+            <button type="button" aria-label="Close" onClick={() => setSearchParams({})} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={downloadTemplate}
+              className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
+              <Download className="w-4 h-4" /> Download template
+            </button>
+            <label className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 cursor-pointer">
+              <Upload className="w-4 h-4" /> Upload spreadsheet
+              <input type="file" accept=".xlsx, .xls, .csv" onChange={handleBulkUpload} className="hidden" disabled={isUploading} />
+            </label>
+          </div>
+        </div>
+      )}
 
       {/* Table Controls */}
       <div className="p-4 border-b border-gray-100 bg-white">

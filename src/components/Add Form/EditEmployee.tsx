@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { X, Save, ArrowLeft, Plus, AlertCircle, Users, Check, PencilLine } from 'lucide-react';
+import { X, Save, ArrowLeft, Plus, AlertCircle, Users, Check, PencilLine, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
@@ -9,6 +9,7 @@ import { NOT_SAVED_NO_ACCESS, requireUpdatedRows } from '../../lib/requireUpdate
 import { removeEmployeePhoto } from '../../lib/onboarding';
 import EmployerPayFields from '../Onboarding/EmployerPayFields';
 import BankBranchFields from '../Onboarding/BankBranchFields';
+import DeleteEmployeeModal from '../Employees/DeleteEmployeeModal';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import { User, Briefcase, CreditCard, Phone, MapPin } from 'lucide-react';
@@ -73,6 +74,7 @@ const EditEmployeePage = () => {
   const { user } = useUser();
   const isAdmin = user?.role === 'ADMIN';
   const isHR = user?.role === 'HR';
+  const [deleting, setDeleting] = useState(false);
 
   const [employee, setEmployee] = useState<Partial<Employee>>({});
   const [loading, setLoading] = useState(true);
@@ -672,15 +674,29 @@ const EditEmployeePage = () => {
               </GlowButton>
             </>
           ) : (
-            <RoleButtonWrapper allowedRoles={['ADMIN', 'HR', 'MANAGER', 'REGIONAL']}>
-              <GlowButton
-                onClick={handleEditToggle}
-                icon={PencilLine}
-                className="bg-brand hover:bg-brand-dark text-white"
-              >
-                Edit Employee
-              </GlowButton>
-            </RoleButtonWrapper>
+            <>
+              <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+                <GlowButton
+                  onClick={() => setDeleting(true)}
+                  icon={Trash2}
+                  className="mr-2 bg-white hover:bg-red-50 text-red-700 border border-red-200"
+                >
+                  Delete
+                </GlowButton>
+              </RoleButtonWrapper>
+              <RoleButtonWrapper allowedRoles={['ADMIN', 'HR', 'MANAGER', 'REGIONAL']}>
+                <GlowButton
+                  onClick={handleEditToggle}
+                  icon={PencilLine}
+                  className="bg-brand hover:bg-brand-dark text-white"
+                >
+                  Edit Employee
+                </GlowButton>
+              </RoleButtonWrapper>
+            </>
+          )}
+          {deleting && employee.id && (
+            <DeleteEmployeeModal employeeId={String(employee.id)} isAdmin={isAdmin} onClose={() => setDeleting(false)} />
           )}
         </div>
       </div>
