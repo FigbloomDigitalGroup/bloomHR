@@ -13,11 +13,22 @@ export default {
           200: "rgb(var(--surface-strong) / <alpha-value>)",
           300: "rgb(var(--surface-stronger) / <alpha-value>)",
         },
+        // slate is used as grey in places (the staff portal, tasks): it follows the page palette the same way
+        slate: {
+          50: "rgb(var(--surface-sunken) / <alpha-value>)",
+          100: "rgb(var(--surface-muted) / <alpha-value>)",
+          200: "rgb(var(--surface-strong) / <alpha-value>)",
+        },
         page: "rgb(var(--page) / <alpha-value>)",
       },
       borderColor: {
         DEFAULT: "rgb(var(--line) / <alpha-value>)",
         gray: {
+          100: "rgb(var(--line-soft) / <alpha-value>)",
+          200: "rgb(var(--line) / <alpha-value>)",
+          300: "rgb(var(--line-strong) / <alpha-value>)",
+        },
+        slate: {
           100: "rgb(var(--line-soft) / <alpha-value>)",
           200: "rgb(var(--line) / <alpha-value>)",
           300: "rgb(var(--line-strong) / <alpha-value>)",

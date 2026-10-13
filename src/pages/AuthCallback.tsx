@@ -65,7 +65,7 @@ export default function AuthCallback() {
     }, [navigate]);
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="min-h-screen flex items-center justify-center bg-page p-4">
             <div className="max-w-md w-full text-center space-y-6">
                 <div className="animate-spin rounded-full h-14 w-14 border-t-2 border-b-2 border-green-500 mx-auto"></div>
                 <div>

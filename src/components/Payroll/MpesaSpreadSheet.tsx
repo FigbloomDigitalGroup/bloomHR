@@ -493,7 +493,7 @@ const MPesaSpreadsheetFullPage = ({ onBack, userRole }) => {
   const processingCount = rows.filter(row => row.status === 'processing').length;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="min-h-screen bg-page p-4">
       {/* Header */}
       <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
         <div className="flex items-center justify-between">

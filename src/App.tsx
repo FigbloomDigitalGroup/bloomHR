@@ -111,7 +111,7 @@ class ErrorBoundaryClass extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="min-h-screen flex items-center justify-center bg-page">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Something went wrong</h1>
             <p className="text-gray-600 mb-4">Please refresh the page to continue</p>
@@ -901,7 +901,7 @@ function App() {
   return (
     <UserProvider>
       <ErrorBoundary>
-        <div className="min-h-screen bg-white overflow-x-hidden">
+        <div className="min-h-screen bg-page overflow-x-hidden">
           {switchingCompany && <AppSkeleton label="Switching company…" />}
           <Suspense fallback={<Loader />}>
           <Routes>
@@ -975,8 +975,7 @@ function App() {
                   </CompanyGate>
                 ) : (
                   <CompanyGate userId={session.user.id}>
-                  <div className="flex flex-col min-h-screen bg-gray-50/50">
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-accent/10 to-transparent pointer-events-none"></div>
+                  <div className="flex flex-col min-h-screen bg-page">
                     <div className="relative flex flex-1 min-h-0 w-full overflow-x-hidden">
                       <Sidebar
                         user={user}

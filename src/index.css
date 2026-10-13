@@ -337,8 +337,12 @@ html[data-a11y-reduce-motion] *::after {
 }
 
 /* ---------- Figbloom "Orbit" loader (components/UI/FigbloomLoader.tsx) ---------- */
-.fb-loader { display: flex; flex-direction: column; align-items: center; gap: 24px; }
-.fb-loader__text { font-size: 15px; font-weight: 300; color: #3E5A48; letter-spacing: .02em; }
+/* it takes the person's page palette: the brand green and the page's text grey, and white on a dark page */
+.fb-loader { --fb-green: rgb(var(--brand)); display: flex; flex-direction: column; align-items: center; gap: 24px; }
+html[data-page="dark"] .fb-loader { --fb-green: rgb(255 255 255); }
+.fb-loader svg circle, .fb-loader svg path { stroke: var(--fb-green); }
+.fb-loader .fb-leaf { stroke: none; fill: var(--fb-green); }
+.fb-loader__text { font-size: 15px; font-weight: 300; color: rgb(var(--text-600)); letter-spacing: .02em; }
 .fb-loader__dot { animation: fb-dots 1.4s ease-in-out infinite; }
 .fb-loader__dot:nth-child(2) { animation-delay: .2s; }
 .fb-loader__dot:nth-child(3) { animation-delay: .4s; }
@@ -346,11 +350,11 @@ html[data-a11y-reduce-motion] *::after {
 .fb-leaf { transform-box: fill-box; transform-origin: 0% 100%; animation: fb-leaf 2.2s infinite; }
 .fb-bowl { transform-box: fill-box; transform-origin: center; animation: fb-bowl 2.2s infinite; }
 @keyframes fb-orbit {
-  0% { transform: rotate(0deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: #0E4F27; animation-timing-function: cubic-bezier(.55,0,.25,1); }
-  12% { transform: rotate(0deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: #0E4F27; animation-timing-function: cubic-bezier(.6,0,.4,1); }
+  0% { transform: rotate(0deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: var(--fb-green); animation-timing-function: cubic-bezier(.55,0,.25,1); }
+  12% { transform: rotate(0deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: var(--fb-green); animation-timing-function: cubic-bezier(.6,0,.4,1); }
   45% { transform: rotate(200deg); stroke-dasharray: 190 170; stroke-dashoffset: 5; stroke: #FF8A12; animation-timing-function: cubic-bezier(.3,0,.2,1); }
-  78% { transform: rotate(360deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: #0E4F27; }
-  100% { transform: rotate(360deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: #0E4F27; }
+  78% { transform: rotate(360deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: var(--fb-green); }
+  100% { transform: rotate(360deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: var(--fb-green); }
 }
 @keyframes fb-leaf {
   0%, 16% { transform: scale(1) rotate(0deg); opacity: 1; animation-timing-function: cubic-bezier(.5,0,.75,0); }
