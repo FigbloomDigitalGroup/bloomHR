@@ -7,6 +7,7 @@ import DocumentsSection from './DocumentsSection';
 import RefereesSection from './RefereesSection';
 import HealthSection from './HealthSection';
 import AgreementsSection from './AgreementsSection';
+import BankBranchFields from './BankBranchFields';
 import {
   type Contact,
   type OnboardingRecord,
@@ -263,12 +264,9 @@ export default function OnboardingForm() {
         </Section>
 
         <Section title="Bank details" description={byBank ? 'Your salary is paid to this account.' : 'Fill these in if you have a bank account; HR decides how your salary is paid.'}>
-          <TextField label="Bank name" required={byBank} value={values['Bank']} onChange={set('Bank')} />
-          <TextField label="Branch name" required={byBank} value={values['Bank Branch']} onChange={set('Bank Branch')} />
+          <BankBranchFields values={values} required={byBank} onChange={(changes) => setValues((v) => ({ ...v, ...changes }))} />
           <TextField label="Account name" required={byBank} value={values['account_number_name']} onChange={set('account_number_name')} />
           <TextField label="Account number" required={byBank} value={values['Account Number']} onChange={set('Account Number')} />
-          <TextField label="Bank code" value={values['bank_code']} onChange={set('bank_code')} />
-          <TextField label="Branch code" value={values['branch_code']} onChange={set('branch_code')} />
           <TextField label="Bank paybill number" value={values['bank_paybill']} onChange={set('bank_paybill')} />
         </Section>
 
