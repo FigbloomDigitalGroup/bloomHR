@@ -1,5 +1,6 @@
 import type { EmployeeRecord } from './profileCompleteness';
 import { paymentKind } from './paymentMethods';
+import { employeeInputs, statutoryFor } from './statutoryCalc';
 import { isValidIdNumber, isValidKraPin, isValidNssfNumber, isValidOnboardingPhone, isValidShaNumber } from './onboardingValidation';
 
 // Upload files built from a month's approved payroll run: the KRA PAYE (iTax P10), SHA and NSSF returns, and the
@@ -86,25 +87,34 @@ const problemsOf = (ls: Line[], check: (e: EmployeeRecord) => string[]) =>
 
 const need = (checks: [string, boolean][]) => checks.filter(([, ok]) => !ok).map(([label]) => label);
 
-/** The P10 figures for one payslip. Caps and reliefs come from the statutory rates in force that month. */
+/** Cash pay as the returns report it: gross pay less the non-taxable per diem (what SHIF, NSSF and AHL are worked on). */
+export const cashPayOf = (payslip: Payslip) => Math.max(0, num(payslip.gross_pay) - num(payslip.per_diem));
+
+/**
+ * The P10 figures for one payslip: SHIF, NSSF, AHL and PAYE as the payslip has them, and taxable pay worked out the
+ * way payroll worked it out (lib/statutoryCalc, with the rates in force that month).
+ */
 export function p10Figures(payslip: Payslip, e: EmployeeRecord, rates: Rates) {
-  const cashPay = num(payslip.gross_pay);
+  const cashPay = cashPayOf(payslip);
   const benefits = num(e['car_benefit']) + num(e['meals_benefit']) + num(e['non_cash_benefit']) + num(e['housing_benefit']) + num(e['other_benefits']);
   const totalGross = cashPay + benefits;
   const shif = num(payslip.nhif_deduction);
   const nssf = num(payslip.nssf_deduction);
   const ahl = num(payslip.housing_levy);
-  const pension = Math.min(num(e['other_pension_contribution']), rate(rates, 'pension_deduction_cap', Infinity));
-  const prmf = Math.min(num(e['post_retirement_medical_fund']), rate(rates, 'prmf_deduction_cap', Infinity));
-  const mortgage = Math.min(num(e['mortgage_interest']), rate(rates, 'mortgage_interest_cap', Infinity));
-  const deductible =
-    nssf + pension + prmf + mortgage + (rate(rates, 'shif_deductible') ? shif : 0) + (rate(rates, 'ahl_deductible') ? ahl : 0);
-  const insuranceRelief = Math.min(num(e['insurance_premium']) * rate(rates, 'insurance_relief_rate'), rate(rates, 'insurance_relief_cap', Infinity));
+  // benefits, caps, the PWD exemption and insurance relief as payroll applies them
+  const calc = statutoryFor({ cashPay, ...employeeInputs(e) }, rates);
+  const beforeExemption = Math.max(
+    0,
+    cashPay + calc.taxableBenefits - nssf - calc.pension - calc.prmf - calc.mortgageInterest -
+      (rate(rates, 'shif_deductible') ? shif : 0) - (rate(rates, 'ahl_deductible') ? ahl : 0)
+  );
+  const pwd = e['is_pwd'] === true ? Math.min(beforeExemption, rate(rates, 'pwd_exempt_income')) : 0;
   return {
-    cashPay, benefits, totalGross, shif, nssf, ahl, pension, prmf, mortgage,
-    taxablePay: Math.max(0, totalGross - deductible),
-    personalRelief: num(payslip.tax_relief),
-    insuranceRelief,
+    cashPay, benefits, totalGross, shif, nssf, ahl,
+    pension: calc.pension, prmf: calc.prmf, mortgage: calc.mortgageInterest,
+    taxablePay: Math.round((beforeExemption - pwd) * 100) / 100,
+    personalRelief: rate(rates, 'personal_relief', num(payslip.tax_relief)),
+    insuranceRelief: calc.insuranceRelief,
     paye: num(payslip.paye_tax),
   };
 }
@@ -162,7 +172,7 @@ export function nssfFile(payslips: Payslip[], employees: EmployeeRecord[]): Expo
     headers: NSSF_HEADERS,
     rows: ls.map(({ payslip, employee: e }) => [
       text(e['Payroll Number']), text(e['Last Name']), [e['First Name'], e['Middle Name']].map(text).filter(Boolean).join(' '),
-      text(e['ID Number']), text(e['Tax PIN']), text(e['NSSF Number']), amount(num(payslip.gross_pay)), amount(num(e['nssf_voluntary_contribution'])),
+      text(e['ID Number']), text(e['Tax PIN']), text(e['NSSF Number']), amount(cashPayOf(payslip)), amount(num(e['nssf_voluntary_contribution'])),
     ]),
     problems: problemsOf(ls, (e) =>
       need([
@@ -219,3 +229,15 @@ export const lastDayOf = (payPeriod: string) => {
   const [y, m] = payPeriod.split('-').map(Number);
   return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
 };
+
+export interface ReturnsReadiness {
+  p10: ExportFile['problems'];
+  sha: ExportFile['problems'];
+  nssf: ExportFile['problems'];
+}
+
+/** Before a month is approved: who on payroll is missing a detail each return needs (the same checks as the files). */
+export function returnsReadiness(employees: EmployeeRecord[]): ReturnsReadiness {
+  const slips = employees.map((e) => ({ employee_id: e['Employee Number'] }));
+  return { p10: p10File(slips, employees, {}).problems, sha: shaFile(slips, employees).problems, nssf: nssfFile(slips, employees).problems };
+}

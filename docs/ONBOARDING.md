@@ -108,6 +108,22 @@ Taxable pay, Personal relief, Insurance relief, PAYE, Self assessed PAYE, SHA CO
 
 ## Statutory rates
 
+Payroll works out SHIF, NSSF, the housing levy and PAYE with `src/lib/statutoryCalc.ts`, using the rates in force for
+the pay month (`useStatutoryRates`, which reads `statutory_rates_on(last day of the month)`). The payroll page, the
+payslips it saves and the P10 download all use it:
+
+- **Cash pay:** gross pay less the per diem (33% of basic salary, not taxed). SHIF, NSSF and AHL are worked out on it, and it is the P10's "Total cash pay" and the NSSF return's "GROSS PAY".
+- **SHIF:** the SHIF rate, never below the SHIF minimum.
+- **NSSF:** the rate up to the upper earnings limit.
+- **Taxable pay:** cash pay + taxable non-cash benefits − NSSF − SHIF and AHL (in months they are deductible) − pension, post-retirement medical fund and mortgage interest (each up to its cap) − the PWD exemption.
+- **PAYE:** tax by the bands, less personal relief and insurance relief (15% of premiums, capped), never below 0.
+- **Deductions from pay:** pension and PRMF contributions come off net pay as payslip deductions.
+- **Missing rates:** if a month has no rate for a code payroll needs, payroll stops and says which.
+
+**Statutory rates** on the payroll page (Quick actions and the toolbar) shows every rate for the month and where it
+comes from. **Change** gives the company its own rate from a date, which ends its previous one the day before.
+
+
 `statutory_rates` holds every rate, cap and relief with `effective_from` / `effective_to`. Rows without a company are
 the defaults; payroll can add its company's own row, which wins from its date. Rates for the same code and company
 can't overlap. `statutory_rates_on(date)` returns everything in force that day as `{code: value}` (PAYE bands as a list).
