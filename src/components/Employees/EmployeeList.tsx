@@ -10,7 +10,8 @@ import {
   Building2,
   CheckSquare,
   X,
-  Save
+  Save,
+  UsersRound
 } from 'lucide-react';
 import DuplicateCheckModal from './DuplicateCheckModal';
 import BulkEditModal from './BulkEditModal';
@@ -393,6 +394,11 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
             <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
               <Button variant="secondary" onClick={() => setShowDuplicateModal(true)} icon={<Copy className="w-3.5 h-3.5" />}>
                 Duplicates
+              </Button>
+            </RoleButtonWrapper>
+            <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+              <Button variant="secondary" onClick={() => navigate('/fogs?add=1')} icon={<UsersRound className="w-3.5 h-3.5" />}>
+                Bulk add
               </Button>
             </RoleButtonWrapper>
             <RoleButtonWrapper allowedRoles={['ADMIN']}>
