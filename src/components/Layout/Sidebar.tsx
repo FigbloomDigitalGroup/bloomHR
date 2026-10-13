@@ -5,7 +5,6 @@ import {
   Target,
   Settings,
   Palette,
-  Wand2,
   Menu,
   ChevronLeft,
   ShieldAlert,
@@ -42,7 +41,6 @@ const menuGroups = [
     items: [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid, path: '/dashboard', permission: 'dashboard' },
       { id: 'calendar', label: 'Calendar', icon: CalendarDays, path: '/calendar', permission: 'dashboard' },
-      { id: 'ai-assistant', label: 'AI Assistant', icon: Wand2, path: '/ai-assistant', permission: 'ai-assistant' },
     ]
   },
   {

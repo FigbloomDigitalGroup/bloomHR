@@ -336,6 +336,11 @@ html[data-a11y-reduce-motion] *::after {
   scroll-behavior: auto !important;
 }
 
+/* a page fades in when it opens (App.tsx) */
+.page-enter { animation: page-enter .15s ease-out both; }
+@keyframes page-enter { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .page-enter { animation: none; } }
+
 /* ---------- Figbloom "Orbit" loader (components/UI/FigbloomLoader.tsx) ---------- */
 /* it takes the person's palette from Appearance: the accent (white on a dark page), the highlight colour for the sweep, and the page's text grey */
 .fb-loader { --fb-green: rgb(var(--brand)); --fb-sweep: rgb(var(--highlight)); display: flex; flex-direction: column; align-items: center; gap: 24px; }
@@ -346,9 +351,12 @@ html[data-page="dark"] .fb-loader { --fb-green: rgb(255 255 255); }
 .fb-loader__dot { animation: fb-dots 1.4s ease-in-out infinite; }
 .fb-loader__dot:nth-child(2) { animation-delay: .2s; }
 .fb-loader__dot:nth-child(3) { animation-delay: .4s; }
-.fb-arc { transform-box: view-box; transform-origin: 32px 29px; stroke-dasharray: 80 280; stroke-dashoffset: -50; animation: fb-orbit 2.2s infinite; }
-.fb-leaf { transform-box: fill-box; transform-origin: 0% 100%; animation: fb-leaf 2.2s infinite; }
-.fb-bowl { transform-box: fill-box; transform-origin: center; animation: fb-bowl 2.2s infinite; }
+.fb-arc { transform-box: view-box; transform-origin: 32px 29px; stroke-dasharray: 80 280; stroke-dashoffset: -50; animation: fb-orbit 2.2s var(--fb-phase, 0s) infinite; }
+.fb-leaf { transform-box: fill-box; transform-origin: 0% 100%; animation: fb-leaf 2.2s var(--fb-phase, 0s) infinite; }
+.fb-bowl { transform-box: fill-box; transform-origin: center; animation: fb-bowl 2.2s var(--fb-phase, 0s) infinite; }
+/* a loader that isn't following another waits a moment, so a quick load shows none */
+.fb-loader--fade-in { animation: fb-appear .25s ease-out .2s both; }
+@keyframes fb-appear { from { opacity: 0; } to { opacity: 1; } }
 @keyframes fb-orbit {
   0% { transform: rotate(0deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: var(--fb-green); animation-timing-function: cubic-bezier(.55,0,.25,1); }
   12% { transform: rotate(0deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: var(--fb-green); animation-timing-function: cubic-bezier(.6,0,.4,1); }
@@ -373,4 +381,5 @@ html[data-page="dark"] .fb-loader { --fb-green: rgb(255 255 255); }
 @keyframes fb-dots { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .fb-arc, .fb-leaf, .fb-bowl, .fb-loader__dot { animation: none; }
+  .fb-loader--fade-in { animation: none; }
 }

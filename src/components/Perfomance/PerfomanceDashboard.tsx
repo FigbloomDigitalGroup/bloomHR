@@ -13,7 +13,6 @@ import {
   BranchPerformanceTable,
 } from './components/Table';
 import Select from 'react-select';
-import ChatFloater from '../AI/AIFloatingWidget';
 import { Card, Button, TabBar, SearchInput } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
@@ -2343,7 +2342,6 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange 
           employees={filteredEmployeesByTown}
         />
       )}
-      <ChatFloater />
     </div>
   );
 };

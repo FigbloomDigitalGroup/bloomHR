@@ -2807,9 +2807,14 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
     </div>
   );
 
-  // Add these modals before the return statement:
-
-  // Add these modals before the return statement:
+  // the first load: the loader in place of the page (later refreshes keep the page on screen)
+  if (loading && leaveApplications.length === 0) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <FigbloomLoader label="Loading leave" />
+      </div>
+    );
+  }
 
 
 
@@ -3161,14 +3166,6 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
         />
       )}
 
-      {/* Global Loading Overlay */}
-      {loading && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center">
-            <FigbloomLoader label="Loading leave" size={80} />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

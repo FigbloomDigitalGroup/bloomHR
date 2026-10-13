@@ -45,7 +45,8 @@ const formatAIResponse = (content: string) => {
     .replace(/\[highlight\](.*?)\[\/highlight\]/gims, '<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 my-2">$1</div>');
 };
 
-export const AIAssistantPage = ({ selectedTown, onTownChange }: TownProps) => {
+/** `widget`: the compact chat in the bottom-right chat window (AIAssistantWidget), without the header and the cards */
+export const AIAssistantPage = ({ selectedTown, onTownChange, widget = false }: TownProps & { widget?: boolean }) => {
   const [message, setMessage] = useState('')
   const [conversation, setConversation] = useState<Array<{role: string, content: string, id: string}>>([])
   const [loading, setLoading] = useState(false)
@@ -380,8 +381,9 @@ export const AIAssistantPage = ({ selectedTown, onTownChange }: TownProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
+    <div className={widget ? 'flex h-full flex-col' : 'min-h-screen bg-background p-4 md:p-8'}>
+      <div className={widget ? 'flex min-h-0 flex-1 flex-col' : 'max-w-6xl mx-auto'}>
+        {!widget && (<>
         {/* Header */}
         <motion.header
           initial={{ opacity: 0, y: -20 }}
@@ -453,18 +455,19 @@ export const AIAssistantPage = ({ selectedTown, onTownChange }: TownProps) => {
             </div>
           </div>
         </motion.div>
+        </>)}
 
         {/* Chat Interface */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="bg-white rounded-card overflow-hidden border border-border"
+          transition={{ delay: widget ? 0 : 0.3 }}
+          className={widget ? 'flex min-h-0 flex-1 flex-col bg-white overflow-hidden' : 'bg-white rounded-card overflow-hidden border border-border'}
         >
           {/* Messages */}
           <div 
             ref={scrollRef}
-            className="h-[500px] overflow-y-auto p-6 space-y-6 custom-scrollbar"
+            className={widget ? 'min-h-0 flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar' : 'h-[500px] overflow-y-auto p-6 space-y-6 custom-scrollbar'}
           >
             <AnimatePresence>
               {conversation
@@ -534,7 +537,7 @@ export const AIAssistantPage = ({ selectedTown, onTownChange }: TownProps) => {
           </div>
 
           {/* Input Area */}
-          <div className="border-t border-gray-200 p-5 bg-gray-50">
+          <div className={widget ? 'border-t border-gray-200 p-3 bg-gray-50' : 'border-t border-gray-200 p-5 bg-gray-50'}>
             {error && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
