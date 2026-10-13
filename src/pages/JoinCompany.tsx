@@ -23,6 +23,8 @@ export default function JoinCompany() {
   const [mode, setMode] = useState<'create' | 'signin'>('create');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
+  // a new account types its password twice, so a typo can't lock them out
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [finishing, setFinishing] = useState(false);
 
@@ -71,6 +73,7 @@ export default function JoinCompany() {
       }
 
       if (password.length < 8) throw new Error('Password must be at least 8 characters.');
+      if (password !== confirmPassword) throw new Error('The passwords don’t match.');
       try {
         await companyApi.createAccountAndJoin(token, password, fullName.trim());
       } catch (err) {
@@ -161,7 +164,11 @@ export default function JoinCompany() {
           onChange={setPassword}
           autoComplete={mode === 'create' ? 'new-password' : 'current-password'}
         />
-        <AuthButton type="submit" disabled={busy || !password || (mode === 'create' && !fullName.trim())}>
+        {mode === 'create' && (
+          <Field label="Confirm password" type="password" value={confirmPassword} onChange={setConfirmPassword} autoComplete="new-password"
+            error={confirmPassword && confirmPassword !== password ? 'The passwords don’t match' : null} />
+        )}
+        <AuthButton type="submit" disabled={busy || !password || (mode === 'create' && (!fullName.trim() || password !== confirmPassword))}>
           {busy ? 'Please wait…' : mode === 'create' ? `Create account and join ${preview.company_name}` : `Sign in and join ${preview.company_name}`}
         </AuthButton>
       </form>
@@ -170,6 +177,7 @@ export default function JoinCompany() {
         onClick={() => {
           setMode(mode === 'create' ? 'signin' : 'create');
           setPassword('');
+          setConfirmPassword('');
         }}
         className={`mt-8 pt-8 border-t border-gray-100 w-full text-center ${authLinkClass}`}
       >

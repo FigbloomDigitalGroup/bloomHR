@@ -2,11 +2,14 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import ShowPasswordButton from '../components/UI/ShowPasswordButton';
 import { Check, X, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
 
 const UpdatePasswordPage = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isValidSession, setIsValidSession] = useState(false);
@@ -152,8 +155,9 @@ const UpdatePasswordPage = () => {
           {/* New Password */}
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1.5">New password</label>
+            <div className="relative">
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               placeholder="Enter new password"
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-sm transition-all bg-gray-50 focus:bg-white"
               value={password}
@@ -161,6 +165,8 @@ const UpdatePasswordPage = () => {
               onChange={(e) => { setPassword(e.target.value); validate(e.target.value); }}
               required
             />
+            <ShowPasswordButton shown={showPassword} onToggle={() => setShowPassword(!showPassword)} />
+            </div>
           </div>
 
           {/* Strength checker */}
@@ -178,8 +184,9 @@ const UpdatePasswordPage = () => {
           {/* Confirm Password */}
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1.5">Confirm password</label>
+            <div className="relative">
             <input
-              type="password"
+              type={showConfirm ? 'text' : 'password'}
               placeholder="Re-enter your new password"
               className={`w-full px-4 py-3 border rounded-xl focus:ring-2 outline-none text-sm transition-all bg-gray-50 focus:bg-white ${
                 passwordsMatch
@@ -192,6 +199,8 @@ const UpdatePasswordPage = () => {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
             />
+            <ShowPasswordButton shown={showConfirm} onToggle={() => setShowConfirm(!showConfirm)} />
+            </div>
             {confirmPassword.length > 0 && (
               <p className={`text-xs mt-1.5 flex items-center gap-1 font-medium ${passwordsMatch ? 'text-green-600' : 'text-red-500'}`}>
                 {passwordsMatch ? <Check size={12} /> : <X size={12} />}

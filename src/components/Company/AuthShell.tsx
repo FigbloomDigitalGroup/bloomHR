@@ -1,4 +1,5 @@
-import { ButtonHTMLAttributes, ReactNode } from 'react';
+import { ButtonHTMLAttributes, ReactNode, useId, useState } from 'react';
+import ShowPasswordButton from '../UI/ShowPasswordButton';
 
 // The sign-in look (split layout: brand image on the left, form on the right) shared by every page where a
 // person creates an account or joins a company, so they all feel like the login page.
@@ -89,15 +90,25 @@ interface FieldProps {
   autoComplete?: string;
   readOnly?: boolean;
   placeholder?: string;
+  /** shown under the field in red, e.g. "Passwords don't match" */
+  error?: string | null;
 }
 
 /** A labelled input styled like the sign-in form's fields. */
-export function Field({ label, type = 'text', value, onChange, autoComplete, readOnly, placeholder }: FieldProps) {
+export function Field({ label, type = 'text', value, onChange, autoComplete, readOnly, placeholder, error }: FieldProps) {
+  // a password field has an eye to show what was typed
+  const [shown, setShown] = useState(false);
+  const isPassword = type === 'password';
+  const errorId = useId();
   return (
+    <div className="space-y-1.5">
     <label className="block space-y-1.5">
       <span className="block text-xs font-bold text-gray-500 ml-1">{label}</span>
+      <span className="relative block">
       <input
-        type={type}
+        type={isPassword && shown ? 'text' : type}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? errorId : undefined}
         value={value}
         readOnly={readOnly}
         autoComplete={autoComplete}
@@ -105,9 +116,14 @@ export function Field({ label, type = 'text', value, onChange, autoComplete, rea
         onChange={(e) => onChange(e.target.value)}
         className={`block w-full px-4 py-3 border border-gray-200 rounded-lg text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 transition-all ${
           readOnly ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-gray-50 hover:border-gray-300'
-        }`}
+        } ${isPassword ? 'pr-11' : ''}`}
       />
+      {isPassword && <ShowPasswordButton shown={shown} onToggle={() => setShown(!shown)} />}
+      </span>
     </label>
+    {/* outside the label, so it is announced as a message, not read as part of the field's name */}
+    {error && <p id={errorId} role="alert" className="text-xs text-red-600 ml-1">{error}</p>}
+    </div>
   );
 }
 

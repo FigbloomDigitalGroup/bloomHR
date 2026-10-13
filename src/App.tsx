@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from './lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import toast, { Toaster } from 'react-hot-toast';
-import { CSSProperties } from 'react';
 import Sidebar from './components/Layout/Sidebar';
 import Header from './components/Layout/Header';
 import Footer from './components/Layout/Footer';
@@ -21,6 +20,7 @@ import { landingTarget, useCompanyProfile, withProfileRole } from './hooks/useCo
 import { syncThemeWithAccount } from './lib/preferences';
 import CompanyGate from './components/Company/CompanyGate';
 import AppSkeleton from './components/Layout/AppSkeleton';
+import FigbloomLoader from './components/UI/FigbloomLoader';
 import { useCompanySwitching } from './hooks/useMyCompanies';
 import { isStaleChunkError, reloadOnceForStaleChunk } from './lib/staleChunk';
 import { welcomeMessage } from './lib/welcome';
@@ -87,41 +87,7 @@ interface Branch {
 // SMS MFA for ADMIN/CHECKER logins. Off unless VITE_MFA_ENABLED=true.
 const MFA_ENABLED = import.meta.env.VITE_MFA_ENABLED === 'true';
 
-const Loader = () => {
-  const loaderStyle: CSSProperties = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 9999,
-  };
-
-  const spinnerStyle: CSSProperties = {
-    width: '50px',
-    height: '50px',
-    border: '5px solid rgba(16, 185, 129, 0.2)',
-    borderTop: '5px solid #10b981',
-    borderRadius: '50%',
-    animation: 'spin 1s linear infinite',
-  };
-
-  return (
-    <div style={loaderStyle}>
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
-      <div style={spinnerStyle}></div>
-    </div>
-  );
-};
+const Loader = () => <FigbloomLoader fullScreen />;
 
 class ErrorBoundaryClass extends React.Component<
   { children: React.ReactNode },

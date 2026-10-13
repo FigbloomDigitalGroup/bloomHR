@@ -335,3 +335,38 @@ html[data-a11y-reduce-motion] *::after {
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
+
+/* ---------- Figbloom "Orbit" loader (components/UI/FigbloomLoader.tsx) ---------- */
+.fb-loader { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+.fb-loader__text { font-size: 15px; font-weight: 300; color: #3E5A48; letter-spacing: .02em; }
+.fb-loader__dot { animation: fb-dots 1.4s ease-in-out infinite; }
+.fb-loader__dot:nth-child(2) { animation-delay: .2s; }
+.fb-loader__dot:nth-child(3) { animation-delay: .4s; }
+.fb-arc { transform-box: view-box; transform-origin: 32px 29px; stroke-dasharray: 80 280; stroke-dashoffset: -50; animation: fb-orbit 2.2s infinite; }
+.fb-leaf { transform-box: fill-box; transform-origin: 0% 100%; animation: fb-leaf 2.2s infinite; }
+.fb-bowl { transform-box: fill-box; transform-origin: center; animation: fb-bowl 2.2s infinite; }
+@keyframes fb-orbit {
+  0% { transform: rotate(0deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: #0E4F27; animation-timing-function: cubic-bezier(.55,0,.25,1); }
+  12% { transform: rotate(0deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: #0E4F27; animation-timing-function: cubic-bezier(.6,0,.4,1); }
+  45% { transform: rotate(200deg); stroke-dasharray: 190 170; stroke-dashoffset: 5; stroke: #FF8A12; animation-timing-function: cubic-bezier(.3,0,.2,1); }
+  78% { transform: rotate(360deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: #0E4F27; }
+  100% { transform: rotate(360deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: #0E4F27; }
+}
+@keyframes fb-leaf {
+  0%, 16% { transform: scale(1) rotate(0deg); opacity: 1; animation-timing-function: cubic-bezier(.5,0,.75,0); }
+  26% { transform: scale(0) rotate(-35deg); opacity: 0; }
+  62% { transform: scale(0) rotate(-35deg); opacity: 0; animation-timing-function: cubic-bezier(.2,.8,.3,1.2); }
+  72% { transform: scale(1.22) rotate(10deg); opacity: 1; animation-timing-function: ease-in-out; }
+  80% { transform: scale(.92) rotate(-5deg); opacity: 1; animation-timing-function: ease-in-out; }
+  88%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+@keyframes fb-bowl {
+  0%, 74% { transform: scale(1); }
+  80% { transform: scale(.94); }
+  88% { transform: scale(1.03); }
+  95%, 100% { transform: scale(1); }
+}
+@keyframes fb-dots { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .fb-arc, .fb-leaf, .fb-bowl, .fb-loader__dot { animation: none; }
+}
