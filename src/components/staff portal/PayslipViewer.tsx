@@ -22,6 +22,8 @@ import html2pdf from 'html2pdf.js';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { paymentMethodLabel } from '../../lib/paymentMethods';
+import DownloadP9 from '../Payroll/DownloadP9';
+import { loadMyP9 } from '../../lib/p9';
 
 // HARDCODED STATUTORY SETTINGS - Updated to match payroll dashboard
 const statutorySettings = {
@@ -968,6 +970,8 @@ const PayslipViewer = () => {
               <h2 className="text-lg font-semibold text-gray-900">Payslip History</h2>
               <p className="text-gray-600 text-xs">{filteredPayslips.length} records found</p>
             </div>
+            {/* the year's P9 tax deduction card, from approved payslips */}
+            <DownloadP9 load={loadMyP9} />
           </div>
         </div>
 
