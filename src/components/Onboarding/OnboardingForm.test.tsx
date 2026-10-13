@@ -21,7 +21,7 @@ const record = (employee: Record<string, unknown>, missing: string[] = []): Onbo
   employee: { id: 'id-1', 'Employee Number': 'E1', 'First Name': 'Amina', onboarding_status: 'invited', ...employee },
   emergency: emptyContact(),
   nextOfKin: emptyContact(),
-  missing: { employee: missing, employer: [] },
+  missing: { employee: missing, employer: [], documentsOutstanding: [] as string[] },
   history: [],
 });
 
@@ -93,5 +93,13 @@ describe('OnboardingForm', () => {
     api.loadMyOnboarding.mockResolvedValue(null);
     render(<OnboardingForm />);
     expect(await screen.findByText(/not linked to an employee record/)).toBeTruthy();
+  });
+
+  it('lists documents still to upload, and says they can be submitted later', async () => {
+    api.loadMyOnboarding.mockResolvedValue({ ...record({}), missing: { employee: [], employer: [], documentsOutstanding: ['Updated CV', 'HELB compliance certificate'] } });
+    render(<OnboardingForm />);
+    expect(await screen.findByText('Updated CV, HELB compliance certificate')).toBeTruthy();
+    expect(screen.getByText(/You can submit without them/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: /Submit to HR/ }) as HTMLButtonElement).disabled).toBe(false);
   });
 });

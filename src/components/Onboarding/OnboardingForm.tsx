@@ -207,6 +207,14 @@ export default function OnboardingForm() {
         </Card>
       )}
 
+      {record.missing.documentsOutstanding.length > 0 && (
+        <Card className="mb-4">
+          <p className="text-sm font-medium text-ink">Documents still to upload</p>
+          <p className="text-sm text-muted-foreground mt-1">{record.missing.documentsOutstanding.join(', ')}</p>
+          <p className="text-xs text-muted-foreground mt-1">You can submit without them and upload them later, below or in the Documents tab.</p>
+        </Card>
+      )}
+
       <Card className="space-y-6">
         <section className="flex items-center gap-4">
           {photo ? (

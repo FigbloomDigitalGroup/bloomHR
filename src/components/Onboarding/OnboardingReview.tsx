@@ -106,6 +106,12 @@ function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: (
                   )}
                 </div>
               )}
+              {record.missing.documentsOutstanding.length > 0 && (
+                <div className="rounded-lg bg-secondary px-3 py-2 text-sm text-ink">
+                  <span className="font-medium">Documents outstanding: </span>{record.missing.documentsOutstanding.join(', ')}
+                  <span className="block text-xs text-muted-foreground mt-0.5">They don’t stop you approving; the employee can upload them later.</span>
+                </div>
+              )}
               <OnboardingSummary record={record} />
               <section className="border-t border-border pt-4">
                 <h3 className="text-sm font-semibold text-ink mb-3">Documents and referees</h3>
@@ -174,7 +180,7 @@ function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: (
   );
 }
 
-type Filter = 'all' | OnboardingStatus;
+type Filter = 'all' | 'documents' | OnboardingStatus;
 
 export default function OnboardingReview() {
   const [rows, setRows] = useState<OverviewRow[] | null>(null);
@@ -204,7 +210,7 @@ export default function OnboardingReview() {
     const q = search.trim().toLowerCase();
     return (rows ?? []).filter(
       (r) =>
-        (filter === 'all' || r.status === filter) &&
+        (filter === 'all' || r.status === filter || (filter === 'documents' && r.documents_outstanding.length > 0)) &&
         (!q || [r.name, r.employee_number, r.payroll_number, r.job_title, r.work_email].some((v) => String(v ?? '').toLowerCase().includes(q)))
     );
   }, [rows, filter, search]);
@@ -220,7 +226,12 @@ export default function OnboardingReview() {
     load();
   };
 
-  const tabs = [{ id: 'all', label: `All (${counts.all})` }, ...ONBOARDING_STATUSES.map((s) => ({ id: s, label: `${STATUS_LABELS[s]} (${counts[s] ?? 0})` }))];
+  const withDocuments = (rows ?? []).filter((r) => r.documents_outstanding.length > 0).length;
+  const tabs = [
+    { id: 'all', label: `All (${counts.all})` },
+    ...ONBOARDING_STATUSES.map((s) => ({ id: s, label: `${STATUS_LABELS[s]} (${counts[s] ?? 0})` })),
+    { id: 'documents', label: `Documents outstanding (${withDocuments})` },
+  ];
 
   return (
     <div className="p-4 sm:p-6 space-y-4">
@@ -260,6 +271,9 @@ export default function OnboardingReview() {
                     {r.employee_part.length > 0 && r.employer_part.length > 0 && ' · '}
                     {r.employer_part.length > 0 && `HR: ${r.employer_part.join(', ')}`}
                   </p>
+                )}
+                {r.documents_outstanding.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">Documents outstanding: {r.documents_outstanding.length}</p>
                 )}
                 {r.status === 'changes_requested' && r.review_comment && (
                   <p className="text-xs text-status-danger mt-1">Sent back: “{r.review_comment}”</p>

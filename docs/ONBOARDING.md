@@ -161,7 +161,7 @@ deductible, capped pension, PRMF and mortgage interest); PAYE is the payslip's. 
 - **Who uploads:** only the employee, from Onboarding or the staff portal's Documents tab, into their own folder in the private `documents` bucket. Files can be PDF, Word or photos, up to 10 MB each.
 - **HR's view:** in the Onboarding review panel, HR opens each file, then accepts it or rejects it with a reason (the employee sees the reason and uploads again). The employee can remove a file that hasn't been accepted.
 - **What's required:** HR sets the company's required documents with **Required documents** on the Onboarding page, and can ask one employee for role-specific ones with **Also ask this employee for** in the review panel.
-- **Submitting and approving:** the employee can't submit until every required document has a file that wasn't rejected. HR can't approve until each one is accepted.
+- **Submitting and approving:** missing documents don't hold up either (`20261013400000`). Every required document without an accepted file is **documents outstanding**: the employee sees what is still to upload, and HR sees a count per employee, a **Documents outstanding** filter, and the list in the review panel, until each is uploaded and accepted. A referee is still needed to submit.
 - **Referees:** as many as the employee likes (name, organisation, position, phone or email, relationship). At least one is needed.
 - **Earlier uploads:** files uploaded on the old Documents tab became documents here, waiting for HR.
 
