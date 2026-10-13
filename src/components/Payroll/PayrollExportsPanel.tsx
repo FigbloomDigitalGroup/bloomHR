@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { saveAs } from 'file-saver';
 import { AlertTriangle, Download, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { Card } from '../UI';
@@ -6,7 +7,7 @@ import { supabase } from '../../lib/supabase';
 import { fetchAll } from '../../lib/fetchAll';
 import { getRunPayslips, type PayrollRun } from '../../lib/payrollRuns';
 import type { EmployeeRecord } from '../../lib/profileCompleteness';
-import { type ExportFile, type Rates, bankFile, lastDayOf, mpesaFile, nssfFile, p10File, shaFile, toCsv } from '../../lib/payrollExports';
+import { type ExportFile, type Rates, bankFile, equityFile, lastDayOf, mpesaFile, nssfFile, p10File, shaFile, toCsv } from '../../lib/payrollExports';
 
 // For an approved (or paid) month: download the KRA P10, SHA and NSSF returns and the M-Pesa and bank bulk-payment
 // files as CSV, each with everyone on that month's payroll, ready to upload. Before each one, who is missing what.
@@ -17,24 +18,47 @@ interface Files {
   nssf: ExportFile;
   mpesa: ExportFile;
   bank: ExportFile;
+  equity: ExportFile;
+  /** the company's Equity account salaries are paid from ('' until payroll sets it) */
+  debitAccount: string;
 }
 
-const FILES: { key: keyof Files; label: string; name: string; what: string }[] = [
+type FileKey = Exclude<keyof Files, 'debitAccount'>;
+
+const FILES: { key: FileKey; label: string; name: string; what: string }[] = [
   { key: 'p10', label: 'KRA PAYE (P10)', name: 'kra-p10', what: 'iTax P10 return' },
   { key: 'sha', label: 'SHA', name: 'sha', what: 'SHA contributions' },
   { key: 'nssf', label: 'NSSF', name: 'nssf', what: 'NSSF contributions' },
   { key: 'mpesa', label: 'M-Pesa bulk pay', name: 'bulk-pay-mpesa', what: 'staff paid by M-Pesa' },
   { key: 'bank', label: 'Bank bulk pay', name: 'bulk-pay-bank', what: 'staff paid by bank' },
+  { key: 'equity', label: 'Equity Bank (Eazzy Biz)', name: 'equity-eazzy-biz', what: 'everyone paid by bank or M-Pesa, from the company’s Equity account' },
 ];
 
+/** The company's Equity account salaries are paid from (company_payroll_settings). */
+export async function loadDebitAccount(): Promise<string> {
+  const { data, error } = await supabase.from('company_payroll_settings').select('equity_debit_account').maybeSingle();
+  if (error) throw error;
+  return String(data?.equity_debit_account ?? '');
+}
+
+export async function saveDebitAccount(account: string): Promise<void> {
+  const digits = account.replace(/[\s-]/g, '');
+  if (!/^\d{6,20}$/.test(digits)) throw new Error('An account number is 6 to 20 digits.');
+  const { error } = await supabase
+    .from('company_payroll_settings')
+    .upsert({ equity_debit_account: digits, updated_at: new Date().toISOString() }, { onConflict: 'tenant_id' });
+  if (error) throw error;
+}
+
 export async function loadExportFiles(run: PayrollRun): Promise<Files> {
-  const [payslips, employees, rates] = await Promise.all([
+  const [payslips, employees, rates, debitAccount] = await Promise.all([
     getRunPayslips(run.id),
     fetchAll((from, to) => supabase.from('employees').select('*').order('id').range(from, to)),
     supabase.rpc('statutory_rates_on', { p_day: lastDayOf(run.pay_period) }).then(({ data, error }) => {
       if (error) throw error;
       return (data ?? {}) as Rates;
     }),
+    loadDebitAccount(),
   ]);
   const ps = payslips as Record<string, unknown>[];
   const es = employees as EmployeeRecord[];
@@ -44,6 +68,8 @@ export async function loadExportFiles(run: PayrollRun): Promise<Files> {
     nssf: nssfFile(ps, es),
     mpesa: mpesaFile(ps, es, run.pay_period),
     bank: bankFile(ps, es, run.pay_period),
+    equity: equityFile(ps, es, debitAccount),
+    debitAccount,
   };
 }
 
@@ -61,15 +87,28 @@ export async function downloadP10(run: PayrollRun) {
 export default function PayrollExportsPanel({ run }: { run: PayrollRun }) {
   const [files, setFiles] = useState<Files | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const [open, setOpen] = useState<keyof Files | null>(null);
+  const [open, setOpen] = useState<FileKey | null>(null);
+  const [account, setAccount] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     setFiles(null);
     setProblem(null);
     loadExportFiles(run).then(setFiles, (err) => setProblem((err as { message?: string })?.message || 'Could not prepare the files.'));
   }, [run]);
 
-  const download = (key: keyof Files, name: string) => {
+  useEffect(load, [load]);
+
+  const saveAccount = async () => {
+    try {
+      await saveDebitAccount(account ?? '');
+      setAccount(null);
+      load();
+    } catch (err) {
+      toast.error((err as { message?: string })?.message || 'The account was not saved.');
+    }
+  };
+
+  const download = (key: FileKey, name: string) => {
     if (!files) return;
     saveCsv(files[key], name, run.pay_period);
   };
@@ -107,12 +146,31 @@ export default function PayrollExportsPanel({ run }: { run: PayrollRun }) {
                       {f.problems.length} missing details
                     </button>
                   )}
-                  <button type="button" disabled={f.rows.length === 0} onClick={() => download(key, name)}
+                  <button type="button" disabled={f.rows.length === 0 || (key === 'equity' && !files.debitAccount)} onClick={() => download(key, name)}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-ink hover:bg-secondary disabled:opacity-50">
                     <Download className="w-3 h-3" />
                     Download CSV
                   </button>
                 </div>
+                {key === 'equity' && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                    {files.debitAccount && account === null ? (
+                      <>
+                        <span className="text-muted-foreground">Paid from Equity account {files.debitAccount}</span>
+                        <button type="button" className="text-brand font-semibold" onClick={() => setAccount(files.debitAccount)}>Change</button>
+                      </>
+                    ) : (
+                      <>
+                        <label htmlFor="equity-debit-account" className="text-ink">The company’s Equity account salaries are paid from</label>
+                        <input id="equity-debit-account" inputMode="numeric" value={account ?? ''} onChange={(e) => setAccount(e.target.value)}
+                          placeholder="Account number" className="w-44 rounded-lg border border-border px-2 py-1" />
+                        <button type="button" disabled={!account?.trim()} onClick={() => void saveAccount()}
+                          className="rounded-lg bg-brand px-2.5 py-1 font-semibold text-white disabled:opacity-50">Save</button>
+                        {files.debitAccount && <button type="button" className="text-muted-foreground" onClick={() => setAccount(null)}>Cancel</button>}
+                      </>
+                    )}
+                  </div>
+                )}
                 {open === key && (
                   <ul className="mt-2 border-t border-border pt-2 space-y-0.5 text-xs text-ink">
                     {f.problems.map((p) => (

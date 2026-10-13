@@ -5,12 +5,19 @@ const data = vi.hoisted(() => ({
   payslips: [] as Record<string, unknown>[],
   employees: [] as Record<string, unknown>[],
   rateDays: [] as unknown[],
+  debit: '' as string,
 }));
 vi.mock('../../lib/payrollRuns', () => ({ getRunPayslips: () => Promise.resolve(data.payslips) }));
 vi.mock('../../lib/fetchAll', () => ({ fetchAll: () => Promise.resolve(data.employees) }));
 vi.mock('../../lib/supabase', () => ({
   supabase: {
-    from: () => ({ select: () => ({ order: () => ({ range: () => undefined }) }) }),
+    from: () => ({
+      select: () => ({ order: () => ({ range: () => undefined }), maybeSingle: () => Promise.resolve({ data: { equity_debit_account: data.debit }, error: null }) }),
+      upsert: (row: { equity_debit_account: string }) => {
+        data.debit = row.equity_debit_account;
+        return Promise.resolve({ error: null });
+      },
+    }),
     rpc: (_fn: string, args: { p_day: string }) => {
       data.rateDays.push(args.p_day);
       return Promise.resolve({ data: { insurance_relief_rate: 0.15 }, error: null });
@@ -44,6 +51,8 @@ beforeEach(() => {
       Bank: 'KCB', account_number_name: 'Juma Otieno', 'Account Number': '1100' },
   ];
   data.rateDays = [];
+  data.debit = '';
+  data.debit = '';
   saved.files = [];
 });
 afterEach(() => cleanup());
@@ -52,7 +61,7 @@ describe('PayrollExportsPanel', () => {
   it('offers each file with its row count, using the rates of the month’s last day', async () => {
     render(<PayrollExportsPanel run={run} />);
     expect(await screen.findByText('KRA PAYE (P10)')).toBeTruthy();
-    expect(screen.getAllByText(/2 rows/)).toHaveLength(3); // P10, SHA, NSSF
+    expect(screen.getAllByText(/2 rows/)).toHaveLength(4); // P10, SHA, NSSF, Equity (M-Pesa and bank together)
     expect(screen.getAllByText(/1 row,/)).toHaveLength(2); // M-Pesa, bank
     expect(data.rateDays).toEqual(['2026-10-31']);
   });
@@ -80,5 +89,17 @@ describe('PayrollExportsPanel', () => {
     expect(header.startsWith('Employee pin,Employee name,')).toBe(true);
     expect(first.startsWith('A012345678Z,Amina Wanjiru,')).toBe(true);
     expect(problems.map((p) => p.employeeNumber)).toEqual(['E2']); // Juma has no KRA PIN yet
+  });
+
+  it('asks for the company’s Equity account before the Eazzy Biz file can be downloaded', async () => {
+    render(<PayrollExportsPanel run={run} />);
+    await screen.findByText('Equity Bank (Eazzy Biz)');
+    const download = screen.getAllByRole('button', { name: /Download CSV/ })[5] as HTMLButtonElement;
+    expect(download.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(/Equity account salaries are paid from/), { target: { value: '0123 456 789' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Paid from Equity account 0123456789')).toBeTruthy();
+    fireEvent.click(screen.getAllByRole('button', { name: /Download CSV/ })[5]);
+    expect(saved.files.map((f) => f.name)).toEqual(['equity-eazzy-biz-2026-10.csv']);
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BANK_HEADERS, MPESA_HEADERS, NSSF_HEADERS, P10_HEADERS, SHA_HEADERS,
-  bankFile, lastDayOf, mpesaFile, mpesaPhone, nssfFile, p10Figures, p10File, shaFile, toCsv,
+  bankFile, equityFile, localBankCode, lastDayOf, mpesaFile, mpesaPhone, nssfFile, p10Figures, p10File, shaFile, toCsv,
 } from './payrollExports';
 
 const rates = {
@@ -150,5 +150,51 @@ describe('helpers', () => {
     expect(lastDayOf('2026-02')).toBe('2026-02-28');
     expect(lastDayOf('2024-02')).toBe('2024-02-29');
     expect(lastDayOf('2026-12')).toBe('2026-12-31');
+  });
+});
+
+describe('Equity Bank Eazzy Biz file', () => {
+  const coop = { ...amina, 'Employee Number': 'E3', Bank: 'Co-operative Bank', bank_code: '11', branch_code: '002', account_number_name: 'Amina N Wanjiru' };
+  const equity = { ...amina, 'Employee Number': 'E4', 'First Name': 'Esther', 'Last Name': 'Nalenyi', Bank: 'Equity Bank', bank_code: '', branch_code: '', account_number_name: '' , 'Account Number': '0180291234567' };
+  const slips = [payslip('E2', { net_pay: 30000 }), payslip('E3', { net_pay: 1250000.5 }), payslip('E4', { net_pay: 20000 }), payslip('E1', { net_pay: 0 })];
+
+  it('has the template’s header row, trailing empty column included', () => {
+    expect(toCsv(equityFile([], [], '0123456789').headers, []).trim()).toBe(
+      'Transaction Type Code,Debit Account No.,Beneficiary Account No.,Beneficiary Name,Beneficiary Bank Swift Code / Local Bank Code,' +
+      'Purpose Code,Transaction Currency,Payment Amount,Payment Type,Service Provider,Beneficiary Mobile No,');
+  });
+
+  it('M-Pesa as MW, Equity accounts as BT, other banks as LBT, all from the company’s account; nothing to pay is left out', () => {
+    const file = equityFile(slips, [amina, juma, coop, equity], '0123456789');
+    expect(file.rows).toEqual([
+      ['MW', '0123456789', '', 'Juma Otieno', '', 'SAL', 'KES', '30,000.00', '', 'MPESA', '0722000111', ''],
+      ['LBT', '0123456789', '1234567890', 'Amina N Wanjiru', '11002', 'SAL', 'KES', '1,250,000.50', 'RTGS', '', '', ''],
+      ['BT', '0123456789', '0180291234567', 'Esther Njeri Nalenyi', '68000', 'SAL', 'KES', '20,000.00', '', '', '', ''],
+    ]);
+    // the M-Pesa row as it appears in the file (first row after the header)
+    expect(toCsv(file.headers, file.rows).split('\r\n')[1]).toBe('MW,0123456789,,Juma Otieno,,SAL,KES,"30,000.00",,MPESA,0722000111,');
+  });
+
+  it('pays smaller amounts to other banks by EFT', () => {
+    expect(equityFile([payslip('E3', { net_pay: 50000 })], [coop], '0123456789').rows[0][8]).toBe('EFT');
+  });
+
+  it('leaves out staff paid in cash', () => {
+    expect(equityFile([payslip('E1', { payment_method: 'Cash' })], [amina], '1').rows).toEqual([]);
+  });
+
+  it('flags another bank without its 5-digit code, a missing account, or a missing M-Pesa number', () => {
+    const file = equityFile(
+      [payslip('E3'), payslip('E2')],
+      [{ ...coop, branch_code: '' }, { ...juma, 'Mobile Number': '' }],
+      '0123456789'
+    );
+    expect(file.problems.map((p) => p.missing)).toEqual([['Bank and branch code (5 digits)'], ['M-Pesa number']]);
+  });
+
+  it('localBankCode joins the 2-digit bank and 3-digit branch, or takes a full 5-digit branch code', () => {
+    expect(localBankCode({ bank_code: '11', branch_code: '002' })).toBe('11002');
+    expect(localBankCode({ bank_code: '', branch_code: '68000' })).toBe('68000');
+    expect(localBankCode({ bank_code: '1', branch_code: '2' })).toBe('');
   });
 });
