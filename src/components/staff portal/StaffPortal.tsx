@@ -49,7 +49,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import StatusPill from '../UI/StatusPill';
-import { fetchStaffHRNotifications } from '../../hooks/useHRNotifications';
+import { fetchStaffHRNotifications, markStaffNotificationRead } from '../../hooks/useHRNotifications';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import TrainingModule from './Training';
@@ -88,6 +88,14 @@ interface NotificationItem {
   timestamp: Date;
   isRead: boolean;
 }
+
+/** hr_notifications that are for HR, not the employee */
+const HR_ONLY_NOTIFICATIONS = ['contract_expiring', 'probation_expiring', 'leave_recommended'];
+
+/** Marks an hr_notifications item ("hr-<id>") read, so it stays cleared; warnings are not stored as read. */
+const persistRead = (id: string) => {
+  if (id.startsWith('hr-')) void markStaffNotificationRead(Number(id.slice(3)));
+};
 
 interface NotificationState {
   items: NotificationItem[];
@@ -2728,12 +2736,14 @@ const StaffPortal = () => {
         createNotificationItem(warning)
       );
 
+      // leave decisions, and what HR did with their onboarding (documents, review, photo; FIG-776); not the
+      // reminders meant for HR (contracts and probation ending, leave recommended)
       const hrNotifs = await fetchStaffHRNotifications(empNumber);
       const leaveItems = hrNotifs
-        .filter(n => n.notification_type === 'leave_approved' || n.notification_type === 'leave_rejected' || n.notification_type === 'leave_year_end_reminder')
+        .filter(n => !HR_ONLY_NOTIFICATIONS.includes(n.notification_type))
         .map(n => ({
           id: `hr-${n.id}`,
-          type: 'leave',
+          type: n.notification_type.startsWith('leave_') ? 'leave' : 'onboarding',
           title: n.title,
           message: n.message,
           timestamp: new Date(n.created_at),
@@ -2784,8 +2794,24 @@ const StaffPortal = () => {
       )
       .subscribe();
 
+    // leave decisions and onboarding updates, as HR makes them
+    const hrChannel = supabase
+      .channel('staff_hr_notifications')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'hr_notifications', filter: `employee_number=eq.${employeeNumber}` },
+        (payload) => {
+          const n = payload.new as { notification_type?: string; title?: string };
+          if (!n.notification_type || HR_ONLY_NOTIFICATIONS.includes(n.notification_type)) return;
+          void fetchNotifications(employeeNumber);
+          toast(n.title || 'New notification');
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(warningChannel);
+      supabase.removeChannel(hrChannel);
     };
   }, [employeeNumber]);
 
@@ -2883,6 +2909,7 @@ const StaffPortal = () => {
 
   // Handle notification click
   const handleNotificationClick = (notification: NotificationItem) => {
+    persistRead(notification.id);
     // Mark as read
     setNotifications(prev => ({
       ...prev,
@@ -2896,6 +2923,7 @@ const StaffPortal = () => {
 
   // Handle clear all notifications
   const handleClearAll = () => {
+    notifications.items.forEach(item => persistRead(item.id));
     setNotifications(prev => ({
       ...prev,
       items: []
@@ -2906,6 +2934,7 @@ const StaffPortal = () => {
 
   // Handle remove single notification
   const handleRemoveNotification = (notificationId: string) => {
+    persistRead(notificationId);
     setNotifications(prev => ({
       ...prev,
       items: prev.items.filter(item => item.id !== notificationId)
