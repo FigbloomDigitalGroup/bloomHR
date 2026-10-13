@@ -157,29 +157,44 @@ describe('referees', () => {
   });
 });
 
-describe('submitting and approving', () => {
-  it('the employee can’t submit while a required document is missing or rejected', async () => {
-    const error = await asUser(db, U.STAFF, () => run(`select submit_onboarding()`));
-    expect(error).toMatch(/Still missing: /);
-    expect(error).toMatch(/Document: Updated CV/);
-    expect(error).not.toMatch(/Passport-size photograph/); // accepted above
-    expect(error).not.toMatch(/Referee/);
-  });
+describe('submitting and approving (documents can follow later: 20261013400000)', () => {
+  const outstanding = async (as: string, employee?: string) =>
+    (await asUser(db, as, () => rows<{ documents_outstanding: string[] }>(`select documents_outstanding from onboarding_missing_for(${employee ? `'${employee}'` : ''})`)))[0].documents_outstanding;
 
-  it('submits once every required document has a file, and HR can’t approve until each is accepted', async () => {
-    for (const code of CORE.filter((c) => c !== 'passport_photo')) await asUser(db, U.STAFF, () => run(upload(code)));
+  it('missing documents don’t hold up submitting; they are listed as outstanding', async () => {
     expect(await asUser(db, U.STAFF, () => run(`select submit_onboarding()`))).toBe('');
-    const me = await idOf('E-ME');
-    expect(await asUser(db, U.HR, () => run(`select review_onboarding('${me}', 'approve')`))).toMatch(/Review document: Updated CV/);
-    for (const { id } of await rows<{ id: string }>(`select id from employee_documents where status = 'pending'`)) {
-      await asUser(db, U.HR, () => run(`select review_employee_document('${id}', 'accept')`));
-    }
-    expect(await asUser(db, U.HR, () => run(`select review_onboarding('${me}', 'approve')`))).toBe('');
+    const left = await outstanding(U.STAFF);
+    expect(left).toEqual(expect.arrayContaining(['Proof of identity', 'Updated CV', 'Academic certificates']));
+    expect(left).not.toContain('Passport-size photograph'); // accepted above
   });
 
-  it('the overview tells HR what is left to review', async () => {
-    const [them] = await asUser(db, U.HR, () => rows<{ employee_part: string[] }>(`select employee_part from onboarding_overview() where employee_number = 'E-THEM'`));
-    expect(them.employee_part).toEqual(expect.arrayContaining(['Document: Updated CV', 'Referee', 'Emergency contact']));
+  it('say where each one is: waiting for HR, or rejected', async () => {
+    await asUser(db, U.STAFF, () => run(upload('cv')));
+    expect(await outstanding(U.STAFF)).toContain('Updated CV (waiting for HR)');
+    const [{ id }] = await rows<{ id: string }>(`select id from employee_documents where code = 'cv' and status = 'pending'`);
+    await asUser(db, U.HR, () => run(`select review_employee_document('${id}', 'reject', 'Blurry')`));
+    expect(await outstanding(U.STAFF)).toContain('Updated CV (rejected, upload again)');
+  });
+
+  it('HR approves (so they are paid) with documents still outstanding, which stay listed', async () => {
+    const me = await idOf('E-ME');
+    expect(await asUser(db, U.HR, () => run(`select review_onboarding('${me}', 'approve')`))).toBe('');
+    expect((await outstanding(U.HR, me)).length).toBeGreaterThan(0);
+  });
+
+  it('once accepted, a document is no longer outstanding', async () => {
+    await asUser(db, U.STAFF, () => run(upload('id_document')));
+    const [{ id }] = await rows<{ id: string }>(`select id from employee_documents where code = 'id_document' and status = 'pending'`);
+    await asUser(db, U.HR, () => run(`select review_employee_document('${id}', 'accept')`));
+    expect(await outstanding(U.STAFF)).not.toContain('Proof of identity');
+  });
+
+  it('the overview tells HR what each employee still needs, and their documents outstanding', async () => {
+    const [them] = await asUser(db, U.HR, () => rows<{ employee_part: string[]; documents_outstanding: string[] }>(
+      `select employee_part, documents_outstanding from onboarding_overview() where employee_number = 'E-THEM'`));
+    expect(them.employee_part).toEqual(expect.arrayContaining(['Referee', 'Emergency contact']));
+    expect(them.employee_part.some((m) => m.startsWith('Document'))).toBe(false);
+    expect(them.documents_outstanding).toContain('Updated CV');
   });
 
   it('every file and referee change is in the audit log for HR', async () => {

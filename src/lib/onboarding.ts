@@ -70,6 +70,8 @@ const contactFilled = (c: Contact) => Boolean(c.full_name && c.phone_number);
 export interface MissingParts {
   employee: string[];
   employer: string[];
+  /** required documents not yet uploaded and accepted: they don't hold up submitting or approving */
+  documentsOutstanding: string[];
 }
 
 export interface ReviewEvent {
@@ -110,12 +112,14 @@ async function loadParts(employee: EmployeeRecord, employeeId: string | null): P
       .order('created_at', { ascending: false }),
   ]);
   for (const r of [emergency, nextOfKin, missing, history]) if (r.error) fail(r.error, 'Could not load the onboarding details.');
-  const parts = (Array.isArray(missing.data) ? missing.data[0] : missing.data) as { employee_part?: string[]; employer_part?: string[] } | null;
+  const parts = (Array.isArray(missing.data) ? missing.data[0] : missing.data) as
+    | { employee_part?: string[]; employer_part?: string[]; documents_outstanding?: string[] }
+    | null;
   return {
     employee,
     emergency: toContact(emergency.data),
     nextOfKin: toContact(nextOfKin.data),
-    missing: { employee: parts?.employee_part ?? [], employer: parts?.employer_part ?? [] },
+    missing: { employee: parts?.employee_part ?? [], employer: parts?.employer_part ?? [], documentsOutstanding: parts?.documents_outstanding ?? [] },
     history: (history.data ?? []) as ReviewEvent[],
   };
 }
@@ -191,6 +195,7 @@ export interface OverviewRow {
   review_comment: string | null;
   employee_part: string[];
   employer_part: string[];
+  documents_outstanding: string[];
 }
 
 export async function loadOnboardingOverview(): Promise<OverviewRow[]> {
