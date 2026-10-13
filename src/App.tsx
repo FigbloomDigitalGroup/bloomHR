@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { Routes, Route, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from './lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import toast, { Toaster } from 'react-hot-toast';
@@ -60,6 +59,7 @@ const RolePermissions = lazy(() => import('./components/Settings/RolePermissions
 const EmailPortal = lazy(() => import('./components/Email/EmailPortal'));
 const HRLifecycleDashboard = lazy(() => import('./components/HR/HRLifecycleDashboard'));
 const CompanyCalendar = lazy(() => import('./components/Calendar/CompanyCalendar'));
+const AIAssistantWidget = lazy(() => import('./components/AI/AIAssistantWidget'));
 const AIAssistantPage = lazy(() => import('./components/AI/AIAssistantPage').then((m) => ({ default: m.AIAssistantPage })));
 const MicrofinanceTodoList = lazy(() => import('./components/Task Manager/TaskManager').then((m) => ({ default: m.MicrofinanceTodoList })));
 const SMSCenter = lazy(() => import('./components/SMS/Sms').then((m) => ({ default: m.SMSCenter })));
@@ -88,6 +88,12 @@ interface Branch {
 const MFA_ENABLED = import.meta.env.VITE_MFA_ENABLED === 'true';
 
 const Loader = () => <FigbloomLoader fullScreen />;
+// while a page's code arrives: in the content area, where the page's own loader then carries on
+const PageLoader = () => (
+  <div className="flex min-h-[60vh] items-center justify-center">
+    <FigbloomLoader label="Loading" />
+  </div>
+);
 
 class ErrorBoundaryClass extends React.Component<
   { children: React.ReactNode },
@@ -996,16 +1002,9 @@ function App() {
                           allTowns={branches}
                         />
                         <main className={location.pathname === '/teams' ? 'flex-1 min-h-0 overflow-hidden flex flex-col' : 'flex-1 overflow-x-hidden p-4'}>
-                          <AnimatePresence mode="wait">
-                            <motion.div
-                              key={location.pathname}
-                              initial={{ opacity: 0, x: 20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              exit={{ opacity: 0, x: -20 }}
-                              transition={{ duration: 0.3 }}
-                              className="w-full h-full"
-                            >
-                              <Suspense fallback={<Loader />}>
+                          {/* the new page fades in; no exit animation, so there's no blank moment between pages */}
+                            <div key={location.pathname} className="page-enter w-full h-full">
+                              <Suspense fallback={<PageLoader />}>
                               <Routes>
                                 <Route
                                   path="/"
@@ -1169,9 +1168,11 @@ function App() {
                                 <Route path="*" element={<NotFound />} />
                               </Routes>
                               </Suspense>
-                            </motion.div>
-                          </AnimatePresence>
+                            </div>
                         </main>
+                        <Suspense fallback={null}>
+                          <AIAssistantWidget selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />
+                        </Suspense>
                         {location.pathname !== '/teams' && <Footer />}
                       </div>
                     </div>
