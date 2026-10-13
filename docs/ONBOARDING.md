@@ -183,3 +183,18 @@ under the Data Protection Act, so:
 - **Signing:** the employee ticks one checkbox per policy ("I have read and agree to …"). `accept_policy()` records it as their signature: who, which version, a SHA-256 fingerprint of that version's wording, when, and their browser. An acceptance can't be changed or removed, and nobody can accept for someone else.
 - **Onboarding:** every required policy in use must be accepted before the employee can submit.
 - **HR's view:** the review panel shows each policy with the date it was accepted. The printed form lists them too.
+
+### Equity Bank (Eazzy Biz) bulk payment
+
+The payroll page's downloads include finance's Equity Bank **Eazzy Biz** file: everyone paid by bank or M-Pesa that
+month, debited from the company's Equity account (saved once in the panel, `company_payroll_settings`).
+
+| Paid to | Transaction Type Code | Beneficiary Account / Bank Code | Purpose | Payment Type | Service Provider / Mobile |
+|---|---|---|---|---|---|
+| An Equity account | `BT` | account number, `68000` | `SAL` | | |
+| Another Kenyan bank | `LBT` | account number, 5-digit bank+branch code (`bank_code` + `branch_code`) | `SAL` | `EFT`, or `RTGS` from KSh 1,000,000 | |
+| M-Pesa | `MW` | | `SAL` | | `MPESA`, `07XXXXXXXX` |
+
+Amounts are net pay, written like `20,000.00`, currency `KES`. The beneficiary name is the bank account name, or the
+employee's name. Cash-paid staff and nothing-to-pay rows are left out. The header row is the template's own,
+including its trailing empty column.

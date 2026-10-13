@@ -241,3 +241,67 @@ export function returnsReadiness(employees: EmployeeRecord[]): ReturnsReadiness 
   const slips = employees.map((e) => ({ employee_id: e['Employee Number'] }));
   return { p10: p10File(slips, employees, {}).problems, sha: shaFile(slips, employees).problems, nssf: nssfFile(slips, employees).problems };
 }
+
+// ---------------------------------------------------------------------------------------------
+// Equity Bank Eazzy Biz bulk payment (finance's "EAZZY BIZ TEMPLATE"): one file for every way staff are paid,
+// debited from the company's Equity account. BT = to an Equity account, LBT = to another Kenyan bank, MW = to M-Pesa.
+// ---------------------------------------------------------------------------------------------
+/** Spelled as in the Eazzy Biz template, including its trailing empty column. */
+export const EQUITY_HEADERS = [
+  'Transaction Type Code', 'Debit Account No.', 'Beneficiary Account No.', 'Beneficiary Name',
+  'Beneficiary Bank Swift Code / Local Bank Code', 'Purpose Code', 'Transaction Currency', 'Payment Amount', 'Payment Type',
+  'Service Provider', 'Beneficiary Mobile No', '',
+] as const;
+
+/** Equity Bank's own local bank code, used for transfers between Equity accounts. */
+export const EQUITY_BANK_CODE = '68000';
+/** Kenyan EFT payments go up to KSh 999,999.99; larger ones go by RTGS. */
+const EFT_LIMIT = 1_000_000;
+
+const isEquity = (e: EmployeeRecord) => /equity/i.test(text(e['Bank'])) || /^68/.test(text(e['bank_code']));
+
+/** The 5-digit local bank code (2-digit bank + 3-digit branch), or '' when the record doesn't have both. */
+export const localBankCode = (e: EmployeeRecord) => {
+  const bank = text(e['bank_code']).replace(/\D/g, '');
+  const branch = text(e['branch_code']).replace(/\D/g, '');
+  if (/^\d{5}$/.test(branch)) return branch;
+  if (/^\d{2}$/.test(bank) && /^\d{3}$/.test(branch)) return bank + branch;
+  return '';
+};
+
+/** A Kenyan mobile number as Eazzy Biz shows it (07XXXXXXXX), or '' when it is not one. */
+const localPhone = (value: unknown) => {
+  const intl = mpesaPhone(value);
+  return intl ? `0${intl.slice(3)}` : '';
+};
+
+/** "20,000.00", as in the template. */
+const eazzyAmount = (value: number) => value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+export function equityFile(payslips: Payslip[], employees: EmployeeRecord[], debitAccount: string): ExportFile {
+  const ls = lines(payslips, employees).filter((l) => kindOf(l) !== 'cash' && num(l.payslip.net_pay) > 0);
+  const debit = text(debitAccount);
+  return {
+    headers: EQUITY_HEADERS,
+    rows: ls.map(({ payslip, employee: e }) => {
+      const pay = num(payslip.net_pay);
+      const name = fullName(e) || text(payslip.employee_name);
+      if (kindOf({ payslip, employee: e }) === 'mobile') {
+        return ['MW', debit, '', name, '', 'SAL', 'KES', eazzyAmount(pay), '', 'MPESA', localPhone(e['Mobile Number']), ''];
+      }
+      const accountName = text(e['account_number_name']) || name;
+      if (isEquity(e)) {
+        return ['BT', debit, text(e['Account Number']), accountName, EQUITY_BANK_CODE, 'SAL', 'KES', eazzyAmount(pay), '', '', '', ''];
+      }
+      return ['LBT', debit, text(e['Account Number']), accountName, localBankCode(e), 'SAL', 'KES', eazzyAmount(pay), pay >= EFT_LIMIT ? 'RTGS' : 'EFT', '', '', ''];
+    }),
+    problems: problemsOf(ls, (e) => {
+      const l = ls.find((x) => x.employee === e);
+      if (l && kindOf(l) === 'mobile') return need([['M-Pesa number', Boolean(localPhone(e['Mobile Number']))]]);
+      return need([
+        ['Account number', Boolean(text(e['Account Number']))],
+        ['Bank and branch code (5 digits)', isEquity(e) || Boolean(localBankCode(e))],
+      ]);
+    }),
+  };
+}
