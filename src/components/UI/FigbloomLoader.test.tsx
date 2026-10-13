@@ -22,7 +22,7 @@ describe('FigbloomLoader', () => {
   });
 
   it('fades in when nothing was loading, and carries straight on from a loader that just went', () => {
-    let t = 1_000_000; // long after the earlier tests' loaders
+    const t = 1_000_000; // long after the earlier tests' loaders (and the next one comes at the same moment)
     vi.spyOn(performance, 'now').mockImplementation(() => t);
     const first = render(<FigbloomLoader label="Opening the page" />);
     expect(first.getByRole('status').className).toMatch(/fb-loader--fade-in/);
