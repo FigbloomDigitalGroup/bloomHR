@@ -50,6 +50,7 @@ import {
 import toast from 'react-hot-toast';
 import StatusPill from '../UI/StatusPill';
 import { fetchStaffHRNotifications, markStaffNotificationRead } from '../../hooks/useHRNotifications';
+import EmailNotificationsToggle from './EmailNotificationsToggle';
 import { supabase } from '../../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import TrainingModule from './Training';
@@ -305,6 +306,7 @@ function NotificationSidebar({
                 <X className="w-5 h-5 text-gray-400" />
               </button>
             </div>
+            <EmailNotificationsToggle />
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {notifications.length === 0 ? (
