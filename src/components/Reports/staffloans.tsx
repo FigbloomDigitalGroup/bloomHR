@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 import { TownProps } from '../../types/supabase';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -1232,7 +1233,7 @@ const StaffLoansReport: React.FC<BaseReportProps> = ({
         <div className="bg-white rounded-lg border border-gray-300 shadow-sm overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 text-brand animate-spin" />
+              <FigbloomLoader label="Loading the report" />
             </div>
           ) : (
             renderLoansReportData(paginatedEmployeeData)

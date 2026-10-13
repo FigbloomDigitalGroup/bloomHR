@@ -8,6 +8,7 @@ import { readEmployeeRows } from '../../lib/employeeSheet';
 import { normaliseWorkEmail, sendInvitations, summariseInvites, workEmailProblem, type InviteOutcome } from '../../lib/employeeInvite';
 import { inviteToOnboard, startOnboardingByEmail } from '../../lib/onboarding';
 import toast from 'react-hot-toast';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 type Employee = {
   "Account Number": string | null
@@ -982,8 +983,7 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
-        <p className="mt-4 text-gray-600">Loading employee data...</p>
+        <FigbloomLoader label="Loading employee data" />
       </div>
     );
   }

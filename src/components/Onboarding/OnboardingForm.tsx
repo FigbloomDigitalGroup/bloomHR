@@ -23,6 +23,7 @@ import { IDENTITY_TYPES, RESIDENCY_OPTIONS, fieldProblem } from '../../lib/onboa
 import type { EmployeeRecord } from '../../lib/profileCompleteness';
 import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
 import { supabase } from '../../lib/supabase';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // The employee's part of onboarding (staff portal): personal, identity and statutory, tax claims, bank, emergency
 // contact and next of kin. They save as they go and submit to HR when it is complete.
@@ -121,7 +122,7 @@ export default function OnboardingForm() {
   if (record === undefined) {
     return (
       <div className="flex justify-center py-16">
-        <Loader2 className="h-6 w-6 animate-spin text-brand" aria-label="Loading" />
+        <FigbloomLoader label="Loading your form" />
       </div>
     );
   }

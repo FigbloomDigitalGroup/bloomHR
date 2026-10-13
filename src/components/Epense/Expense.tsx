@@ -23,6 +23,7 @@ import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 import { PageHeader, Card, Button, StatusPill, EmptyState, SearchInput } from '../UI';
 import type { StatusTone } from '../UI';
 import { TownProps } from '../../types/supabase';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 interface Expense {
   id: string;
@@ -944,10 +945,7 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader className="w-8 h-8 animate-spin mx-auto text-gray-900" />
-          <p className="mt-2 text-gray-600">Loading expenses...</p>
-        </div>
+        <FigbloomLoader label="Loading expenses" />
       </div>
     );
   }

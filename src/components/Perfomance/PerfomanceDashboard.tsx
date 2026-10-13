@@ -15,6 +15,7 @@ import {
 import Select from 'react-select';
 import ChatFloater from '../AI/AIFloatingWidget';
 import { Card, Button, TabBar, SearchInput } from '../UI';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 type EmployeePerformance = {
   id: string;
@@ -1453,7 +1454,7 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange 
   if (loading) {
     return (
       <div className="p-4 flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <FigbloomLoader label="Loading performance" />
       </div>
     );
   }

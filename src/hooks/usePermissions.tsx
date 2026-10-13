@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { queryKeys } from '../lib/queryClient';
 import { fetchTrustedRole } from '../lib/trustedRole';
+import FigbloomLoader from '../components/UI/FigbloomLoader';
 
 interface UsePermissionsReturn {
     permissions: string[];
@@ -117,10 +118,7 @@ export function withPermission<P extends object>(
         if (loading) {
             return (
                 <div className="flex items-center justify-center h-96">
-                    <div className="text-center">
-                        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                        <p className="text-sm text-gray-600">Checking permissions...</p>
-                    </div>
+                    <FigbloomLoader label="Checking permissions" />
                 </div>
             );
         }

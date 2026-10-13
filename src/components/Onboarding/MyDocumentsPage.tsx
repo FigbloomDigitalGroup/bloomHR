@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
 import { Card } from '../UI';
 import DocumentsSection from './DocumentsSection';
 import RefereesSection from './RefereesSection';
 import { errorMessage, loadMyOnboarding } from '../../lib/onboarding';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // The staff portal's Documents tab: the same documents and referees as the Onboarding tab, on their own.
 
@@ -19,7 +19,7 @@ export default function MyDocumentsPage() {
   }, []);
 
   if (problem) return <p className="p-6 text-sm text-status-danger">{problem}</p>;
-  if (employeeId === undefined) return <Loader2 className="h-6 w-6 animate-spin text-brand m-8" aria-label="Loading" />;
+  if (employeeId === undefined) return <div className="flex justify-center py-16"><FigbloomLoader label="Loading your documents" /></div>;
   if (employeeId === null) {
     return (
       <Card className="m-6 text-sm text-ink">

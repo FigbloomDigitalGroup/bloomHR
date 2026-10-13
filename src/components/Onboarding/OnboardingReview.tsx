@@ -23,6 +23,7 @@ import {
   statusTone,
 } from '../../lib/onboarding';
 import { ONBOARDING_STATUSES, type OnboardingStatus } from '../../lib/onboardingValidation';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // HR's onboarding page: where every employee is, what each still needs, inviting them, and reviewing what they
 // submitted (approve, or send back with a comment). Only approved employees are paid.
@@ -252,7 +253,7 @@ export default function OnboardingReview() {
       </div>
 
       {rows === null ? (
-        <Loader2 className="h-6 w-6 animate-spin text-brand mx-auto" aria-label="Loading" />
+        <div className="flex justify-center py-8"><FigbloomLoader label="Loading onboarding" /></div>
       ) : shown.length === 0 ? (
         <EmptyState icon={<ClipboardCheck className="h-6 w-6" />} title="Nobody here" description="No employees match this filter." />
       ) : (

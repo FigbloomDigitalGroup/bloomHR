@@ -9,6 +9,7 @@ import GetStarted from './GetStarted';
 import { TodaysBirthdayWishes } from '../Celebrations/BirthdayWishes';
 import { findBirthdays } from '../../lib/birthdays';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import FigbloomLoader from "../UI/FigbloomLoader";
 
 const LEAVE_STATUS_COLORS: Record<string, string> = {
   Pending: '#F26A1B',
@@ -561,10 +562,7 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
 
         {isLoading ? (
           <div className="flex justify-center items-center h-64">
-            <div className="relative w-16 h-16">
-              <div className="absolute top-0 left-0 w-full h-full border-4 border-primary/20 rounded-full opacity-20"></div>
-              <div className="absolute top-0 left-0 w-full h-full border-4 border-primary rounded-full border-t-transparent animate-spin"></div>
-            </div>
+            <FigbloomLoader label="Loading the dashboard" />
           </div>
         ) : (
           /* Main Content */

@@ -11,6 +11,7 @@ import { usePermissions } from "../../hooks/usePermissions";
 import { isOnline, useOnlinePeople } from "./lib/presence";
 import { ChatPeopleContext } from "./lib/chatPeople";
 import type { Employee, User, Channel, DirectMessage, Message } from "../chat/types/types";
+import FigbloomLoader from "../UI/FigbloomLoader";
 
 /** `onMessagesRead` lets the staff portal refresh its unread badge when a conversation is opened. */
 export function ChatLayout({ onMessagesRead }: { onMessagesRead?: () => void } = {}) {
@@ -576,10 +577,7 @@ const handleDMCreate = async (userId: string) => {
 function LoadingScreen({ message }: { message: string }) {
   return (
     <div className="flex h-full w-full bg-background items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand mx-auto"></div>
-        <p className="mt-4 text-gray-600">{message}</p>
-      </div>
+      <FigbloomLoader label={message.replace(/\.+$/, "")} />
     </div>
   );
 }
