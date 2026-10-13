@@ -19,6 +19,7 @@ import AdvanceApplicationManager from './staffSetting';
 import SearchableDropdown from '../UI/SearchableDropdown';
 import TransactionStatusChecker from './TransactionStatusChecker';
 import { fetchTrustedRole } from '../../lib/trustedRole';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 
 // SMS Service Functions
@@ -2526,8 +2527,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
 
       {isLoading ? (
         <div className="flex justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
-          <span className="ml-2 text-sm text-gray-600">Loading M-Pesa callbacks...</span>
+          <FigbloomLoader label="Loading M-Pesa callbacks" size={64} />
         </div>
       ) : filteredCallbacks.length === 0 ? (
         <div className="text-center py-8 text-gray-500">
@@ -5658,7 +5658,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
             <div className="bg-white border border-border rounded-card overflow-hidden">
               {isLoading ? (
                 <div className="flex items-center justify-center py-16">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-brand" />
+                  <FigbloomLoader label="Loading applications" size={64} />
                 </div>
               ) : filteredApplications.length === 0 ? (
                 <div className="text-center py-16">

@@ -19,13 +19,13 @@ import {
     ChevronRight,
     Calendar as CalendarIcon,
     Plus,
-    Loader2,
     Search,
     Download,
-    X as CloseIcon
+    X as CloseIcon,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 interface LeaveSchedulerProps {
     selectedTown?: string;
@@ -340,8 +340,7 @@ const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSche
 
                 {loading ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm z-50">
-                        <Loader2 className="w-10 h-10 animate-spin text-emerald-600 mb-2" />
-                        <p className="text-sm text-gray-500 font-medium animate-pulse">Syncing Schedule...</p>
+                        <FigbloomLoader label="Syncing the schedule" size={80} />
                     </div>
                 ) : (
                     <>

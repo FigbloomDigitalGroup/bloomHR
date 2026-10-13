@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 type EmploymentType = 'Attachment' | 'Probation' | 'Contract' | 'Permanent';
 type DurationUnit = 'months' | 'weeks';
@@ -559,7 +560,7 @@ export default function EmploymentStatusModule({ onRefresh, initialSearch = '' }
             {/* List */}
             {loading ? (
                 <div className="flex items-center justify-center h-40">
-                    <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
+                    <FigbloomLoader label="Loading" size={64} />
                 </div>
             ) : filtered.length === 0 ? (
                 <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">

@@ -14,6 +14,7 @@ import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import { Card, Button, SearchInput, StatusPill, EmptyState } from '../UI';
 import type { StatusTone } from '../UI';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 interface IncidentReport {
     id: string;
@@ -288,7 +289,7 @@ const IncidentReportsManagement = () => {
     if (isLoading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand"></div>
+                <FigbloomLoader label="Loading incident reports" />
             </div>
         );
     }

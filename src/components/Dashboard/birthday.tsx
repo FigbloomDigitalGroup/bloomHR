@@ -4,6 +4,7 @@ import { Cake, Send, Phone, Calendar, CheckCircle, Loader, RefreshCw } from 'luc
 import { supabase } from '../../lib/supabase';
 import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
 import toast from 'react-hot-toast';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // Phone formatting function (same as your SMS system)
 const formatPhoneNumberForSMS = (phone: string): string => {
@@ -366,7 +367,7 @@ export default function BirthdaySMS() {
         
         {isLoading ? (
           <div className="flex justify-center py-8">
-            <Loader className="w-6 h-6 animate-spin text-slate-400" />
+            <FigbloomLoader label="Loading birthdays" size={56} />
           </div>
         ) : todayBirthdays.length === 0 ? (
           <div className="text-center py-8 border border-dashed border-slate-300 rounded-lg">

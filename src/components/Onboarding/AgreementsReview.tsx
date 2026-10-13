@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
 import { type PolicyItem, loadPolicyChecklist } from '../../lib/companyPolicies';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // HR's view of which company policies an employee has accepted, and when (in the Onboarding review panel).
 
@@ -13,7 +13,7 @@ export default function AgreementsReview({ employeeId }: { employeeId: string })
     loadPolicyChecklist(employeeId).then(setItems, () => setItems([]));
   }, [employeeId]);
 
-  if (!items) return <Loader2 className="h-5 w-5 animate-spin text-brand" aria-label="Loading policies" />;
+  if (!items) return <FigbloomLoader label="Loading policies" size={48} />;
   if (items.length === 0) return <p className="text-sm text-muted-foreground">No company policies yet. Add them with Policies on the Onboarding page.</p>;
   return (
     <ul className="space-y-1 text-sm">

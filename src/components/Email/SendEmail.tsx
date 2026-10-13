@@ -7,6 +7,7 @@ import { Loader2, Send, Filter, Users, X, Check, Paperclip } from 'lucide-react'
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import SearchableDropdown from '../UI/SearchableDropdown';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 
 interface Employee {
@@ -223,7 +224,7 @@ export default function SendEmail() {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <Loader2 className="w-8 h-8 animate-spin text-green-500" />
+        <FigbloomLoader label="Loading" />
       </div>
     );
   }
