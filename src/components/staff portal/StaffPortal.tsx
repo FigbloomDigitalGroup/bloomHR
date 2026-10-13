@@ -2696,21 +2696,7 @@ const StaffPortal = () => {
     }
   };
 
-  // Create notification item from warning data
-  const createNotificationItem = (warning: any): NotificationItem => {
-    return {
-      id: `warning-${warning.id}`,
-      type: 'warning',
-      title: `Warning: ${warning.type}`,
-      message: warning.message,
-      timestamp: new Date(warning.created_at || new Date()),
-      isRead: false
-    };
-  };
-
-  // Fetch notifications from the warnings table, merged with leave
-  // approve/reject decisions (FIG-574) from the shared hr_notifications
-  // system (previously only read by the admin bell in Header.tsx).
+  // Fetch the bell's notifications from the shared hr_notifications.
   //
   // Takes the employee number as a parameter rather than reading the
   // `employeeNumber` state directly: the only call site invokes this
@@ -2724,33 +2710,21 @@ const StaffPortal = () => {
     if (!empNumber) return;
 
     try {
-      const { data: warnings, error } = await supabase
-        .from('warnings')
-        .select('*')
-        .eq('employee_id', empNumber)
-        .order('issued_at', { ascending: false });
-
-      if (error) throw error;
-
-      const warningItems = (warnings || []).map(warning =>
-        createNotificationItem(warning)
-      );
-
-      // leave decisions, and what HR did with their onboarding (documents, review, photo; FIG-776); not the
-      // reminders meant for HR (contracts and probation ending, leave recommended)
+      // everything HR, managers and payroll did that concerns them (database triggers write these, warnings
+      // included; FIG-776); not the reminders meant for HR (contracts and probation ending, leave recommended)
       const hrNotifs = await fetchStaffHRNotifications(empNumber);
       const leaveItems = hrNotifs
         .filter(n => !HR_ONLY_NOTIFICATIONS.includes(n.notification_type))
         .map(n => ({
           id: `hr-${n.id}`,
-          type: n.notification_type.startsWith('leave_') ? 'leave' : 'onboarding',
+          type: n.notification_type.startsWith('leave_') ? 'leave' : n.notification_type === 'warning_issued' ? 'warning' : 'update',
           title: n.title,
           message: n.message,
           timestamp: new Date(n.created_at),
           isRead: false
         }));
 
-      const notificationItems = [...warningItems, ...leaveItems].sort(
+      const notificationItems = leaveItems.sort(
         (a, b) => b.timestamp.getTime() - a.timestamp.getTime()
       );
 
@@ -2768,33 +2742,10 @@ const StaffPortal = () => {
     }
   };
 
-  // Setup real-time subscription for warnings
+  // new notifications as they are written (hr_notifications is in the realtime publication)
   useEffect(() => {
     if (!employeeNumber) return;
 
-    const warningChannel = supabase
-      .channel('warnings_notifications')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'warnings',
-          filter: `employee_id=eq.${employeeNumber}`
-        },
-        (payload) => {
-          const newNotification = createNotificationItem(payload.new);
-          setNotifications(prev => ({
-            items: [newNotification, ...prev.items],
-            lastUpdated: new Date()
-          }));
-          setShowNotificationDot(true);
-          toast.success('New warning notification received');
-        }
-      )
-      .subscribe();
-
-    // leave decisions and onboarding updates, as HR makes them
     const hrChannel = supabase
       .channel('staff_hr_notifications')
       .on(
@@ -2810,7 +2761,6 @@ const StaffPortal = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(warningChannel);
       supabase.removeChannel(hrChannel);
     };
   }, [employeeNumber]);

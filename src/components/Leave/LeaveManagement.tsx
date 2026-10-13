@@ -86,6 +86,8 @@ type LeaveApplication = {
   recstatus: 'recommended' | 'not_recommended' | null;
   time_added: string;
   recommendation_notes?: string;
+  /** HR's note when approving or rejecting (the employee's own reason stays in Reason) */
+  notes?: string;
 };
 
 type EmployeeLeaveBalance = {
@@ -455,6 +457,13 @@ const LeaveApplicationDetails = ({ application, onClose }: { application: LeaveA
               <p className="text-xs text-gray-500">Reason</p>
               <p className="font-medium text-sm whitespace-pre-line">{application.Reason}</p>
             </div>
+
+            {application.notes && (
+              <div>
+                <p className="text-xs text-gray-500">Decision Notes</p>
+                <p className="font-medium text-sm whitespace-pre-line">{application.notes}</p>
+              </div>
+            )}
 
             {application.recommendation_notes && (
               <div>
@@ -1659,13 +1668,14 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
       let localUpdateData: Partial<LeaveApplication> = {};
 
       if (status === 'approved' || status === 'rejected') {
+        // HR's note goes in "notes": "reason" is the employee's own reason for the leave
         dbUpdateData = {
           "status": status,
-          "reason": notes
+          "notes": notes
         };
         localUpdateData = {
           "Status": status,
-          "Reason": notes
+          "notes": notes
         };
       } else if (status === 'recommended' || status === 'not_recommended') {
         dbUpdateData = {
@@ -2063,7 +2073,8 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
             "Status": (app.status || 'pending').toLowerCase() as 'pending' | 'approved' | 'rejected',
             "recstatus": app.recstatus || null,
             "time_added": app.time_added,
-            "recommendation_notes": app.recommendation_notes || undefined
+            "recommendation_notes": app.recommendation_notes || undefined,
+            "notes": app.notes || undefined
           };
         });
 
