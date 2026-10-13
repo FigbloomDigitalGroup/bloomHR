@@ -72,6 +72,7 @@ describe('JoinCompany', () => {
     await screen.findByText('Join Favor Farm');
     fireEvent.change(screen.getByLabelText('Your full name'), { target: { value: 'Jane Doe' } });
     fireEvent.change(screen.getByLabelText('Choose a password'), { target: { value: 'a-good-password' } });
+    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'a-good-password' } });
     fireEvent.click(screen.getByRole('button', { name: /Create account and join Favor Farm/ }));
 
     await waitFor(() => expect(mocks.createAccountAndJoin).toHaveBeenCalledWith('tok-123', 'a-good-password', 'Jane Doe'));
@@ -85,6 +86,7 @@ describe('JoinCompany', () => {
     await screen.findByText('Join Favor Farm');
     fireEvent.change(screen.getByLabelText('Your full name'), { target: { value: 'Jane Doe' } });
     fireEvent.change(screen.getByLabelText('Choose a password'), { target: { value: 'whatever-123' } });
+    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'whatever-123' } });
     fireEvent.click(screen.getByRole('button', { name: /Create account and join/ }));
 
     expect(await screen.findByRole('button', { name: /Sign in and join Favor Farm/ })).toBeTruthy();
@@ -116,6 +118,7 @@ describe('JoinCompany', () => {
     await screen.findByText('Join Favor Farm');
     fireEvent.change(screen.getByLabelText('Your full name'), { target: { value: 'Jane' } });
     fireEvent.change(screen.getByLabelText('Choose a password'), { target: { value: 'short' } });
+    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'short' } });
     fireEvent.click(screen.getByRole('button', { name: /Create account and join/ }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Password must be at least 8 characters.'));
     expect(mocks.createAccountAndJoin).not.toHaveBeenCalled();
@@ -141,5 +144,28 @@ describe('JoinCompany', () => {
     expect(await screen.findByText(/this invitation was sent to/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Sign out and use jane@gmail.com/ }));
     expect(mocks.signOut).toHaveBeenCalled();
+  });
+
+  it('asks for the password twice, and won’t create the account until they match', async () => {
+    open();
+    await screen.findByText('Join Favor Farm');
+    fireEvent.change(screen.getByLabelText('Your full name'), { target: { value: 'Jane Doe' } });
+    fireEvent.change(screen.getByLabelText('Choose a password'), { target: { value: 'a-good-password' } });
+    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'a-good-passwort' } });
+    expect(screen.getByRole('alert').textContent).toMatch(/don’t match/);
+    expect((screen.getByRole('button', { name: /Create account and join/ }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'a-good-password' } });
+    expect((screen.getByRole('button', { name: /Create account and join/ }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('shows what was typed with the eye, and hides it again', async () => {
+    open();
+    await screen.findByText('Join Favor Farm');
+    const field = screen.getByLabelText('Choose a password') as HTMLInputElement;
+    expect(field.type).toBe('password');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Show password' })[0]);
+    expect(field.type).toBe('text');
+    fireEvent.click(screen.getByRole('button', { name: 'Hide password' }));
+    expect(field.type).toBe('password');
   });
 });

@@ -14,6 +14,9 @@ export default function CreateCompany() {
   const [companyName, setCompanyName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  // typed twice when signing up, so a typo can't lock them out
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const mismatch = confirmPassword.length > 0 && confirmPassword !== password;
   const [busy, setBusy] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
 
@@ -50,6 +53,7 @@ export default function CreateCompany() {
         return;
       }
       if (password.length < 8) throw new Error('Password must be at least 8 characters.');
+      if (password !== confirmPassword) throw new Error('The passwords don’t match.');
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
@@ -93,9 +97,11 @@ export default function CreateCompany() {
           <>
             <Field label="Your email" type="email" value={email} onChange={setEmail} autoComplete="email" />
             <Field label="Password" type="password" value={password} onChange={setPassword} autoComplete="new-password" />
+            <Field label="Confirm password" type="password" value={confirmPassword} onChange={setConfirmPassword} autoComplete="new-password"
+              error={mismatch ? 'The passwords don’t match' : null} />
           </>
         )}
-        <AuthButton type="submit" disabled={busy || sessionEmail === undefined || !companyName.trim() || (sessionEmail === null && (!email || !password))}>
+        <AuthButton type="submit" disabled={busy || sessionEmail === undefined || !companyName.trim() || (sessionEmail === null && (!email || !password || password !== confirmPassword))}>
           {busy ? 'Creating…' : 'Create company'}
         </AuthButton>
       </form>
