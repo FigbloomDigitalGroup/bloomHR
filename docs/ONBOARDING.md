@@ -198,3 +198,12 @@ month, debited from the company's Equity account (saved once in the panel, `comp
 Amounts are net pay, written like `20,000.00`, currency `KES`. The beneficiary name is the bank account name, or the
 employee's name. Cash-paid staff and nothing-to-pay rows are left out. The header row is the template's own,
 including its trailing empty column.
+
+### Banks and branches
+
+Bank and branch are picked from the Kenya Bankers Association's list of banks and branches with their clearing codes
+(`banks`, `bank_branches`; migration `20261013200000_bank_branch_codes.sql`). The pickers on the Onboarding form and
+on HR's add and edit pages fill in "Bank" and "Bank Branch" with the official names, and `bank_code` (2 digits) and
+`branch_code` (3 digits) with their codes. The Equity Eazzy Biz file joins the two into the 5-digit local bank code
+for other banks. When the list was added, existing records whose typed bank name clearly named a bank (KCB, Equity,
+Co-op, Absa/Barclays…) got its code, and the branch code where the branch name matched.

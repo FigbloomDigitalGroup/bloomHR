@@ -8,6 +8,7 @@ import { describeSaveError, isValidPhone, summarizeErrors } from '../../lib/form
 import { NOT_SAVED_NO_ACCESS, requireUpdatedRows } from '../../lib/requireUpdated';
 import { removeEmployeePhoto } from '../../lib/onboarding';
 import EmployerPayFields from '../Onboarding/EmployerPayFields';
+import BankBranchFields from '../Onboarding/BankBranchFields';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import { User, Briefcase, CreditCard, Phone, MapPin } from 'lucide-react';
@@ -1237,11 +1238,9 @@ const EditEmployeePage = () => {
                   icon={CreditCard}
                 />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                  <FormField
-                    label="Bank Name"
-                    name="Bank"
-                    value={employee['Bank'] || ''}
-                    onChange={handleInputChange}
+                  <BankBranchFields
+                    values={employee as Record<string, unknown>}
+                    onChange={(changes) => setEmployee(prev => ({ ...prev, ...changes }))}
                     disabled={!isEditMode}
                   />
                   <FormField
@@ -1255,13 +1254,6 @@ const EditEmployeePage = () => {
                     label="Account Name"
                     name="account_number_name"
                     value={employee.account_number_name || ''}
-                    onChange={handleInputChange}
-                    disabled={!isEditMode}
-                  />
-                  <FormField
-                    label="Bank Branch"
-                    name="Bank Branch"
-                    value={employee['Bank Branch'] || ''}
                     onChange={handleInputChange}
                     disabled={!isEditMode}
                   />

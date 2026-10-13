@@ -9,6 +9,7 @@ import { isValidPhone, summarizeErrors } from '../../lib/formValidation';
 import { normaliseWorkEmail } from '../../lib/employeeInvite';
 import { inviteToOnboard } from '../../lib/onboarding';
 import EmployerPayFields from '../Onboarding/EmployerPayFields';
+import BankBranchFields from '../Onboarding/BankBranchFields';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import SearchableDropdown from '../UI/SearchableDropdown';
@@ -1134,11 +1135,9 @@ const AddEmployeePage = () => {
                     icon={CreditCard}
                   />
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-                    <FormField
-                      label="Bank"
-                      name="Bank"
-                      value={newEmployee['Bank'] || ''}
-                      onChange={handleInputChange}
+                    <BankBranchFields
+                      values={newEmployee as Record<string, unknown>}
+                      onChange={(changes) => setNewEmployee(prev => ({ ...prev, ...changes }))}
                     />
                     <FormField
                       label="Account Number"
@@ -1150,12 +1149,6 @@ const AddEmployeePage = () => {
                       label="Account Name"
                       name="account_number_name"
                       value={newEmployee.account_number_name || ''}
-                      onChange={handleInputChange}
-                    />
-                    <FormField
-                      label="Branch Name"
-                      name="Bank Branch"
-                      value={newEmployee['Bank Branch'] || ''}
                       onChange={handleInputChange}
                     />
                     <FormField
