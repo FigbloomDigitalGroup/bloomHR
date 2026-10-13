@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import EmailDashboard from '../components/Email/EmailDashboard';
 import { useStaffSignupLogic } from '../hooks/useStaffSignupLogic';
+import FigbloomLoader from '../components/UI/FigbloomLoader';
 
 export default function StaffSignupRequests() {
   const {
@@ -71,8 +72,7 @@ export default function StaffSignupRequests() {
   if (loading && requests.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
-        <Loader2 className="w-8 h-8 text-brand animate-spin mb-4" />
-        <p className="text-gray-500 font-medium text-sm">Loading requests...</p>
+        <FigbloomLoader label="Loading requests" />
       </div>
     );
   }

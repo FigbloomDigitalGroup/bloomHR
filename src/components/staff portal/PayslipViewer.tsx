@@ -22,6 +22,7 @@ import html2pdf from 'html2pdf.js';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { paymentMethodLabel } from '../../lib/paymentMethods';
+import FigbloomLoader from '../UI/FigbloomLoader';
 import DownloadP9 from '../Payroll/DownloadP9';
 import { loadMyP9 } from '../../lib/p9';
 
@@ -834,7 +835,7 @@ const PayslipViewer = () => {
   if (isLoading) {
     return (
       <div className="p-8 flex justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-brand"></div>
+        <FigbloomLoader label="Loading your payslips" />
       </div>
     );
   }

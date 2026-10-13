@@ -26,6 +26,7 @@ import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import { Card, Button, SearchInput, StatusPill, EmptyState } from '../UI';
 import type { StatusTone } from '../UI';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // Role definitions
 const ROLES = {
@@ -954,7 +955,7 @@ export default function UserRolesSettings() {
 
         {loading ? (
           <Card className="flex items-center justify-center !p-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand"></div>
+            <FigbloomLoader label="Loading users" />
           </Card>
         ) : (
           <>

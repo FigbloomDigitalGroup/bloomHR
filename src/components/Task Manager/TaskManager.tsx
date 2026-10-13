@@ -9,6 +9,7 @@ import {
   List, Grid, ChevronLeft, ChevronRight, Eye, Lock, Unlock, FileText, MapPin, BarChart3,
   Download, Search, Play, Pause
 } from 'lucide-react';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 // Simple Auth Hook
 const useAuth = () => {
@@ -1499,7 +1500,7 @@ export function MicrofinanceTodoList() {
   if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand"></div>
+        <FigbloomLoader label="Loading tasks" />
       </div>
     );
   }

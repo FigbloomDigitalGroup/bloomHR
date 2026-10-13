@@ -23,6 +23,7 @@ import {
   Brain,
   Zap
 } from 'lucide-react';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 export default function WarningModule() {
   const [employees, setEmployees] = useState<any[]>([]);
@@ -554,10 +555,7 @@ Make sure to incorporate the severity level (${severity}) and be specific about 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-10 h-10 text-brand animate-spin" />
-          <p className="m-0 text-xs text-muted-foreground font-medium">Loading warnings...</p>
-        </div>
+        <FigbloomLoader label="Loading warnings" />
       </div>
     );
   }

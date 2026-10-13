@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { NOT_SAVED_NOT_LINKED, requireUpdatedRows, saveFailureMessage } from '../../lib/requireUpdated';
 import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
+import FigbloomLoader from '../UI/FigbloomLoader';
 
 const Profile = () => {
   const [employeeData, setEmployeeData] = useState<any>(null);
@@ -130,7 +131,7 @@ const Profile = () => {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <FigbloomLoader label="Loading your profile" />
       </div>
     );
   }

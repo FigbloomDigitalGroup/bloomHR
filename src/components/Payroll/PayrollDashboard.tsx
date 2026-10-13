@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import EmployeePicker from '../UI/EmployeePicker';
+import FigbloomLoader from '../UI/FigbloomLoader';
 import {
   DollarSign,
   Calculator,
@@ -3430,14 +3431,7 @@ This can't be undone: the payslips stay locked for good.`,
   if (isLoading || settingsLoading) {
     return (
       <div className="p-4 bg-gray-50 min-h-screen max-w-screen-2xl mx-auto flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-gray-600">
-            {settingsLoading
-              ? "Loading statutory rates..."
-              : "Loading employee data..."}
-          </p>
-        </div>
+        <FigbloomLoader label={settingsLoading ? "Loading statutory rates" : "Loading employee data"} />
       </div>
     );
   }
