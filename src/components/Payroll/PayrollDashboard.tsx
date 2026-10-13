@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import EmployeePicker from '../UI/EmployeePicker';
+import FigbloomLoader from '../UI/FigbloomLoader';
 import {
   DollarSign,
   Calculator,
@@ -69,10 +70,10 @@ import { employeesMissingDetails } from "../../lib/missingPayrollDetails";
 import { isPaidByMpesa, paymentMethodLabel } from "../../lib/paymentMethods";
 import { fetchAll } from "../../lib/fetchAll";
 import { isPayrollReady } from "../../lib/onboardingValidation";
+import { downloadP9Pdf, loadEmployerPin, loadP9For, saveEmployerPin } from "../../lib/p9";
 import { useNavigate } from "react-router-dom";
 import { deductionsForPeriod, loadDeductionSetup, payslipDeductionLines, totalOf } from "../../lib/voluntaryDeductions";
 import BulkSalaryHistoryUpload from "./BulkSalaryHistoryUpload";
-import FigbloomLoader from "../UI/FigbloomLoader";
 
 // SMS Service Configuration for SMS Leopard
 const SMS_LEOPARD_CONFIG = {
@@ -1214,7 +1215,6 @@ const P9FormGenerator = ({
   isOpen,
   onClose,
   records,
-  companyInfo,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -1224,205 +1224,40 @@ const P9FormGenerator = ({
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [taxYear, setTaxYear] = useState(new Date().getFullYear().toString());
   const [isGenerating, setIsGenerating] = useState(false);
+  const [employerPin, setEmployerPin] = useState<string | null>(null);
+  const [pinDraft, setPinDraft] = useState("");
 
+  useEffect(() => {
+    if (!isOpen) return;
+    loadEmployerPin().then((pin) => { setEmployerPin(pin); setPinDraft(pin); }, () => setEmployerPin(""));
+  }, [isOpen]);
+
+  const savePin = async () => {
+    try {
+      setEmployerPin(await saveEmployerPin(pinDraft));
+      toast.success("Employer KRA PIN saved");
+    } catch (error: any) {
+      toast.error(error.message || "The PIN was not saved");
+    }
+  };
+
+  // the year's P9 from the employee's approved payslips, worked out as payroll and the P10 are (lib/p9)
   const generateP9Form = async (employeeData: any) => {
     setIsGenerating(true);
     try {
-      const employeeRecords = records.filter(
-        (r: any) => r.employee_id === employeeData.employee_id,
-      );
-
-      const annualTotals = {
-        basicSalary:
-          employeeRecords.reduce((sum: number, r: any) => sum + r.basic_salary, 0) * 12,
-        benefits:
-          employeeRecords.reduce(
-            (sum: number, r: any) =>
-              sum +
-              r.house_allowance +
-              r.transport_allowance +
-              r.medical_allowance +
-              r.other_allowances,
-            0,
-          ) * 12,
-        grossPay: employeeRecords.reduce((sum: number, r: any) => sum + r.gross_pay, 0) * 12,
-        paye: employeeRecords.reduce((sum: number, r: any) => sum + r.paye_tax, 0) * 12,
-        nhif:
-          employeeRecords.reduce((sum: number, r: any) => sum + r.nhif_deduction, 0) * 12,
-        nssf:
-          employeeRecords.reduce((sum: number, r: any) => sum + r.nssf_deduction, 0) * 12,
-        housingLevy:
-          employeeRecords.reduce((sum: number, r: any) => sum + r.housing_levy, 0) * 12,
-        netPay: employeeRecords.reduce((sum: number, r: any) => sum + r.net_pay, 0) * 12,
-      };
-
-      const p9Content = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>P9 Form - ${employeeData.employee_name} - ${taxYear}</title>
-          <style>
-            body { font-family: 'Avenir Next', sans-serif; margin: 20px; font-size: 12px; }
-            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 20px; }
-            .company-logo { max-height: 60px; margin-bottom: 10px; }
-            .form-title { font-size: 18px; font-weight: bold; margin: 20px 0; }
-            .section { margin-bottom: 25px; }
-            .section-title { background-color: #f0f0f0; padding: 8px; font-weight: bold; border: 1px solid #000; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th, td { border: 1px solid #000; padding: 8px; text-align: left; }
-            th { background-color: #f5f5f5; font-weight: bold; }
-            .number { text-align: right; }
-            .total-row { background-color: #e8f4f8; font-weight: bold; }
-            .signature-section { margin-top: 50px; display: flex; justify-content: space-between; }
-            .signature-box { width: 200px; text-align: center; }
-            .signature-line { border-top: 2px solid #000; margin-top: 40px; padding-top: 5px; }
-            .form-info { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-            .info-box { padding: 10px; border: 1px solid #ccc; background-color: #f9f9f9; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            ${companyInfo?.image_url ? `<img src="${companyInfo.image_url}" alt="Company Logo" class="company-logo">` : ""}
-            <h1>${companyInfo?.company_name || "Company Name"}</h1>
-            <p>${companyInfo?.company_tagline || ""}</p>
-            <div class="form-title">INCOME TAX DEDUCTION CARD - P9A</div>
-            <div>Year: ${taxYear}</div>
-          </div>
-
-          <div class="form-info">
-            <div class="info-box">
-              Employer Details:<br>
-              Name: ${companyInfo?.company_name || "Company Name"}<br>
-              PIN: _________________<br>
-              Employer Code: _________
-            </div>
-            <div class="info-box">
-              Employee Details:<br>
-              Name: ${employeeData.employee_name}<br>
-              PIN: _________________<br>
-              Employee No: ${employeeData.employee_id}<br>
-              Department: ${employeeData.department}
-            </div>
-          </div>
-
-          <div class="section">
-            <div class="section-title">MONTHLY BREAKDOWN</div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Month</th>
-                  <th>Basic Salary</th>
-                  <th>Benefits</th>
-                  <th>Gross Pay</th>
-                  <th>PAYE</th>
-                  <th>SHIF</th>
-                  <th>NSSF</th>
-                  <th>Housing Levy</th>
-                  <th>Net Pay</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${Array.from({ length: 12 }, (_, i) => {
-        const monthNames = [
-          "January",
-          "February",
-          "March",
-          "April",
-          "May",
-          "June",
-          "July",
-          "August",
-          "September",
-          "October",
-          "November",
-          "December",
-        ];
-        const monthData = employeeRecords[0] || employeeData;
-        return `
-                    <tr>
-                      <td>${monthNames[i]}</td>
-                      <td class="number">${monthData.basic_salary.toLocaleString()}</td>
-                      <td class="number">${(monthData.house_allowance + monthData.transport_allowance + monthData.medical_allowance).toLocaleString()}</td>
-                      <td class="number">${monthData.gross_pay.toLocaleString()}</td>
-                      <td class="number">${Math.round(monthData.paye_tax).toLocaleString()}</td>
-                      <td class="number">${monthData.nhif_deduction.toLocaleString()}</td>
-                      <td class="number">${monthData.nssf_deduction.toLocaleString()}</td>
-                      <td class="number">${monthData.housing_levy.toLocaleString()}</td>
-                      <td class="number">${Math.round(monthData.net_pay).toLocaleString()}</td>
-                    </tr>
-                  `;
-      }).join("")}
-                <tr class="total-row">
-                  <td>TOTAL</td>
-                  <td class="number">${annualTotals.basicSalary.toLocaleString()}</td>
-                  <td class="number">${annualTotals.benefits.toLocaleString()}</td>
-                  <td class="number">${annualTotals.grossPay.toLocaleString()}</td>
-                  <td class="number">${Math.round(annualTotals.paye).toLocaleString()}</td>
-                  <td class="number">${annualTotals.nhif.toLocaleString()}</td>
-                  <td class="number">${annualTotals.nssf.toLocaleString()}</td>
-                  <td class="number">${annualTotals.housingLevy.toLocaleString()}</td>
-                  <td class="number">${Math.round(annualTotals.netPay).toLocaleString()}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="section">
-            <div class="section-title">ANNUAL SUMMARY</div>
-            <table style="width: 60%;">
-              <tr>
-                <td>Total Gross Pay</td>
-                <td class="number" style="font-weight:500;">KSh ${annualTotals.grossPay.toLocaleString()}</td>
-              </tr>
-              <tr>
-                <td>Total PAYE Tax</td>
-                <td class="number">KSh ${Math.round(annualTotals.paye).toLocaleString()}</td>
-              </tr>
-              <tr>
-                <td>Total SHIF</td>
-                <td class="number">KSh ${annualTotals.nhif.toLocaleString()}</td>
-              </tr>
-              <tr>
-                <td>Total NSSF</td>
-                <td class="number">KSh ${annualTotals.nssf.toLocaleString()}</td>
-              </tr>
-              <tr>
-                <td>Total Housing Levy</td>
-                <td class="number">KSh ${annualTotals.housingLevy.toLocaleString()}</td>
-              </tr>
-            </table>
-          </div>
-
-          <div class="signature-section">
-            <div class="signature-box">
-              <div class="signature-line">Employee Signature</div>
-              <div>Date: _______________</div>
-            </div>
-            <div class="signature-box">
-              <div class="signature-line">Employer Signature</div>
-              <div>Date: _______________</div>
-            </div>
-          </div>
-
-          <div style="text-align: center; margin-top: 30px; font-size: 10px; color: #666;">
-            Generated on ${new Date().toLocaleDateString()} by ${companyInfo?.company_name || "Payroll System"}
-          </div>
-        </body>
-        </html>
-      `;
-
-      const opt = {
-        margin: 0.5,
-        filename: `P9_${employeeData.employee_id}_${taxYear}.pdf`,
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
-      };
-
-      html2pdf().from(p9Content).set(opt).save();
-      toast.success("P9 Form generated successfully!");
+      const { data: employee, error } = await supabase
+        .from("employees").select("*").eq("Employee Number", employeeData.employee_id).maybeSingle();
+      if (error) throw error;
+      if (!employee) throw new Error("Employee not found");
+      const p9 = await loadP9For(employee, Number(taxYear));
+      if (p9.rows.every((r) => r.values.every((v) => v === 0))) {
+        toast.error(`No approved payslips for ${taxYear}`);
+        return;
+      }
+      downloadP9Pdf(p9);
+      toast.success("P9 downloaded");
     } catch (error: any) {
-      toast.error(`P10 form generation failed: ${error.message}`);
+      toast.error(`The P9 could not be made: ${error.message}`);
     } finally {
       setIsGenerating(false);
     }
@@ -1444,12 +1279,24 @@ const P9FormGenerator = ({
               Tax Year
             </label>
             <SearchableDropdown
-              options={["2024", "2023", "2022"]}
+              options={[0, 1, 2].map((n) => String(new Date().getFullYear() - n))}
               value={taxYear}
               onChange={setTaxYear}
               placeholder="Select Year"
               icon={Calendar}
             />
+          </div>
+
+          <div>
+            <label htmlFor="employer-kra-pin" className="block text-xs font-medium text-gray-700 mb-1">
+              Employer KRA PIN (printed on every P9)
+            </label>
+            <div className="flex gap-2">
+              <input id="employer-kra-pin" value={pinDraft} onChange={(e) => setPinDraft(e.target.value.toUpperCase())}
+                placeholder="P051234567X" className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs" />
+              <button type="button" onClick={() => void savePin()} disabled={employerPin === null || pinDraft.trim() === employerPin}
+                className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md disabled:opacity-50">Save</button>
+            </div>
           </div>
 
           <div>
