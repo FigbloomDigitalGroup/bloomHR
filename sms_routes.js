@@ -27,6 +27,7 @@ const CELCOM_TIMEOUT_MS = 15000;
 const PURPOSES = {
   "sms-center": { modules: ["sms"] },
   "salary-advance": { modules: ["salaryadmin"] },
+  payroll: { modules: ["payroll"] },
   birthday: { modules: ["sms", "hr-lifecycle"] },
   mfa: { modules: null },
 };
@@ -173,7 +174,7 @@ router.post(
 router.get(
   "/balance",
   handler(async (_req, res, caller) => {
-    if (!(await callerHasModule(caller, ["sms", "salaryadmin"]))) throw new HttpError(403, "Forbidden");
+    if (!(await callerHasModule(caller, ["sms", "salaryadmin", "payroll"]))) throw new HttpError(403, "Forbidden");
     const cfg = config();
     if (!cfg.apiKey || !cfg.partnerId) throw new HttpError(503, "SMS service is not configured on the server");
 

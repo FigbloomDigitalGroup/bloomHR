@@ -41,6 +41,10 @@ vi.mock('../../../lib/supabase', () => {
       call.ops.push({ op: 'single', args: [] });
       return Promise.resolve(result());
     };
+    chain.maybeSingle = () => {
+      call.ops.push({ op: 'maybeSingle', args: [] });
+      return Promise.resolve(result());
+    };
     chain.then = (resolve: (v: unknown) => void) => resolve(result());
     return chain;
   };
