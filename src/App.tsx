@@ -86,8 +86,8 @@ interface Branch {
   created_at?: string;
 }
 
-// SMS MFA for ADMIN/CHECKER logins. Off unless VITE_MFA_ENABLED=true.
-const MFA_ENABLED = import.meta.env.VITE_MFA_ENABLED === 'true';
+// Pages a signed-in person may be on before two-step sign-in is done.
+const MFA_OPEN_PATHS = ['/login', '/mfa', '/update-password', '/join', '/create-company'];
 
 const Loader = () => <FigbloomLoader fullScreen />;
 // while a page's code arrives: in the content area, where the page's own loader then carries on
@@ -189,6 +189,33 @@ function App() {
 
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Two-step sign-in (FIG-834): the server decides whether this sign-in still needs a code. mfa_required() reads the
+  // pass the server records after a right code, for this session only, so nothing kept in the browser can skip it.
+  // Asked again on each page until it says no; then not again for this login. A failed check does not lock people out
+  // (as before); the server-side check, mfa_satisfied(), is what policies rely on.
+  const mfaClearedFor = useRef<string | null>(null);
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) {
+      mfaClearedFor.current = null;
+      return;
+    }
+    if (mfaClearedFor.current === userId || MFA_OPEN_PATHS.includes(location.pathname)) return;
+    let live = true;
+    supabase.rpc('mfa_required').then(({ data, error }) => {
+      if (!live || error) return;
+      if (data) {
+        sessionStorage.setItem('isMFAProcess', 'true');
+        navigate('/mfa', { replace: true });
+      } else {
+        mfaClearedFor.current = userId;
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, [session?.user?.id, location.pathname, navigate]);
 
   // go to the landing page once the company profile of the login that just signed in is known
   useEffect(() => {
@@ -496,28 +523,18 @@ function App() {
 
     hasShownWelcomeToast.current = true;
 
-    // For CHECKER and ADMIN, check if MFA is enabled in DB before triggering MFA flow
-    if (role === 'CHECKER' || role === 'ADMIN') {
-      try {
-        const { data: mfaRequired } = await supabase.rpc('mfa_required');
+    // Does the company ask this person for a code (two-step sign-in, FIG-834)? The database decides by role.
+    try {
+      const { data: mfaRequired } = await supabase.rpc('mfa_required');
 
-        if (mfaRequired) {
-          sessionStorage.setItem('isMFAProcess', 'true');
-          const mfaData = {
-            userId: userData.id,
-            email: userData.email,
-            userRole: role,
-            branch: userData.branch || userData.town || ''
-          };
-          sessionStorage.setItem('mfaData', JSON.stringify(mfaData));
-          navigate(`/mfa?email=${encodeURIComponent(userData.email)}&userId=${userData.id}&role=${role}`, { replace: true });
-          return;
-        }
-        // MFA disabled — fall through to normal navigation
-      } catch (e) {
-        console.error('Failed to check MFA setting, skipping MFA:', e);
-        // On error, skip MFA to avoid locking users out
+      if (mfaRequired) {
+        sessionStorage.setItem('isMFAProcess', 'true');
+        navigate('/mfa', { replace: true });
+        return;
       }
+    } catch (e) {
+      // as before, a failed check does not lock people out
+      console.error('Failed to check MFA setting, skipping MFA:', e);
     }
 
     goToLanding();
@@ -696,11 +713,10 @@ function App() {
 
           // Normal navigation logic
           if ((currentPath === '/' || currentPath === '/login') && !isEmailConfirmation && !navigationHandled.current) {
-            const requiresMFA = MFA_ENABLED && (userData.role === 'ADMIN' || userData.role === 'CHECKER');
-            const mfaCompleted = sessionStorage.getItem('mfaCompleted') === 'true';
+            // whether a code is still needed is the server's call (see the two-step effect above)
             const mfaInProgress = sessionStorage.getItem('isMFAProcess') === 'true';
 
-            if (requiresMFA && !mfaCompleted && mfaInProgress) {
+            if (mfaInProgress) {
               navigate('/mfa', { replace: true });
             } else {
               goToLanding();
@@ -779,8 +795,8 @@ function App() {
 
         setUser(userData);
 
-        // Handle MFA process for ADMIN and CHECKER roles
-        if (isMFAProcess && (userData.role === 'CHECKER' || userData.role === 'ADMIN')) {
+        // Two-step sign-in in progress (whoever the company asks for a code)
+        if (isMFAProcess) {
           console.log('MFA process detected for', userData.role, 'role');
 
           // Ensure mfaData is set in sessionStorage if missing
@@ -832,36 +848,11 @@ function App() {
           const currentPath = location.pathname;
           const publicPaths = ['/login', '/update-password', '/mfa', '/join', '/create-company'];
 
-          // Check if MFA is required for this user
-          const requiresMFA = MFA_ENABLED && (userData.role === 'ADMIN' || userData.role === 'CHECKER');
-          const mfaCompleted = sessionStorage.getItem('mfaCompleted') === 'true';
-
-          // If MFA is in progress, prevent welcome toast and ensure we are on MFA page
-          // Also handle race condition where isMFAProcess might not be set yet but role requires it
-          if (requiresMFA && !mfaCompleted) {
-            console.log('MFA required for', userData.role, '- redirecting to MFA');
-
-            if (location.pathname !== '/mfa') {
-              navigate('/mfa', { replace: true });
-            }
-            return; // Exit early, do not show welcome toast or navigate to dashboard
-          }
-
-
-          // Show welcome toast only if not in MFA process
+          // a two-step sign-in still due is caught by the two-step effect, which asks the server
           toast.success(welcomeMessage(session?.user?.id, userData.email));
 
           if (publicPaths.includes(currentPath)) {
-            // If MFA is required but not completed, stay on current page (should be /mfa)
-            if (requiresMFA && !mfaCompleted) {
-              console.log('MFA required but not completed, staying on MFA page');
-              if (currentPath !== '/mfa') {
-                navigate('/mfa', { replace: true });
-              }
-            } else {
-              // Normal navigation for non-MFA users or MFA-completed users
-              goToLanding();
-            }
+            goToLanding();
           }
         }
       } else {

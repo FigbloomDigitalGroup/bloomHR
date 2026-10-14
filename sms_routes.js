@@ -97,6 +97,18 @@ async function sendOne({ apiKey, partnerId }, shortcode, mobile, message) {
   }
 }
 
+/**
+ * Sends one message from the server's own code (e.g. a sign-in code from mfa_routes.js), with the default sender id.
+ * Resolves { success, error? }; never throws. The caller decides who may receive it.
+ */
+export async function sendServerSms(phone, message) {
+  const cfg = config();
+  if (!cfg.apiKey || !cfg.partnerId) return { success: false, error: "SMS service is not configured on the server" };
+  const mobile = formatPhone(phone);
+  if (!mobile) return { success: false, error: "Invalid phone number" };
+  return sendOne(cfg, cfg.shortcode, mobile, message);
+}
+
 const handler = (fn) => async (req, res) => {
   try {
     if (!admin) throw new HttpError(500, "SMS API is not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");

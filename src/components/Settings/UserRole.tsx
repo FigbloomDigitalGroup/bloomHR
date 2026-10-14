@@ -16,8 +16,7 @@ import {
   X,
   MoreVertical,
   Key,
-  MapPin,
-  Lock
+  MapPin
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { assertEmployeeForStaffLogin } from '../../lib/staffEmployee';
@@ -28,6 +27,7 @@ import { Card, Button, SearchInput, StatusPill, EmptyState, Modal } from '../UI'
 import type { StatusTone } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import EmployeeNumberingCard from './EmployeeNumbering';
+import TwoStepSignInCard from './TwoStepSignIn';
 
 // Role definitions
 const ROLES = {
@@ -674,54 +674,6 @@ export default function UserRolesSettings() {
   const [currentPage, setCurrentPage] = useState(1);
   const [usersPerPage] = useState(12);
 
-  // MFA Settings
-  const [mfaEnabled, setMfaEnabled] = useState(false);
-  const [mfaLoading, setMfaLoading] = useState(false);
-  const [mfaFetched, setMfaFetched] = useState(false);
-
-  // Fetch MFA setting from DB
-  useEffect(() => {
-    const fetchMfaSetting = async () => {
-      try {
-        const { supabase } = await import('../../lib/supabase');
-        const { data, error } = await supabase
-          .from('system_settings')
-          .select('mfa_enabled')
-          .eq('id', 1)
-          .single();
-        if (!error && data) {
-          setMfaEnabled(data.mfa_enabled ?? false);
-        }
-      } catch (e) {
-        console.error('Failed to fetch MFA setting:', e);
-      } finally {
-        setMfaFetched(true);
-      }
-    };
-    fetchMfaSetting();
-  }, []);
-
-  const handleMfaToggle = async () => {
-    const newValue = !mfaEnabled;
-    setMfaLoading(true);
-    try {
-      const { supabase } = await import('../../lib/supabase');
-      const { error } = await supabase
-        .from('system_settings')
-        .update({ mfa_enabled: newValue })
-        .eq('id', 1);
-      if (error) throw error;
-      setMfaEnabled(newValue);
-      toast.success(`MFA verification ${newValue ? 'enabled' : 'disabled'} successfully.`);
-    } catch (e: any) {
-      toast.error('Failed to update MFA setting: ' + (e.message || 'Unknown error'));
-    } finally {
-      setMfaLoading(false);
-    }
-  };
-
-
-
   // Fetch users from Supabase - FIXED to get all users
   useEffect(() => {
     const fetchUsers = async () => {
@@ -862,36 +814,8 @@ export default function UserRolesSettings() {
     <div>
       <div className="space-y-5">
 
-        {/* MFA */}
-        <Card className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className={`w-[38px] h-[38px] shrink-0 rounded-tile flex items-center justify-center transition-colors ${mfaEnabled ? 'bg-green-tint text-brand' : 'bg-secondary text-muted-foreground'}`}>
-              <Lock className="w-[17px] h-[17px]" strokeWidth={1.8} />
-            </div>
-            <div>
-              <h2 id="mfa-title" className="m-0 text-[13.5px] font-bold text-ink">Two-Factor Authentication (MFA)</h2>
-              <p className="m-0 text-[11.5px] text-muted-foreground max-w-[520px]">
-                When enabled, Admin and Checker users must verify their identity via SMS code on every login.
-                Disable temporarily if you are experiencing SMS delivery issues.
-              </p>
-              <p className={`m-0 mt-1 text-[11px] font-semibold ${mfaEnabled ? 'text-brand' : 'text-subtle'}`} role="status">
-                {mfaFetched ? (mfaEnabled ? 'Active: SMS verification required on login' : 'Inactive: users skip SMS verification') : 'Loading...'}
-              </p>
-            </div>
-          </div>
-          <button
-            id="mfa-toggle-btn"
-            type="button"
-            onClick={handleMfaToggle}
-            disabled={mfaLoading || !mfaFetched}
-            role="switch"
-            aria-checked={mfaEnabled}
-            aria-labelledby="mfa-title"
-            className={`relative inline-flex h-[22px] w-10 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${mfaEnabled ? 'bg-brand' : 'bg-border'}`}
-          >
-            <span className={`pointer-events-none absolute top-0.5 left-0.5 h-[18px] w-[18px] rounded-full bg-white shadow transition-transform duration-200 ${mfaEnabled ? 'translate-x-[18px]' : 'translate-x-0'}`} />
-          </button>
-        </Card>
+        {/* two-step sign-in, per company (FIG-834) */}
+        <TwoStepSignInCard />
 
         <EmployeeNumberingCard className="" />
 
