@@ -417,3 +417,7 @@ enabled = true
 # Called by pg_cron with a shared secret (x-cron-secret), not a user login (migration 20261013800000)
 [functions.send-notification-emails]
 verify_jwt = false
+
+# Called by pg_cron with the same shared secret (x-cron-secret), not a user login (migration 20261014300000)
+[functions.send-invites]
+verify_jwt = false
