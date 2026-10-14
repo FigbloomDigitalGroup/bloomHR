@@ -25,10 +25,12 @@ if ('serviceWorker' in navigator) {
       console.log('SW registration failed:', error);
     });
 }
-// Vite fires this when a page file it needs is gone (a new version was deployed): load the new version once
+// Vite fires this when a page file it needs is gone (a new version was deployed): load the new version once.
+// Only cancel the error when the page is really reloading: a cancelled error makes the page import "succeed" with
+// nothing, and React then fails with "Cannot read properties of undefined (reading 'default')", which nothing
+// recognises. Left alone, the error reaches the error screen as "Failed to fetch dynamically imported module".
 window.addEventListener('vite:preloadError', (event) => {
-  event.preventDefault();
-  reloadOnceForStaleChunk();
+  if (reloadOnceForStaleChunk()) event.preventDefault();
 });
 
 applyA11y(loadA11y()); // text size, bolder text, contrast: also before the first render
