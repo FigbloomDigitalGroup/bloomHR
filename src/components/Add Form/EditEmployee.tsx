@@ -14,11 +14,17 @@ import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import { User, Briefcase, CreditCard, Phone, MapPin } from 'lucide-react';
 import SearchableDropdown from '../UI/SearchableDropdown';
+import DepartmentPicker from '../UI/DepartmentPicker';
+import EmployeePicker from '../UI/EmployeePicker';
+import { useEmployeeDirectory } from '../../hooks/useEmployeeDirectory';
 import { employeeTypeOptions } from '../../lib/employmentTypes';
 import { STARTER_DEPARTMENTS, ensureBranchListed, loadEmployeeFieldValues, optionsWithStarters } from '../../lib/employeeOptions';
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 import { useUser } from '../ProtectedRoutes/UserContext';
 import { PAYMENT_METHODS, paymentMethodOption } from '../../lib/paymentMethods';
+import { useJobGroups } from '../../hooks/useJobGroups';
+import JobGroupPicker from './JobGroupPicker';
+import { lockedPayFields } from '../../lib/jobGroups';
 
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'SHIF Number'?: string | null;
@@ -26,6 +32,9 @@ type Employee = Database['public']['Tables']['employees']['Row'] & {
   'Tax PIN'?: string | null;
   NITA?: string | null;
   HELB?: string | null;
+  // org structure (20261016200000): the department and who they report to
+  department_id?: string | null;
+  reports_to_id?: string | null;
 };
 
 type DropdownOptions = {
@@ -74,9 +83,14 @@ const EditEmployeePage = () => {
   const { user } = useUser();
   const isAdmin = user?.role === 'ADMIN';
   const isHR = user?.role === 'HR';
+  // the company's job groups (null when this person may not see them: the free-text "Job Group" stays)
+  const jobGroups = useJobGroups();
   const [deleting, setDeleting] = useState(false);
 
   const [employee, setEmployee] = useState<Partial<Employee>>({});
+  // the "Reports to" picker works by employee number; reports_to_id is what is saved
+  const { employees: directory } = useEmployeeDirectory();
+  const reportsToNumber = directory.find((e) => e.id && e.id === employee.reports_to_id)?.employeeNumber || '';
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -954,14 +968,10 @@ const EditEmployeePage = () => {
                       disabled={!isEditMode}
                     />
                   )}
-                  <FormField
-                    label="Department"
-                    name="Job Level"
-                    type={isEditMode ? "select" : "text"}
-                    creatable
-                    value={employee['Job Level'] || ''}
-                    onChange={handleInputChange}
-                    options={dropdownOptions.jobLevels}
+                  <DepartmentPicker
+                    value={employee.department_id}
+                    fallbackLabel={employee['Job Level'] || undefined}
+                    onChange={(d) => setEmployee(prev => ({ ...prev, department_id: d?.id ?? null, 'Job Level': d?.name ?? null }))}
                     disabled={!isEditMode}
                   />
                   <FormField
@@ -974,15 +984,16 @@ const EditEmployeePage = () => {
                     options={dropdownOptions.jobTitles}
                     disabled={!isEditMode}
                   />
+                  {/* chosen under Salary Information when the company has job groups */}
                   <FormField
                     label="Job Group"
                     name="Job Group"
-                    type={isEditMode ? "select" : "text"}
+                    type={isEditMode && !jobGroups?.length ? "select" : "text"}
                     creatable
                     value={employee['Job Group'] || ''}
                     onChange={handleInputChange}
                     options={dropdownOptions.jobGroup}
-                    disabled={!isEditMode}
+                    disabled={!isEditMode || !!jobGroups?.length}
                   />
                   <FormField
                     label="Branch"
@@ -1014,13 +1025,14 @@ const EditEmployeePage = () => {
                     icon={User}
                   />
                   <div className="grid grid-cols-1 gap-6 mt-4">
-                    <FormField
-                      label="Manager"
-                      name="Manager"
-                      type={isEditMode ? "select" : "text"}
-                      value={employee['Manager'] || ''}
-                      onChange={handleInputChange}
-                      options={dropdownOptions.supervisors}
+                    <EmployeePicker
+                      label="Reports to"
+                      value={reportsToNumber}
+                      fallbackLabel={employee['Manager'] || undefined}
+                      // the database fills in Manager (the name) from reports_to_id
+                      onChange={(m) => setEmployee(prev => ({ ...prev, reports_to_id: m?.id || null }))}
+                      filter={(e) => e.id !== employee.id}
+                      placeholder="Search for their manager..."
                       disabled={!isEditMode}
                     />
                     <FormField
@@ -1253,6 +1265,14 @@ const EditEmployeePage = () => {
                     icon={CreditCard}
                   />
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+                    {!!jobGroups?.length && (
+                      <JobGroupPicker
+                        groups={jobGroups}
+                        values={employee as Record<string, unknown>}
+                        onChange={(patch) => setEmployee(prev => ({ ...prev, ...patch }) as typeof prev)}
+                        disabled={!isEditMode}
+                      />
+                    )}
                     {isAdmin && (
                       <FormField
                         label="Basic Salary"
@@ -1266,7 +1286,7 @@ const EditEmployeePage = () => {
                             "Basic Salary": numValue
                           }));
                         }}
-                        disabled={!isEditMode}
+                        disabled={!isEditMode || lockedPayFields(jobGroups, employee as Record<string, unknown>).includes('Basic Salary')}
                       />
                     )}
                     <FormField
@@ -1283,6 +1303,7 @@ const EditEmployeePage = () => {
                     values={employee as Record<string, unknown>}
                     onChange={(field, value) => setEmployee(prev => ({ ...prev, [field]: value }))}
                     disabled={!isEditMode}
+                    locked={lockedPayFields(jobGroups, employee as Record<string, unknown>)}
                   />
                 </div>
               )}

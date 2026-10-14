@@ -1,492 +1,208 @@
-import { useState, useEffect, useRef } from 'react';
-import { sendSingleSms } from '../lib/smsApi';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { CELCOM_AFRICA_CONFIG } from '../config/sms';
-import toast from 'react-hot-toast';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { MfaError, sendMfaCode, verifyMfaCode, type TwoStepMethod } from '../lib/mfaApi';
 
-interface MFAData {
-  userId: string;
-  email: string;
-  userRole: string;
-  branch: string;
-  session: any;
-}
+// Two-step sign-in (FIG-834, FIG-658). The server makes the code, sends it (by email, or SMS where the company chose
+// it) and checks it; a right code is recorded against this sign-in on the server, which is what lets the app in. This
+// page only asks for a code and passes on what was typed, so nothing here can mark the sign-in as verified.
 
-// Utility for phone number formatting
-const formatPhoneNumberForSMS = (phone: string): string => {
-  if (!phone) return '';
-  let cleaned = phone.replace(/\D/g, '');
-  if (cleaned.startsWith('0') && cleaned.length === 10) {
-    cleaned = '254' + cleaned.substring(1);
-  } else if (cleaned.startsWith('7') && cleaned.length === 9) {
-    cleaned = '254' + cleaned;
-  } else if (cleaned.startsWith('254') && cleaned.length === 12) {
-    // Keep as is
-  } else if (cleaned.startsWith('+254') && cleaned.length === 13) {
-    cleaned = cleaned.substring(1);
-  }
-  return cleaned.length === 12 && cleaned.startsWith('254') ? cleaned : phone;
+const CODE_LENGTH = 6;
+
+const clearMfaFlags = () => {
+  sessionStorage.removeItem('mfaData');
+  sessionStorage.removeItem('isMFAProcess');
+  sessionStorage.removeItem('mfaInProgress');
 };
 
 export default function MFAVerification() {
-  const [codes, setCodes] = useState<string[]>(Array(6).fill(''));
-  const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState('');
-  const [userId, setUserId] = useState('');
-  const [resendLoading, setResendLoading] = useState(false);
-  const [attemptCount, setAttemptCount] = useState(0);
-  const [isLocked, setIsLocked] = useState(false);
-  const [lockTime, setLockTime] = useState(0);
-  const [countdown, setCountdown] = useState(0);
-  const [isVerified, setIsVerified] = useState(false);
-
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const hasShownSessionError = useRef(false); // Prevent infinite error loop
-  const hasTriggeredInitialSend = useRef(false); // NEW: Prevent race conditions in auto-send
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-
-  // CRITICAL FIX: Prevent back button bypass
-  useEffect(() => {
-    // Set MFA verification flag
-    sessionStorage.setItem('mfaInProgress', 'true');
-
-    const handleBackButton = (event: PopStateEvent) => {
-      if (!isVerified) {
-        event.preventDefault();
-        event.stopPropagation();
-        toast.error('Please complete MFA verification first');
-        window.history.pushState(null, '', window.location.href);
-      }
-    };
-
-    window.addEventListener('popstate', handleBackButton);
-    window.history.pushState(null, '', window.location.href);
-
-    return () => {
-      window.removeEventListener('popstate', handleBackButton);
-      if (!isVerified) {
-        sessionStorage.removeItem('mfaInProgress');
-      }
-    };
-  }, [isVerified]);
+  const [codes, setCodes] = useState<string[]>(Array(CODE_LENGTH).fill(''));
+  const [destination, setDestination] = useState('');
+  const [method, setMethod] = useState<TwoStepMethod>('email');
+  const [sending, setSending] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  // the code can no longer be used (expired, too many tries): only a new one helps
+  const [needsNewCode, setNeedsNewCode] = useState(false);
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const started = useRef(false);
 
   useEffect(() => {
-    // Check if user is already locked out
-    const lockUntil = localStorage.getItem('mfaLockUntil');
-    if (lockUntil && parseInt(lockUntil) > Date.now()) {
-      setIsLocked(true);
-      setLockTime(parseInt(lockUntil));
-      return;
-    }
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
 
-    // Retrieve MFA data from sessionStorage
-    const mfaData = sessionStorage.getItem('mfaData');
-    if (mfaData) {
-      try {
-        const parsedData: MFAData = JSON.parse(mfaData);
-        setEmail(parsedData.email);
-        setUserId(parsedData.userId);
+  const finish = useCallback(() => {
+    clearMfaFlags();
+    sessionStorage.setItem('mfaCompleted', 'true');
+    navigate('/dashboard', { replace: true });
+  }, [navigate]);
 
-        if (parsedData.session) {
-          supabase.auth.setSession(parsedData.session);
-        }
-      } catch (error) {
-        console.error('Error parsing MFA data:', error);
-        toast.error('Invalid session data');
-        navigate('/login');
-      }
-    } else {
-      const redirectEmail = searchParams.get('email');
-      const redirectUserId = searchParams.get('userId');
-
-      if (redirectEmail && redirectUserId) {
-        setEmail(redirectEmail);
-        setUserId(redirectUserId);
-      } else {
-        const initFromSession = async () => {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user) {
-            setEmail(session.user.email || '');
-            setUserId(session.user.id);
-            return true;
-          }
-          return false;
-        };
-
-        initFromSession().then((foundSession) => {
-          if (!foundSession && !hasShownSessionError.current) {
-            hasShownSessionError.current = true;
-            toast.dismiss();
-            supabase.auth.signOut().finally(() => {
-              sessionStorage.removeItem('isMFAProcess');
-              navigate('/login', { replace: true });
-            });
-          }
-        });
-      }
-    }
-
-    // REMOVED: Premature countdown set here. It should only start after a successful send.
-  }, []);
-
-  // Initial code send effect
-  useEffect(() => {
-    if (userId && email && !isVerified && !loading && !resendLoading && !hasTriggeredInitialSend.current) {
-      const sentFlag = `mfa_sent_${userId}`;
-      const hasSentInitial = sessionStorage.getItem(sentFlag);
-
-      if (!hasSentInitial) {
-        hasTriggeredInitialSend.current = true;
-
-        // Reduced delay for better UX, but keep enough for session stability
-        const timeoutId = setTimeout(() => {
-          console.log('🚀 Triggering initial MFA code send for:', email);
-          handleResendCode(true)
-            .then(() => {
-              sessionStorage.setItem(sentFlag, 'true');
-            })
-            .catch((err) => {
-              console.error('Failed initial send:', err);
-              hasTriggeredInitialSend.current = false;
-            });
-        }, 800);
-
-        return () => clearTimeout(timeoutId);
-      }
-    }
-  }, [userId, email]);
-
-  // Handle lockout timer
-  useEffect(() => {
-    if (!isLocked) return;
-
-    const interval = setInterval(() => {
-      const remainingTime = lockTime - Date.now();
-      if (remainingTime <= 0) {
-        setIsLocked(false);
-        localStorage.removeItem('mfaLockUntil');
-        localStorage.removeItem('mfaAttemptCount');
-        clearInterval(interval);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isLocked, lockTime]);
-
-  const handleCodeChange = (index: number, value: string) => {
-    if (isLocked) return;
-
-    if (!/^\d*$/.test(value)) return;
-
-    const newCodes = [...codes];
-    newCodes[index] = value;
-    setCodes(newCodes);
-
-    if (value && index < 5) {
-      inputRefs.current[index + 1]?.focus();
-    }
-
-    if (newCodes.every(code => code !== '') && index === 5) {
-      handleVerification(newCodes.join(''));
-    }
-  };
-
-  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !codes[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-  };
-
-  const handlePaste = (e: React.ClipboardEvent) => {
-    e.preventDefault();
-    const pastedData = e.clipboardData.getData('text');
-    const digits = pastedData.replace(/\D/g, '').split('').slice(0, 6);
-
-    if (digits.length === 6) {
-      const newCodes = [...codes];
-      digits.forEach((digit, index) => {
-        newCodes[index] = digit;
-      });
-      setCodes(newCodes);
-      inputRefs.current[5]?.focus();
-    }
-  };
-
-  const handleVerification = async (fullCode: string) => {
-    if (isLocked) {
-      toast.error(`Please wait ${Math.ceil((lockTime - Date.now()) / 1000)} seconds before trying again`);
-      return;
-    }
-
-    if (!fullCode || fullCode.length !== 6) {
-      toast.error('Please enter a valid 6-digit code');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const { data, error } = await supabase
-        .from('mfa_codes')
-        .select('*')
-        .eq('email', email)
-        .eq('code', fullCode)
-        .eq('used', false)
-        .gt('expires_at', new Date().toISOString())
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (data) {
-        await supabase
-          .from('mfa_codes')
-          .update({ used: true })
-          .eq('id', data.id);
-
-        setIsVerified(true);
-        sessionStorage.setItem('mfaVerified', 'true');
-        sessionStorage.setItem('mfaCompleted', 'true');
-        sessionStorage.setItem('mfaVerifiedUserId', userId);
-        sessionStorage.setItem('mfaVerifiedTime', Date.now().toString());
-
-        localStorage.removeItem('mfaAttemptCount');
-        localStorage.removeItem('mfaLockUntil');
-        sessionStorage.removeItem('mfaData');
-        sessionStorage.removeItem('isMFAProcess');
-        localStorage.removeItem(`mfa_${userId}`);
-
-        toast.success('Verification successful!');
-
-        setTimeout(() => {
-          navigate('/dashboard', { replace: true });
-        }, 1000);
-      } else {
-        const newAttemptCount = attemptCount + 1;
-        setAttemptCount(newAttemptCount);
-        localStorage.setItem('mfaAttemptCount', newAttemptCount.toString());
-
-        if (newAttemptCount >= 5) {
-          const lockUntil = Date.now() + 5 * 60 * 1000;
-          setIsLocked(true);
-          setLockTime(lockUntil);
-          localStorage.setItem('mfaLockUntil', lockUntil.toString());
-          toast.error('Too many failed attempts. Please try again in 5 minutes.');
-        } else {
-          throw new Error(`Invalid verification code or code expired. ${5 - newAttemptCount} attempts remaining`);
-        }
-      }
-    } catch (error: any) {
-      toast.error(error.message || 'Verification failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResendCode = async (isInitial = false) => {
-    if (!isInitial && (isLocked || countdown > 0)) {
-      toast.error(`Please wait ${countdown} seconds before requesting a new code`);
-      return;
-    }
-
-    setResendLoading(true);
-    try {
-      // 1. Get phone number
-      const { data: numData, error: numError } = await supabase
-        .from('mfa_numbers')
-        .select('phone_number')
-        .eq('email', email)
-        .single();
-
-      if (numError || !numData?.phone_number) {
-        throw new Error('MFA phone number not found. Please contact administrator.');
-      }
-
-      const phoneNumber = numData.phone_number;
-      const formattedPhone = formatPhoneNumberForSMS(phoneNumber);
-
-      // 2. Generate and store code
-      const mfaCode = Math.floor(100000 + Math.random() * 900000).toString();
-
-      // Invalidate ALL previous unused codes for this email first
-      await supabase
-        .from('mfa_codes')
-        .update({ used: true })
-        .eq('email', email)
-        .eq('used', false);
-
-      // Now insert a fresh code as the single valid one
-      const { error: storeError } = await supabase
-        .from('mfa_codes')
-        .insert({
-          user_id: userId,
-          email: email,
-          code: mfaCode,
-          phone_number: formattedPhone,
-          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-          used: false
-        });
-
-      if (storeError) throw storeError;
-
-      // 3. Send the code through the backend. It only sends to the number registered for this login.
-      const message = `Your Figbloom HR verification code is: ${mfaCode}. This code expires in 10 minutes.`;
-      const sms = await sendSingleSms(formattedPhone, message, {
-        purpose: 'mfa',
-        senderId: CELCOM_AFRICA_CONFIG.defaultShortcode || undefined,
-      });
-      if (!sms.success) {
-        throw new Error(sms.error || 'Could not send the verification code');
-      }
-
-      setCountdown(30);
-      const countdownInterval = setInterval(() => {
-        setCountdown(prev => {
-          if (prev <= 1) {
-            clearInterval(countdownInterval);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      toast.success('Verification code sent successfully!');
-    } catch (error: any) {
-      console.error('MFA Resend error:', error);
-      toast.error(error.message || 'Failed to resend code');
-    } finally {
-      setResendLoading(false);
-    }
-  };
-
-  const handleBackToLogin = () => {
-    // Clear all MFA data
-    sessionStorage.removeItem('mfaData');
-    sessionStorage.removeItem('mfaInProgress');
-    sessionStorage.removeItem('mfaVerified');
-    sessionStorage.removeItem('mfaVerifiedUserId');
-    sessionStorage.removeItem('mfaVerifiedTime');
-    localStorage.removeItem(`mfa_${userId}`);
-    localStorage.removeItem('mfaAttemptCount');
-    localStorage.removeItem('mfaLockUntil');
-
-    supabase.auth.signOut();
-
-    // Use replace to prevent back navigation
+  const backToLogin = useCallback(async () => {
+    clearMfaFlags();
+    sessionStorage.removeItem('mfaCompleted');
+    await supabase.auth.signOut();
     navigate('/login', { replace: true });
+  }, [navigate]);
+
+  const send = useCallback(async (resend: boolean) => {
+    setSending(true);
+    setError('');
+    setNotice('');
+    try {
+      const result = await sendMfaCode(resend);
+      setDestination(result.destination);
+      setMethod(result.method);
+      setCooldown(result.resendIn);
+      setNeedsNewCode(false);
+      setCodes(Array(CODE_LENGTH).fill(''));
+      if (resend) setNotice('A new code is on its way.');
+      inputRefs.current[0]?.focus();
+    } catch (e) {
+      const err = e as MfaError;
+      if (err.reason === 'not_required') return finish(); // this company does not ask this person for a code
+      if (err.status === 401) return void backToLogin();
+      if (err.reason === 'cooldown' && err.retryAfter) setCooldown(err.retryAfter);
+      setError(err.message || 'Could not send a code');
+    } finally {
+      setSending(false);
+    }
+  }, [finish, backToLogin]);
+
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) return void backToLogin();
+      void send(false);
+    });
+  }, [send, backToLogin]);
+
+  const verify = async (code: string) => {
+    if (code.length !== CODE_LENGTH || verifying) return;
+    setVerifying(true);
+    setError('');
+    setNotice('');
+    try {
+      await verifyMfaCode(code);
+      finish();
+    } catch (e) {
+      const err = e as MfaError;
+      if (err.status === 401) return void backToLogin();
+      setError(err.message || 'Could not check the code');
+      if (err.reason === 'expired' || err.reason === 'too_many' || err.reason === 'none') setNeedsNewCode(true);
+      setCodes(Array(CODE_LENGTH).fill(''));
+      inputRefs.current[0]?.focus();
+    } finally {
+      setVerifying(false);
+    }
   };
 
-  const formatTimeRemaining = () => {
-    const seconds = Math.ceil((lockTime - Date.now()) / 1000);
-    return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`;
+  const setDigits = (index: number, value: string) => {
+    const digits = value.replace(/\D/g, '');
+    if (!digits && value) return;
+    const next = [...codes];
+    if (digits.length > 1) {
+      // pasted or autofilled: spread from here
+      digits.slice(0, CODE_LENGTH - index).split('').forEach((d, i) => (next[index + i] = d));
+    } else {
+      next[index] = digits;
+    }
+    setCodes(next);
+    const filled = Math.min(index + Math.max(digits.length, 1), CODE_LENGTH - 1);
+    if (digits) inputRefs.current[filled]?.focus();
+    if (next.every((c) => c !== '')) void verify(next.join(''));
   };
+
+  const onKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !codes[index] && index > 0) inputRefs.current[index - 1]?.focus();
+  };
+
+  const busy = verifying || sending;
+  const where = method === 'sms' ? 'texted' : 'emailed';
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style={{ background: 'linear-gradient(135deg, #022c22 0%, #065f46 50%, #4ade80 100%)' }}>
-      <div className="max-w-md w-full space-y-8">
-        <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-100">
-          <div className="flex justify-center mb-6">
+    <div className="min-h-screen flex items-center justify-center py-8 px-4 sm:px-6" style={{ background: 'linear-gradient(135deg, #022c22 0%, #065f46 50%, #4ade80 100%)' }}>
+      <div className="w-full max-w-md">
+        <div className="bg-white p-5 sm:p-8 rounded-2xl shadow-lg border border-gray-100">
+          <div className="flex justify-center mb-5">
             <div className="p-4 rounded-full" style={{ background: 'linear-gradient(135deg, #022c22 0%, #4ade80 100%)' }}>
-              <img
-                src="/bloom-mark.png"
-                alt="Company Logo"
-                className="h-12 w-12 object-contain"
-              />
+              <img src="/bloom-mark.png" alt="Company Logo" className="h-10 w-10 sm:h-12 sm:w-12 object-contain" />
             </div>
           </div>
 
-          <h2 className="mt-4 text-center text-3xl font-bold text-gray-900">
-            Verify Your Identity
-          </h2>
-          <p className="mt-2 text-center text-xs text-gray-600">
-            Enter the 6-digit verification code sent to your phone
-          </p>
-          <p className="text-center text-xs font-medium text-green-600">
-            {email}
+          <h1 className="text-center text-2xl sm:text-3xl font-bold text-gray-900">Check your {method === 'sms' ? 'phone' : 'email'}</h1>
+          <p className="mt-2 text-center text-sm text-gray-600" role="status" aria-live="polite">
+            {destination
+              ? <>We {where} a 6-digit code to <span className="font-semibold text-gray-900 break-all">{destination}</span>. It expires in 10 minutes.</>
+              : sending ? 'Sending your code...' : 'Enter the 6-digit code we sent you.'}
           </p>
 
-          {isLocked && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-center">
-              <p className="text-xs font-medium">Account temporarily locked</p>
-              <p className="text-xs">Please try again in {formatTimeRemaining()}</p>
-            </div>
-          )}
-
-          <form className="mt-8 space-y-6" onSubmit={(e) => {
-            e.preventDefault();
-            handleVerification(codes.join(''));
-          }}>
-            <div className="flex justify-center space-x-3">
-              {codes.map((code, index) => (
+          <form
+            className="mt-6 space-y-5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void verify(codes.join(''));
+            }}
+          >
+            <fieldset className="flex justify-center gap-1.5 sm:gap-3">
+              <legend className="sr-only">Sign-in code</legend>
+              {codes.map((digit, index) => (
                 <input
                   key={index}
                   ref={(el) => (inputRefs.current[index] = el)}
+                  aria-label={`Digit ${index + 1}`}
                   type="text"
                   inputMode="numeric"
+                  autoComplete={index === 0 ? 'one-time-code' : 'off'}
                   pattern="[0-9]*"
-                  maxLength={1}
-                  value={code}
-                  onChange={(e) => handleCodeChange(index, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(index, e)}
-                  onPaste={index === 0 ? handlePaste : undefined}
-                  disabled={loading || isLocked}
-                  className="w-12 h-12 text-center text-2xl font-semibold bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 shadow-sm transition-all duration-200 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  maxLength={index === 0 ? CODE_LENGTH : 1}
+                  value={digit}
+                  onChange={(e) => setDigits(index, e.target.value)}
+                  onKeyDown={(e) => onKeyDown(index, e)}
                   autoFocus={index === 0}
+                  disabled={busy || needsNewCode}
+                  className="w-10 h-12 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-semibold bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 shadow-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
               ))}
-            </div>
+            </fieldset>
 
-            <div>
-              <button
-                type="submit"
-                disabled={loading || isLocked || codes.some(code => code === '')}
-                className="group relative w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-xs font-medium text-white bg-gradient-to-r from-green-600 to-cyan-600 hover:from-green-700 hover:to-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-              >
-                {loading ? (
-                  <span className="flex items-center">
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Verifying...
-                  </span>
-                ) : (
-                  'Verify Code'
-                )}
+            {error && (
+              <p className="m-0 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-center text-sm" role="alert">{error}</p>
+            )}
+            {notice && !error && <p className="m-0 text-center text-sm text-green-700">{notice}</p>}
+
+            <button
+              type="submit"
+              disabled={busy || needsNewCode || codes.some((c) => c === '')}
+              className="w-full flex justify-center py-3 px-4 rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-green-600 to-cyan-600 hover:from-green-700 hover:to-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {verifying ? 'Checking...' : 'Verify'}
+            </button>
+
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-between items-center gap-3 pt-2">
+              <button type="button" onClick={() => void backToLogin()} className="text-sm text-green-700 hover:text-green-600 font-medium">
+                Back to sign in
               </button>
-            </div>
-
-            <div className="flex justify-between items-center pt-4">
               <button
                 type="button"
-                onClick={handleBackToLogin}
-                className="text-xs text-green-600 hover:text-green-500 font-medium flex items-center transition-colors duration-200"
+                onClick={() => void send(true)}
+                disabled={sending || cooldown > 0}
+                className="text-sm text-green-700 hover:text-green-600 font-medium disabled:text-gray-400 disabled:cursor-not-allowed"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                Back to Login
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleResendCode()}
-                disabled={resendLoading || isLocked || countdown > 0}
-                className="text-xs text-green-600 hover:text-green-500 font-medium disabled:text-gray-400 disabled:cursor-not-allowed transition-colors duration-200"
-              >
-                {resendLoading ? 'Sending...' : countdown > 0 ? `Resend in ${countdown}s` : 'Resend Code'}
+                {sending ? 'Sending...' : cooldown > 0 ? `Send a new code in ${cooldown}s` : 'Send a new code'}
               </button>
             </div>
           </form>
         </div>
 
-        <div className="text-center text-xs text-white/70">
-          <p>Having trouble receiving the code?</p>
-          <p className="mt-1">Check your phone connection or contact support</p>
-        </div>
+        <p className="mt-4 text-center text-xs text-white/80">
+          {method === 'sms' ? 'No text? Check the number with your administrator.' : 'No email? Check your spam folder, or send a new code.'}
+        </p>
       </div>
     </div>
   );

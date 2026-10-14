@@ -115,11 +115,16 @@ describe('cross-tenant access is blocked on every tenant table', () => {
     ] as const) {
       await asUser(db, user, async () => {
         for (const t of tables) {
-          const seen = await rows<{ n: number }>(`select count(*)::int n from public."${t}" where tenant_id = '${other}'`);
-          if (seen[0].n !== 0) leaks.push(`${user} reads ${t}`);
-          const upd = await rows(`update public."${t}" set tenant_id = tenant_id where tenant_id = '${other}' returning 1`);
+          // a table closed to signed-in users altogether (server only, e.g. mfa_codes) refuses: no leak either
+          const refused = (e: unknown) => {
+            if (!/permission denied/.test((e as Error).message)) throw e;
+            return [] as { n: number }[];
+          };
+          const seen = await rows<{ n: number }>(`select count(*)::int n from public."${t}" where tenant_id = '${other}'`).catch(refused);
+          if (seen.length && seen[0].n !== 0) leaks.push(`${user} reads ${t}`);
+          const upd = await rows(`update public."${t}" set tenant_id = tenant_id where tenant_id = '${other}' returning 1`).catch(refused);
           if (upd.length) leaks.push(`${user} updates ${t}`);
-          const del = await rows(`delete from public."${t}" where tenant_id = '${other}' returning 1`);
+          const del = await rows(`delete from public."${t}" where tenant_id = '${other}' returning 1`).catch(refused);
           if (del.length) leaks.push(`${user} deletes ${t}`);
         }
       });

@@ -2,8 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
+const perms = vi.hoisted(() => ({ granted: null as string[] | null }));
 vi.mock('../../hooks/usePermissions', () => ({
-  usePermissions: () => ({ hasPermission: () => true, loading: false }),
+  usePermissions: () => ({
+    hasPermission: (p: string) => !perms.granted || perms.granted.includes(p),
+    hasAnyPermission: (ps: string[]) => !perms.granted || ps.some((p) => perms.granted!.includes(p)),
+    loading: false,
+  }),
 }));
 vi.mock('../../hooks/useMyPreferences', () => ({
   useMyPreferences: () => ({ data: null }),
@@ -130,5 +135,36 @@ describe('admin sidebar on a desktop', () => {
     expect(screen.queryByTestId('sidebar-backdrop')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
     expect(onToggle).toHaveBeenCalledWith(true);
+  });
+});
+
+describe('Job groups in the menu', () => {
+  const sidebar = () =>
+    render(
+      <MemoryRouter>
+        <Sidebar user={{ email: 'a@co.com', role: 'HR' }} isCollapsed={false} onToggle={() => {}} />
+      </MemoryRouter>,
+    );
+  afterEach(() => {
+    perms.granted = null;
+  });
+
+  it('shows for Payroll or Employees users, who can’t open Settings', () => {
+    setWidth(1280);
+    perms.granted = ['payroll'];
+    sidebar();
+    expect(screen.getByText('Job groups')).toBeTruthy();
+    expect(screen.queryByText('Settings')).toBeNull();
+    cleanup();
+    perms.granted = ['employees'];
+    sidebar();
+    expect(screen.getByText('Job groups')).toBeTruthy();
+  });
+
+  it('is hidden from anyone else', () => {
+    setWidth(1280);
+    perms.granted = ['dashboard', 'leaves'];
+    sidebar();
+    expect(screen.queryByText('Job groups')).toBeNull();
   });
 });

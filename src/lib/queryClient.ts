@@ -29,4 +29,5 @@ export const queryKeys = {
   employeeDirectory: ['employee-directory'] as const,
   myPermissions: ['my-permissions'] as const,
   myCompanies: ['my-companies'] as const,
+  departments: ['departments'] as const,
 };

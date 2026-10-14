@@ -234,21 +234,21 @@ describe('logs, sign-up requests and meetings follow the modules', () => {
   }
 });
 
-describe('MFA tables (stop-gap)', () => {
+describe('MFA tables', () => {
   beforeAll(async () => {
     await db.exec(`
       insert into mfa_numbers (email, phone_number, tenant_id) values ('me@a.co', '0711', '${A}'), ('them@a.co', '0722', '${A}');
-      insert into mfa_codes (email, code, phone_number, expires_at, tenant_id) values
-        ('me@a.co', '111111', '0711', now() + interval '5 minutes', '${A}'),
-        ('them@a.co', '222222', '0722', now() + interval '5 minutes', '${A}');
+      insert into mfa_codes (email, code_hash, phone_number, expires_at, tenant_id) values
+        ('me@a.co', 'h1', '0711', now() + interval '5 minutes', '${A}'),
+        ('them@a.co', 'h2', '0722', now() + interval '5 minutes', '${A}');
     `);
   });
-  it('an employee sees only their own phone number and codes', async () => {
+  it('an employee sees only their own phone number, and no codes at all (the server checks them, FIG-834)', async () => {
     await asUser(db, U.STAFF, async () => {
       expect((await rows<{ phone_number: string }>(`select phone_number from mfa_numbers`)).map((x) => x.phone_number)).toEqual(['0711']);
-      expect((await rows<{ code: string }>(`select code from mfa_codes`)).map((x) => x.code)).toEqual(['111111']);
-      expect(await count(`update mfa_codes set used = true where email = 'them@a.co' returning 1`)).toBe(0);
-      expect(await attempt(`insert into mfa_codes (email, code, phone_number, expires_at) values ('them@a.co', '1', '0722', now())`)).toBe(false);
+      expect(await attempt(`select 1 from mfa_codes`)).toBe(false);
+      expect(await attempt(`update mfa_codes set used = true`)).toBe(false);
+      expect(await attempt(`insert into mfa_codes (email, code_hash, phone_number, expires_at) values ('me@a.co', '1', '0711', now())`)).toBe(false);
       expect(await attempt(`insert into mfa_numbers (email, phone_number) values ('me@a.co', '0799')`)).toBe(false); // changing the MFA phone needs the settings module
     });
   });

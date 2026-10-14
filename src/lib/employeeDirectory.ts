@@ -15,11 +15,21 @@ export interface DirectoryEmployee {
   branch: string;
   town: string;
   email: string;
+  /** The employee's id (employees.id); '' if the row did not include it. */
+  id: string;
+  /** Their department (departments.id) and the name it shows as (`Job Level`). */
+  departmentId: string | null;
+  department: string;
+  /** Who they report to (employees.id). */
+  reportsToId: string | null;
+  photo: string;
+  status: string;
 }
 
 type DirectoryRow = Record<string, string | null>;
 
-const COLUMNS = '"Employee Number", "First Name", "Middle Name", "Last Name", "Job Title", "Branch", "Town", "Work Email"';
+const COLUMNS = '"Employee Number", "First Name", "Middle Name", "Last Name", "Job Title", "Branch", "Town", "Work Email", ' +
+  'id, department_id, reports_to_id, "Job Level", "Profile Image", "Status"';
 
 export const toDirectoryEmployee = (row: DirectoryRow): DirectoryEmployee => {
   const firstName = (row['First Name'] || '').trim();
@@ -35,6 +45,12 @@ export const toDirectoryEmployee = (row: DirectoryRow): DirectoryEmployee => {
     branch: (row['Branch'] || '').trim(),
     town: (row['Town'] || '').trim(),
     email: (row['Work Email'] || '').trim(),
+    id: String(row.id ?? ''),
+    departmentId: row.department_id || null,
+    department: (row['Job Level'] || '').trim(),
+    reportsToId: row.reports_to_id || null,
+    photo: (row['Profile Image'] || '').trim(),
+    status: (row['Status'] || '').trim(),
   };
 };
 

@@ -47,6 +47,9 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import StatusPill from '../UI/StatusPill';
+import ApprovalChain from '../Approvals/ApprovalChain';
+import LeaveAwaitingMe from '../Approvals/LeaveAwaitingMe';
+import { ApprovalChain as ApprovalChainData, loadApprovalChains } from '../../lib/approvals';
 import { fetchStaffHRNotifications, markStaffNotificationRead } from '../../hooks/useHRNotifications';
 import EmailNotificationsToggle from './EmailNotificationsToggle';
 import { supabase } from '../../lib/supabase';
@@ -808,6 +811,8 @@ const LeaveApplicationForm = () => {
 // LeaveApplicationsList Component
 const LeaveApplicationsList = () => {
   const [applications, setApplications] = useState<any[]>([]);
+  // each application's approval chain (FIG-829): who has approved and who it is waiting on
+  const [chains, setChains] = useState<Record<string, ApprovalChainData>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -835,6 +840,9 @@ const LeaveApplicationsList = () => {
             if (leaveError) throw leaveError;
 
             setApplications(leaveData || []);
+            loadApprovalChains('leave', (leaveData || []).map((l: any) => l.id))
+              .then(setChains)
+              .catch((e) => console.error('Error fetching approval chains:', e));
           }
         } catch (error) {
           console.error('Error fetching leave applications:', error);
@@ -881,6 +889,9 @@ const LeaveApplicationsList = () => {
   if (applications.length === 0) {
     return (
       <div className="p-8 text-center">
+        <div className="text-left">
+          <LeaveAwaitingMe />
+        </div>
         <div className="max-w-md mx-auto bg-gray-50 p-6 rounded-lg">
           <div className="h-12 w-12 mx-auto bg-gray-200 rounded-full flex items-center justify-center mb-4">
             <PhCalendarBlank className="h-5 w-5 text-gray-500" weight="duotone" />
@@ -894,6 +905,7 @@ const LeaveApplicationsList = () => {
 
   return (
     <div className="p-6">
+      <LeaveAwaitingMe />
       <div className="mb-6">
         <h2 className="text-2xl font-semibold text-gray-800">My Leave Applications</h2>
         <div className="flex items-center mt-2">
@@ -918,6 +930,9 @@ const LeaveApplicationsList = () => {
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Approvals
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Submitted On
@@ -948,6 +963,9 @@ const LeaveApplicationsList = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {getStatusBadge(app.status)}
+                  </td>
+                  <td className="px-6 py-4">
+                    {chains[app.id] ? <ApprovalChain chain={chains[app.id]} compact /> : <span className="text-xs text-gray-400">-</span>}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
                     {parseApplicationDate(app).toLocaleDateString()}
