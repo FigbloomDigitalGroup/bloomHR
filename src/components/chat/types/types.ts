@@ -63,6 +63,7 @@ export interface DirectMessage {
   // Add these optional properties for better integration
   lastMessage?: string;
   lastMessageTime?: string;
+  hasMessages?: boolean;
   email?: string;
   isOnline?: boolean;
 }
