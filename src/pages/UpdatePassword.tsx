@@ -84,7 +84,7 @@ const UpdatePasswordPage = () => {
   if (isSuccess) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6" style={bgStyle}>
-        <div className="bg-white rounded-2xl shadow-2xl p-10 max-w-md w-full text-center border border-white/10">
+        <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-10 max-w-md w-full text-center border border-white/10">
           <div className="flex justify-center mb-6">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
               <CheckCircle2 className="h-10 w-10 text-green-600" />
@@ -115,7 +115,7 @@ const UpdatePasswordPage = () => {
   if (!isValidSession) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6" style={bgStyle}>
-        <div className="bg-white rounded-2xl shadow-2xl p-10 max-w-md w-full text-center border border-white/10">
+        <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-10 max-w-md w-full text-center border border-white/10">
           <div className="flex justify-center mb-6">
             <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center">
               <X className="h-10 w-10 text-red-500" />
@@ -139,7 +139,7 @@ const UpdatePasswordPage = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6" style={bgStyle}>
-      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full border border-white/10">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full border border-white/10">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">

@@ -5,6 +5,7 @@ import { fetchAll, fetchAllResult } from '../../lib/fetchAll';
 import { groupBy } from '../../lib/utils';
 import toast from 'react-hot-toast';
 import FigbloomLoader from '../UI/FigbloomLoader';
+import TableScroll from '../UI/TableScroll';
 
 interface PayrollRecord {
     id?: number;
@@ -134,6 +135,7 @@ export default function PayrollHistoryModule() {
                 </div>
             ) : (
                 <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <TableScroll>
                     <table className="w-full text-xs">
                         <thead>
                             <tr className="bg-gray-50 border-b border-gray-200">
@@ -243,6 +245,7 @@ export default function PayrollHistoryModule() {
                             ))}
                         </tbody>
                     </table>
+                    </TableScroll>
                 </div>
             )}
         </div>

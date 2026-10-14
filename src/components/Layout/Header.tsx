@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { AccessibilityButton } from '../Accessibility/AccessibilityModal';
-import { Bell, X, Trash2, CheckCircle, UserPlus, Calendar, Image, Upload, MapPin, ChevronDown, AlertTriangle, Clock, HelpCircle } from 'lucide-react';
+import { Bell, X, Trash2, CheckCircle, UserPlus, Calendar, Image, Upload, MapPin, ChevronDown, AlertTriangle, Clock, HelpCircle, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -22,6 +22,9 @@ interface HeaderProps {
   towns?: string[];
   regions?: string[];
   allTowns?: string[];
+  /** opens the sidebar drawer on phones; the button only shows below md */
+  onOpenMenu?: () => void;
+  menuOpen?: boolean;
 }
 
 interface NotificationItem {
@@ -122,7 +125,7 @@ const HeaderDropdown = ({ value, options, onChange, placeholder, icon: Icon }: {
   );
 };
 // ...
-export default function Header({ selectedTown, onTownChange, selectedRegion, onRegionChange, towns, regions }: HeaderProps) {
+export default function Header({ selectedTown, onTownChange, selectedRegion, onRegionChange, towns, regions, onOpenMenu, menuOpen }: HeaderProps) {
   // the company the person is working in: its name stands in until a company profile has been set up
   const { data: myCompanies } = useMyCompanies();
   const currentCompanyName = myCompanies?.find((c) => c.is_current)?.name;
@@ -545,6 +548,19 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
       >
+        {onOpenMenu && (
+          <button
+            type="button"
+            onClick={onOpenMenu}
+            aria-label="Open menu"
+            aria-expanded={!!menuOpen}
+            aria-controls="app-sidebar"
+            className="md:hidden -ml-1 w-9 h-9 flex-shrink-0 rounded-pill flex items-center justify-center text-muted-foreground hover:bg-secondary transition-colors"
+          >
+            <Menu className="w-5 h-5 stroke-[1.8px]" />
+          </button>
+        )}
+
         {/* Company menu: switch company, company profile, new company */}
         <div className="flex items-center min-w-0 flex-shrink max-w-[38%] sm:max-w-[240px]">
           <CompanySwitcher
@@ -839,7 +855,7 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'tween', duration: 0.3 }}
-              className="fixed right-4 top-4 h-[95vh] w-96 bg-white z-50 flex flex-col rounded-2xl"
+              className="fixed right-4 top-4 h-[95vh] w-[calc(100vw-2rem)] sm:w-96 bg-white z-50 flex flex-col rounded-2xl"
               style={{
                 boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
                 border: '1px solid rgba(255, 255, 255, 0.2)'

@@ -21,6 +21,7 @@ import CompanyGate from './components/Company/CompanyGate';
 import AppSkeleton from './components/Layout/AppSkeleton';
 import FigbloomLoader from './components/UI/FigbloomLoader';
 import { useCompanySwitching } from './hooks/useMyCompanies';
+import { useMobileNav } from './components/Layout/useMobileNav';
 import { isStaleChunkError, reloadOnceForStaleChunk } from './lib/staleChunk';
 import { welcomeMessage } from './lib/welcome';
 import { isHiddenModule } from './lib/hiddenModules';
@@ -897,7 +898,9 @@ function App() {
     navigationHandled.current = false;
   }, [location.pathname]);
 
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  // tablets start with the slim sidebar so the page keeps its room; phones get a drawer instead (below md)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 1024);
+  const mobileNav = useMobileNav();
   const switchingCompany = useCompanySwitching();
 
   if (!authChecked || isInitializing) {
@@ -989,8 +992,11 @@ function App() {
                         isCollapsed={isSidebarCollapsed}
                         onToggle={setIsSidebarCollapsed}
                         onLogout={handleLogout}
+                        isMobile={mobileNav.isMobile}
+                        mobileOpen={mobileNav.open}
+                        onMobileClose={mobileNav.closeNav}
                       />
-                      <div className={`flex-1 min-w-0 min-h-0 flex flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${isSidebarCollapsed ? 'ml-[88px]' : 'ml-[280px]'}`}>
+                      <div className={`flex-1 min-w-0 min-h-0 flex flex-col transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ml-0 ${isSidebarCollapsed ? 'md:ml-[88px]' : 'md:ml-[280px]'}`}>
                         <Header
                           user={user}
                           onLogout={handleLogout}
@@ -1001,8 +1007,11 @@ function App() {
                           towns={filteredTowns}
                           regions={regions}
                           allTowns={branches}
+                          onOpenMenu={mobileNav.openNav}
+                          menuOpen={mobileNav.open}
                         />
-                        <main className={location.pathname === '/teams' ? 'flex-1 min-h-0 overflow-hidden flex flex-col' : 'flex-1 overflow-x-hidden p-4'}>
+                        {/* on phones the bottom padding lets the last controls scroll clear of the AI assistant button */}
+                        <main className={location.pathname === '/teams' ? 'flex-1 min-h-0 overflow-hidden flex flex-col' : 'flex-1 overflow-x-hidden p-4 pb-20 sm:pb-4'}>
                           {/* the new page fades in; no exit animation, so there's no blank moment between pages */}
                             <div key={location.pathname} className="page-enter w-full h-full">
                               <Suspense fallback={<PageLoader />}>

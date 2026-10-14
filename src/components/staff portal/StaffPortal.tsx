@@ -62,6 +62,7 @@ import { addIncoming, toUnreadCounts, totalUnread, type IncomingMessage, type Un
 import CelebrationsCard from './CelebrationsCard';
 import VideoConferenceComponent from './VideoConf';
 import UserProfileDropdown from './UserProfile';
+import StaffMobileHeader from './StaffMobileHeader';
 import PasswordResetModal from './PasswordRestModal';
 import MyDocumentsPage from '../Onboarding/MyDocumentsPage';
 import Appearance from '../Settings/Appearance';
@@ -304,7 +305,7 @@ function NotificationSidebar({
                 <h3 className="text-lg font-bold text-gray-900">Notifications</h3>
                 <p className="text-xs text-gray-500">{notifications.length} updates pending</p>
               </div>
-              <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+              <button onClick={onClose} aria-label="Close notifications" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                 <X className="w-5 h-5 text-gray-400" />
               </button>
             </div>
@@ -3233,25 +3234,15 @@ const StaffPortal = () => {
       <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
 
         {/* Mobile Header Toggle */}
-        <div className="md:hidden flex items-center justify-between p-4 bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-40">
-          <div className="flex items-center space-x-3">
-            <div className="relative w-8 h-8 rounded-lg bg-brand flex items-center justify-center shadow-lg shadow-brand/20">
-              <img src={bloomMark} alt="Logo" className="w-5 h-5 object-contain brightness-0 invert" />
-            </div>
-            <span className="font-sans font-bold text-gray-900 tracking-tight">Staff Portal</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setActiveTab('details')}
-              className="w-8 h-8 rounded-full bg-green-tint border border-green-tint flex items-center justify-center text-brand font-bold text-xs"
-            >
-              {userName[0]?.toUpperCase()}
-            </button>
-            <button onClick={() => setSidebarOpen(true)} className="p-2 text-gray-500 hover:text-brand">
-              <Menu className="w-6 h-6" />
-            </button>
-          </div>
-        </div>
+        <StaffMobileHeader
+          userName={userName}
+          hasUnread={unreadNotifications.length > 0}
+          loginStatus={loginStatus}
+          onOpenNotifications={() => setNotificationSidebarOpen(true)}
+          onOpenMenu={() => setSidebarOpen(true)}
+          onPasswordReset={() => setShowResetModal(true)}
+          setActiveTab={setActiveTab}
+        />
 
         {/* Floating Header */}
         <motion.header
@@ -3324,7 +3315,7 @@ const StaffPortal = () => {
               className={activeTab === 'chat' ? 'flex-1 min-h-0' : undefined}
             >
               {employeeLinked === false && (
-                <div className="m-6 mb-0 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <div className="m-0 mb-4 sm:m-6 sm:mb-0 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                   <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
                   <div>
                     <p className="font-semibold">Your account isn't linked to an employee record</p>
@@ -3337,7 +3328,7 @@ const StaffPortal = () => {
               )}
               {/* Render Active Tab */}
               {activeTab === 'home' && <DashboardHome setActiveTab={setActiveTab} userName={userName} />}
-              {activeTab === 'salary-advance' && <div className="p-6"><SalaryAdvanceForm /></div>}
+              {activeTab === 'salary-advance' && <div className="p-0 sm:p-6"><SalaryAdvanceForm /></div>}
               {activeTab === 'onboarding' && <OnboardingForm />}
               {activeTab === 'biodata' && <EmployeeBioPage />}
               {activeTab === 'payslips' && <PayslipViewer />}

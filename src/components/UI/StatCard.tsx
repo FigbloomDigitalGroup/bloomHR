@@ -23,12 +23,12 @@ export default function StatCard({ label, value, icon, tint = 'green', className
   const { bg, fg } = tintClasses[tint];
   return (
     <Card className={className}>
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <div className="text-[11.5px] font-semibold text-muted-foreground">{label}</div>
-          <div className="text-2xl font-bold text-ink mt-1">{value}</div>
+          <div className="text-xl sm:text-2xl font-bold text-ink mt-1 break-words">{value}</div>
         </div>
-        <div className={`w-[38px] h-[38px] rounded-tile flex items-center justify-center ${bg} ${fg}`}>
+        <div className={`w-[38px] h-[38px] shrink-0 rounded-tile flex items-center justify-center ${bg} ${fg}`}>
           {icon}
         </div>
       </div>

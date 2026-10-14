@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { lastDayOf } from '../../lib/payrollExports';
 import { RATE_LABELS, type RateRow, ratesInForce, setCompanyRate } from '../../lib/statutoryRates';
 import FigbloomLoader from '../UI/FigbloomLoader';
+import TableScroll from '../UI/TableScroll';
 
 // The statutory rates payroll uses for a month (statutory_rates), and where each comes from. Payroll can give the
 // company its own rate for a code from a date; the defaults change only with the law (by migration).
@@ -66,6 +67,7 @@ export default function StatutoryRatesModal({ payPeriod, onClose, onChanged }: {
         <div className="overflow-y-auto px-5 py-4">
           {!rows && <FigbloomLoader label="Loading rates" size={48} />}
           {rows && (
+            <TableScroll>
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-muted-foreground">
@@ -95,6 +97,7 @@ export default function StatutoryRatesModal({ payPeriod, onClose, onChanged }: {
                 ))}
               </tbody>
             </table>
+            </TableScroll>
           )}
 
           {editing && (

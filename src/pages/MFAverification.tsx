@@ -387,7 +387,7 @@ export default function MFAVerification() {
   return (
     <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style={{ background: 'linear-gradient(135deg, #022c22 0%, #065f46 50%, #4ade80 100%)' }}>
       <div className="max-w-md w-full space-y-8">
-        <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
+        <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-lg border border-gray-100">
           <div className="flex justify-center mb-6">
             <div className="p-4 rounded-full" style={{ background: 'linear-gradient(135deg, #022c22 0%, #4ade80 100%)' }}>
               <img

@@ -10,3 +10,6 @@ export { default as EmptyState } from './EmptyState';
 export { default as SearchInput } from './SearchInput';
 export { default as Button } from './Button';
 export { default as EmployeePicker } from './EmployeePicker';
+export { default as Modal } from './Modal';
+export type { ModalSize } from './Modal';
+export { default as TableScroll } from './TableScroll';
