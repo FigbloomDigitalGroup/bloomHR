@@ -5,6 +5,7 @@ import { StatusBadge } from './StatusBadge';
 import { sendEmail } from '../../../services/email';
 import toast from 'react-hot-toast';
 import { openPrivateFile } from '../../../lib/privateFiles';
+import { saveInterview } from '../pipeline/api';
 
 interface ApplicationsTableProps {
   applications: any[];
@@ -94,6 +95,21 @@ export const ApplicationsTable = ({ applications, setSelectedApplication }: Appl
         subject: `Interview Scheduled for ${selectedApplicationForSchedule.position}`,
         html: emailContent,
       }, 'recruitment');
+
+      // keep the interview too, so it shows on the candidate's page in the pipeline
+      try {
+        await saveInterview({
+          applicationId: selectedApplicationForSchedule.id,
+          scheduledAt: new Date(`${scheduleData.date}T${scheduleData.time}`),
+          durationMinutes: Number(scheduleData.duration) || 30,
+          mode: scheduleData.interviewType === 'in-person' ? 'in_person' : 'video',
+          location: scheduleData.location,
+          meetingLink: scheduleData.meetingLink,
+          notes: scheduleData.notes,
+        });
+      } catch (saveError) {
+        toast.error('Email sent, but the interview could not be saved: ' + (saveError as Error).message);
+      }
 
       toast.success('Interview scheduled and email sent!');
       setShowScheduleModal(false);
