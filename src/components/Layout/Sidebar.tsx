@@ -25,7 +25,7 @@ import {
   Mails,
   ShieldHalf,
   HeartHandshake,
-  LogOut, CalendarDays, ClipboardCheck
+  LogOut, CalendarDays, ClipboardCheck, Layers
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useMyPreferences } from '../../hooks/useMyPreferences';
@@ -72,6 +72,8 @@ const menuGroups = [
     title: "Finance",
     items: [
       { id: 'payroll', label: 'Payroll', icon: Landmark, path: '/payroll', permission: 'payroll' },
+      // job groups and their pay: for Payroll and Employees, who can't open Settings
+      { id: 'job-groups', label: 'Job groups', icon: Layers, path: '/settings/job-groups', anyPermission: ['payroll', 'employees'] },
       { id: 'expense', label: 'Expenses', icon: Receipt, path: '/expenses', permission: 'expenses' },
       { id: 'advanced', label: 'Salary Advance', icon: Landmark, path: '/salaryadmin', permission: 'salaryadmin' },
       { id: 'asset', label: 'Assets', icon: Package, path: '/asset', permission: 'asset' },
@@ -110,7 +112,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
   const [searchQuery, setSearchQuery] = useState('');
 
   // Use permissions hook for dynamic access control
-  const { hasPermission, loading: permissionsLoading } = usePermissions();
+  const { hasPermission, hasAnyPermission, loading: permissionsLoading } = usePermissions();
   const { data: myPreferences } = useMyPreferences(user?.email);
 
   // Badge on "Time Off" (FIG-575): count of pending leave applications that
@@ -357,6 +359,8 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
                     // While permissions are loading, show all items (avoid blank sidebar flash)
                     // Once loaded, hide items the user doesn't have access to
                     if (!permissionsLoading && item.permission && !hasPermission(item.permission)) return null;
+                    const anyOf = (item as { anyPermission?: string[] }).anyPermission;
+                    if (!permissionsLoading && anyOf && !hasAnyPermission(anyOf)) return null;
 
                     return (
                       <motion.button

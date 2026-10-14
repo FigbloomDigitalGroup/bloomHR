@@ -19,6 +19,9 @@ import { STARTER_DEPARTMENTS, ensureBranchListed, loadEmployeeFieldValues, optio
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 import { useUser } from '../ProtectedRoutes/UserContext';
 import { PAYMENT_METHODS, paymentMethodOption } from '../../lib/paymentMethods';
+import { useJobGroups } from '../../hooks/useJobGroups';
+import JobGroupPicker from './JobGroupPicker';
+import { lockedPayFields } from '../../lib/jobGroups';
 
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'SHIF Number'?: string | null;
@@ -74,6 +77,8 @@ const EditEmployeePage = () => {
   const { user } = useUser();
   const isAdmin = user?.role === 'ADMIN';
   const isHR = user?.role === 'HR';
+  // the company's job groups (null when this person may not see them: the free-text "Job Group" stays)
+  const jobGroups = useJobGroups();
   const [deleting, setDeleting] = useState(false);
 
   const [employee, setEmployee] = useState<Partial<Employee>>({});
@@ -974,15 +979,16 @@ const EditEmployeePage = () => {
                     options={dropdownOptions.jobTitles}
                     disabled={!isEditMode}
                   />
+                  {/* chosen under Salary Information when the company has job groups */}
                   <FormField
                     label="Job Group"
                     name="Job Group"
-                    type={isEditMode ? "select" : "text"}
+                    type={isEditMode && !jobGroups?.length ? "select" : "text"}
                     creatable
                     value={employee['Job Group'] || ''}
                     onChange={handleInputChange}
                     options={dropdownOptions.jobGroup}
-                    disabled={!isEditMode}
+                    disabled={!isEditMode || !!jobGroups?.length}
                   />
                   <FormField
                     label="Branch"
@@ -1253,6 +1259,14 @@ const EditEmployeePage = () => {
                     icon={CreditCard}
                   />
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+                    {!!jobGroups?.length && (
+                      <JobGroupPicker
+                        groups={jobGroups}
+                        values={employee as Record<string, unknown>}
+                        onChange={(patch) => setEmployee(prev => ({ ...prev, ...patch }) as typeof prev)}
+                        disabled={!isEditMode}
+                      />
+                    )}
                     {isAdmin && (
                       <FormField
                         label="Basic Salary"
@@ -1266,7 +1280,7 @@ const EditEmployeePage = () => {
                             "Basic Salary": numValue
                           }));
                         }}
-                        disabled={!isEditMode}
+                        disabled={!isEditMode || lockedPayFields(jobGroups, employee as Record<string, unknown>).includes('Basic Salary')}
                       />
                     )}
                     <FormField
@@ -1283,6 +1297,7 @@ const EditEmployeePage = () => {
                     values={employee as Record<string, unknown>}
                     onChange={(field, value) => setEmployee(prev => ({ ...prev, [field]: value }))}
                     disabled={!isEditMode}
+                    locked={lockedPayFields(jobGroups, employee as Record<string, unknown>)}
                   />
                 </div>
               )}

@@ -23,9 +23,11 @@ interface Props {
   values: Record<string, unknown>;
   onChange: (field: string, value: unknown) => void;
   disabled?: boolean;
+  /** fields set by the employee's job group, shown but not editable */
+  locked?: string[];
 }
 
-export default function EmployerPayFields({ values, onChange, disabled }: Props) {
+export default function EmployerPayFields({ values, onChange, disabled, locked = [] }: Props) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
       <SelectField
@@ -38,8 +40,9 @@ export default function EmployerPayFields({ values, onChange, disabled }: Props)
         disabled={disabled}
       />
       {AMOUNTS.map(([field, label, hint]) => (
-        <AmountField key={field} label={label} hint={hint ?? 'Per month; leave blank if none'} value={values[field]}
-          onChange={(v) => onChange(field, v)} disabled={disabled} />
+        <AmountField key={field} label={label}
+          hint={locked.includes(field) ? 'Set by the job group' : hint ?? 'Per month; leave blank if none'} value={values[field]}
+          onChange={(v) => onChange(field, v)} disabled={disabled || locked.includes(field)} />
       ))}
     </div>
   );

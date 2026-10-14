@@ -942,6 +942,10 @@ Company Name
               <div className="space-y-3">
                 <DetailRow label="Full Name" value={`${employee['First Name']} ${employee['Middle Name'] || ''} ${employee['Last Name']}`.trim()} />
                 <DetailRow label="Job Title" value={employee['Job Title'] || 'N/A'} />
+                <DetailRow
+                  label="Job Group"
+                  value={`${employee['Job Group'] || 'N/A'}${isAdmin && employee.job_group_id && employee.pay_overridden ? ' (pay set by hand)' : ''}`}
+                />
                 <DetailRow label="Department" value={employee['Employee Type'] || 'N/A'} />
                 <DetailRow label="Start Date" value={employee['Start Date'] ? format(new Date(employee['Start Date']), 'MMMM d, yyyy') : 'N/A'} />
                 <DetailRow label="Email" value={employee['Email Address'] || 'N/A'} />
