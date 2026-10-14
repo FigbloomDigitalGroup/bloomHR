@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   Plus,
@@ -568,7 +569,7 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
       }
     } catch (error) {
       console.error('Error fetching expenses:', error);
-      alert('Error fetching expenses. Please try again.');
+      toast.error('Error fetching expenses. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -749,10 +750,10 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
       });
       
       setShowAddForm(false);
-      alert('Expense submitted successfully!');
+      toast.success('Expense submitted successfully!');
     } catch (error) {
       console.error('Error adding expense:', error);
-      alert('Error adding expense. Please try again.');
+      toast.error('Error adding expense. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -827,10 +828,10 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
       const actionMessage = approvalAction === 'recommend' 
         ? 'Recommendation added successfully! Expense can still be approved or rejected.'
         : `Expense ${approvalAction}d successfully!`;
-      alert(actionMessage);
+      toast.success(actionMessage);
     } catch (error) {
       console.error('Error updating expense:', error);
-      alert('Error updating expense. Please try again.');
+      toast.error('Error updating expense. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -871,10 +872,10 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
       setShowReceiptUpload(false);
       setReceiptUploadExpense(null);
       setReceiptFile(null);
-      alert('Receipt uploaded successfully!');
+      toast.success('Receipt uploaded successfully!');
     } catch (error) {
       console.error('Error uploading receipt:', error);
-      alert('Error uploading receipt. Please try again.');
+      toast.error('Error uploading receipt. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -1691,7 +1692,7 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                         <button
                           type="button"
                           onClick={() =>
-                            openPrivateFile('expense-receipts', selectedExpense.receipt!).catch((err) => alert(err.message))
+                            openPrivateFile('expense-receipts', selectedExpense.receipt!).catch((err) => toast.error(err.message))
                           }
                           className="text-xs text-blue-600 hover:text-blue-800 flex items-center space-x-1"
                         >

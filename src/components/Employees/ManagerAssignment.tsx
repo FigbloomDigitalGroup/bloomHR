@@ -9,6 +9,7 @@ import { Card, Button, TabBar, SearchInput, StatusPill, EmptyState } from '../UI
 import SearchableDropdown from '../UI/SearchableDropdown';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 type Employee = Database['public']['Tables']['employees']['Row'];
 
 const ManagerAssignment = () => {
@@ -222,7 +223,7 @@ const ManagerAssignment = () => {
     // ... (render logic)
 
     const handleUnassign = async (empId: string) => {
-        if (!window.confirm('Are you sure you want to remove this manager appointment?')) return;
+        if (!(await confirmDialog({ title: 'Remove this manager appointment?', confirmLabel: 'Remove', tone: 'danger' }))) return;
 
         try {
             const { error } = await supabase

@@ -19,6 +19,7 @@ import { supabase } from '../../lib/supabase';
 import { fetchAllResult } from '../../lib/fetchAll';
 import { PageHeader, Card, Button, Modal } from '../UI';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 interface BirthdayEntry {
   name: string;
   town?: string;
@@ -152,7 +153,7 @@ export default function CompanyCalendar() {
   };
 
   const handleDeleteEvent = async (event: CompanyEvent) => {
-    if (!window.confirm(`Remove "${event.title}" from the calendar?`)) return;
+    if (!(await confirmDialog({ title: `Remove “${event.title}” from the calendar?`, confirmLabel: 'Remove', tone: 'danger' }))) return;
     try {
       const { error } = await supabase.from('company_events').delete().eq('id', event.id);
       if (error) throw error;

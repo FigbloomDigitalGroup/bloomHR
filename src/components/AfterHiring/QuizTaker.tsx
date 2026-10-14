@@ -3,6 +3,7 @@ import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { Button } from '../UI';
 import { type QuizResult, type QuizToTake, loadQuizToTake, submitQuiz } from '../../lib/afterHiring';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 // Taking a test in the staff portal: one choice per question, then the answers are sent and marked by the database
 // (the right answers never reach the browser). One attempt; the result shows straight away.
 
@@ -34,7 +35,7 @@ export default function QuizTaker({ assignmentId, onFinished, onClose }: {
       setProblem(`Answer every question (${unanswered} left).`);
       return;
     }
-    if (!window.confirm('Send your answers? You can take this test once.')) return;
+    if (!(await confirmDialog({ title: 'Send your answers?', message: 'You can take this test once.', confirmLabel: 'Send answers' }))) return;
     setBusy(true);
     setProblem(null);
     try {

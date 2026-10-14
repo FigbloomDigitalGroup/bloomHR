@@ -18,6 +18,7 @@ import {
   unknownPlaceholders,
 } from '../../lib/offers';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 // Writing an offer: the candidate, the job and its pay (a job group fills the pay from its current rate), the dates,
 // and the letter (from a template, editable), with the letter previewed beside the form as the candidate will see it.
 
@@ -74,11 +75,11 @@ export default function OfferEditor({ offer, initial, templates, groups, brandin
     setFields((f) => ({ ...f, job_group_id: id || null, ...(pay ?? {}) }));
   };
 
-  const chooseTemplate = (id: string) => {
+  const chooseTemplate = async (id: string) => {
     const t = templates.find((x) => x.id === id);
     if (!t) return;
     if (fields.body.trim() && fields.body !== templates.find((x) => x.id === fields.template_id)?.body
-        && !window.confirm('Replace the letter you have written with this template?')) return;
+        && !(await confirmDialog({ title: 'Replace your letter?', message: 'The letter you have written is replaced with this template.', confirmLabel: 'Replace' }))) return;
     setFields((f) => ({ ...f, template_id: t.id, title: t.title, body: t.body }));
   };
 

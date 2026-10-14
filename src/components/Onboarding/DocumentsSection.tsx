@@ -17,6 +17,7 @@ import {
 } from '../../lib/employeeDocuments';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 // The employee's documents, by section: what is required, what they uploaded and what HR made of each file.
 // Only the employee uploads (HR reviews them in the Onboarding review panel).
 
@@ -45,7 +46,7 @@ function DocumentRow({ item, files, employeeId, onChanged }: { item: ChecklistIt
   };
 
   const remove = async (doc: EmployeeDocument) => {
-    if (!window.confirm(`Remove ${doc.file_name}?`)) return;
+    if (!(await confirmDialog({ title: `Remove ${doc.file_name}?`, confirmLabel: 'Remove', tone: 'danger' }))) return;
     try {
       await deleteMyDocument(doc);
       onChanged();

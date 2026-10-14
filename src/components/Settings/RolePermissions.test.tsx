@@ -93,7 +93,7 @@ describe('RolePermissions', () => {
 
     fireEvent.click(role('Administrator')); // confirm -> discard
     expect(window.confirm).toHaveBeenCalled();
-    expect(screen.queryByText('Unsaved changes')).toBeNull();
+    await waitFor(() => expect(screen.queryByText('Unsaved changes')).toBeNull());
 
     // the old behaviour kept the edit in memory, showing 2 with no Save button
     expect(role('Human Resources').textContent).toContain('1');

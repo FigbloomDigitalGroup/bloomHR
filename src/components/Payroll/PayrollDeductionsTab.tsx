@@ -21,6 +21,7 @@ import {
   type ParsedDeductionRow,
 } from '../../lib/voluntaryDeductions';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 // The Deductions tab (was the "Deductions" pop-up): the company's own deduction types (SACCO, welfare...) and what
 // each employee has taken from pay every month.
 
@@ -160,10 +161,10 @@ export default function PayrollDeductionsTab({ onChanged, draftNotice }: Payroll
     if (saved) setForm(null);
   };
 
-  const handleRemove = (d: EmployeeDeduction) => {
+  const handleRemove = async (d: EmployeeDeduction) => {
     const who = employeeName.get(d.employee_number) ?? d.employee_number;
     const what = typeById.get(d.deduction_type_id)?.name ?? 'deduction';
-    if (!window.confirm(`Stop taking ${what} from ${who}? Payslips already approved keep it.`)) return;
+    if (!(await confirmDialog({ title: `Stop taking ${what} from ${who}?`, message: 'Payslips already approved keep it.', confirmLabel: 'Stop deduction', tone: 'danger' }))) return;
     change(() => removeEmployeeDeduction(d.id), `${what} removed for ${who}.`);
   };
 

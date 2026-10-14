@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { X, Check } from 'lucide-react';
 import { GlowButton } from './GlowButton';
 import { useRecruitmentDepartments } from './constants/departments';
@@ -89,7 +90,7 @@ export const NewPositionModal = ({ onClose }: NewPositionModalProps) => {
               icon={Check}
               size="sm"
               onClick={() => {
-                alert("New position created successfully");
+                toast.success("New position created successfully");
                 onClose();
               }}
             >

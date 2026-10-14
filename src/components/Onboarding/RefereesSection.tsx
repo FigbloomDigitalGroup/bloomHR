@@ -6,6 +6,7 @@ import { TextField } from './Fields';
 import { type Referee, deleteReferee, emptyReferee, loadReferees, refereeProblem, saveReferee } from '../../lib/employeeDocuments';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 // The employee's referees: as many as they like, at least one. Each has a phone number or an email.
 
 const errorText = (err: unknown, fallback: string) => (err instanceof Error && err.message ? err.message : fallback);
@@ -44,7 +45,7 @@ export default function RefereesSection({ employeeId, onChanged }: { employeeId:
   };
 
   const remove = async (r: Referee) => {
-    if (!r.id || !window.confirm(`Remove ${r.full_name}?`)) return;
+    if (!r.id || !(await confirmDialog({ title: `Remove ${r.full_name}?`, confirmLabel: 'Remove', tone: 'danger' }))) return;
     try {
       await deleteReferee(r.id);
       await load();

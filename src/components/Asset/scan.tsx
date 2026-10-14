@@ -13,6 +13,7 @@ import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 type Asset = Database['public']['Tables']['assets']['Row'];
 
 const QRScanner: React.FC = () => {
@@ -309,8 +310,8 @@ const QRScanner: React.FC = () => {
   };
 
   // Clear history
-  const clearHistory = () => {
-    if (window.confirm('Are you sure you want to clear scan history?')) {
+  const clearHistory = async () => {
+    if (await confirmDialog({ title: 'Clear the scan history?', confirmLabel: 'Clear', tone: 'danger' })) {
       setScanHistory([]);
     }
   };

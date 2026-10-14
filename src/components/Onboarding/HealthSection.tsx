@@ -23,6 +23,7 @@ import {
 } from '../../lib/employeeHealth';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 // The employee's health information: optional, after consent. Medical conditions and disability / accommodation
 // needs, with supporting documents from medical institutions.
 
@@ -101,7 +102,7 @@ export default function HealthSection({ employeeId }: { employeeId: string }) {
                 onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f && r.id) void act(() => uploadHealthFile(r.id as string, f), 'Document uploaded'); }} />
             </label>
             <button type="button" onClick={() => setEditing(r)} className="text-xs text-brand inline-flex items-center gap-1"><Pencil className="h-3.5 w-3.5" /> Edit</button>
-            <button type="button" onClick={() => { if (window.confirm(`Delete ${r.title} and its documents?`)) void act(() => deleteHealthRecord(r)); }}
+            <button type="button" onClick={async () => { if (await confirmDialog({ title: `Delete ${r.title} and its documents?`, confirmLabel: 'Delete', tone: 'danger' })) void act(() => deleteHealthRecord(r)); }}
               className="text-xs text-muted-foreground hover:text-status-danger inline-flex items-center gap-1"><Trash2 className="h-3.5 w-3.5" /> Delete</button>
           </div>
           {(r.files ?? []).length > 0 && (
@@ -154,8 +155,8 @@ export default function HealthSection({ employeeId }: { employeeId: string }) {
       <p className="text-xs text-muted-foreground">
         You consented on {new Date(info.consent_given_at).toLocaleDateString('en-KE', { dateStyle: 'medium' })}.{' '}
         <button type="button" className="underline hover:text-status-danger" disabled={busy}
-          onClick={() => {
-            if (window.confirm('Withdraw your consent? All your health information and documents will be deleted.')) {
+          onClick={async () => {
+            if (await confirmDialog({ title: 'Withdraw your consent?', message: 'All your health information and documents will be deleted.', confirmLabel: 'Withdraw consent', tone: 'danger' })) {
               void act(() => withdrawHealthConsent(employeeId, info), 'Your health information was deleted');
             }
           }}>

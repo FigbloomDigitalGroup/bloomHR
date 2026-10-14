@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import EmployeePicker from '../UI/EmployeePicker';
 import { supabase } from '../../lib/supabase';
@@ -533,7 +534,7 @@ export function MicrofinanceTodoList() {
   const handleFormSubmit = useCallback(async (formData: FormData) => {
     try {
       if (!userId) {
-        alert('Please log in to create tasks');
+        toast.error('Please log in to create tasks');
         return;
       }
 
@@ -571,7 +572,7 @@ export function MicrofinanceTodoList() {
       setShowForm(false);
     } catch (error: any) {
       console.error('Error creating todo:', error);
-      alert('Error creating task');
+      toast.error('Error creating task');
     }
   }, [userId]);
 

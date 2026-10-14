@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { Download } from 'lucide-react';
 import { openPrivateFile } from '../../../lib/privateFiles';
 
@@ -28,7 +29,7 @@ export const DetailItem = ({
           <button
             type="button"
             disabled={!value}
-            onClick={() => value && openPrivateFile('resumes', value).catch((err) => alert(err.message))}
+            onClick={() => value && openPrivateFile('resumes', value).catch((err) => toast.error(err.message))}
             className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-xs font-medium text-[#58cc8b] bg-white hover:bg-gray-50 transition-colors"
           >
             <Download className="w-4 h-4 mr-2" />

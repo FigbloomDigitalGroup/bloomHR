@@ -25,6 +25,7 @@ import {
   templateError,
 } from '../../lib/afterHiring';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 // Setting up what new employees get after hiring: orientation checklists, the training required of them, and tests.
 
 const smallInput = 'rounded-lg border border-border px-2 py-1.5 text-sm bg-white text-ink';
@@ -128,7 +129,7 @@ function ChecklistsTab() {
           {!t.active && <StatusPill label="Inactive" />}
           <Button variant="secondary" onClick={() => setEditing({ ...t })}>Edit</Button>
           <button type="button" aria-label={`Delete ${t.name}`} className="p-1 text-muted-foreground hover:text-status-danger"
-            onClick={() => window.confirm(`Delete “${t.name}”? Checklists already given to employees stay.`) &&
+            onClick={async () => (await confirmDialog({ title: `Delete “${t.name}”?`, message: 'Checklists already given to employees stay.', confirmLabel: 'Delete', tone: 'danger' })) &&
               void deleteOrientationTemplate(t.id).then(load, (err) => toast.error((err as Error).message))}>
             <Trash2 className="h-4 w-4" />
           </button>
@@ -340,7 +341,7 @@ function TestsTab() {
           {!q.active && <StatusPill label="Inactive" />}
           <Button variant="secondary" onClick={() => setEditing({ ...q })}>Edit</Button>
           <button type="button" aria-label={`Delete ${q.title}`} className="p-1 text-muted-foreground hover:text-status-danger"
-            onClick={() => window.confirm(`Delete “${q.title}” and everyone’s results for it?`) &&
+            onClick={async () => (await confirmDialog({ title: `Delete “${q.title}”?`, message: 'Everyone’s results for it are deleted too.', confirmLabel: 'Delete', tone: 'danger' })) &&
               void deleteQuiz(q.id).then(load, (err) => toast.error((err as Error).message))}>
             <Trash2 className="h-4 w-4" />
           </button>
