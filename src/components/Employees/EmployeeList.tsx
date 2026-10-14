@@ -622,13 +622,13 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
       {/* Terminate confirmation: hands off to HR Lifecycle, where the termination itself is recorded */}
       {terminateTarget && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto"
           role="dialog"
           aria-modal="true"
           aria-labelledby="terminate-title"
           onClick={() => setTerminateTarget(null)}
         >
-          <Card className="w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+          <Card className="w-full max-w-sm overflow-y-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             <h2 id="terminate-title" className="m-0 text-[15px] font-bold text-ink">
               Terminate {terminateTarget['First Name']} {terminateTarget['Last Name']}?
             </h2>

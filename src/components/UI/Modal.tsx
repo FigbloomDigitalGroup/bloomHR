@@ -44,16 +44,21 @@ export default function Modal({
 }: ModalProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
+  // Callers often pass a fresh `onClose` arrow on every render; keep the latest one in a ref so the
+  // effect below only runs when the modal opens. Otherwise each keystroke in a form inside the modal
+  // re-renders the parent, re-runs the effect and pulls focus off the field onto the panel.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     window.addEventListener('keydown', onKey);
     panelRef.current?.focus();
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

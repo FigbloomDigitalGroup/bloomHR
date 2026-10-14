@@ -176,7 +176,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           <div className="lg:hidden text-center mb-10">
             <div className="inline-flex items-center gap-2 mb-2">
               <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
-                <img src="/bloom-mark.png" alt="Logo" className="w-5 h-5 brightness-0 invert" />
+                <img src="/bloom-mark.png" alt="Logo" className="w-5 h-5 object-contain brightness-0 invert" />
               </div>
               <span className="text-2xl font-bold text-gray-900 tracking-tight">Figbloom<span className="text-gray-500">HR</span></span>
             </div>
@@ -287,11 +287,11 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       </div>
 
       {showForgotPassword && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white p-8 rounded-lg shadow-2xl max-w-md w-full relative"
+            className="bg-white p-8 rounded-lg shadow-2xl max-w-md w-full relative overflow-y-auto max-h-[90vh]"
           >
             <div className="flex justify-between items-start mb-6">
               <div className="space-y-1">

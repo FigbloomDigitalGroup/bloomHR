@@ -1151,11 +1151,11 @@ Company Name
       {/* Confirmation Modal */}
       {
         showConfirm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full"
+              className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full overflow-y-auto max-h-[90vh]"
             >
               <div className="text-center">
                 <div className={`mx-auto flex items-center justify-center h-12 w-12 rounded-full ${employee['Termination Date'] ? 'bg-blue-100' : 'bg-red-100'

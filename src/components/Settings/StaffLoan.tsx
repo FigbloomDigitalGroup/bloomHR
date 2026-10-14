@@ -256,7 +256,7 @@ const LoanRequestsAdmin = () => {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white rounded-[3rem] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col relative z-10 border border-white/20"
+              className="bg-white rounded-[3rem] shadow-2xl w-full max-w-3xl overflow-y-auto flex flex-col relative z-10 border border-white/20 max-h-[90vh]"
             >
               <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
                 <div className="space-y-1">

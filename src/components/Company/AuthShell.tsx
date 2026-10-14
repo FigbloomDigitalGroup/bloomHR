@@ -62,7 +62,7 @@ export default function AuthShell({ title, subtitle, children }: AuthShellProps)
           <div className="lg:hidden text-center mb-10">
             <div className="inline-flex items-center gap-2 mb-2">
               <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
-                <img src="/bloom-mark.png" alt="" className="w-5 h-5 brightness-0 invert" />
+                <img src="/bloom-mark.png" alt="" className="w-5 h-5 object-contain brightness-0 invert" />
               </div>
               <span className="text-2xl font-bold text-gray-900 tracking-tight">
                 Figbloom<span className="text-gray-500">HR</span>

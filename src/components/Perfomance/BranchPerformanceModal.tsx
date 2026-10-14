@@ -173,7 +173,7 @@ const BranchPerformanceTable: React.FC<BranchPerformanceModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-h-[85vh] overflow-hidden max-w-3xl border border-gray-100">
         {/* Header */}
         <div className="bg-primary p-4 text-white">

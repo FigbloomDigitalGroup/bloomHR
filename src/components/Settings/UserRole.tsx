@@ -24,7 +24,7 @@ import { assertEmployeeForStaffLogin } from '../../lib/staffEmployee';
 import { adminApi } from '../../lib/adminApi';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
-import { Card, Button, SearchInput, StatusPill, EmptyState } from '../UI';
+import { Card, Button, SearchInput, StatusPill, EmptyState, Modal } from '../UI';
 import type { StatusTone } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
@@ -346,8 +346,7 @@ const UserEditModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+    <Modal open onClose={onClose} title={user ? 'Edit User' : 'Add New User'} hideTitle size="md" className="bg-white rounded-lg shadow-lg">
         <div className="flex justify-between items-center p-4 border-b">
           <h3 className="text-lg font-semibold text-gray-900">
             {user ? 'Edit User' : 'Add New User'}
@@ -446,7 +445,7 @@ const UserEditModal = ({
 
           <div className="p-3 bg-gray-50 rounded-lg">
             <label className="block text-xs font-medium text-gray-900 mb-2">Account Status</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
                 onClick={() => setEditedUser({ ...editedUser, account_status: 'ACTIVE' })}
                 className={`p-2 border rounded-lg text-xs font-medium transition-colors ${editedUser.account_status === 'ACTIVE' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 hover:bg-gray-50 text-gray-700'}`}
@@ -489,8 +488,7 @@ const UserEditModal = ({
             {user ? 'Save Changes' : 'Create User'}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 
@@ -544,10 +542,9 @@ const ResetPasswordModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
-        <div className="flex justify-between items-center p-4 border-b">
-          <h3 className="text-lg font-semibold text-gray-900">
+    <Modal open onClose={onClose} title={`Reset Password for ${user?.email ?? ''}`} hideTitle size="md" className="bg-white rounded-lg shadow-lg">
+        <div className="flex justify-between items-center gap-2 p-4 border-b">
+          <h3 className="text-lg font-semibold text-gray-900 min-w-0 break-words">
             Reset Password for {user?.email}
           </h3>
           <button
@@ -660,8 +657,7 @@ const ResetPasswordModal = ({
             Reset Password
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

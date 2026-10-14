@@ -402,7 +402,7 @@ const MpesaZapPortal: React.FC = () => {
             <AnimatePresence>
                 {showConfirm && (
                     <div
-                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/40"
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/40 overflow-y-auto"
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby="zap-confirm-title"
@@ -411,7 +411,7 @@ const MpesaZapPortal: React.FC = () => {
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-white rounded-card shadow-xl w-full max-w-md overflow-hidden flex flex-col relative z-10 border border-border"
+                            className="bg-white rounded-card shadow-xl w-full max-w-md overflow-y-auto flex flex-col relative z-10 border border-border max-h-[90vh]"
                         >
                             <div className="p-6 border-b border-border flex flex-col items-center text-center">
                                 <div className="w-12 h-12 rounded-full bg-orange-tint flex items-center justify-center text-orange mb-4">

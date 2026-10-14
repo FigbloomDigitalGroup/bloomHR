@@ -457,7 +457,7 @@ const PayslipModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-xl shadow-lg w-full max-w-6xl max-h-[90vh] overflow-auto">
         <div className="sticky top-0 bg-white p-4 border-b border-gray-200 flex flex-wrap gap-2 justify-between items-center z-10">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Modern Payslip</h2>

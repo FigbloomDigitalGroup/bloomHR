@@ -222,7 +222,7 @@ const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSche
             <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center bg-white/80 backdrop-blur-md gap-4 z-20 sticky top-0">
 
                 {/* Date Navigation */}
-                <div className="flex items-center gap-4 bg-gray-50 p-1.5 rounded-lg border border-gray-200 shadow-sm">
+                <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 bg-gray-50 p-1.5 rounded-lg border border-gray-200 shadow-sm max-w-full">
                     <button
                         onClick={handlePrevMonth}
                         className="p-1.5 hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-600"
@@ -230,7 +230,7 @@ const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSche
                     >
                         <ChevronLeft className="w-5 h-5" />
                     </button>
-                    <div className="flex items-center gap-2 min-w-[160px] justify-center">
+                    <div className="flex items-center gap-2 sm:min-w-[160px] justify-center">
                         <CalendarIcon className="w-4 h-4 text-emerald-600" />
                         <span className="text-sm font-bold text-gray-800 tracking-wide">
                             {format(currentDate, 'MMMM yyyy')}
@@ -347,9 +347,9 @@ const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSche
                 ) : (
                     <>
                         {/* 1. Sticky Sidebar: Employees */}
-                        <div className="flex flex-col border-r border-gray-100 bg-white z-20 shadow-[4px_0_24px_-2px_rgba(0,0,0,0.03)] w-[280px] min-w-[280px]">
+                        <div className="flex flex-col border-r border-gray-100 bg-white z-20 shadow-[4px_0_24px_-2px_rgba(0,0,0,0.03)] w-40 min-w-[10rem] sm:w-[280px] sm:min-w-[280px]">
                             {/* Sidebar Header */}
-                            <div className="h-14 border-b border-gray-100 bg-gray-50/50 flex items-center px-6 font-bold text-gray-400 text-[10px] uppercase tracking-widest justify-between">
+                            <div className="h-14 border-b border-gray-100 bg-gray-50/50 flex items-center px-3 sm:px-6 font-bold text-gray-400 text-[10px] uppercase tracking-widest justify-between">
                                 <span>Staff Member</span>
                                 <span className="bg-white px-2 py-0.5 rounded-md shadow-sm border border-gray-100 text-[10px] text-gray-500">{filteredEmployees.length}</span>
                             </div>
@@ -360,11 +360,11 @@ const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSche
                                     filteredEmployees.map((emp, idx) => (
                                         <div
                                             key={emp.id}
-                                            className={`h-16 border-b border-gray-50/50 flex items-center px-4 transition-all group cursor-pointer 
+                                            className={`h-16 border-b border-gray-50/50 flex items-center px-2 sm:px-4 transition-all group cursor-pointer 
                           ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'} 
                           hover:bg-emerald-50/40 border-l-4 border-l-transparent hover:border-l-emerald-500`}
                                         >
-                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 ring-2 ring-white shadow-sm flex items-center justify-center text-gray-500 mr-3 overflow-hidden flex-shrink-0">
+                                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 ring-2 ring-white shadow-sm flex items-center justify-center text-gray-500 mr-2 sm:mr-3 overflow-hidden flex-shrink-0">
                                                 {emp.avatar_url ? (
                                                     <img src={emp.avatar_url} alt="" className="w-full h-full object-cover" />
                                                 ) : (

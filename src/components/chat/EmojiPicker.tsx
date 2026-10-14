@@ -31,7 +31,7 @@ export function EmojiPicker({ onEmojiSelect, children, open, onOpenChange }: Emo
       <PopoverTrigger asChild>
         {children}
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0 bg-background">
+      <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] p-0 bg-background">
         <div className="max-h-60 overflow-y-auto">
           {Object.entries(emojiCategories).map(([category, emojis]) => (
             <div key={category} className="border-b last:border-b-0">
@@ -69,7 +69,7 @@ export function EmojiPickerWithSolidHeaders({ onEmojiSelect, children, open, onO
       <PopoverTrigger asChild>
         {children}
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0 bg-background">
+      <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] p-0 bg-background">
         <div className="max-h-60 overflow-y-auto">
           {Object.entries(emojiCategories).map(([category, emojis]) => (
             <div key={category} className="border-b last:border-b-0">

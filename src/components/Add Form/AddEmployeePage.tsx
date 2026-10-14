@@ -597,7 +597,7 @@ const AddEmployeePage = () => {
               <img
                 src="/avatar.png"
                 alt="avatar"
-                className="w-16 h-16 rounded-full border-2 border-gray-100 shadow-sm"
+                className="w-16 h-16 rounded-full object-cover border-2 border-gray-100 shadow-sm"
               />
             </div>
             <div>

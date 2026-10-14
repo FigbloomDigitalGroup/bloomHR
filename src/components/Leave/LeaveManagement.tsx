@@ -39,7 +39,7 @@ import { TownProps } from '../../types/supabase';
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 import { useUser } from '../ProtectedRoutes/UserContext';
 import LeaveScheduler from './LeaveScheduler';
-import { PageHeader, StatCard, Card, TabBar, Button, EmptyState } from '../UI';
+import { PageHeader, StatCard, Card, TabBar, Button, EmptyState, Modal } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
 // Initialize Supabase client
@@ -588,8 +588,7 @@ const StatusUpdateModal = ({
   const Icon = getButtonIcon();
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+    <Modal open={isOpen} onClose={onClose} title={getModalTitle()} hideTitle size="md" className="bg-white rounded-xl shadow-lg p-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-base text-gray-900">
             {getModalTitle()}
@@ -638,8 +637,7 @@ const StatusUpdateModal = ({
             {action === 'recommend' ? 'Recommend' : action === 'not_recommend' ? 'Not Recommend' : 'Update Status'}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 
@@ -779,8 +777,7 @@ const LeaveTypeFormModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+    <Modal open={isOpen} onClose={onClose} title={newLeaveType.id ? 'Edit Leave Type' : 'Add Leave Type'} hideTitle size="md" className="bg-white rounded-xl shadow-lg p-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-base text-gray-900">
             {newLeaveType.id ? 'Edit Leave Type' : 'Add Leave Type'}
@@ -820,7 +817,7 @@ const LeaveTypeFormModal = ({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Maximum Days
@@ -854,7 +851,7 @@ const LeaveTypeFormModal = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Accrual Method
@@ -893,7 +890,7 @@ const LeaveTypeFormModal = ({
           </div>
 
           {isYearlyMethod(newLeaveType.accrual_method) && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Remind from (days before year end)</label>
                 <input
@@ -920,7 +917,7 @@ const LeaveTypeFormModal = ({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex items-center">
               <input
                 type="checkbox"
@@ -968,8 +965,7 @@ const LeaveTypeFormModal = ({
             {newLeaveType.id ? 'Update' : 'Save'} Leave Type
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 
@@ -992,8 +988,7 @@ const HolidayFormModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+    <Modal open={isOpen} onClose={onClose} title={newHoliday.id ? 'Edit Holiday' : 'Add Holiday'} hideTitle size="md" className="bg-white rounded-xl shadow-lg p-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-base text-gray-900">
             {newHoliday.id ? 'Edit Holiday' : 'Add Holiday'}
@@ -1070,8 +1065,7 @@ const HolidayFormModal = ({
             {newHoliday.id ? 'Update' : 'Save'} Holiday
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 
@@ -1110,8 +1104,7 @@ const AccrualSettingsModal = ({
   const monthName = new Date().toLocaleDateString(undefined, { month: 'long' });
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
+    <Modal open={isOpen} onClose={onClose} title="Leave Balance Resets" hideTitle size="md" className="bg-white rounded-xl shadow-lg p-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-base text-gray-900">Leave Balance Resets</h3>
           <button
@@ -1196,8 +1189,7 @@ const AccrualSettingsModal = ({
             Close
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 
@@ -1245,8 +1237,7 @@ const LeaveApplicationFormModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto thin-scrollbar">
+    <Modal open={isOpen} onClose={onClose} title="Assign Leave" hideTitle size="2xl" className="bg-white rounded-xl shadow-lg p-4 sm:p-6 thin-scrollbar">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-bold text-gray-900">Assign Leave</h3>
           <button
@@ -1374,8 +1365,7 @@ const LeaveApplicationFormModal = ({
             Confirm Assignment
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 
@@ -3120,11 +3110,11 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
 
       {/* Error Alert */}
       {error && (
-        <div className="fixed bottom-4 right-4 z-50">
+        <div className="fixed bottom-4 right-4 z-50 max-w-[calc(100vw-2rem)]">
           <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-lg">
             <div className="flex items-center gap-2">
-              <AlertCircle className="w-5 h-5" />
-              <div>
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <div className="min-w-0 break-words">
                 <p className="font-medium">Error</p>
                 <p className="text-xs">{error}</p>
               </div>

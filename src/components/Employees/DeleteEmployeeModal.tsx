@@ -44,8 +44,8 @@ export default function DeleteEmployeeModal({ employeeId, isAdmin, onClose }: Pr
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" role="dialog" aria-label="Delete employee">
-      <div className="bg-white rounded-[10px] border border-border shadow-lg w-full max-w-md">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto" role="dialog" aria-label="Delete employee">
+      <div className="bg-white rounded-[10px] border border-border shadow-lg w-full max-w-md overflow-y-auto max-h-[90vh]">
         <div className="px-5 py-3 border-b border-border flex items-center justify-between">
           <h2 className="text-sm font-semibold text-ink">Delete employee</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="p-1 text-muted-foreground hover:text-ink"><X className="h-4 w-4" /></button>

@@ -64,7 +64,7 @@ export default function PoliciesModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" role="dialog" aria-label="Company policies">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto" role="dialog" aria-label="Company policies">
       <div className="bg-white rounded-[10px] border border-border shadow-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
         <div className="px-5 py-3 border-b border-border flex items-center justify-between">
           <div>

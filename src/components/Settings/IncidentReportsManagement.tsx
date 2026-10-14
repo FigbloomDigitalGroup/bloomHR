@@ -402,7 +402,7 @@ const IncidentReportsManagement = () => {
             {/* Report details */}
             {selectedReport && (
                 <div
-                    className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+                    className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto"
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="incident-details-title"

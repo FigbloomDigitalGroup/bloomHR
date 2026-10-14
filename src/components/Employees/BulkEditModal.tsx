@@ -84,12 +84,12 @@ const BulkEditModal: React.FC<BulkEditModalProps> = ({
 
     return (
         <AnimatePresence>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100"
+                    className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-y-auto border border-gray-100 max-h-[90vh]"
                 >
                     {/* Header */}
                     <div className="px-6 py-4 flex items-center justify-between border-b border-gray-100 bg-gray-50/50">

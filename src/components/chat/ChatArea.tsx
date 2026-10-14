@@ -61,17 +61,17 @@ export function ChatArea({ channel, messages, currentUserId, onSendMessage, onTo
     <>
       <div className="flex-1 flex flex-col bg-white">
         {/* Enhanced Header */}
-        <header className="h-16 border-b border-gray-200 flex items-center justify-between px-6 bg-white/80 backdrop-blur-sm">
-          <div className="flex items-center gap-4">
+        <header className="h-16 border-b border-gray-200 flex items-center justify-between gap-2 px-3 sm:px-6 bg-white/80 backdrop-blur-sm">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <SidebarTrigger />
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               {channel.type === 'channel' ? (
-                <div className="w-10 h-10 rounded-lg bg-brand flex items-center justify-center">
+                <div className="w-10 h-10 shrink-0 rounded-lg bg-brand flex items-center justify-center">
                   <Hash className="h-5 w-5 text-white" />
                 </div>
               ) : (
                 <EmployeeProfile employee={channel as any}>
-                  <div className="relative cursor-pointer">
+                  <div className="relative shrink-0 cursor-pointer">
                     {channel.avatar ? (
                       <img src={channel.avatar} alt="" className="w-10 h-10 rounded-full object-cover ring-2 ring-white shadow-sm" />
                     ) : (
@@ -89,29 +89,30 @@ export function ChatArea({ channel, messages, currentUserId, onSendMessage, onTo
                   </div>
                 </EmployeeProfile>
               )}
-              <div>
-                <h1 className="font-semibold text-gray-900 text-lg">
+              <div className="min-w-0">
+                <h1 className="font-semibold text-gray-900 text-base sm:text-lg truncate">
                   {channel.type === 'channel' ? `# ${channel.name}` : channel.name}
                 </h1>
                 {channel.type === 'channel' ? (
-                  <p className="text-sm text-gray-500">
+                  <p className="text-xs sm:text-sm text-gray-500 truncate">
                     {employees.length} members • {channel.isPrivate ? 'Private channel' : 'Public channel'}
                   </p>
                 ) : (
-                  <p className="text-sm text-gray-500 capitalize">
+                  <p className="text-xs sm:text-sm text-gray-500 capitalize truncate">
                     {channel.status} • Direct message
                   </p>
                 )}
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
+            {/* On phones only mute and the menu stay in the header; call, search and members move into the menu */}
             {channel.type === 'direct_message' && (
               <>
-                <Button variant="ghost" size="icon" onClick={handleVoiceCall} className="text-gray-500 hover:text-brand hover:bg-green-tint">
+                <Button variant="ghost" size="icon" onClick={handleVoiceCall} className="hidden sm:inline-flex text-gray-500 hover:text-brand hover:bg-green-tint">
                   <Phone className="h-5 w-5" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={handleVideoCall} className="text-gray-500 hover:text-brand hover:bg-green-tint">
+                <Button variant="ghost" size="icon" onClick={handleVideoCall} className="hidden sm:inline-flex text-gray-500 hover:text-brand hover:bg-green-tint">
                   <Video className="h-5 w-5" />
                 </Button>
               </>
@@ -119,11 +120,11 @@ export function ChatArea({ channel, messages, currentUserId, onSendMessage, onTo
             <Button variant="ghost" size="icon" onClick={handleToggleMute} className="text-gray-500 hover:text-orange-600 hover:bg-orange-50">
               {isMuted ? <BellOff className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleSearch} className="text-gray-500 hover:text-green-600 hover:bg-green-50">
+            <Button variant="ghost" size="icon" onClick={handleSearch} className="hidden sm:inline-flex text-gray-500 hover:text-green-600 hover:bg-green-50">
               <Search className="h-5 w-5" />
             </Button>
             {channel.type === 'channel' && (
-              <Button variant="ghost" size="icon" onClick={handleShowUsers} className="text-gray-500 hover:text-brand hover:bg-green-tint">
+              <Button variant="ghost" size="icon" onClick={handleShowUsers} className="hidden sm:inline-flex text-gray-500 hover:text-brand hover:bg-green-tint">
                 <Users className="h-5 w-5" />
               </Button>
             )}
@@ -136,6 +137,28 @@ export function ChatArea({ channel, messages, currentUserId, onSendMessage, onTo
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
+                {channel.type === 'direct_message' && (
+                  <>
+                    <DropdownMenuItem onClick={handleVoiceCall} className="sm:hidden">
+                      <Phone className="h-4 w-4 mr-2" />
+                      Voice call
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleVideoCall} className="sm:hidden">
+                      <Video className="h-4 w-4 mr-2" />
+                      Video call
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuItem onClick={handleSearch} className="sm:hidden">
+                  <Search className="h-4 w-4 mr-2" />
+                  Search
+                </DropdownMenuItem>
+                {channel.type === 'channel' && (
+                  <DropdownMenuItem onClick={handleShowUsers} className="sm:hidden">
+                    <Users className="h-4 w-4 mr-2" />
+                    Members
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={handleNavigateHome}>
                   <Home className="h-4 w-4 mr-2" />
                   Go to Home

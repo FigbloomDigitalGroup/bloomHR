@@ -34,8 +34,8 @@ export const PDFViewer = ({ fileName, fileUrl, onClose }: PDFViewerProps) => {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
+        <div className="bg-white rounded-lg p-6 overflow-y-auto max-h-[90vh] w-full">
           <FigbloomLoader label="Loading the PDF" size={64} />
         </div>
       </div>
@@ -44,8 +44,8 @@ export const PDFViewer = ({ fileName, fileUrl, onClose }: PDFViewerProps) => {
 
   if (error) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 max-w-md">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
+        <div className="bg-white rounded-lg p-6 max-w-md overflow-y-auto max-h-[90vh] w-full">
           <div className="flex items-center gap-3 text-red-600 mb-4">
             <AlertCircle className="w-5 h-5" />
             <span>{error}</span>
@@ -62,7 +62,7 @@ export const PDFViewer = ({ fileName, fileUrl, onClose }: PDFViewerProps) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-lg w-full max-w-6xl h-[90vh] flex flex-col">
         <div className="flex justify-between items-center p-4 border-b">
           <h3 className="text-lg font-semibold text-gray-900">Resume: {fileName}</h3>

@@ -105,7 +105,7 @@ const DuplicateCheckModal: React.FC<DuplicateCheckModalProps> = ({ isOpen, onClo
 
     return (
         <AnimatePresence>
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -288,12 +288,12 @@ const DuplicateCheckModal: React.FC<DuplicateCheckModalProps> = ({ isOpen, onClo
             {/* Confirmation Modal Overlay */}
             {
                 employeeToDelete && (
-                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
                         <motion.div
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.9 }}
-                            className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden"
+                            className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-y-auto max-h-[90vh]"
                         >
                             <div className="p-6 text-center">
                                 <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
