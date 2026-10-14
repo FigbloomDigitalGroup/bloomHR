@@ -66,11 +66,11 @@ export default function PayrollRunBar({
   return (
     <Card padding="sm" className="!rounded-xl">
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap min-w-0 w-full sm:w-auto sm:flex-1">
           {run && run.status !== 'draft' && <Lock className="w-3.5 h-3.5 text-subtle shrink-0" aria-hidden />}
           <span className="text-xs font-bold text-ink whitespace-nowrap">Payroll {periodLabel}</span>
           <StatusPill label={pill.label} tone={pill.tone} />
-          <span className="text-[11.5px] text-muted-foreground">{message}</span>
+          <span className="text-[11.5px] text-muted-foreground w-full sm:w-auto">{message}</span>
         </div>
 
         {!loading && (

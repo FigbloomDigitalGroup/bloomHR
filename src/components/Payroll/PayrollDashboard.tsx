@@ -1504,8 +1504,10 @@ This can't be undone: the payslips stay locked for good.`,
         className="!mb-0"
         subtitle={<span>Pay, deductions, statutory rates and returns for {periodLabel}</span>}
         actions={
-          <>
+          // one row: the date picker wraps itself in a block, which would put "More" underneath
+          <div className="flex items-center gap-2 flex-wrap">
           <DatePicker
+            wrapperClassName="!w-auto"
             selected={selectedPeriod ?? null}
             onChange={(date) => setSelectedPeriod(date)}
             dateFormat="MMMM yyyy"
@@ -1524,7 +1526,7 @@ This can't be undone: the payslips stay locked for good.`,
             }
           />
           <PayrollMoreMenu items={moreMenuItems} />
-          </>
+          </div>
         }
       />
 
