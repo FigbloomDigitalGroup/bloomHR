@@ -27,6 +27,7 @@ import { Link } from 'react-router-dom';
 import { Card, Button, SearchInput, StatusPill, EmptyState, Modal } from '../UI';
 import type { StatusTone } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
+import EmployeeNumberingCard from './EmployeeNumbering';
 
 // Role definitions
 const ROLES = {
@@ -891,6 +892,8 @@ export default function UserRolesSettings() {
             <span className={`pointer-events-none absolute top-0.5 left-0.5 h-[18px] w-[18px] rounded-full bg-white shadow transition-transform duration-200 ${mfaEnabled ? 'translate-x-[18px]' : 'translate-x-0'}`} />
           </button>
         </Card>
+
+        <EmployeeNumberingCard className="" />
 
         {/* Users */}
         <div className="flex flex-wrap items-center justify-between gap-3">

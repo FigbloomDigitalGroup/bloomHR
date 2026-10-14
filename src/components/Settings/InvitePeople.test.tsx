@@ -9,6 +9,7 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
+vi.mock('./EmployeeNumbering', () => ({ default: () => null }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../../lib/companyApi', async (importOriginal) => {
   const real = await importOriginal<typeof import('../../lib/companyApi')>();

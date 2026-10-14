@@ -10,6 +10,7 @@ import { inviteToOnboard, startOnboardingByEmail } from '../../lib/onboarding';
 import { fetchAll } from '../../lib/fetchAll';
 import { describeSaveError, saveEmployeesInBatches } from '../../lib/bulkEmployees';
 import { employeeTemplateWorkbook, parseAmount } from '../../lib/employeeTemplate';
+import { useEmployeeNumbering } from '../../hooks/useEmployeeNumbering';
 import {
   inviteBatchProgress, lastInviteBatch, progressSummary, queueInvitations, rememberInviteBatch, retryFailedInvitations,
   type InviteProgress,
@@ -203,6 +204,8 @@ const InviteBatchStatus: React.FC<{
 const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const addingFromSheet = searchParams.get('add') === '1';
+  // the company's own numbers are typed in (and needed for new people); otherwise the system gives them
+  const { numbering, ownNumbers, reload: reloadNumbering } = useEmployeeNumbering();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -470,6 +473,11 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
         toast.error('First Name and Last Name are required.');
         return;
       }
+      const ownNumber = String(newEmployee["Employee Number"] ?? '').trim();
+      if (ownNumbers && !ownNumber) {
+        toast.error('Employee Number is required: your company uses its own numbers.');
+        return;
+      }
       // the invitation to join goes to the work email, and their login finds this record by it
       const emailProblem = workEmailProblem(newEmployee["Work Email"]);
       if (emailProblem) {
@@ -479,13 +487,17 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
 
       const { data, error } = await supabase
         .from('employees')
-        // the employee number is given by the system when saved (MCL-000001, ...)
-        .insert([{ ...newEmployee, "Employee Number": undefined, "Work Email": normaliseWorkEmail(newEmployee["Work Email"]) }])
+        // the company's own number as typed, or (undefined) the system's next number, given when saved
+        .insert([{ ...newEmployee, "Employee Number": ownNumbers ? ownNumber : undefined, "Work Email": normaliseWorkEmail(newEmployee["Work Email"]) }])
         .select();
 
       if (error) {
         if (error.code === '23505' && /work email/i.test(error.message)) {
           toast.error('Another employee already has this work email.');
+          return;
+        }
+        if (error.code === '23505' && /employees_pkey/i.test(error.message)) {
+          toast.error('Another employee already has this Employee Number.');
           return;
         }
         throw error;
@@ -499,6 +511,7 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
         
         setEmployees(prev => [...prev, newEmployeeWithId]);
         setIsAddingNew(false);
+        void reloadNumbering(); // the next number shown moves on
         setNewEmployee({
           "Employee Number": '',
           "First Name": '',
@@ -607,9 +620,11 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
     const operations: UploadOperation[] = [];
     const emailsInSheet = new Set<string>();
     const matchedInSheet = new Set<string>();
+    const newNumbersInSheet = new Set<string>();
 
     // the company's employees, read once (not one request per row): a row updates the one its number or work email
-    // belongs to; any other row is a new employee, who gets the next number from the system
+    // belongs to; any other row is a new employee, who gets the next number from the system (or, when the company
+    // uses its own numbers, the number typed in the sheet)
     const existing = await fetchAll<{ 'Employee Number': string; 'Work Email': string | null }>((from, to) =>
       supabase.from('employees').select('id, "Employee Number", "Work Email"').order('id').range(from, to)
     );
@@ -663,9 +678,22 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
         const workEmail = employeeData["Work Email"];
         const typedNumber = String(employeeData["Employee Number"] ?? '').trim();
         const matched = existingNumbers.has(typedNumber) ? typedNumber : (workEmail && numberOfEmail.get(workEmail)) || null;
-        // a new employee's number comes from the system, never from the sheet (no missing, mistyped or odd numbers)
-        employeeData["Employee Number"] = matched ?? '';
+        // a new employee's number comes from the system, never from the sheet (no missing, mistyped or odd numbers),
+        // unless the company uses its own numbers: then the sheet's number is kept, and needed
+        employeeData["Employee Number"] = matched ?? (ownNumbers ? typedNumber : '');
         const who = matched ?? workEmail ?? `${employeeData["First Name"]} ${employeeData["Last Name"]}`;
+
+        if (ownNumbers && !matched) {
+          if (!typedNumber) {
+            operations.push({ employee: employeeData, operation: 'error', line: lineNo, error: `${line} (${who}): missing Employee Number` });
+            continue;
+          }
+          if (newNumbersInSheet.has(typedNumber)) {
+            operations.push({ employee: employeeData, operation: 'error', line: lineNo, error: `${line} (${who}): Employee Number ${typedNumber} is used by another row` });
+            continue;
+          }
+          newNumbersInSheet.add(typedNumber);
+        }
 
         if (matched && matchedInSheet.has(matched)) {
           operations.push({ employee: employeeData, operation: 'error', line: lineNo, error: `${line} (${who}): another row is about the same employee` });
@@ -745,6 +773,7 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
 
       // Refresh the data
       await fetchData(true);
+      void reloadNumbering();
 
       // everyone who was added gets a link to join the company (sent in the background), and is now onboarding
       if (createdEmails.length) {
@@ -812,7 +841,7 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
   };
 
   const downloadTemplate = () => {
-    XLSX.writeFile(employeeTemplateWorkbook(), 'employee_bulk_upload_template.xlsx');
+    XLSX.writeFile(employeeTemplateWorkbook(ownNumbers ? 'own' : 'system'), 'employee_bulk_upload_template.xlsx');
     toast.success('Template downloaded successfully!');
   };
 
@@ -1052,7 +1081,10 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
               <h2 className="text-sm font-semibold text-gray-900">Add employees from a spreadsheet</h2>
               <ol className="mt-1 list-decimal pl-5 text-xs text-gray-700 space-y-0.5">
                 <li>Download the template.</li>
-                <li>Fill in one row per employee: First Name, Last Name and Work Email are needed. Employee numbers are given by the system. The employee fills in their own details when they accept the invitation.</li>
+                <li>
+                  Fill in one row per employee: {ownNumbers ? 'Employee Number, First Name, Last Name and Work Email are needed. Use your own employee numbers.' : 'First Name, Last Name and Work Email are needed. Employee numbers are given by the system.'}
+                  {' '}The employee fills in their own details when they accept the invitation.
+                </li>
                 <li>Upload it, check the preview, and confirm. Each new employee is emailed an invitation to join and complete their onboarding. A row for someone already in the company (same Work Email or Employee Number) updates them instead.</li>
               </ol>
             </div>
@@ -1265,13 +1297,26 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
               <tr className="bg-blue-50">
                 <td className="px-4 py-3 whitespace-nowrap"></td>
                 <td className="px-4 py-3 whitespace-nowrap">
-                  <input
-                    type="text"
-                    className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-emerald-500 focus:border-emerald-500"
-                    value=""
-                    disabled
-                    placeholder="Given when saved"
-                  />
+                  {ownNumbers ? (
+                    <input
+                      type="text"
+                      aria-label="Employee Number"
+                      required
+                      className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-emerald-500 focus:border-emerald-500"
+                      value={newEmployee["Employee Number"] || ''}
+                      onChange={(e) => setNewEmployee({ ...newEmployee, "Employee Number": e.target.value })}
+                      placeholder="Employee Number *"
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      aria-label="Employee Number"
+                      className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-emerald-500 focus:border-emerald-500"
+                      value=""
+                      disabled
+                      placeholder={`Given when saved${numbering ? ` (${numbering.preview})` : ''}`}
+                    />
+                  )}
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <input
