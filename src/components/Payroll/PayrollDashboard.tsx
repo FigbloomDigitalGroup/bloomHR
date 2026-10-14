@@ -3429,7 +3429,8 @@ This can't be undone: the payslips stay locked for good.`,
     }
   };
 
-  if (currentView === "mpesa-spreadsheet") {
+  // the spreadsheet page sends M-Pesa payments itself, so it is off with the other in-app paying
+  if (IN_APP_PAYMENTS && currentView === "mpesa-spreadsheet") {
     return (
       <MPesaSpreadsheetFullPage
         onBack={() => setCurrentView("dashboard")}
@@ -3913,14 +3914,14 @@ This can't be undone: the payslips stay locked for good.`,
 
         <div className="flex-1" />
 
-        <button
+        {IN_APP_PAYMENTS && <button
           type="button"
           onClick={() => setCurrentView("mpesa-spreadsheet")}
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-ink transition-colors"
         >
           <FileSpreadsheet className="w-3 h-3" />
           M-PESA Spreadsheet
-        </button>
+        </button>}
         <button
           type="button"
           onClick={() => setShowDeductions(true)}
