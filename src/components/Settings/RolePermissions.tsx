@@ -21,6 +21,7 @@ import { Card, Button, SearchInput } from '../UI';
 import { queryClient, queryKeys } from '../../lib/queryClient';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 interface Permission {
     id: string;
     module_name: string;
@@ -158,10 +159,10 @@ export default function RolePermissions() {
         }
     };
 
-    const selectRole = (roleId: string) => {
+    const selectRole = async (roleId: string) => {
         if (roleId === selectedRole) return;
         if (hasChanges) {
-            if (!window.confirm('You have unsaved changes. Discard them and continue?')) return;
+            if (!(await confirmDialog({ title: 'Discard your unsaved changes?', confirmLabel: 'Discard', tone: 'danger' }))) return;
             // put the stored permissions back, otherwise the edits would stay on screen looking saved
             setRolePermissions(savedPermissions);
             setHasChanges(false);
@@ -170,7 +171,7 @@ export default function RolePermissions() {
     };
 
     const copyPermissionsFrom = async (sourceRole: string) => {
-        if (window.confirm(`Copy all permissions from ${sourceRole} to ${selectedRole}?`)) {
+        if (await confirmDialog({ title: `Copy all permissions from ${sourceRole} to ${selectedRole}?`, confirmLabel: 'Copy' })) {
             setRolePermissions(prev => ({
                 ...prev,
                 [selectedRole]: [...(prev[sourceRole] || [])]
@@ -180,8 +181,8 @@ export default function RolePermissions() {
         }
     };
 
-    const clearAllPermissions = () => {
-        if (window.confirm(`Remove all permissions for ${selectedRole}?`)) {
+    const clearAllPermissions = async () => {
+        if (await confirmDialog({ title: `Remove all permissions for ${selectedRole}?`, confirmLabel: 'Remove all', tone: 'danger' })) {
             setRolePermissions(prev => ({
                 ...prev,
                 [selectedRole]: []
@@ -191,8 +192,8 @@ export default function RolePermissions() {
         }
     };
 
-    const grantAllPermissions = () => {
-        if (window.confirm(`Grant all permissions to ${selectedRole}?`)) {
+    const grantAllPermissions = async () => {
+        if (await confirmDialog({ title: `Grant all permissions to ${selectedRole}?`, confirmLabel: 'Grant all' })) {
             setRolePermissions(prev => ({
                 ...prev,
                 [selectedRole]: permissions.map(p => p.module_id)

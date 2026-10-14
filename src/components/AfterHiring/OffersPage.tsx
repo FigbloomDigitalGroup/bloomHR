@@ -35,6 +35,7 @@ import {
   type SendOutcome,
 } from '../../lib/offers';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 // Offers (FIG-831): HR (Employees or Recruitment) writes offers to candidates, sends them by email with a private
 // link, and sees each answer. An accepted offer becomes an employee with "Add as employee". Opened from the sidebar,
 // the Onboarding page, or with ?application=<id>&name=&email=&job= to start an offer from a job application.
@@ -157,13 +158,13 @@ function OfferDetails({ offer, branding, groups, onClose, onEdit, onChanged }: {
         )}
         {(offer.status === 'draft' || status === 'sent') && (
           <Button variant="secondary" disabled={busy !== null} icon={spin('withdraw', <Ban className="h-4 w-4" />)}
-            onClick={() => window.confirm('Withdraw this offer? Its link stops working.') && void act('withdraw', () => withdrawOffer(offer.id))}>
+            onClick={async () => (await confirmDialog({ title: 'Withdraw this offer?', message: 'Its link stops working.', confirmLabel: 'Withdraw', tone: 'danger' })) && void act('withdraw', () => withdrawOffer(offer.id))}>
             Withdraw
           </Button>
         )}
         {['draft', 'withdrawn', 'declined', 'expired'].includes(offer.status) && (
           <Button variant="ghost" disabled={busy !== null} icon={spin('delete', <Trash2 className="h-4 w-4" />)}
-            onClick={() => window.confirm('Delete this offer?') && void act('delete', async () => { await deleteOffer(offer.id); onClose(); })}>
+            onClick={async () => (await confirmDialog({ title: 'Delete this offer?', confirmLabel: 'Delete', tone: 'danger' })) && void act('delete', async () => { await deleteOffer(offer.id); onClose(); })}>
             Delete
           </Button>
         )}

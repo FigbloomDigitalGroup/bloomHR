@@ -1,3 +1,5 @@
+import toast from 'react-hot-toast';
+import { noticeDialog } from '../../lib/confirmDialog';
 import React, { useState, useEffect } from 'react';
 import EmployeePicker from '../UI/EmployeePicker';
 import Modal from '../UI/Modal';
@@ -322,7 +324,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
                     `${t.application_date}: KES ${t.amount_requested} - ${t.status}`
                   ).join('\n')
                 );
-                alert('Transaction details copied to clipboard!');
+                toast.success('Transaction details copied to clipboard!');
               }}
               className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-all hover:scale-105 active:scale-95 shadow-sm"
             >
@@ -408,7 +410,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
                                 Reference: ${transaction.mpesa_code}
                                 Reason: ${transaction.reason || 'N/A'}
                               `;
-                              alert(details);
+                              void noticeDialog({ title: 'Transaction details', message: details.replace(/^\s+/gm, '').trim() });
                             }}
                             className="p-1.5 text-brand hover:bg-green-tint rounded-lg transition-colors"
                             title="View Details"
@@ -418,7 +420,7 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
                           <button
                             onClick={() => {
                               navigator.clipboard.writeText(transaction.id);
-                              alert('Transaction ID copied!');
+                              toast.success('Transaction ID copied!');
                             }}
                             className="p-1.5 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
                             title="Copy ID"
@@ -1288,7 +1290,7 @@ const BaseReport: React.FC<BaseReportProps> = ({
     // Only export rows that have actual advance records
     const exportData = reportData.filter(row => row.status !== undefined && row.amount_requested && row.amount_requested > 0);
     if (exportData.length === 0) {
-      alert('No advance records found to export. Please ensure advances exist for the selected filters.');
+      toast.error('No advance records found to export. Please ensure advances exist for the selected filters.');
       return;
     }
 
@@ -1403,7 +1405,7 @@ const BaseReport: React.FC<BaseReportProps> = ({
       ? employeeAdvanceArray
       : employeeAdvanceArray.filter(emp => selectedEmployees.has(emp.employee.employee_number));
 
-    alert(`Downloading ${employeesToDownload.length} reports in ${format.toUpperCase()} format...`);
+    toast(`Downloading ${employeesToDownload.length} reports in ${format.toUpperCase()} is coming soon.`);
     // Implement actual download logic here
   };
 
@@ -1662,7 +1664,7 @@ const BaseReport: React.FC<BaseReportProps> = ({
                         </button>
                         <button
                           onClick={() => {
-                            alert(`Printing report for ${employee.first_name} ${employee.last_name}`);
+                            toast(`Printing ${employee.first_name} ${employee.last_name}'s report is coming soon.`);
                             // Add print logic here
                           }}
                           className="flex-1 px-2 py-1 text-xs font-medium text-orange bg-orange-tint hover:bg-orange-tint rounded border border-orange/20 transition-colors"

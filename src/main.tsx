@@ -13,6 +13,7 @@ import { applyStoredTheme } from './theme/applyTheme';
 import { reloadOnceForStaleChunk } from './lib/staleChunk';
 import { applyA11y, loadA11y } from './lib/a11y';
 import A11yMotion from './components/Accessibility/A11yMotion';
+import DialogHost from './components/UI/DialogHost';
 
 
 if ('serviceWorker' in navigator) {
@@ -45,6 +46,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <BrowserRouter>
             <A11yMotion>
               <App />
+              <DialogHost />
             </A11yMotion>
           </BrowserRouter>
         </ThemedConfigProvider>

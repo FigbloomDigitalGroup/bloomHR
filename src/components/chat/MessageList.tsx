@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 // MessageList.tsx
 import { ScrollArea } from "./ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
@@ -23,14 +24,14 @@ export function MessageList({ messages, channel, currentUserId }: MessageListPro
     setActiveReactionPicker(null);
   };
 
-  const handleReply = (messageId: string) => {
+  const handleReply = (_messageId: string) => {
     // Implement reply functionality
-    alert(`Reply to message ${messageId}`);
+    toast('Replying to a message is coming soon.');
   };
 
-  const handleMoreOptions = (messageId: string) => {
+  const handleMoreOptions = (_messageId: string) => {
     // Implement more options (edit, delete, pin, etc.)
-    alert(`More options for message ${messageId}`);
+    toast('More message options are coming soon.');
   };
 
   const formatTime = (timestamp: string) => {

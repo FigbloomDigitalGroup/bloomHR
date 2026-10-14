@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React from 'react';
 import { Download, Printer, Share2, X, ArrowLeft, ArrowRight, Shield, Award, Building2 } from 'lucide-react';
 import GlowButton from '../UI/GlowButton';
@@ -536,14 +537,14 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, onClose, onPrevious
 
         if (navigator.clipboard) {
           await navigator.clipboard.writeText(text);
-          alert('Payslip information copied to clipboard');
+          toast.success('Payslip information copied to clipboard');
         } else {
-          alert('Sharing not supported in this browser');
+          toast.error('Sharing not supported in this browser');
         }
       }
     } catch (err) {
       console.error('Error sharing:', err);
-      alert('Failed to share payslip');
+      toast.error('Failed to share payslip');
     }
   };
 

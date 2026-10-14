@@ -5,7 +5,6 @@ import {
   Calculator,
   FileText,
   Download,
-  Calendar,
   TrendingUp,
   Trash2,
   Upload,
@@ -22,7 +21,7 @@ import { supabase } from "../../lib/supabase";
 import toast from "react-hot-toast";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { Modal, PageHeader, TabBar } from "../UI";
+import { PageHeader, TabBar } from "../UI";
 import MPesaSpreadsheetFullPage from "./MpesaSpreadSheet";
 import useStatutoryRates from "../../hooks/useStatutoryRates";
 import { usePermissions } from "../../hooks/usePermissions";
@@ -65,7 +64,8 @@ import {
   type PayRecipient,
 } from "./PaymentApprovalModals";
 import { ExportModal, P9FormGenerator } from "./PayrollToolModals";
-import { GlowButtonss, PayslipModal } from "./PayrollPayslipModal";
+import { PayslipModal } from "./PayrollPayslipModal";
+import { confirmDialog, type DialogOptions } from "../../lib/confirmDialog";
 import { PAYROLL_TABS, usePayrollTab } from "./payrollTabs";
 import PayrollRunTab from "./PayrollRunTab";
 import PayrollEmployeesTab from "./PayrollEmployeesTab";
@@ -113,7 +113,6 @@ export default function PayrollDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState<Date | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("all");
-  const [showQuickActions, setShowQuickActions] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedRows, setExpandedRows] = useState(new Set());
@@ -1297,8 +1296,8 @@ export default function PayrollDashboard() {
     }
   };
 
-  const changeRunStatus = async (status: PayrollRunStatus, question: string, done: string) => {
-    if (!monthRun || !window.confirm(question)) return;
+  const changeRunStatus = async (status: PayrollRunStatus, question: DialogOptions, done: string) => {
+    if (!monthRun || !(await confirmDialog(question))) return;
     setRunBusy(true);
     try {
       await setRunStatus(monthRun.id, status);
@@ -1353,41 +1352,68 @@ export default function PayrollDashboard() {
     return new Set([...r.p10, ...r.sha, ...r.nssf].map((p) => p.employeeNumber)).size;
   }, [onPayroll]);
 
+  // the month's people with details missing: only those on this payroll, not everyone in the company
+  const runMissingDetails = useMemo(() => {
+    const onRun = new Set(payrollRecords.map((r: any) => String(r.employee_id ?? "")));
+    return missingDetails.filter((m) => onRun.has(m.employeeNumber)).length;
+  }, [payrollRecords, missingDetails]);
+  const people = (n: number) => `${n} ${n === 1 ? "employee" : "employees"}`;
+
   const handleApproveRun = () =>
     changeRunStatus(
       "approved",
-      `Approve payroll for ${periodLabel}?
-
-${payrollRecords.length} employees, net pay KSh ${Math.round(runNetPay).toLocaleString()}.
-${missingDetails.length ? `
-${missingDetails.length} employee(s) are missing a KRA PIN, NSSF or SHA number, or payment details (see "Employees' pay").
-` : ""}${returnsGaps ? `
-${returnsGaps} employee(s) are missing details the P10, SHA or NSSF returns need (see "Returns check" on the Run tab).
-` : ""}
-Payslips will be locked and staff will be able to see them.`,
+      {
+        title: `Approve payroll for ${periodLabel}?`,
+        message: [
+          `${people(payrollRecords.length)}, net pay KSh ${Math.round(runNetPay).toLocaleString()}.`,
+          runMissingDetails
+            ? `${people(runMissingDetails)} ${runMissingDetails === 1 ? "is" : "are"} missing a KRA PIN, NSSF or SHA number, or payment details (see "Employees' pay").`
+            : "",
+          returnsGaps
+            ? `${people(returnsGaps)} ${returnsGaps === 1 ? "is" : "are"} missing details the P10, SHA or NSSF returns need (see the returns check).`
+            : "",
+          "Payslips will be locked and staff will be able to see them.",
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
+        confirmLabel: "Approve payroll",
+      },
       `Payroll for ${periodLabel} approved. Staff can now see their payslips.`,
     );
 
   const handleReopenRun = () =>
     changeRunStatus(
       "draft",
-      `Reopen payroll for ${periodLabel}?
-
-Staff won't see these payslips until it is approved again.`,
+      {
+        title: `Reopen payroll for ${periodLabel}?`,
+        message: "Staff won't see these payslips until it is approved again.",
+        confirmLabel: "Reopen",
+      },
       `Payroll for ${periodLabel} reopened as a draft.`,
     );
 
   const handleMarkRunPaid = () =>
     changeRunStatus(
       "paid",
-      `Mark payroll for ${periodLabel} as paid?
-
-This can't be undone: the payslips stay locked for good.`,
+      {
+        title: `Mark payroll for ${periodLabel} as paid?`,
+        message: "This can't be undone: the payslips stay locked for good.",
+        confirmLabel: "Mark as paid",
+      },
       `Payroll for ${periodLabel} marked as paid.`,
     );
 
   const handleDiscardRun = async () => {
-    if (!monthRun || !window.confirm(`Discard the draft payroll for ${periodLabel}? Its saved payslips are deleted.`)) return;
+    if (
+      !monthRun ||
+      !(await confirmDialog({
+        title: `Discard the draft payroll for ${periodLabel}?`,
+        message: "Its saved payslips are deleted.",
+        confirmLabel: "Discard",
+        tone: "danger",
+      }))
+    )
+      return;
     setRunBusy(true);
     try {
       await discardDraftRun(monthRun.id);
@@ -1682,126 +1708,7 @@ This can't be undone: the payslips stay locked for good.`,
           </div>
         )}
 
-      <Modal
-        open={showQuickActions}
-        onClose={() => setShowQuickActions(false)}
-        title="Quick Actions"
-        size="md"
-        className="bg-white rounded-xl shadow-lg p-6"
-      >
-              <button
-                type="button"
-                onClick={() => setShowQuickActions(false)}
-                aria-label="Close quick actions"
-                className="absolute top-6 right-6 text-gray-500 hover:text-gray-700"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <GlowButtonss
-                icon={Calculator}
-                size="sm"
-                onClick={() => {
-                  alert("Bulk Calculate initiated");
-                  setShowQuickActions(false);
-                }}
-              >
-                Bulk Calculate
-              </GlowButtonss>
-              <GlowButtonss
-                variant="secondary"
-                icon={FileText}
-                size="sm"
-                onClick={() => {
-                  setShowP9Modal(true);
-                  setShowQuickActions(false);
-                }}
-              >
-                Generate P9A Forms
-              </GlowButtonss>
-              <GlowButtonss
-                variant="secondary"
-                icon={Download}
-                size="sm"
-                onClick={() => {
-                  setShowExportModal(true);
-                  setShowQuickActions(false);
-                }}
-              >
-                Export Data
-              </GlowButtonss>
-              <GlowButtonss
-                variant="secondary"
-                icon={FileText}
-                size="sm"
-                onClick={() => {
-                  alert("Batch payslip generation started");
-                  setShowQuickActions(false);
-                }}
-              >
-                Payslip Batch
-              </GlowButtonss>
-              <GlowButtonss
-                variant="secondary"
-                icon={TrendingUp}
-                size="sm"
-                onClick={() => {
-                  alert("Tax certificates being prepared");
-                  setShowQuickActions(false);
-                }}
-              >
-                Tax Certificates
-              </GlowButtonss>
-              <GlowButtonss
-                variant="secondary"
-                icon={Calendar}
-                size="sm"
-                onClick={() => {
-                  alert("Payment scheduling opened");
-                  setShowQuickActions(false);
-                }}
-              >
-                Schedule Payments
-              </GlowButtonss>
-              <GlowButtonss
-                variant="secondary"
-                icon={Settings}
-                size="sm"
-                onClick={() => {
-                  setShowStatutorySettings(true);
-                  setShowQuickActions(false);
-                }}
-              >
-                Statutory Rates
-              </GlowButtonss>
-              {IN_APP_PAYMENTS && (userRole === "checker" ||
-                userRole === "credit_analyst_officer") && (
-                  <GlowButtonss
-                    variant="secondary"
-                    icon={Clock}
-                    size="sm"
-                    onClick={() => {
-                      setShowApprovalQueue(true);
-                      setShowQuickActions(false);
-                    }}
-                  >
-                    Approval Queue ({pendingCount})
-                  </GlowButtonss>
-                )}
-              {/* NEW: Bulk Upload History Button */}
-              <GlowButtonss
-                variant="secondary"
-                icon={Upload}
-                size="sm"
-                onClick={() => {
-                  setShowBulkUploadModal(true);
-                  setShowQuickActions(false);
-                }}
-              >
-                Upload History
-              </GlowButtonss>
-            </div>
-      </Modal>
+
 
       {tab === "run" && (dataLoading ? loader : (
         <PayrollRunTab

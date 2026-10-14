@@ -5,6 +5,7 @@ import { StatusBadge } from './StatusBadge';
 import { branches } from './constants/branches';
 import { supabase } from '../../../lib/supabase';
 
+import { confirmDialog } from '../../../lib/confirmDialog';
 // Toast component
 const Toast = ({ message, type, onClose }: { message: string; type: 'success' | 'error' | 'warning' | 'info'; onClose: () => void }) => {
   const icons = {
@@ -584,7 +585,7 @@ const PositionsTable = ({ positions, onUpdate = () => {} }: PositionsTableProps)
       return;
     }
 
-    if (!confirm('Are you sure you want to delete this position? This action cannot be undone.')) return;
+    if (!(await confirmDialog({ title: 'Delete this position?', message: 'This cannot be undone.', confirmLabel: 'Delete', tone: 'danger' }))) return;
 
     setIsLoading(true);
     try {
