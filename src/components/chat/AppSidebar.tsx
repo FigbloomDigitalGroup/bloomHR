@@ -32,7 +32,7 @@ interface AppSidebarProps {
   onDMCreate: (userId: string) => void;
   currentUser: User | null;
   users: User[];
-  /** Only administrators, HR and managers create channels; for everyone else the "+" is not shown. */
+  /** Only roles with the create-channels module create channels; for everyone else the "+" is not shown. */
   canCreateChannels?: boolean;
 }
 

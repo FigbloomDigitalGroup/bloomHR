@@ -34,7 +34,8 @@ beforeAll(async () => {
       ('${ADMIN}', 'admin@a.co', 'ADMIN', '${A}'), ('${MANAGER}', 'mgr@a.co', 'MANAGER', '${A}'),
       ('${ANNA}', 'anna@a.co', 'STAFF', '${A}'), ('${BEN}', 'ben@a.co', 'STAFF', '${A}'),
       ('${OTHER_MANAGER}', 'mgr2@a.co', 'MANAGER', '${A}'), ('${OUTSIDER}', 'out@b.co', 'STAFF', '${B}');
-    insert into role_permissions (role_name, permissions, tenant_id) values ('STAFF', array['dashboard'], '${A}'), ('STAFF', array['dashboard'], '${B}');
+    insert into role_permissions (role_name, permissions, tenant_id) values ('STAFF', array['dashboard'], '${A}'), ('STAFF', array['dashboard'], '${B}'),
+      ('MANAGER', array['create-channels'], '${A}');
   `);
   await asUser(db, MANAGER, async () => {
     const r = await db.query<{ id: string }>(`insert into channels (name, type, is_private, created_by) values ('leads', 'channel', true, '${MANAGER}') returning id`);

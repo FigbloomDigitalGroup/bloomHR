@@ -28,9 +28,12 @@ import { Card, Button, SearchInput, StatusPill, EmptyState, Modal } from '../UI'
 import type { StatusTone } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import EmployeeNumberingCard from './EmployeeNumbering';
+import { companyApi, fallbackRoleLabel } from '../../lib/companyApi';
+import type { CompanyRole } from '../../lib/companyApi';
 
-// Role definitions
-const ROLES = {
+// The fixed roles' icons and descriptions. The roles themselves are the company's own (FIG-827): read from the
+// database, with the names the company gave them; a role of its own has no entry here.
+const ROLES: Record<string, { label: string; description: string; icon: React.ReactNode; requiresLocation: boolean }> = {
   ADMIN: {
     label: 'Admin',
     description: 'Full access to all features and settings across all locations',
@@ -98,18 +101,22 @@ const StatusBadge = ({ status }: { status: string }) => (
   />
 );
 
-const RoleBadge = ({ role }: { role: keyof typeof ROLES }) => {
-  const roleInfo = ROLES[role] || ROLES.STAFF;
-  return <StatusPill label={roleInfo.label} tone={ROLE_TONE[role] || 'neutral'} />;
-};
+// a role of the company's own is tied to a location, like the fixed ones other than the administrator
+const requiresLocation = (role: string) => ROLES[role]?.requiresLocation ?? true;
+
+const RoleBadge = ({ role, label }: { role: string; label?: string }) => (
+  <StatusPill label={label || ROLES[role]?.label || fallbackRoleLabel(role)} tone={ROLE_TONE[role] || 'neutral'} />
+);
 
 const UserCard = ({
   user,
+  roleLabel,
   onEdit,
   onDelete,
   onResetPassword
 }: {
   user: any;
+  roleLabel?: string;
   onEdit: (user: any) => void;
   onDelete: (user: any) => void;
   onResetPassword: (user: any) => void;
@@ -185,7 +192,7 @@ const UserCard = ({
 
       <div className="flex flex-wrap gap-2 mt-3">
         <StatusBadge status={user.account_status} />
-        <RoleBadge role={user.role || 'STAFF'} />
+        <RoleBadge role={user.role || 'STAFF'} label={roleLabel} />
       </div>
     </Card>
   );
@@ -281,10 +288,13 @@ interface UserData {
 
 const UserEditModal = ({
   user,
+  roles,
   onClose,
   onSave
 }: {
   user: UserData | null;
+  /** the company's roles the administrator may give */
+  roles: CompanyRole[];
   onClose: () => void;
   onSave: (user: UserData) => void
 }) => {
@@ -309,7 +319,7 @@ const UserEditModal = ({
     }
   }, [user]);
 
-  const handleRoleChange = (role: keyof typeof ROLES) => {
+  const handleRoleChange = (role: string) => {
     setEditedUser({ ...editedUser, role });
   };
 
@@ -419,12 +429,11 @@ const UserEditModal = ({
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
             <div className="grid grid-cols-2 gap-2">
-              {(Object.keys(ROLES) as Array<keyof typeof ROLES>).map((role) => {
-                const roleInfo = ROLES[role];
-
+              {roles.map(({ role_name: role, display_name }) => {
                 return (
                   <button
                     key={role}
+                    type="button"
                     onClick={() => handleRoleChange(role)}
                     className={`p-2 border rounded-lg text-xs font-medium ${editedUser.role === role ?
                       (role === 'ADMIN' ? 'border-purple-500 bg-purple-50 text-purple-700' :
@@ -437,7 +446,7 @@ const UserEditModal = ({
                       'border-gray-200 hover:bg-gray-50'
                       }`}
                   >
-                    {roleInfo.label}
+                    {display_name}
                   </button>
                 );
               })}
@@ -673,6 +682,13 @@ export default function UserRolesSettings() {
   const [resettingPasswordUser, setResettingPasswordUser] = useState<any | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [usersPerPage] = useState(12);
+  // the company's roles (all of them for an administrator), with the names the company gave them
+  const [companyRoles, setCompanyRoles] = useState<CompanyRole[]>([]);
+  const roleLabels = Object.fromEntries(companyRoles.map((r) => [r.role_name, r.display_name]));
+
+  useEffect(() => {
+    companyApi.assignableRoles().then(setCompanyRoles).catch((e) => console.error('Failed to load roles:', e));
+  }, []);
 
   // MFA Settings
   const [mfaEnabled, setMfaEnabled] = useState(false);
@@ -810,7 +826,7 @@ export default function UserRolesSettings() {
           email: finalUserData.email,
           role: finalUserData.role,
           account_status: finalUserData.account_status,
-          location: ROLES[finalUserData.role as keyof typeof ROLES]?.requiresLocation ? finalUserData.location || null : null
+          location: requiresLocation(finalUserData.role) ? finalUserData.location || null : null
         });
 
         setUsers(users.map(u => u.id === editingUser.id ? {
@@ -832,7 +848,7 @@ export default function UserRolesSettings() {
           password: finalUserData.password,
           role: finalUserData.role,
           account_status: finalUserData.account_status,
-          location: ROLES[finalUserData.role as keyof typeof ROLES]?.requiresLocation ? finalUserData.location || null : null
+          location: requiresLocation(finalUserData.role) ? finalUserData.location || null : null
         });
 
         setUsers([...users, {
@@ -930,8 +946,8 @@ export default function UserRolesSettings() {
               className="w-full appearance-none rounded-tile border border-border bg-white pl-3 pr-8 py-2 text-xs text-ink outline-none focus:border-brand"
             >
               <option value="ALL">All Roles</option>
-              {(Object.keys(ROLES) as Array<keyof typeof ROLES>).map((role) => (
-                <option key={role} value={role}>{ROLES[role].label}</option>
+              {companyRoles.map((r) => (
+                <option key={r.role_name} value={r.role_name}>{r.display_name}</option>
               ))}
             </select>
             <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-subtle" strokeWidth={2} />
@@ -964,6 +980,7 @@ export default function UserRolesSettings() {
                   <UserCard
                     key={user.id}
                     user={user}
+                    roleLabel={roleLabels[user.role]}
                     onEdit={setEditingUser}
                     onDelete={handleDeleteUser}
                     onResetPassword={setResettingPasswordUser}
@@ -998,6 +1015,7 @@ export default function UserRolesSettings() {
       {showAddUserModal && (
         <UserEditModal
           user={null}
+          roles={companyRoles}
           onClose={() => setShowAddUserModal(false)}
           onSave={handleSaveUser}
         />
@@ -1006,6 +1024,7 @@ export default function UserRolesSettings() {
       {editingUser && (
         <UserEditModal
           user={editingUser}
+          roles={companyRoles}
           onClose={() => setEditingUser(null)}
           onSave={handleSaveUser}
         />

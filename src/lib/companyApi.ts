@@ -42,7 +42,15 @@ export interface CreatedInvitation {
   expires_at: string;
 }
 
-export const INVITABLE_ROLES = ['STAFF', 'MANAGER', 'REGIONAL', 'OPERATIONS', 'CHECKER', 'HR', 'ADMIN'] as const;
+/** A role of the company (FIG-827): `role_name` is its key, what memberships and invitations hold. */
+export interface CompanyRole {
+  role_name: string;
+  display_name: string;
+}
+
+/** How a role is shown when its company's name for it is not at hand: HR, Staff, Field Officer. */
+export const fallbackRoleLabel = (key: string) =>
+  key.length <= 3 ? key : key.charAt(0) + key.slice(1).toLowerCase().replace(/_/g, ' ');
 
 /** Supabase errors are plain objects, not Error instances: turn them into a message a person can read. */
 export function describeCompanyError(error: unknown): string {
@@ -109,6 +117,16 @@ export const companyApi = {
   myPendingInvitations: async (): Promise<PendingInvitation[]> => (await call<PendingInvitation[] | null>('my_pending_invitations', undefined)) ?? [],
 
   acceptMyInvitation: (id: string) => call<string>('accept_my_invitation', { p_id: id }),
+
+  /** The company's roles the signed-in person may give someone (the database decides: assignable_roles()). */
+  assignableRoles: async (): Promise<CompanyRole[]> => (await call<CompanyRole[] | null>('assignable_roles', undefined)) ?? [],
+
+  /** Every role of the company the signed-in person works in, with its name. */
+  companyRoles: async (): Promise<CompanyRole[]> => {
+    const { data, error } = await supabase.from('role_permissions').select('role_name, display_name').order('display_name');
+    if (error) throw new Error(describeCompanyError(error));
+    return (data ?? []) as CompanyRole[];
+  },
 
   listInvitations: async (): Promise<Invitation[]> => {
     const { data, error } = await supabase

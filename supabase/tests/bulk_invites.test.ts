@@ -44,7 +44,7 @@ beforeAll(async () => {
       ('${ADMIN}', 'admin@a.co', 'ADMIN', '${A}'), ('${HR}', 'hr@a.co', 'HR', '${A}'),
       ('${STAFF}', 'staff@a.co', 'STAFF', '${A}'), ('${ADMIN_B}', 'admin@b.co', 'ADMIN', '${B}');
     insert into role_permissions (role_name, permissions, tenant_id) values
-      ('STAFF', array['dashboard'], '${A}'), ('HR', array['dashboard', 'employees'], '${A}');
+      ('STAFF', array['dashboard'], '${A}'), ('HR', array['dashboard', 'employees', 'invite-people'], '${A}');
     insert into employees ("Employee Number", "First Name", "Last Name", "Work Email", tenant_id) values
       ('E-OLD', 'Old', 'Hand', 'old@a.co', '${A}');
   `);

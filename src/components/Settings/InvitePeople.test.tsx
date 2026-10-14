@@ -6,6 +6,8 @@ const api = vi.hoisted(() => ({
   createInvitation: vi.fn(),
   revokeInvitation: vi.fn(),
   emailInvitation: vi.fn(),
+  assignableRoles: vi.fn(),
+  companyRoles: vi.fn(),
 }));
 
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
@@ -27,6 +29,11 @@ beforeEach(() => {
   api.createInvitation.mockReset();
   api.revokeInvitation.mockReset().mockResolvedValue(undefined);
   api.emailInvitation.mockReset().mockResolvedValue({ ok: true, sentTo: 'x' });
+  api.assignableRoles.mockReset().mockResolvedValue([{ role_name: 'STAFF', display_name: 'Staff' }]);
+  api.companyRoles.mockReset().mockResolvedValue([
+    { role_name: 'HR', display_name: 'Human Resources' },
+    { role_name: 'STAFF', display_name: 'Staff' },
+  ]);
   vi.mocked(toast.error).mockClear();
 });
 afterEach(() => cleanup());
@@ -67,8 +74,13 @@ describe('InvitePeople', () => {
 
   it('creates an invitation and shows a link to send, containing the token', async () => {
     api.createInvitation.mockResolvedValue({ invitation_id: 'i1', token: 'tok123', expires_at: future });
+    api.assignableRoles.mockResolvedValue([
+      { role_name: 'STAFF', display_name: 'Staff' },
+      { role_name: 'HR', display_name: 'Human Resources' },
+    ]);
     render(<InvitePeople />);
     await screen.findByText('No invitations yet');
+    await screen.findByRole('option', { name: 'Human Resources' });
 
     fireEvent.change(screen.getByPlaceholderText('name@gmail.com'), { target: { value: 'New.Person@Gmail.com' } });
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'HR' } });
@@ -109,14 +121,33 @@ describe('InvitePeople', () => {
     await waitFor(() => expect(api.revokeInvitation).toHaveBeenCalledWith('w'));
   });
 
-  it('offers HR only the staff role, and administrators every role', async () => {
-    const { unmount } = render(<InvitePeople callerRole="HR" />);
+  it('offers the company’s roles the database says you may give, by their names', async () => {
+    const { unmount } = render(<InvitePeople />);
     await screen.findByText('No invitations yet');
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Staff']);
+    await waitFor(() => expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Staff']));
     unmount();
-    render(<InvitePeople callerRole="ADMIN" />);
-    await screen.findByText('No invitations yet');
-    expect(screen.getAllByRole('option').length).toBe(7);
+    api.assignableRoles.mockResolvedValue([
+      { role_name: 'STAFF', display_name: 'Staff' },
+      { role_name: 'FIELD_OFFICER', display_name: 'Field Officer' },
+      { role_name: 'ADMIN', display_name: 'Administrator' },
+    ]);
+    api.createInvitation.mockResolvedValue({ invitation_id: 'i1', token: 'tok123', expires_at: future });
+    render(<InvitePeople />);
+    await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(3));
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'FIELD_OFFICER' } });
+    fireEvent.change(screen.getByPlaceholderText('name@gmail.com'), { target: { value: 'new@gmail.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /Create invitation/ }));
+    await waitFor(() => expect(api.createInvitation).toHaveBeenCalledWith('new@gmail.com', 'FIELD_OFFICER'));
+  });
+
+  it('shows each invitation’s role by the company’s name for it', async () => {
+    api.listInvitations.mockResolvedValue([
+      { id: 'w', email: 'waiting@x.co', role: 'HR', status: 'pending', created_at: past, expires_at: future, accepted_at: null },
+      { id: 'o', email: 'old@x.co', role: 'GONE_ROLE', status: 'accepted', created_at: past, expires_at: future, accepted_at: past },
+    ]);
+    render(<InvitePeople />);
+    expect(await screen.findByText('Human Resources')).toBeTruthy();
+    expect(screen.getByText('Gone role')).toBeTruthy(); // a role since deleted still reads sensibly
   });
 
   it('resends every unused invitation at once, after asking', async () => {

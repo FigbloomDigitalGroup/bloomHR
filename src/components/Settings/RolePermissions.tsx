@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import {
     Shield,
     Save,
@@ -12,7 +12,10 @@ import {
     Briefcase,
     Check,
     ChevronDown,
-    Info
+    Info,
+    Plus,
+    Pencil,
+    Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
@@ -29,15 +32,17 @@ interface Permission {
     category: string;
 }
 
-const AVAILABLE_ROLES = [
-    { id: 'ADMIN', name: 'Administrator', description: 'Full system access & configuration' },
-    { id: 'HR', name: 'Human Resources', description: 'Employee & payroll management' },
-    { id: 'CHECKER', name: 'Checker', description: 'Verification & approval workflows' },
-    { id: 'MANAGER', name: 'Manager', description: 'Team oversight & reporting' },
-    { id: 'REGIONAL', name: 'Regional Manager', description: 'Multi-branch supervision' },
-    { id: 'OPERATIONS', name: 'Operations', description: 'Day-to-day system operations' },
-    { id: 'STAFF', name: 'Staff', description: 'Basic portal access' },
-];
+/**
+ * A role of the company (FIG-827, 20261015300000_company_roles.sql). `role_name` is its key, what people's
+ * memberships hold, and never changes; renaming changes `display_name`. ADMIN and STAFF are built in (is_system).
+ */
+interface CompanyRole {
+    role_name: string;
+    display_name: string | null;
+    description: string | null;
+    is_system: boolean;
+    permissions: string[] | null;
+}
 
 const CATEGORY_ICONS: Record<string, any> = {
     'overview': LayoutDashboard,
@@ -56,7 +61,17 @@ const PERMISSION_CATEGORIES = [
     { id: 'system', name: 'System' },
 ];
 
+// the administrator first, staff next, then the company's other roles by name
+const roleOrder = (r: CompanyRole) => (r.role_name === 'ADMIN' ? 0 : r.role_name === 'STAFF' ? 1 : 2);
+const sortRoles = (roles: CompanyRole[]) =>
+    [...roles].sort((a, b) => roleOrder(a) - roleOrder(b) || (a.display_name || a.role_name).localeCompare(b.display_name || b.role_name));
+
+/** Supabase errors are plain objects: the database's own message says why (e.g. a module you do not have). */
+const reason = (error: unknown) =>
+    typeof error === 'object' && error !== null && 'message' in error ? String((error as { message: unknown }).message) : 'Please try again.';
+
 export default function RolePermissions() {
+    const [roles, setRoles] = useState<CompanyRole[]>([]);
     const [selectedRole, setSelectedRole] = useState<string>('ADMIN');
     const [permissions, setPermissions] = useState<Permission[]>([]);
     const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
@@ -67,6 +82,12 @@ export default function RolePermissions() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
     const [hasChanges, setHasChanges] = useState(false);
+    // the open form, if any: a new role, renaming the selected one, or deleting it
+    const [form, setForm] = useState<null | 'new' | 'rename' | 'delete'>(null);
+    const [formName, setFormName] = useState('');
+    const [formDescription, setFormDescription] = useState('');
+    const [replacement, setReplacement] = useState('');
+    const [busy, setBusy] = useState(false);
 
     useEffect(() => {
         fetchPermissions();
@@ -94,15 +115,16 @@ export default function RolePermissions() {
             setLoading(true);
             const { data, error } = await supabase
                 .from('role_permissions')
-                .select('*');
+                .select('role_name, display_name, description, is_system, permissions');
 
             if (error) throw error;
 
             const permissionsMap: Record<string, string[]> = {};
-            (data || []).forEach((rp: any) => {
+            (data || []).forEach((rp: CompanyRole) => {
                 permissionsMap[rp.role_name] = rp.permissions || [];
             });
 
+            setRoles(sortRoles((data || []) as CompanyRole[]));
             setRolePermissions(permissionsMap);
             setSavedPermissions(permissionsMap);
         } catch (error) {
@@ -113,7 +135,14 @@ export default function RolePermissions() {
         }
     };
 
+    const role = roles.find(r => r.role_name === selectedRole);
+    const roleName = (key: string) => roles.find(r => r.role_name === key)?.display_name || key;
+    const selectedName = roleName(selectedRole);
+    // ADMIN always has every module; nothing about it can be changed
+    const locked = selectedRole === 'ADMIN';
+
     const togglePermission = (moduleId: string) => {
+        if (locked) return;
         setHasChanges(true);
         setRolePermissions(prev => {
             const currentPermissions = prev[selectedRole] || [];
@@ -132,27 +161,24 @@ export default function RolePermissions() {
         try {
             setSaving(true);
             const toSave = rolePermissions[selectedRole] || [];
-            const { error } = await supabase
+            // tenant_id comes from the row (one per company, FIG-515); the database refuses modules you lack yourself
+            const { data, error } = await supabase
                 .from('role_permissions')
-                .upsert({
-                    role_name: selectedRole,
-                    permissions: toSave,
-                    updated_at: new Date().toISOString()
-                }, {
-                    // unique per tenant (FIG-515); tenant_id is stamped by the column default
-                    onConflict: 'tenant_id,role_name'
-                });
+                .update({ permissions: toSave, updated_at: new Date().toISOString() })
+                .eq('role_name', selectedRole)
+                .select('role_name');
 
             if (error) throw error;
+            if (!data || data.length === 0) throw { message: 'You cannot change this role.' };
 
             setSavedPermissions(prev => ({ ...prev, [selectedRole]: toSave }));
             // the sidebar reads the signed-in user's permissions from the shared cache: refresh them now
             queryClient.invalidateQueries({ queryKey: queryKeys.myPermissions });
-            toast.success(`Permissions saved for ${selectedRole}`);
+            toast.success(`Permissions saved for ${selectedName}`);
             setHasChanges(false);
         } catch (error) {
             console.error('Error saving permissions:', error);
-            toast.error('Failed to save permissions');
+            toast.error(`Failed to save permissions: ${reason(error)}`);
         } finally {
             setSaving(false);
         }
@@ -166,22 +192,99 @@ export default function RolePermissions() {
             setRolePermissions(savedPermissions);
             setHasChanges(false);
         }
+        setForm(null);
         setSelectedRole(roleId);
     };
 
+    const openForm = (which: 'new' | 'rename' | 'delete') => {
+        if (hasChanges && !window.confirm('You have unsaved changes. Discard them and continue?')) return;
+        if (hasChanges) {
+            setRolePermissions(savedPermissions);
+            setHasChanges(false);
+        }
+        setForm(which);
+        setFormName(which === 'rename' ? role?.display_name || '' : '');
+        setFormDescription(which === 'rename' ? role?.description || '' : '');
+        setReplacement('');
+    };
+
+    const createRole = async (e: FormEvent) => {
+        e.preventDefault();
+        setBusy(true);
+        try {
+            const { data, error } = await supabase.rpc('create_company_role', {
+                p_name: formName.trim(),
+                p_description: formDescription.trim() || null,
+                p_permissions: [],
+            });
+            if (error) throw error;
+            toast.success(`Role "${formName.trim()}" created. Choose its modules.`);
+            setForm(null);
+            await fetchRolePermissions();
+            setSelectedRole(String(data));
+        } catch (error) {
+            toast.error(`Could not create the role: ${reason(error)}`);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const renameRole = async (e: FormEvent) => {
+        e.preventDefault();
+        setBusy(true);
+        try {
+            const { data, error } = await supabase
+                .from('role_permissions')
+                .update({ display_name: formName.trim(), description: formDescription.trim() || null, updated_at: new Date().toISOString() })
+                .eq('role_name', selectedRole)
+                .select('role_name');
+            if (error) throw error;
+            if (!data || data.length === 0) throw { message: 'You cannot change this role.' };
+            toast.success('Role renamed');
+            setForm(null);
+            await fetchRolePermissions();
+        } catch (error) {
+            toast.error(`Could not rename the role: ${reason(error)}`);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const deleteRole = async (e: FormEvent) => {
+        e.preventDefault();
+        setBusy(true);
+        try {
+            const { data, error } = await supabase.rpc('delete_company_role', {
+                p_role: selectedRole,
+                p_replacement: replacement || null,
+            });
+            if (error) throw error;
+            const moved = Number(data) || 0;
+            toast.success(moved ? `Role deleted. ${moved} ${moved === 1 ? 'person was' : 'people were'} moved to ${roleName(replacement)}.` : 'Role deleted');
+            setForm(null);
+            setSelectedRole(replacement || 'ADMIN');
+            await fetchRolePermissions();
+            queryClient.invalidateQueries({ queryKey: queryKeys.myPermissions });
+        } catch (error) {
+            toast.error(`Could not delete the role: ${reason(error)}`);
+        } finally {
+            setBusy(false);
+        }
+    };
+
     const copyPermissionsFrom = async (sourceRole: string) => {
-        if (window.confirm(`Copy all permissions from ${sourceRole} to ${selectedRole}?`)) {
+        if (window.confirm(`Copy all permissions from ${roleName(sourceRole)} to ${selectedName}?`)) {
             setRolePermissions(prev => ({
                 ...prev,
                 [selectedRole]: [...(prev[sourceRole] || [])]
             }));
             setHasChanges(true);
-            toast.success(`Permissions copied from ${sourceRole}`);
+            toast.success(`Permissions copied from ${roleName(sourceRole)}`);
         }
     };
 
     const clearAllPermissions = () => {
-        if (window.confirm(`Remove all permissions for ${selectedRole}?`)) {
+        if (window.confirm(`Remove all permissions for ${selectedName}?`)) {
             setRolePermissions(prev => ({
                 ...prev,
                 [selectedRole]: []
@@ -192,7 +295,7 @@ export default function RolePermissions() {
     };
 
     const grantAllPermissions = () => {
-        if (window.confirm(`Grant all permissions to ${selectedRole}?`)) {
+        if (window.confirm(`Grant all permissions to ${selectedName}?`)) {
             setRolePermissions(prev => ({
                 ...prev,
                 [selectedRole]: permissions.map(p => p.module_id)
@@ -217,6 +320,9 @@ export default function RolePermissions() {
 
     const selectClass =
         'appearance-none rounded-tile border border-border bg-white pl-3 pr-8 py-2 text-xs font-semibold text-ink outline-none focus:border-brand cursor-pointer';
+    const inputClass =
+        'w-full px-3 py-2 rounded-tile border border-border text-[12.5px] text-ink bg-white focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand';
+    const linkButtonClass = 'inline-flex items-center gap-1 text-[11.5px] font-bold disabled:opacity-50';
 
     if (loading) {
         return (
@@ -236,7 +342,7 @@ export default function RolePermissions() {
                         <h1 className="m-0 text-xl font-bold text-ink">Role &amp; Permissions</h1>
                     </div>
                     <p className="m-0 ml-[29px] text-xs text-muted-foreground">
-                        Configure access controls and security policies for each role
+                        Your company's roles and what each can use. Add your own roles, rename them, or remove ones you no longer need.
                     </p>
                 </div>
 
@@ -257,50 +363,138 @@ export default function RolePermissions() {
             <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4 items-start">
                 {/* Role selection */}
                 <Card padding="sm" className="!p-3.5">
-                    <div className="text-[10px] font-bold uppercase text-subtle mb-2 px-1.5" id="role-list-label">Select Role</div>
+                    <div className="flex items-center justify-between mb-2 px-1.5">
+                        <div className="text-[10px] font-bold uppercase text-subtle" id="role-list-label">Select Role</div>
+                        <button type="button" onClick={() => openForm('new')} className={`${linkButtonClass} text-brand`}>
+                            <Plus className="w-3 h-3" strokeWidth={2.5} /> New role
+                        </button>
+                    </div>
                     <div role="group" aria-labelledby="role-list-label" className="space-y-0.5">
-                        {AVAILABLE_ROLES.map((role) => {
-                            const permCount = (rolePermissions[role.id] || []).length;
-                            const isSelected = selectedRole === role.id;
+                        {roles.map((r) => {
+                            const permCount = (rolePermissions[r.role_name] || []).length;
+                            const isSelected = selectedRole === r.role_name;
 
                             return (
                                 <button
                                     type="button"
-                                    key={role.id}
+                                    key={r.role_name}
                                     aria-pressed={isSelected}
-                                    onClick={() => selectRole(role.id)}
+                                    onClick={() => selectRole(r.role_name)}
                                     className={`w-full text-left px-2.5 py-[9px] rounded-[9px] transition-colors flex items-center justify-between ${isSelected
                                         ? 'bg-green-tint text-brand'
                                         : 'text-ink hover:bg-background'
                                         }`}
                                 >
-                                    <span className={`text-[12.5px] ${isSelected ? 'font-bold' : 'font-medium'}`}>{role.name}</span>
-                                    <span className="text-[10.5px] font-bold text-subtle">{permCount}</span>
+                                    <span className={`text-[12.5px] ${isSelected ? 'font-bold' : 'font-medium'}`}>{r.display_name || r.role_name}</span>
+                                    <span className="text-[10.5px] font-bold text-subtle">{r.role_name === 'ADMIN' ? 'All' : permCount}</span>
                                 </button>
                             );
                         })}
                     </div>
 
-                    <div className="flex flex-col gap-2 mt-3.5">
-                        <button
-                            type="button"
-                            onClick={grantAllPermissions}
-                            className="w-full text-center py-[9px] rounded-[9px] bg-green-tint text-brand-dark text-[11.5px] font-bold hover:bg-[#d3e6d9] transition-colors"
-                        >
-                            Grant All
-                        </button>
-                        <button
-                            type="button"
-                            onClick={clearAllPermissions}
-                            className="w-full text-center py-[9px] rounded-[9px] bg-orange-tint-alt text-status-danger text-[11.5px] font-bold hover:bg-[#fbdcc5] transition-colors"
-                        >
-                            Revoke All
-                        </button>
-                    </div>
+                    {!locked && (
+                        <div className="flex flex-col gap-2 mt-3.5">
+                            <button
+                                type="button"
+                                onClick={grantAllPermissions}
+                                className="w-full text-center py-[9px] rounded-[9px] bg-green-tint text-brand-dark text-[11.5px] font-bold hover:bg-[#d3e6d9] transition-colors"
+                            >
+                                Grant All
+                            </button>
+                            <button
+                                type="button"
+                                onClick={clearAllPermissions}
+                                className="w-full text-center py-[9px] rounded-[9px] bg-orange-tint-alt text-status-danger text-[11.5px] font-bold hover:bg-[#fbdcc5] transition-colors"
+                            >
+                                Revoke All
+                            </button>
+                        </div>
+                    )}
                 </Card>
 
                 {/* Permissions */}
                 <div>
+                    {form === 'new' && (
+                        <Card className="mb-3.5">
+                            <form onSubmit={createRole} aria-label="New role" className="flex flex-wrap items-end gap-3">
+                                <label className="flex-1 min-w-[180px]">
+                                    <span className="block text-[11.5px] font-semibold text-muted-foreground mb-1">Role name</span>
+                                    <input required minLength={2} maxLength={60} value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="e.g. Field Officer" className={inputClass} />
+                                </label>
+                                <label className="flex-[2] min-w-[200px]">
+                                    <span className="block text-[11.5px] font-semibold text-muted-foreground mb-1">Description (optional)</span>
+                                    <input maxLength={200} value={formDescription} onChange={(e) => setFormDescription(e.target.value)} className={inputClass} />
+                                </label>
+                                <Button type="submit" disabled={busy || formName.trim().length < 2}>Create role</Button>
+                                <Button type="button" variant="secondary" onClick={() => setForm(null)}>Cancel</Button>
+                            </form>
+                        </Card>
+                    )}
+
+                    {role && (
+                        <div className="flex flex-wrap items-start justify-between gap-3 mb-3.5">
+                            <div>
+                                <h2 className="m-0 text-[15px] font-bold text-ink">{selectedName}</h2>
+                                {role.description && <p className="m-0 text-[11.5px] text-muted-foreground">{role.description}</p>}
+                                {role.is_system && <p className="m-0 text-[10.5px] font-semibold text-subtle">Built in</p>}
+                            </div>
+                            {!locked && (
+                                <div className="flex items-center gap-3">
+                                    <button type="button" onClick={() => openForm('rename')} className={`${linkButtonClass} text-ink`}>
+                                        <Pencil className="w-3 h-3" /> Rename
+                                    </button>
+                                    {!role.is_system && (
+                                        <button type="button" onClick={() => openForm('delete')} className={`${linkButtonClass} text-status-danger`}>
+                                            <Trash2 className="w-3 h-3" /> Delete role
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {form === 'rename' && !locked && (
+                        <Card className="mb-3.5">
+                            <form onSubmit={renameRole} aria-label="Rename role" className="flex flex-wrap items-end gap-3">
+                                <label className="flex-1 min-w-[180px]">
+                                    <span className="block text-[11.5px] font-semibold text-muted-foreground mb-1">Role name</span>
+                                    <input required minLength={2} maxLength={60} value={formName} onChange={(e) => setFormName(e.target.value)} className={inputClass} />
+                                </label>
+                                <label className="flex-[2] min-w-[200px]">
+                                    <span className="block text-[11.5px] font-semibold text-muted-foreground mb-1">Description (optional)</span>
+                                    <input maxLength={200} value={formDescription} onChange={(e) => setFormDescription(e.target.value)} className={inputClass} />
+                                </label>
+                                <Button type="submit" disabled={busy || formName.trim().length < 2}>Save name</Button>
+                                <Button type="button" variant="secondary" onClick={() => setForm(null)}>Cancel</Button>
+                            </form>
+                            <p className="m-0 mt-2 text-[11px] text-muted-foreground">People in this role keep it: only its name changes.</p>
+                        </Card>
+                    )}
+
+                    {form === 'delete' && role && !role.is_system && (
+                        <Card className="mb-3.5">
+                            <form onSubmit={deleteRole} aria-label="Delete role" className="flex flex-wrap items-end gap-3">
+                                <label className="flex-1 min-w-[220px]">
+                                    <span className="block text-[11.5px] font-semibold text-muted-foreground mb-1">
+                                        Move anyone in {selectedName} (and their open invitations) to
+                                    </span>
+                                    <span className="relative block">
+                                        <select value={replacement} onChange={(e) => setReplacement(e.target.value)} className={`${selectClass} w-full`}>
+                                            <option value="">Nobody is in this role</option>
+                                            {roles.filter(r => r.role_name !== selectedRole).map(r => (
+                                                <option key={r.role_name} value={r.role_name}>{r.display_name || r.role_name}</option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-subtle" strokeWidth={2} />
+                                    </span>
+                                </label>
+                                <Button type="submit" disabled={busy}>Delete {selectedName}</Button>
+                                <Button type="button" variant="secondary" onClick={() => setForm(null)}>Cancel</Button>
+                            </form>
+                            <p className="m-0 mt-2 text-[11px] text-muted-foreground">A role that people still have cannot be deleted until they are moved to another one.</p>
+                        </Card>
+                    )}
+
                     <div className="flex flex-wrap items-center gap-2.5 mb-[18px]">
                         <div className="flex-1 min-w-[200px]">
                             <SearchInput
@@ -324,28 +518,30 @@ export default function RolePermissions() {
                             </select>
                             <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-subtle" strokeWidth={2} />
                         </label>
-                        <label className="flex items-center gap-2 text-[11px] font-bold uppercase text-subtle">
-                            Copy from
-                            <span className="relative inline-block normal-case">
-                                <select
-                                    onChange={(e) => e.target.value && copyPermissionsFrom(e.target.value)}
-                                    value=""
-                                    className={selectClass}
-                                >
-                                    <option value="">Select role...</option>
-                                    {AVAILABLE_ROLES.filter(r => r.id !== selectedRole).map(role => (
-                                        <option key={role.id} value={role.id}>{role.name}</option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-subtle" strokeWidth={2} />
-                            </span>
-                        </label>
+                        {!locked && (
+                            <label className="flex items-center gap-2 text-[11px] font-bold uppercase text-subtle">
+                                Copy from
+                                <span className="relative inline-block normal-case">
+                                    <select
+                                        onChange={(e) => e.target.value && copyPermissionsFrom(e.target.value)}
+                                        value=""
+                                        className={selectClass}
+                                    >
+                                        <option value="">Select role...</option>
+                                        {roles.filter(r => r.role_name !== selectedRole && r.role_name !== 'ADMIN').map(r => (
+                                            <option key={r.role_name} value={r.role_name}>{r.display_name || r.role_name}</option>
+                                        ))}
+                                    </select>
+                                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-subtle" strokeWidth={2} />
+                                </span>
+                            </label>
+                        )}
                     </div>
 
-                    {selectedRole === 'ADMIN' && (
+                    {locked && (
                         <div className="flex items-start gap-2 p-3 mb-3.5 bg-status-info-tint rounded-xl text-xs text-status-info">
                             <Info className="w-4 h-4 shrink-0 mt-px" />
-                            <span>Administrators always have access to every screen, whatever is ticked here.</span>
+                            <span>Administrators always have access to every screen. This role is built in and cannot be changed or deleted.</span>
                         </div>
                     )}
 
@@ -374,13 +570,13 @@ export default function RolePermissions() {
                                                 <h3 className="m-0 text-[13px] font-bold text-ink">{category.name}</h3>
                                             </div>
                                             <span className="text-[11px] text-muted-foreground">
-                                                {categoryPerms.filter(p => currentRolePermissions.includes(p.module_id)).length} / {categoryPerms.length} Active
+                                                {locked ? categoryPerms.length : categoryPerms.filter(p => currentRolePermissions.includes(p.module_id)).length} / {categoryPerms.length} Active
                                             </span>
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                                             {categoryPerms.map(permission => {
-                                                const hasPermission = currentRolePermissions.includes(permission.module_id);
+                                                const hasPermission = locked || currentRolePermissions.includes(permission.module_id);
 
                                                 return (
                                                     <button
@@ -388,8 +584,9 @@ export default function RolePermissions() {
                                                         key={permission.id}
                                                         role="switch"
                                                         aria-checked={hasPermission}
+                                                        disabled={locked}
                                                         onClick={() => togglePermission(permission.module_id)}
-                                                        className={`flex gap-2.5 p-3 rounded-[10px] border text-left transition-colors ${hasPermission
+                                                        className={`flex gap-2.5 p-3 rounded-[10px] border text-left transition-colors disabled:cursor-not-allowed ${hasPermission
                                                             ? 'border-green-tint bg-gray-50'
                                                             : 'border-border bg-white hover:bg-background'
                                                             }`}

@@ -6,10 +6,28 @@ import { fetchTrustedRole } from '../../lib/trustedRole';
 
 interface AuthRouteProps {
   children: React.ReactNode;
+  /** Roles let in by name. */
   allowedRoles?: string[];
+  /**
+   * Or: modules, any one of which lets a role in (ADMIN always), so a company's own roles (FIG-827) reach the pages
+   * their modules are for. Where allowedRoles is given too, the seven fixed roles are decided by it alone, exactly as
+   * before, and STAFF (the staff portal's role) is never let in by a module.
+   */
+  modules?: string[];
 }
 
-export default function AuthRoute({ children, allowedRoles }: AuthRouteProps) {
+const FIXED_ROLES = ['ADMIN', 'HR', 'CHECKER', 'MANAGER', 'REGIONAL', 'OPERATIONS', 'STAFF'];
+
+/** Does the role have one of the modules? Its permissions are read from the person's own company (RLS). */
+async function roleHasModule(role: string, modules: string[]): Promise<boolean> {
+  if (role === 'ADMIN') return true;
+  if (role === 'STAFF') return false;
+  const { data, error } = await supabase.from('role_permissions').select('permissions').eq('role_name', role).maybeSingle();
+  if (error || !Array.isArray(data?.permissions)) return false;
+  return modules.some((m) => (data.permissions as string[]).includes(m));
+}
+
+export default function AuthRoute({ children, allowedRoles, modules }: AuthRouteProps) {
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -30,7 +48,12 @@ export default function AuthRoute({ children, allowedRoles }: AuthRouteProps) {
 
       const userRole = (await fetchTrustedRole(user.id)) || 'STAFF';
 
-      if (allowedRoles && !allowedRoles.includes(userRole)) {
+      const restricted = !!allowedRoles || !!modules;
+      const byModule = !!modules && !(allowedRoles && FIXED_ROLES.includes(userRole));
+      const allowed =
+        !restricted || !!allowedRoles?.includes(userRole) || (byModule && (await roleHasModule(userRole, modules ?? [])));
+
+      if (!allowed) {
         // Redirect based on role
         if (isPasswordRecovery) return;
 
@@ -71,7 +94,7 @@ export default function AuthRoute({ children, allowedRoles }: AuthRouteProps) {
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate, allowedRoles]);
+  }, [navigate, allowedRoles, modules]);
 
   return <>{children}</>;
 }

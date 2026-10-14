@@ -2,11 +2,9 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Card, PageHeader, StatusPill, EmptyState, Button, TableScroll } from '../UI';
 import type { StatusTone } from '../UI';
-import { companyApi, inviteLink, Invitation, INVITABLE_ROLES } from '../../lib/companyApi';
+import { companyApi, fallbackRoleLabel, inviteLink, Invitation, CompanyRole } from '../../lib/companyApi';
 import { sendInvitations, summariseInvites } from '../../lib/employeeInvite';
 import EmployeeNumberingCard from './EmployeeNumbering';
-
-const roleLabel = (role: string) => role.charAt(0) + role.slice(1).toLowerCase();
 
 const effectiveStatus = (inv: Invitation): { label: string; tone: StatusTone } => {
   if (inv.status === 'accepted') return { label: 'Joined', tone: 'success' };
@@ -15,14 +13,14 @@ const effectiveStatus = (inv: Invitation): { label: string; tone: StatusTone } =
   return { label: 'Waiting', tone: 'info' };
 };
 
-interface InvitePeopleProps {
-  /** HR may only invite staff; administrators may invite any role. */
-  callerRole?: string;
-}
-
-/** Invite people to the company you are working in: they get a link that creates their account in it. */
-export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps) {
-  const roles = callerRole === 'ADMIN' ? INVITABLE_ROLES : (['STAFF'] as const);
+/**
+ * Invite people to the company you are working in: they get a link that creates their account in it. The roles
+ * offered are the company's own that you may give (the database decides: administrators any, others only roles with
+ * less access than their own).
+ */
+export default function InvitePeople() {
+  const [roles, setRoles] = useState<CompanyRole[]>([]);
+  const [labels, setLabels] = useState<Record<string, string>>({});
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<string>('STAFF');
   const [busy, setBusy] = useState(false);
@@ -43,6 +41,24 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    let live = true;
+    Promise.all([companyApi.assignableRoles(), companyApi.companyRoles()])
+      .then(([mine, all]) => {
+        if (!live) return;
+        setRoles(mine);
+        setLabels(Object.fromEntries(all.map((r) => [r.role_name, r.display_name])));
+        // staff stays the default; someone who may not give it starts on the first role they may give
+        if (mine.length && !mine.some((r) => r.role_name === 'STAFF')) setRole(mine[0].role_name);
+      })
+      .catch((e) => live && toast.error(`Could not load the roles: ${(e as Error).message}`));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const roleLabel = (key: string) => labels[key] ?? fallbackRoleLabel(key);
 
   const copy = async (text: string) => {
     try {
@@ -146,13 +162,13 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
               className="px-3 py-2 rounded-tile border border-border text-[13px] text-ink bg-white focus:outline-none focus:ring-1 focus:ring-brand"
             >
               {roles.map((r) => (
-                <option key={r} value={r}>
-                  {roleLabel(r)}
+                <option key={r.role_name} value={r.role_name}>
+                  {r.display_name}
                 </option>
               ))}
             </select>
           </label>
-          <Button type="submit" disabled={busy || !email.trim()}>
+          <Button type="submit" disabled={busy || !email.trim() || roles.length === 0}>
             {busy ? 'Creating link…' : 'Create invitation'}
           </Button>
         </form>

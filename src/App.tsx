@@ -1023,7 +1023,7 @@ function App() {
                                   element={
                                     user?.role === 'STAFF' ?
                                       <StaffPortalLanding /> :
-                                      <AuthRoute allowedRoles={['ADMIN', 'MANAGER', 'HR', 'CHECKER']}>
+                                      <AuthRoute allowedRoles={['ADMIN', 'MANAGER', 'HR', 'CHECKER']} modules={['dashboard']}>
                                         <Dashboard selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />
                                       </AuthRoute>
                                   }
@@ -1031,7 +1031,7 @@ function App() {
                                 <Route
                                   path="/dashboard"
                                   element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'MANAGER', 'HR', 'REGIONAL', 'OPERATIONS', 'CHECKER']}>
+                                    <AuthRoute allowedRoles={['ADMIN', 'MANAGER', 'HR', 'REGIONAL', 'OPERATIONS', 'CHECKER']} modules={['dashboard']}>
                                       <Dashboard selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />
                                     </AuthRoute>
                                   }
@@ -1047,8 +1047,8 @@ function App() {
                                 <Route
                                   path="/invite-people"
                                   element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'HR']}>
-                                      <InvitePeople callerRole={user.role} />
+                                    <AuthRoute allowedRoles={['ADMIN', 'HR']} modules={['invite-people']}>
+                                      <InvitePeople />
                                     </AuthRoute>
                                   }
                                 />
@@ -1095,7 +1095,7 @@ function App() {
                                 <Route
                                   path="/payroll"
                                   element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'CHECKER']}>
+                                    <AuthRoute allowedRoles={['ADMIN', 'CHECKER']} modules={['payroll']}>
                                       <PayrollDashboard />
                                     </AuthRoute>
                                   }
@@ -1103,7 +1103,7 @@ function App() {
                                 <Route
                                   path="/settings"
                                   element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'CHECKER']}>
+                                    <AuthRoute allowedRoles={['ADMIN', 'CHECKER']} modules={['settings']}>
                                       <UserRolesSettings />
                                     </AuthRoute>
                                   }
@@ -1111,7 +1111,7 @@ function App() {
                                 <Route
                                   path="/salaryadmin"
                                   element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'CHECKER', 'MANAGER', 'REGIONAL']}>
+                                    <AuthRoute allowedRoles={['ADMIN', 'CHECKER', 'MANAGER', 'REGIONAL']} modules={['salaryadmin']}>
                                       <SalaryAdvanceAdmin
                                         selectedTown={selectedTown}
                                         selectedRegion={selectedRegion}
@@ -1126,7 +1126,7 @@ function App() {
                                 <Route
                                   path="/incident-reports"
                                   element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'CHECKER', 'MANAGER']}>
+                                    <AuthRoute allowedRoles={['ADMIN', 'CHECKER', 'MANAGER']} modules={['incident-reports']}>
                                       <IncidentReportsManagement />
                                     </AuthRoute>
                                   }
@@ -1134,14 +1134,14 @@ function App() {
                                 <Route
                                   path="/adminconfirm"
                                   element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'OPERATIONS', 'CHECKER', 'HR']}>
+                                    <AuthRoute allowedRoles={['ADMIN', 'OPERATIONS', 'CHECKER', 'HR']} modules={['adminconfirm']}>
                                       <StaffSignupRequests />
                                     </AuthRoute>
                                   }
                                 />
                                 <Route path="/recruitment"
                                   element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'HR', 'OPERATIONS', 'CHECKER']}>
+                                    <AuthRoute allowedRoles={['ADMIN', 'HR', 'OPERATIONS', 'CHECKER']} modules={['recruitment']}>
                                       <RecruitmentDashboard />
                                     </AuthRoute>} />
                                 <Route path="/performance" element={
@@ -1160,7 +1160,7 @@ function App() {
                                 <Route path="/mpesa-zap" element={<MpesaZapPortal />} />
 
                                 <Route path="/email-portal" element={
-                                  <AuthRoute allowedRoles={['ADMIN', 'HR', 'CHECKER', 'MANAGER', 'OPERATIONS']}>
+                                  <AuthRoute allowedRoles={['ADMIN', 'HR', 'CHECKER', 'MANAGER', 'OPERATIONS']} modules={['email-portal']}>
                                     <EmailPortal />
                                   </AuthRoute>
                                 } />
@@ -1171,7 +1171,7 @@ function App() {
                                 <Route
                                   path="/hr-lifecycle"
                                   element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'HR', 'CHECKER', 'MANAGER']}>
+                                    <AuthRoute allowedRoles={['ADMIN', 'HR', 'CHECKER', 'MANAGER']} modules={['hr-lifecycle']}>
                                       <HRLifecycleDashboard />
                                     </AuthRoute>
                                   }

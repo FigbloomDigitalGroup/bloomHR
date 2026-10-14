@@ -35,7 +35,7 @@ beforeAll(async () => {
       ('${HR}', 'hr@figbloom.org', 'HR', '${DEFAULT}'),
       ('${STAFF}', 'staff@figbloom.org', 'STAFF', '${DEFAULT}');
     insert into role_permissions (role_name, permissions, tenant_id) values
-      ('STAFF', array['dashboard'], '${DEFAULT}'), ('HR', array['dashboard','employees'], '${DEFAULT}');
+      ('STAFF', array['dashboard'], '${DEFAULT}'), ('HR', array['dashboard','employees','invite-people'], '${DEFAULT}');
   `);
 }, 120000);
 

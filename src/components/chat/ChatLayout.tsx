@@ -16,7 +16,7 @@ import FigbloomLoader from "../UI/FigbloomLoader";
 
 /** `onMessagesRead` tells the staff portal a conversation was read (opened, or a message arrived in it while open). */
 export function ChatLayout({ onMessagesRead }: { onMessagesRead?: (channelId: string) => void } = {}) {
-  const { userRole } = usePermissions();
+  const { userRole, hasPermission } = usePermissions();
   const onlinePeople = useOnlinePeople();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -313,7 +313,7 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: (channelId: st
       console.error('❌ Error creating channel:', error);
       toast.error(
         /row-level security/i.test(error?.message || '')
-          ? 'Only administrators, HR and managers can create channels.'
+          ? 'Your role cannot create channels. An administrator can allow it under Role & Permissions.'
           : error?.message || 'Failed to create channel'
       );
       throw error;
@@ -565,7 +565,7 @@ const handleDMCreate = async (userId: string) => {
           activeChannel={liveActiveChannel}
           onChannelSelect={handleChannelSelect}
           onChannelCreate={handleChannelCreate}
-          canCreateChannels={canCreateChannels(userRole)}
+          canCreateChannels={canCreateChannels(hasPermission)}
           onDMCreate={handleDMCreate}
           currentUser={getSafeUserData()}
           users={getUsersForSidebar()}

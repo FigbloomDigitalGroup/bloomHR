@@ -1,6 +1,6 @@
-/** Administrators, HR and managers create channels (and so choose their names); everyone else uses what exists.
- *  The database enforces the same list (20261006000800_channel_creators.sql). */
-export const CHANNEL_CREATOR_ROLES = ['ADMIN', 'HR', 'MANAGER'] as const;
+/** Who creates channels (and so chooses their names) is the 'create-channels' module, given to roles under Role &
+ *  Permissions (administrators always have it). The database enforces the same (20261015300000_company_roles.sql);
+ *  everyone else uses the channels that exist. */
+export const CREATE_CHANNELS_MODULE = 'create-channels';
 
-export const canCreateChannels = (role: string | null | undefined): boolean =>
-  CHANNEL_CREATOR_ROLES.includes(String(role ?? '').toUpperCase() as (typeof CHANNEL_CREATOR_ROLES)[number]);
+export const canCreateChannels = (hasPermission: (module: string) => boolean): boolean => hasPermission(CREATE_CHANNELS_MODULE);

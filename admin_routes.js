@@ -17,9 +17,15 @@ const admin =
     ? createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
     : null;
 
-const ROLES = ["ADMIN", "HR", "CHECKER", "MANAGER", "REGIONAL", "OPERATIONS", "STAFF"];
+// Roles are each company's own (FIG-827): a role is a key of the company's role_permissions, checked against the
+// database when it is given (assertCanManageRole). These fixed roles are the ones that never had a location.
+const ROLE_KEY_RE = /^[A-Z][A-Z0-9_]{1,39}$/;
 const STATUSES = ["ACTIVE", "SUSPENDED", "DEACTIVATED"];
-const LOCATION_ROLES = ["REGIONAL", "MANAGER", "OPERATIONS", "STAFF"];
+const NO_LOCATION_ROLES = ["ADMIN", "HR", "CHECKER"];
+const usesLocation = (role) => !NO_LOCATION_ROLES.includes(role);
+// The module that lets someone other than ADMIN invite people and manage logins (of roles with less access).
+const INVITE_MODULE = "invite-people";
+const ADMIN_ONLY = Symbol("ADMIN only");
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 6;
 
@@ -57,12 +63,27 @@ async function authenticate(req) {
   return { id: data.user.id, email: data.user.email, role: profile.role, tenantId: profile.tenant_id };
 }
 
-// Wraps a handler with auth, a role allow-list and uniform error handling.
-const guard = (allowedRoles, handler) => async (req, res) => {
+// Does the caller's role in their company include the module? ADMIN always does (the same rule as has_module()).
+async function callerHasModule(caller, module) {
+  if (caller.role === "ADMIN") return true;
+  const { data, error } = await admin
+    .from("role_permissions")
+    .select("permissions")
+    .eq("tenant_id", caller.tenantId)
+    .eq("role_name", caller.role)
+    .maybeSingle();
+  if (error) throw new HttpError(500, "Could not verify permissions");
+  return Array.isArray(data?.permissions) && data.permissions.includes(module);
+}
+
+// Wraps a handler with auth, an access check (ADMIN_ONLY, or a module the caller's role must have) and uniform
+// error handling.
+const guard = (access, handler) => async (req, res) => {
   try {
     if (!admin) throw new HttpError(500, "Admin API is not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
     const caller = await authenticate(req);
-    if (!allowedRoles.includes(caller.role)) throw new HttpError(403, "Forbidden");
+    const allowed = access === ADMIN_ONLY ? caller.role === "ADMIN" : await callerHasModule(caller, access);
+    if (!allowed) throw new HttpError(403, "Forbidden");
     await handler(req, res, caller);
   } catch (err) {
     const status = err instanceof HttpError ? err.status : err.status && err.status < 500 ? err.status : 500;
@@ -154,14 +175,20 @@ async function tenantProfiles(caller) {
   return new Map(data.map((p) => [p.user_id, p]));
 }
 
-// HR may only manage STAFF accounts (the staff sign-up approval flow); ADMIN may manage any.
-function assertCanManageRole(caller, role) {
-  if (caller.role !== "ADMIN" && role !== "STAFF") throw new HttpError(403, "Only an ADMIN can manage non-STAFF accounts");
+// ADMIN may manage accounts of any role; someone with invite-people only those of a role with less access than
+// their own (HR: STAFF, as before). The database decides (can_assign_role(), 20261015300000), the same rule the
+// invitations follow; it also refuses a role the company does not have.
+async function assertCanManageRole(caller, role) {
+  const { data, error } = await admin.rpc("can_assign_role", { p_user: caller.id, p_tenant: caller.tenantId, p_role: role });
+  if (error) throw new HttpError(500, "Could not verify the role");
+  if (data !== true) {
+    throw new HttpError(403, caller.role === "ADMIN" ? "This company has no such role" : "You can only manage accounts of roles with less access than your own");
+  }
 }
 
 function validateFields({ email, role, account_status, password }, { requireAll }) {
   if (email !== undefined && !EMAIL_RE.test(email)) throw new HttpError(400, "A valid email is required");
-  if (role !== undefined && !ROLES.includes(role)) throw new HttpError(400, `role must be one of ${ROLES.join(", ")}`);
+  if (role !== undefined && !(typeof role === "string" && ROLE_KEY_RE.test(role))) throw new HttpError(400, "role must be a role key of this company");
   if (account_status !== undefined && !STATUSES.includes(account_status)) {
     throw new HttpError(400, `account_status must be one of ${STATUSES.join(", ")}`);
   }
@@ -174,16 +201,16 @@ function validateFields({ email, role, account_status, password }, { requireAll 
 // GET /api/admin/users - every auth user with role/status (ADMIN)
 router.get(
   "/users",
-  guard(["ADMIN"], async (_req, res, caller) => {
+  guard(ADMIN_ONLY, async (_req, res, caller) => {
     const [users, byId] = await Promise.all([listAllAuthUsers(), tenantProfiles(caller)]);
     res.json({ users: users.filter((u) => byId.has(u.id)).map((u) => toUserView(u, byId.get(u.id))) });
   })
 );
 
-// GET /api/admin/auth-users - slim id/email/metadata list for sign-up matching (ADMIN, HR)
+// GET /api/admin/auth-users - slim id/email/metadata list for sign-up matching (ADMIN, invite-people)
 router.get(
   "/auth-users",
-  guard(["ADMIN", "HR"], async (_req, res, caller) => {
+  guard(INVITE_MODULE, async (_req, res, caller) => {
     const [users, byId] = await Promise.all([listAllAuthUsers(), tenantProfiles(caller)]);
     res.json({
       users: users.filter((u) => byId.has(u.id)).map((u) => ({ id: u.id, email: u.email, user_metadata: u.user_metadata })),
@@ -191,19 +218,19 @@ router.get(
   })
 );
 
-// POST /api/admin/users - create a login (ADMIN any role, HR STAFF only)
+// POST /api/admin/users - create a login (ADMIN any role, invite-people roles with less access than theirs)
 router.post(
   "/users",
-  guard(["ADMIN", "HR"], async (req, res, caller) => {
+  guard(INVITE_MODULE, async (req, res, caller) => {
     const { password, role, account_status = "ACTIVE", location, branch } = req.body || {};
     const email = normalizeEmail(req.body?.email);
     validateFields({ email, role, account_status, password }, { requireAll: true });
-    assertCanManageRole(caller, role);
+    await assertCanManageRole(caller, role);
 
     const user_metadata = {
       role,
       account_status,
-      ...(LOCATION_ROLES.includes(role) && location ? { location } : {}),
+      ...(usesLocation(role) && location ? { location } : {}),
       ...(branch ? { branch } : {}),
     };
     const { data, error } = await admin.auth.admin.createUser({
@@ -228,10 +255,11 @@ router.post(
   })
 );
 
-// PATCH /api/admin/users/:id - change email/role/status/location/branch/password (ADMIN, HR for STAFF)
+// PATCH /api/admin/users/:id - change email/role/status/location/branch/password (ADMIN, invite-people for roles
+// with less access than theirs)
 router.patch(
   "/users/:id",
-  guard(["ADMIN", "HR"], async (req, res, caller) => {
+  guard(INVITE_MODULE, async (req, res, caller) => {
     const { id } = req.params;
     const { password, role, account_status, location, branch } = req.body || {};
     const email = req.body?.email === undefined ? undefined : normalizeEmail(req.body.email);
@@ -243,13 +271,14 @@ router.patch(
     const current = existing.user;
 
     const currentRole = currentProfile?.role || current.user_metadata?.role || "STAFF";
-    assertCanManageRole(caller, currentRole);
     const nextRole = role ?? currentRole;
-    assertCanManageRole(caller, nextRole);
-
     if (id === caller.id && ((role && role !== currentRole) || (account_status && account_status !== "ACTIVE"))) {
       throw new HttpError(400, "You cannot change your own role or deactivate your own account");
     }
+    // the account they manage, and the role it ends up with, must both be within their reach (a role that was
+    // deleted cannot be given again)
+    await assertCanManageRole(caller, currentRole);
+    if (nextRole !== currentRole) await assertCanManageRole(caller, nextRole);
 
     const nextStatus = account_status ?? currentProfile?.account_status ?? current.user_metadata?.account_status ?? "ACTIVE";
     const user_metadata = {
@@ -259,7 +288,7 @@ router.patch(
       updated_at: new Date().toISOString(),
     };
     if (role !== undefined || location !== undefined) {
-      if (LOCATION_ROLES.includes(nextRole)) {
+      if (usesLocation(nextRole)) {
         if (location !== undefined) user_metadata.location = location || null;
       } else {
         user_metadata.location = null;
@@ -290,7 +319,7 @@ router.patch(
 // DELETE /api/admin/users/:id (ADMIN)
 router.delete(
   "/users/:id",
-  guard(["ADMIN"], async (req, res, caller) => {
+  guard(ADMIN_ONLY, async (req, res, caller) => {
     if (req.params.id === caller.id) throw new HttpError(400, "You cannot delete your own account");
     await loadTenantProfile(req.params.id, caller);
     // Leave this company; the login itself goes only when it belongs to no other company.
@@ -310,7 +339,7 @@ router.delete(
 // POST /api/admin/users/:id/reset-email - send the user a password reset email (ADMIN)
 router.post(
   "/users/:id/reset-email",
-  guard(["ADMIN"], async (req, res, caller) => {
+  guard(ADMIN_ONLY, async (req, res, caller) => {
     await loadTenantProfile(req.params.id, caller);
     const { data, error } = await admin.auth.admin.getUserById(req.params.id);
     if (error || !data?.user?.email) throw new HttpError(404, "User not found");

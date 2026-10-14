@@ -17,6 +17,10 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+// Companies make their own roles (FIG-827), so any role key is valid; what it may do comes from its modules.
+// Someone with no role (or a malformed one) is treated as staff, as before.
+const roleOrStaff = (role: string | null) => (role && /^[A-Z][A-Z0-9_]{1,39}$/.test(role) ? role : 'STAFF');
+
 interface UserProviderProps {
   children: React.ReactNode;
 }
@@ -33,9 +37,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         // The role in the company the person is working in (user_metadata is editable and not per company)
         const userRole = await fetchTrustedRole(session.user.id);
 
-        // Validate that the role is one of your expected roles
-        const validRoles = ['ADMIN', 'MANAGER', 'STAFF', 'HR', 'OPERATIONS', 'REGIONAL', 'CHECKER'];
-        const role = validRoles.includes(userRole ?? '') ? (userRole as string) : 'STAFF';
+        const role = roleOrStaff(userRole);
 
         setUser({
           email: session.user.email,
@@ -57,8 +59,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           // Look the role up outside this callback: calling supabase from inside it can deadlock the client
           setTimeout(async () => {
             const userRole = await fetchTrustedRole(authUser.id);
-            const validRoles = ['ADMIN', 'MANAGER', 'STAFF', 'HR', 'OPERATIONS', 'REGIONAL', 'CHECKER'];
-            const role = validRoles.includes(userRole ?? '') ? (userRole as string) : 'STAFF';
+            const role = roleOrStaff(userRole);
 
             setUser({
               email: authUser.email,

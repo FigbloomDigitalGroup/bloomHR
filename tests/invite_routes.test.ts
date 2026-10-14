@@ -38,6 +38,12 @@ vi.mock('@supabase/supabase-js', () => {
   const client = {
     auth: { getUser: async (token: string) => ({ data: { user: state.authUsers.find((u) => u.id === token) ?? null }, error: null }) },
     from: (name: string) => table(name as 'user_profiles'),
+    // can_assign_role() as the database answers it for these roles: ADMIN any, HR (invite-people) only STAFF
+    rpc: async (fn: string, args: { p_user: string; p_tenant: string; p_role: string }) => {
+      if (fn !== 'can_assign_role') throw new Error(`unexpected rpc ${fn}`);
+      const me = state.user_profiles.find((p) => p.user_id === args.p_user && p.tenant_id === args.p_tenant);
+      return { data: me?.role === 'ADMIN' || (me?.role === 'HR' && args.p_role === 'STAFF'), error: null };
+    },
   };
   return { createClient: () => client };
 });

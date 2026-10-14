@@ -18,13 +18,14 @@ const state = vi.hoisted(() => ({
   memberships: [] as Membership[],
   updates: [] as Record<string, unknown>[],
   authUsers: [] as { id: string; email: string; user_metadata: Record<string, unknown> }[],
+  rolePermissions: [] as { tenant_id: string; role_name: string; permissions: string[] }[],
   calls: [] as string[],
 }));
 
 vi.mock('@supabase/supabase-js', () => {
   // Minimal query builder over state[table]: select / eq / maybeSingle / upsert / delete.
   // user_profiles is read-only here (authenticate); the database mirrors memberships into it.
-  const makeTable = (name: 'profiles' | 'memberships') => {
+  const makeTable = (name: 'profiles' | 'memberships' | 'rolePermissions') => {
     const filters: [string, unknown][] = [];
     const rowsOf = () => state[name] as Record<string, unknown>[];
     const run = () => rowsOf().filter((p) => filters.every(([k, v]) => p[k] === v));
@@ -94,9 +95,25 @@ vi.mock('@supabase/supabase-js', () => {
     from: (table: string) => {
       if (table === 'user_profiles') return makeTable('profiles');
       if (table === 'memberships') return makeTable('memberships');
+      if (table === 'role_permissions') return makeTable('rolePermissions');
       throw new Error(`unexpected table ${table}`);
     },
   };
+  // can_assign_role() (20261015300000) as the database answers it: the role must exist in the company; ADMIN may
+  // give any; someone with invite-people a role with less access than theirs, never ADMIN
+  const perms = (tenant: string, role: string) => state.rolePermissions.find((r) => r.tenant_id === tenant && r.role_name === role)?.permissions;
+  Object.assign(client, {
+    rpc: async (fn: string, { p_user, p_tenant, p_role }: { p_user: string; p_tenant: string; p_role: string }) => {
+      if (fn !== 'can_assign_role') throw new Error(`unexpected rpc ${fn}`);
+      const me = state.memberships.find((m) => m.user_id === p_user && m.tenant_id === p_tenant && m.account_status === 'ACTIVE');
+      const theirs = perms(p_tenant, p_role);
+      if (!me || (!theirs && p_role !== 'ADMIN')) return { data: false, error: null };
+      if (me.role === 'ADMIN') return { data: true, error: null };
+      const mine = perms(p_tenant, me.role) ?? [];
+      const below = !!theirs && theirs.every((m) => mine.includes(m)) && !mine.every((m) => theirs.includes(m));
+      return { data: p_role !== 'ADMIN' && mine.includes('invite-people') && below, error: null };
+    },
+  });
   return { createClient: () => client };
 });
 
@@ -138,6 +155,13 @@ beforeEach(() => {
   ];
   state.memberships = state.profiles.map((p) => ({ user_id: p.user_id, tenant_id: p.tenant_id as string, role: p.role, account_status: p.account_status }));
   state.updates = [];
+  state.rolePermissions = [TENANT_A, TENANT_B].flatMap((tenant_id) => [
+    { tenant_id, role_name: 'ADMIN', permissions: [] },
+    { tenant_id, role_name: 'HR', permissions: ['dashboard', 'employees', 'invite-people'] },
+    { tenant_id, role_name: 'MANAGER', permissions: ['dashboard', 'employees'] },
+    { tenant_id, role_name: 'STAFF', permissions: ['dashboard'] },
+  ]);
+  state.rolePermissions.push({ tenant_id: TENANT_A, role_name: 'FIELD_AGENT', permissions: ['dashboard', 'leaves'] });
 });
 
 const call = (method: string, path: string, as: string, body?: unknown) =>
@@ -266,5 +290,41 @@ describe('a person in several companies', () => {
     await call('DELETE', '/users/staff-a', 'admin-a');
     expect(state.calls).toContain('deleteUser:staff-a');
     expect(state.memberships.some((m) => m.user_id === 'staff-a')).toBe(false);
+  });
+});
+
+describe('company roles (FIG-827)', () => {
+  beforeEach(() => {
+    state.authUsers.push({ id: 'hr-a', email: 'hr@a.co', user_metadata: {} });
+    state.profiles.push({ user_id: 'hr-a', email: 'hr@a.co', role: 'HR', account_status: 'ACTIVE', tenant_id: TENANT_A });
+    state.memberships.push({ user_id: 'hr-a', tenant_id: TENANT_A, role: 'HR', account_status: 'ACTIVE' });
+  });
+
+  it('an administrator gives the company’s own roles, and only roles the company has', async () => {
+    expect((await call('POST', '/users', 'admin-a', { email: 'f@a.co', password: 'secret1', role: 'FIELD_AGENT' })).status).toBe(201);
+    expect(state.memberships.find((m) => m.user_id === 'new-f@a.co')?.role).toBe('FIELD_AGENT');
+    // B has no such role
+    expect((await call('POST', '/users', 'admin-b', { email: 'f@b.co', password: 'secret1', role: 'FIELD_AGENT' })).status).toBe(403);
+    expect((await call('PATCH', '/users/staff-a', 'admin-a', { role: 'NO_SUCH_ROLE' })).status).toBe(403);
+    expect((await call('PATCH', '/users/staff-a', 'admin-a', { role: 'not a key' })).status).toBe(400);
+    expect(state.memberships.find((m) => m.user_id === 'staff-a')?.role).toBe('STAFF');
+  });
+
+  it('invite-people gives roles with less access than one’s own, never ADMIN or one’s own', async () => {
+    expect((await call('POST', '/users', 'hr-a', { email: 's@a.co', password: 'secret1', role: 'STAFF' })).status).toBe(201);
+    expect((await call('POST', '/users', 'hr-a', { email: 'a@a.co', password: 'secret1', role: 'ADMIN' })).status).toBe(403);
+    expect((await call('POST', '/users', 'hr-a', { email: 'h@a.co', password: 'secret1', role: 'HR' })).status).toBe(403);
+    expect((await call('POST', '/users', 'hr-a', { email: 'f@a.co', password: 'secret1', role: 'FIELD_AGENT' })).status).toBe(403); // leaves
+    expect((await call('PATCH', '/users/staff-a', 'hr-a', { role: 'MANAGER' })).status).toBe(200);
+    expect((await call('PATCH', '/users/admin-a', 'hr-a', { account_status: 'SUSPENDED' })).status).toBe(403);
+    expect((await call('PATCH', '/users/hr-a', 'hr-a', { role: 'STAFF' })).status).toBe(400); // never their own role
+    expect((await call('GET', '/users', 'hr-a')).status).toBe(403); // the full list stays ADMIN only
+    expect((await call('GET', '/auth-users', 'hr-a')).status).toBe(200);
+  });
+
+  it('without invite-people nobody manages logins', async () => {
+    state.rolePermissions.find((r) => r.tenant_id === TENANT_A && r.role_name === 'HR')!.permissions = ['dashboard', 'employees'];
+    expect((await call('POST', '/users', 'hr-a', { email: 's@a.co', password: 'secret1', role: 'STAFF' })).status).toBe(403);
+    expect((await call('GET', '/auth-users', 'staff-a')).status).toBe(403);
   });
 });

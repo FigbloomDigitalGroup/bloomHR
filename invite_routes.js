@@ -66,12 +66,11 @@ export function invitationEmail({ company, role, inviter, link, expires }) {
   return { subject, html, text };
 }
 
-// POST /api/invites/send  { token }  -> emails the invitation that token belongs to (ADMIN, HR)
+// POST /api/invites/send  { token }  -> emails the invitation that token belongs to (whoever may give its role)
 router.post("/send", async (req, res) => {
   try {
     if (!admin) throw new HttpError(500, "Admin API is not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
     const caller = await authenticate(req);
-    if (!["ADMIN", "HR"].includes(caller.role)) throw new HttpError(403, "Forbidden");
 
     const token = req.body?.token;
     if (typeof token !== "string" || token.length < 20 || token.length > 200) throw new HttpError(400, "A valid invitation token is required");
@@ -86,8 +85,15 @@ router.post("/send", async (req, res) => {
     if (!invitation || invitation.status !== "pending" || new Date(invitation.expires_at) < new Date()) {
       throw new HttpError(404, "This invitation is not valid any more");
     }
-    // the database already limits HR to inviting staff; keep that true here too
-    if (caller.role !== "ADMIN" && invitation.role !== "STAFF") throw new HttpError(403, "Only an administrator can send this invitation");
+    // the database already limits who may invite to which role (can_assign_role(): ADMIN any, someone with the
+    // invite-people module a role with less access than theirs); keep that true here too
+    const { data: allowed, error: roleError } = await admin.rpc("can_assign_role", {
+      p_user: caller.id,
+      p_tenant: caller.tenantId,
+      p_role: invitation.role,
+    });
+    if (roleError) throw roleError;
+    if (allowed !== true) throw new HttpError(403, "Only an administrator can send this invitation");
 
     if (!process.env.RESEND_API_KEY) throw new HttpError(503, "Email is not set up yet (RESEND_API_KEY)");
 
