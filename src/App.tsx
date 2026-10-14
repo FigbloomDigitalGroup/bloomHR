@@ -761,7 +761,9 @@ function App() {
 
     initializeAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Never await supabase inside this callback: the client holds its auth lock until the callback returns, so a
+    // query waited on here can stall every other supabase call (sign-in hangs). Lookups go in a setTimeout instead.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       // FIRST: Check if we're in password recovery mode - if so, don't interfere
       const currentPath = location.pathname;
       const urlHasRecoveryToken = window.location.href.includes('type=recovery') ||
@@ -838,19 +840,22 @@ function App() {
           setSelectedTown(userData.town);
           localStorage.setItem('selectedTown', userData.town);
 
-          try {
-            const { data } = await supabase
-              .from('kenya_branches')
-              .select('"Area"')
-              .eq('"Branch Office"', userData.town)
-              .single();
+          const town = userData.town;
+          setTimeout(async () => {
+            try {
+              const { data } = await supabase
+                .from('kenya_branches')
+                .select('"Area"')
+                .eq('"Branch Office"', town)
+                .single();
 
-            if (data) {
-              setSelectedRegion(data.Area);
+              if (data) {
+                setSelectedRegion(data.Area);
+              }
+            } catch (error) {
+              console.error('Error finding region for town:', error);
             }
-          } catch (error) {
-            console.error('Error finding region for town:', error);
-          }
+          }, 0);
         }
 
         // Only show welcome toast and navigate for actual sign-in events, not token refreshes
