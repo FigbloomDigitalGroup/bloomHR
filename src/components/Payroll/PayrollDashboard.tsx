@@ -64,6 +64,7 @@ import MissingPayrollDetailsModal from "./MissingPayrollDetailsModal";
 import { downloadP10 } from "./PayrollExportsPanel";
 import { ApprovedRunPanels, BulkPayButton } from "./RunPayActions";
 import { IN_APP_PAYMENTS, IN_APP_PAYMENTS_OFF_MESSAGE } from "../../lib/inAppPayments";
+import { advanceDeductionFor } from "../../lib/salaryAdvance";
 import ReturnsReadiness from "./ReturnsReadiness";
 import { returnsReadiness } from "../../lib/payrollExports";
 import { employeesMissingDetails } from "../../lib/missingPayrollDetails";
@@ -2167,7 +2168,8 @@ export default function PayrollDashboard() {
           supabase
             .from("salary_advance")
             .select(
-              '"Employee Number", "Amount Requested", payment_processed, status, time_added',
+              // every column: repayment_months is read when the database has it (one month when not)
+              '*',
             )
             .eq("payment_processed", "true")
             .eq("status", "paid")
@@ -2196,63 +2198,10 @@ export default function PayrollDashboard() {
     fetchAllSalaryAdvances();
   }, []); // Empty dependency array = runs once when component mounts
 
-  // Updated: Just searches in already-loaded data (NO database call)
-  const calculateAdvanceDeduction = (employeeNumber: any, period: any) => {
-    // console.log('=== DEBUG: Looking for advance for employee:', employeeNumber, 'Period:', period);
-
-    if (!employeeNumber) {
-      return 0;
-    }
-
-    // Find ALL advances for this employee matching the period
-    const employeeAdvances = salaryAdvances.filter((adv) => {
-      const advanceEmpNumber = adv["Employee Number"];
-      const advanceDate = adv.time_added; // Assuming ISO string like 2024-01-26T...
-
-      // Match Employee
-      // Use loose equality to handle string/number differences
-      if (advanceEmpNumber != employeeNumber) return false;
-
-      // Match Period (YYYY-MM)
-      if (period) {
-        if (!advanceDate) return false; // Strict: must have a date to match period
-
-        // Handle various date formats safely
-        let advancePeriod = "";
-        try {
-          // Try substring first for ISO strings
-          if (typeof advanceDate === "string" && advanceDate.length >= 7) {
-            advancePeriod = advanceDate.substring(0, 7);
-          } else {
-            // Fallback for Date objects or other formats
-            const d = new Date(advanceDate);
-            if (!isNaN(d.getTime())) {
-              advancePeriod = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-            }
-          }
-        } catch {
-          console.warn("Error parsing advance date:", advanceDate);
-          return false;
-        }
-
-        if (advancePeriod !== period) return false;
-      }
-
-      return true;
-    });
-
-    if (employeeAdvances.length === 0) {
-      return 0;
-    }
-
-    // Sum matching advances
-    const totalAmount = employeeAdvances.reduce((sum, adv) => {
-      const amount = parseFloat(adv["Amount Requested"]) || 0;
-      return sum + amount;
-    }, 0);
-
-    return totalAmount;
-  };
+  // What comes off this pay for advances (no database call): a one-month advance in full in the month it was asked
+  // for, an advance spread over N months in N parts from that month (src/lib/salaryAdvance.ts)
+  const calculateAdvanceDeduction = (employeeNumber: any, period: any) =>
+    advanceDeductionFor(salaryAdvances, employeeNumber, period);
   // Enhanced SMS notification functions
   const sendPayslipNotification = async (employee: any) => {
     if (!employee.employeeNu) {

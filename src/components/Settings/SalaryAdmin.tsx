@@ -21,6 +21,8 @@ import SearchableDropdown from '../UI/SearchableDropdown';
 import TransactionStatusChecker from './TransactionStatusChecker';
 import { fetchTrustedRole } from '../../lib/trustedRole';
 import FigbloomLoader from '../UI/FigbloomLoader';
+import AdvanceQueue from '../SalaryAdvance/AdvanceQueue';
+import { IN_APP_PAYMENTS, IN_APP_PAYMENTS_OFF_MESSAGE } from '../../lib/inAppPayments';
 
 
 // SMS Service Functions
@@ -3286,7 +3288,8 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   const [itemsPerPage] = useState(6);
 
   // NEW: Active tab state for M-Pesa callbacks
-  const [activeTab, setActiveTab] = useState('applications');
+  // the advance requests queue (approve, decline, record payment) opens first; the older views stay a tab away
+  const [activeTab, setActiveTab] = useState('requests');
 
   // NEW: Enhanced filter states
   const [selectedStatus, setSelectedStatus] = useState('all');
@@ -4133,6 +4136,8 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   // Enhanced M-Pesa payment function with SMS notifications
   // Enhanced M-Pesa payment function with SMS notifications
   const processMpesaPayment = async (employeeNumber: string, amount: number, fullName: string) => {
+    // paying from the app is off: never reach the M-Pesa server (nor the development mock below)
+    if (!IN_APP_PAYMENTS) throw new Error(IN_APP_PAYMENTS_OFF_MESSAGE);
     try {
       const mobileNumber = employeeMobileNumbers[employeeNumber];
       if (!mobileNumber) {
@@ -4272,6 +4277,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
   // Enhanced payment processing with proper status updates and SMS notifications
   const processBulkMpesaPayment = async (advancesData: any[]) => {
+    if (!IN_APP_PAYMENTS) throw new Error(IN_APP_PAYMENTS_OFF_MESSAGE);
     if (userRole === 'maker') {
       throw new Error('Makers are not authorized to process payments directly');
     }
@@ -4427,6 +4433,10 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
   // Approve payment request function
   const approvePayment = async (payment) => {
+    if (!IN_APP_PAYMENTS) {
+      toast.error(IN_APP_PAYMENTS_OFF_MESSAGE);
+      return;
+    }
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
 
@@ -4573,6 +4583,10 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   };
 
   const handleBulkPayment = async () => {
+    if (!IN_APP_PAYMENTS) {
+      toast.error(IN_APP_PAYMENTS_OFF_MESSAGE);
+      return;
+    }
     // Determine eligible apps based on bypass mode
     const eligibleApps = applications.filter(app => {
       const status = app.status?.toLowerCase();
@@ -4710,6 +4724,10 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   const executeIndividualBypassPayment = async () => {
     const app = selectedAppForBypass;
     if (!app) return;
+    if (!IN_APP_PAYMENTS) {
+      toast.error(IN_APP_PAYMENTS_OFF_MESSAGE);
+      return;
+    }
 
     // Set status to processing locally AND in DB to hide all action buttons immediately
     const targetId = app.id;
@@ -5404,8 +5422,11 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
               }`;
             return (
               <>
+                <button type="button" aria-pressed={activeTab === 'requests'} onClick={() => setActiveTab('requests')} className={tabClass('requests')}>
+                  <CheckCircle className="w-3 h-3" /> Requests
+                </button>
                 <button type="button" aria-pressed={activeTab === 'applications'} onClick={() => setActiveTab('applications')} className={tabClass('applications')}>
-                  <Activity className="w-3 h-3" /> Applications
+                  <Activity className="w-3 h-3" /> All applications
                 </button>
 
                 <RoleButtonWrapper allowedRoles={['ADMIN', 'CHECKER']}>
@@ -5438,7 +5459,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
             </button>
           )}
 
-          {fullyApprovedApplications.length > 0 && (
+          {IN_APP_PAYMENTS && fullyApprovedApplications.length > 0 && (
             <button
               type="button"
               onClick={() => setShowBulkPaymentModal(true)}
@@ -5622,7 +5643,9 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         )}
 
         {/* ── Main Content ──────────────────────────────── */}
-        {activeTab === 'settings' ? (
+        {activeTab === 'requests' ? (
+          <AdvanceQueue canDecide={isAdminOrChecker} onChanged={fetchApplications} />
+        ) : activeTab === 'settings' ? (
           <AdvanceApplicationManager />
         ) : activeTab === 'callbacks' ? (
           <MpesaCallbacks filterType="payments" />
