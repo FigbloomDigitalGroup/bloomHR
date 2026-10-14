@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { NOT_SAVED_NOT_LINKED, requireUpdatedRows } from './requireUpdated';
+import { chunks } from './fetchAll';
 import { inviteEmployee, type InviteOutcome } from './employeeInvite';
 import type { EmployeeRecord } from './profileCompleteness';
 import type { OnboardingStatus } from './onboardingValidation';
@@ -233,18 +234,19 @@ export async function inviteToOnboard(employeeId: string, workEmail: string | nu
   return outcome;
 }
 
+/** Work emails per start_onboarding_by_email call (the database takes up to 1000). */
+export const START_ONBOARDING_BATCH_SIZE = 500;
+
 /**
- * After invitations went out to employees added in bulk: marks those still drafts as invited, found by work email.
- * Returns how many could not be marked (they stay drafts and can be invited from the Onboarding page).
+ * After invitations were queued for employees added in bulk: marks those still drafts as invited, found by work
+ * email, a chunk at a time in one database call each (start_onboarding_by_email). Returns how many emails were in
+ * chunks that could not be marked (those stay drafts and can be invited from the Onboarding page).
  */
-export async function startOnboardingByEmail(emails: string[]): Promise<number> {
-  if (emails.length === 0) return 0;
-  const { data, error } = await supabase.from('employees').select('id').in('Work Email', emails).eq('onboarding_status', 'draft');
-  if (error) return emails.length;
+export async function startOnboardingByEmail(emails: string[], batchSize = START_ONBOARDING_BATCH_SIZE): Promise<number> {
   let failed = 0;
-  for (const row of data ?? []) {
-    const r = await supabase.rpc('start_onboarding', { p_employee: row.id });
-    if (r.error) failed += 1;
+  for (const chunk of chunks(emails, batchSize)) {
+    const { error } = await supabase.rpc('start_onboarding_by_email', { p_emails: chunk });
+    if (error) failed += chunk.length;
   }
   return failed;
 }

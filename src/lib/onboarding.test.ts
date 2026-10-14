@@ -89,16 +89,22 @@ describe('inviteToOnboard', () => {
 });
 
 describe('startOnboardingByEmail', () => {
-  it('marks each draft found by work email as invited', async () => {
-    db.drafts = [{ id: 'd1' }, { id: 'd2' }];
-    expect(await startOnboardingByEmail(['a@co.com', 'b@co.com'])).toBe(0);
-    expect(db.rpcs.map((r) => r.args)).toEqual([{ p_employee: 'd1' }, { p_employee: 'd2' }]);
-    expect(db.calls).toContainEqual({ table: 'employees', op: 'eq', args: ['onboarding_status', 'draft'] });
+  it('marks the drafts in one database call per chunk of emails (no per-row calls, no long address)', async () => {
+    const emails = Array.from({ length: 1201 }, (_, i) => `p${i}@co.com`);
+    expect(await startOnboardingByEmail(emails)).toBe(0);
+    expect(db.rpcs.map((r) => r.fn)).toEqual(['start_onboarding_by_email', 'start_onboarding_by_email', 'start_onboarding_by_email']);
+    expect(db.rpcs.map((r) => (r.args as { p_emails: string[] }).p_emails.length)).toEqual([500, 500, 201]);
+    expect(db.calls).toEqual([]);
+  });
+
+  it('counts the emails in a chunk the database refused', async () => {
+    db.rpcError = { message: 'Only HR can do this' };
+    expect(await startOnboardingByEmail(['a@co.com', 'b@co.com', 'c@co.com'], 2)).toBe(3);
   });
 
   it('does nothing for an empty list', async () => {
     expect(await startOnboardingByEmail([])).toBe(0);
-    expect(db.calls).toEqual([]);
+    expect(db.rpcs).toEqual([]);
   });
 });
 

@@ -5,8 +5,14 @@ import { supabase } from '../../lib/supabase';
 import { TownProps } from '../../types/supabase';
 import * as XLSX from 'xlsx';
 import { readEmployeeRows } from '../../lib/employeeSheet';
-import { normaliseWorkEmail, sendInvitations, summariseInvites, workEmailProblem, type InviteOutcome } from '../../lib/employeeInvite';
+import { normaliseWorkEmail, workEmailProblem } from '../../lib/employeeInvite';
 import { inviteToOnboard, startOnboardingByEmail } from '../../lib/onboarding';
+import { fetchAll } from '../../lib/fetchAll';
+import { describeSaveError, saveEmployeesInBatches } from '../../lib/bulkEmployees';
+import {
+  inviteBatchProgress, lastInviteBatch, progressSummary, queueInvitations, rememberInviteBatch, retryFailedInvitations,
+  type InviteProgress,
+} from '../../lib/inviteQueue';
 import toast from 'react-hot-toast';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
@@ -94,8 +100,8 @@ type Employee = {
 type UploadOperation = {
   employee: Partial<Employee>;
   operation: 'create' | 'update' | 'error';
-  existingData?: Partial<Employee>;
-  changes?: { field: string; oldValue: any; newValue: any }[];
+  /** the spreadsheet row (the header is row 1) */
+  line: number;
   error?: string;
 };
 
@@ -107,6 +113,90 @@ type BulkUploadPreview = {
     update: number;
     error: number;
   };
+};
+
+/**
+ * How far the invitations of an upload have got. They are sent in the background (send-invites Edge Function), so
+ * this is read back from the database: it keeps going when the page is closed.
+ */
+const InviteBatchStatus: React.FC<{
+  progress: InviteProgress | null;
+  rejected: { email: string; reason: string }[];
+  onRetry: () => void;
+  retrying: boolean;
+  onDismiss?: () => void;
+}> = ({ progress, rejected, onRetry, retrying, onDismiss }) => {
+  const summary = progress ? progressSummary(progress) : null;
+  const percent = summary && summary.total > 0 ? Math.round((summary.done / summary.total) * 100) : 0;
+  return (
+    <div className="rounded-lg border border-gray-200 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+          <Mail className="w-4 h-4" />
+          Invitations to join
+        </p>
+        {onDismiss && (
+          <button type="button" aria-label="Hide" onClick={onDismiss} className="text-gray-400 hover:text-gray-600">
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+      {!progress || !summary ? (
+        <p className="mt-1 text-xs text-gray-600">Queueing the invitations…</p>
+      ) : (
+        <>
+          <div className="mt-2 w-full bg-gray-200 rounded-full h-1.5">
+            <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${percent}%` }} />
+          </div>
+          <p className="mt-1 text-xs text-gray-600">
+            {progress.sent} of {progress.total} sent
+            {progress.skipped > 0 && `, ${progress.skipped} already had access`}
+            {progress.failed > 0 && `, ${progress.failed} failed`}.
+          </p>
+          {summary.waiting > 0 && (
+            <p className="mt-1 text-xs text-gray-500">
+              {summary.waiting} still to send. They go out in the background: you can close this page and come back later.
+            </p>
+          )}
+          {progress.failures.length > 0 && (
+            <>
+              <ul className="mt-1 max-h-24 overflow-y-auto text-xs text-amber-700 list-disc pl-5 space-y-0.5">
+                {progress.failures.map((f) => (
+                  <li key={f.email}>
+                    {f.email}: {f.error || 'not sent'}
+                  </li>
+                ))}
+              </ul>
+              {progress.failed > progress.failures.length && (
+                <p className="text-xs text-amber-700">…and {progress.failed - progress.failures.length} more.</p>
+              )}
+              <button
+                type="button"
+                onClick={onRetry}
+                disabled={retrying}
+                className="mt-2 inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+              >
+                <RotateCcw className="w-3 h-3" />
+                Try the {progress.failed} failed again
+              </button>
+            </>
+          )}
+        </>
+      )}
+      {rejected.length > 0 && (
+        <>
+          <p className="mt-2 text-xs font-semibold text-red-700">Not invited:</p>
+          <ul className="max-h-24 overflow-y-auto text-xs text-red-600 list-disc pl-5 space-y-0.5">
+            {rejected.map((r) => (
+              <li key={r.email}>
+                {r.email}: {r.reason}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
 };
 
 const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
@@ -158,33 +248,61 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
   });
   // rows that were not saved, and why ("Row 4 (EMP-012): no work email ...")
   const [bulkProblems, setBulkProblems] = useState<string[]>([]);
-  // invitations to join for the employees the upload created
-  const [bulkInvites, setBulkInvites] = useState<{ done: number; total: number; outcomes: InviteOutcome[] | null } | null>(null);
+  // invitations to join for the employees an upload created: queued, then sent in the background. The last batch
+  // is remembered in this browser so its progress shows again when the page is reopened.
+  const [inviteBatch, setInviteBatch] = useState<{ id: string; rejected: { email: string; reason: string }[] } | null>(() => {
+    const id = lastInviteBatch();
+    return id ? { id, rejected: [] } : null;
+  });
+  const [inviteProgress, setInviteProgress] = useState<InviteProgress | null>(null);
+  const [inviteRetrying, setInviteRetrying] = useState(false);
+  const [invitePoll, setInvitePoll] = useState(0);
 
   // Fetch data from Supabase
   useEffect(() => {
     fetchData();
   }, [selectedTown]);
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      let query = supabase.from('employees').select('*');
-      
-      if (selectedTown && selectedTown !== 'ADMIN_ALL') {
-        query = query.eq('Town', selectedTown);
+  // follow the invitations until none are waiting
+  useEffect(() => {
+    if (!inviteBatch) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        const progress = await inviteBatchProgress(inviteBatch.id);
+        if (stopped) return;
+        setInviteProgress(progress);
+        if (progress.total > 0 && !progressSummary(progress).finished) timer = setTimeout(poll, 4000);
+      } catch {
+        if (!stopped) timer = setTimeout(poll, 15000);
       }
-      
-      const { data, error } = await query;
-      
-      if (error) throw error;
-      
-      const employeesWithId = data?.map(emp => ({
+    };
+    poll();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [inviteBatch, invitePoll]);
+
+  // every employee, a page at a time (a company may have thousands); `quiet` keeps the page up while it reloads
+  const fetchData = async (quiet = false) => {
+    try {
+      if (!quiet) setLoading(true);
+      setError(null);
+
+      const data = await fetchAll<Employee>((from, to) => {
+        let query = supabase.from('employees').select('*');
+        if (selectedTown && selectedTown !== 'ADMIN_ALL') {
+          query = query.eq('Town', selectedTown);
+        }
+        return query.order('id').range(from, to);
+      });
+
+      const employeesWithId = data.map(emp => ({
         ...emp,
         id: emp.id || `emp-${emp["Employee Number"] || Math.random().toString(36).substring(2, 9)}`
-      })) || [];
+      }));
       
       setEmployees(employeesWithId);
       setFilteredEmployees(employeesWithId);
@@ -192,7 +310,7 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
       setError('Failed to fetch employee data. Please try again.');
       console.error('Error fetching employee data:', err);
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   };
 
@@ -486,9 +604,18 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
   const generateBulkUploadPreview = async (data: any[]): Promise<BulkUploadPreview> => {
     const operations: UploadOperation[] = [];
     const emailsInSheet = new Set<string>();
+    const numbersInSheet = new Set<string>();
+
+    // the employee numbers already in the company, read once (not one request per row)
+    const existingNumbers = new Set(
+      (await fetchAll<{ 'Employee Number': string }>((from, to) =>
+        supabase.from('employees').select('id, "Employee Number"').order('id').range(from, to)
+      )).map((e) => String(e['Employee Number']).trim())
+    );
 
     for (const [index, row] of data.entries()) {
-      const line = `Row ${index + 2}`; // the header is row 1, as in Excel
+      const lineNo = index + 2; // the header is row 1, as in Excel
+      const line = `Row ${lineNo}`;
       try {
         // Map Excel columns to database columns
         const employeeData: Partial<Employee> = {
@@ -521,60 +648,41 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
           operations.push({
             employee: employeeData,
             operation: 'error',
+            line: lineNo,
             error: `${line}: missing Employee Number, First Name or Last Name`
           });
           continue;
         }
 
+        const number = String(employeeData["Employee Number"]).trim();
+        if (numbersInSheet.has(number)) {
+          operations.push({ employee: employeeData, operation: 'error', line: lineNo, error: `${line} (${number}): Employee Number ${number} is used by another row` });
+          continue;
+        }
+        numbersInSheet.add(number);
+
         const workEmail = employeeData["Work Email"];
         if (workEmail && emailsInSheet.has(workEmail)) {
-          operations.push({ employee: employeeData, operation: 'error', error: `${line} (${employeeData["Employee Number"]}): work email ${workEmail} is used by another row` });
+          operations.push({ employee: employeeData, operation: 'error', line: lineNo, error: `${line} (${number}): work email ${workEmail} is used by another row` });
           continue;
         }
         if (workEmail) emailsInSheet.add(workEmail);
 
-        // Check if employee exists using Employee Number
-        const { data: existingEmployee, error } = await supabase
-          .from('employees')
-          .select('*')
-          .eq('Employee Number', employeeData["Employee Number"])
-          .maybeSingle();
-
-        if (error) {
-          console.error('Error checking existing employee:', error);
-          operations.push({
-            employee: employeeData,
-            operation: 'error',
-            error: 'Database error while checking existing record'
-          });
-          continue;
-        }
-
+        const exists = existingNumbers.has(number);
         // a new employee needs a work email (the invitation to join is sent there); an update may leave it blank
-        const emailProblem = existingEmployee && !workEmail ? null : workEmailProblem(workEmail);
+        const emailProblem = exists && !workEmail ? null : workEmailProblem(workEmail);
         if (emailProblem) {
-          operations.push({ employee: employeeData, operation: 'error', error: `${line} (${employeeData["Employee Number"]}): ${emailProblem}` });
+          operations.push({ employee: employeeData, operation: 'error', line: lineNo, error: `${line} (${number}): ${emailProblem}` });
           continue;
         }
 
-        if (existingEmployee) {
-          operations.push({
-            employee: employeeData,
-            operation: 'update',
-            existingData: existingEmployee
-          });
-        } else {
-          operations.push({
-            employee: employeeData,
-            operation: 'create'
-          });
-        }
-
+        operations.push({ employee: employeeData, operation: exists ? 'update' : 'create', line: lineNo });
       } catch (error) {
         console.error('Error processing row:', error);
         operations.push({
           employee: row,
           operation: 'error',
+          line: lineNo,
           error: `${line}: ${error instanceof Error ? error.message : 'could not be read'}`
         });
       }
@@ -593,102 +701,49 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
     };
   };
 
-  // FIXED: Upload execution with proper error handling and progress
+  // Saves the rows a few hundred at a time (each row's result comes back), then queues the invitations for the new
+  // employees: they are emailed in the background, so the page can be closed once the rows are saved.
   const executeBulkUpload = async (previewData: BulkUploadPreview) => {
     if (!previewData) return;
 
     setIsUploading(true);
-    let successCount = 0;
-    let errorCount = 0;
     const problems: string[] = previewData.operations.filter((op) => op.operation === 'error').map((op) => op.error ?? 'Could not be read');
-    const createdEmails: string[] = [];
     setBulkProblems(problems);
-    setBulkInvites(null);
+    setUploadProgress((prev) => ({ ...prev, processed: problems.length, errors: problems.length }));
 
     try {
-      for (let i = 0; i < previewData.operations.length; i++) {
-        const operation = previewData.operations[i];
-        
-        // Update progress
-        setUploadProgress(prev => ({
+      const rows = previewData.operations
+        .filter((op) => op.operation !== 'error')
+        .map((op) => ({ row: op.line, data: op.employee as Record<string, unknown> }));
+
+      const saved = await saveEmployeesInBatches(rows, (batch) => {
+        const failed = batch.filter((s) => s.outcome === 'error');
+        for (const s of failed) {
+          problems.push(`Row ${s.row_no}${s.employee_number ? ` (${s.employee_number})` : ''}: ${describeSaveError(s.error_code, s.error_message)}`);
+        }
+        setBulkProblems([...problems]);
+        setUploadProgress((prev) => ({
           ...prev,
-          processed: i + 1
+          processed: prev.processed + batch.length,
+          success: prev.success + batch.length - failed.length,
+          errors: prev.errors + failed.length,
         }));
-
-        if (operation.operation === 'error') {
-          errorCount++;
-          setUploadProgress(prev => ({
-            ...prev,
-            errors: prev.errors + 1
-          }));
-          continue;
-        }
-
-        try {
-          if (operation.operation === 'update') {
-            // Update existing employee using Employee Number
-            const { error } = await supabase
-              .from('employees')
-              .update(operation.employee)
-              .eq('Employee Number', operation.employee["Employee Number"]);
-            
-            if (error) {
-              console.error('Update error:', error);
-              throw error;
-            }
-            successCount++;
-            setUploadProgress(prev => ({
-              ...prev,
-              success: prev.success + 1
-            }));
-          } else if (operation.operation === 'create') {
-            // Insert new employee
-            const { error } = await supabase
-              .from('employees')
-              .insert([operation.employee]);
-            
-            if (error) {
-              console.error('Create error:', error);
-              throw error;
-            }
-            if (operation.employee["Work Email"]) createdEmails.push(operation.employee["Work Email"]);
-            successCount++;
-            setUploadProgress(prev => ({
-              ...prev,
-              success: prev.success + 1
-            }));
-          }
-        } catch (error) {
-          errorCount++;
-          setUploadProgress(prev => ({
-            ...prev,
-            errors: prev.errors + 1
-          }));
-          console.error('Error processing employee:', operation.employee["Employee Number"], error);
-          const failure = error as { code?: string; message?: string } | null;
-          const message = failure?.code === '23505' && /work email/i.test(String(failure.message))
-            ? 'another employee already has this work email'
-            : String(failure?.message || 'could not be saved');
-          problems.push(`${operation.employee["Employee Number"]}: ${message}`);
-          setBulkProblems([...problems]);
-        }
-      }
+      });
+      const successCount = saved.filter((s) => s.outcome !== 'error').length;
+      const errorCount = problems.length;
+      const createdEmails = saved.filter((s) => s.outcome === 'created' && s.work_email).map((s) => s.work_email as string);
 
       // Refresh the data
-      await fetchData();
+      await fetchData(true);
 
-      // email everyone who was added a link to join the company
-      let invitesNotSent = 0;
+      // everyone who was added gets a link to join the company (sent in the background), and is now onboarding
       if (createdEmails.length) {
-        setBulkInvites({ done: 0, total: createdEmails.length, outcomes: null });
-        const outcomes = await sendInvitations(
-          createdEmails.map((email) => ({ email, role: 'STAFF' })),
-          (done, total) => setBulkInvites({ done, total, outcomes: null })
-        );
-        setBulkInvites({ done: outcomes.length, total: outcomes.length, outcomes });
-        invitesNotSent = summariseInvites(outcomes).notSent.length;
-        // everyone whose invitation was made is now onboarding
-        await startOnboardingByEmail(outcomes.filter((o) => o.status !== 'failed').map((o) => o.email));
+        setInviteProgress(null);
+        const queued = await queueInvitations(createdEmails.map((email) => ({ email, role: 'STAFF' })));
+        rememberInviteBatch(queued.batchId);
+        setInviteBatch({ id: queued.batchId, rejected: queued.rejected });
+        const rejected = new Set(queued.rejected.map((r) => r.email));
+        await startOnboardingByEmail(createdEmails.filter((email) => !rejected.has(email)));
       }
 
       if (errorCount === 0) {
@@ -697,8 +752,8 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
         toast.success(`Bulk upload completed: ${successCount} successful, ${errorCount} errors`);
       }
 
-      // close by itself only when there is nothing to read or retry
-      if (errorCount === 0 && invitesNotSent === 0) {
+      // close by itself only when there is nothing to read or follow
+      if (errorCount === 0 && createdEmails.length === 0) {
         setTimeout(() => {
           closeUploadModal();
         }, 2000);
@@ -713,12 +768,11 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
     }
   };
 
-  // FIXED: Manual close function for the upload modal
+  // FIXED: Manual close function for the upload modal (the invitations carry on; their progress stays on the page)
   const closeUploadModal = () => {
     setShowUploadModal(false);
     setBulkUploadPreview(null);
     setBulkProblems([]);
-    setBulkInvites(null);
     setUploadProgress({
       processed: 0,
       total: 0,
@@ -727,18 +781,24 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
     });
   };
 
-  const resendFailedInvites = async () => {
-    const outcomes = bulkInvites?.outcomes;
-    if (!outcomes) return;
-    const retry = summariseInvites(outcomes).notSent.map((o) => o.email);
-    setBulkInvites({ done: 0, total: retry.length, outcomes: null });
-    const retried = await sendInvitations(retry.map((email) => ({ email, role: 'STAFF' })), (done, total) => setBulkInvites({ done, total, outcomes: null }));
-    const byEmail = new Map(retried.map((o) => [o.email, o]));
-    const merged = outcomes.map((o) => byEmail.get(o.email) ?? o);
-    setBulkInvites({ done: merged.length, total: merged.length, outcomes: merged });
-    const stillNotSent = summariseInvites(merged).notSent.length;
-    if (stillNotSent) toast.error(`${stillNotSent} invitation(s) still not sent.`);
-    else toast.success('All invitations sent.');
+  const retryFailedInvites = async () => {
+    if (!inviteBatch) return;
+    setInviteRetrying(true);
+    try {
+      const n = await retryFailedInvitations(inviteBatch.id);
+      toast.success(n ? `${n} invitation(s) will be sent again shortly.` : 'Nothing to send again.');
+      setInvitePoll((k) => k + 1);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not send them again.');
+    } finally {
+      setInviteRetrying(false);
+    }
+  };
+
+  const dismissInviteBatch = () => {
+    rememberInviteBatch(null);
+    setInviteBatch(null);
+    setInviteProgress(null);
   };
 
   const downloadTemplate = () => {
@@ -900,47 +960,9 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
               </div>
             )}
 
-            {bulkInvites && (
-              <div className="mb-4 rounded-lg border border-gray-200 p-3">
-                <p className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-                  <Mail className="w-4 h-4" />
-                  Invitations to join
-                </p>
-                {!bulkInvites.outcomes ? (
-                  <p className="mt-1 text-xs text-gray-600">
-                    Sending {bulkInvites.done} of {bulkInvites.total}…
-                  </p>
-                ) : (() => {
-                  const summary = summariseInvites(bulkInvites.outcomes);
-                  return (
-                    <>
-                      <p className="mt-1 text-xs text-gray-600">
-                        {summary.sent} sent
-                        {summary.members > 0 && `, ${summary.members} already had access`}
-                        {summary.notSent.length > 0 && `, ${summary.notSent.length} not sent`}.
-                      </p>
-                      {summary.notSent.length > 0 && (
-                        <>
-                          <ul className="mt-1 max-h-24 overflow-y-auto text-xs text-amber-700 list-disc pl-5 space-y-0.5">
-                            {summary.notSent.map((o) => (
-                              <li key={o.email}>
-                                {o.email}: {o.reason}
-                              </li>
-                            ))}
-                          </ul>
-                          <button
-                            type="button"
-                            onClick={resendFailedInvites}
-                            className="mt-2 inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
-                          >
-                            <RotateCcw className="w-3 h-3" />
-                            Resend the {summary.notSent.length} not sent
-                          </button>
-                        </>
-                      )}
-                    </>
-                  );
-                })()}
+            {inviteBatch && (
+              <div className="mb-4">
+                <InviteBatchStatus progress={inviteProgress} rejected={inviteBatch.rejected} onRetry={retryFailedInvites} retrying={inviteRetrying} />
               </div>
             )}
 
@@ -949,14 +971,14 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
                 <>
                   <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
                   <span className="text-sm text-gray-700">
-                    {bulkInvites && !bulkInvites.outcomes ? 'Sending invitations...' : 'Applying changes to database...'}
+                    {uploadProgress.processed < uploadProgress.total ? 'Saving employees...' : 'Queueing invitations...'}
                   </span>
                 </>
               ) : (
                 <>
                   <CheckCircle className="w-6 h-6 text-green-500" />
                   <span className="text-sm text-gray-700">
-                    {bulkProblems.length === 0 && (!bulkInvites?.outcomes || summariseInvites(bulkInvites.outcomes).notSent.length === 0)
+                    {bulkProblems.length === 0 && !inviteBatch
                       ? 'Processing completed! Closing automatically...'
                       : 'Processing completed.'}
                   </span>
@@ -1006,6 +1028,7 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
   if (employees.length === 0 && !loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 p-6 bg-gray-50 rounded-lg">
+        <UploadProgressModal />
         <AlertCircle className="w-8 h-8 text-gray-400" />
         <p className="mt-4 text-gray-600">No employee data found</p>
         <div className="flex gap-3 mt-4">
@@ -1035,6 +1058,19 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
       <UploadProgressModal />
+
+      {/* the last upload's invitations, while they go out (and after, until hidden) */}
+      {!showUploadModal && inviteBatch && inviteProgress && inviteProgress.total > 0 && (
+        <div className="m-4">
+          <InviteBatchStatus
+            progress={inviteProgress}
+            rejected={inviteBatch.rejected}
+            onRetry={retryFailedInvites}
+            retrying={inviteRetrying}
+            onDismiss={dismissInviteBatch}
+          />
+        </div>
+      )}
 
       {/* opened from Employees → Bulk add: adding employees from a spreadsheet, step by step */}
       {addingFromSheet && (
