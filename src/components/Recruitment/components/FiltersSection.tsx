@@ -1,6 +1,6 @@
 import { Search } from 'lucide-react';
 import { branches } from './constants/branches';
-import { departments } from './constants/departments';
+import { useRecruitmentDepartments } from './constants/departments';
 import { statusOptions } from './constants/statusOptions';
 import { employeeTypes } from './constants/employeeTypes';
 
@@ -29,6 +29,7 @@ export const FiltersSection = ({
   searchTerm,
   setSearchTerm,
 }: FiltersSectionProps) => {
+  const departments = useRecruitmentDepartments();
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Recruitment Filters</h2>

@@ -13,6 +13,8 @@ import BankBranchFields from '../Onboarding/BankBranchFields';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import SearchableDropdown from '../UI/SearchableDropdown';
+import DepartmentPicker from '../UI/DepartmentPicker';
+import EmployeePicker from '../UI/EmployeePicker';
 import { employeeTypeOptions } from '../../lib/employmentTypes';
 import { STARTER_DEPARTMENTS, ensureBranchListed, loadEmployeeFieldValues, optionsWithStarters } from '../../lib/employeeOptions';
 import { PAYMENT_METHODS } from '../../lib/paymentMethods';
@@ -27,6 +29,9 @@ type Employee = Database['public']['Tables']['employees']['Row'] & {
   'Tax PIN': string | null;
   'NITA': string | null;
   'HELB': string | null;
+  // org structure (20261015200000): the department and who they report to
+  department_id?: string | null;
+  reports_to_id?: string | null;
 };
 
 type DropdownOptions = {
@@ -87,6 +92,8 @@ const AddEmployeePage = () => {
     supervisors: []
   });
   const [activeTab, setActiveTab] = useState('personal');
+  // the "Reports to" picker shows the manager by employee number; reports_to_id is what is saved
+  const [reportsToNumber, setReportsToNumber] = useState('');
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([{ name: '', relationship: '', phone: '' }]);
   const [dependents, setDependents] = useState<Dependent[]>([{ name: '', relationship: '' }]);
   const [statutoryDeductions, setStatutoryDeductions] = useState<StatutoryDeduction[]>([
@@ -864,15 +871,9 @@ const AddEmployeePage = () => {
                     error={errors['Start Date']}
                     required
                   />
-                  <FormField
-                    label="Department"
-                    name="Job Level"
-                    type="select"
-                    creatable
-                    value={newEmployee['Job Level'] || ''}
-                    onChange={handleInputChange}
-                    options={dropdownOptions.jobLevels}
-                    error={errors['Job Level']}
+                  <DepartmentPicker
+                    value={newEmployee.department_id}
+                    onChange={(d) => setNewEmployee(prev => ({ ...prev, department_id: d?.id ?? null, 'Job Level': d?.name ?? null }))}
                   />
                   <FormField
                     label="Job Title"
@@ -904,13 +905,15 @@ const AddEmployeePage = () => {
                     options={dropdownOptions.office}
                   />
 
-                  <FormField
-                    label="Manager"
-                    name="Manager"
-                    type="select"
-                    value={newEmployee['Manager'] || ''}
-                    onChange={handleInputChange}
-                    options={dropdownOptions.supervisors}
+                  <EmployeePicker
+                    label="Reports to"
+                    value={reportsToNumber}
+                    onChange={(m) => {
+                      // the database fills in Manager and manager_email from reports_to_id
+                      setReportsToNumber(m?.employeeNumber || '');
+                      setNewEmployee(prev => ({ ...prev, reports_to_id: m?.id || null }));
+                    }}
+                    placeholder="Search for their manager..."
                   />
                   <FormField
                     label="Work Email"
