@@ -1,6 +1,6 @@
 // @vitest-environment node
 //
-// After hiring (20261016000000): offer letters with a public token link (only its holder sees that offer, answers it
+// After hiring (20261016300000): offer letters with a public token link (only its holder sees that offer, answers it
 // once, before it expires), adding the candidate as an employee, orientation checklists, required training and tests
 // marked in the database. HR is ADMIN or the Employees or Recruitment module; each company sees only its own.
 import { beforeAll, describe, expect, it } from 'vitest';

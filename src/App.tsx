@@ -68,6 +68,8 @@ const AIAssistantPage = lazy(() => import('./components/AI/AIAssistantPage').the
 const MicrofinanceTodoList = lazy(() => import('./components/Task Manager/TaskManager').then((m) => ({ default: m.MicrofinanceTodoList })));
 const SMSCenter = lazy(() => import('./components/SMS/Sms').then((m) => ({ default: m.SMSCenter })));
 const JoinCompany = lazy(() => import('./pages/JoinCompany'));
+const OfferPage = lazy(() => import('./pages/OfferPage'));
+const OffersPage = lazy(() => import('./components/AfterHiring/OffersPage'));
 const CreateCompany = lazy(() => import('./pages/CreateCompany'));
 const NoCompany = lazy(() => import('./pages/NoCompany'));
 const Appearance = lazy(() => import('./components/Settings/Appearance'));
@@ -208,7 +210,7 @@ function App() {
 
   // Check if current route should be excluded from inactivity timer
   const shouldExcludeFromInactivityTimer = useCallback(() => {
-    const excludedRoutes = ['/login', '/mfa', '/update-password', '/join', '/create-company'];
+    const excludedRoutes = ['/login', '/mfa', '/update-password', '/join', '/offer', '/create-company'];
     const isExcludedRoute = excludedRoutes.includes(location.pathname);
     const isAuthProcess = sessionStorage.getItem('isMFAProcess') === 'true';
 
@@ -712,7 +714,7 @@ function App() {
         } else {
           setUser(null);
           const currentPath = location.pathname;
-          const publicPaths = ['/login', '/update-password', '/mfa', '/join', '/create-company'];
+          const publicPaths = ['/login', '/update-password', '/mfa', '/join', '/offer', '/create-company'];
 
           const urlHasRecoveryToken = window.location.href.includes('type=recovery') ||
             window.location.hash.includes('type=recovery');
@@ -832,7 +834,7 @@ function App() {
           hasShownWelcomeToast.current = true;
 
           const currentPath = location.pathname;
-          const publicPaths = ['/login', '/update-password', '/mfa', '/join', '/create-company'];
+          const publicPaths = ['/login', '/update-password', '/mfa', '/join', '/offer', '/create-company'];
 
           // Check if MFA is required for this user
           const requiresMFA = MFA_ENABLED && (userData.role === 'ADMIN' || userData.role === 'CHECKER');
@@ -928,6 +930,8 @@ function App() {
             />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/join" element={<JoinCompany />} />
+            {/* a candidate's offer letter: the link's token opens that one offer, signed in or not */}
+            <Route path="/offer" element={<OfferPage />} />
             <Route path="/create-company" element={<CreateCompany />} />
             <Route path="/update-password" element={<UpdatePasswordPage />} />
             <Route
@@ -1042,6 +1046,8 @@ function App() {
                                 <Route path="/employees" element={<EmployeeList selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />} />
                                 <Route path="/add-employee" element={<AddEmployeePage />} />
                                 <Route path="/onboarding" element={<OnboardingReview />} />
+                                {/* Employees or Recruitment; the database decides what each may see */}
+                                <Route path="/offers" element={<OffersPage />} />
                                 <Route path="/view-employee/:id" element={<ViewEmployeePage />} />
                                 <Route path="/view-employee/:employeeId" element={<ViewEmployeePage />} />
                                 <Route path="/edit-employee/:id" element={<EditEmployeePage />} />

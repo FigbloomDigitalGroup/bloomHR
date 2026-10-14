@@ -12,6 +12,7 @@ export type EmailPurpose =
   | 'hr-reminder'
   | 'warning'
   | 'recruitment'
+  | 'offer'
   | 'performance'
   | 'staff-signup';
 

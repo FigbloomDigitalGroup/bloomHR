@@ -215,6 +215,12 @@ describe('nobody can send or read logs without signing in and having the permiss
     expect((await send(who('ops'), { ...mail, purpose: 'hr-reminder' })).status).toBe(403);
   });
 
+  it('lets Employees (or Recruitment) send offer letters, and nobody else', async () => {
+    expect((await send(who('ops'), { ...mail, purpose: 'offer' })).status).toBe(200);
+    expect((await send(who('hr'), { ...mail, purpose: 'offer' })).status).toBe(403);
+    expect((await send(who('staff'), { ...mail, purpose: 'offer' })).status).toBe(403);
+  });
+
   it('maps the in-app emails (warnings, recruitment, performance, sign-up approvals) to their own modules', async () => {
     // HR has email-portal + hr-lifecycle only, so none of these four are open to it
     for (const purpose of ['warning', 'recruitment', 'performance', 'staff-signup']) {
