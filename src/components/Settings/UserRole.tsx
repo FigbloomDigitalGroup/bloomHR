@@ -30,6 +30,7 @@ import { Card, Button, SearchInput, StatusPill, EmptyState, Modal } from '../UI'
 import type { StatusTone } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import EmployeeNumberingCard from './EmployeeNumbering';
+import ApprovalWorkflowsCard from './ApprovalWorkflows';
 
 // Role definitions
 const ROLES = {
@@ -928,6 +929,8 @@ export default function UserRolesSettings() {
         </Link>
 
         <EmployeeNumberingCard className="" />
+
+        <ApprovalWorkflowsCard />
 
         {/* Users */}
         <div className="flex flex-wrap items-center justify-between gap-3">
