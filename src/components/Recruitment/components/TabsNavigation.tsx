@@ -19,6 +19,7 @@ export const TabsNavigation = ({
     <div className="pb-[18px] border-b border-border">
       <TabBar
         items={[
+          { id: 'pipeline', label: 'Pipeline' },
           { id: 'positions', label: `Open Positions (${jobPositionsCount})` },
           { id: 'applications', label: `Applications (${applicationsCount})` },
           { id: 'branches', label: `Branches (${branchesCount})` },

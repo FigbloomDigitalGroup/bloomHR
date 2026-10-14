@@ -25,7 +25,7 @@ import {
   Mails,
   ShieldHalf,
   HeartHandshake,
-  LogOut, CalendarDays, ClipboardCheck
+  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useMyPreferences } from '../../hooks/useMyPreferences';
@@ -58,6 +58,7 @@ const menuGroups = [
     title: "Team",
     items: [
       { id: 'employees', label: 'Employees', icon: UsersRound, path: '/employees', permission: 'employees' },
+      { id: 'organogram', label: 'Organogram', icon: OrgChart, path: '/organogram' },
       { id: 'onboarding', label: 'Onboarding', icon: ClipboardCheck, path: '/onboarding', permission: 'employees' },
       { id: 'recruitment', label: 'Recruitment', icon: UserPlus2, path: '/recruitment', permission: 'recruitment' },
       { id: 'leaves', label: 'Time Off', icon: CalendarRange, path: '/leaves', permission: 'leaves' },
@@ -72,6 +73,8 @@ const menuGroups = [
     title: "Finance",
     items: [
       { id: 'payroll', label: 'Payroll', icon: Landmark, path: '/payroll', permission: 'payroll' },
+      // job groups and their pay: for Payroll and Employees, who can't open Settings
+      { id: 'job-groups', label: 'Job groups', icon: Layers, path: '/settings/job-groups', anyPermission: ['payroll', 'employees'] },
       { id: 'expense', label: 'Expenses', icon: Receipt, path: '/expenses', permission: 'expenses' },
       { id: 'advanced', label: 'Salary Advance', icon: Landmark, path: '/salaryadmin', permission: 'salaryadmin' },
       { id: 'asset', label: 'Assets', icon: Package, path: '/asset', permission: 'asset' },
@@ -85,6 +88,7 @@ const menuGroups = [
       { id: 'email admin', label: 'Email Admin', icon: ShieldEllipsis, path: '/adminconfirm', permission: 'adminconfirm' },
       { id: 'incident-reports', label: 'Incidents', icon: ShieldAlert, path: '/incident-reports', permission: 'incident-reports' },
       { id: 'settings', label: 'Settings', icon: Settings, path: '/settings', permission: 'settings' },
+      { id: 'departments', label: 'Departments', icon: Building2, path: '/departments', permission: 'employees' },
       { id: 'role-permissions', label: 'Role Permissions', icon: ShieldHalf, path: '/role-permissions', permission: 'role-permissions' },
       { id: 'appearance', label: 'Appearance', icon: Palette, path: '/appearance' },
     ]
@@ -110,7 +114,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
   const [searchQuery, setSearchQuery] = useState('');
 
   // Use permissions hook for dynamic access control
-  const { hasPermission, loading: permissionsLoading } = usePermissions();
+  const { hasPermission, hasAnyPermission, loading: permissionsLoading } = usePermissions();
   const { data: myPreferences } = useMyPreferences(user?.email);
 
   // Badge on "Time Off" (FIG-575): count of pending leave applications that
@@ -357,6 +361,8 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
                     // While permissions are loading, show all items (avoid blank sidebar flash)
                     // Once loaded, hide items the user doesn't have access to
                     if (!permissionsLoading && item.permission && !hasPermission(item.permission)) return null;
+                    const anyOf = (item as { anyPermission?: string[] }).anyPermission;
+                    if (!permissionsLoading && anyOf && !hasAnyPermission(anyOf)) return null;
 
                     return (
                       <motion.button

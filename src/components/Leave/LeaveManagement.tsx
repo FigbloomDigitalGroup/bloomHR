@@ -37,8 +37,9 @@ import { WRITE_BATCH_SIZE, chunks, fetchAll, fetchAllResult } from '../../lib/fe
 import { groupBy } from '../../lib/utils';
 import { TownProps } from '../../types/supabase';
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
-import { useUser } from '../ProtectedRoutes/UserContext';
 import LeaveScheduler from './LeaveScheduler';
+import ApprovalChain from '../Approvals/ApprovalChain';
+import { ApprovalChain as ApprovalChainData, loadApprovalChains } from '../../lib/approvals';
 import { PageHeader, StatCard, Card, TabBar, Button, EmptyState, Modal } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
@@ -387,7 +388,13 @@ const LeaveTypeIcon = ({ type }: { type: LeaveType }) => {
 // Detailed View Component
 // Detailed View Component
 // Detailed View Component
-const LeaveApplicationDetails = ({ application, onClose }: { application: LeaveApplication, onClose: () => void }) => {
+const LeaveApplicationDetails = ({ application, onClose, chain, onDecided }: {
+  application: LeaveApplication,
+  onClose: () => void,
+  // its approval chain (FIG-829); the current approver approves or rejects here
+  chain?: ApprovalChainData,
+  onDecided?: (status: 'pending' | 'approved' | 'rejected') => void | Promise<void>
+}) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
@@ -460,6 +467,13 @@ const LeaveApplicationDetails = ({ application, onClose }: { application: LeaveA
               <p className="font-medium text-sm whitespace-pre-line">{application.Reason}</p>
             </div>
 
+            {chain && (
+              <div>
+                <p className="text-xs text-gray-500 mb-2">Approvals</p>
+                <ApprovalChain chain={chain} onDecided={onDecided} />
+              </div>
+            )}
+
             {application.notes && (
               <div>
                 <p className="text-xs text-gray-500">Decision Notes</p>
@@ -490,157 +504,6 @@ const LeaveApplicationDetails = ({ application, onClose }: { application: LeaveA
     </div>
   );
 };
-// Status Update Modal Component
-const StatusUpdateModal = ({
-  isOpen,
-  onClose,
-  applicationId,
-  action,
-  onUpdateStatus
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  applicationId: string | null;
-  action: 'approve' | 'reject' | 'recommend' | 'not_recommend' | null;
-  onUpdateStatus: (applicationId: string, status: 'approved' | 'rejected' | 'recommended' | 'not_recommended', notes: string) => Promise<void>;
-}) => {
-  const [notes, setNotes] = useState('');
-  const [isUpdating, setIsUpdating] = useState(false);
-
-  const handleSubmit = async () => {
-    if (!applicationId || !action) return;
-
-    setIsUpdating(true);
-    try {
-      let status: 'approved' | 'rejected' | 'recommended' | 'not_recommended';
-      if (action === 'approve') {
-        status = 'approved';
-      } else if (action === 'reject') {
-        status = 'rejected';
-      } else if (action === 'recommend') {
-        status = 'recommended';
-      } else {
-        status = 'not_recommended';
-      }
-
-      await onUpdateStatus(applicationId, status, notes);
-      setNotes('');
-      onClose();
-    } catch (error) {
-      console.error('Error updating status:', error);
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const getModalTitle = () => {
-    switch (action) {
-      case 'approve': return 'Approve Leave';
-      case 'reject': return 'Reject Leave';
-      case 'recommend': return 'Recommend Leave';
-      case 'not_recommend': return 'Not Recommend Leave';
-      default: return 'Update Leave Status';
-    }
-  };
-
-  const getNotesLabel = () => {
-    switch (action) {
-      case 'approve': return 'Approval Notes';
-      case 'reject': return 'Reason for Rejection';
-      case 'recommend': return 'Recommendation Notes';
-      case 'not_recommend': return 'Reason for Not Recommending';
-      default: return 'Notes';
-    }
-  };
-
-  const getNotesPlaceholder = () => {
-    switch (action) {
-      case 'approve': return 'Add any notes about this approval...';
-      case 'reject': return 'Explain why this leave application is being rejected...';
-      case 'recommend': return 'Add your recommendation notes for this leave application...';
-      case 'not_recommend': return 'Explain why you are not recommending this leave application...';
-      default: return 'Add notes...';
-    }
-  };
-
-  const getButtonColor = () => {
-    switch (action) {
-      case 'approve': return 'bg-green-600 hover:bg-green-700';
-      case 'reject': return 'bg-red-600 hover:bg-red-700';
-      case 'recommend': return 'bg-brand hover:bg-brand-dark';
-      case 'not_recommend': return 'bg-orange-600 hover:bg-orange-700';
-      default: return 'bg-gray-600 hover:bg-gray-700';
-    }
-  };
-
-  const getButtonIcon = () => {
-    switch (action) {
-      case 'approve': return CheckCircle;
-      case 'reject': return XCircle;
-      case 'recommend': return ThumbsUp;
-      case 'not_recommend': return ThumbsDown;
-      default: return CheckCircle;
-    }
-  };
-
-  if (!isOpen) return null;
-
-  const Icon = getButtonIcon();
-
-  return (
-    <Modal open={isOpen} onClose={onClose} title={getModalTitle()} hideTitle size="md" className="bg-white rounded-xl shadow-lg p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-base text-gray-900">
-            {getModalTitle()}
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              {getNotesLabel()}
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
-              rows={4}
-              placeholder={getNotesPlaceholder()}
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 pt-6">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs"
-            disabled={isUpdating}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            className={`px-4 py-2 ${getButtonColor()} text-white rounded-lg text-xs flex items-center gap-2`}
-            disabled={isUpdating}
-          >
-            {isUpdating ? (
-              <span className="inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-            ) : (
-              <Icon className="w-4 h-4" />
-            )}
-            {action === 'recommend' ? 'Recommend' : action === 'not_recommend' ? 'Not Recommend' : 'Update Status'}
-          </button>
-        </div>
-    </Modal>
-  );
-};
-
 // Pagination Component
 const Pagination = ({
   currentPage,
@@ -1379,10 +1242,6 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
   const [townsInArea, setTownsInArea] = useState<string[]>([]);
   const [, setDebugInfo] = useState<string>("Initializing...");
 
-  // Two-level leave approval (FIG-573): who is the logged-in user, for
-  // matching against an applicant's assigned "Leave Approver" below.
-  const { user: currentAuthUser } = useUser();
-
   // Original state variables
   const [activeTab, setActiveTab] = useState('applications');
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
@@ -1395,11 +1254,8 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
   const [error, setError] = useState<string | null>(null);
   const [selectedApplication, setSelectedApplication] = useState<LeaveApplication | null>(null);
 
-  // Status update modal state
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
-  const [statusAction, setStatusAction] = useState<'approve' | 'reject' | 'recommend' | 'not_recommend' | null>(null);
-  const [, setUpdatingStatus] = useState(false);
+  // Approval chains (FIG-829), by application id: the database decides who approves each step
+  const [chains, setChains] = useState<Record<string, ApprovalChainData>>({});
 
   // Pagination states
   const [applicationsPage, setApplicationsPage] = useState(1);
@@ -1533,14 +1389,6 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
     }
   }, [currentTown, areaTownMapping]);
 
-  // Two-level leave approval (FIG-573): the logged-in user's own name, for
-  // matching against each application's assigned "Leave Approver"/
-  // "Alternate Approver". Only meaningful once `employees` has loaded.
-  const currentUserEmployee = employees.find(e => e["Work Email"] === currentAuthUser?.email);
-  const currentUserFullName = currentUserEmployee
-    ? `${currentUserEmployee["First Name"]} ${currentUserEmployee["Last Name"]}`
-    : null;
-
   // Calculate paginated data
   const paginatedApplications = leaveApplications.slice(
     (applicationsPage - 1) * applicationsPerPage,
@@ -1625,80 +1473,43 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
     }
   };
 
-  // Function to open status update modal
-  const openStatusModal = (applicationId: string, action: 'approve' | 'reject' | 'recommend' | 'not_recommend') => {
-    setSelectedApplicationId(applicationId);
-    setStatusAction(action);
-    setShowStatusModal(true);
+  // The approval chains of the applications on this page (and the one open), read from the database (FIG-829)
+  const refreshChains = async (ids: string[]) => {
+    if (!ids.length) return;
+    try {
+      const loaded = await loadApprovalChains('leave', ids);
+      setChains(prev => ({ ...prev, ...loaded }));
+    } catch (err) {
+      console.error('Failed to load approval chains:', err);
+    }
   };
 
-  // Function to update leave status with reason
-  const handleUpdateStatus = async (applicationId: string, status: 'approved' | 'rejected' | 'recommended' | 'not_recommended', notes: string) => {
-    // Two-level leave approval (FIG-573): defense-in-depth mirror of the
-    // disabled Approve button - refuse final approval here too if the
-    // applicant has an assigned Leave Approver who hasn't recommended it
-    // yet, in case this ever gets called from somewhere other than that
-    // button. (This is a client-side guard only, same as every other role
-    // check in this file - real enforcement needs RLS, see FIG-515.)
-    if (status === 'approved') {
-      const application = leaveApplications.find(app => app.id === applicationId);
-      const applicantEmployee = application
-        ? employees.find(e => e["Employee Number"] === application["Employee Number"])
-        : undefined;
-      const deptHeadName = applicantEmployee?.["Leave Approver"];
-      if (deptHeadName && application?.recstatus !== 'recommended') {
-        setError(`Cannot approve: awaiting ${deptHeadName}'s recommendation first.`);
-        return;
-      }
-    }
-
-    setUpdatingStatus(true);
+  // After the signed-in approver approved or rejected through the chain (decide_approval writes the status,
+  // the recommendation and the notifications): show the application as it now is, and take the leave from the
+  // balance once it is finally approved, as approving did before.
+  const handleApprovalDecided = async (application: LeaveApplication, status: 'pending' | 'approved' | 'rejected') => {
     try {
-      // DB payload: `leave_application` stores status/reason as lowercase columns
-      // (see fetchLeaveApplications above); local state uses the capitalized shape.
-      let dbUpdateData: any = {};
-      let localUpdateData: Partial<LeaveApplication> = {};
-
-      if (status === 'approved' || status === 'rejected') {
-        // HR's note goes in "notes": "reason" is the employee's own reason for the leave
-        dbUpdateData = {
-          "status": status,
-          "notes": notes
-        };
-        localUpdateData = {
-          "Status": status,
-          "notes": notes
-        };
-      } else if (status === 'recommended' || status === 'not_recommended') {
-        dbUpdateData = {
-          "recstatus": status,
-          "recommendation_notes": notes
-        };
-        localUpdateData = {
-          "recstatus": status,
-          "recommendation_notes": notes
-        };
-      }
-
-      const { error } = await supabase
+      const { data: row } = await supabase
         .from('leave_application')
-        .update(dbUpdateData)
-        .eq('id', applicationId);
-
-      if (error) throw error;
-
-      setLeaveApplications(prev => prev.map(app =>
-        app.id === applicationId ? {
-          ...app,
-          ...localUpdateData
-        } : app
-      ));
+        .select('status, recstatus, notes, recommendation_notes')
+        .eq('id', application.id)
+        .maybeSingle();
+      if (row) {
+        const localUpdateData: Partial<LeaveApplication> = {
+          "Status": (row.status || 'pending').toLowerCase() as LeaveApplication['Status'],
+          "recstatus": row.recstatus || null,
+          "notes": row.notes || undefined,
+          "recommendation_notes": row.recommendation_notes || undefined
+        };
+        setLeaveApplications(prev => prev.map(app => app.id === application.id ? { ...app, ...localUpdateData } : app));
+        setSelectedApplication(prev => prev && prev.id === application.id ? { ...prev, ...localUpdateData } : prev);
+      }
+      await refreshChains([application.id]);
 
       // Deduct from the real leave_balances row on approval (see FIG-563).
       // Rejecting needs no reversal here: nothing is deducted until
       // approval, so there's nothing to undo on rejection.
       if (status === 'approved') {
-        const application = leaveApplications.find(app => app.id === applicationId);
         const leaveType = application ? leaveTypes.find(lt => lt.name === application["Leave Type"]) : undefined;
 
         if (application && leaveType?.is_deductible) {
@@ -1734,54 +1545,17 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
         }
       }
 
-      // Notify (FIG-574): recommending alerts HR/Admin via the existing
-      // admin bell (fetchAdminHRNotifications has no type filter, so a new
-      // notification_type shows up there with no other wiring needed);
-      // approving/rejecting alerts the employee via the Staff Portal's
-      // notification panel. "Leave submitted" has no new notification here
-      // - Header.tsx already shows a generic one for any new application.
-      if (status === 'recommended' || status === 'approved' || status === 'rejected') {
-        const application = leaveApplications.find(app => app.id === applicationId);
-        if (application) {
-          const dayLabel = `${application.Days} day${application.Days !== 1 ? 's' : ''}`;
-          const notificationsToInsert =
-            status === 'recommended'
-              ? [{
-                notification_type: 'leave_recommended',
-                title: 'Leave application recommended - awaiting final approval',
-                message: `${currentUserFullName || 'The department head'} recommended ${application.Name}'s ${application["Leave Type"]} application (${dayLabel}). Awaiting HR/Admin approval.`
-              }]
-              : [{
-                notification_type: status === 'approved' ? 'leave_approved' : 'leave_rejected',
-                title: status === 'approved' ? 'Leave application approved' : 'Leave application rejected',
-                message: status === 'approved'
-                  ? `Your ${application["Leave Type"]} application (${dayLabel}, ${application["Start Date"]} to ${application["End Date"]}) has been approved.`
-                  : `Your ${application["Leave Type"]} application (${dayLabel}) has been rejected.${notes ? ` Reason: ${notes}` : ''}`
-              }];
-
-          const { error: notifyError } = await supabase.from('hr_notifications').insert(
-            notificationsToInsert.map(n => ({
-              employee_number: application["Employee Number"],
-              employee_name: application.Name,
-              end_date: application["End Date"],
-              is_read_admin: false,
-              is_read_staff: false,
-              email_sent: false,
-              ...n
-            }))
-          );
-
-          if (notifyError) console.error('Failed to create leave notification:', notifyError);
-        }
-      }
-
     } catch (err) {
       setError(`Failed to update status. Please try again.`);
       console.error(err);
-    } finally {
-      setUpdatingStatus(false);
     }
   };
+
+  // reload when the page shows other applications, or one of them changed
+  const pageChainKey = paginatedApplications.map(app => `${app.id}:${app.Status}:${app.recstatus}`).join(',');
+  useEffect(() => {
+    refreshChains(pageChainKey ? pageChainKey.split(',').map(k => k.split(':')[0]) : []);
+  }, [pageChainKey]);
 
   // Fetch employees for dropdown
   useEffect(() => {
@@ -2924,10 +2698,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
             <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-4 text-[10px] text-gray-500 font-medium bg-gray-50/50 p-2 rounded-xl">
               <span className="uppercase tracking-widest font-bold text-gray-400">Icon Guide:</span>
               <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><Eye className="w-3 h-3 text-brand" /> View</div>
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><CheckCircle className="w-3 h-3 text-emerald-600" /> Approve</div>
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><XCircle className="w-3 h-3 text-rose-600" /> Reject</div>
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><ThumbsUp className="w-3 h-3 text-brand" /> Recommend</div>
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><ThumbsDown className="w-3 h-3 text-orange-600" /> Not Recommend</div>
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-white rounded shadow-sm border border-gray-100"><CheckCircle className="w-3 h-3 text-emerald-600" /> Approve or reject (when it is waiting on you)</div>
             </div>
           </div>
 
@@ -2941,7 +2712,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
                   <th className="text-left py-3.5 px-6 text-gray-500 font-bold uppercase tracking-wider text-[10px]">Duration</th>
                   <th className="text-left py-3.5 px-6 text-gray-500 font-bold uppercase tracking-wider text-[10px]">Branch</th>
                   <th className="text-left py-3.5 px-6 text-gray-500 font-bold uppercase tracking-wider text-[10px]">Status</th>
-                  <th className="text-left py-3.5 px-6 text-gray-500 font-bold uppercase tracking-wider text-[10px]">Recommendation</th>
+                  <th className="text-left py-3.5 px-6 text-gray-500 font-bold uppercase tracking-wider text-[10px]">Approvals</th>
                   <th className="text-left py-3.5 px-6 text-gray-500 font-bold uppercase tracking-wider text-[10px]">Applied</th>
                   <th className="text-center py-3.5 px-6 text-gray-500 font-bold uppercase tracking-wider text-[10px]">Actions</th>
                 </tr>
@@ -2961,19 +2732,11 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
                   </tr>
                 ) : (
                   paginatedApplications.map((application) => {
-                    // Two-level leave approval (FIG-573): dept head must
-                    // recommend before HR/Admin can give final approval -
-                    // unless the applicant has no Leave Approver assigned,
-                    // in which case it goes straight to HR (today's
-                    // pre-existing behavior, unchanged for anyone not yet
-                    // set up in Add/Edit Employee's "Leave Approvers").
-                    const applicantEmployee = employees.find(e => e["Employee Number"] === application["Employee Number"]);
-                    const deptHeadName = applicantEmployee?.["Leave Approver"] || null;
-                    const altDeptHeadName = applicantEmployee?.["Alternate Approver"] || null;
-                    const isDeptHeadForApp = currentAuthUser?.role === 'ADMIN' ||
-                      (!!currentUserFullName && (currentUserFullName === deptHeadName || currentUserFullName === altDeptHeadName));
-                    const requiresDeptHeadApproval = !!deptHeadName;
-                    const canFinalApprove = !requiresDeptHeadApproval || application.recstatus === 'recommended';
+                    // Approval workflows (FIG-829): the company's chain (by default the Leave Approver
+                    // recommends, then HR approves) is checked in the database; whoever may decide the
+                    // current step gets Approve / Reject in the details.
+                    const chain = chains[application.id];
+                    const canDecide = !!chain && chain.status === 'pending' && (chain.can_approve || chain.can_reject);
 
                     return (
                     <tr key={application.id} className="border-b border-gray-50 hover:bg-primary/5 transition-colors group">
@@ -3013,7 +2776,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
                         <StatusBadge status={application.Status} />
                       </td>
                       <td className="py-3 px-6">
-                        <RecStatusBadge recstatus={application.recstatus} />
+                        {chain ? <ApprovalChain chain={chain} compact /> : <RecStatusBadge recstatus={application.recstatus} />}
                       </td>
                       <td className="py-3 px-6 text-gray-500 text-[11px]">
                         {formatDate(application.time_added)}
@@ -3027,49 +2790,15 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          {application.Status === 'pending' && (
-                            <>
-                              <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
-                                <button
-                                  onClick={() => canFinalApprove && openStatusModal(application.id, 'approve')}
-                                  disabled={!canFinalApprove}
-                                  className={`p-1.5 rounded-md transition-colors shadow-sm ring-1 ${canFinalApprove
-                                    ? 'bg-gray-50 hover:bg-emerald-50 text-emerald-600 ring-gray-200 hover:ring-emerald-200'
-                                    : 'bg-gray-50 text-gray-300 ring-gray-100 cursor-not-allowed'
-                                    }`}
-                                  title={canFinalApprove ? 'Approve' : `Awaiting ${deptHeadName}'s recommendation`}
-                                >
-                                  <CheckCircle className="w-4 h-4" />
-                                </button>
-                              </RoleButtonWrapper>
-                              <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
-                                <button
-                                  onClick={() => openStatusModal(application.id, 'reject')}
-                                  className="p-1.5 bg-gray-50 hover:bg-rose-50 text-rose-600 rounded-md transition-colors shadow-sm ring-1 ring-gray-200 hover:ring-rose-200"
-                                  title="Reject"
-                                >
-                                  <XCircle className="w-4 h-4" />
-                                </button>
-                              </RoleButtonWrapper>
-                              {isDeptHeadForApp && (
-                                <>
-                                  <button
-                                    onClick={() => openStatusModal(application.id, 'recommend')}
-                                    className="p-1.5 bg-gray-50 hover:bg-green-tint text-brand rounded-md transition-colors shadow-sm ring-1 ring-gray-200 hover:ring-brand/20"
-                                    title="Recommend"
-                                  >
-                                    <ThumbsUp className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => openStatusModal(application.id, 'not_recommend')}
-                                    className="p-1.5 bg-gray-50 hover:bg-orange-50 text-orange-600 rounded-md transition-colors shadow-sm ring-1 ring-gray-200 hover:ring-orange-200"
-                                    title="Not Recommend"
-                                  >
-                                    <ThumbsDown className="w-4 h-4" />
-                                  </button>
-                                </>
-                              )}
-                            </>
+                          {canDecide && (
+                            <button
+                              onClick={() => setSelectedApplication(application)}
+                              className="p-1.5 bg-gray-50 hover:bg-emerald-50 text-emerald-600 rounded-md transition-colors shadow-sm ring-1 ring-gray-200 hover:ring-emerald-200"
+                              title="Approve or reject"
+                              aria-label={`Approve or reject ${application.Name}'s leave`}
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                            </button>
                           )}
                         </div>
                       </td>
@@ -3099,14 +2828,6 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
 
       {activeTab === 'settings' && renderSettingsTab()}
 
-      {/* Status Update Modal */}
-      <StatusUpdateModal
-        isOpen={showStatusModal}
-        onClose={() => setShowStatusModal(false)}
-        applicationId={selectedApplicationId}
-        action={statusAction}
-        onUpdateStatus={handleUpdateStatus}
-      />
 
       {/* Error Alert */}
       {error && (
@@ -3134,6 +2855,8 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
         <LeaveApplicationDetails
           application={selectedApplication}
           onClose={() => setSelectedApplication(null)}
+          chain={chains[selectedApplication.id]}
+          onDecided={(status) => handleApprovalDecided(selectedApplication, status)}
         />
       )}
 

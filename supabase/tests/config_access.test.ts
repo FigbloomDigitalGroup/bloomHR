@@ -120,9 +120,12 @@ describe('system_settings keeps the Gmail tokens private but everyone can learn 
       expect(await count(`select gmail_refresh_token from system_settings`)).toBe(0);
     });
   });
-  it('…but mfa_required() answers for their own company', async () => {
-    await asUser(db, USER.STAFF, async () => {
+  it('…but mfa_required() answers for their own company (the old switch means admins, HR and checkers)', async () => {
+    await asUser(db, USER.HR, async () => {
       expect((await db.query<{ v: boolean }>(`select mfa_required() v`)).rows[0].v).toBe(true);
+    });
+    await asUser(db, USER.STAFF, async () => {
+      expect((await db.query<{ v: boolean }>(`select mfa_required() v`)).rows[0].v).toBe(false);
     });
     await asUser(db, OTHER_ADMIN, async () => {
       expect((await db.query<{ v: boolean }>(`select mfa_required() v`)).rows[0].v).toBe(false);

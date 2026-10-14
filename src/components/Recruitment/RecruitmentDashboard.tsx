@@ -10,6 +10,7 @@ import { ApplicationsTable } from './components/ApplicationsTable';
 import { BranchesSection } from './components/BranchesSection';
 import { NewPositionModal } from './components/NewPositionModal';
 import { ApplicationDetailModal } from './components/ApplicationDetailModal';
+import RecruitmentPipeline from './pipeline/RecruitmentPipeline';
 import { branches } from './components/constants/branches';
 import { jobPositions } from './components/constants/jobPositions';
 
@@ -30,7 +31,7 @@ interface Position {
 }
 
 export default function RecruitmentDashboard() {
-  const [selectedTab, setSelectedTab] = useState('positions');
+  const [selectedTab, setSelectedTab] = useState('pipeline');
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [selectedDepartment, setSelectedDepartment] = useState('All Departments');
   const [selectedStatus, setSelectedStatus] = useState('All Statuses');
@@ -172,6 +173,8 @@ export default function RecruitmentDashboard() {
         applicationsCount={applications.length}
         branchesCount={branches.length}
       />
+
+      {selectedTab === 'pipeline' && <RecruitmentPipeline />}
 
       {selectedTab === 'positions' && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

@@ -176,6 +176,9 @@ export type Database = {
           kra_residency: string | null
           is_pwd: boolean | null
           other_cash_allowances: number | null
+          job_group_id: string | null
+          pay_overridden: boolean
+          pay_override_reason: string | null
           car_benefit: number | null
           meals_benefit: number | null
           non_cash_benefit: number | null
@@ -286,6 +289,9 @@ export type Database = {
           kra_residency?: string | null
           is_pwd?: boolean | null
           other_cash_allowances?: number | null
+          job_group_id?: string | null
+          pay_overridden?: boolean
+          pay_override_reason?: string | null
           car_benefit?: number | null
           meals_benefit?: number | null
           non_cash_benefit?: number | null
@@ -396,6 +402,9 @@ export type Database = {
           kra_residency?: string | null
           is_pwd?: boolean | null
           other_cash_allowances?: number | null
+          job_group_id?: string | null
+          pay_overridden?: boolean
+          pay_override_reason?: string | null
           car_benefit?: number | null
           meals_benefit?: number | null
           non_cash_benefit?: number | null

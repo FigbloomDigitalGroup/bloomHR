@@ -8,6 +8,9 @@ import GlowButton from '../UI/GlowButton';
 import SearchableDropdown from '../UI/SearchableDropdown';
 import { format } from 'date-fns';
 import { useUser } from '../ProtectedRoutes/UserContext';
+import { useEmployeeDirectory } from '../../hooks/useEmployeeDirectory';
+import { useDepartments } from '../../hooks/useDepartments';
+import { departmentPath } from '../../lib/orgStructure';
 
 
 type Employee = any;
@@ -19,6 +22,11 @@ const ViewEmployeePage = () => {
   const { user: currentUser } = useUser();
   const isAdmin = currentUser?.role === 'ADMIN';
   const [employee, setEmployee] = useState<Employee | null>(null);
+  // their department (with the departments above it) and who they report to
+  const { employees: directory } = useEmployeeDirectory();
+  const { departments } = useDepartments();
+  const manager = employee?.reports_to_id ? directory.find((e) => e.id === employee.reports_to_id) : undefined;
+  const departmentName = (employee?.department_id && departmentPath(departments, employee.department_id)) || employee?.['Job Level'] || '';
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -942,7 +950,12 @@ Company Name
               <div className="space-y-3">
                 <DetailRow label="Full Name" value={`${employee['First Name']} ${employee['Middle Name'] || ''} ${employee['Last Name']}`.trim()} />
                 <DetailRow label="Job Title" value={employee['Job Title'] || 'N/A'} />
-                <DetailRow label="Department" value={employee['Employee Type'] || 'N/A'} />
+                <DetailRow
+                  label="Job Group"
+                  value={`${employee['Job Group'] || 'N/A'}${isAdmin && employee.job_group_id && employee.pay_overridden ? ' (pay set by hand)' : ''}`}
+                />
+                <DetailRow label="Department" value={departmentName || 'N/A'} />
+                <DetailRow label="Reports to" value={manager ? `${manager.fullName}${manager.jobTitle ? ` (${manager.jobTitle})` : ''}` : employee['Manager'] || 'N/A'} />
                 <DetailRow label="Start Date" value={employee['Start Date'] ? format(new Date(employee['Start Date']), 'MMMM d, yyyy') : 'N/A'} />
                 <DetailRow label="Email" value={employee['Email Address'] || 'N/A'} />
                 <DetailRow label="Phone" value={employee['Phone Number'] || 'N/A'} />
