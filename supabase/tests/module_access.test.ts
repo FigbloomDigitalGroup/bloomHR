@@ -21,7 +21,7 @@ const TABLES: Record<string, { modules: string[]; insert: string }> = {
   mpesa_transactions: { modules: ['mpesa-zap', 'reports'], insert: 'default values' },
   hr_terminations: { modules: ['hr-lifecycle'], insert: `("Employee Number", termination_date) values ('E1', current_date)` },
   hr_suspensions: { modules: ['hr-lifecycle'], insert: `("Employee Number", suspension_date) values ('E1', current_date)` },
-  hr_termination_interviews: { modules: ['hr-lifecycle'], insert: `("Employee Number") values ('E1')` },
+  hr_termination_interviews: { modules: ['employees', 'hr-lifecycle'], insert: `("Employee Number") values ('E1')` },
   termination_requests: { modules: ['employees', 'hr-lifecycle'], insert: 'default values' },
 };
 

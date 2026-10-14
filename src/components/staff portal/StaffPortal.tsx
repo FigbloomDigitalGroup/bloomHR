@@ -20,7 +20,8 @@ import {
   Clock as PhClock,
   CurrencyDollar as PhCurrencyDollar,
   Warning as PhWarning,
-  ClipboardText as PhClipboardText
+  ClipboardText as PhClipboardText,
+  SignOut as PhSignOut
 } from '@phosphor-icons/react';
 
 // Keep Lucide icons for UI elements only
@@ -68,6 +69,7 @@ import PasswordResetModal from './PasswordRestModal';
 import MyDocumentsPage from '../Onboarding/MyDocumentsPage';
 import Appearance from '../Settings/Appearance';
 import MyContract from './MyContract';
+import MyResignation from './MyResignation';
 import { leaveDays, NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
 import CompleteProfileCard from './CompleteProfileCard';
 import OnboardingForm from '../Onboarding/OnboardingForm';
@@ -94,7 +96,7 @@ interface NotificationItem {
 }
 
 /** hr_notifications that are for HR, not the employee */
-const HR_ONLY_NOTIFICATIONS = ['contract_expiring', 'probation_expiring', 'leave_recommended'];
+const HR_ONLY_NOTIFICATIONS = ['contract_expiring', 'probation_expiring', 'leave_recommended', 'exit_requested'];
 
 /** Marks an hr_notifications item ("hr-<id>") read, so it stays cleared; warnings are not stored as read. */
 const persistRead = (id: string) => {
@@ -2627,6 +2629,7 @@ const staffMenuGroups: MenuGroup[] = [
       { id: 'biodata', label: 'Bio Data', icon: PhBriefcase },
       { id: 'documents', label: 'Documents', icon: PhUpload },
       { id: 'appearance', label: 'Appearance', icon: PhPalette },
+      { id: 'resignation', label: 'Resignation', icon: PhSignOut },
     ]
   }
 ];
@@ -3328,6 +3331,7 @@ const StaffPortal = () => {
               {activeTab === 'leave' && <LeaveApplicationForm />}
               {activeTab === 'leave-history' && <LeaveApplicationsList />}
               {activeTab === 'contract' && <MyContract />}
+              {activeTab === 'resignation' && <MyResignation />}
               {activeTab === 'details' && <Profile />}
               {activeTab === 'documents' && <MyDocumentsPage />}
               {activeTab === 'appearance' && <Appearance />}

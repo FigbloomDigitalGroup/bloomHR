@@ -4,6 +4,7 @@ import {
   employerPartMissing,
   fieldProblem,
   isPayrollReady,
+  leftBefore,
   isValidIdNumber,
   isValidKraPin,
   isValidNssfNumber,
@@ -141,5 +142,13 @@ describe('isPayrollReady', () => {
   it('only an approved record is paid', () => {
     expect(isPayrollReady({ onboarding_status: 'approved' })).toBe(true);
     for (const s of ['draft', 'invited', 'submitted', 'changes_requested', undefined]) expect(isPayrollReady({ onboarding_status: s })).toBe(false);
+  });
+
+  it('a leaver is paid up to the month they leave in, not after', () => {
+    expect(isPayrollReady({ onboarding_status: 'approved', 'Termination Date': '2000-01-31' })).toBe(false);
+    expect(isPayrollReady({ onboarding_status: 'approved', 'Termination Date': '2999-01-31' })).toBe(true);
+    expect(leftBefore({ 'Termination Date': '2026-10-15' }, '2026-10')).toBe(false);
+    expect(leftBefore({ 'Termination Date': '2026-10-15' }, '2026-11')).toBe(true);
+    expect(leftBefore({ 'Termination Date': '' }, '2026-11')).toBe(false);
   });
 });

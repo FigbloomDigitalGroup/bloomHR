@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
     Users, Clock, ShieldOff,
     XCircle, AlertTriangle, CheckCircle,
-    RefreshCw, Loader2, History, Bell
+    RefreshCw, Loader2, History, Bell, LogOut
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
@@ -12,6 +12,7 @@ import EmploymentStatusModule from './EmploymentStatusModule';
 import LifecycleHistoryModule from './LifecycleHistoryModule';
 import SuspensionModule from './SuspensionModule';
 import HRReportsDashboard from './HRReportsDashboard';
+import ExitsModule from './ExitsModule';
 import { useHRNotifications, fetchAdminHRNotifications, markAdminNotificationRead, type HRNotification } from '../../hooks/useHRNotifications';
 
 interface DashboardStats {
@@ -29,6 +30,7 @@ const tabs = [
     { id: 'status', label: 'Employment Status' },
     { id: 'history', label: 'Lifecycle History' },
     { id: 'suspension', label: 'Suspension' },
+    { id: 'exits', label: 'Exits' },
     { id: 'reports', label: 'Reports' },
 ];
 
@@ -117,6 +119,7 @@ export default function HRLifecycleDashboard() {
         { label: 'Manage Employment Status', tab: 'status', icon: Users, desc: 'Probation, Contract, Permanent' },
         { label: 'Lifecycle History', tab: 'history', icon: History, desc: 'View complete employee timelines' },
         { label: 'Record Suspension', tab: 'suspension', icon: ShieldOff, desc: 'Suspend or reactivate staff' },
+        { label: 'Exits', tab: 'exits', icon: LogOut, desc: 'Resignations, terminations, clearance, final dues' },
     ];
 
     return (
@@ -265,6 +268,7 @@ export default function HRLifecycleDashboard() {
             {activeTab === 'status' && <EmploymentStatusModule onRefresh={fetchDashboardStats} initialSearch={searchParams.get('q') || ''} />}
             {activeTab === 'history' && <LifecycleHistoryModule />}
             {activeTab === 'suspension' && <SuspensionModule onRefresh={fetchDashboardStats} />}
+            {activeTab === 'exits' && <ExitsModule onRefresh={fetchDashboardStats} />}
             {activeTab === 'reports' && <HRReportsDashboard stats={stats} />}
         </div>
     );
