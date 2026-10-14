@@ -5,6 +5,38 @@ import type { Channel, Message, Employee, DirectMessage } from "../types/types";
 import { AvatarService } from './avatar';
 import type { DirectoryPerson, Member } from '../lib/groups';
 import { chatDisplayName, directMessageId, initialsOf, isDirectMessageId, realChannelId } from '../lib/names';
+import { toUnreadCounts, type UnreadCounts } from '../lib/unread';
+
+/** How many of a channel's latest messages the chat loads. */
+const CHANNEL_HISTORY_LIMIT = 500;
+
+interface MessageRow {
+  id: string;
+  content: string;
+  author_id: string;
+  author_name?: string | null;
+  author_avatar?: string | null;
+  author_initials?: string | null;
+  author_town?: string | null;
+  created_at: string;
+  reactions?: Message['reactions'] | null;
+}
+
+const toMessage = (msg: MessageRow): Message => ({
+  id: msg.id,
+  content: msg.content,
+  author: {
+    id: msg.author_id,
+    name: msg.author_name || 'Unknown User',
+    avatar: msg.author_avatar || '',
+    initials: msg.author_initials || 'UU',
+    email: '',
+    status: 'online',
+    town: msg.author_town || 'Unknown'
+  },
+  timestamp: msg.created_at,
+  reactions: msg.reactions || []
+});
 
 class ChatService {
   private isInitialized = false;
@@ -94,8 +126,12 @@ class ChatService {
     try {
       console.log("📡 Fetching channels for user:", userId);
 
-      const regularChannels = await this.getRegularChannels(userId);
-      const directMessages = await this.getDirectMessageChannels(userId);
+      // one query for every channel's unread count, shared by the channels and the direct messages
+      const unread = await this.getUnreadCounts();
+      const [regularChannels, directMessages] = await Promise.all([
+        this.getRegularChannels(userId, unread),
+        this.getDirectMessageChannels(userId, unread),
+      ]);
       const allChannels = [...regularChannels, ...directMessages];
 
       console.log(`✅ Loaded ${allChannels.length} channels`);
@@ -108,12 +144,11 @@ class ChatService {
   }
 
   /** My direct messages, as chat entries ("dm-<conversation id>") that remember who is on the other end. */
-  private async getDirectMessageChannels(userId: string): Promise<Channel[]> {
+  private async getDirectMessageChannels(userId: string, unread: UnreadCounts): Promise<Channel[]> {
     try {
       const { data, error } = await supabase.rpc('my_direct_messages');
       if (error || !data) return [];
       const rows = data as { channel_id: string; other_user_id: string; other_email: string }[];
-      const unread = await this.getUnreadCountsByChannel(userId, rows.map((r) => r.channel_id));
       const partners = await this.getPartnerIdentities(rows);
       return rows.map((row) => ({
         id: directMessageId(row.channel_id),
@@ -206,7 +241,7 @@ class ChatService {
     return Number(data) || 0;
   }
 
-  private async getRegularChannels(userId: string): Promise<Channel[]> {
+  private async getRegularChannels(userId: string, unreadCounts: UnreadCounts): Promise<Channel[]> {
     const { data: userData } = await supabase.auth.getUser();
     const userEmail = userData.user?.email;
 
@@ -240,8 +275,6 @@ class ChatService {
       return [];
     }
 
-    const unreadCounts = await this.getUnreadCountsByChannel(userId, data.map(c => c.id));
-
     const channels: Channel[] = data.map(channel => ({
       id: channel.id,
       name: channel.name,
@@ -257,34 +290,16 @@ class ChatService {
     return channels;
   }
 
-  // Real per-channel unread counts via `user_channel_states.last_read_at`
-  // (the same table `markMessagesAsRead` already writes to, but until now
-  // nothing ever read it back - every channel's `unread_count` was a
-  // hardcoded 0, since `channels` itself has no such column). A channel
-  // with no read-state row yet counts as fully unread.
-  private async getUnreadCountsByChannel(userId: string, channelIds: string[]): Promise<Record<string, number>> {
-    if (channelIds.length === 0) return {};
-
+  /**
+   * Unread messages in every channel I can see (direct messages included), by channel id, from one query:
+   * my_unread_counts() reads `user_channel_states.last_read_at` (a channel I never opened counts as fully unread) and
+   * stops each count at 100 (the badges show 99+). The open chat keeps them current from realtime after that.
+   */
+  async getUnreadCounts(): Promise<UnreadCounts> {
     try {
-      const { data: readStates } = await supabase
-        .from('user_channel_states')
-        .select('channel_id, last_read_at')
-        .eq('user_id', userId);
-
-      const lastReadMap = new Map((readStates || []).map((r: any) => [r.channel_id, r.last_read_at]));
-
-      const entries = await Promise.all(channelIds.map(async (channelId) => {
-        const lastRead = lastReadMap.get(channelId);
-        let query = supabase
-          .from('messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('channel_id', channelId);
-        if (lastRead) query = query.gt('created_at', lastRead);
-        const { count } = await query;
-        return [channelId, count || 0] as const;
-      }));
-
-      return Object.fromEntries(entries);
+      const { data, error } = await supabase.rpc('my_unread_counts');
+      if (error) throw error;
+      return toUnreadCounts(data as { channel_id: string; unread: number }[]);
     } catch (error) {
       console.error('Error computing unread counts:', error);
       return {};
@@ -311,12 +326,16 @@ class ChatService {
     try {
       console.log("📨 Fetching messages for:", channelId);
 
-      // a direct message is a real conversation, stored like any channel under its own id
-      const { data, error } = await supabase
+      // a direct message is a real conversation, stored like any channel under its own id. The latest messages,
+      // newest first then put back in order: oldest first, the API stops at 1000 rows, so a busy channel (every
+      // company's general) showed its first 1000 messages and never the new ones.
+      const { data: latest, error } = await supabase
         .from('messages')
         .select('*')
         .eq('channel_id', realChannelId(channelId))
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false })
+        .limit(CHANNEL_HISTORY_LIMIT);
+      const data = latest ? [...latest].reverse() : latest;
 
       if (error) {
         console.error('❌ Error fetching messages:', error);
@@ -327,23 +346,7 @@ class ChatService {
         return this.getWelcomeMessage(channelId);
       }
 
-      const messages: Message[] = data.map(msg => ({
-        id: msg.id,
-        content: msg.content,
-        author: {
-          id: msg.author_id,
-          name: msg.author_name || 'Unknown User',
-          avatar: msg.author_avatar || '',
-          initials: msg.author_initials || 'UU',
-          email: '',
-          status: 'online',
-          town: msg.author_town || 'Unknown'
-        },
-        timestamp: msg.created_at,
-        reactions: msg.reactions || []
-      }));
-
-      return messages;
+      return data.map(toMessage);
 
     } catch (error) {
       console.error('❌ Error fetching messages:', error);
@@ -434,7 +437,7 @@ class ChatService {
           name: fullName,
           avatar: userAvatar,
           initials: initials,
-          email: userEmail,
+          email: userEmail || '',
           status: 'online',
           town: town
         },
@@ -564,34 +567,19 @@ class ChatService {
             filter: `channel_id=eq.${conversationId}`
           },
           async (payload) => {
-            console.log('📨 New real-time message:', payload);
-
+            // the inserted row comes with the event: reading it back again was one more query per person watching
+            // the channel for every message
+            if (payload.new?.id && payload.new.content !== undefined) {
+              callback(toMessage(payload.new as MessageRow));
+              return;
+            }
             try {
               const { data: messageData } = await supabase
                 .from('messages')
                 .select(`*`)
                 .eq('id', payload.new.id)
                 .single();
-
-              if (messageData) {
-                const newMessage: Message = {
-                  id: messageData.id,
-                  content: messageData.content,
-                  author: {
-                    id: messageData.author_id,
-                    name: messageData.author_name || 'Unknown User',
-                    avatar: messageData.author_avatar || '',
-                    initials: messageData.author_initials || 'UU',
-                    email: '',
-                    status: 'online',
-                    town: messageData.author_town || 'Unknown'
-                  },
-                  timestamp: messageData.created_at,
-                  reactions: messageData.reactions || []
-                };
-
-                callback(newMessage);
-              }
+              if (messageData) callback(toMessage(messageData));
             } catch (fetchError) {
               console.error('Error fetching message details:', fetchError);
             }

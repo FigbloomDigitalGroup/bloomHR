@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Phosphor Icons - Premium icon set
@@ -57,6 +57,8 @@ import TrainingModule from './Training';
 import Profile from './Profile';
 import { ChatLayout } from '../chat/ChatLayout';
 import { useOnlinePeople } from '../chat/lib/presence';
+import { realChannelId } from '../chat/lib/names';
+import { addIncoming, toUnreadCounts, totalUnread, type IncomingMessage, type UnreadCounts } from '../chat/lib/unread';
 import CelebrationsCard from './CelebrationsCard';
 import VideoConferenceComponent from './VideoConf';
 import UserProfileDropdown from './UserProfile';
@@ -2643,11 +2645,11 @@ const StaffPortal = () => {
   const sidebarVariants = {
     expanded: {
       width: 260,
-      transition: { type: "spring", stiffness: 300, damping: 30 }
+      transition: { type: "spring" as const, stiffness: 300, damping: 30 }
     },
     collapsed: {
       width: 68,
-      transition: { type: "spring", stiffness: 300, damping: 30 }
+      transition: { type: "spring" as const, stiffness: 300, damping: 30 }
     }
   };
   // collapsed stays collapsed (the mouse is always over the bar when the toggle is clicked, so hover must not re-open it)
@@ -2674,8 +2676,10 @@ const StaffPortal = () => {
   // admin chat service already writes to) rather than in-memory-only state,
   // so it survives a refresh and reflects reality across sessions. Lives
   // here rather than inside ChatComponent since the badge must show even
-  // before the user opens the Chat tab.
-  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  // before the user opens the Chat tab. Kept per channel, so a message read in the chat clears just its channel.
+  const [unreadByChannel, setUnreadByChannel] = useState<UnreadCounts>({});
+  const unreadMessageCount = totalUnread(unreadByChannel);
+  const myUserIdRef = useRef<string | null>(null);
 
   const fetchCompanyProfile = async () => {
     try {
@@ -2767,43 +2771,27 @@ const StaffPortal = () => {
     };
   }, [employeeNumber]);
 
-  // Total unread chat messages across all channels, using the persisted
-  // `user_channel_states.last_read_at` (per user, per channel) rather than
-  // in-memory state - a channel with no row yet is treated as fully unread
-  // (matches standard chat-app behavior: you haven't opened it yet).
+  // Unread chat messages per channel, using the persisted `user_channel_states.last_read_at` (per user, per channel)
+  // rather than in-memory state - a channel with no row yet is treated as fully unread (matches standard chat-app
+  // behavior: you haven't opened it yet). One query for all channels (my_unread_counts, FIG-817).
   const fetchUnreadMessageCount = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) return;
+      myUserIdRef.current = user.id;
 
-      const { data: channelsData } = await supabase.from('channels').select('id');
-      if (!channelsData || channelsData.length === 0) {
-        setUnreadMessageCount(0);
-        return;
-      }
-
-      const { data: readStates } = await supabase
-        .from('user_channel_states')
-        .select('channel_id, last_read_at')
-        .eq('user_id', user.id);
-
-      const lastReadMap = new Map((readStates || []).map((r: any) => [r.channel_id, r.last_read_at]));
-
-      const counts = await Promise.all(channelsData.map(async (ch: any) => {
-        const lastRead = lastReadMap.get(ch.id);
-        let query = supabase
-          .from('messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('channel_id', ch.id);
-        if (lastRead) query = query.gt('created_at', lastRead);
-        const { count } = await query;
-        return count || 0;
-      }));
-
-      setUnreadMessageCount(counts.reduce((a, b) => a + b, 0));
+      const { data, error } = await supabase.rpc('my_unread_counts');
+      if (error) throw error;
+      setUnreadByChannel(toUnreadCounts(data as { channel_id: string; unread: number }[]));
     } catch (err) {
       console.error('Error fetching unread message count:', err);
     }
+  }, []);
+
+  // the chat read a conversation (opened it, or a message arrived while it was open): its messages are no longer unread
+  const handleChatRead = useCallback((chatId: string) => {
+    const channelId = realChannelId(chatId);
+    setUnreadByChannel(prev => (prev[channelId] ? { ...prev, [channelId]: 0 } : prev));
   }, []);
 
   // Check login status and fetch data on component mount
@@ -2818,19 +2806,20 @@ const StaffPortal = () => {
   // supabase_realtime publication to include `messages` - see
   // supabase/migrations/chat_realtime.sql; verified empirically that this
   // wasn't the case before that migration, so without it this badge only
-  // updates on next page load, not live).
+  // updates on next page load, not live). The new row says which channel it is in: +1 there, no re-count (one message
+  // in general reaches the whole company at once). Realtime only delivers messages I can read; my own do not count.
   useEffect(() => {
     const channel = supabase
       .channel('staffportal_unread_messages')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
-        fetchUnreadMessageCount();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        setUnreadByChannel(prev => addIncoming(prev, payload.new as IncomingMessage, myUserIdRef.current));
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchUnreadMessageCount]);
+  }, []);
 
   const fetchUserData = async () => {
     try {
@@ -3362,7 +3351,7 @@ const StaffPortal = () => {
               {activeTab === 'appearance' && <Appearance />}
               {activeTab === 'incident-report' && <IncidentReport />}
               {activeTab === 'job-applications' && <JobApplications />}
-              {activeTab === 'chat' && <div className="relative h-full"><ChatLayout onMessagesRead={fetchUnreadMessageCount} /></div>}
+              {activeTab === 'chat' && <div className="relative h-full"><ChatLayout onMessagesRead={handleChatRead} /></div>}
               {activeTab === 'VideoConf' && <VideoConferenceComponent />}
             </motion.div>
           </div>

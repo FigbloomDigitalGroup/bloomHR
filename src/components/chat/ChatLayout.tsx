@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SidebarProvider } from "./ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { ChatArea } from "./ChatArea";
@@ -6,6 +6,7 @@ import { chatService } from "./services/chatServices";
 import { supabase } from "../../lib/supabase";
 import toast from "react-hot-toast";
 import { initialsOf } from "./lib/names";
+import { countsAsUnread, findChat, sortDirectMessages, withIncomingChannelMessage, withIncomingDirectMessage, type IncomingMessage } from "./lib/unread";
 import { canCreateChannels } from "./lib/permissions";
 import { usePermissions } from "../../hooks/usePermissions";
 import { isOnline, useOnlinePeople } from "./lib/presence";
@@ -13,8 +14,8 @@ import { ChatPeopleContext } from "./lib/chatPeople";
 import type { Employee, User, Channel, DirectMessage, Message } from "../chat/types/types";
 import FigbloomLoader from "../UI/FigbloomLoader";
 
-/** `onMessagesRead` lets the staff portal refresh its unread badge when a conversation is opened. */
-export function ChatLayout({ onMessagesRead }: { onMessagesRead?: () => void } = {}) {
+/** `onMessagesRead` tells the staff portal a conversation was read (opened, or a message arrived in it while open). */
+export function ChatLayout({ onMessagesRead }: { onMessagesRead?: (channelId: string) => void } = {}) {
   const { userRole } = usePermissions();
   const onlinePeople = useOnlinePeople();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -138,14 +139,7 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: () => void } =
     );
 
     // conversations with messages first, then by last message time
-    return built.sort((a, b) => {
-      if (a.hasMessages && !b.hasMessages) return -1;
-      if (!a.hasMessages && b.hasMessages) return 1;
-      if (a.lastMessageTime && b.lastMessageTime) {
-        return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
-      }
-      return a.name.localeCompare(b.name);
-    });
+    return sortDirectMessages(built);
   };
 
   const loadUserChannels = async (userId: string) => {
@@ -154,7 +148,7 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: () => void } =
       setError(null);
       const userChannels = await chatService.getUserChannels(userId);
       console.log("✅ Loaded channels:", userChannels.length);
-      setChannels(userChannels);
+      setChannels(userChannels as Channel[]);
       setDirectMessages(await buildDirectMessages(userChannels));
 
       if (userChannels.length > 0) {
@@ -334,7 +328,7 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: () => void } =
     if (currentUser) {
       try {
         await chatService.markMessagesAsRead(channel.id, currentUser.id);
-        onMessagesRead?.();
+        onMessagesRead?.(channel.id);
       } catch (error) {
         console.error('Error marking messages as read:', error);
       }
@@ -447,9 +441,9 @@ const handleDMCreate = async (userId: string) => {
       // shouldn't show as unread either - the channel is actively being
       // viewed, same reasoning as the sender's own case in handleSendMessage.
       if (currentUser) {
-        chatService.markMessagesAsRead(activeChannel.id, currentUser.id).catch(err =>
-          console.error('Error marking incoming message as read:', err)
-        );
+        chatService.markMessagesAsRead(activeChannel.id, currentUser.id)
+          .then(() => onMessagesRead?.(activeChannel.id))
+          .catch(err => console.error('Error marking incoming message as read:', err));
       }
 
       // Update DM activity status for real-time messages
@@ -484,25 +478,51 @@ const handleDMCreate = async (userId: string) => {
     }
   }, [employees.length]);
 
-  // Live per-channel unread badge updates (see getUnreadCountsByChannel in
-  // chatServices.ts - unread_count was always hardcoded to 0 until now).
-  // A message arriving in a channel other than the active one only shows up
-  // here, not in the per-active-channel subscription above, so this needs
-  // its own unscoped listener.
+  // What the unread listener below needs to know without resubscribing: the chat that is open, and the chats listed.
+  const activeChatIdRef = useRef<string | null>(null);
+  const listedRef = useRef<{ channels: Channel[]; directMessages: DirectMessage[] }>({ channels: [], directMessages: [] });
+  useEffect(() => {
+    activeChatIdRef.current = activeChannel?.id ?? null;
+  }, [activeChannel?.id]);
+  useEffect(() => {
+    listedRef.current = { channels, directMessages };
+  }, [channels, directMessages]);
+
+  // Live unread badges and latest direct message (FIG-817). Every company's general channel reaches everyone, so a
+  // message must not make every open chat re-count every channel: the new row says which channel it is in, and that
+  // channel's badge goes up by one here. Realtime only delivers messages I can read. A message in a chat that is not
+  // listed (a colleague just started a conversation with me, a new channel) reloads the list, once per chat: some
+  // channels I can see are not listed (e.g. an administrator sees private channels), and must not reload on every message.
+  const unlistedChatsRef = useRef(new Set<string>());
   useEffect(() => {
     if (!currentUser) return;
 
+    const reloadSidebar = async () => {
+      try {
+        const fresh = await chatService.getUserChannels(currentUser.id);
+        const regular = fresh.filter(ch => !ch.id.startsWith('dm-')) as Channel[];
+        setChannels(regular);
+        setDirectMessages(await buildDirectMessages(fresh));
+      } catch (err) {
+        console.error('Error refreshing channel unread counts:', err);
+      }
+    };
+
     const subscription = supabase
       .channel('chatlayout_unread_counts')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async () => {
-        try {
-          const fresh = await chatService.getUserChannels(currentUser.id);
-          const regular = fresh.filter(ch => !ch.id.startsWith('dm-')) as Channel[];
-          setChannels(regular);
-          setDirectMessages(await buildDirectMessages(fresh));
-        } catch (err) {
-          console.error('Error refreshing channel unread counts:', err);
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        const message = payload.new as IncomingMessage;
+        if (!message?.channel_id) return;
+        const { channels: listedChannels, directMessages: listedDms } = listedRef.current;
+        if (!findChat(listedChannels, message) && !findChat(listedDms, message)) {
+          if (unlistedChatsRef.current.has(message.channel_id)) return;
+          unlistedChatsRef.current.add(message.channel_id);
+          void reloadSidebar();
+          return;
         }
+        const unread = countsAsUnread(message, currentUser.id, activeChatIdRef.current);
+        setChannels(prev => withIncomingChannelMessage(prev, message, unread));
+        setDirectMessages(prev => withIncomingDirectMessage(prev, message, unread));
       })
       .subscribe();
 

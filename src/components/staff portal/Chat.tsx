@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { v4 as uuidv4 } from '@lukeed/uuid';
 import FigbloomLoader from '../UI/FigbloomLoader';
+import { addIncoming, toUnreadCounts, type IncomingMessage } from '../chat/lib/unread';
 
 // Matches the real `messages` table (see master_schema.sql / chatServices.ts,
 // the admin Teams chat's data layer) - this component previously used
@@ -72,6 +73,11 @@ const ChatComponent = ({ onMessagesRead }: ChatComponentProps) => {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
   const subscriptionRef = useRef<any>(null);
+  // the open channel, for the unread listener (which should not resubscribe on every switch)
+  const currentChannelRef = useRef('');
+  useEffect(() => {
+    currentChannelRef.current = currentChannel;
+  }, [currentChannel]);
 
   const fetchChannels = useCallback(async () => {
     try {
@@ -99,7 +105,7 @@ const ChatComponent = ({ onMessagesRead }: ChatComponentProps) => {
     try {
       const { data: { user }, error } = await supabase.auth.getUser();
       if (error) throw error;
-      setCurrentUser(user);
+      setCurrentUser(user as User | null);
       return user;
     } catch (error) {
       console.error('Error getting current user:', error);
@@ -129,33 +135,17 @@ const ChatComponent = ({ onMessagesRead }: ChatComponentProps) => {
   }, [onMessagesRead]);
 
   // Real per-channel unread counts for the sidebar list, replacing the
-  // structurally-broken client-side getUnreadCount below.
-  const fetchUnreadCounts = useCallback(async (userId: string) => {
-    if (channels.length === 0) return;
+  // structurally-broken client-side getUnreadCount below. One query for
+  // every channel (my_unread_counts, FIG-817), not one per channel.
+  const fetchUnreadCounts = useCallback(async () => {
     try {
-      const { data: readStates } = await supabase
-        .from('user_channel_states')
-        .select('channel_id, last_read_at')
-        .eq('user_id', userId);
-
-      const lastReadMap = new Map((readStates || []).map((r: any) => [r.channel_id, r.last_read_at]));
-
-      const entries = await Promise.all(channels.map(async (ch) => {
-        const lastRead = lastReadMap.get(ch.id);
-        let query = supabase
-          .from('messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('channel_id', ch.id);
-        if (lastRead) query = query.gt('created_at', lastRead);
-        const { count } = await query;
-        return [ch.id, count || 0] as const;
-      }));
-
-      setUnreadByChannel(Object.fromEntries(entries));
+      const { data, error } = await supabase.rpc('my_unread_counts');
+      if (error) throw error;
+      setUnreadByChannel(toUnreadCounts(data as { channel_id: string; unread: number }[]));
     } catch (err) {
       console.error('Error fetching per-channel unread counts:', err);
     }
-  }, [channels]);
+  }, []);
 
   const fetchMessages = useCallback(async () => {
     if (!currentChannel) return;
@@ -164,16 +154,17 @@ const ChatComponent = ({ onMessagesRead }: ChatComponentProps) => {
     setError(null);
 
     try {
+      // the latest 100 (oldest first, this showed a busy channel's first 100 and never the new ones)
       const { data, error } = await supabase
         .from('messages')
         .select('*')
         .eq('channel_id', currentChannel)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
         .limit(100);
 
       if (error) throw error;
       
-      setMessages(data || []);
+      setMessages([...(data || [])].reverse());
     } catch (error) {
       console.error('Error fetching messages:', error);
       setError('Failed to load messages');
@@ -251,15 +242,16 @@ const ChatComponent = ({ onMessagesRead }: ChatComponentProps) => {
   // Per-channel sidebar badges: initial load once channels + user are ready,
   // then live updates via an unfiltered subscription (a message landing in
   // any channel, not just the active one, can change another channel's
-  // count).
+  // count). The new row says which channel: +1 there instead of re-counting
+  // every channel (FIG-817); not my own, not the channel I have open.
   useEffect(() => {
     if (!currentUser || channels.length === 0) return;
-    fetchUnreadCounts(currentUser.id);
+    fetchUnreadCounts();
 
     const subscription = supabase
       .channel('staffchat_unread_counts')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
-        fetchUnreadCounts(currentUser.id);
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        setUnreadByChannel(prev => addIncoming(prev, payload.new as IncomingMessage, currentUser.id, currentChannelRef.current));
       })
       .subscribe();
 
