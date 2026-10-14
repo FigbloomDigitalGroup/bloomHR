@@ -4,6 +4,7 @@ import { Printer } from 'lucide-react';
 import OnboardingSummary from './OnboardingSummary';
 import { type OnboardingRecord, errorMessage, loadOnboardingForReview, statusLabel } from '../../lib/onboarding';
 import { supabase } from '../../lib/supabase';
+import { loadCompanyIdentity } from '../../lib/companyProfile';
 import { type PolicyItem, loadPolicyChecklist } from '../../lib/companyPolicies';
 import { type ChecklistItem, DOCUMENT_STATUS_LABELS, type EmployeeDocument, type Referee, loadChecklist, loadDocuments, loadReferees } from '../../lib/employeeDocuments';
 import FigbloomLoader from '../UI/FigbloomLoader';
@@ -17,7 +18,7 @@ interface Company {
 }
 
 async function loadCompany(): Promise<Company> {
-  const { data: logo } = await supabase.from('company_logo').select('company_name, image_url').order('created_at', { ascending: false }).limit(1).maybeSingle();
+  const logo = await loadCompanyIdentity().catch(() => null);
   if (logo?.company_name) return { name: String(logo.company_name), logo: logo.image_url ? String(logo.image_url) : null };
   const { data: tenant } = await supabase.from('tenants').select('name').limit(1).maybeSingle();
   return { name: String(tenant?.name ?? ''), logo: logo?.image_url ? String(logo.image_url) : null };

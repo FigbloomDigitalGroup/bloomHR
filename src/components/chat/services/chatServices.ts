@@ -1,6 +1,5 @@
 // services/chatServices.ts
 import { supabase } from "../../../lib/supabase";
-import { databaseService } from "./databaseService";
 import type { Channel, Message, Employee, DirectMessage } from "../types/types";
 import { AvatarService } from './avatar';
 import type { DirectoryPerson, Member } from '../lib/groups';
@@ -44,12 +43,8 @@ class ChatService {
   async initialize() {
     if (this.isInitialized) return;
 
-    try {
-      await databaseService.initializeDatabase();
-      this.isInitialized = true;
-    } catch (error) {
-      console.error('Failed to initialize database:', error);
-    }
+    // the chat tables come from migrations; the old "create the tables from the browser" calls only failed (404s)
+    this.isInitialized = true;
   }
 
   async getEmployees(): Promise<Employee[]> {
@@ -249,7 +244,7 @@ class ChatService {
       .from('employees')
       .select('"Job Title"')
       .eq('Work Email', userEmail)
-      .single();
+      .maybeSingle();
 
     const userJobTitle = employeeData?.["Job Title"];
 

@@ -145,8 +145,8 @@ export default {
         pill: "9999px",
       },
       fontFamily: {
-        sans: ["Figtree", "-apple-system", "BlinkMacSystemFont", "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Helvetica", "Arial", "sans-serif"],
-        "san-pro": ["Figtree", "-apple-system", "BlinkMacSystemFont", "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Helvetica", "Arial", "sans-serif"],
+        sans: ["Outfit", "-apple-system", "BlinkMacSystemFont", "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Helvetica", "Arial", "sans-serif"],
+        "san-pro": ["Outfit", "-apple-system", "BlinkMacSystemFont", "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Helvetica", "Arial", "sans-serif"],
         mono: ["IBM Plex Mono", "ui-monospace", "monospace"],
         poppins: ["Poppins", "sans-serif"],
         lexend: ["Lexend", "sans-serif"],
