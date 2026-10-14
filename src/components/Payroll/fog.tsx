@@ -479,7 +479,7 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
 
       const { data, error } = await supabase
         .from('employees')
-        // the employee number is given by the system when saved (PR-00001, ...)
+        // the employee number is given by the system when saved (MCL-000001, ...)
         .insert([{ ...newEmployee, "Employee Number": undefined, "Work Email": normaliseWorkEmail(newEmployee["Work Email"]) }])
         .select();
 

@@ -1,35 +1,63 @@
 -- Employee numbers come from the system, in one format, so a bulk upload can't add numbers that are missing, mistyped
 -- or in someone's own style. HR adds people with just their names and work email.
 --
--- Every new employee already gets a payroll number (PR-00001, ...) from employees_onboarding_rules. A new employee
--- added without an Employee Number now gets the same value as their Employee Number: one number, nothing to make up.
--- (If an older, hand-typed Employee Number already uses it, the next payroll number is taken for both.)
+-- A new employee added without an Employee Number gets the company's next one: its prefix (MCL unless the company
+-- sets another) and a 6-digit count, MCL-000001, MCL-000002, ... in order per company. A number already in use (an
+-- older hand-typed or clock-based MCL-302233, say) is skipped. The payroll number (PR-00001) is separate and unchanged.
 --
 -- save_employees_batch (the bulk upload) no longer takes new employee numbers from the sheet:
 --   * a row whose Employee Number or Work Email belongs to an employee of the company updates that employee;
 --   * any other row adds a new employee with a generated number (a number typed for a new person is ignored), and
 --     the number is returned so the upload can show it.
 
--- Postgres runs BEFORE triggers in name order: this name sorts after employees_onboarding_rules, which sets the
--- payroll number, and before employees_photo_owner_only.
-create or replace function public.employees_payroll_number_as_employee_number() returns trigger
+alter table public.company_payroll_settings add column if not exists employee_number_prefix text not null default 'MCL';
+alter table public.company_payroll_settings drop constraint if exists company_payroll_settings_employee_number_prefix_check;
+alter table public.company_payroll_settings add constraint company_payroll_settings_employee_number_prefix_check
+  check (employee_number_prefix ~ '^[A-Z][A-Z0-9]{0,9}$');
+
+create table if not exists public.employee_number_counters (
+  tenant_id uuid primary key references public.tenants(id) on delete cascade,
+  last_value integer not null default 0
+);
+-- only next_employee_number uses it: RLS with no permissive policy keeps everyone else out
+alter table public.employee_number_counters enable row level security;
+drop policy if exists tenant_isolation on public.employee_number_counters;
+create policy tenant_isolation on public.employee_number_counters as restrictive for all
+  using (tenant_id = (select public.current_tenant_id()))
+  with check (tenant_id = (select public.current_tenant_id()));
+revoke all on public.employee_number_counters from anon;
+
+create or replace function public.next_employee_number(p_tenant uuid) returns text
+language plpgsql security definer set search_path = public as $$
+declare
+  prefix text := coalesce((select s.employee_number_prefix from public.company_payroll_settings s where s.tenant_id = p_tenant), 'MCL');
+  n integer;
+  candidate text;
+begin
+  loop
+    insert into public.employee_number_counters as c (tenant_id, last_value) values (p_tenant, 1)
+      on conflict (tenant_id) do update set last_value = c.last_value + 1
+      returning last_value into n;
+    candidate := prefix || '-' || lpad(n::text, greatest(6, length(n::text)), '0');
+    exit when not exists (select 1 from public.employees where tenant_id = p_tenant and "Employee Number" = candidate);
+  end loop;
+  return candidate;
+end $$;
+revoke all on function public.next_employee_number(uuid) from public, anon, authenticated;
+
+create or replace function public.employees_default_employee_number() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
   if coalesce(btrim(new."Employee Number"), '') = '' then
-    if coalesce(btrim(new."Payroll Number"), '') = '' then
-      new."Payroll Number" := public.next_payroll_number(new.tenant_id);
-    end if;
-    while exists (select 1 from public.employees where tenant_id = new.tenant_id and "Employee Number" = new."Payroll Number") loop
-      new."Payroll Number" := public.next_payroll_number(new.tenant_id);
-    end loop;
-    new."Employee Number" := new."Payroll Number";
+    new."Employee Number" := public.next_employee_number(new.tenant_id);
   end if;
   return new;
 end $$;
 
-drop trigger if exists employees_payroll_number_as_employee_number on public.employees;
-create trigger employees_payroll_number_as_employee_number before insert on public.employees
-  for each row execute function public.employees_payroll_number_as_employee_number();
+-- Postgres runs BEFORE triggers in name order; nothing before this one reads the employee number
+drop trigger if exists employees_default_employee_number on public.employees;
+create trigger employees_default_employee_number before insert on public.employees
+  for each row execute function public.employees_default_employee_number();
 
 create or replace function public.save_employees_batch(p_rows jsonb)
 returns table (row_no integer, employee_number text, outcome text, employee_id uuid, work_email text, error_code text, error_message text)

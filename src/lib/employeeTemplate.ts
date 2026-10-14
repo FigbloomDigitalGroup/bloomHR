@@ -4,7 +4,7 @@ import { STANDARD_EMPLOYEE_TYPES } from './employmentTypes';
 /**
  * The bulk-add template: only what HR has to give. The employee fills in their own ID, KRA PIN, NSSF and SHA numbers,
  * phone, date of birth and bank details when they accept the invitation sent to their work email.
- * The first three are required; the rest may be left blank. Employee numbers are given by the system (PR-00001, ...),
+ * The first three are required; the rest may be left blank. Employee numbers are given by the system (MCL-000001, ...),
  * so there is no column for them.
  */
 export const TEMPLATE_COLUMNS = [
@@ -24,7 +24,7 @@ const HOW_TO_FILL = [
   ['How to fill the Employees sheet'],
   [],
   ['Needed for every employee: First Name, Last Name, Work Email.'],
-  ['Employee numbers are given by the system (PR-00001, PR-00002, ...): there is nothing to fill in for them.'],
+  ['Employee numbers are given by the system (MCL-000001, MCL-000002, ...): there is nothing to fill in for them.'],
   ['Each new employee is emailed an invitation at their Work Email and fills in their own ID, KRA PIN, NSSF and SHA numbers, phone, date of birth and bank details.'],
   ['A row with the Work Email of someone already in the company updates that employee instead of adding a new one.'],
   [],

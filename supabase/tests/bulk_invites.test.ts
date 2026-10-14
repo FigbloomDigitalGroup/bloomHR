@@ -61,12 +61,12 @@ describe('save_employees_batch', () => {
       [2, 'created', 'amina@a.co'],
       [3, 'updated', 'old@a.co'],
     ]);
-    expect(result[0].employee_number).toMatch(/^PR-\d+$/);
+    expect(result[0].employee_number).toMatch(/^MCL-\d{6}$/);
     expect(result[1].employee_number).toBe('E-OLD');
     expect(result[0].employee_id).toMatch(/^[0-9a-f-]{36}$/);
     const [created] = await rows<Record<string, unknown>>(`select * from employees where "Work Email" = 'amina@a.co'`);
     expect(created).toMatchObject({ 'First Name': 'Amina', 'ID Number': '12345678', tenant_id: A, onboarding_status: 'draft' });
-    expect(created['Employee Number']).toBe(created['Payroll Number']); // one number, the payroll one
+    expect(created['Payroll Number']).toMatch(/^PR-\d+$/); // the employees triggers still run
     expect(await rows(`select "Job Title", "First Name" from employees where "Employee Number" = 'E-OLD'`)).toEqual([{ 'Job Title': 'Driver', 'First Name': 'Old' }]);
   });
 
