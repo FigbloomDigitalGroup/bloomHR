@@ -15,6 +15,8 @@ const state = vi.hoisted(() => ({
   permissions: [] as { tenant_id: string; role_name: string; permissions: string[] }[],
   authUsers: [] as { id: string; email: string }[],
   modelCalls: [] as { url: string; auth: string; body: any }[],
+  budgets: new Map<string, number>(),
+  budgetCalls: [] as Record<string, unknown>[],
   modelReply: { ok: true, status: 200, json: { choices: [{ message: { content: 'An answer' } }], usage: { total_tokens: 7 } } } as {
     ok: boolean;
     status: number;
@@ -36,6 +38,16 @@ vi.mock('@supabase/supabase-js', () => {
     return b;
   };
   const client = {
+    // take_rate_limit(): the database's shared count (its sliding window is tested in supabase/tests)
+    rpc: async (fn: string, args: Record<string, any>) => {
+      if (fn !== 'take_rate_limit') throw new Error(`unexpected rpc ${fn}`);
+      state.budgetCalls.push(args);
+      const key = `${args.p_tenant}/${args.p_bucket}`;
+      const used = state.budgets.get(key) ?? 0;
+      if (used + args.p_cost > args.p_limit) return { data: false, error: null };
+      state.budgets.set(key, used + args.p_cost);
+      return { data: true, error: null };
+    },
     // the bearer token is simply the caller's user id in these tests
     auth: { getUser: async (token: string) => ({ data: { user: state.authUsers.find((u) => u.id === token) ?? null }, error: null }) },
     from: (name: string) => {
@@ -94,6 +106,8 @@ beforeEach(() => {
     { tenant_id: 'other-tenant', role_name: 'STAFF', permissions: ['ai-assistant', 'staffcheck'] }, // must never apply to tenant-a staff
   ];
   state.modelCalls = [];
+  state.budgets = new Map();
+  state.budgetCalls = [];
   state.modelReply = { ok: true, status: 200, json: { choices: [{ message: { content: 'An answer' } }], usage: { total_tokens: 7 } } };
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -177,4 +191,16 @@ describe('asking the model', () => {
     for (let i = 0; i < 100; i++) expect((await ask(admin, question)).status).toBe(200);
     expect((await ask(admin, question)).status).toBe(429);
   }, 30000); // 101 requests: allow for a busy machine
+
+  it('counts in the database, so every server instance shares the budget', async () => {
+    const admin = who('admin');
+    expect((await ask(admin, question)).status).toBe(200);
+    expect(state.budgetCalls).toEqual([
+      { p_tenant: TENANT, p_bucket: `ai:default:${admin}`, p_cost: 1, p_limit: 100, p_window_seconds: 3600 },
+    ]);
+    // another instance has used the rest of this hour's budget
+    state.budgets.set(`${TENANT}/ai:default:${admin}`, 100);
+    expect((await ask(admin, question)).status).toBe(429);
+    expect(state.modelCalls).toHaveLength(1);
+  });
 });

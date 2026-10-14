@@ -22,6 +22,13 @@ const state = vi.hoisted(() => ({
   sentEmails: [] as Record<string, unknown>[],
   logCalls: [] as string[],
   logReply: { ok: true, status: 200, json: { data: [{ id: 'e1' }] } } as { ok: boolean; status: number; json: unknown },
+  // take_rate_limit(): what each budget has used (the database's sliding window is tested in supabase/tests)
+  budgets: new Map<string, number>(),
+  budgetCalls: [] as Record<string, unknown>[],
+  rateLimitDown: false,
+  // queue_bulk_email(): the company's employees' work emails, and what was asked to be queued
+  employeeEmails: [] as string[],
+  queued: [] as Record<string, any>[],
 }));
 
 vi.mock('@supabase/supabase-js', () => {
@@ -45,6 +52,23 @@ vi.mock('@supabase/supabase-js', () => {
     return b;
   };
   const client = {
+    rpc: async (fn: string, args: Record<string, any>) => {
+      if (fn === 'take_rate_limit') {
+        if (state.rateLimitDown) return { data: null, error: { message: 'function take_rate_limit does not exist' } };
+        state.budgetCalls.push(args);
+        const key = `${args.p_tenant}/${args.p_bucket}`;
+        const used = state.budgets.get(key) ?? 0;
+        if (used + args.p_cost > args.p_limit) return { data: false, error: null };
+        state.budgets.set(key, used + args.p_cost);
+        return { data: true, error: null };
+      }
+      if (fn === 'queue_bulk_email') {
+        state.queued.push(args);
+        const queued = (args.p_emails as string[]).filter((e) => state.employeeEmails.includes(e)).length;
+        return { data: [{ bulk_email_id: queued ? 'bulk-1' : null, queued, skipped: args.p_emails.length - queued }], error: null };
+      }
+      throw new Error(`unexpected rpc ${fn}`);
+    },
     // the bearer token is simply the caller's user id in these tests
     auth: { getUser: async (token: string) => ({ data: { user: state.authUsers.find((u) => u.id === token) ?? null }, error: null }) },
     from: (name: string) => {
@@ -141,6 +165,11 @@ beforeEach(() => {
   state.sentEmails = [];
   state.logCalls = [];
   state.logReply = { ok: true, status: 200, json: { data: [{ id: 'e1' }] } };
+  state.budgets = new Map();
+  state.budgetCalls = [];
+  state.rateLimitDown = false;
+  state.employeeEmails = [];
+  state.queued = [];
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
 });
@@ -288,6 +317,80 @@ describe('limits', () => {
     const fifty = Array.from({ length: 50 }, (_, i) => `u${i}@example.org`);
     for (let i = 0; i < 20; i++) expect((await send(admin, { ...mail, to: fifty })).status).toBe(200);
     expect((await send(admin, mail)).status).toBe(429);
+  });
+
+  it("counts in the database, shared by every server, per user and per company", async () => {
+    const admin = who('admin');
+    await send(admin, { ...mail, to: ['a@example.org', 'b@example.org'] });
+    expect(state.budgetCalls).toEqual([
+      { p_tenant: TENANT, p_bucket: `email-recipients:default:${admin}`, p_cost: 2, p_limit: 1000, p_window_seconds: 3600 },
+      { p_tenant: TENANT, p_bucket: 'email-recipients-company:default:company', p_cost: 2, p_limit: 50_000, p_window_seconds: 86400 },
+    ]);
+  });
+
+  it("stops a company at its daily limit, whoever sends", async () => {
+    state.budgets.set(`${TENANT}/email-recipients-company:default:company`, 49_999);
+    expect((await send(who('admin'), mail)).status).toBe(200);
+    expect((await send(who('hr'), mail)).status).toBe(429);
+  });
+
+  it("falls back to this server's own count if the database cannot be asked", async () => {
+    state.rateLimitDown = true;
+    const admin = who('admin');
+    const fifty = Array.from({ length: 50 }, (_, i) => `u${i}@example.org`);
+    for (let i = 0; i < 20; i++) expect((await send(admin, { ...mail, to: fifty })).status).toBe(200);
+    expect((await send(admin, mail)).status).toBe(429);
+  });
+});
+
+describe('company-wide email (queued)', () => {
+  const bulk = (token: string | null, body: Record<string, unknown>) => call('POST', '/bulk', token, body);
+  const everyone = Array.from({ length: 6000 }, (_, i) => `staff${i}@a.co`);
+
+  it('needs a signed-in caller with the Email Portal', async () => {
+    const body = { ...mail, to: everyone };
+    expect((await bulk(null, body)).status).toBe(401);
+    expect((await bulk(who('staff'), body)).status).toBe(403);
+    expect((await bulk(who('ops'), body)).status).toBe(403);
+    expect((await bulk(who('hr'), { ...body, purpose: 'termination' })).status).toBe(400); // only the Email Portal sends to everyone
+    expect(state.queued).toHaveLength(0);
+  });
+
+  it('queues thousands at once, beyond the per-user hourly budget, and sends nothing inline', async () => {
+    state.employeeEmails = everyone.slice(0, 5999);
+    const res = await bulk(who('hr'), { ...mail, to: [...everyone, 'STAFF0@a.co'] });
+    expect(res.status).toBe(202);
+    expect(await res.json()).toEqual({ id: 'bulk-1', queued: 5999, skipped: 1 });
+    expect(state.queued[0]).toMatchObject({
+      p_tenant: TENANT, p_created_by: who('hr'), p_purpose: 'email-portal', p_from: 'HR <hr@example.org>', p_subject: 'Hello', p_html: '<p>Hi</p>',
+      p_attachments: [],
+    });
+    expect(state.queued[0].p_emails).toHaveLength(6000); // the same address twice is one person
+    expect(state.resendSends).toHaveLength(0);
+    expect(state.budgetCalls).toEqual([
+      { p_tenant: TENANT, p_bucket: 'email-recipients-company:default:company', p_cost: 6000, p_limit: 50_000, p_window_seconds: 86400 },
+    ]);
+  });
+
+  it("refuses when nobody on the list is one of the company's employees", async () => {
+    const res = await bulk(who('admin'), { ...mail, to: ['stranger@x.co'] });
+    expect(res.status).toBe(400);
+  });
+
+  it('validates like a single send, and refuses over the daily company limit', async () => {
+    const admin = who('admin');
+    state.employeeEmails = everyone;
+    expect((await bulk(admin, { ...mail, to: [] })).status).toBe(400);
+    expect((await bulk(admin, { ...mail, to: 'a@a.co' })).status).toBe(400);
+    expect((await bulk(admin, { ...mail, to: Array(25_001).fill('a@a.co') })).status).toBe(400);
+    expect((await bulk(admin, { ...mail, to: ['a@b.co\r\nBcc: spy@x.co'] })).status).toBe(400);
+    expect((await bulk(admin, { ...mail, to: everyone, subject: 'Hi\r\nBcc: spy@x.co' })).status).toBe(400);
+    expect((await bulk(admin, { ...mail, to: everyone, attachments: Array(6).fill({ filename: 'a.txt', content: 'aGk=' }) })).status).toBe(400);
+    expect(state.queued).toHaveLength(0);
+
+    state.budgets.set(`${TENANT}/email-recipients-company:default:company`, 45_000);
+    expect((await bulk(admin, { ...mail, to: everyone })).status).toBe(429);
+    expect(state.queued).toHaveLength(0);
   });
 });
 
