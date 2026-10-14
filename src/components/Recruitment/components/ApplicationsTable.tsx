@@ -85,7 +85,6 @@ export const ApplicationsTable = ({ applications, setSelectedApplication }: Appl
           `<p><strong>Meeting Link:</strong> ${scheduleData.meetingLink}</p>` :
           `<p><strong>Location:</strong> ${scheduleData.location}</p>`}
             ${scheduleData.notes ? `<p><strong>Notes:</strong> ${scheduleData.notes}</p>` : ''}
-            <p> follow this link to do interview https://recruit-11b6.onrender.com </p>
           </div>
         </div>
       `;

@@ -40,7 +40,6 @@ export const sendScheduleEmail = async (to: string, data: {
         <p><strong>Details:</strong> ${data.details}</p>
       </div>
       <p>Best regards,<br/>Figbloom HR Team</p>
-      <p>Follow this link to do the interview: <a href="https://recruit-11b6.onrender.com">https://recruit-11b6.onrender.com</a></p>
     </div>
   `;
 
