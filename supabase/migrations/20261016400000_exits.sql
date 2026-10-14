@@ -390,6 +390,8 @@ alter table public.hr_notifications add constraint hr_notifications_notification
   'payslip_ready', 'salary_paid', 'expense_approved', 'expense_rejected', 'phone_change_approved', 'phone_change_rejected',
   'incident_update', 'warning_issued', 'suspended', 'reactivated', 'employment_update', 'leave_scheduled', 'policy_to_accept',
   'task_assigned', 'asset_assigned',
+  -- from the approval workflows (20261015800000): every type added since must stay in this list
+  'approval_needed', 'approval_progress',
   'exit_requested', 'exit_approved', 'exit_declined'
 ));
 
