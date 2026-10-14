@@ -20,13 +20,15 @@ export default function JoinCompany() {
   const sessionEmail = useSessionEmail();
 
   const [preview, setPreview] = useState<InvitePreview | null | undefined>(undefined);
-  const [mode, setMode] = useState<'create' | 'signin'>('create');
+  // back from "forgot password" (account=existing): straight to signing in
+  const [mode, setMode] = useState<'create' | 'signin'>(params.get('account') === 'existing' ? 'signin' : 'create');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
   // a new account types its password twice, so a typo can't lock them out
   const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,6 +44,24 @@ export default function JoinCompany() {
       cancelled = true;
     };
   }, [token]);
+
+  // an existing account that forgot its password: the reset link sets a new one and comes back to this invitation,
+  // ready to sign in
+  const sendReset = async () => {
+    if (!preview) return;
+    setBusy(true);
+    const back = `/join?token=${encodeURIComponent(token)}&account=existing`;
+    const { error } = await supabase.auth.resetPasswordForEmail(preview.email, {
+      redirectTo: `${window.location.origin}/update-password?next=${encodeURIComponent(back)}`,
+    });
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setResetSent(true);
+    toast.success(`We've emailed ${preview.email} a link to set a new password. It brings you back here.`);
+  };
 
   // a full load so every screen starts from the new company
   const enter = () => window.location.assign('/dashboard');
@@ -172,6 +192,11 @@ export default function JoinCompany() {
           {busy ? 'Please wait…' : mode === 'create' ? `Create account and join ${preview.company_name}` : `Sign in and join ${preview.company_name}`}
         </AuthButton>
       </form>
+      {mode === 'signin' && (
+        <button type="button" onClick={sendReset} disabled={busy || resetSent} className={`mt-4 w-full text-center disabled:opacity-50 ${authLinkClass}`}>
+          {resetSent ? 'Reset link sent: check your email' : 'Forgot your password?'}
+        </button>
+      )}
       <button
         type="button"
         onClick={() => {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import ShowPasswordButton from '../components/UI/ShowPasswordButton';
 import { Check, X, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
@@ -24,6 +24,10 @@ const UpdatePasswordPage = () => {
   });
 
   const navigate = useNavigate();
+  // where to go once the password is set: an invitation the person was joining (only a /join link), else sign-in
+  const [params] = useSearchParams();
+  const next = params.get('next') ?? '';
+  const backToInvite = /^\/join\?token=[A-Za-z0-9%._~-]+(&account=existing)?$/.test(next) ? next : null;
 
   useEffect(() => {
     const validateAccess = async () => {
@@ -91,12 +95,16 @@ const UpdatePasswordPage = () => {
             </div>
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Password Updated!</h1>
-          <p className="text-sm text-gray-500 mb-8">Your password has been successfully updated. You can now sign in with your new credentials.</p>
+          <p className="text-sm text-gray-500 mb-8">
+            {backToInvite
+              ? 'Your password has been updated. Sign in on your invitation to join the company.'
+              : 'Your password has been successfully updated. You can now sign in with your new credentials.'}
+          </p>
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => navigate(backToInvite ?? '/login')}
             className="w-full py-3 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 transition-all shadow-lg shadow-green-100"
           >
-            Sign In Now
+            {backToInvite ? 'Back to your invitation' : 'Sign In Now'}
           </button>
         </div>
       </div>

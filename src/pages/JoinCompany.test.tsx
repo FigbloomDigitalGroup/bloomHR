@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   acceptInvitation: vi.fn(),
   signIn: vi.fn(),
   signOut: vi.fn(),
+  resetPassword: vi.fn(),
   sessionEmail: null as string | null,
   assign: vi.fn(),
 }));
@@ -19,6 +20,7 @@ vi.mock('../lib/supabase', () => ({
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
       signInWithPassword: (...a: unknown[]) => mocks.signIn(...a),
       signOut: () => mocks.signOut(),
+      resetPasswordForEmail: (...a: unknown[]) => mocks.resetPassword(...a),
     },
   },
 }));
@@ -38,9 +40,9 @@ import toast from 'react-hot-toast';
 import { ApiError } from '../lib/adminApi';
 import JoinCompany from './JoinCompany';
 
-const open = (token = 'tok-123') =>
+const open = (token = 'tok-123', extra = '') =>
   render(
-    <MemoryRouter initialEntries={[`/join?token=${token}`]}>
+    <MemoryRouter initialEntries={[`/join?token=${token}${extra}`]}>
       <JoinCompany />
     </MemoryRouter>
   );
@@ -52,6 +54,7 @@ beforeEach(() => {
   mocks.createAccountAndJoin.mockResolvedValue({ ok: true, email: 'jane@gmail.com' });
   mocks.acceptInvitation.mockResolvedValue('tenant-1');
   mocks.signIn.mockResolvedValue({ error: null });
+  mocks.resetPassword.mockResolvedValue({ error: null });
   vi.mocked(toast.error).mockClear();
   Object.defineProperty(window, 'location', { configurable: true, value: { ...window.location, assign: mocks.assign } });
 });
@@ -167,5 +170,22 @@ describe('JoinCompany', () => {
     expect(field.type).toBe('text');
     fireEvent.click(screen.getByRole('button', { name: 'Hide password' }));
     expect(field.type).toBe('password');
+  });
+
+  it('an existing account that forgot its password gets a reset link that comes back to this invitation', async () => {
+    open();
+    fireEvent.click(await screen.findByText('I already have an account'));
+    fireEvent.click(screen.getByText('Forgot your password?'));
+    const back = encodeURIComponent('/join?token=tok-123&account=existing');
+    await waitFor(() =>
+      expect(mocks.resetPassword).toHaveBeenCalledWith('jane@gmail.com', { redirectTo: `${window.location.origin}/update-password?next=${back}` })
+    );
+    expect(await screen.findByText('Reset link sent: check your email')).toBeTruthy();
+  });
+
+  it('back from the reset link, it opens on signing in', async () => {
+    open('tok-123', '&account=existing');
+    expect(await screen.findByText(/Sign in and join Favor Farm/)).toBeTruthy();
+    expect(screen.queryByText('Your full name')).toBeNull();
   });
 });
