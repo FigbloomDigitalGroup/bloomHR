@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 
 // Two-step sign-in (FIG-834). The server (mfa_routes.js) makes, sends and checks the code and records the pass for
 // this sign-in; the browser only asks for a code and hands back what the person typed. The company's setting is read
-// and changed through database functions (migration 20261015400000).
+// and changed through database functions (migration 20261016010000).
 const API_URL =
   import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? '/api' : 'http://localhost:3001/api');
 

@@ -1,6 +1,6 @@
 // @vitest-environment node
 //
-// Two-step sign-in checked on the server (20261015400000, FIG-834 / FIG-658): codes are closed to the browser, only the
+// Two-step sign-in checked on the server (20261016010000, FIG-834 / FIG-658): codes are closed to the browser, only the
 // server records a pass, mfa_required() reads it per sign-in, and each company has its own setting (ADMIN only).
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { PGlite } from '@electric-sql/pglite';
@@ -167,7 +167,7 @@ describe('mfa_required() and the company setting', () => {
 describe('migrating the old switch', () => {
   it('a company with mfa_enabled keeps two-step sign-in, by SMS where it had numbers', async () => {
     const migrated = await bootDb({
-      file: '20261015400000_mfa_server_side.sql',
+      file: '20261016010000_mfa_server_side.sql',
       seed: async (d) => {
         await d.exec(`
           insert into tenants (id, name, slug) values ('${B}', 'Other Co', 'other-co');
