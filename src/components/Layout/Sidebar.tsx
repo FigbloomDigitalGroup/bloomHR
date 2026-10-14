@@ -25,7 +25,7 @@ import {
   Mails,
   ShieldHalf,
   HeartHandshake,
-  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2
+  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useMyPreferences } from '../../hooks/useMyPreferences';
@@ -61,6 +61,7 @@ const menuGroups = [
       { id: 'organogram', label: 'Organogram', icon: OrgChart, path: '/organogram' },
       { id: 'onboarding', label: 'Onboarding', icon: ClipboardCheck, path: '/onboarding', permission: 'employees' },
       { id: 'recruitment', label: 'Recruitment', icon: UserPlus2, path: '/recruitment', permission: 'recruitment' },
+      { id: 'offers', label: 'Offers', icon: FileSignature, path: '/offers', anyPermission: ['employees', 'recruitment'] },
       { id: 'leaves', label: 'Time Off', icon: CalendarRange, path: '/leaves', permission: 'leaves' },
       { id: 'performance', label: 'Performance', icon: Target, path: '/performance', permission: 'performance' },
       { id: 'training', label: 'Training', icon: Award, path: '/training', permission: 'training' },

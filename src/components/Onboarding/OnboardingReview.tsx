@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { CheckCircle2, ClipboardCheck, FileCheck2, Loader2, Mail, Pencil, Printer, ScrollText, Undo2, X } from 'lucide-react';
+import { CheckCircle2, ClipboardCheck, FileCheck2, FileSignature, ListChecks, Loader2, Mail, Pencil, Printer, ScrollText, Undo2, X } from 'lucide-react';
 import { Button, Card, EmptyState, PageHeader, SearchInput, StatusPill, TabBar } from '../UI';
 import OnboardingSummary from './OnboardingSummary';
 import DocumentsReview from './DocumentsReview';
@@ -9,6 +9,9 @@ import HealthReview from './HealthReview';
 import AgreementsReview from './AgreementsReview';
 import PoliciesModal from './PoliciesModal';
 import RequiredDocumentsModal from './RequiredDocumentsModal';
+import AfterHiringPanel from '../AfterHiring/AfterHiringPanel';
+import AfterHiringSetupModal from '../AfterHiring/AfterHiringSetupModal';
+import { type ProgressSummary, loadAfterHiringSummary } from '../../lib/afterHiring';
 import {
   type OnboardingRecord,
   type OverviewRow,
@@ -126,6 +129,10 @@ function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: (
                 <h3 className="text-sm font-semibold text-ink mb-3">Health</h3>
                 <HealthReview employeeId={row.id} />
               </section>
+              <section className="border-t border-border pt-4">
+                <h3 className="text-sm font-semibold text-ink mb-3">After hiring</h3>
+                <AfterHiringPanel employeeId={row.id} />
+              </section>
               {record.history.length > 0 && (
                 <section>
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">History</h3>
@@ -191,6 +198,9 @@ export default function OnboardingReview() {
   const [inviting, setInviting] = useState<string | null>(null);
   const [settingDocuments, setSettingDocuments] = useState(false);
   const [settingPolicies, setSettingPolicies] = useState(false);
+  const [settingAfterHiring, setSettingAfterHiring] = useState(false);
+  const [afterHiring, setAfterHiring] = useState<Map<string, ProgressSummary>>(new Map());
+  const navigate = useNavigate();
 
   const load = useCallback(() => {
     loadOnboardingOverview().then(setRows, (err) => {
@@ -200,6 +210,9 @@ export default function OnboardingReview() {
   }, []);
 
   useEffect(load, [load]);
+  useEffect(() => {
+    if (rows) loadAfterHiringSummary().then(setAfterHiring, () => undefined);
+  }, [rows]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: rows?.length ?? 0 };
@@ -241,6 +254,8 @@ export default function OnboardingReview() {
         subtitle="Employees fill in their own details; you review and approve them. Only approved employees are paid."
         actions={
           <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" icon={<FileSignature className="h-4 w-4" />} onClick={() => navigate('/offers')}>Offers</Button>
+            <Button variant="secondary" icon={<ListChecks className="h-4 w-4" />} onClick={() => setSettingAfterHiring(true)}>After hiring</Button>
             <Button variant="secondary" icon={<ScrollText className="h-4 w-4" />} onClick={() => setSettingPolicies(true)}>Policies</Button>
             <Button variant="secondary" icon={<FileCheck2 className="h-4 w-4" />} onClick={() => setSettingDocuments(true)}>Required documents</Button>
           </div>
@@ -276,6 +291,12 @@ export default function OnboardingReview() {
                 {r.documents_outstanding.length > 0 && (
                   <p className="text-xs text-muted-foreground mt-1">Documents outstanding: {r.documents_outstanding.length}</p>
                 )}
+                {afterHiring.has(r.id) && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    After hiring: checklist {afterHiring.get(r.id)!.orientation_done}/{afterHiring.get(r.id)!.orientation_total}
+                    {afterHiring.get(r.id)!.tests_total > 0 && ` · tests passed ${afterHiring.get(r.id)!.tests_passed}/${afterHiring.get(r.id)!.tests_total}`}
+                  </p>
+                )}
                 {r.status === 'changes_requested' && r.review_comment && (
                   <p className="text-xs text-status-danger mt-1">Sent back: “{r.review_comment}”</p>
                 )}
@@ -298,6 +319,7 @@ export default function OnboardingReview() {
 
       {reviewing && <ReviewPanel row={reviewing} onClose={() => setReviewing(null)} onChanged={load} />}
       {settingDocuments && <RequiredDocumentsModal onClose={() => { setSettingDocuments(false); load(); }} />}
+      {settingAfterHiring && <AfterHiringSetupModal onClose={() => { setSettingAfterHiring(false); load(); }} />}
       {settingPolicies && <PoliciesModal onClose={() => { setSettingPolicies(false); load(); }} />}
     </div>
   );

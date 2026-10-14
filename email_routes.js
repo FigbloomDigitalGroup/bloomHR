@@ -45,6 +45,8 @@ const PURPOSES = {
     "hr-reminder": { modules: ["hr-lifecycle"] },
     warning: { modules: ["staffcheck"] },
     recruitment: { modules: ["recruitment"] },
+    // offer letters to candidates (FIG-831): whoever makes offers, HR or Recruitment
+    offer: { modules: ["employees", "recruitment"] },
     performance: { modules: ["performance"] },
     "staff-signup": { modules: ["adminconfirm"] },
 };

@@ -31,7 +31,8 @@ export interface HRNotification {
         | 'payslip_ready' | 'salary_paid' | 'expense_approved' | 'expense_rejected' | 'phone_change_approved' | 'phone_change_rejected'
         | 'incident_update' | 'warning_issued' | 'suspended' | 'reactivated' | 'employment_update' | 'leave_scheduled' | 'policy_to_accept'
         | 'task_assigned' | 'asset_assigned'
-        | 'approval_needed' | 'approval_progress';
+        | 'approval_needed' | 'approval_progress'
+        | 'exit_requested' | 'exit_approved' | 'exit_declined';
     title: string;
     message: string;
     // Nullable for leave notifications - only contract/probation reminders
