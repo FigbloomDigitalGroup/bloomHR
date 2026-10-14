@@ -263,8 +263,14 @@ describe('setting up workflows', () => {
   });
 
   it('department heads are offered only where departments exist', async () => {
-    expect((await asUser(db, U.ADMIN, () => rows(`select approval_department_head_available() as ok`)))[0]).toEqual({ ok: false });
-    expect(await setWorkflow(U.ADMIN, [{ approver_type: 'department_head' }])).toMatch(/Departments are not set up/);
+    // departments come with the org structure (FIG-826): before it, department head is refused; with it, offered
+    const [{ has }] = await rows<{ has: boolean }>(
+      `select to_regclass('public.departments') is not null
+          and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'employees' and column_name = 'department_id') as has`
+    );
+    expect((await asUser(db, U.ADMIN, () => rows(`select approval_department_head_available() as ok`)))[0]).toEqual({ ok: has });
+    if (has) expect(await setWorkflow(U.ADMIN, [{ approver_type: 'department_head' }])).toBe('');
+    else expect(await setWorkflow(U.ADMIN, [{ approver_type: 'department_head' }])).toMatch(/Departments are not set up/);
   });
 
   it('a new company starts with the default', async () => {
