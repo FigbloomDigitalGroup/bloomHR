@@ -14,11 +14,17 @@
 --   * department_id set     -> `Job Level` becomes the department's name (renaming a department renames it too)
 --   * `Job Level` typed     -> department_id is the company's department of that name, created if there is none
 --                              (the bulk upload and older screens write only `Job Level`)
---   * reports_to_id set     -> manager_email becomes the manager's work email and `Manager` their name, so
---                              supervises() / supervised_employee_numbers() keep working unchanged
---   * manager_email typed   -> reports_to_id is the one employee with that work email (none if it is nobody, more
---                              than one person, the employee themselves, or would make a loop)
---   * a manager's work email or name changes -> their reports' manager_email / `Manager` follow
+--   * reports_to_id set     -> `Manager` (the free-text name the forms used to take) becomes the manager's name, and
+--                              follows when the manager's name changes
+--
+-- manager_email and regional_manager are left alone. Assign Managers (ManagerAssignment.tsx) uses them to mark a row
+-- AS a manager: it puts the manager's own login email on their own row (manager_email for a branch manager,
+-- regional_manager for a regional one); it lists every row with either set as an "assigned manager", and Salary
+-- Advance finds a manager's town by `manager_email = their email` expecting one row. Writing the boss's email into
+-- every report's manager_email would turn each report into an "assigned manager" and give the boss several rows, and
+-- overwriting a manager's own marker would un-appoint them. So instead the supervisor checks, supervises() and
+-- supervised_employee_numbers(), also count the people who report to the signed-in user (reports_to_id = their own
+-- employee record): what they matched before is unchanged, and a reporting line set here is a supervisor link too.
 --
 -- Backfill (existing companies): a department for each distinct non-empty `Job Level` (ignoring case and spaces) and
 -- each employee put in it; reports_to_id where manager_email is exactly one other employee's work email (ignoring
@@ -211,7 +217,6 @@ declare
   dep_changed boolean;
   level_changed boolean;
   rep_changed boolean;
-  email_changed boolean;
   d public.departments;
   m public.employees;
   level text := nullif(btrim(new."Job Level"), '');
@@ -219,8 +224,6 @@ begin
   dep_changed := case when is_insert then new.department_id is not null else new.department_id is distinct from old.department_id end;
   level_changed := case when is_insert then level is not null else new."Job Level" is distinct from old."Job Level" end;
   rep_changed := case when is_insert then new.reports_to_id is not null else new.reports_to_id is distinct from old.reports_to_id end;
-  email_changed := case when is_insert then nullif(btrim(new.manager_email), '') is not null
-                        else new.manager_email is distinct from old.manager_email end;
 
   -- the department (it wins over `Job Level` when both change)
   if dep_changed then
@@ -254,7 +257,7 @@ begin
     end if;
   end if;
 
-  -- the manager (reports_to_id wins over manager_email when both change)
+  -- the manager; manager_email / regional_manager are Assign Managers' "is a manager" marks and are never touched
   if rep_changed then
     if new.reports_to_id is not null then
       if new.reports_to_id = new.id then
@@ -268,28 +271,12 @@ begin
         raise exception 'That would make a loop: % already reports (directly or through others) to this employee',
           btrim(concat_ws(' ', m."First Name", m."Last Name")) using errcode = '23514';
       end if;
-      if lower(btrim(coalesce(new.manager_email, ''))) <> lower(btrim(coalesce(m."Work Email", ''))) then
-        new.manager_email := nullif(btrim(m."Work Email"), '');
-      end if;
       new."Manager" := nullif(btrim(concat_ws(' ', m."First Name", m."Last Name")), '');
     elsif not is_insert and old.reports_to_id is not null then
-      -- no manager now: clear what pointed at the old one (an email someone typed for another reason stays)
+      -- no manager now: clear the name if it was the old manager's (a name someone typed for another reason stays)
       select * into m from public.employees where id = old.reports_to_id;
-      if m.id is not null and lower(btrim(coalesce(new.manager_email, ''))) = lower(btrim(coalesce(m."Work Email", ''))) then
-        new.manager_email := null;
-      end if;
       if m.id is not null and btrim(coalesce(new."Manager", '')) = btrim(concat_ws(' ', m."First Name", m."Last Name")) then
         new."Manager" := null;
-      end if;
-    end if;
-  elsif email_changed then
-    -- the manager's own work email changed (it still points at them): keep them
-    if new.reports_to_id is null or not exists (
-      select 1 from public.employees x where x.id = new.reports_to_id
-        and lower(btrim(x."Work Email")) = lower(btrim(coalesce(new.manager_email, '')))) then
-      new.reports_to_id := public.employee_by_work_email(new.tenant_id, new.manager_email, new.id);
-      if new.reports_to_id is not null and public.reports_to_loops(new.id, new.reports_to_id) then
-        new.reports_to_id := null;
       end if;
     end if;
   end if;
@@ -300,23 +287,20 @@ drop trigger if exists employees_org_structure on public.employees;
 create trigger employees_org_structure before insert or update on public.employees
   for each row execute function public.employees_org_structure();
 
--- a manager's new work email or name goes on their reports, so the supervisor checks keep finding them
+-- a manager's new name goes on their reports' `Manager`
 create or replace function public.employees_manager_details_follow() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
   update public.employees e
-  set manager_email = nullif(btrim(new."Work Email"), ''),
-      "Manager" = nullif(btrim(concat_ws(' ', new."First Name", new."Last Name")), '')
+  set "Manager" = nullif(btrim(concat_ws(' ', new."First Name", new."Last Name")), '')
   where e.reports_to_id = new.id and e.tenant_id = new.tenant_id
-    and (e.manager_email is distinct from nullif(btrim(new."Work Email"), '')
-         or e."Manager" is distinct from nullif(btrim(concat_ws(' ', new."First Name", new."Last Name")), ''));
+    and e."Manager" is distinct from nullif(btrim(concat_ws(' ', new."First Name", new."Last Name")), '');
   return null;
 end $$;
 
 drop trigger if exists employees_manager_details_follow on public.employees;
-create trigger employees_manager_details_follow after update of "Work Email", "First Name", "Last Name" on public.employees
-  for each row when (old."Work Email" is distinct from new."Work Email" or old."First Name" is distinct from new."First Name"
-                     or old."Last Name" is distinct from new."Last Name")
+create trigger employees_manager_details_follow after update of "First Name", "Last Name" on public.employees
+  for each row when (old."First Name" is distinct from new."First Name" or old."Last Name" is distinct from new."Last Name")
   execute function public.employees_manager_details_follow();
 
 revoke all on function public.departments_rules() from public, anon, authenticated;
@@ -325,7 +309,30 @@ revoke all on function public.employees_org_structure() from public, anon, authe
 revoke all on function public.employees_manager_details_follow() from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------------------------------
--- 7. the directory every role reads: plus id, department and manager (the organogram, the "Reports to" picker)
+-- 7. the supervisor checks also count who reports to the signed-in user
+-- ---------------------------------------------------------------------------------------------
+-- as in 20261014100000 / 20261014400000 (the worker's manager_email or regional_manager is the signed-in user's
+-- email), or the worker reports to the signed-in user's own employee record
+create or replace function public.supervises(p_employee_number text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.employees e join auth.users u on u.id = auth.uid()
+    where e.tenant_id = public.current_tenant_id() and e."Employee Number" = p_employee_number
+      and (lower(u.email) in (lower(btrim(e.manager_email)), lower(btrim(e.regional_manager)))
+           or e.reports_to_id = public.current_employee_id())
+  )
+$$;
+
+create or replace function public.supervised_employee_numbers() returns setof text
+language sql stable security definer set search_path = public as $$
+  select e."Employee Number" from public.employees e join auth.users u on u.id = auth.uid()
+  where e.tenant_id = public.current_tenant_id()
+    and (lower(u.email) in (lower(btrim(e.manager_email)), lower(btrim(e.regional_manager)))
+         or e.reports_to_id = (select public.current_employee_id()))
+$$;
+
+-- ---------------------------------------------------------------------------------------------
+-- 8. the directory every role reads: plus id, department and manager (the organogram, the "Reports to" picker)
 -- ---------------------------------------------------------------------------------------------
 create or replace view public.employee_directory with (security_barrier = true) as
   select "tenant_id",

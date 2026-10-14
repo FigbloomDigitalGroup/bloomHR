@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import type { DirectoryEmployee } from './employeeDirectory';
 
 /**
- * The company's departments and reporting lines (FIG-826, see 20261015200000_org_structure.sql): loading and saving
+ * The company's departments and reporting lines (FIG-826, see 20261016200000_org_structure.sql): loading and saving
  * departments, and turning flat lists into the trees the Departments page and the organogram draw.
  */
 export interface Department {

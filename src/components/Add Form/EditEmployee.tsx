@@ -29,7 +29,7 @@ type Employee = Database['public']['Tables']['employees']['Row'] & {
   'Tax PIN'?: string | null;
   NITA?: string | null;
   HELB?: string | null;
-  // org structure (20261015200000): the department and who they report to
+  // org structure (20261016200000): the department and who they report to
   department_id?: string | null;
   reports_to_id?: string | null;
 };
@@ -1023,7 +1023,7 @@ const EditEmployeePage = () => {
                       label="Reports to"
                       value={reportsToNumber}
                       fallbackLabel={employee['Manager'] || undefined}
-                      // the database fills in Manager and manager_email from reports_to_id
+                      // the database fills in Manager (the name) from reports_to_id
                       onChange={(m) => setEmployee(prev => ({ ...prev, reports_to_id: m?.id || null }))}
                       filter={(e) => e.id !== employee.id}
                       placeholder="Search for their manager..."

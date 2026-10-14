@@ -1,6 +1,6 @@
 // @vitest-environment node
 //
-// Org structure (20261015200000): departments (nested, no loops, one name per company), each employee's department
+// Org structure (20261016200000): departments (nested, no loops, one name per company), each employee's department
 // and who they report to (same company, not themselves, no loops), the old columns kept in step, the backfill from
 // `Job Level` and manager_email, who may change departments, and that companies never see each other's.
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -30,6 +30,13 @@ const emp = async (email: string) =>
     `select department_id, reports_to_id, manager_email, "Manager", "Job Level" from employees where "Work Email" = $1`, [email]))[0];
 const addDept = (user: string, name: string, parent: string | null = null) =>
   asUser(db, user, () => rows<{ id: string }>(`insert into departments (name, parent_id) values ($1, $2) returning id`, [name, parent])).then((r) => r[0].id);
+const MID = '00000000-0000-0000-0000-00000000fa05';
+const BM = '00000000-0000-0000-0000-00000000fa06';
+const RM = '00000000-0000-0000-0000-00000000fa07';
+const login = (id: string, email: string) => db.exec(`insert into auth.users (id, email) values ('${id}', '${email}');
+  insert into user_profiles (user_id, email, role, tenant_id) values ('${id}', '${email}', 'STAFF', '${A}')`);
+const team = (user: string) =>
+  asUser(db, user, () => rows<{ n: string }>(`select n from supervised_employee_numbers() n order by 1`)).then((r) => r.map((x) => x.n));
 const setReportsTo = (user: string, email: string, manager: string | null) =>
   asUser(db, user, () => db.query(`update employees set reports_to_id = $2 where "Work Email" = $1`, [email, manager]));
 
@@ -132,42 +139,76 @@ describe('an employee’s department', () => {
 });
 
 describe('who an employee reports to', () => {
-  it('keeps manager_email and `Manager` in step, so the supervisor checks still work', async () => {
+  it('sets `Manager` and makes the manager their supervisor, leaving manager_email alone', async () => {
     await setReportsTo(HR, 'mid@a.co', await idOf('ceo@a.co'));
     await setReportsTo(HR, 'low@a.co', await idOf('mid@a.co'));
-    expect(await emp('low@a.co')).toMatchObject({ manager_email: 'mid@a.co', Manager: 'Ben Mid' });
-    await db.exec(`insert into auth.users (id, email) values ('00000000-0000-0000-0000-00000000fa05', 'mid@a.co');
-      insert into user_profiles (user_id, email, role, tenant_id) values ('00000000-0000-0000-0000-00000000fa05', 'mid@a.co', 'STAFF', '${A}')`);
-    const team = await asUser(db, '00000000-0000-0000-0000-00000000fa05', () => rows<{ n: string }>(`select n from supervised_employee_numbers() n`));
-    expect(team.map((r) => r.n)).toEqual(['A-3']);
+    // manager_email is Assign Managers' "is a manager" mark: a report must not become an "assigned manager"
+    expect(await emp('low@a.co')).toMatchObject({ manager_email: null, Manager: 'Ben Mid' });
+    await login(MID, 'mid@a.co');
+    expect(await team(MID)).toEqual(['A-3']);
+    expect(await asUser(db, MID, () => rows<{ s: boolean }>(`select supervises('A-3') s`))).toEqual([{ s: true }]);
+    expect(await asUser(db, MID, () => rows<{ s: boolean }>(`select supervises('A-1') s`))).toEqual([{ s: false }]);
   });
 
-  it('a manager’s new work email follows to their reports', async () => {
-    await asUser(db, HR, () => db.query(`update employees set "Work Email" = 'ben@a.co' where "Work Email" = 'mid@a.co'`));
-    expect((await emp('low@a.co')).manager_email).toBe('ben@a.co');
-    await asUser(db, HR, () => db.query(`update employees set "Work Email" = 'mid@a.co' where "Work Email" = 'ben@a.co'`));
+  it('a manager marked the Assign Managers way keeps the mark, and their team, when given a "Reports to"', async () => {
+    await db.exec(`
+      insert into employees ("Employee Number", "First Name", "Last Name", "Work Email", "Town", "Branch", manager_email, regional_manager, tenant_id) values
+        ('BM-1', 'Bea', 'Branch', 'bm@a.co', 'Nakuru', 'Rift', 'bm@a.co', null, '${A}'),
+        ('RM-1', 'Rex', 'Region', 'rm@a.co', 'Nakuru', 'Rift', null, 'rm@a.co', '${A}'),
+        ('W-1', 'Wes', 'Worker', 'w1@a.co', 'Nakuru', 'Rift', 'bm@a.co', null, '${A}');
+    `);
+    await login(BM, 'bm@a.co');
+    await login(RM, 'rm@a.co');
+    const marked = () => rows<{ n: string; m: string | null; r: string | null }>(`select "Employee Number" n, manager_email m, regional_manager r
+      from employees where tenant_id = '${A}' and (manager_email is not null or regional_manager is not null) order by 1`);
+    const supervisesW1 = () => asUser(db, BM, () => rows(`select supervises('W-1') s`));
+    const before = { marked: await marked(), bm: await team(BM), rm: await team(RM), w1: await supervisesW1() };
+    expect(before.marked.map((r) => r.n)).toEqual(['BM-1', 'RM-1', 'W-1']);
+    expect(before.bm).toEqual(['BM-1', 'W-1']);
+
+    await setReportsTo(HR, 'bm@a.co', await idOf('rm@a.co'));
+    await setReportsTo(HR, 'rm@a.co', await idOf('ceo@a.co'));
+
+    // still marked as managers, exactly as before (Assign Managers lists the same people)
+    expect(await marked()).toEqual(before.marked);
+    expect(await emp('bm@a.co')).toMatchObject({ manager_email: 'bm@a.co', Manager: 'Rex Region' });
+    // Salary Advance finds the branch manager's town by manager_email = their email: the same rows as before
+    expect(await rows(`select "Employee Number" from employees where manager_email = 'bm@a.co' order by 1`)).toEqual(
+      [{ 'Employee Number': 'BM-1' }, { 'Employee Number': 'W-1' }]);
+    // their own team is unchanged
+    expect(await team(BM)).toEqual(before.bm);
+    expect(await supervisesW1()).toEqual(before.w1);
+    // the new reporting line adds Bea to Rex's team; nothing he had before goes
+    expect(await team(RM)).toEqual([...new Set([...before.rm, 'BM-1'])].sort());
   });
 
-  it('typing manager_email (Assign Managers) sets who they report to', async () => {
-    await asUser(db, HR, () => db.query(`update employees set manager_email = 'CEO@a.co' where "Work Email" = 'staff@a.co'`));
-    expect((await emp('staff@a.co')).reports_to_id).toBe(await idOf('ceo@a.co'));
-    await asUser(db, HR, () => db.query(`update employees set manager_email = 'nobody@a.co' where "Work Email" = 'staff@a.co'`));
-    expect((await emp('staff@a.co')).reports_to_id).toBeNull();
+  it('appointing a manager (Assign Managers) does not change who they report to', async () => {
+    const boss = (await emp('low@a.co')).reports_to_id;
+    expect(boss).not.toBeNull();
+    await asUser(db, HR, () => db.query(`update employees set manager_email = 'low@a.co' where "Work Email" = 'low@a.co'`));
+    expect(await emp('low@a.co')).toMatchObject({ reports_to_id: boss, manager_email: 'low@a.co' });
+    await asUser(db, HR, () => db.query(`update employees set manager_email = null where "Work Email" = 'low@a.co'`));
+    expect((await emp('low@a.co')).reports_to_id).toBe(boss);
   });
 
-  it('clearing it clears the manager_email that pointed at the old manager', async () => {
+  it('a manager’s new name follows to their reports', async () => {
+    await asUser(db, HR, () => db.query(`update employees set "Last Name" = 'Middle' where "Work Email" = 'mid@a.co'`));
+    expect((await emp('low@a.co')).Manager).toBe('Ben Middle');
+    await asUser(db, HR, () => db.query(`update employees set "Last Name" = 'Mid' where "Work Email" = 'mid@a.co'`));
+  });
+
+  it('clearing it clears the old manager’s name, and never manager_email', async () => {
+    await asUser(db, HR, () => db.query(`update employees set manager_email = 'staff@a.co' where "Work Email" = 'staff@a.co'`));
     await setReportsTo(HR, 'staff@a.co', await idOf('mid@a.co'));
     await setReportsTo(HR, 'staff@a.co', null);
-    expect(await emp('staff@a.co')).toMatchObject({ reports_to_id: null, manager_email: null, Manager: null });
+    expect(await emp('staff@a.co')).toMatchObject({ reports_to_id: null, manager_email: 'staff@a.co', Manager: null });
+    await asUser(db, HR, () => db.query(`update employees set manager_email = null where "Work Email" = 'staff@a.co'`));
   });
 
   it('refuses themselves, loops and other companies’ people', async () => {
     expect(await fails(setReportsTo(HR, 'ceo@a.co', await idOf('ceo@a.co')))).toMatch(/themselves|reports_to_not_self/);
     expect(await fails(setReportsTo(HR, 'ceo@a.co', await idOf('low@a.co')))).toMatch(/loop/);
     expect(await fails(setReportsTo(HR, 'ceo@a.co', await idOf('bo@b.co')))).toMatch(/this company/);
-    // a manager_email that would loop is not followed
-    await asUser(db, HR, () => db.query(`update employees set manager_email = 'low@a.co' where "Work Email" = 'ceo@a.co'`));
-    expect((await emp('ceo@a.co')).reports_to_id).toBeNull();
   });
 
   it('staff cannot change their own manager', async () => {
@@ -177,7 +218,7 @@ describe('who an employee reports to', () => {
   it('the directory shows ids, departments and managers to every role, in their company only', async () => {
     const dir = await asUser(db, STAFF, () => rows<{ id: string; reports_to_id: string | null; tenant_id: string }>(
       `select id, reports_to_id, tenant_id from employee_directory`));
-    expect(dir.length).toBe(4);
+    expect(dir.length).toBe((await rows(`select 1 from employees where tenant_id = '${A}'`)).length);
     expect(dir.every((r) => r.tenant_id === A && r.id)).toBe(true);
     expect(dir.some((r) => r.reports_to_id)).toBe(true);
   });
@@ -186,7 +227,7 @@ describe('who an employee reports to', () => {
 describe('backfill of existing companies', () => {
   it('departments from `Job Level`, reporting lines from manager_email (no self, no loops, no other company)', async () => {
     const old = await bootDb({
-      file: '20261015200000_org_structure.sql',
+      file: '20261016200000_org_structure.sql',
       seed: async (d) => {
         await d.exec(`
           insert into tenants (id, name, slug) values ('${B}', 'Other Co', 'other-co');
