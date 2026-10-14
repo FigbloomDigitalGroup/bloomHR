@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from "react";
-import EmployeePicker from '../UI/EmployeePicker';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import {
   DollarSign,
@@ -11,40 +10,22 @@ import {
   Trash2,
   Upload,
   ChevronDown,
-  ChevronUp,
-  ArrowLeft,
-  ArrowRight,
-  Search,
-  Smartphone,
-  Send,
-  FileSpreadsheet,
   Loader,
   CheckCircle,
-  XCircle,
   X,
   Clock,
   Users,
-  Eye,
   Settings,
   AlertTriangle,
-  MessageSquare,
-  MapPin,
-  Briefcase,
-  CreditCard,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import toast from "react-hot-toast";
-import * as XLSX from "xlsx";
-import { saveAs } from "file-saver";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
-import html2pdf from "html2pdf.js";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import SearchableDropdown from "../UI/SearchableDropdown";
-import { Card, Modal, SearchInput, TableScroll } from "../UI";
+import { Modal, PageHeader, TabBar } from "../UI";
 import MPesaSpreadsheetFullPage from "./MpesaSpreadSheet";
 import useStatutoryRates from "../../hooks/useStatutoryRates";
+import { usePermissions } from "../../hooks/usePermissions";
 import StatutoryRatesModal from "./StatutoryRatesModal";
 import { employeeInputs, missingRates, statutoryFor } from "../../lib/statutoryCalc";
 import type { SalaryHistoryRecord } from "../../lib/salaryHistory";
@@ -58,1988 +39,41 @@ import {
   saveDraftRun,
   setRunStatus,
 } from "../../lib/payrollRuns";
-import PayrollRunBar from "./PayrollRunBar";
-import VoluntaryDeductionsModal from "./VoluntaryDeductionsModal";
 import MissingPayrollDetailsModal from "./MissingPayrollDetailsModal";
-import { downloadP10 } from "./PayrollExportsPanel";
-import { ApprovedRunPanels, BulkPayButton } from "./RunPayActions";
-import { IN_APP_PAYMENTS, IN_APP_PAYMENTS_OFF_MESSAGE } from "../../lib/inAppPayments";
-import ReturnsReadiness from "./ReturnsReadiness";
+import { IN_APP_PAYMENTS, IN_APP_PAYMENTS_OFF_MESSAGE, PAYMENTS_DEMO } from "../../lib/inAppPayments";
+import { demoPayLines } from "../../lib/demoPayments";
+import { DemoPayAllDialog } from "./DemoPayments";
+import PayrollMoreMenu, { type MoreMenuItem } from "./PayrollMoreMenu";
 import { returnsReadiness } from "../../lib/payrollExports";
 import { employeesMissingDetails } from "../../lib/missingPayrollDetails";
 import { isPaidByMpesa, paymentMethodLabel } from "../../lib/paymentMethods";
 import { fetchAll } from "../../lib/fetchAll";
 import { isPayrollReady } from "../../lib/onboardingValidation";
-import { downloadP9Pdf, loadEmployerPin, loadP9For, saveEmployerPin } from "../../lib/p9";
 import { useNavigate } from "react-router-dom";
-import { deductionsForPeriod, loadDeductionSetup, payslipDeductionLines, totalOf } from "../../lib/voluntaryDeductions";
+import { deductionsForPeriod, loadDeductionSetup, totalOf } from "../../lib/voluntaryDeductions";
+import { checkSMSBalance, formatPhoneNumber, sendSMSWithRetry, smsTemplates } from "../../lib/payrollSms";
 import BulkSalaryHistoryUpload from "./BulkSalaryHistoryUpload";
-
-// SMS Service Configuration for SMS Leopard
-const SMS_LEOPARD_CONFIG = {
-  baseUrl: "https://api.smsleopard.com/v1",
-  username: import.meta.env.VITE_SMS_LEOPARD_USERNAME || '',
-  password: import.meta.env.VITE_SMS_LEOPARD_PASSWORD || '',
-  source: "sms_Leopard",
-};
-
-// Utility function to add query parameters
-const addQueryParams = (url: string, params: Record<string, string | number | boolean | (string | number | boolean)[]>) => {
-  const queryString = Object.entries(params)
-    .flatMap(([key, value]) =>
-      Array.isArray(value)
-        ? value.map(
-          (val) => `${encodeURIComponent(key)}=${encodeURIComponent(val)}`,
-        )
-        : `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
-    )
-    .join("&");
-
-  return `${url}?${queryString}`;
-};
-
-// SMS Service Functions for SMS Leopard
-const sendSMSLeopard = async (phoneNumber: string, message: string) => {
-  try {
-    const formattedPhone = formatPhoneNumber(phoneNumber);
-
-    if (!formattedPhone || !message) {
-      throw new Error("Phone number and message are required");
-    }
-
-    const endpoint = addQueryParams(`${SMS_LEOPARD_CONFIG.baseUrl}/sms/send`, {
-      username: SMS_LEOPARD_CONFIG.username,
-      password: SMS_LEOPARD_CONFIG.password,
-      message: message,
-      destination: formattedPhone,
-      source: SMS_LEOPARD_CONFIG.source,
-    });
-
-    const credentials = btoa(
-      `${SMS_LEOPARD_CONFIG.username}:${SMS_LEOPARD_CONFIG.password}`,
-    );
-
-    const response = await fetch(endpoint, {
-      method: "GET",
-      headers: {
-        Authorization: `Basic ${credentials}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`SMS service error: ${response.status} - ${errorText}`);
-    }
-
-    const result = await response.json();
-
-    if (result.status === "success" || response.ok) {
-      return {
-        success: true,
-        message: "SMS sent successfully",
-        timestamp: new Date().toISOString(),
-        rawResponse: result,
-      };
-    } else {
-      throw new Error(result.message || "Failed to send SMS");
-    }
-  } catch (error) {
-    console.error("SMS sending error:", error);
-
-    console.log("SMS would have been sent:", {
-      to: formatPhoneNumber(phoneNumber),
-      message: message,
-      provider: "SMS Leopard",
-    });
-
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-      fallback: true,
-      message: "SMS queued for retry",
-    };
-  }
-};
-
-const checkSMSBalance = async () => {
-  try {
-    const endpoint = `${SMS_LEOPARD_CONFIG.baseUrl}/balance`;
-    const credentials = btoa(
-      `${SMS_LEOPARD_CONFIG.username}:${SMS_LEOPARD_CONFIG.password}`,
-    );
-
-    const response = await fetch(endpoint, {
-      method: "GET",
-      headers: {
-        Authorization: `Basic ${credentials}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to check balance: ${response.status}`);
-    }
-
-    const result = await response.json();
-
-    if (result.balance !== undefined) {
-      return `KSh ${result.balance}`;
-    } else if (result.data && result.data.balance !== undefined) {
-      return `KSh ${result.data.balance}`;
-    } else {
-      return "Balance information not available";
-    }
-  } catch (error) {
-    console.error("SMS balance check error:", error);
-    return "Service unavailable";
-  }
-};
-
-// Enhanced phone number formatting for SMS Leopard
-const formatPhoneNumber = (phone: string | number | null | undefined): string => {
-  if (!phone) return "";
-
-  let cleaned = String(phone).replace(/\D/g, "");
-
-  if (cleaned.startsWith("0")) {
-    cleaned = "254" + cleaned.substring(1);
-  } else if (cleaned.startsWith("7")) {
-    cleaned = "254" + cleaned;
-  } else if (cleaned.startsWith("+254")) {
-    cleaned = cleaned.substring(1);
-  }
-
-  if (cleaned.length === 12 && cleaned.startsWith("254")) {
-    return cleaned;
-  }
-
-  console.warn("Invalid phone number format:", phone, "cleaned:", cleaned);
-  return cleaned;
-};
-
-// Enhanced SMS sending with retry logic
-const sendSMSWithRetry = async (phoneNumber: string, message: string, maxRetries = 3) => {
-  let lastError: any;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`SMS attempt ${attempt} for ${phoneNumber}`);
-      const result = await sendSMSLeopard(phoneNumber, message);
-
-      if (result.success) {
-        console.log(`SMS sent successfully on attempt ${attempt}`);
-        return result;
-      }
-
-      lastError = new Error(result.message || "SMS sending failed");
-    } catch (error) {
-      lastError = error;
-      console.warn(`SMS attempt ${attempt} failed:`, error);
-
-      if (attempt < maxRetries) {
-        const delay = 1000 * attempt;
-        console.log(`Waiting ${delay}ms before retry...`);
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
-  }
-
-  console.error(`All ${maxRetries} SMS attempts failed for ${phoneNumber}`);
-  throw lastError;
-};
-
-// SMS Templates
-const smsTemplates = {
-  payslipNotification: (employeeName: string, netPay: number, payPeriod: string) =>
-    `Dear ${employeeName}, your payslip for ${payPeriod} is ready. Net Pay: KSh ${netPay.toLocaleString()}. Login to view details.`,
-
-  paymentConfirmation: (employeeName: string, amount: number) =>
-    `Dear ${employeeName}, payment of KSh ${amount.toLocaleString()} has been processed successfully via M-PESA. Thank you.`,
-
-  paymentFailed: (employeeName: string) =>
-    `Dear ${employeeName}, we encountered an issue processing your payment. Please contact HR for assistance.`,
-
-  mpesaSuccess: (employeeName: string, amount: number, reference: string) =>
-    `Dear ${employeeName}, KSh ${amount.toLocaleString()} has been sent to your M-PESA account. Reference: ${reference}.`,
-
-  mpesaFailed: (employeeName: string, reference: string) =>
-    `Dear ${employeeName}, M-PESA payment failed for reference ${reference}. Please contact HR.`,
-};
-
-// Comment Modal Component
-const CommentModal = ({
-  isOpen,
-  onClose,
-  onSubmit,
-  title = "Add Comment",
-  submitText = "Submit",
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (comment: string) => void;
-  title?: string;
-  submitText?: string;
-}) => {
-  const [comment, setComment] = useState("");
-
-  const handleSubmit = () => {
-    if (comment.trim()) {
-      onSubmit(comment);
-      setComment("");
-      onClose();
-    } else {
-      toast.error("Please enter a comment");
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-          <MessageSquare className="h-5 w-5 text-blue-600" />
-          {title}
-        </h3>
-
-        <div className="mb-4">
-          <label className="block text-xs font-medium text-gray-700 mb-2">
-            Comment <span className="text-red-500">*</span>
-          </label>
-          <textarea
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Enter your comment here..."
-            rows={4}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            This comment will be recorded in the audit trail.
-          </p>
-        </div>
-
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-          >
-            {submitText}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Maker-Checker Status Badge Component
-const StatusBadge = ({ status }: { status: string }) => {
-  const statusConfig = {
-    pending: {
-      bg: "bg-yellow-100",
-      text: "text-yellow-800",
-      icon: Clock,
-      label: "Pending Approval",
-    },
-    approved: {
-      bg: "bg-green-100",
-      text: "text-green-800",
-      icon: CheckCircle,
-      label: "Approved",
-    },
-    rejected: {
-      bg: "bg-red-100",
-      text: "text-red-800",
-      icon: XCircle,
-      label: "Rejected",
-    },
-    processing: {
-      bg: "bg-blue-100",
-      text: "text-blue-800",
-      icon: Loader,
-      label: "Processing",
-    },
-    completed: {
-      bg: "bg-emerald-100",
-      text: "text-emerald-800",
-      icon: CheckCircle,
-      label: "Completed",
-    },
-    failed: {
-      bg: "bg-red-100",
-      text: "text-red-800",
-      icon: XCircle,
-      label: "Failed",
-    },
-  };
-
-  const config =
-    statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
-  const Icon = config.icon;
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${config.bg} ${config.text}`}
-    >
-      <Icon className="w-3 h-3" />
-      {config.label}
-    </span>
-  );
-};
-
-// Pending Payment Card Component
-const PendingPaymentCard = ({
-  payment,
-  onApprove,
-  onReject,
-  onViewDetails,
-  userRole,
-  isSelected,
-  onSelect,
-}: {
-  payment: any;
-  onApprove: (payment: any) => void;
-  onReject: (payment: any) => void;
-  onViewDetails: (payment: any) => void;
-  userRole: string;
-  isSelected?: boolean;
-  onSelect?: (id: string, checked: boolean) => void;
-}) => {
-  const isChecker =
-    userRole === "checker" || userRole === "credit_analyst_officer";
-  const totalAmount =
-    payment.type === "bulk"
-      ? payment.employees_data?.reduce(
-        (sum: number, emp: any) => sum + (emp.net_pay || 0),
-        0,
-      ) || 0
-      : payment.employee_data?.net_pay || 0;
-
-  return (
-    <div
-      className={`bg-white rounded-lg border ${isSelected ? "border-blue-500 ring-2 ring-blue-200" : "border-gray-200"} p-4 hover:shadow-md transition-shadow`}
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
-          {onSelect && (
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={(e) => {
-                e.stopPropagation();
-                onSelect(payment.id, e.target.checked);
-              }}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-          )}
-          <div className="p-2 bg-orange-100 rounded-lg">
-            {payment.type === "bulk" ? (
-              <Users className="w-5 h-5 text-orange-600" />
-            ) : (
-              <Smartphone className="w-5 h-5 text-orange-600" />
-            )}
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-900">
-              {payment.type === "bulk"
-                ? `Bulk Payment (${payment.employees_data?.length || 0} employees)`
-                : `Payment to ${payment.employee_data?.employee_name || "Unknown"}`}
-            </h3>
-            <p className="text-xs text-gray-600">
-              Initiated by {payment.created_by_email} •{" "}
-              {new Date(payment.created_at).toLocaleString()}
-            </p>
-          </div>
-        </div>
-        <StatusBadge status={payment.status} />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-        <div>
-          <p className="text-xs text-gray-600">Total Amount</p>
-          <p className="font-bold text-lg text-primary">
-            KSh {totalAmount.toLocaleString()}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-gray-600">Payment Method</p>
-          <p className="font-medium">M-Pesa B2C</p>
-        </div>
-      </div>
-
-      {payment.type === "bulk" && payment.employees_data && (
-        <div className="mb-4">
-          <p className="text-xs text-gray-600 mb-2">Employees:</p>
-          <div className="max-h-20 overflow-y-auto text-xs">
-            {payment.employees_data.slice(0, 3).map((emp: any, index: number) => (
-              <div key={index} className="flex justify-between py-1">
-                <span>{emp.employee_name}</span>
-                <span>KSh {emp.net_pay?.toLocaleString()}</span>
-              </div>
-            ))}
-            {payment.employees_data.length > 3 && (
-              <p className="text-gray-500 text-xs mt-1">
-                +{payment.employees_data.length - 3} more employees
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      <div className="flex gap-2">
-        <button
-          onClick={() => onViewDetails(payment)}
-          className="flex-1 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 flex items-center justify-center gap-2"
-        >
-          <Eye className="w-4 h-4" />
-          View Details
-        </button>
-
-        {isChecker && payment.status === "pending" && (
-          <>
-            <button
-              onClick={() => onApprove(payment)}
-              className="flex-1 px-3 py-2 text-xs font-medium text-white bg-primary rounded-md hover:bg-primary/90 flex items-center justify-center gap-2"
-            >
-              <CheckCircle className="w-4 h-4" />
-              Approve
-            </button>
-            <button
-              onClick={() => onReject(payment)}
-              className="flex-1 px-3 py-2 text-xs font-medium text-white bg-red-600 rounded-md hover:bg-red-700 flex items-center justify-center gap-2"
-            >
-              <XCircle className="w-4 h-4" />
-              Reject
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// Payment Details Modal Component
-const PaymentDetailsModal = ({
-  payment,
-  isOpen,
-  onClose,
-  onApprove,
-  onReject,
-  userRole,
-}: {
-  payment: any;
-  isOpen: boolean;
-  onClose: () => void;
-  onApprove: (payment: any) => void;
-  onReject: (payment: any) => void;
-  userRole: string;
-}) => {
-  if (!isOpen || !payment) return null;
-
-  const isChecker =
-    userRole === "checker" || userRole === "credit_analyst_officer";
-  const totalAmount =
-    payment.type === "bulk"
-      ? payment.employees_data?.reduce(
-        (sum: number, emp: any) => sum + (emp.net_pay || 0),
-        0,
-      ) || 0
-      : payment.employee_data?.net_pay || 0;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-4xl max-h-[90vh] overflow-auto">
-        <div className="sticky top-0 bg-white p-6 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Payment Request Details
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <div className="p-6">
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-xs text-gray-600">Payment Type</p>
-                <p className="font-semibold">
-                  {payment.type === "bulk" ? "Bulk Payment" : "Single Payment"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Total Amount</p>
-                <p className="font-semibold text-primary">
-                  KSh {totalAmount.toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Status</p>
-                <StatusBadge status={payment.status} />
-              </div>
-              <div>
-                <p className="text-xs text-gray-600">Created</p>
-                <p className="font-semibold">
-                  {new Date(payment.created_at).toLocaleString()}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mb-6">
-            <h3 className="font-semibold text-gray-900 mb-2">Justification</h3>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-gray-700">{payment.justification}</p>
-            </div>
-          </div>
-
-          <div className="mb-6">
-            <h3 className="font-semibold text-gray-900 mb-3">Audit Trail</h3>
-            <div className="space-y-2">
-              <div className="flex items-center gap-3 text-xs">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span>
-                  Payment request created by {payment.created_by_email}
-                </span>
-                <span className="text-gray-500">
-                  {new Date(payment.created_at).toLocaleString()}
-                </span>
-              </div>
-              {payment.approved_by_email && (
-                <div className="flex items-center gap-3 text-xs">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span>Approved by {payment.approved_by_email}</span>
-                  <span className="text-gray-500">
-                    {new Date(payment.approved_at).toLocaleString()}
-                  </span>
-                  {payment.approval_comment && (
-                    <span className="text-green-600">
-                      - {payment.approval_comment}
-                    </span>
-                  )}
-                </div>
-              )}
-              {payment.rejected_by_email && (
-                <div className="flex items-center gap-3 text-xs">
-                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <span>Rejected by {payment.rejected_by_email}</span>
-                  <span className="text-gray-500">
-                    {new Date(payment.rejected_at).toLocaleString()}
-                  </span>
-                  {payment.rejection_reason && (
-                    <span className="text-red-600">
-                      - {payment.rejection_reason}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="mb-6">
-            <h3 className="font-semibold text-gray-900 mb-3">
-              {payment.type === "bulk"
-                ? "Employees to be Paid"
-                : "Employee Details"}
-            </h3>
-
-            {payment.type === "bulk" && payment.employees_data ? (
-              <div className="max-h-60 overflow-y-auto">
-                <TableScroll>
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left">Employee</th>
-                      <th className="px-3 py-2 text-right">Phone Number</th>
-                      <th className="px-3 py-2 text-right">Net Pay</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payment.employees_data.map((emp: any, index: number) => (
-                      <tr key={index} className="border-t">
-                        <td className="px-3 py-2">
-                          <div>
-                            <p className="font-medium">{emp.employee_name}</p>
-                            <p className="text-gray-500 text-xs">
-                              {emp.employee_id}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          {emp.employeeNu}
-                        </td>
-                        <td className="px-3 py-2 text-right font-medium">
-                          KSh {emp.net_pay?.toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                </TableScroll>
-              </div>
-            ) : (
-              payment.employee_data && (
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-gray-600">Employee Name</p>
-                      <p className="font-medium">
-                        {payment.employee_data.employee_name}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600">Employee ID</p>
-                      <p className="font-medium">
-                        {payment.employee_data.employee_id}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600">Phone Number</p>
-                      <p className="font-medium">
-                        {payment.employee_data.employeeNu}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600">Department</p>
-                      <p className="font-medium">
-                        {payment.employee_data.department}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )
-            )}
-          </div>
-
-          {isChecker && payment.status === "pending" && (
-            <div className="flex gap-3 pt-4 border-t border-gray-200">
-              <button
-                onClick={() => onApprove(payment)}
-                className="flex-1 px-4 py-3 text-xs font-medium text-white bg-primary rounded-lg hover:bg-primary/90 flex items-center justify-center gap-2"
-              >
-                <CheckCircle className="w-4 h-4" />
-                Approve Payment
-              </button>
-              <button
-                onClick={() => onReject(payment)}
-                className="flex-1 px-4 py-3 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 flex items-center justify-center gap-2"
-              >
-                <XCircle className="w-4 h-4" />
-                Reject Payment
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Rejection Modal Component
-const RejectionModal = ({
-  isOpen,
-  onClose,
-  onConfirm,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: (reason: string) => void;
-}) => {
-  const [reason, setReason] = useState("");
-
-  const handleConfirm = () => {
-    if (reason.trim()) {
-      onConfirm(reason);
-      setReason("");
-      onClose();
-    } else {
-      toast.error("Please enter a reason for rejection");
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-          <XCircle className="h-5 w-5 text-red-600" />
-          Reject Payment Request
-        </h3>
-
-        <div className="mb-4">
-          <label className="block text-xs font-medium text-gray-700 mb-2">
-            Reason for rejection <span className="text-red-500">*</span>
-          </label>
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Please provide a reason for rejecting this payment request..."
-            rows={4}
-            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500"
-          />
-        </div>
-
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            disabled={!reason.trim()}
-            className="px-4 py-2 text-xs font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Confirm Rejection
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// M-PESA Single Payment Modal
-const MpesaSinglePaymentModal = ({
-  isOpen,
-  onClose,
-  employee,
-  onConfirm,
-  userRole = "maker",
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  employee: any;
-  onConfirm: (justification: string) => Promise<void>;
-  userRole?: string;
-}) => {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [justification, setJustification] = useState("");
-
-  const handlePayment = async () => {
-    if (userRole === "maker" && !justification.trim()) {
-      toast.error("Please provide a justification for this payment request");
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      await onConfirm(justification);
-      onClose();
-    } catch (error) {
-      console.error("Payment error:", error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-          <Smartphone className="h-5 w-5 text-primary" />
-          {userRole === "maker"
-            ? "Create Payment Request"
-            : "Confirm M-PESA Payment"}
-        </h3>
-
-        <div className="mb-4 p-3 bg-gray-50 rounded-md">
-          <p className="text-xs text-gray-600 mb-2">
-            {userRole === "maker"
-              ? "You are creating a payment request for:"
-              : "You are about to send an M-PESA payment to:"}
-          </p>
-          <div className="space-y-1">
-            <p className="font-medium">{employee.employee_name}</p>
-            <p className="text-xs text-gray-600">ID: {employee.employee_id}</p>
-            <p className="text-xs text-gray-600">
-              Phone: {employee.employeeNu || "No phone number available"}
-            </p>
-            <p className="text-xs text-gray-600">
-              Amount: KSh {employee.net_pay?.toLocaleString()}
-            </p>
-          </div>
-        </div>
-
-        {userRole === "maker" && (
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-gray-700 mb-2">
-              Justification <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={justification}
-              onChange={(e) => setJustification(e.target.value)}
-              placeholder="Please provide a justification for this payment request..."
-              rows={3}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
-            />
-          </div>
-        )}
-
-        {userRole === "maker" && (
-          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-yellow-600 mt-0.5" />
-              <div className="text-xs text-yellow-800">
-                <p className="font-medium">Maker-Checker Process</p>
-                <p>
-                  This payment will be submitted for approval before processing.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
-            disabled={isProcessing}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handlePayment}
-            className="px-4 py-2 text-xs font-medium text-white bg-primary rounded-md hover:bg-primary/90 flex items-center gap-2"
-            disabled={
-              isProcessing || (userRole === "maker" && !justification.trim())
-            }
-          >
-            {isProcessing ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                Processing...
-              </>
-            ) : (
-              <>
-                <Send size={16} />
-                {userRole === "maker" ? "Submit Request" : "Confirm Payment"}
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// M-PESA Bulk Payment Modal
-/** The parts of a payroll record that decide whether M-Pesa may pay it. */
-type PayRecipient = { employee_name?: string; payment_method?: unknown };
-
-const MpesaBulkPaymentModal = ({
-  isOpen,
-  onClose,
-  employees: allEmployees,
-  onConfirm,
-  userRole = "maker",
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  employees: any[];
-  onConfirm: (selectedEmployees: any[], justification: string) => Promise<void>;
-  userRole?: string;
-}) => {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedStaff, setSelectedStaff] = useState<Record<string, boolean>>({});
-  const [searchTerm, setSearchTerm] = useState("");
-  const [justification, setJustification] = useState("");
-
-  // M-Pesa can only pay staff paid by M-Pesa: bank, cash and Airtel staff are left out of the list
-  const payable = useMemo(() => allEmployees.filter(isPaidByMpesa), [allEmployees]);
-  const notPayable = useMemo(() => {
-    const counts = new Map<string, number>();
-    allEmployees
-      .filter((emp) => !isPaidByMpesa(emp))
-      .forEach((emp) => {
-        const method = paymentMethodLabel(emp.payment_method);
-        counts.set(method, (counts.get(method) ?? 0) + 1);
-      });
-    return [...counts.entries()];
-  }, [allEmployees]);
-  const employees = payable;
-
-  useEffect(() => {
-    const initialSelected = {};
-    employees.forEach((emp) => {
-      (initialSelected as Record<string, boolean>)[emp.employee_id] = true;
-    });
-    setSelectedStaff(initialSelected);
-  }, [employees]);
-
-  const filteredEmployees = employees.filter(
-    (emp) =>
-      emp.employee_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.employee_id.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
-
-  const calculateTotalAmount = () => {
-    return employees.reduce((total: number, emp: any) => {
-      if (selectedStaff[emp.employee_id]) {
-        return total + (emp.net_pay || 0);
-      }
-      return total;
-    }, 0);
-  };
-
-  const getSelectedStaffCount = () => {
-    return Object.values(selectedStaff).filter((selected) => selected).length;
-  };
-
-  const toggleStaffSelection = (id: string) => {
-    setSelectedStaff((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
-  };
-
-  const selectAllStaff = () => {
-    const newSelection: Record<string, boolean> = {};
-    employees.forEach((emp: any) => {
-      newSelection[emp.employee_id] = true;
-    });
-    setSelectedStaff(newSelection);
-  };
-
-  const deselectAllStaff = () => {
-    setSelectedStaff({});
-  };
-
-  const handleBulkPayment = async () => {
-    if (userRole === "maker" && !justification.trim()) {
-      toast.error(
-        "Please provide a justification for this bulk payment request",
-      );
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      const selectedEmployees = employees.filter(
-        (emp) => selectedStaff[emp.employee_id],
-      );
-      await onConfirm(selectedEmployees, justification);
-      onClose();
-    } catch (error) {
-      console.error("Bulk payment error:", error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
-        <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-          <Users className="h-5 w-5 text-primary" />
-          {userRole === "maker"
-            ? "Create Bulk Payment Request"
-            : "Confirm M-PESA Bulk Payment"}
-        </h3>
-
-        <div className="mb-4 p-3 bg-gray-50 rounded-md">
-          <p className="text-xs text-gray-600">
-            {userRole === "maker"
-              ? `You are creating a bulk payment request for ${getSelectedStaffCount()} selected staff members.`
-              : `You are about to process M-PESA B2C payments for ${getSelectedStaffCount()} selected staff members.`}
-          </p>
-
-          {notPayable.length > 0 && (
-            <p className="mt-2 text-xs text-gray-600">
-              Not included (not paid by M-Pesa):{" "}
-              {notPayable.map(([method, count]) => `${count} ${method}`).join(", ")}.
-            </p>
-          )}
-
-          <div className="mt-3 flex gap-2">
-            <button
-              onClick={selectAllStaff}
-              className="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded"
-            >
-              Select All
-            </button>
-            <button
-              onClick={deselectAllStaff}
-              className="text-xs bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded"
-            >
-              Deselect All
-            </button>
-          </div>
-
-          <div className="mt-3 border-t pt-3">
-            <div className="flex justify-between text-xs">
-              <span className="font-medium">Total Amount:</span>
-              <span className="font-bold text-primary">
-                KSh {calculateTotalAmount().toLocaleString()}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {userRole === "maker" && (
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-gray-700 mb-2">
-              Justification <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={justification}
-              onChange={(e) => setJustification(e.target.value)}
-              placeholder="Please provide a justification for this bulk payment request..."
-              rows={3}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
-            />
-          </div>
-        )}
-
-        {userRole === "maker" && (
-          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-yellow-600 mt-0.5" />
-              <div className="text-xs text-yellow-800">
-                <p className="font-medium">Maker-Checker Process</p>
-                <p>
-                  This bulk payment will be submitted for approval before
-                  processing.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="mb-4 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search employees..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 pr-4 py-2 border border-gray-300 rounded-md text-xs w-full focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
-          />
-        </div>
-
-        <div className="mb-4 max-h-60 overflow-y-auto">
-          <p className="text-xs font-medium mb-2">Staff to be paid:</p>
-          <ul className="text-xs divide-y divide-gray-200">
-            {filteredEmployees.map((emp: any) => (
-              <li
-                key={emp.employee_id}
-                className="py-2 flex items-center justify-between"
-              >
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={selectedStaff[emp.employee_id] || false}
-                    onChange={() => toggleStaffSelection(emp.employee_id)}
-                    className="mr-2 h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                  />
-                  <div>
-                    <div
-                      className={
-                        selectedStaff[emp.employee_id]
-                          ? "font-medium"
-                          : "text-gray-500"
-                      }
-                    >
-                      {emp.employee_name}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {emp.employeeNu || "No phone number"} • {emp.employee_id}
-                    </div>
-                  </div>
-                </div>
-                <span
-                  className={
-                    selectedStaff[emp.employee_id]
-                      ? "font-medium"
-                      : "text-gray-500"
-                  }
-                >
-                  KSh {emp.net_pay?.toLocaleString()}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
-            disabled={isProcessing}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleBulkPayment}
-            className="px-4 py-2 text-xs font-medium text-white bg-primary rounded-md hover:bg-primary/90 flex items-center gap-2"
-            disabled={
-              isProcessing ||
-              getSelectedStaffCount() === 0 ||
-              (userRole === "maker" && !justification.trim())
-            }
-          >
-            {isProcessing ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                Processing...
-              </>
-            ) : (
-              <>
-                <Send size={16} />
-                {userRole === "maker"
-                  ? `Submit Request (${getSelectedStaffCount()})`
-                  : `Confirm M-Pesa Payment (${getSelectedStaffCount()})`}
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// P9 Form Generator Component
-const P9FormGenerator = ({
-  isOpen,
-  onClose,
-  records,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  records: any[];
-  companyInfo: any;
-}) => {
-  const [selectedEmployee, setSelectedEmployee] = useState("");
-  const [taxYear, setTaxYear] = useState(new Date().getFullYear().toString());
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [employerPin, setEmployerPin] = useState<string | null>(null);
-  const [pinDraft, setPinDraft] = useState("");
-
-  useEffect(() => {
-    if (!isOpen) return;
-    loadEmployerPin().then((pin) => { setEmployerPin(pin); setPinDraft(pin); }, () => setEmployerPin(""));
-  }, [isOpen]);
-
-  const savePin = async () => {
-    try {
-      setEmployerPin(await saveEmployerPin(pinDraft));
-      toast.success("Employer KRA PIN saved");
-    } catch (error: any) {
-      toast.error(error.message || "The PIN was not saved");
-    }
-  };
-
-  // the year's P9 from the employee's approved payslips, worked out as payroll and the P10 are (lib/p9)
-  const generateP9Form = async (employeeData: any) => {
-    setIsGenerating(true);
-    try {
-      const { data: employee, error } = await supabase
-        .from("employees").select("*").eq("Employee Number", employeeData.employee_id).maybeSingle();
-      if (error) throw error;
-      if (!employee) throw new Error("Employee not found");
-      const p9 = await loadP9For(employee, Number(taxYear));
-      if (p9.rows.every((r) => r.values.every((v) => v === 0))) {
-        toast.error(`No approved payslips for ${taxYear}`);
-        return;
-      }
-      downloadP9Pdf(p9);
-      toast.success("P9 downloaded");
-    } catch (error: any) {
-      toast.error(`The P9 could not be made: ${error.message}`);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-          <FileText className="h-5 w-5 text-blue-600" />
-          Generate P9 Forms
-        </h3>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Tax Year
-            </label>
-            <SearchableDropdown
-              options={[0, 1, 2].map((n) => String(new Date().getFullYear() - n))}
-              value={taxYear}
-              onChange={setTaxYear}
-              placeholder="Select Year"
-              icon={Calendar}
-            />
-          </div>
-
-          <div>
-            <label htmlFor="employer-kra-pin" className="block text-xs font-medium text-gray-700 mb-1">
-              Employer KRA PIN (printed on every P9)
-            </label>
-            <div className="flex gap-2">
-              <input id="employer-kra-pin" value={pinDraft} onChange={(e) => setPinDraft(e.target.value.toUpperCase())}
-                placeholder="P051234567X" className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs" />
-              <button type="button" onClick={() => void savePin()} disabled={employerPin === null || pinDraft.trim() === employerPin}
-                className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-md disabled:opacity-50">Save</button>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Select Employee
-            </label>
-            <EmployeePicker
-              value={selectedEmployee}
-              allowedNumbers={records.map((r) => r.employee_id)}
-              placeholder="Select Employee"
-              onChange={(emp) => setSelectedEmployee(emp?.employeeNumber ?? "")}
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3 mt-6">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
-            disabled={isGenerating}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              const employee = records.find(
-                (r: any) => r.employee_id === selectedEmployee,
-              );
-              if (employee) generateP9Form(employee);
-            }}
-            className="px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 flex items-center gap-2"
-            disabled={!selectedEmployee || isGenerating}
-          >
-            {isGenerating ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                Generating...
-              </>
-            ) : (
-              <>
-                <FileText size={16} />
-                Generate P9
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Export Modal Component
-const ExportModal = ({
-  isOpen,
-  onClose,
-  records,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  records: any[];
-}) => {
-  const [exportFormat, setExportFormat] = useState("excel");
-  const [isExporting, setIsExporting] = useState(false);
-
-  const exportToExcel = () => {
-    setIsExporting(true);
-    try {
-      const ws = XLSX.utils.json_to_sheet(
-        records.map((record: any) => ({
-          "Employee ID": record.employee_id,
-          "Employee Name": record.employee_name,
-          Department: record.department,
-          Position: record.position,
-          "Basic Salary": record.basic_salary,
-          "House Allowance": record.house_allowance,
-          "Transport Allowance": record.transport_allowance,
-          "Medical Allowance": record.medical_allowance,
-          "Overtime Hours": record.overtime_hours,
-          "Overtime Pay": record.overtime_hours * record.overtime_rate,
-          "Gross Pay": record.gross_pay,
-          "PAYE Tax": Math.round(record.paye_tax),
-          NHIF: record.nhif_deduction,
-          NSSF: record.nssf_deduction,
-          "Housing Levy": record.housing_levy,
-          "Total Deductions": record.total_deductions,
-          "Net Pay": Math.round(record.net_pay),
-          "Pay Period": record.pay_period,
-        })),
-      );
-
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Payroll");
-
-      const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-      const data = new Blob([excelBuffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      saveAs(data, `payroll_${new Date().toISOString().slice(0, 10)}.xlsx`);
-
-      toast.success("Excel file exported successfully!");
-    } catch {
-      toast.error("Failed to export Excel file");
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const exportToCSV = () => {
-    setIsExporting(true);
-    try {
-      const ws = XLSX.utils.json_to_sheet(
-        records.map((record: any) => ({
-          "Employee ID": record.employee_id,
-          "Employee Name": record.employee_name,
-          Department: record.department,
-          Position: record.position,
-          "Basic Salary": record.basic_salary,
-          "House Allowance": record.house_allowance,
-          "Transport Allowance": record.transport_allowance,
-          "Medical Allowance": record.medical_allowance,
-          "Overtime Hours": record.overtime_hours,
-          "Overtime Pay": record.overtime_hours * record.overtime_rate,
-          "Gross Pay": record.gross_pay,
-          "PAYE Tax": Math.round(record.paye_tax),
-          NHIF: record.nhif_deduction,
-          NSSF: record.nssf_deduction,
-          "Housing Levy": record.housing_levy,
-          "Total Deductions": record.total_deductions,
-          "Net Pay": Math.round(record.net_pay),
-          "Pay Period": record.pay_period,
-        })),
-      );
-
-      const csv = XLSX.utils.sheet_to_csv(ws);
-      const data = new Blob([csv], { type: "text/csv" });
-      saveAs(data, `payroll_${new Date().toISOString().slice(0, 10)}.csv`);
-
-      toast.success("CSV file exported successfully!");
-    } catch {
-      toast.error("Failed to export CSV file");
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const exportToPDF = () => {
-    setIsExporting(true);
-    try {
-      const doc = new jsPDF();
-
-      doc.setFontSize(16);
-      doc.text("Payroll Report", 14, 22);
-      doc.setFontSize(12);
-      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 32);
-
-      const tableData = records.map((record: any) => [
-        record.employee_id,
-        record.employee_name,
-        record.department,
-        `KSh ${record.gross_pay.toLocaleString()}`,
-        `KSh ${Math.round(record.paye_tax).toLocaleString()}`,
-        `KSh ${record.total_deductions.toLocaleString()}`,
-        `KSh ${Math.round(record.net_pay).toLocaleString()}`,
-      ]);
-
-      (doc as any).autoTable({
-        head: [
-          [
-            "ID",
-            "Name",
-            "Department",
-            "Gross Pay",
-            "PAYE",
-            "Total Deductions",
-            "Net Pay",
-          ],
-        ],
-        body: tableData,
-        startY: 40,
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [34, 197, 94] },
-      });
-
-      doc.save(`payroll_${new Date().toISOString().slice(0, 10)}.pdf`);
-      toast.success("PDF file exported successfully!");
-    } catch {
-      toast.error("Failed to export PDF file");
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const handleExport = () => {
-    switch (exportFormat) {
-      case "excel":
-        exportToExcel();
-        break;
-      case "csv":
-        exportToCSV();
-        break;
-      case "pdf":
-        exportToPDF();
-        break;
-      default:
-        break;
-    }
-    onClose();
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-          <Download className="h-5 w-5 text-primary" />
-          Export Payroll Data
-        </h3>
-
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-2">
-              Export Format
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-                <input
-                  type="radio"
-                  value="excel"
-                  checked={exportFormat === "excel"}
-                  onChange={(e) => setExportFormat(e.target.value)}
-                  className="mr-2"
-                />
-                <FileSpreadsheet className="w-5 h-5 mr-2 text-green-600" />
-                Excel
-              </label>
-              <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-                <input
-                  type="radio"
-                  value="csv"
-                  checked={exportFormat === "csv"}
-                  onChange={(e) => setExportFormat(e.target.value)}
-                  className="mr-2"
-                />
-                <FileText className="w-5 h-5 mr-2 text-blue-600" />
-                CSV
-              </label>
-              <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-                <input
-                  type="radio"
-                  value="pdf"
-                  checked={exportFormat === "pdf"}
-                  onChange={(e) => setExportFormat(e.target.value)}
-                  className="mr-2"
-                />
-                <FileText className="w-5 h-5 mr-2 text-red-600" />
-                PDF
-              </label>
-            </div>
-          </div>
-
-          <div className="text-xs text-gray-600">
-            <p>Exporting {records.length} payroll records</p>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3 mt-6">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
-            disabled={isExporting}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleExport}
-            className="px-4 py-2 text-xs font-medium text-white bg-primary rounded-md hover:bg-primary/90 flex items-center gap-2"
-            disabled={isExporting}
-          >
-            {isExporting ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                Exporting...
-              </>
-            ) : (
-              <>
-                <Download size={16} />
-                Export {exportFormat.toUpperCase()}
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const GlowButtonss = ({
-  children,
-  variant = "primary",
-  icon: Icon,
-  size = "md",
-  onClick,
-  disabled = false,
-  className,
-}: {
-  children: React.ReactNode;
-  variant?: "primary" | "secondary" | "danger";
-  icon?: any;
-  size?: "sm" | "md" | "lg";
-  onClick?: () => void;
-  disabled?: boolean;
-  className?: string;
-}) => {
-  const baseClasses =
-    "inline-flex items-center gap-2 rounded-lg font-medium transition-all duration-300 border";
-  const sizeClasses = {
-    sm: "px-3 py-1.5 text-xs",
-    md: "px-4 py-2 text-xs",
-    lg: "px-6 py-3 text-base",
-  };
-  const variantClasses = {
-    primary:
-      "bg-primary/10 border-primary text-primary hover:bg-primary/20 hover:border-primary hover:text-primary transition-all duration-300",
-    secondary:
-      "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-300",
-    danger:
-      "bg-red-50 border-red-500 text-red-600 hover:bg-red-100 hover:border-red-600 hover:text-red-700 transition-all duration-300",
-  };
-
-  return (
-    <button
-      className={`${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${className || ""}`}
-      onClick={onClick}
-      disabled={disabled}
-    >
-      {Icon && <Icon className="w-4 h-4" />}
-      {children}
-    </button>
-  );
-};
-
-const PayslipModal = ({
-  record,
-  onClose,
-  onPrevious,
-  onNext,
-  companyInfo,
-}: {
-  record: any;
-  onClose: () => void;
-  onPrevious?: () => void;
-  onNext?: () => void;
-  companyInfo: any;
-}) => {
-
-  const handleDownloadPDF = () => {
-    const element = document.getElementById("payslip-content");
-    const opt = {
-      margin: 0.5,
-      filename: `payslip_${record.employee_id}_${record.pay_period}.pdf`,
-      image: { type: "jpeg", quality: 0.98 },
-      // windowWidth lays the copy out as on a desktop screen, so a PDF downloaded on a phone keeps the desktop layout
-      html2canvas: { scale: 2, useCORS: true, windowWidth: 1280 },
-      jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
-    };
-
-    html2pdf().from(element!).set(opt).save();
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-6xl max-h-[90vh] overflow-auto">
-        <div className="sticky top-0 bg-white p-4 border-b border-gray-200 flex flex-wrap gap-2 justify-between items-center z-10">
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
-            Modern Payslip
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            <GlowButtonss
-              variant="secondary"
-              icon={Download}
-              size="sm"
-              onClick={handleDownloadPDF}
-            >
-              Download PDF
-            </GlowButtonss>
-            <GlowButtonss variant="danger" icon={X} size="sm" onClick={onClose}>
-              Close
-            </GlowButtonss>
-          </div>
-        </div>
-
-        <div className="p-2 bg-gray-50 payslip-container print:p-0 print:w-[210mm] print:h-[297mm]">
-          <div
-            id="payslip-content"
-            className="bg-white border text-black border-gray-300 text-xs leading-tight mx-auto"
-            style={{ maxWidth: '800px', boxShadow: '0 4px 15px rgba(0, 0, 0, 0.05)', fontFamily: 'Calibri, Helvetica, sans-serif' }}
-          >
-            <div className="bg-white text-black p-6 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-end border-b-[3px] border-double border-gray-300">
-              <div className="flex items-center min-w-0">
-                {companyInfo?.image_url && (
-                  <img
-                    src={companyInfo.image_url}
-                    alt="Company Logo"
-                    className="h-16 w-16 mr-4 object-contain shrink-0"
-                  />
-                )}
-                <div className="min-w-0">
-                  <h1 className="text-xl sm:text-2xl font-bold uppercase text-gray-900 break-words">
-                    {companyInfo?.company_name || "Your Company Name"}
-                  </h1>
-                  <div className="text-gray-600 text-sm font-semibold mt-1">
-                    {companyInfo?.company_tagline || "Excellence in service"}
-                  </div>
-                </div>
-              </div>
-              <div className="sm:text-right">
-                <h2 className="text-2xl sm:text-3xl font-bold uppercase text-gray-900 mb-1">PAYSLIP</h2>
-                <div className="text-gray-600 font-semibold text-sm">
-                  {(() => {
-                    const now = new Date();
-                    const fallbackPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-                    const periodToUse = record.pay_period || record["Pay Period"] || fallbackPeriod;
-                    const [year, month] = String(periodToUse).split('-').map(Number);
-                    let prevMonth = month - 1;
-                    let prevYear = year;
-                    if (prevMonth === 0) { prevMonth = 12; prevYear = year - 1; }
-                    return new Date(prevYear, prevMonth - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
-                  })()}
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-                <div className="border border-gray-300 p-4">
-                  <h3 className="font-bold border-b border-gray-300 pb-2 mb-3 text-gray-900 text-sm">
-                    Employee information
-                  </h3>
-                  <div className="space-y-1.5 text-black">
-                    <div className="flex justify-between">
-                      <span className="font-semibold text-gray-600">Full name:</span>
-                      <span className="font-bold text-right">{record.employee_name || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-semibold text-gray-600">Employee no:</span>
-                      <span className="font-bold text-right">{record.employee_id || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-semibold text-gray-600">Position:</span>
-                      <span className="font-bold text-right">{record.department || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-semibold text-gray-600">Dept:</span>
-                      <span className="font-bold text-right">Operations</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="font-semibold text-gray-600">Region:</span>
-                      <span className="font-bold text-right">{record.branch || 'N/A'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border border-gray-300 p-4">
-                  <h3 className="font-bold border-b border-gray-300 pb-2 mb-3 text-gray-900 text-sm">
-                    Payment details
-                  </h3>
-                  <div className="space-y-1.5 text-black">
-                    <div className="flex justify-between">
-                      <span className="font-semibold text-gray-600">Method:</span>
-                      <span className="font-bold text-right">{record.payment_method || 'M-Pesa'}</span>
-                    </div>
-                    {record.payment_method === "Bank Transfer" && (
-                      <>
-                        <div className="flex justify-between">
-                          <span className="font-semibold text-gray-600">Bank:</span>
-                          <span className="font-bold text-right">{record.bank_name || 'N/A'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="font-semibold text-gray-600">Account:</span>
-                          <span className="font-bold text-right">{record.account_number || 'N/A'}</span>
-                        </div>
-                      </>
-                    )}
-                    {record.payment_method === "M-Pesa" && (
-                      <div className="flex justify-between">
-                        <span className="font-semibold text-gray-600">M-Pesa no:</span>
-                        <span className="font-bold text-right">{record.employeeNu || 'N/A'}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="font-semibold text-gray-600">Job group:</span>
-                      <span className="font-bold text-right">{record.jobGroup || 'N/A'}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-                <div className="border border-gray-300">
-                  <div className="bg-gray-100 border-b border-gray-300 font-bold p-3 text-gray-900">Earnings</div>
-                  <div className="p-3 space-y-2 text-black">
-                    <div className="flex justify-between">
-                      <span>Basic</span>
-                      <span className="font-semibold">KSh {(record.basic_salary || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>House</span>
-                      <span className="font-semibold">KSh {(record.house_allowance || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Transport</span>
-                      <span className="font-semibold">KSh {(record.transport_allowance || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Medical</span>
-                      <span className="font-semibold">KSh {(record.medical_allowance || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Other</span>
-                      <span className="font-semibold">KSh {(record.other_allowances || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Overtime</span>
-                      <span className="font-semibold">
-                        KSh {((record.overtime_hours || 0) * (record.overtime_rate || 0)).toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Commission</span>
-                      <span className="font-semibold">KSh {(record.commission || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Bonus</span>
-                      <span className="font-semibold">KSh {(record.bonus || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between bg-gray-50 p-1 border border-gray-200 mt-2">
-                      <span>Per diem</span>
-                      <span className="font-bold">KSh {(record.per_diem || 0).toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border border-gray-300">
-                  <div className="bg-gray-100 border-b border-gray-300 font-bold p-3 text-gray-900">Deductions</div>
-                  <div className="p-3 space-y-2 text-black">
-                    <div className="flex justify-between">
-                      <span>PAYE</span>
-                      <span className="font-semibold">KSh {Math.round(record.paye_tax || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>SHIF / NHIF</span>
-                      <span className="font-semibold">KSh {(record.nhif_deduction || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>NSSF</span>
-                      <span className="font-semibold">KSh {(record.nssf_deduction || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>AHL</span>
-                      <span className="font-semibold">KSh {(record.housing_levy || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Advance</span>
-                      <span className="font-semibold">KSh {(record.advance_deduction || 0).toLocaleString()}</span>
-                    </div>
-                    {payslipDeductionLines(record).map((line, i) => (
-                      <div key={`${line.name}-${i}`} className="flex justify-between">
-                        <span>{line.name}</span>
-                        <span className="font-semibold">KSh {line.amount.toLocaleString()}</span>
-                      </div>
-                    ))}
-                    <div className="flex justify-between text-gray-600 mt-2 border-t border-gray-200 pt-1">
-                      <span>Tax relief:</span>
-                      <span className="font-semibold">KSh -2400</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border border-gray-300 p-4 mb-8 bg-gray-50">
-                <div className="flex justify-between border-b border-gray-300 pb-2 mb-2 text-sm text-black">
-                  <span className="font-bold">Gross pay</span>
-                  <span className="font-bold">KSh {(record.gross_pay || 0).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between border-b border-gray-300 pb-2 mb-3 text-sm text-black">
-                  <span className="font-bold">Total deductions</span>
-                  <span className="font-bold">KSh {(record.total_deductions || 0).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center text-lg text-black mt-2">
-                  <span className="font-bold">Net pay</span>
-                  <span className="font-bold border-b-[3px] border-gray-400 border-double pb-0.5">KSh {Math.round(record.net_pay || 0).toLocaleString()}</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-4 text-center text-xs">
-                <div className="p-2 pt-8">
-                  <div className="border-t border-gray-300 pt-2 font-bold text-gray-800">
-                    Employee signature
-                  </div>
-                  <div className="text-gray-500 mt-1">Date: ________________________</div>
-                </div>
-                <div className="p-2 pt-8">
-                  <div className="border-t border-gray-300 pt-2 font-bold text-gray-800">
-                    Authorized signatory
-                  </div>
-                  <div className="text-gray-500 mt-1">Date: ________________________</div>
-                </div>
-              </div>
-
-              <div className="text-center text-gray-500 text-xs border-t border-gray-300 pt-4 mt-6">
-                Generated on {new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })} {new Date().toLocaleTimeString()} &bull; {companyInfo?.company_name || 'Company'} &bull; Strictly confidential
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {(!!onPrevious || !!onNext) && (
-          <div className="sticky bottom-0 bg-white p-4 border-t border-gray-200 flex justify-between">
-            {onPrevious && (
-              <GlowButtonss icon={ArrowLeft} onClick={onPrevious}>
-                Previous
-              </GlowButtonss>
-            )}
-            {onNext && (
-              <GlowButtonss
-                icon={ArrowRight}
-                onClick={onNext}
-                className="ml-auto"
-              >
-                Next
-              </GlowButtonss>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// Pagination Component
-const Pagination = ({
-  currentPage,
-  totalPages,
-  onPageChange,
-  totalItems,
-  itemsPerPage,
-}: {
-  currentPage: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-  totalItems: number;
-  itemsPerPage: number;
-  currentItemsCount: number;
-}) => {
-  const pages = [];
-  const maxVisiblePages = 5;
-
-  let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-  const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-
-  if (endPage - startPage + 1 < maxVisiblePages) {
-    startPage = Math.max(1, endPage - maxVisiblePages + 1);
-  }
-
-  for (let i = startPage; i <= endPage; i++) {
-    pages.push(i);
-  }
-
-  const startItem = (currentPage - 1) * itemsPerPage + 1;
-  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
-
-  return (
-    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-white sm:px-6">
-      <div className="flex justify-between sm:hidden">
-        <button
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          className="relative inline-flex items-center px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Previous
-        </button>
-        <button
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-          className="relative inline-flex items-center px-4 py-2 ml-3 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Next
-        </button>
-      </div>
-      <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-        <div>
-          <p className="text-xs text-gray-700">
-            Showing <span className="font-medium">{startItem}</span> to{" "}
-            <span className="font-medium">{endItem}</span> of{" "}
-            <span className="font-medium">{totalItems}</span> results
-          </p>
-        </div>
-        <div>
-          <nav
-            className="isolate inline-flex -space-x-px rounded-md shadow-sm"
-            aria-label="Pagination"
-          >
-            <button
-              onClick={() => onPageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="relative inline-flex items-center px-2 py-2 text-gray-400 rounded-l-md ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="sr-only">Previous</span>
-              <ArrowLeft className="w-5 h-5" aria-hidden="true" />
-            </button>
-
-            {pages.map((page) => (
-              <button
-                key={page}
-                onClick={() => onPageChange(page)}
-                className={`relative inline-flex items-center px-4 py-2 text-xs font-semibold ${currentPage === page
-                  ? "z-10 bg-primary text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                  : "text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0"
-                  }`}
-              >
-                {page}
-              </button>
-            ))}
-
-            <button
-              onClick={() => onPageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className="relative inline-flex items-center px-2 py-2 text-gray-400 rounded-r-md ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="sr-only">Next</span>
-              <ArrowRight className="w-5 h-5" aria-hidden="true" />
-            </button>
-          </nav>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// P10 Form Generator Component
+import {
+  CommentModal,
+  MpesaBulkPaymentModal,
+  MpesaSinglePaymentModal,
+  PaymentDetailsModal,
+  PendingPaymentCard,
+  RejectionModal,
+  type PayRecipient,
+} from "./PaymentApprovalModals";
+import { ExportModal, P9FormGenerator } from "./PayrollToolModals";
+import { GlowButtonss, PayslipModal } from "./PayrollPayslipModal";
+import { PAYROLL_TABS, usePayrollTab } from "./payrollTabs";
+import PayrollRunTab from "./PayrollRunTab";
+import PayrollEmployeesTab from "./PayrollEmployeesTab";
+import PayrollDeductionsTab from "./PayrollDeductionsTab";
+import PayrollRatesTab from "./PayrollRatesTab";
+import PayrollFilesTab from "./PayrollFilesTab";
+import PayrollHistoryTab from "./PayrollHistoryTab";
+
+// The payroll page: a month picker and six tabs (Run, Employees' pay, Deductions, Rates, Files, History). This shell
+// works out the month's figures and owns the run, the shared state and the pop-ups; each tab only shows its part.
 
 const PAYSLIP_AMOUNTS = [
   "basic_salary", "gross_pay", "net_pay", "total_deductions", "nssf_deduction", "nhif_deduction", "paye_tax",
@@ -2098,7 +132,12 @@ export default function PayrollDashboard() {
   const [runPeriod, setRunPeriod] = useState<string | null>(null);
   const [runVersion, setRunVersion] = useState(0);
   const [runBusy, setRunBusy] = useState(false);
-  const [showDeductions, setShowDeductions] = useState(false);
+  // the open tab (?tab=...), and a counter bumped when the rates editor saves so the Rates tab reloads
+  const [tab, setTab] = usePayrollTab();
+  const [ratesVersion, setRatesVersion] = useState(0);
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
+  // changing the company's rates needs payroll access (the statutory_rates policy checks the same)
+  const canEditRates = !permissionsLoading && hasPermission("payroll");
   // bumped when voluntary deductions change, so this month's figures are worked out again
   const [deductionsVersion, setDeductionsVersion] = useState(0);
   const [showMissingDetails, setShowMissingDetails] = useState(false);
@@ -2115,6 +154,8 @@ export default function PayrollDashboard() {
   const [showP9Modal, setShowP9Modal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showStatutorySettings, setShowStatutorySettings] = useState(false);
+  const [showDemoPayAll, setShowDemoPayAll] = useState(false);
+  const [demoPaid, setDemoPaid] = useState<{ period: string; numbers: Set<string> }>({ period: "", numbers: new Set() });
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
 
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
@@ -3333,27 +1374,36 @@ export default function PayrollDashboard() {
   const runNetPay = payrollRecords.reduce((sum: number, r: any) => sum + (r.net_pay || 0), 0);
 
   const missingDetails = useMemo(() => employeesMissingDetails(employees), [employees]);
+
+  // demo paying (PAYMENTS_DEMO): who would be paid how, and who was "paid" this month, in memory only (gone on reload)
+  const demoPayEnabled = PAYMENTS_DEMO && monthRun?.status === "approved";
+  const demoLines = useMemo(() => demoPayLines(payrollRecords, employees), [payrollRecords, employees]);
+  const demoLineByNumber = useMemo(() => new Map(demoLines.map((l) => [l.employeeNumber, l])), [demoLines]);
+  const demoPaidNow = demoPaid.period === actualPeriod ? demoPaid.numbers : new Set<string>();
+  const markDemoPaid = (numbers: string[]) =>
+    setDemoPaid((prev) => ({
+      period: actualPeriod,
+      numbers: new Set([...(prev.period === actualPeriod ? prev.numbers : []), ...numbers]),
+    }));
+
+  // the tools used now and then, in the header's "More" menu
+  const moreMenuItems: MoreMenuItem[] = [
+    {
+      label: "Statutory override",
+      hint: overrideStatutoryChecks ? "On" : "Off",
+      icon: <Settings className="w-3.5 h-3.5" />,
+      onSelect: toggleStatutoryOverride,
+    },
+    { label: "P9 tax card", icon: <FileText className="w-3.5 h-3.5" />, onSelect: () => setShowP9Modal(true) },
+    { label: "Export payroll table", icon: <Download className="w-3.5 h-3.5" />, onSelect: () => setShowExportModal(true) },
+    { label: "Upload salary history", icon: <Upload className="w-3.5 h-3.5" />, onSelect: () => setShowBulkUploadModal(true) },
+  ];
   const notOnboarded = useMemo(() => employees.filter((e) => !isPayrollReady(e)), [employees]);
   const onPayroll = useMemo(() => employees.filter(isPayrollReady), [employees]);
   const returnsGaps = useMemo(() => {
     const r = returnsReadiness(onPayroll);
     return new Set([...r.p10, ...r.sha, ...r.nssf].map((p) => p.employeeNumber)).size;
   }, [onPayroll]);
-
-  // the KRA P10 for this month, as CSV, from its approved payslips (the same file as "Statutory returns" offers)
-  const handleP10Download = async () => {
-    if (!monthRun || (monthRun.status !== "approved" && monthRun.status !== "paid")) {
-      toast.error(`Approve payroll for ${periodLabel} first: the P10 is made from the approved payslips`);
-      return;
-    }
-    try {
-      const problems = await downloadP10(monthRun);
-      if (problems.length) toast(`P10 downloaded. ${problems.length} employee(s) are missing details KRA needs (see Statutory returns below).`);
-      else toast.success("P10 downloaded");
-    } catch (err) {
-      toast.error((err as { message?: string })?.message || "The P10 could not be made");
-    }
-  };
 
   const handleApproveRun = () =>
     changeRunStatus(
@@ -3362,9 +1412,9 @@ export default function PayrollDashboard() {
 
 ${payrollRecords.length} employees, net pay KSh ${Math.round(runNetPay).toLocaleString()}.
 ${missingDetails.length ? `
-${missingDetails.length} employee(s) are missing a KRA PIN, NSSF or SHA number, or payment details (see "Missing details").
+${missingDetails.length} employee(s) are missing a KRA PIN, NSSF or SHA number, or payment details (see "Employees' pay").
 ` : ""}${returnsGaps ? `
-${returnsGaps} employee(s) are missing details the P10, SHA or NSSF returns need (see "Returns check").
+${returnsGaps} employee(s) are missing details the P10, SHA or NSSF returns need (see "Returns check" on the Run tab).
 ` : ""}
 Payslips will be locked and staff will be able to see them.`,
       `Payroll for ${periodLabel} approved. Staff can now see their payslips.`,
@@ -3439,19 +1489,46 @@ This can't be undone: the payslips stay locked for good.`,
     );
   }
 
-  if (isLoading || settingsLoading) {
-    return (
-      <div className="p-4 bg-page min-h-screen max-w-screen-2xl mx-auto flex items-center justify-center">
-        <FigbloomLoader label={settingsLoading ? "Loading statutory rates" : "Loading employee data"} />
-      </div>
-    );
-  }
+  // the Run and Employees' pay tabs wait for the month's figures; the others load their own
+  const dataLoading = isLoading || settingsLoading;
+  const loader = (
+    <div className="py-16 flex items-center justify-center">
+      <FigbloomLoader label={settingsLoading ? "Loading statutory rates" : "Loading employee data"} />
+    </div>
+  );
 
   return (
     <div className="p-4 space-y-4 bg-page min-h-screen max-w-screen-2xl mx-auto">
+      <PageHeader
+        title="Payroll"
+        className="!mb-0"
+        subtitle={<span>Pay, deductions, statutory rates and returns for {periodLabel}</span>}
+        actions={
+          <>
+          <DatePicker
+            selected={selectedPeriod ?? null}
+            onChange={(date) => setSelectedPeriod(date)}
+            dateFormat="MMMM yyyy"
+            showMonthYearPicker
+            customInput={
+              <button
+                type="button"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-tile border border-border bg-white text-xs font-semibold text-ink hover:bg-secondary transition-colors"
+              >
+                Pay Period &middot;{" "}
+                {selectedPeriod
+                  ? selectedPeriod.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+                  : "Select"}
+                <ChevronDown className="w-3 h-3 text-subtle" strokeWidth={2} />
+              </button>
+            }
+          />
+          <PayrollMoreMenu items={moreMenuItems} />
+          </>
+        }
+      />
 
-
-
+      <TabBar items={[...PAYROLL_TABS]} activeId={tab} onChange={setTab} className="border-b border-border" />
 
       {/* WALLET UI REMOVED - Commented out as requested */}
 
@@ -3776,469 +1853,112 @@ This can't be undone: the payslips stay locked for good.`,
             </div>
       </Modal>
 
-      {/* ── TOOLBAR (FIG-544): pay period, statutory override, reports, bulk pay ── */}
-      <div className="flex items-center gap-2.5 flex-wrap">
-        <DatePicker
-          selected={selectedPeriod ?? null}
-          onChange={(date) => setSelectedPeriod(date)}
-          dateFormat="MMMM yyyy"
-          showMonthYearPicker
-          customInput={
-            <button
-              type="button"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-tile border border-border bg-white text-xs font-semibold text-ink hover:bg-secondary transition-colors"
-            >
-              Pay Period &middot;{" "}
-              {selectedPeriod
-                ? selectedPeriod.toLocaleDateString("en-US", { month: "long", year: "numeric" })
-                : "Select"}
-              <ChevronDown className="w-3 h-3 text-subtle" strokeWidth={2} />
-            </button>
-          }
-        />
-
-        <button
-          type="button"
-          role="switch"
-          aria-checked={overrideStatutoryChecks}
-          onClick={toggleStatutoryOverride}
-          className={`flex items-center gap-2 px-3 py-2 rounded-tile text-[11.5px] font-bold border transition-colors ${
-            overrideStatutoryChecks
-              ? "bg-brand text-white border-brand"
-              : "bg-white text-ink border-border hover:bg-secondary"
-          }`}
-        >
-          Statutory Override
-          <span className="text-[10px] font-semibold opacity-80">{overrideStatutoryChecks ? "On" : "Off"}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setShowP9Modal(true)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-tile border border-border bg-white text-[11.5px] font-semibold text-ink hover:bg-secondary transition-colors"
-        >
-          <FileText className="w-3 h-3" strokeWidth={2} />
-          P9
-        </button>
-        <button
-          type="button"
-          onClick={() => void handleP10Download()}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-tile border border-border bg-white text-[11.5px] font-semibold text-ink hover:bg-secondary transition-colors"
-        >
-          <FileText className="w-3 h-3" strokeWidth={2} />
-          P10
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowExportModal(true)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-tile border border-border bg-white text-[11.5px] font-semibold text-ink hover:bg-secondary transition-colors"
-        >
-          <Download className="w-3 h-3" strokeWidth={2} />
-          Export
-        </button>
-
-        <div className="flex-1" />
-
-        <BulkPayButton
-          label={userRole === "credit_analyst_officer" ? "M-PESA Bulk Pay" : "Make Bulk Pay"}
-          onClick={handleBulkMpesaPayment}
-          // an approved month is paid with "Pay staff" below, which records every payment; never both
-          disabled={finalFilteredRecords.length === 0 || monthRun?.status === "approved" || monthRun?.status === "paid"}
-          title={
-            monthRun?.status === "approved" || monthRun?.status === "paid"
-              ? `Pay ${periodLabel}'s approved payroll with "Pay staff" below: it records every payment`
-              : undefined
-          }
-        />
-      </div>
-
-      <PayrollRunBar
-        periodLabel={periodLabel}
-        run={monthRun}
-        loading={runLoading}
-        busy={runBusy}
-        onStart={handleSaveRun}
-        onRecalculate={handleSaveRun}
-        onApprove={handleApproveRun}
-        onReopen={handleReopenRun}
-        onMarkPaid={handleMarkRunPaid}
-        onDiscard={handleDiscardRun}
-      />
-
-      {(!monthRun || monthRun.status === "draft") && <ReturnsReadiness employees={onPayroll} />}
-      {monthRun && <ApprovedRunPanels run={monthRun} />}
-
-      {/* Filters, search and the less-used payroll tools */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="w-36">
-          <SearchableDropdown
-            options={branches}
-            value={selectedBranch}
-            onChange={setSelectedBranch}
-            placeholder="Select Branch"
-            icon={MapPin}
-          />
-        </div>
-        <div className="w-40">
-          <SearchableDropdown
-            options={departments.map((dept) => ({
-              label: dept === "all" ? "All Departments" : dept,
-              value: dept,
-            }))}
-            value={selectedDepartment}
-            onChange={setSelectedDepartment}
-            placeholder="Select Department"
-            icon={Briefcase}
-          />
-        </div>
-        <div className="w-36">
-          <SearchableDropdown
-            options={paymentMethods.map((method) => ({
-              label: method === "all" ? "All Methods" : method,
-              value: method,
-            }))}
-            value={selectedPaymentMethod}
-            onChange={setSelectedPaymentMethod}
-            placeholder="Select Method"
-            icon={CreditCard}
-          />
-        </div>
-        <div className="w-64">
-          <SearchInput
-            placeholder="Search by name or employee ID"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="!bg-white !border-border"
-          />
-        </div>
-
-        <div className="flex-1" />
-
-        {IN_APP_PAYMENTS && <button
-          type="button"
-          onClick={() => setCurrentView("mpesa-spreadsheet")}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-ink transition-colors"
-        >
-          <FileSpreadsheet className="w-3 h-3" />
-          M-PESA Spreadsheet
-        </button>}
-        <button
-          type="button"
-          onClick={() => setShowDeductions(true)}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-ink transition-colors"
-        >
-          <Users className="w-3 h-3" />
-          Deductions
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowMissingDetails(true)}
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border text-[11px] font-semibold transition-colors ${
-            missingDetails.length
-              ? "border-orange-text-alt/40 bg-orange-tint-alt text-orange-text-alt hover:brightness-95"
-              : "border-border bg-white text-muted-foreground hover:bg-secondary hover:text-ink"
-          }`}
-        >
-          <AlertTriangle className="w-3 h-3" />
-          Missing details{missingDetails.length ? ` (${missingDetails.length})` : ""}
-        </button>
-        {notOnboarded.length > 0 && (
-          <button
-            type="button"
-            onClick={() => navigate("/onboarding")}
-            title="These employees are not paid until HR approves their onboarding"
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-orange-text-alt/40 bg-orange-tint-alt text-[11px] font-semibold text-orange-text-alt hover:brightness-95 transition-colors"
-          >
-            <Users className="w-3 h-3" />
-            Not onboarded ({notOnboarded.length})
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => setShowStatutorySettings(true)}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-ink transition-colors"
-        >
-          <Settings className="w-3 h-3" />
-          Statutory rates
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowBulkUploadModal(true)}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-ink transition-colors"
-        >
-          <Upload className="w-3 h-3" />
-          Upload History
-        </button>
-        {IN_APP_PAYMENTS && (userRole === "checker" || userRole === "credit_analyst_officer") && (
-          <button
-            type="button"
-            onClick={() => setShowApprovalQueue(true)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-ink transition-colors"
-          >
-            <Clock className="w-3 h-3" />
-            Approvals ({pendingCount})
-          </button>
-        )}
-      </div>
-
-      {/* ── PAYROLL REPORT ──────────────────────────────────── */}
-      <div>
-        {/* Summary tiles: totals are over every filtered record, not just the visible page */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 mb-4">
-          {[
-            { label: "Employees", value: String(finalFilteredRecords.length), color: "text-ink" },
-            { label: "Gross pay", value: `KSh ${totalGrossPay.toLocaleString()}`, color: "text-ink" },
-            { label: "Net pay", value: `KSh ${totalNetPay.toLocaleString()}`, color: "text-brand-dark" },
-            { label: "Deductions", value: `KSh ${totalDeductions.toLocaleString()}`, color: "text-status-danger" },
-            { label: "PAYE", value: `KSh ${totalPAYE.toLocaleString()}`, color: "text-orange-text" },
-            { label: "SHIF", value: `KSh ${totalNHIF.toLocaleString()}`, color: "text-status-purple" },
-            { label: "NSSF", value: `KSh ${totalNSSF.toLocaleString()}`, color: "text-status-info" },
-            { label: "Housing levy", value: `KSh ${totalHousingLevy.toLocaleString()}`, color: "text-orange-text-alt" },
-          ].map((tile) => (
-            <Card key={tile.label} padding="sm" className="!rounded-xl">
-              <div className="text-[9.5px] font-bold uppercase text-subtle">{tile.label}</div>
-              <div className={`text-[14.5px] font-bold mt-0.5 truncate ${tile.color}`}>{tile.value}</div>
-            </Card>
-          ))}
-        </div>
-
-        <Card padding="none" className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-xs">
-              <thead className="bg-gray-50 border-b border-border">
-                <tr className="text-left text-[10px] font-bold uppercase text-subtle">
-                  <th className="px-4 py-2.5">Employee</th>
-                  <th className="px-4 py-2.5">Gross Pay</th>
-                  <th className="px-4 py-2.5">PAYE</th>
-                  <th className="px-4 py-2.5">Net Pay</th>
-                  <th className="px-4 py-2.5">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentItems.map((record, index) => {
-                  const isExpanded = expandedRows.has(record.id);
-                  const smsStatus = (smsSendingStatus as Record<string, any>)[record.employee_id];
-
-                  return (
-                    <React.Fragment key={record.id}>
-                      <tr className="border-b border-[#F1F5F2] hover:bg-background transition-colors text-ink">
-                        <td className="px-4 py-3">
-                          <div className="flex items-start">
-                            <button
-                              type="button"
-                              aria-label={isExpanded ? "Hide breakdown" : "Show breakdown"}
-                              onClick={(e) => toggleRowExpand(record.id, e)}
-                              className="mr-2 mt-0.5 text-subtle hover:text-ink shrink-0"
-                            >
-                              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                            </button>
-                            <div>
-                              <div className="font-bold">{record.employee_name}</div>
-                              <div className="text-[10px] text-subtle">
-                                {record.employeeNu || record.employee_id} &middot; {record.position}
-                                {" "}&middot;{" "}
-                                {record.department === "Branch Staff" ? record.branch : record.department}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">KSh {record.gross_pay.toLocaleString()}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">KSh {Math.round(record.paye_tax).toLocaleString()}</td>
-                        <td className="px-4 py-3 whitespace-nowrap font-bold text-brand-dark">
-                          KSh {Math.round(record.net_pay).toLocaleString()}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {IN_APP_PAYMENTS && (
-                              <button
-                                type="button"
-                                onClick={() => handleSingleMpesaPayment(record)}
-                                className="px-2.5 py-1 rounded-[7px] bg-green-tint text-brand-dark text-[10.5px] font-bold hover:bg-[#d3e6d9] transition-colors"
-                              >
-                                {userRole === "credit_analyst_officer" ? "M-Pesa" : "Pay"}
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewPayslip(record, index);
-                              }}
-                              className="px-2.5 py-1 rounded-[7px] bg-status-info-tint text-status-info text-[10.5px] font-semibold hover:bg-[#dbe7f1] transition-colors"
-                            >
-                              Payslip
-                            </button>
-                            {record.employeeNu && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  sendPayslipNotification(record);
-                                }}
-                                disabled={sendingSMS || smsStatus === "sending"}
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[7px] text-[10.5px] font-semibold transition-colors disabled:opacity-50 ${
-                                  smsStatus === "success"
-                                    ? "bg-green-tint text-brand-dark"
-                                    : smsStatus === "failed"
-                                      ? "bg-orange-tint text-status-danger"
-                                      : "bg-secondary text-muted-foreground hover:bg-border"
-                                }`}
-                              >
-                                {smsStatus === "sending" ? (
-                                  <Loader className="w-3 h-3 animate-spin" />
-                                ) : smsStatus === "success" ? (
-                                  <CheckCircle className="w-3 h-3" />
-                                ) : smsStatus === "failed" ? (
-                                  <XCircle className="w-3 h-3" />
-                                ) : (
-                                  <Send className="w-3 h-3" />
-                                )}
-                                {smsStatus === "sending"
-                                  ? "Sending"
-                                  : smsStatus === "success"
-                                    ? "Sent"
-                                    : smsStatus === "failed"
-                                      ? "Failed"
-                                      : "SMS"}
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-
-                      {isExpanded && (
-                        <tr className="bg-background">
-                          <td
-                            colSpan={5}
-                            className="px-4 py-4 border-t border-border"
-                          >
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
-                              <div className="space-y-2">
-                                <h4 className="font-medium text-gray-900">
-                                  Earnings
-                                </h4>
-                                <div className="flex justify-between">
-                                  <span>Total Basic Salary:</span>
-                                  <span>
-                                    KSh {record.basic_salary.toLocaleString()}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>House Allowance:</span>
-                                  <span>
-                                    KSh{" "}
-                                    {record.house_allowance.toLocaleString()}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Transport Allowance:</span>
-                                  <span>
-                                    KSh{" "}
-                                    {record.transport_allowance.toLocaleString()}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Overtime:</span>
-                                  <span>
-                                    KSh{" "}
-                                    {(
-                                      record.overtime_hours *
-                                      record.overtime_rate
-                                    ).toLocaleString()}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between font-bold bg-yellow-50 p-1">
-                                  <span>Per Diem:</span>
-                                  <span>
-                                    KSh{" "}
-                                    {record.per_diem?.toLocaleString() || "0"}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="space-y-2">
-                                <h4 className="font-medium text-gray-900">
-                                  Statutory Deductions
-                                </h4>
-                                <div className="flex justify-between">
-                                  <span>PAYE:</span>
-                                  <span className="text-red-600">
-                                    KSh {record.paye_tax.toLocaleString()}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>SHIF:</span>
-                                  <span className="text-red-600">
-                                    KSh {record.nhif_deduction.toLocaleString()}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>NSSF:</span>
-                                  <span className="text-red-600">
-                                    KSh {record.nssf_deduction.toLocaleString()}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span>Housing Levy:</span>
-                                  <span className="text-red-600">
-                                    KSh {record.housing_levy.toLocaleString()}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between text-green-600">
-                                  <span>Tax Relief:</span>
-                                  <span>
-                                    KSh{" "}
-                                    {record.tax_relief?.toLocaleString() || "0"}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="space-y-2">
-                                <h4 className="font-medium text-gray-900">
-                                  Other Deductions
-                                </h4>
-                                <div className="flex justify-between">
-                                  <span>Advances:</span>
-                                  <span className="text-red-600">
-                                    KSh{" "}
-                                    {record.advance_deduction.toLocaleString()}
-                                  </span>
-                                </div>
-                                {payslipDeductionLines(record).map((line, i) => (
-                                  <div key={`${line.name}-${i}`} className="flex justify-between">
-                                    <span>{line.name}:</span>
-                                    <span className="text-red-600">KSh {line.amount.toLocaleString()}</span>
-                                  </div>
-                                ))}
-                                <div className="flex justify-between font-medium">
-                                  <span>Total Deductions:</span>
-                                  <span className="text-red-600">
-                                    KSh{" "}
-                                    {record.total_deductions.toLocaleString()}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-
-        <Pagination
+      {tab === "run" && (dataLoading ? loader : (
+        <PayrollRunTab
+          periodLabel={periodLabel}
+          monthRun={monthRun}
+          runLoading={runLoading}
+          runBusy={runBusy}
+          onStart={handleSaveRun}
+          onApprove={handleApproveRun}
+          onReopen={handleReopenRun}
+          onMarkPaid={handleMarkRunPaid}
+          onDiscard={handleDiscardRun}
+          onPayroll={onPayroll}
+          onOpenFiles={() => setTab("files")}
+          userRole={userRole}
+          handleBulkMpesaPayment={handleBulkMpesaPayment}
+          onOpenSpreadsheet={() => setCurrentView("mpesa-spreadsheet")}
+          onOpenApprovals={() => setShowApprovalQueue(true)}
+          pendingCount={pendingCount}
+          branches={branches}
+          selectedBranch={selectedBranch}
+          setSelectedBranch={setSelectedBranch}
+          departments={departments}
+          selectedDepartment={selectedDepartment}
+          setSelectedDepartment={setSelectedDepartment}
+          paymentMethods={paymentMethods}
+          selectedPaymentMethod={selectedPaymentMethod}
+          setSelectedPaymentMethod={setSelectedPaymentMethod}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          finalFilteredRecords={finalFilteredRecords}
+          currentItems={currentItems}
+          totals={{ totalGrossPay, totalDeductions, totalNetPay, totalPAYE, totalNHIF, totalNSSF, totalHousingLevy }}
+          expandedRows={expandedRows}
+          toggleRowExpand={toggleRowExpand}
+          smsSendingStatus={smsSendingStatus}
+          sendingSMS={sendingSMS}
+          sendPayslipNotification={sendPayslipNotification}
+          handleSingleMpesaPayment={handleSingleMpesaPayment}
+          handleViewPayslip={handleViewPayslip}
           currentPage={currentPage}
           totalPages={totalPages}
-          onPageChange={handlePageChange}
-          totalItems={finalFilteredRecords.length}
+          handlePageChange={handlePageChange}
           itemsPerPage={itemsPerPage}
-          currentItemsCount={currentItems.length}
+          demoPay={{
+            enabled: demoPayEnabled,
+            lineFor: (employeeNumber) => demoLineByNumber.get(String(employeeNumber ?? "")),
+            isPaid: (employeeNumber) => demoPaidNow.has(employeeNumber),
+            onPaid: (employeeNumber) => markDemoPaid([employeeNumber]),
+            onPayAll: () => setShowDemoPayAll(true),
+          }}
         />
-      </div>
+      ))}
+
+      {tab === "employees" && (dataLoading ? loader : (
+        <PayrollEmployeesTab
+          onPayroll={onPayroll}
+          notOnboarded={notOnboarded}
+          missingDetails={missingDetails}
+          onFixMissing={() => setShowMissingDetails(true)}
+          onGoToOnboarding={() => navigate("/onboarding")}
+        />
+      ))}
+
+      {tab === "deductions" && (
+        <PayrollDeductionsTab
+          onChanged={() => setDeductionsVersion((v) => v + 1)}
+          draftNotice={
+            monthRun?.status === "draft"
+              ? `Payroll for ${periodLabel} is a draft: press Recalculate to apply deduction changes to it.`
+              : monthRun
+                ? `Payroll for ${periodLabel} is ${monthRun.status}, so changes apply from the next month you run.`
+                : null
+          }
+        />
+      )}
+
+      {tab === "rates" && (
+        <PayrollRatesTab
+          payPeriod={actualPeriod}
+          periodLabel={periodLabel}
+          canEdit={canEditRates}
+          onEdit={() => setShowStatutorySettings(true)}
+          version={ratesVersion}
+        />
+      )}
+
+      {tab === "files" && (
+        <PayrollFilesTab
+          periodLabel={periodLabel}
+          run={monthRun}
+          onOpenP9={() => setShowP9Modal(true)}
+          onOpenExport={() => setShowExportModal(true)}
+          onGoToRun={() => setTab("run")}
+        />
+      )}
+
+      {tab === "history" && (
+        <PayrollHistoryTab
+          version={runVersion}
+          onUploadHistory={() => setShowBulkUploadModal(true)}
+          onOpen={(period) => {
+            setSelectedPeriod(new Date(`${period}-01T00:00:00`));
+            setTab("run");
+          }}
+        />
+      )}
 
       {selectedRecord && (
         <PayslipModal
@@ -4368,17 +2088,14 @@ This can't be undone: the payslips stay locked for good.`,
       />
 
 
-      {showDeductions && (
-        <VoluntaryDeductionsModal
-          onClose={() => setShowDeductions(false)}
-          onChanged={() => setDeductionsVersion((v) => v + 1)}
-          draftNotice={
-            monthRun?.status === "draft"
-              ? `Payroll for ${periodLabel} is a draft: press Recalculate to apply deduction changes to it.`
-              : monthRun
-                ? `Payroll for ${periodLabel} is ${monthRun.status}, so changes apply from the next month you run.`
-                : null
-          }
+      {demoPayEnabled && (
+        <DemoPayAllDialog
+          open={showDemoPayAll}
+          onClose={() => setShowDemoPayAll(false)}
+          periodLabel={periodLabel}
+          lines={demoLines.filter((l) => !demoPaidNow.has(l.employeeNumber))}
+          onPaid={markDemoPaid}
+          onFixDetails={() => setShowMissingDetails(true)}
         />
       )}
 
@@ -4401,7 +2118,10 @@ This can't be undone: the payslips stay locked for good.`,
         <StatutoryRatesModal
           payPeriod={actualPeriod}
           onClose={() => setShowStatutorySettings(false)}
-          onChanged={() => void reloadRates()}
+          onChanged={() => {
+            void reloadRates();
+            setRatesVersion((v) => v + 1);
+          }}
         />
       )}
 
