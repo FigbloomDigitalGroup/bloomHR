@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { queryAI, type AIHistoryMessage } from '../../services/ai'
-import { employeeTable, upcomingDates } from '../../lib/aiEmployeeContext'
+import { employeeContext } from '../../lib/aiEmployeeContext'
+import { fetchAll } from '../../lib/fetchAll'
 import { supabase } from '../../lib/supabase'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, User, Users, Activity, BarChart2, Wand2 } from 'lucide-react'
@@ -82,12 +83,12 @@ export const AIAssistantPage = ({ selectedTown, onTownChange, widget = false }: 
   useEffect(() => {
     const loadMappings = async () => {
       try {
-        // Fetch the area-town mapping from the database
-        const { data: employeesData, error: employeesError } = await supabase
-          .from('employees')
-          .select('Branch, Town');
-        
-        if (employeesError) {
+        // Fetch the area-town mapping from the database (every employee: one request returns at most 1000 rows)
+        let employeesData: { Branch: string | null; Town: string | null }[];
+        try {
+          employeesData = await fetchAll((from, to) =>
+            supabase.from('employees').select('Branch, Town').order('id').range(from, to));
+        } catch (employeesError) {
           console.error("Error loading area-town mapping:", employeesError);
           return;
         }
@@ -163,17 +164,12 @@ export const AIAssistantPage = ({ selectedTown, onTownChange, widget = false }: 
       try {
         console.log('Fetching ALL employees...');
         
-        const { data, error } = await supabase
-          .from('employees')
-          .select('*')
-        
-        if (error) {
-          console.error('Supabase error:', error);
-          throw error;
-        }
-        
-        console.log('Fetched total employees:', data?.length);
-        setAllEmployees(data || []);
+        // a page at a time: one request returns at most 1000 rows, and a company may have thousands (FIG-820)
+        const data = await fetchAll((from, to) =>
+          supabase.from('employees').select('*').order('id').range(from, to));
+
+        console.log('Fetched total employees:', data.length);
+        setAllEmployees(data);
         
       } catch (err) {
         setError('Failed to load employee data')
@@ -238,25 +234,12 @@ export const AIAssistantPage = ({ selectedTown, onTownChange, widget = false }: 
     try {
       // The records come from the employees query above, which runs with the signed-in person's session, so the AI sees
       // exactly what they are allowed to see. Date-based facts are worked out here; models are unreliable at date maths.
-      const today = new Date()
-      const realDataStats = calculateRealDataStats(filteredEmployees);
-
-      const enhancedContext = `
-        TODAY: ${today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-
-        SCOPE: ${filteredEmployees.length} employee records ${getTownContext()}. These are all the records the person asking may see.
-
-        COMING UP IN THE NEXT 30 DAYS (worked out from the records; use these rather than calculating dates yourself):
-        ${upcomingDates(filteredEmployees, today)}
-
-        SUMMARY:
-        ${realDataStats}
-
-        EMPLOYEE RECORDS (one per line, fields separated by " | ", first line is the column names; empty means not recorded):
-        ${employeeTable(filteredEmployees)}
+      // The totals are worked out over every record, and the table holds as many records as fit (FIG-820).
+      const enhancedContext = `${employeeContext(filteredEmployees, new Date(), getTownContext())}
 
         RESPONSE GUIDELINES:
         - Answer from these records: name the people, give counts, percentages and dates
+        - Take every count and share from the TOTALS, which cover all the records, not from the table
         - If a field is empty for someone, say it is not recorded rather than guessing
         - Keep answers as short as the question allows
 
@@ -300,50 +283,6 @@ export const AIAssistantPage = ({ selectedTown, onTownChange, widget = false }: 
       setLoading(false)
     }
   }
-
-  // Helper function to calculate real data statistics
-  const calculateRealDataStats = (employees: any[]) => {
-    if (employees.length === 0) return 'No employee data available for analysis.';
-    
-    // Gender distribution
-    const genderCounts = employees.reduce((acc, emp) => {
-      const gender = emp.Gender || 'Unknown';
-      acc[gender] = (acc[gender] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    
-    // Job Title distribution
-    const jobTitleCounts = employees.reduce((acc, emp) => {
-      const title = emp['Job Title'] || 'Unknown';
-      acc[title] = (acc[title] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    const topJobTitles = Object.entries(jobTitleCounts)
-      .sort(([,a], [,b]) => b - a);
-    
-    // Branch distribution
-    const branchCounts = employees.reduce((acc, emp) => {
-      const branch = emp.Branch || 'Unknown';
-      acc[branch] = (acc[branch] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    
-    // Salary statistics (if available)
-    const salaries = employees.map(emp => emp['Basic Salary']).filter(Boolean);
-    const salaryStats = salaries.length > 0 ? {
-      min: Math.min(...salaries),
-      max: Math.max(...salaries),
-      avg: salaries.reduce((a, b) => a + b, 0) / salaries.length
-    } : null;
-    
-    return `
-      - Gender Distribution: ${Object.entries(genderCounts).map(([gender, count]) => `${gender}: ${count}`).join(', ')}
-      - Job Titles: ${topJobTitles.map(([title, count]) => `${title}: ${count}`).join(', ')}
-      - Branch Distribution: ${Object.entries(branchCounts).map(([branch, count]) => `${branch}: ${count}`).join(', ')}
-      ${salaryStats ? `- Salary Range: KES ${salaryStats.min.toLocaleString()} - KES ${salaryStats.max.toLocaleString()} (Avg: KES ${Math.round(salaryStats.avg).toLocaleString()})` : ''}
-      - Employee Types: ${[...new Set(employees.map(emp => emp['Employee Type']).filter(Boolean))].join(', ')}
-    `;
-  };
 
   // Helper function to get town context
   const getTownContext = () => {

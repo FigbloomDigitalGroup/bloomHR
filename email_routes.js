@@ -9,6 +9,7 @@
 // asked for one email's details only after the row has been found in the caller's company.
 //
 //   POST /api/email/send   { purpose, to, subject, html, attachments?, provider?, cpanelUser? }
+//   POST /api/email/bulk   { purpose: "email-portal", to: [...], subject, html, attachments? }  (queued, see below)
 //   GET  /api/email/logs?limit=&cursor=
 //   GET  /api/email/logs/:id
 import express from "express";
@@ -17,7 +18,7 @@ import { Resend } from "resend";
 import dotenv from "dotenv";
 import fetch from "node-fetch";
 import { authenticate, HttpError, admin } from "./admin_routes.js";
-import { callerHasModule, createBudget } from "./authz.js";
+import { callerHasModule, createSharedBudget } from "./authz.js";
 
 dotenv.config();
 
@@ -59,8 +60,23 @@ const EMAIL_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i; // sent_emails ids
 const CURSOR_RE = /^\d{1,7}$/; // the log is paged by position
 
-// Per-user budget (recipients per hour) so a stolen session cannot be used to spam from the company address.
-const takeBudget = createBudget({ default: { limit: 1000, windowMs: 60 * 60 * 1000 } });
+// A company-wide email is queued (bulk_emails, migration 20261014500000) and sent by the send-notification-emails Edge
+// Function, so it can reach every employee instead of the browser sending one request per person (FIG-820).
+const BULK_PURPOSES = ["email-portal"];
+const MAX_BULK_RECIPIENTS = 25_000; // per request
+
+// Budgets, counted in the database so every server instance shares them (see createSharedBudget):
+//   * recipients per user per hour, so a stolen session cannot be used to spam from the company address;
+//   * recipients per company per day (EMAIL_COMPANY_DAILY_LIMIT, default 50,000), inline and queued sends together,
+//     so even a company-wide email cannot be sent over and over.
+const HOUR = 60 * 60 * 1000;
+const COMPANY_DAILY_LIMIT = (() => {
+    const n = Number(process.env.EMAIL_COMPANY_DAILY_LIMIT);
+    return Number.isInteger(n) && n > 0 ? n : 50_000;
+})();
+const takeUserBudget = createSharedBudget("email-recipients", { default: { limit: 1000, windowMs: HOUR } });
+const companyBudget = createSharedBudget("email-recipients-company", { default: { limit: COMPANY_DAILY_LIMIT, windowMs: 24 * HOUR } });
+const takeCompanyBudget = (caller, cost) => companyBudget(caller, "default", cost, "company");
 
 const handler = (fn) => async (req, res) => {
     try {
@@ -88,6 +104,32 @@ const asRecipients = (to) => {
         if (!addr || addr.length > 254 || !EMAIL_RE.test(addr)) throw new HttpError(400, "Invalid recipient address");
     }
     return list;
+};
+
+// The subject and body of a send, checked: a one-line subject (no header injection) and a body of bounded size.
+const asContent = ({ subject, html }) => {
+    if (typeof subject !== "string" || !subject.trim() || typeof html !== "string" || !html.trim()) {
+        throw new HttpError(400, "to, subject, and html are required");
+    }
+    if (subject.length > MAX_SUBJECT || /[\r\n]/.test(subject)) throw new HttpError(400, "Invalid subject");
+    if (html.length > MAX_HTML) throw new HttpError(400, "Email body is too large");
+    return { subject, html };
+};
+
+// Attachments as [{ filename, content (base64) }], checked: a few, of bounded size, with plain file names.
+const asAttachments = (attachments) => {
+    const files = [];
+    if (attachments === undefined) return files;
+    if (!Array.isArray(attachments) || attachments.length > MAX_ATTACHMENTS) throw new HttpError(400, `At most ${MAX_ATTACHMENTS} attachments`);
+    let total = 0;
+    for (const att of attachments) {
+        const name = typeof att?.filename === "string" ? att.filename : "";
+        if (!name || name.length > 200 || /[\\/\r\n]/.test(name) || typeof att.content !== "string") throw new HttpError(400, "Invalid attachment");
+        total += att.content.length;
+        files.push({ filename: name, content: att.content });
+    }
+    if (total > MAX_ATTACHMENT_TOTAL) throw new HttpError(400, "Attachments are too large");
+    return files;
 };
 
 // Records a send in the caller's company log. The mail has already gone, so a failure here is logged, not reported.
@@ -189,29 +231,13 @@ router.post(
         // permission first, so a caller without access learns nothing else about the request rules
         if (!(await callerHasModule(caller, rule.modules))) throw new HttpError(403, "Forbidden");
 
-        const { subject, html, attachments } = req.body;
-        if (typeof subject !== "string" || !subject.trim() || typeof html !== "string" || !html.trim()) {
-            throw new HttpError(400, "to, subject, and html are required");
-        }
-        if (subject.length > MAX_SUBJECT || /[\r\n]/.test(subject)) throw new HttpError(400, "Invalid subject");
-        if (html.length > MAX_HTML) throw new HttpError(400, "Email body is too large");
+        const { subject, html } = asContent(req.body);
         const recipients = asRecipients(req.body.to);
 
         const provider = req.body.provider === undefined ? "resend" : String(req.body.provider);
         if (!PROVIDERS.includes(provider)) throw new HttpError(400, "Unknown email provider");
 
-        let files = [];
-        if (attachments !== undefined) {
-            if (!Array.isArray(attachments) || attachments.length > MAX_ATTACHMENTS) throw new HttpError(400, `At most ${MAX_ATTACHMENTS} attachments`);
-            let total = 0;
-            for (const att of attachments) {
-                const name = typeof att?.filename === "string" ? att.filename : "";
-                if (!name || name.length > 200 || /[\\/\r\n]/.test(name) || typeof att.content !== "string") throw new HttpError(400, "Invalid attachment");
-                total += att.content.length;
-                files.push({ filename: name, content: att.content });
-            }
-            if (total > MAX_ATTACHMENT_TOTAL) throw new HttpError(400, "Attachments are too large");
-        }
+        const files = asAttachments(req.body.attachments);
 
         let cpanelUser = process.env.CPANEL_USER;
         if (provider === "cpanel" && req.body.cpanelUser !== undefined && req.body.cpanelUser !== "") {
@@ -219,7 +245,9 @@ router.post(
             if (!allowedCpanelUsers().includes(cpanelUser)) throw new HttpError(403, "You cannot send as that mailbox");
         }
 
-        if (!takeBudget(caller.id, "default", recipients.length)) throw new HttpError(429, "Email limit reached for now. Try again later.");
+        if (!(await takeUserBudget(caller, "default", recipients.length)) || !(await takeCompanyBudget(caller, recipients.length))) {
+            throw new HttpError(429, "Email limit reached for now. Try again later.");
+        }
 
         const record = (used, providerId, from) =>
             recordSend(caller, { provider: used, providerId, purpose, from, to: recipients, subject });
@@ -274,6 +302,48 @@ router.post(
         const info = await transporter.sendMail(mailOptions);
         await record("smtp", info.messageId, mailOptions.from);
         res.json({ message: "Email sent successfully", id: info.messageId });
+    })
+);
+
+// A company-wide email: queued for the send-notification-emails Edge Function, which sends it through Resend, each
+// person getting their own copy. Only the company's own employees' work emails are queued (queue_bulk_email()); the
+// rest are skipped and counted. Answers 202 { id, queued, skipped }.
+router.post(
+    "/bulk",
+    handler(async (req, res, caller) => {
+        const purpose = String(req.body?.purpose || "");
+        if (!BULK_PURPOSES.includes(purpose)) throw new HttpError(400, "Unknown email purpose");
+
+        // permission first, so a caller without access learns nothing else about the request rules
+        if (!(await callerHasModule(caller, PURPOSES[purpose].modules))) throw new HttpError(403, "Forbidden");
+
+        const { subject, html } = asContent(req.body);
+        const to = req.body.to;
+        if (!Array.isArray(to) || to.length === 0 || to.length > MAX_BULK_RECIPIENTS) {
+            throw new HttpError(400, `Between 1 and ${MAX_BULK_RECIPIENTS} recipients per request`);
+        }
+        const recipients = [...new Set(to.map((t) => (typeof t === "string" ? t.trim().toLowerCase() : "")))];
+        if (recipients.some((addr) => !addr || addr.length > 254 || !EMAIL_RE.test(addr))) throw new HttpError(400, "Invalid recipient address");
+        const files = asAttachments(req.body.attachments);
+
+        if (!(await takeCompanyBudget(caller, recipients.length))) {
+            throw new HttpError(429, "Your company has reached its daily email limit. Try again tomorrow.");
+        }
+
+        const { data, error } = await admin.rpc("queue_bulk_email", {
+            p_tenant: caller.tenantId,
+            p_created_by: caller.id,
+            p_purpose: purpose,
+            p_from: process.env.SMTP_FROM || "onboarding@resend.dev",
+            p_subject: subject,
+            p_html: html,
+            p_attachments: files,
+            p_emails: recipients,
+        });
+        if (error) throw new HttpError(500, "Could not queue the email");
+        const row = (Array.isArray(data) ? data[0] : data) || {};
+        if (!row.bulk_email_id) throw new HttpError(400, "None of the recipients is an employee's work email");
+        res.status(202).json({ id: row.bulk_email_id, queued: row.queued, skipped: row.skipped });
     })
 );
 

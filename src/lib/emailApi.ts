@@ -50,6 +50,13 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 export const sendEmailViaServer = (email: OutgoingEmail, options: { purpose: EmailPurpose }) =>
   request<{ message: string; id?: string }>('POST', '/send', { ...email, purpose: options.purpose });
 
+/**
+ * Queues one email to many of the company's employees (each gets their own copy); the server sends it over the next
+ * few minutes. Only the work emails of the company's own employees are queued; the answer says how many were skipped.
+ */
+export const queueBulkEmail = (email: Omit<OutgoingEmail, 'to' | 'provider' | 'cpanelUser'> & { to: string[] }) =>
+  request<{ id: string; queued: number; skipped: number }>('POST', '/bulk', { ...email, purpose: 'email-portal' });
+
 /** The provider's sent-mail list ({ data: [...], has_more }). */
 export const listEmailLogs = (limit: number, cursor?: string) =>
   request<{ data?: any[]; has_more?: boolean }>(

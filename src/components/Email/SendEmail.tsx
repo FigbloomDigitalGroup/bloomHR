@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { sendEmailViaServer } from '../../lib/emailApi';
+import { queueBulkEmail, sendEmailViaServer } from '../../lib/emailApi';
 import EmployeePicker from '../UI/EmployeePicker';
 import { supabase } from '../../lib/supabase';
 import { fetchAllResult } from '../../lib/fetchAll';
@@ -151,6 +151,32 @@ export default function SendEmail() {
 
     setSending(true);
     const toastId = toast.loading(`Sending email to ${recipients.length} recipients...`);
+
+    // An email to many people through Resend is handed to the server in one request and queued: it goes out over the
+    // next few minutes, so a company-wide email reaches thousands without the browser sending each one (FIG-820).
+    if (mode === 'bulk' && provider === 'resend') {
+      try {
+        const { queued, skipped } = await queueBulkEmail({
+          to: recipients.map((r) => r['Work Email']),
+          subject,
+          html: body,
+          attachments: attachments.length > 0 ? attachments : undefined,
+        });
+        toast.success(
+          `Queued for ${queued} ${queued === 1 ? 'person' : 'people'}; it will go out over the next few minutes.` +
+            (skipped > 0 ? ` ${skipped} address${skipped === 1 ? ' was' : 'es were'} skipped (not an employee's work email).` : ''),
+          { id: toastId }
+        );
+        setSubject('');
+        setBody('');
+      } catch (error) {
+        console.error('Error queueing the email:', error);
+        toast.error(error instanceof Error ? error.message : 'Failed to send emails', { id: toastId });
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
 
     try {
       // We will send individually to each recipient to generate individual logs

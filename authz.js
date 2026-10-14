@@ -20,8 +20,40 @@ export async function callerHasModule(caller, modules) {
 }
 
 /**
+ * A budget over a sliding window counted in the database (take_rate_limit(), migration 20261014500100), so every
+ * server instance shares one count: on Vercel each instance has its own memory, so an in-memory count let a caller
+ * use the budget once per running instance (FIG-820).
+ *
+ * `name` keeps budgets apart (e.g. "ai"); `limits` maps a kind to { limit, windowMs } and must include "default".
+ * The returned function takes (caller, kind, cost, key = caller.id) and resolves true if the cost fits, using it up.
+ * The count is per company (caller.tenantId) and key, so a company-wide budget passes a fixed key such as "company".
+ * If the database cannot be asked (e.g. the migration is not applied yet) it falls back to this instance's own count,
+ * so the limit still holds per instance rather than not at all.
+ */
+export function createSharedBudget(name, limits) {
+  const fallback = createBudget(limits);
+  return async (caller, kind, cost, key = caller.id) => {
+    const { limit, windowMs } = limits[kind] || limits.default;
+    try {
+      const { data, error } = await admin.rpc("take_rate_limit", {
+        p_tenant: caller.tenantId,
+        p_bucket: `${name}:${kind}:${key}`,
+        p_cost: cost,
+        p_limit: limit,
+        p_window_seconds: Math.ceil(windowMs / 1000),
+      });
+      if (error) throw error;
+      return data === true;
+    } catch (err) {
+      console.error(`[authz] shared rate limit "${name}" unavailable, counting on this server only:`, err?.message || err);
+      return fallback(`${caller.tenantId}:${key}`, kind, cost);
+    }
+  };
+}
+
+/**
  * A per-user budget over a sliding window, so a stolen session cannot be used to drain an account.
- * In-memory: fine for one server process; move to a shared store if this is ever scaled out.
+ * In-memory: one count per server process (see createSharedBudget for one shared by all of them).
  *
  * `spent` is keyed by `${kind}:${userId}`; `limits` maps a kind to { limit, windowMs } and must include "default".
  */

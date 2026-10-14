@@ -5,7 +5,7 @@ vi.mock('./supabase', () => ({
   supabase: { auth: { getSession: async () => ({ data: { session: session.token ? { access_token: session.token } : null } }) } },
 }));
 
-import { getEmailLog, listEmailLogs, sendEmailViaServer } from './emailApi';
+import { getEmailLog, listEmailLogs, queueBulkEmail, sendEmailViaServer } from './emailApi';
 
 const fetchMock = vi.fn();
 beforeEach(() => {
@@ -27,6 +27,15 @@ describe('emailApi', () => {
     expect(init.method).toBe('POST');
     expect(init.headers.Authorization).toBe('Bearer tok-1');
     expect(JSON.parse(init.body)).toEqual({ to: 'a@b.co', subject: 'Hi', html: '<p>x</p>', provider: 'resend', purpose: 'email-portal' });
+  });
+
+  it('queues a company-wide email in one request, for the Email Portal', async () => {
+    fetchMock.mockReturnValue(ok({ id: 'bulk-1', queued: 2, skipped: 0 }));
+    const out = await queueBulkEmail({ to: ['a@b.co', 'c@b.co'], subject: 'Hi', html: '<p>x</p>' });
+    expect(out).toEqual({ id: 'bulk-1', queued: 2, skipped: 0 });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/email\/bulk$/);
+    expect(JSON.parse(init.body)).toEqual({ to: ['a@b.co', 'c@b.co'], subject: 'Hi', html: '<p>x</p>', purpose: 'email-portal' });
   });
 
   it('refuses when nobody is signed in, without calling the server', async () => {
