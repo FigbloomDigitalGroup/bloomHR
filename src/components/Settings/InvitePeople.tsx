@@ -4,6 +4,7 @@ import { Card, PageHeader, StatusPill, EmptyState, Button, TableScroll } from '.
 import type { StatusTone } from '../UI';
 import { companyApi, inviteLink, Invitation, INVITABLE_ROLES } from '../../lib/companyApi';
 import { sendInvitations, summariseInvites } from '../../lib/employeeInvite';
+import EmployeeNumberingCard from './EmployeeNumbering';
 
 const roleLabel = (role: string) => role.charAt(0) + role.slice(1).toLowerCase();
 
@@ -239,6 +240,9 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
           </TableScroll>
         )}
       </Card>
+
+      {/* HR reaches it here (Settings is for administrators) */}
+      <EmployeeNumberingCard className="mt-4" />
     </div>
   );
 }

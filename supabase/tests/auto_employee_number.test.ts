@@ -53,10 +53,10 @@ describe('employee numbers from the system', () => {
   });
 
   it("uses the company's own prefix when it sets one", async () => {
-    await db.exec(`insert into company_payroll_settings (tenant_id, employee_number_prefix) values ('${A}', 'FIG') on conflict (tenant_id) do update set employee_number_prefix = 'FIG'`);
+    await db.exec(`insert into company_payroll_settings (tenant_id, employee_number_prefix) values ('${A}', 'FIG-') on conflict (tenant_id) do update set employee_number_prefix = 'FIG-'`);
     await asUser(db, HR, () => db.exec(`insert into employees ("First Name", "Work Email") values ('Fay', 'fay@a.co')`));
     expect((await numbers('fay@a.co')).e).toMatch(/^FIG-\d{6}$/);
-    await db.exec(`update company_payroll_settings set employee_number_prefix = 'MCL' where tenant_id = '${A}'`);
+    await db.exec(`update company_payroll_settings set employee_number_prefix = 'MCL-' where tenant_id = '${A}'`);
     await expect(db.exec(`update company_payroll_settings set employee_number_prefix = 'bad prefix' where tenant_id = '${A}'`)).rejects.toThrow(/check/);
   });
 });
