@@ -15,6 +15,7 @@ import { Cake, PartyPopper, CalendarPlus, ChevronLeft, ChevronRight, X, Trash2 }
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
+import { fetchAllResult } from '../../lib/fetchAll';
 import { PageHeader, Card, Button } from '../UI';
 
 interface BirthdayEntry {
@@ -51,7 +52,10 @@ export default function CompanyCalendar() {
     setLoading(true);
     try {
       const [{ data: employees }, { data: holidays }, { data: events }] = await Promise.all([
-        supabase.from('employee_directory').select('"First Name", "Last Name", "Date of Birth", Town'),
+        // every employee, a page at a time (one request is capped at 1000 rows)
+        fetchAllResult((from, to) =>
+          supabase.from('employee_directory').select('"First Name", "Last Name", "Date of Birth", Town').order('"Employee Number"').range(from, to)
+        ),
         supabase.from('holidays').select('name, date, recurring'),
         supabase.from('company_events').select('id, title, date, description').order('date'),
       ]);

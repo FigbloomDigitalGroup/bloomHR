@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Users, CalendarDays, Calendar, Wallet, NotepadText, Phone, AlertCircle, MapPin, RefreshCw, Cake, Video, BookOpen, FileText, TrendingUp, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase"
+import { fetchAllResult } from "../../lib/fetchAll";
 import { TownProps } from '../../types/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageHeader, StatCard, Card, TabBar, EmptyState, Button } from '../UI';
@@ -72,9 +73,15 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
     try {
       const today = new Date();
 
-      const { data: employees, error } = await supabase
-        .from('employees')
-        .select('"First Name", "Last Name", "Mobile Number", "Date of Birth", Town, Branch');
+      // every employee, a page at a time (one request is capped at 1000 rows)
+      const { data: employees, error } = await fetchAllResult((from, to) =>
+        supabase
+          .from('employees')
+          .select('"First Name", "Last Name", "Mobile Number", "Date of Birth", Town, Branch')
+          .order('"Employee Number"')
+          .order('id')
+          .range(from, to)
+      );
 
       if (error) {
         console.error('Error fetching employees for birthdays:', error);
@@ -142,9 +149,9 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
     const loadMappings = async () => {
       try {
         // Fetch the area-town mapping from the database
-        const { data: employeesData, error: employeesError } = await supabase
-          .from('employees')
-          .select('Branch, Town');
+        const { data: employeesData, error: employeesError } = await fetchAllResult((from, to) =>
+          supabase.from('employees').select('Branch, Town').order('"Employee Number"').order('id').range(from, to)
+        );
 
         if (employeesError) {
           console.error("Error loading area-town mapping:", employeesError);
@@ -225,9 +232,12 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
 
     const fetchAnalytics = async () => {
       try {
+        // every row, a page at a time (one request is capped at 1000 rows)
         const [{ data: leaveRows }, { data: employeeRows }] = await Promise.all([
-          supabase.from('leave_application').select('status'),
-          supabase.from('employees').select('Town'),
+          fetchAllResult((from, to) => supabase.from('leave_application').select('status').order('id').range(from, to)),
+          fetchAllResult((from, to) =>
+            supabase.from('employees').select('Town').order('"Employee Number"').order('id').range(from, to)
+          ),
         ]);
 
         const statusCounts: Record<string, number> = {};

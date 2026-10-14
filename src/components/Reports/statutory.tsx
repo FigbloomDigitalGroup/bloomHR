@@ -16,10 +16,18 @@ import {
 import { createClient } from '@supabase/supabase-js';
 import { TownProps } from '../../types/supabase';
 import FigbloomLoader from '../UI/FigbloomLoader';
+import { fetchAllResult } from '../../lib/fetchAll';
+import { groupBy } from '../../lib/utils';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// every statutory deduction, newest period first, a page at a time (one request is capped at 1000 rows)
+const loadDeductions = () =>
+  fetchAllResult((from, to) =>
+    supabase.from('statutory_deductions').select('*').order('deduction_period', { ascending: false }).order('id').range(from, to)
+  );
 
 interface ReportFilters {
   startDate: string;
@@ -467,18 +475,22 @@ const StatutoryDeductionsReport: React.FC<BaseReportProps> = ({
         setLoading(true);
 
         // Fetch towns from employees
-        const { data: townsData } = await supabase
+        // (every page of each list: one request is capped at 1000 rows)
+        const { data: townsData } = await fetchAllResult((from, to) => supabase
           .from('employees')
           .select('Town')
-          .not('Town', 'is', null);
-        
+          .not('Town', 'is', null)
+          .order('"Employee Number"')
+          .order('id')
+          .range(from, to));
+
         if (townsData) {
           const uniqueTowns = [...new Set(townsData.map(t => t.Town))].filter(Boolean);
           setTowns(uniqueTowns as string[]);
         }
 
         // Fetch all employees
-        const { data: employeesData } = await supabase
+        const { data: employeesData } = await fetchAllResult((from, to) => supabase
           .from('employees')
           .select(`
             "Employee Number",
@@ -490,22 +502,21 @@ const StatutoryDeductionsReport: React.FC<BaseReportProps> = ({
             "Job Title",
             "Mobile Number"
           `)
-          .order('"First Name"');
+          .order('"First Name"')
+          .order('"Employee Number"')
+          .order('id')
+          .range(from, to));
 
         // Fetch statutory deductions
-        const { data: deductionsData } = await supabase
-          .from('statutory_deductions')
-          .select('*')
-          .order('deduction_period', { ascending: false });
+        const { data: deductionsData } = await loadDeductions();
+        const deductionsByEmployee = groupBy(deductionsData || [], (d) => d.employee_number);
 
         if (employeesData) {
           // Combine employee data with their statutory deductions
           const deductionTableData: StatutoryDeductionData[] = [];
-          
+
           employeesData.forEach(emp => {
-            const employeeDeductions = deductionsData?.filter(
-              deduction => deduction.employee_number === emp['Employee Number']
-            ) || [];
+            const employeeDeductions = deductionsByEmployee.get(emp['Employee Number']) || [];
 
             if (employeeDeductions.length > 0) {
               // Create an entry for each deduction
@@ -611,17 +622,13 @@ const StatutoryDeductionsReport: React.FC<BaseReportProps> = ({
 
     // Update report data with filtered employees and their deductions
     const fetchFilteredData = async () => {
-      const { data: deductionsData } = await supabase
-        .from('statutory_deductions')
-        .select('*')
-        .order('deduction_period', { ascending: false });
+      const { data: deductionsData } = await loadDeductions();
+      const deductionsByEmployee = groupBy(deductionsData || [], (d) => d.employee_number);
 
       const filteredReportData: StatutoryDeductionData[] = [];
-      
+
       filtered.forEach(emp => {
-        const employeeDeductions = deductionsData?.filter(
-          deduction => deduction.employee_number === emp['Employee Number']
-        ) || [];
+        const employeeDeductions = deductionsByEmployee.get(emp['Employee Number']) || [];
 
         if (employeeDeductions.length > 0) {
           employeeDeductions.forEach(deduction => {

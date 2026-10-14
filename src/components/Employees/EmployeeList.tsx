@@ -18,6 +18,7 @@ import BulkEditModal from './BulkEditModal';
 import BulkTerminateModal from './BulkTerminateModal';
 import { TownProps } from '../../types/supabase';
 import { supabase } from '../../lib/supabase';
+import { fetchAllResult } from '../../lib/fetchAll';
 import { Database } from '../../types/supabase';
 import { PageHeader, Card, Button, StatusPill, EmptyState, SearchInput } from '../UI';
 import { profileItems, profileScore } from '../../lib/profileCompleteness';
@@ -70,13 +71,12 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
 
   useEffect(() => {
     let cancelled = false;
-    supabase
-      .from('emergency_contact')
-      .select('"Employee Number"')
-      .then(({ data, error }) => {
-        if (cancelled || error || !data) return; // unknown: the emergency contact is then left out of the score
-        setEmergencyContacts(new Set(data.map((r: Record<string, unknown>) => String(r['Employee Number']))));
-      });
+    fetchAllResult((from, to) =>
+      supabase.from('emergency_contact').select('"Employee Number"').order('id').range(from, to)
+    ).then(({ data, error }) => {
+      if (cancelled || error || !data) return; // unknown: the emergency contact is then left out of the score
+      setEmergencyContacts(new Set(data.map((r: Record<string, unknown>) => String(r['Employee Number']))));
+    });
     return () => {
       cancelled = true;
     };
@@ -99,9 +99,9 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
     const loadMappings = async () => {
       try {
         // Fetch the area-town mapping from the database
-        const { data: employeesData, error: employeesError } = await supabase
-          .from('employees')
-          .select('Branch, Town');
+        const { data: employeesData, error: employeesError } = await fetchAllResult((from, to) =>
+          supabase.from('employees').select('Branch, Town').order('"Employee Number"').order('id').range(from, to)
+        );
 
         if (employeesError) {
           console.error("Error loading area-town mapping:", employeesError);
@@ -157,23 +157,28 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      let query = supabase
-        .from('employees')
-        .select('*')
-        .order('Employee Number', { ascending: false });
+      // every matching employee, a page at a time (one request is capped at 1000 rows)
+      const page = (from: number, to: number) => {
+        let query = supabase
+          .from('employees')
+          .select('*')
+          .order('Employee Number', { ascending: false })
+          .order('id');
 
-      // Apply town/area filtering
-      if (currentTown && currentTown !== 'ADMIN_ALL') {
-        if (isArea && townsInArea.length > 0) {
-          // Filter by all towns in the area
-          query = query.in('Town', townsInArea);
-        } else {
-          // Filter by specific town
-          query = query.eq('Town', currentTown);
+        // Apply town/area filtering
+        if (currentTown && currentTown !== 'ADMIN_ALL') {
+          if (isArea && townsInArea.length > 0) {
+            // Filter by all towns in the area
+            query = query.in('Town', townsInArea);
+          } else {
+            // Filter by specific town
+            query = query.eq('Town', currentTown);
+          }
         }
-      }
+        return query.range(from, to);
+      };
 
-      const { data, error } = await query;
+      const { data, error } = await fetchAllResult(page);
 
       if (error) throw error;
       setEmployees(data || []);

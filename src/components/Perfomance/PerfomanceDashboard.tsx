@@ -15,6 +15,11 @@ import {
 import Select from 'react-select';
 import { Card, Button, TabBar, SearchInput } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
+import { fetchAllResult } from '../../lib/fetchAll';
+
+// every row of a table, a page at a time (one request is capped at 1000 rows); `key` is its unique column
+const readAll = (table: string, key: string) =>
+  fetchAllResult((from, to) => supabase.from(table).select('*').order(key).range(from, to));
 
 type EmployeePerformance = {
   id: string;
@@ -334,9 +339,9 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange 
       try {
         setDebugInfo("Loading mappings...");
         // Load employees data for town-branch relationships
-        const { data: employeesData, error: employeesError } = await supabase
-          .from('employees')
-          .select('Branch, Town, Office');
+        const { data: employeesData, error: employeesError } = await fetchAllResult((from, to) =>
+          supabase.from('employees').select('Branch, Town, Office').order('"Employee Number"').order('id').range(from, to)
+        );
 
         if (employeesError) {
           console.error("Error loading employees data:", employeesError);
@@ -610,15 +615,17 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange 
           { data: performanceTargetsData },
           { data: clientVisitsData }
         ] = await Promise.all([
-          supabase.from('employees').select('*'),
-          supabase.from('kenya_branches').select('*'),
-          supabase.from('clients').select('*'),
-          supabase.from('loans').select('*'),
-          supabase.from('loan_payments').select('*'),
-          supabase.from('employee_performance').select('*'),
-          supabase.from('branch_performance').select('*'),
-          supabase.from('performance_targets').select('*'),
-          supabase.from('client_visits').select('*')
+          fetchAllResult((from, to) =>
+            supabase.from('employees').select('*').order('"Employee Number"').order('id').range(from, to)
+          ),
+          readAll('kenya_branches', 'id'),
+          readAll('clients', 'client_id'),
+          readAll('loans', 'loan_id'),
+          readAll('loan_payments', 'payment_id'),
+          readAll('employee_performance', 'id'),
+          readAll('branch_performance', 'id'),
+          readAll('performance_targets', 'id'),
+          readAll('client_visits', 'visit_id')
         ]);
         if (employeesData) setEmployees(employeesData);
         if (branchesData) setBranches(branchesData);
@@ -651,13 +658,13 @@ const PerformanceDashboard: React.FC<TownProps> = ({ selectedTown, onTownChange 
         { data: performanceTargetsData },
         { data: clientVisitsData }
       ] = await Promise.all([
-        supabase.from('clients').select('*'),
-        supabase.from('loans').select('*'),
-        supabase.from('loan_payments').select('*'),
-        supabase.from('employee_performance').select('*'),
-        supabase.from('branch_performance').select('*'),
-        supabase.from('performance_targets').select('*'),
-        supabase.from('client_visits').select('*')
+        readAll('clients', 'client_id'),
+        readAll('loans', 'loan_id'),
+        readAll('loan_payments', 'payment_id'),
+        readAll('employee_performance', 'id'),
+        readAll('branch_performance', 'id'),
+        readAll('performance_targets', 'id'),
+        readAll('client_visits', 'visit_id')
       ]);
       if (clientsData) setClients(clientsData);
       if (loansData) setLoans(loansData);

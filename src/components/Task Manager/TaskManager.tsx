@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import EmployeePicker from '../UI/EmployeePicker';
 import { supabase } from '../../lib/supabase';
+import { fetchAllResult } from '../../lib/fetchAll';
 import { Button, EmptyState } from '../UI';
 import {
   Plus, Check, Circle, Trash2, Calendar, AlertCircle, Clock, User, 
@@ -56,10 +57,13 @@ const useEmployees = () => {
 
   const fetchEmployees = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      // every employee, a page at a time (one request is capped at 1000 rows)
+      const { data, error } = await fetchAllResult((from, to) => supabase
         .from('employee_directory')
         .select('"Employee Number", "First Name", "Middle Name", "Last Name", "Town", "Work Email", "Branch"')
-        .order('"First Name"', { ascending: true });
+        .order('"First Name"', { ascending: true })
+        .order('"Employee Number"')
+        .range(from, to));
 
       if (error) throw error;
 

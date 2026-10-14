@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
+import { fetchAllResult } from '../../lib/fetchAll';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import { useNavigate } from 'react-router-dom';
@@ -20,6 +21,12 @@ import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 
 type Asset = Database['public']['Tables']['assets']['Row'];
 type Employee = Database['public']['Tables']['employees']['Row'];
+
+// every asset, newest purchase first, a page at a time (one request is capped at 1000 rows)
+const loadAssets = () =>
+  fetchAllResult((from, to) =>
+    supabase.from('assets').select('*').order('purchase_date', { ascending: false }).order('id').range(from, to)
+  );
 
 interface AssetCategory {
   id: string;
@@ -80,18 +87,15 @@ const AssetManagement: React.FC = () => {
         setLoading(true);
         
         // Fetch assets
-        const { data: assetsData, error: assetsError } = await supabase
-          .from('assets')
-          .select('*')
-          .order('purchase_date', { ascending: false });
+        const { data: assetsData, error: assetsError } = await loadAssets();
 
         if (assetsError) throw assetsError;
         setAssets(assetsData || []);
 
         // Fetch employees for dropdowns
-        const { data: employeesData, error: employeesError } = await supabase
-          .from('employees')
-          .select('*');
+        const { data: employeesData, error: employeesError } = await fetchAllResult((from, to) =>
+          supabase.from('employees').select('*').order('"Employee Number"').order('id').range(from, to)
+        );
 
         if (employeesError) throw employeesError;
         setEmployees(employeesData || []);
@@ -222,10 +226,7 @@ const AssetManagement: React.FC = () => {
       if (error) throw error;
       
       // Refresh asset list
-      const { data: updatedData } = await supabase
-        .from('assets')
-        .select('*')
-        .order('purchase_date', { ascending: false });
+      const { data: updatedData } = await loadAssets();
       
       setAssets(updatedData || []);
       setIsAddModalOpen(false);
@@ -302,10 +303,7 @@ const AssetManagement: React.FC = () => {
         if (error) throw error;
         
         // Refresh asset list
-        const { data } = await supabase
-          .from('assets')
-          .select('*')
-          .order('purchase_date', { ascending: false });
+        const { data } = await loadAssets();
         
         setAssets(data || []);
       } catch (err) {

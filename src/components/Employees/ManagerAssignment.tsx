@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { fetchAll } from '../../lib/fetchAll';
 import { Save, UserCog, ArrowLeft, Filter, Users, MapPin, Building2, Settings, ShieldAlert, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -42,14 +43,14 @@ const ManagerAssignment = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
+            // every employee, a page at a time (one request is capped at 1000 rows)
+            const emps = await fetchAll((from, to) => supabase
                 .from('employees')
                 .select('*')
-                .order('First Name', { ascending: true });
-
-            if (error) throw error;
-
-            const emps = data || [];
+                .order('First Name', { ascending: true })
+                .order('"Employee Number"')
+                .order('id')
+                .range(from, to));
             setEmployees(emps);
             setFilteredEmployees(emps);
 

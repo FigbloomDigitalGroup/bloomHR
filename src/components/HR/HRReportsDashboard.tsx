@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
+import { fetchAllResult } from '../../lib/fetchAll';
 
 interface DashboardStats {
     on_probation: number;
@@ -86,12 +87,13 @@ export default function HRReportsDashboard({ stats }: { stats: DashboardStats })
     const handleDownload = async (report: typeof REPORTS[0]) => {
         setGeneratingId(report.id);
         try {
-            let query = supabase.from(report.table as 'hr_employment_status').select('*');
+            let query = supabase.from(report.table as 'hr_employment_status').select('*').order('id');
             if (report.filter && Object.keys(report.filter).length > 0) {
                 const [key, value] = Object.entries(report.filter)[0];
                 query = (query as any).eq(key, value);
             }
-            const { data, error } = await query;
+            // every page (one request is capped at 1000 rows); range() replaces the previous page's range
+            const { data, error } = await fetchAllResult((from, to) => query.range(from, to));
             if (error) throw error;
 
             if (!data || data.length === 0) {

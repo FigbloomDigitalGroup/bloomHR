@@ -10,6 +10,7 @@ import {
   CalendarClock as Schedule // Using CalendarClock as Schedule replacement
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { WRITE_BATCH_SIZE, chunks, fetchAll } from '../../lib/fetchAll';
 import toast from 'react-hot-toast';
 
 interface AdvanceApplicationManagerProps {
@@ -177,13 +178,12 @@ const AdvanceApplicationManager = ({ onStatusChange }: AdvanceApplicationManager
 
   const notifyAllStaff = async (title: string, message: string) => {
     try {
-      const { data: employees, error: employeesError } = await supabase
-        .from('employees')
-        .select('"Employee Number"');
+      // every employee, a page at a time (one request is capped at 1000 rows)
+      const employees = await fetchAll((from, to) =>
+        supabase.from('employees').select('"Employee Number"').order('"Employee Number"').order('id').range(from, to)
+      );
 
-      if (employeesError) throw employeesError;
-
-      if (employees && employees.length > 0) {
+      if (employees.length > 0) {
         const notifications = employees.map(employee => ({
           employee_number: employee["Employee Number"],
           type: 'system_announcement',
@@ -194,11 +194,14 @@ const AdvanceApplicationManager = ({ onStatusChange }: AdvanceApplicationManager
           created_at: new Date().toISOString()
         }));
 
-        const { error: notificationError } = await supabase
-          .from('notifications')
-          .insert(notifications);
+        // in batches, so a large company's rows fit in each request
+        for (const batch of chunks(notifications, WRITE_BATCH_SIZE)) {
+          const { error: notificationError } = await supabase
+            .from('notifications')
+            .insert(batch);
 
-        if (notificationError) throw notificationError;
+          if (notificationError) throw notificationError;
+        }
       }
     } catch (error) {
       console.error('Error notifying staff:', error);

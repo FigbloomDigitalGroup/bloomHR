@@ -3,6 +3,7 @@ import EmployeePicker from '../UI/EmployeePicker';
 import { motion } from 'framer-motion';
 import { Calendar, Plus, Search, X, Loader2, CheckCircle, Bell } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { fetchAllResult } from '../../lib/fetchAll';
 import toast from 'react-hot-toast';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
@@ -48,9 +49,10 @@ export default function LeaveScheduleAssigner({ onRefresh }: { onRefresh?: () =>
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
+            // every row, a page at a time (one request is capped at 1000 rows)
             const [schedulesRes, empsRes] = await Promise.all([
-                supabase.from('hr_leave_schedules').select('*').order('leave_start_date', { ascending: true }),
-                supabase.from('employees').select('"Employee Number", "First Name", "Last Name", "Job Title", "Branch"')
+                fetchAllResult((from, to) => supabase.from('hr_leave_schedules').select('*').order('leave_start_date', { ascending: true }).order('id').range(from, to)),
+                fetchAllResult((from, to) => supabase.from('employees').select('"Employee Number", "First Name", "Last Name", "Job Title", "Branch"').order('"Employee Number"').order('id').range(from, to))
             ]);
             const emps = empsRes.data || [];
             setEmployees(emps as Employee[]);

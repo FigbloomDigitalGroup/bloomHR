@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { sendEmailViaServer } from '../../lib/emailApi';
 import EmployeePicker from '../UI/EmployeePicker';
 import { supabase } from '../../lib/supabase';
+import { fetchAllResult } from '../../lib/fetchAll';
 import { Loader2, Send, Filter, Users, X, Check, Paperclip } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -51,11 +52,15 @@ export default function SendEmail() {
   const fetchEmployees = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      // every page (one request is capped at 1000 rows)
+      const { data, error } = await fetchAllResult((from, to) => supabase
         .from('employees')
         .select('*')
         .not('Work Email', 'is', null) // Only fetch those with emails
-        .not('Work Email', 'eq', '');
+        .not('Work Email', 'eq', '')
+        .order('"Employee Number"')
+        .order('id')
+        .range(from, to));
 
       if (error) throw error;
 

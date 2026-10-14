@@ -15,7 +15,7 @@ import GlowButton from '../UI/GlowButton';
 import { User, Briefcase, CreditCard, Phone, MapPin } from 'lucide-react';
 import SearchableDropdown from '../UI/SearchableDropdown';
 import { employeeTypeOptions } from '../../lib/employmentTypes';
-import { STARTER_DEPARTMENTS, ensureBranchListed, optionsWithStarters } from '../../lib/employeeOptions';
+import { STARTER_DEPARTMENTS, ensureBranchListed, loadEmployeeFieldValues, optionsWithStarters } from '../../lib/employeeOptions';
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 import { useUser } from '../ProtectedRoutes/UserContext';
 import { PAYMENT_METHODS, paymentMethodOption } from '../../lib/paymentMethods';
@@ -116,46 +116,7 @@ const EditEmployeePage = () => {
         if (!empData) throw new Error('Employee not found');
 
         // Fetch dropdown options
-        const { data: empTypes } = await supabase
-          .from('employees')
-          .select('"Employee Type"')
-          .not('Employee Type', 'is', null)
-          .order('"Employee Type"', { ascending: true });
-
-        const { data: branches } = await supabase
-          .from('employees')
-          .select('"Branch"')
-          .not('Branch', 'is', null)
-          .order('"Branch"', { ascending: true });
-
-        const { data: jobLevels } = await supabase
-          .from('employees')
-          .select('"Job Level"')
-          .not('Job Level', 'is', null)
-          .order('"Job Level"', { ascending: true });
-
-        const { data: jobGroup } = await supabase
-          .from('employees')
-          .select('"Job Group"')
-          .not('Job Group', 'is', null)
-          .order('"Job Group"', { ascending: true });
-
-        const { data: office } = await supabase
-          .from('employees')
-          .select('"Town"')
-          .not('Town', 'is', null)
-          .order('"Town"', { ascending: true });
-
-        const { data: jobTitles } = await supabase
-          .from('employees')
-          .select('"Job Title"')
-          .not('Job Title', 'is', null)
-          .order('"Job Title"', { ascending: true });
-
-        const { data: supervisors } = await supabase
-          .from('employees')
-          .select('"First Name", "Last Name"')
-          .order('"First Name"', { ascending: true });
+        const values = await loadEmployeeFieldValues('employees');
 
         // Fetch emergency contact (single contact)
         const { data: contacts } = await supabase
@@ -182,13 +143,13 @@ const EditEmployeePage = () => {
 
         setDropdownOptions(prev => ({
           ...prev,
-          employmentTypes: employeeTypeOptions(empTypes?.map(item => item['Employee Type'] as string)),
-          branches: optionsWithStarters(branches?.map(item => item.Branch as string)),
-          jobLevels: optionsWithStarters(jobLevels?.map(item => item['Job Level'] as string), STARTER_DEPARTMENTS),
-          jobGroup: optionsWithStarters(jobGroup?.map(item => item['Job Group'] as string)),
-          office: optionsWithStarters(office?.map(item => item.Town as string)),
-          jobTitles: optionsWithStarters(jobTitles?.map(item => item['Job Title'] as string)),
-          supervisors: supervisors?.map(item => `${item['First Name']} ${item['Last Name']}`) || [],
+          employmentTypes: employeeTypeOptions(values.employeeTypes),
+          branches: optionsWithStarters(values.branches),
+          jobLevels: optionsWithStarters(values.jobLevels, STARTER_DEPARTMENTS),
+          jobGroup: optionsWithStarters(values.jobGroups),
+          office: optionsWithStarters(values.towns),
+          jobTitles: optionsWithStarters(values.jobTitles),
+          supervisors: values.supervisors,
         }));
 
         // older records say "Mobile Money" or "MPESA": show (and save) the spelling payroll and payslips match

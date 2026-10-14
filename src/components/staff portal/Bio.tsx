@@ -13,6 +13,7 @@ import GlowButton from '../UI/GlowButton';
 import StatusPill from '../UI/StatusPill';
 import { User, Briefcase, CreditCard, Phone, MapPin } from 'lucide-react';
 import { PAYMENT_METHODS, paymentMethodOption } from '../../lib/paymentMethods';
+import { loadEmployeeFieldValues } from '../../lib/employeeOptions';
 
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'SHIF Number'?: string | null;
@@ -176,46 +177,7 @@ const EmployeeBioPage = () => {
         if (!empData) throw new Error('Employee not found');
 
         // Fetch dropdown options
-        const { data: empTypes } = await supabase
-          .from('employee_directory')
-          .select('"Employee Type"')
-          .not('Employee Type', 'is', null)
-          .order('"Employee Type"', { ascending: true });
-
-        const { data: branches } = await supabase
-          .from('employee_directory')
-          .select('"Branch"')
-          .not('Branch', 'is', null)
-          .order('"Branch"', { ascending: true });
-
-        const { data: jobLevels } = await supabase
-          .from('employee_directory')
-          .select('"Job Level"')
-          .not('Job Level', 'is', null)
-          .order('"Job Level"', { ascending: true });
-
-        const { data: jobGroup } = await supabase
-          .from('employee_directory')
-          .select('"Job Group"')
-          .not('Job Group', 'is', null)
-          .order('"Job Group"', { ascending: true });
-
-        const { data: office } = await supabase
-          .from('employee_directory')
-          .select('"Town"')
-          .not('Town', 'is', null)
-          .order('"Town"', { ascending: true });
-
-        const { data: jobTitles } = await supabase
-          .from('employee_directory')
-          .select('"Job Title"')
-          .not('Job Title', 'is', null)
-          .order('"Job Title"', { ascending: true });
-
-        const { data: supervisors } = await supabase
-          .from('employee_directory')
-          .select('"First Name", "Last Name"')
-          .order('"First Name"', { ascending: true });
+        const values = await loadEmployeeFieldValues('employee_directory');
 
         // Fetch emergency contact (single contact)
         const { data: contacts } = await supabase
@@ -242,13 +204,13 @@ const EmployeeBioPage = () => {
 
         setDropdownOptions(prev => ({
           ...prev,
-          employmentTypes: [...new Set(empTypes?.map(item => item['Employee Type'] as string))],
-          branches: [...new Set(branches?.map(item => item.Branch as string))],
-          jobLevels: [...new Set(jobLevels?.map(item => item['Job Level'] as string))],
-          jobGroup: [...new Set(jobGroup?.map(item => item['Job Group'] as string))],
-          office: [...new Set(office?.map(item => item.Town as string))],
-          jobTitles: [...new Set(jobTitles?.map(item => item['Job Title'] as string))],
-          supervisors: supervisors?.map(item => `${item['First Name']} ${item['Last Name']}`) || [],
+          employmentTypes: [...new Set(values.employeeTypes)],
+          branches: [...new Set(values.branches)],
+          jobLevels: [...new Set(values.jobLevels)],
+          jobGroup: [...new Set(values.jobGroups)],
+          office: [...new Set(values.towns)],
+          jobTitles: [...new Set(values.jobTitles)],
+          supervisors: values.supervisors,
         }));
 
         setEmployee(empData);

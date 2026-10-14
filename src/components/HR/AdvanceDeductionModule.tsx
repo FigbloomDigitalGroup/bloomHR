@@ -8,6 +8,7 @@ import {
     ArrowUpRight, Plus, MapPin
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { fetchAllResult } from '../../lib/fetchAll';
 import toast from 'react-hot-toast';
 
 interface Advance {
@@ -58,9 +59,10 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
+            // every row, a page at a time (one request is capped at 1000 rows)
             const [advRes, empRes] = await Promise.all([
-                supabase.from('hr_salary_advances').select('*').order('advance_date', { ascending: false }),
-                supabase.from('employees').select('"Employee Number", "First Name", "Last Name", "Job Title", "Branch", "Town", "Mobile Number"')
+                fetchAllResult((from, to) => supabase.from('hr_salary_advances').select('*').order('advance_date', { ascending: false }).order('id').range(from, to)),
+                fetchAllResult((from, to) => supabase.from('employees').select('"Employee Number", "First Name", "Last Name", "Job Title", "Branch", "Town", "Mobile Number"').order('"Employee Number"').order('id').range(from, to))
             ]);
             const emps = (empRes.data || []) as Employee[];
             setEmployees(emps);

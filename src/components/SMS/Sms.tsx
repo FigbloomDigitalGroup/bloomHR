@@ -5,6 +5,7 @@ import {
   Loader, RefreshCw, Save
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { fetchAllResult } from '../../lib/fetchAll';
 import { smsSegments } from '../../lib/smsSegments';
 import { getSmsBalance, sendSingleSms } from '../../lib/smsApi';
 import { Card, Button, TabBar } from '../UI';
@@ -619,7 +620,8 @@ export function SMSCenter() {
   const fetchEmployees = async () => {
     try {
       setIsLoadingEmployees(true);
-      const { data, error } = await supabase
+      // every employee, a page at a time (one request is capped at 1000 rows)
+      const { data, error } = await fetchAllResult((from, to) => supabase
         .from('employees')
         .select(`
           "Employee Number",
@@ -636,7 +638,10 @@ export function SMSCenter() {
           "Office",
           "Town"
         `)
-        .order('"First Name"');
+        .order('"First Name"')
+        .order('"Employee Number"')
+        .order('id')
+        .range(from, to));
 
       if (error) throw error;
 

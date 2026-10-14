@@ -5,6 +5,7 @@ import {
     ChevronLeft, ChevronRight, RefreshCw, Users
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { fetchAllResult } from '../../lib/fetchAll';
 import toast from 'react-hot-toast';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
@@ -74,9 +75,10 @@ export default function LifecycleHistoryModule() {
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
+            // every row, a page at a time (one request is capped at 1000 rows)
             const [histRes, empRes] = await Promise.all([
-                supabase.from('hr_lifecycle_history').select('*').order('event_date', { ascending: false }),
-                supabase.from('employees').select('"Employee Number", "First Name", "Last Name"')
+                fetchAllResult((from, to) => supabase.from('hr_lifecycle_history').select('*').order('event_date', { ascending: false }).order('id').range(from, to)),
+                fetchAllResult((from, to) => supabase.from('employees').select('"Employee Number", "First Name", "Last Name"').order('"Employee Number"').order('id').range(from, to))
             ]);
             const emps = (empRes.data || []) as Employee[];
             setAllEmployees(emps);

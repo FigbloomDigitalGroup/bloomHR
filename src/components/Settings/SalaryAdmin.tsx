@@ -4,6 +4,7 @@ import { sendSingleSms } from '../../lib/smsApi';
 import { Card, Button, SearchInput } from '../UI';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
+import { IN_LIST_SIZE, chunks, fetchAllResult } from '../../lib/fetchAll';
 import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
 import toast from 'react-hot-toast';
 import { XCircle, Clock, Search, ChevronDown, Send, Users,
@@ -1619,13 +1620,15 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
       let query = supabase
         .from('mpesa_callbacks')
         .select('*')
-        .order('callback_date', { ascending: false });
+        .order('callback_date', { ascending: false })
+        .order('id', { ascending: false });
 
       if (filterStatus !== 'all') {
         query = query.eq('status', filterStatus);
       }
 
-      const { data, error } = await query;
+      // every page (one request is capped at 1000 rows); range() replaces the previous page's range
+      const { data, error } = await fetchAllResult((from, to) => query.range(from, to));
 
       if (error) {
         console.error('❌ Supabase Query Error:', error);
@@ -2178,7 +2181,8 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
       let query = supabase
         .from('mpesa_callbacks')
         .select('*')
-        .order('callback_date', { ascending: false });
+        .order('callback_date', { ascending: false })
+        .order('id', { ascending: false });
 
       // Apply status filter
       if (filterStatus !== 'all') {
@@ -2225,7 +2229,8 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
         }
       }
 
-      const { data, error } = await query;
+      // every page (one request is capped at 1000 rows); range() replaces the previous page's range
+      const { data, error } = await fetchAllResult((from, to) => query.range(from, to));
 
       if (error) {
         console.error('Error fetching callbacks for export:', error);
@@ -3366,9 +3371,9 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   useEffect(() => {
     const loadMappings = async () => {
       try {
-        const { data, error: employeesError } = await supabase
-          .from('employees')
-          .select('"Branch", "Town"');
+        const { data, error: employeesError } = await fetchAllResult((from, to) =>
+          supabase.from('employees').select('"Branch", "Town"').order('"Employee Number"').order('id').range(from, to)
+        );
 
         if (employeesError) {
           console.error("Error loading area-town mapping:", employeesError);
@@ -3530,10 +3535,12 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   const fetchPaymentRequests = async () => {
     try {
       setIsLoadingRequests(true);
-      const { data, error } = await supabase
+      const { data, error } = await fetchAllResult((from, to) => supabase
         .from('salary_advance_payment_flows')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to));
 
       if (error) {
         console.error('Error fetching payment requests:', error);
@@ -3554,12 +3561,15 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
   const fetchTowns = async () => {
     try {
       console.log('📍 Fetching towns and regions from database...');
-      const { data: employeesData, error: employeesError } = await supabase
+      const { data: employeesData, error: employeesError } = await fetchAllResult((from, to) => supabase
         .from('employees')
         .select('"Town", "Branch"')
-        .not('Town', 'is', null);
+        .not('Town', 'is', null)
+        .order('"Employee Number"')
+        .order('id')
+        .range(from, to));
 
-      if (employeesError) {
+      if (employeesError || !employeesData) {
         console.error('❌ Error fetching towns:', employeesError);
         return;
       }
@@ -3594,25 +3604,29 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       let query = supabase
         .from('salary_advance')
         .select('*')
-        .order('time_added', { ascending: false });
+        .order('time_added', { ascending: false })
+        .order('id', { ascending: false });
 
       // Role-based filtering
       if (!isAdminOrChecker) {
         if (isRegionalManager && selectedRegion && selectedRegion !== 'All Regions') {
           console.log('🌍 Regional Manager - Filtering by region:', selectedRegion);
 
-          const { data: regionTowns, error: townsError } = await supabase
+          const { data: regionTowns, error: townsError } = await fetchAllResult((from, to) => supabase
             .from('employees')
             .select('"Town"')
             .ilike('Branch', `%${selectedRegion}%`)
-            .not('Town', 'is', null);
+            .not('Town', 'is', null)
+            .order('"Employee Number"')
+            .order('id')
+            .range(from, to));
 
           if (townsError) {
             console.error('❌ Error fetching region towns:', townsError);
             throw townsError;
           }
 
-          const uniqueTowns = [...new Set(regionTowns.map(item => item.Town))].filter(Boolean);
+          const uniqueTowns = [...new Set((regionTowns || []).map(item => item.Town))].filter(Boolean);
           console.log('🏙️ Towns in region:', uniqueTowns);
 
           if (uniqueTowns.length > 0) {
@@ -3631,7 +3645,8 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         }
       }
 
-      const { data, error } = await query;
+      // every page (one request is capped at 1000 rows); range() replaces the previous page's range
+      const { data, error } = await fetchAllResult((from, to) => query.range(from, to));
 
       if (error) {
         console.error('❌ Error fetching applications:', error);
@@ -3718,12 +3733,16 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
       if (employeeNumbers.length === 0) return;
 
-      const { data, error } = await supabase
-        .from('employees')
-        .select('"Employee Number", "Job Title"')
-        .in('"Employee Number"', employeeNumbers);
-
-      if (error) throw error;
+      // a chunk of employee numbers per request: thousands do not fit one filter
+      const data = [];
+      for (const numbers of chunks([...new Set(employeeNumbers)], IN_LIST_SIZE)) {
+        const { data: rows, error } = await supabase
+          .from('employees')
+          .select('"Employee Number", "Job Title"')
+          .in('"Employee Number"', numbers);
+        if (error) throw error;
+        data.push(...(rows ?? []));
+      }
 
       const jobTitleMap: Record<string, string> = {};
       const branchManagerMap: Record<string, boolean> = {};
@@ -3754,12 +3773,16 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
       if (employeeNumbers.length === 0) return;
 
-      const { data, error } = await supabase
-        .from('employees')
-        .select('"Employee Number", "Mobile Number", "Branch", "Town"')
-        .in('"Employee Number"', employeeNumbers);
-
-      if (error) throw error;
+      // a chunk of employee numbers per request: thousands do not fit one filter
+      const data = [];
+      for (const numbers of chunks([...new Set(employeeNumbers)], IN_LIST_SIZE)) {
+        const { data: rows, error } = await supabase
+          .from('employees')
+          .select('"Employee Number", "Mobile Number", "Branch", "Town"')
+          .in('"Employee Number"', numbers);
+        if (error) throw error;
+        data.push(...(rows ?? []));
+      }
 
       const mobileMap: Record<string, string> = {};
       const branchMap: Record<string, string> = {};
@@ -4911,7 +4934,8 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       let query = supabase
         .from('salary_advance')
         .select('*')
-        .order('time_added', { ascending: false });
+        .order('time_added', { ascending: false })
+        .order('id', { ascending: false });
 
       // Apply date range filter for export
       if (exportConfig.dateRange && exportConfig.dateRange !== 'all') {
@@ -4958,12 +4982,13 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         query = query.ilike('"Office Branch"', `%${exportConfig.town}%`);
       }
 
-      const { data, error } = await query;
+      // every page (one request is capped at 1000 rows); range() replaces the previous page's range
+      const { data, error } = await fetchAllResult((from, to) => query.range(from, to));
 
       if (error) throw error;
 
       // Prepare data for export with in-memory filtering for accurate status matching
-      const filteredData = data.filter(app => {
+      const filteredData = (data || []).filter(app => {
         if (!exportConfig.status || exportConfig.status === 'all') return true;
 
         const appStatus = app.status?.toLowerCase();

@@ -7,7 +7,13 @@ vi.mock('./supabase', () => ({
   supabase: {
     from: (table: string) => {
       calls.push(table);
-      const chain = { select: () => chain, order: () => chain, limit: () => Promise.resolve(results[table]) };
+      // like the API: the requested range of rows, at most 1000 per request
+      const range = (from: number, to: number) => {
+        const r = results[table];
+        const rows = Array.isArray(r.data) ? r.data.slice(from, Math.min(to + 1, from + 1000)) : r.data;
+        return Promise.resolve({ data: rows, error: r.error });
+      };
+      const chain = { select: () => chain, order: () => chain, range };
       return chain;
     },
   },
@@ -28,6 +34,13 @@ describe('loadEmployeeDirectory', () => {
     const list = await loadEmployeeDirectory();
     expect(list.map((e) => e.fullName)).toEqual(['Mike Otieno']);
     expect(calls).toEqual(['employee_directory']);
+  });
+
+  it('reads past the 1000-row cap of a single request', async () => {
+    const rows = Array.from({ length: 2500 }, (_, i) => ({ ...row, 'Employee Number': String(i + 1) }));
+    results.employee_directory = { data: rows, error: null };
+    expect(await loadEmployeeDirectory()).toHaveLength(2500);
+    expect(calls).toEqual(['employee_directory', 'employee_directory', 'employee_directory']);
   });
 
   it('falls back to the employees table when the directory cannot be read', async () => {

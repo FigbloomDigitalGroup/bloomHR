@@ -28,6 +28,20 @@ export async function fetchAll<T>(page: (from: number, to: number) => PageResult
   }
 }
 
+/**
+ * `fetchAll` with the result shaped like a single request's `{ data, error }`, for code that already handles
+ * that shape. The error is whatever the failing page returned (a database error has a `message`).
+ */
+export function fetchAllResult<T>(
+  page: (from: number, to: number) => PageResult<T>,
+  pageSize = PAGE_SIZE,
+): Promise<{ data: T[] | null; error: { message: string } | null }> {
+  return fetchAll(page, pageSize).then(
+    (data) => ({ data, error: null }),
+    (error) => ({ data: null, error }),
+  );
+}
+
 /** `items` split into consecutive pieces of at most `size`. */
 export function chunks<T>(items: readonly T[], size: number): T[][] {
   if (size < 1) throw new Error('chunk size must be at least 1');
