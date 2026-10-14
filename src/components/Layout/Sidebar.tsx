@@ -25,7 +25,7 @@ import {
   Mails,
   ShieldHalf,
   HeartHandshake,
-  LogOut, CalendarDays, ClipboardCheck, Layers
+  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useMyPreferences } from '../../hooks/useMyPreferences';
@@ -58,6 +58,7 @@ const menuGroups = [
     title: "Team",
     items: [
       { id: 'employees', label: 'Employees', icon: UsersRound, path: '/employees', permission: 'employees' },
+      { id: 'organogram', label: 'Organogram', icon: OrgChart, path: '/organogram' },
       { id: 'onboarding', label: 'Onboarding', icon: ClipboardCheck, path: '/onboarding', permission: 'employees' },
       { id: 'recruitment', label: 'Recruitment', icon: UserPlus2, path: '/recruitment', permission: 'recruitment' },
       { id: 'leaves', label: 'Time Off', icon: CalendarRange, path: '/leaves', permission: 'leaves' },
@@ -87,6 +88,7 @@ const menuGroups = [
       { id: 'email admin', label: 'Email Admin', icon: ShieldEllipsis, path: '/adminconfirm', permission: 'adminconfirm' },
       { id: 'incident-reports', label: 'Incidents', icon: ShieldAlert, path: '/incident-reports', permission: 'incident-reports' },
       { id: 'settings', label: 'Settings', icon: Settings, path: '/settings', permission: 'settings' },
+      { id: 'departments', label: 'Departments', icon: Building2, path: '/departments', permission: 'employees' },
       { id: 'role-permissions', label: 'Role Permissions', icon: ShieldHalf, path: '/role-permissions', permission: 'role-permissions' },
       { id: 'appearance', label: 'Appearance', icon: Palette, path: '/appearance' },
     ]

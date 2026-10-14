@@ -1,6 +1,6 @@
 import { X, Check } from 'lucide-react';
 import { GlowButton } from './GlowButton';
-import { departments } from './constants/departments';
+import { useRecruitmentDepartments } from './constants/departments';
 import { employeeTypes } from './constants/employeeTypes';
 import { branches } from './constants/branches';
 
@@ -9,6 +9,7 @@ interface NewPositionModalProps {
 }
 
 export const NewPositionModal = ({ onClose }: NewPositionModalProps) => {
+  const departments = useRecruitmentDepartments();
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
       <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md overflow-y-auto max-h-[90vh]">

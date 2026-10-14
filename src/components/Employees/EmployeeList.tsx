@@ -11,7 +11,8 @@ import {
   CheckSquare,
   X,
   Save,
-  UsersRound
+  UsersRound,
+  Network
 } from 'lucide-react';
 import DuplicateCheckModal from './DuplicateCheckModal';
 import BulkEditModal from './BulkEditModal';
@@ -340,11 +341,16 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
           </>
         }
         actions={
-          <RoleButtonWrapper allowedRoles={['ADMIN', 'HR', 'MANAGER', 'REGIONAL']}>
-            <Button onClick={() => navigate('/add-employee')} icon={<Plus className="w-3.5 h-3.5" strokeWidth={2.2} />}>
-              Add Employee
+          <>
+            <Button variant="secondary" onClick={() => navigate('/organogram')} icon={<Network className="w-3.5 h-3.5" strokeWidth={2} />}>
+              Organogram
             </Button>
-          </RoleButtonWrapper>
+            <RoleButtonWrapper allowedRoles={['ADMIN', 'HR', 'MANAGER', 'REGIONAL']}>
+              <Button onClick={() => navigate('/add-employee')} icon={<Plus className="w-3.5 h-3.5" strokeWidth={2.2} />}>
+                Add Employee
+              </Button>
+            </RoleButtonWrapper>
+          </>
         }
       />
 

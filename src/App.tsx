@@ -41,6 +41,8 @@ const PerformanceDashboard = lazy(() => import('./components/Perfomance/Perfoman
 const AddEmployeePage = lazy(() => import('./components/Add Form/AddEmployeePage'));
 const ViewEmployeePage = lazy(() => import('./components/view_form/EmployeeDetails'));
 const ManagerAssignment = lazy(() => import('./components/Employees/ManagerAssignment'));
+const Organogram = lazy(() => import('./components/Employees/Organogram'));
+const Departments = lazy(() => import('./components/Settings/Departments'));
 const SuccessPage = lazy(() => import('./components/Add Form/SuccessPage'));
 const EmployeeDataTable = lazy(() => import('./components/Payroll/fog'));
 const EditEmployeePage = lazy(() => import('./components/Add Form/EditEmployee'));
@@ -1037,6 +1039,8 @@ function App() {
                                 <Route path="/view-employee/:employeeId" element={<ViewEmployeePage />} />
                                 <Route path="/edit-employee/:id" element={<EditEmployeePage />} />
                                 <Route path="/assign-managers" element={<ManagerAssignment />} />
+                                <Route path="/organogram" element={<Organogram />} />
+                                <Route path="/departments" element={<Departments />} />
                                 <Route
                                   path="/invite-people"
                                   element={

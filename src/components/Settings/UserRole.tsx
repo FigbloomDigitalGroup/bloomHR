@@ -856,6 +856,23 @@ export default function UserRolesSettings() {
 
         <ApprovalWorkflowsCard />
 
+        {/* Org structure */}
+        <Card className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-[38px] h-[38px] shrink-0 rounded-tile flex items-center justify-center bg-green-tint text-brand">
+              <Building2 className="w-[17px] h-[17px]" strokeWidth={1.8} />
+            </div>
+            <div>
+              <h2 className="m-0 text-[13.5px] font-bold text-ink">Departments</h2>
+              <p className="m-0 text-[11.5px] text-muted-foreground">Set up your departments and who heads them; see them on the organogram.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link to="/organogram"><Button variant="secondary">Organogram</Button></Link>
+            <Link to="/departments"><Button>Departments</Button></Link>
+          </div>
+        </Card>
+
         {/* Users */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
