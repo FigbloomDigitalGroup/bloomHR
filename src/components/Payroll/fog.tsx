@@ -9,6 +9,7 @@ import { normaliseWorkEmail, workEmailProblem } from '../../lib/employeeInvite';
 import { inviteToOnboard, startOnboardingByEmail } from '../../lib/onboarding';
 import { fetchAll } from '../../lib/fetchAll';
 import { describeSaveError, saveEmployeesInBatches } from '../../lib/bulkEmployees';
+import { employeeTemplateWorkbook, parseAmount } from '../../lib/employeeTemplate';
 import {
   inviteBatchProgress, lastInviteBatch, progressSummary, queueInvitations, rememberInviteBatch, retryFailedInvitations,
   type InviteProgress,
@@ -628,7 +629,7 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
           "Job Title": row['Job Title'] || row['job_title'] || row['Position'],
           "Employee Type": row['Employee Type'] || row['employee_type'] || row['Type'],
           "Job Group": row['Job Group'] || row['job_group'] || row['Grade'],
-          "Basic Salary": parseFloat(row['Basic Salary'] || row['basic_salary'] || row['Salary']) || null,
+          "Basic Salary": parseAmount(row['Basic Salary'] ?? row['basic_salary'] ?? row['Salary']),
           "SHIF Number": row['SHIF Number'] || row['shif_number'] || row['SHIF'],
           "NSSF Number": row['NSSF Number'] || row['nssf_number'] || row['NSSF'],
           "NHIF Number": row['NHIF Number'] || row['nhif_number'] || row['NHIF'],
@@ -802,45 +803,7 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
   };
 
   const downloadTemplate = () => {
-    const templateData = [
-      {
-        'Employee Number': 'EMP001',
-        'First Name': 'John',
-        'Last Name': 'Doe',
-        'Work Email': 'john.doe@company.com',
-        'Town': 'Nairobi',
-        'Job Title': 'Software Engineer',
-        'Employee Type': 'Permanent',
-        'Job Group': 'JG5',
-        'Basic Salary': '150000',
-        'SHIF Number': 'CR1234567',
-        'NSSF Number': '2012345678',
-        'NHIF Number': '',
-        'Tax PIN': 'A001234567B',
-        'ID Number': '12345678',
-        'Mobile Number': '0712345678',
-        'Personal Email': 'john@gmail.com',
-        'Gender': 'Male',
-        'Marital Status': 'Single',
-        'Date of Birth': '1990-01-01',
-        'manager_email': 'manager@company.com',
-        'regional_manager': 'regional.manager@company.com'
-      }
-    ];
-
-    const ws = XLSX.utils.json_to_sheet(templateData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Template');
-    
-    const colWidths = [
-      { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 10 },
-      { wch: 15 }, { wch: 12 }, { wch: 8 }, { wch: 12 }, { wch: 12 },
-      { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 12 },
-      { wch: 20 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 20 }
-    ];
-    ws['!cols'] = colWidths;
-    
-    XLSX.writeFile(wb, 'employee_bulk_upload_template.xlsx');
+    XLSX.writeFile(employeeTemplateWorkbook(), 'employee_bulk_upload_template.xlsx');
     toast.success('Template downloaded successfully!');
   };
 
