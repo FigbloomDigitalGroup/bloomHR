@@ -52,6 +52,7 @@ import StatusPill from '../UI/StatusPill';
 import { fetchStaffHRNotifications, markStaffNotificationRead } from '../../hooks/useHRNotifications';
 import EmailNotificationsToggle from './EmailNotificationsToggle';
 import { supabase } from '../../lib/supabase';
+import { loadCompanyIdentity } from '../../lib/companyProfile';
 import { useNavigate } from 'react-router-dom';
 import TrainingModule from './Training';
 import Profile from './Profile';
@@ -78,7 +79,6 @@ import bloomMark from '../../../public/bloom-mark.png';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
 interface CompanyProfile {
-  id: number;
   image_url: string | null;
   company_name: string | null;
   company_tagline: string | null;
@@ -2684,17 +2684,8 @@ const StaffPortal = () => {
 
   const fetchCompanyProfile = async () => {
     try {
-      const { data, error } = await supabase
-        .from('company_logo')
-        .select('*')
-        .order('id', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
+      // name, logo and tagline from the company profile (FIG-825)
+      const data = await loadCompanyIdentity();
       if (data) {
         setCompanyProfile(data);
       }
