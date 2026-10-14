@@ -146,9 +146,12 @@ describe('leave_application', () => {
       expect(await count(`update leave_application set status = 'approved' where "Employee Number" = 'E-ME' returning 1`)).toBe(0);
     });
   });
-  it('an approver can decide an application', async () => {
+  // decisions go through the application's approval chain (FIG-829, approval_workflows.test.ts)
+  it('an approver can decide an application, through its approval chain', async () => {
     await asUser(db, U.HR, async () => {
-      expect(await attempt(`update leave_application set status = 'approved' where "Employee Number" = 'E-THEM'`)).toBe(true);
+      expect(await attempt(`update leave_application set status = 'approved' where "Employee Number" = 'E-THEM'`)).toBe(false);
+      expect(await attempt(`select decide_approval(r.id, 'approved') from approval_requests r join leave_application l on l.id = r.record_id
+        where l."Employee Number" = 'E-THEM'`)).toBe(true);
     });
   });
 });
