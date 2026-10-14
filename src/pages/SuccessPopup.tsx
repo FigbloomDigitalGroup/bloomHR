@@ -21,8 +21,8 @@ export function SuccessPopup({ message, onClose, show }: SuccessPopupProps) {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50 backdrop-blur-sm">
-      <div className="relative bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all duration-300 scale-95 animate-scaleIn">
+    <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50 backdrop-blur-sm overflow-y-auto p-4">
+      <div className="relative bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4 transform transition-all duration-300 scale-95 animate-scaleIn overflow-y-auto max-h-[90vh]">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-500 focus:outline-none"

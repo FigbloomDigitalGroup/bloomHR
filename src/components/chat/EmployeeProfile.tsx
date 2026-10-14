@@ -50,7 +50,7 @@ export function EmployeeProfile({ employee: person, children }: EmployeeProfileP
       <PopoverTrigger asChild>
         {children}
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0 bg-white border border-gray-200 rounded-xl shadow-lg">
+      <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] p-0 bg-white border border-gray-200 rounded-xl shadow-lg">
         {/* Header */}
         <div className="bg-brand p-6 text-white rounded-t-xl">
           <div className="flex items-center gap-4">

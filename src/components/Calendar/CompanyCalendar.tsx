@@ -6,6 +6,7 @@ import {
   endOfWeek,
   eachDayOfInterval,
   isSameMonth,
+  isSameDay,
   isToday,
   format,
   addMonths,
@@ -16,7 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { fetchAllResult } from '../../lib/fetchAll';
-import { PageHeader, Card, Button } from '../UI';
+import { PageHeader, Card, Button, Modal } from '../UI';
 
 interface BirthdayEntry {
   name: string;
@@ -44,6 +45,8 @@ export default function CompanyCalendar() {
   const [holidaysByDay, setHolidaysByDay] = useState<Map<string, HolidayEntry[]>>(new Map());
   const [eventsByDay, setEventsByDay] = useState<Map<string, CompanyEvent[]>>(new Map());
   const [loading, setLoading] = useState(true);
+  // the day tapped on the phone layout, whose entries are listed under the grid
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [showEventForm, setShowEventForm] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: '', date: format(new Date(), 'yyyy-MM-dd'), description: '' });
@@ -116,6 +119,12 @@ export default function CompanyCalendar() {
     ...(holidaysByDay.get(`d-${format(day, 'yyyy-MM-dd')}`) || []),
   ];
   const getEventsFor = (day: Date) => eventsByDay.get(format(day, 'yyyy-MM-dd')) || [];
+  const hasEntries = (day: Date) =>
+    getEventsFor(day).length > 0 || getHolidaysFor(day).length > 0 || getBirthdaysFor(day).length > 0;
+  // the days listed under the grid on phones
+  const phoneListDays = selectedDay
+    ? (hasEntries(selectedDay) ? [selectedDay] : [])
+    : gridDays.filter((day) => isSameMonth(day, currentMonth) && hasEntries(day));
 
   const handleAddEvent = async () => {
     if (!newEvent.title.trim() || !newEvent.date) {
@@ -161,12 +170,12 @@ export default function CompanyCalendar() {
         title="Company Calendar"
         subtitle="Birthdays, holidays and company events"
         actions={
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={() => setCurrentMonth((m) => subMonths(m, 1))} icon={<ChevronLeft className="w-3.5 h-3.5" />}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" onClick={() => { setCurrentMonth((m) => subMonths(m, 1)); setSelectedDay(null); }} icon={<ChevronLeft className="w-3.5 h-3.5" />}>
               Prev
             </Button>
             <span className="text-[13px] font-bold text-ink w-32 text-center">{format(currentMonth, 'MMMM yyyy')}</span>
-            <Button variant="secondary" onClick={() => setCurrentMonth((m) => addMonths(m, 1))} icon={<ChevronRight className="w-3.5 h-3.5" />}>
+            <Button variant="secondary" onClick={() => { setCurrentMonth((m) => addMonths(m, 1)); setSelectedDay(null); }} icon={<ChevronRight className="w-3.5 h-3.5" />}>
               Next
             </Button>
             <Button variant="primary" onClick={() => setShowEventForm(true)} icon={<CalendarPlus className="w-3.5 h-3.5" />}>
@@ -179,8 +188,9 @@ export default function CompanyCalendar() {
       <Card padding="none" className="overflow-hidden">
         <div className="grid grid-cols-7 border-b border-border bg-secondary">
           {WEEKDAY_LABELS.map((label) => (
-            <div key={label} className="px-2 py-2 text-[10.5px] font-semibold text-muted-foreground text-center uppercase tracking-wide">
-              {label}
+            <div key={label} className="px-0.5 sm:px-2 py-2 text-[10.5px] font-semibold text-muted-foreground text-center uppercase tracking-wide">
+              <span className="sm:hidden">{label.charAt(0)}</span>
+              <span className="hidden sm:inline">{label}</span>
             </div>
           ))}
         </div>
@@ -190,19 +200,35 @@ export default function CompanyCalendar() {
             const birthdays = getBirthdaysFor(day);
             const holidays = getHolidaysFor(day);
             const events = getEventsFor(day);
+            const isSelected = selectedDay !== null && isSameDay(day, selectedDay);
+            const dayNumberClass = `text-[11px] font-semibold w-5 h-5 items-center justify-center rounded-full ${
+              isToday(day) ? 'bg-brand text-white' : inMonth ? 'text-ink' : 'text-subtle'
+            }`;
             return (
               <div
                 key={day.toISOString()}
-                className={`min-h-[104px] border-b border-r border-border p-1.5 last:border-r-0 ${inMonth ? 'bg-white' : 'bg-secondary/40'}`}
+                className={`min-h-[52px] sm:min-h-[104px] border-b border-r border-border p-0.5 sm:p-1.5 last:border-r-0 ${inMonth ? 'bg-white' : 'bg-secondary/40'}`}
               >
-                <div
-                  className={`text-[11px] font-semibold w-5 h-5 flex items-center justify-center rounded-full ${
-                    isToday(day) ? 'bg-brand text-white' : inMonth ? 'text-ink' : 'text-subtle'
-                  }`}
+                {/* Phones: the columns are too narrow for event labels, so show the day and a dot per kind
+                    of entry, and list the tapped day's entries under the grid */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedDay(isSelected ? null : day)}
+                  aria-pressed={isSelected}
+                  aria-label={format(day, 'd MMMM yyyy')}
+                  className={`sm:hidden w-full h-full min-h-[44px] flex flex-col items-center gap-1 rounded ${isSelected ? 'ring-2 ring-brand' : ''}`}
                 >
+                  <span className={`flex ${dayNumberClass}`}>{format(day, 'd')}</span>
+                  <span className="flex items-center gap-0.5" aria-hidden>
+                    {events.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-status-purple" />}
+                    {holidays.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-orange-text" />}
+                    {birthdays.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-brand" />}
+                  </span>
+                </button>
+                <div className={`hidden sm:flex ${dayNumberClass}`}>
                   {format(day, 'd')}
                 </div>
-                <div className="mt-1 space-y-1">
+                <div className="mt-1 space-y-1 hidden sm:block">
                   {events.map((e) => (
                     <button
                       key={e.id}
@@ -244,13 +270,80 @@ export default function CompanyCalendar() {
         </div>
       </Card>
 
+      {/* Phones: the entries for the tapped day, or for the whole month when no day is picked */}
+      <div className="sm:hidden mt-4" data-testid="calendar-phone-list">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <h2 className="text-[13px] font-bold text-ink">
+            {selectedDay ? format(selectedDay, 'EEEE d MMMM') : `This month`}
+          </h2>
+          {selectedDay && (
+            <button type="button" onClick={() => setSelectedDay(null)} className="text-[12px] font-semibold text-brand">
+              Show whole month
+            </button>
+          )}
+        </div>
+        {phoneListDays.length === 0 ? (
+          <p className="text-[12px] text-muted-foreground">
+            {selectedDay ? 'Nothing on this day.' : 'Nothing on the calendar this month.'}
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {phoneListDays.map((day) => (
+              <li key={day.toISOString()} className="bg-white border border-border rounded-card p-3">
+                {!selectedDay && <p className="text-[11px] font-semibold text-muted-foreground mb-1.5">{format(day, 'EEE d MMM')}</p>}
+                <div className="space-y-1.5">
+                  {getEventsFor(day).map((e) => (
+                    <button
+                      key={e.id}
+                      type="button"
+                      onClick={() => handleDeleteEvent(e)}
+                      className="flex items-start gap-1.5 text-left text-[12px] font-medium text-status-purple bg-status-purple-tint rounded px-2 py-1 w-full"
+                      title="Tap to remove"
+                    >
+                      <CalendarPlus className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                      <span className="min-w-0 break-words">
+                        {e.title}
+                        {e.description && <span className="block text-[11px] font-normal opacity-80">{e.description}</span>}
+                      </span>
+                    </button>
+                  ))}
+                  {getHolidaysFor(day).map((h, i) => (
+                    <div key={`h-${i}`} className="flex items-start gap-1.5 text-[12px] font-medium text-orange-text bg-orange-tint rounded px-2 py-1">
+                      <PartyPopper className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                      <span className="min-w-0 break-words">{h.name}</span>
+                    </div>
+                  ))}
+                  {getBirthdaysFor(day).map((b, i) => (
+                    <button
+                      key={`b-${i}`}
+                      type="button"
+                      onClick={() => navigate(`/employees?q=${encodeURIComponent(b.name)}`)}
+                      className="flex items-start gap-1.5 text-left text-[12px] font-medium text-brand bg-green-tint rounded px-2 py-1 w-full"
+                    >
+                      <Cake className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                      <span className="min-w-0 break-words">{b.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       {!loading && birthdaysByDay.size === 0 && holidaysByDay.size === 0 && eventsByDay.size === 0 && (
         <p className="text-[11.5px] text-muted-foreground text-center mt-4">No birthdays, holidays or events on record yet.</p>
       )}
 
-      {showEventForm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-sm">
+      <Modal
+        open={showEventForm}
+        onClose={() => setShowEventForm(false)}
+        closeOnBackdrop={!savingEvent}
+        title="New Company Event"
+        hideTitle
+        size="sm"
+        className="bg-white border border-border rounded-card p-[18px]"
+      >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-[14px] font-bold text-ink">New Company Event</h2>
               <button type="button" onClick={() => setShowEventForm(false)} className="text-subtle hover:text-ink transition-colors">
@@ -295,9 +388,7 @@ export default function CompanyCalendar() {
                 {savingEvent ? 'Saving...' : 'Add Event'}
               </Button>
             </div>
-          </Card>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }

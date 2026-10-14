@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Card, PageHeader, StatusPill, EmptyState, Button } from '../UI';
+import { Card, PageHeader, StatusPill, EmptyState, Button, TableScroll } from '../UI';
 import type { StatusTone } from '../UI';
 import { companyApi, inviteLink, Invitation, INVITABLE_ROLES } from '../../lib/companyApi';
 import { sendInvitations, summariseInvites } from '../../lib/employeeInvite';
@@ -197,7 +197,8 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
         ) : invitations.length === 0 ? (
           <EmptyState icon={<span aria-hidden>✉</span>} title="No invitations yet" description="Invite someone above and they will appear here." />
         ) : (
-          <table className="w-full text-[13px]">
+          <TableScroll>
+          <table className="w-full min-w-[600px] text-[13px]">
             <thead>
               <tr className="text-left text-[11.5px] text-muted-foreground border-b border-border">
                 <th className="px-4 py-2.5 font-semibold">Email</th>
@@ -235,6 +236,7 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
               })}
             </tbody>
           </table>
+          </TableScroll>
         )}
       </Card>
     </div>

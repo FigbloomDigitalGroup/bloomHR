@@ -391,14 +391,14 @@ const PhoneNumberApprovals = () => {
             {/* Review Modal */}
             <AnimatePresence>
                 {selectedRequest && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 border border-white/20">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 border border-white/20 overflow-y-auto">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedRequest(null)} className="absolute inset-0 bg-gray-900/60 backdrop-blur-md" />
 
                         <motion.div
                             initial={{ scale: 0.9, opacity: 0, y: 20 }}
                             animate={{ scale: 1, opacity: 1, y: 0 }}
                             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                            className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col relative z-10 border border-white/20"
+                            className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-y-auto flex flex-col relative z-10 border border-white/20 max-h-[90vh]"
                         >
                             <div className="p-10 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
                                 <div className="space-y-1">

@@ -55,7 +55,7 @@ export default function StatutoryRatesModal({ payPeriod, onClose, onChanged }: {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" role="dialog" aria-label="Statutory rates">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto" role="dialog" aria-label="Statutory rates">
       <div className="bg-white rounded-[10px] border border-border shadow-lg w-full max-w-3xl max-h-[90vh] flex flex-col">
         <div className="px-5 py-3 border-b border-border flex items-center justify-between">
           <div>

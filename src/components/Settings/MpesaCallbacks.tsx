@@ -171,8 +171,8 @@ const MpesaCallbacks: React.FC = () => {
             </div>
 
             <div className="bg-white border border-gray-100 rounded-[2.5rem] shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-gray-50 flex flex-wrap items-center justify-between gap-6 bg-gray-50/50">
-                    <div className="relative flex-1 min-w-[300px]">
+                <div className="p-4 sm:p-6 border-b border-gray-50 flex flex-wrap items-center justify-between gap-4 sm:gap-6 bg-gray-50/50">
+                    <div className="relative flex-1 basis-full sm:basis-0 min-w-0 sm:min-w-[300px]">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                         <input
                             type="text"
@@ -293,9 +293,9 @@ const MpesaCallbacks: React.FC = () => {
 
             <AnimatePresence>
                 {selectedLog && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-12">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-12 overflow-y-auto">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedLog(null)} className="absolute inset-0 bg-gray-900/60 backdrop-blur-md" />
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-white rounded-[3rem] w-full max-w-2xl overflow-hidden relative z-10 border border-white/20">
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-white rounded-[3rem] w-full max-w-2xl overflow-y-auto relative z-10 border border-white/20 max-h-[90vh]">
                             <div className="p-10 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
                                 <h3 className="text-2xl font-black text-gray-900 tracking-tight">Transaction Details</h3>
                                 <button onClick={() => setSelectedLog(null)} className="p-3 bg-white text-gray-400 hover:text-red-500 rounded-2xl shadow-sm border border-gray-100 transition-colors">

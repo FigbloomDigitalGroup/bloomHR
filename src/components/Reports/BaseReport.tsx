@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import EmployeePicker from '../UI/EmployeePicker';
+import Modal from '../UI/Modal';
 import {
   Filter,
   Download,
@@ -228,13 +229,13 @@ const TransactionDetailsModal: React.FC<TransactionDetailsModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto md:overflow-hidden transform transition-all duration-300 scale-100">
         {/* Header */}
-        <div className="bg-gradient-to-r from-brand to-orange p-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-3">
-                <img src='/public/mobile-transfer.png' className='w-9' />
+        <div className="bg-gradient-to-r from-brand to-orange p-4 sm:p-6">
+          <div className="flex justify-between items-start gap-2">
+            <div className="min-w-0">
+              <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 flex items-center gap-3">
+                <img src='/public/mobile-transfer.png' className='w-9 object-contain' alt='' />
                 Transaction Details
               </h2>
               <div className="flex items-center gap-4 text-white/70">
@@ -504,8 +505,15 @@ const BulkDownloadModal: React.FC<BulkDownloadModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all duration-300 scale-100">
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      closeOnBackdrop={!isDownloading}
+      title="Download Reports"
+      hideTitle
+      size="md"
+      className="bg-white rounded-2xl shadow-2xl"
+    >
         {/* Header */}
         <div className="bg-gradient-to-r from-orange to-brand p-6 rounded-t-2xl">
           <div className="flex justify-between items-center">
@@ -528,7 +536,7 @@ const BulkDownloadModal: React.FC<BulkDownloadModalProps> = ({
         {/* Content */}
         <div className="p-6">
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-4 p-3 bg-green-tint rounded-lg border border-brand/20">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4 p-3 bg-green-tint rounded-lg border border-brand/20">
               <div>
                 <p className="text-sm font-medium text-brand-dark">Download Scope</p>
                 <p className="text-xs text-brand-dark">
@@ -625,8 +633,7 @@ const BulkDownloadModal: React.FC<BulkDownloadModalProps> = ({
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

@@ -201,7 +201,7 @@ export default function VoluntaryDeductionsModal({ onClose, onChanged, draftNoti
   const activeTypes = types.filter((t) => t.active || t.id === form?.deduction_type_id);
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-[10px] border border-gray-200 shadow-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between shrink-0">
           <div>

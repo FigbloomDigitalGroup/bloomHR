@@ -192,7 +192,7 @@ const EditModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
       <div className="bg-white max-h-[80vh] overflow-y-auto rounded-lg p-6 w-full max-w-2xl">
         <h2 className="text-xl font-semibold mb-4">Edit Record</h2>
         <form onSubmit={handleSubmit}>
@@ -339,8 +339,8 @@ const BulkUploadModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md overflow-y-auto max-h-[90vh]">
         <h2 className="text-xl font-semibold mb-4">Bulk Upload</h2>
         <div className="mb-4">
           <label className="block text-xs font-medium text-gray-700 mb-2">

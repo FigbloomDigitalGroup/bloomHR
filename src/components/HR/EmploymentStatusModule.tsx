@@ -160,7 +160,7 @@ function PremiumDatePicker({ value, onChange, label }: { value: string; onChange
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 4, scale: 0.97 }}
                         transition={{ duration: 0.12 }}
-                        className="absolute z-50 left-0 mt-1.5 bg-white border border-gray-200 rounded-xl shadow-lg p-3 w-64"
+                        className="absolute z-50 left-0 mt-1.5 bg-white border border-gray-200 rounded-xl shadow-lg p-3 w-full sm:w-64 max-w-[calc(100vw-2rem)]"
                     >
                         <div className="flex items-center justify-between mb-3">
                             <button type="button" onClick={prevMonth} className="p-1 hover:bg-gray-100 rounded-lg"><ChevronLeft className="w-3.5 h-3.5" /></button>
@@ -693,9 +693,9 @@ export default function EmploymentStatusModule({ onRefresh, initialSearch = '' }
 
             {/* Action Modal */}
             {showModal && selectedRecord && actionType && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
                     <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 overflow-y-auto max-h-[90vh]">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-sm font-bold text-gray-900">
                                 {actionType === 'confirm' ? 'Confirm Probation' :
@@ -737,7 +737,7 @@ export default function EmploymentStatusModule({ onRefresh, initialSearch = '' }
 
             {/* Add Status Modal */}
             {showAddModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
                     <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
                         className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh] overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
@@ -850,9 +850,9 @@ export default function EmploymentStatusModule({ onRefresh, initialSearch = '' }
 
             {/* Bulk Modal */}
             {showBulkModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
                     <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                        className="bg-white rounded-2xl shadow-2xl w-full max-w-xs p-6">
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-xs p-6 overflow-y-auto max-h-[90vh]">
                         <h3 className="text-sm font-bold text-gray-900 mb-1">Bulk Status Update</h3>
                         <p className="text-xs text-gray-500 mb-4">{selectedIds.size} employee(s) selected</p>
                         <div className="mb-4">

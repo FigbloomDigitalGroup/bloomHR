@@ -332,7 +332,7 @@ const ExportModal = ({ isOpen, onClose, onExport, isLoading, filterOptions }: {
   ];
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-[10px] max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
           <Download className="h-5 w-5 text-green-600" />
@@ -376,7 +376,7 @@ const ExportModal = ({ isOpen, onClose, onExport, isLoading, filterOptions }: {
           </div>
 
           {dateRange === 'custom' && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-2">
                   Start Date
@@ -507,8 +507,8 @@ const ImportModal = ({ isOpen, onClose, isLoading }: {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[10px] max-w-md w-full p-6">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-[10px] max-w-md w-full p-6 overflow-y-auto max-h-[90vh]">
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
           <Upload className="h-5 w-5 text-blue-600" />
           Import Salary Advance Data
@@ -698,7 +698,7 @@ const EnhancedFilter = ({
       </button>
 
       {showFilter && (
-        <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-[10px] shadow-lg border border-gray-200 z-50 p-4">
+        <div className="absolute top-full left-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-[10px] shadow-lg border border-gray-200 z-50 p-4">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-sm font-medium text-gray-900">
               Filter Applications
@@ -753,7 +753,7 @@ const EnhancedFilter = ({
 
             {/* Custom Date Range Inputs */}
             {selectedDateRange === 'custom' && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-2">
                     Start Date
@@ -877,8 +877,8 @@ const CommentModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[10px] max-w-md w-full p-6">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-[10px] max-w-md w-full p-6 overflow-y-auto max-h-[90vh]">
         <h3 className="text-lg font-medium text-gray-900 mb-2 flex items-center gap-2">
           <Smartphone className="h-5 w-5 text-blue-600" />
           Add Comment
@@ -1038,7 +1038,7 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, us
   const totalAmount = payment.advances_data?.reduce((sum: number, advance: any) => sum + (advance.amount_requested || 0), 0) || 0;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-[10px] shadow-lg w-full max-w-4xl max-h-[90vh] overflow-auto">
         <div className="sticky top-0 bg-gray-100 p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-xl font-semibold text-gray-900">Salary Advance Payment Request Details</h2>
@@ -1111,7 +1111,7 @@ const PaymentDetailsModal = ({ payment, isOpen, onClose, onApprove, onReject, us
             <h3 className="font-semibold text-gray-900 mb-3">Salary Advances to be Paid</h3>
 
             {payment.advances_data && (
-              <div className="max-h-60 overflow-y-auto">
+              <div className="max-h-60 overflow-auto">
                 <table className="w-full text-xs">
                   <thead className="bg-gray-50">
                     <tr>
@@ -1194,8 +1194,8 @@ const RejectionModal = ({ isOpen, onClose, onConfirm }: {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[10px] max-w-md w-full p-6">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-[10px] max-w-md w-full p-6 overflow-y-auto max-h-[90vh]">
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
           <XCircleIcon className="h-5 w-5 text-red-600" />
           Reject Payment Request
@@ -1320,8 +1320,8 @@ const RecommendationModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[10px] max-w-md w-full p-6">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-[10px] max-w-md w-full p-6 overflow-y-auto max-h-[90vh]">
         <h3 className="text-lg font-medium text-gray-900 mb-2 flex items-center gap-2">
           <CheckCircle className="h-5 w-5 text-blue-600" />
           {getActionTitle()}
@@ -1418,12 +1418,12 @@ const BypassConfirmModal = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[60] p-4 overflow-y-auto">
         <motion.div
           initial={{ opacity: 0, scale: 0.9, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
-          className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden"
+          className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-y-auto max-h-[90vh]"
         >
           <div className="p-8">
             <div className="w-16 h-16 bg-green-100 rounded-[10px] flex items-center justify-center mb-6 mx-auto">
@@ -2057,8 +2057,8 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
     };
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-[10px] max-w-md w-full p-6">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="bg-white rounded-[10px] max-w-md w-full p-6 overflow-y-auto max-h-[90vh]">
           <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
             <Download className="h-5 w-5 text-green-600" />
             Export M-Pesa Statements
@@ -2099,7 +2099,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
             </div>
 
             {dateRange === 'custom' && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-2">
                     Start Date
@@ -2373,8 +2373,8 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
 
   return (
     <div className="bg-white border border-gray-200 rounded-[10px] p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6">
+        <div className="min-w-0">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
             <img src='M-PESA_LOGO-01.svg.png' className='w-14' alt="M-Pesa Logo" />
             {filterType === 'status' ? 'M-Pesa Transaction Status' : 'M-Pesa Callbacks'}
@@ -2389,9 +2389,9 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
             )}
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
           {/* Search Input */}
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
@@ -2401,7 +2401,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-80 pl-10 pr-4 py-2 bg-white rounded-[25px] text-xs focus:outline-none focus:ring-2 focus:ring-violet-400 border border-indigo-100 shadow-sm"
+              className="w-full sm:w-80 pl-10 pr-4 py-2 bg-white rounded-[25px] text-xs focus:outline-none focus:ring-2 focus:ring-violet-400 border border-indigo-100 shadow-sm"
             />
           </div>
 
@@ -2775,7 +2775,7 @@ const MpesaCallbacks = ({ filterType = 'all' }: { filterType?: 'payments' | 'sta
 
       {/* Enhanced Callback Details Modal */}
       {showDetails && selectedCallback && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-[10px] shadow-lg w-full max-w-4xl max-h-[90vh] overflow-auto">
             <div className="sticky top-0 bg-gray-100 p-6 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-xl font-semibold text-gray-900">Callback Details</h2>
@@ -3028,7 +3028,7 @@ const BulkPaymentModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-[10px] max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto">
         <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
           <Users className="h-5 w-5 text-green-600" />

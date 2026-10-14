@@ -358,7 +358,7 @@ const AssetManagement: React.FC = () => {
     <div className="p-6 space-y-6 text-xs">
       {/* Add Asset Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <motion.div 
             ref={addModalRef}
             initial={{ opacity: 0, scale: 0.9 }}
@@ -915,7 +915,7 @@ const AssetManagement: React.FC = () => {
 
       {/* View Asset Modal */}
       {isViewModalOpen && selectedAsset && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-3 z-50 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-3 z-50 backdrop-blur-sm overflow-y-auto">
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}

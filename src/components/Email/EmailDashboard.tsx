@@ -321,7 +321,7 @@ export default function EmailDashboard() {
 
             {/* Email Details Modal */}
             {selectedEmail && (
-                <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+                <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50 overflow-y-auto">
                     <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                             <h3 className="text-lg font-medium text-gray-900">Email Details</h3>

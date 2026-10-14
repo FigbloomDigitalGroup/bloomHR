@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { SidebarProvider } from "./ui/sidebar";
+import { SidebarProvider, SidebarTrigger } from "./ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { ChatArea } from "./ChatArea";
 import { chatService } from "./services/chatServices";
@@ -644,33 +644,38 @@ function ErrorScreen({ error, onRetry }: { error: string, onRetry: () => void })
   );
 }
 
-function WelcomeScreen({ currentUser, onCreateChannel }: { currentUser: User, onCreateChannel: (name: string, isPrivate?: boolean) => void }) {
+export function WelcomeScreen({ currentUser, onCreateChannel }: { currentUser: User, onCreateChannel: (name: string, isPrivate?: boolean) => void }) {
   return (
-    <div className="flex-1 flex items-center justify-center">
-      <div className="text-center max-w-2xl mx-auto p-8">
-        <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-brand flex items-center justify-center shadow-lg">
-          <span className="text-2xl font-bold text-white">
+    <div className="flex-1 flex flex-col min-w-0">
+      {/* On phones the channel list is a slide-in sheet, so it needs a button to open it */}
+      <div className="md:hidden h-14 flex items-center px-3 border-b border-gray-200">
+        <SidebarTrigger />
+      </div>
+      <div className="flex-1 flex items-center justify-center overflow-y-auto">
+      <div className="text-center max-w-2xl mx-auto p-5 sm:p-8">
+        <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-6 rounded-full bg-brand flex items-center justify-center shadow-lg">
+          <span className="text-xl sm:text-2xl font-bold text-white">
             {currentUser.initials}
           </span>
         </div>
-        <h1 className="text-4xl font-bold text-brand mb-4">
+        <h1 className="text-2xl sm:text-4xl font-bold text-brand mb-4">
           Welcome to Figbloom Teams
         </h1>
-        <p className="text-xl text-gray-600 mb-2">
+        <p className="text-lg sm:text-xl text-gray-600 mb-2">
           Hello, <strong>{currentUser.name}</strong>!
         </p>
         {currentUser.employeeData && (
-          <div className="inline-flex items-center gap-2 bg-green-tint text-brand px-4 py-2 rounded-full text-sm font-medium mb-6 shadow-sm">
+          <div className="inline-flex flex-wrap justify-center items-center gap-2 bg-green-tint text-brand px-4 py-2 rounded-full text-sm font-medium mb-6 shadow-sm">
             <span>{currentUser.employeeData.jobTitle}</span>
             <span>•</span>
             <span>{currentUser.employeeData.department}</span>
           </div>
         )}
-        <p className="text-gray-500 mb-8 leading-relaxed text-lg">
-          Connect with your colleagues, share ideas, and collaborate seamlessly. 
+        <p className="text-gray-500 mb-8 leading-relaxed text-base sm:text-lg">
+          Connect with your colleagues, share ideas, and collaborate seamlessly.
           Start by creating a channel or sending a direct message.
         </p>
-        <div className="flex gap-4 justify-center">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
           <button
             onClick={() => onCreateChannel('general', false)}
             className="px-6 py-3 bg-brand text-white rounded-lg font-semibold hover:bg-brand-dark transition-all shadow-lg hover:shadow-xl"
@@ -681,6 +686,7 @@ function WelcomeScreen({ currentUser, onCreateChannel }: { currentUser: User, on
             Explore Teams
           </button>
         </div>
+      </div>
       </div>
     </div>
   );

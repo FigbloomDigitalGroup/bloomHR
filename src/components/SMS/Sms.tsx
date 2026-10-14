@@ -8,7 +8,7 @@ import { supabase } from '../../lib/supabase';
 import { fetchAllResult } from '../../lib/fetchAll';
 import { smsSegments } from '../../lib/smsSegments';
 import { getSmsBalance, sendSingleSms } from '../../lib/smsApi';
-import { Card, Button, TabBar } from '../UI';
+import { Card, Button, TabBar, Modal } from '../UI';
 import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
 import toast from 'react-hot-toast';
 
@@ -2089,9 +2089,14 @@ export function SMSCenter() {
       </div>
 
       {/* Additional Variables Modal */}
-      {showAdditionalVariablesModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+      <Modal
+        open={showAdditionalVariablesModal}
+        onClose={() => setShowAdditionalVariablesModal(false)}
+        title="Additional Information Needed"
+        hideTitle
+        size="md"
+        className="bg-white rounded-xl p-6"
+      >
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-ink">Additional Information Needed</h3>
               <button
@@ -2140,14 +2145,17 @@ export function SMSCenter() {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* New Template Modal */}
-      {showNewTemplateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+      <Modal
+        open={showNewTemplateModal}
+        onClose={() => setShowNewTemplateModal(false)}
+        title="Create New Template"
+        hideTitle
+        size="md"
+        className="bg-white rounded-xl p-6"
+      >
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-ink">Create New Template</h3>
               <button
@@ -2210,13 +2218,16 @@ export function SMSCenter() {
                 Create Template
               </button>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {showPackageModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+      <Modal
+        open={showPackageModal}
+        onClose={() => setShowPackageModal(false)}
+        title="Purchase SMS Package"
+        hideTitle
+        size="md"
+        className="bg-white rounded-xl p-6"
+      >
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-ink">Purchase SMS Package</h3>
               <button
@@ -2257,9 +2268,7 @@ export function SMSCenter() {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }

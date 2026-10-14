@@ -128,7 +128,7 @@ function PremiumDatePicker({ value, onChange }: { value: string; onChange: (v: s
                 {open && (
                     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                         transition={{ duration: 0.12 }}
-                        className="absolute z-50 left-0 mt-1.5 bg-white border border-gray-200 rounded-xl shadow-lg p-3 w-64">
+                        className="absolute z-50 left-0 mt-1.5 bg-white border border-gray-200 rounded-xl shadow-lg p-3 w-full sm:w-64 max-w-[calc(100vw-2rem)]">
                         <div className="flex items-center justify-between mb-3">
                             <button type="button" onClick={() => setViewDate(new Date(year, month - 1, 1))} className="p-1 hover:bg-gray-100 rounded-lg"><ChevronLeft className="w-3.5 h-3.5" /></button>
                             <span className="text-xs font-semibold">{monthNames[month]} {year}</span>
@@ -443,7 +443,7 @@ export default function SuspensionModule({ onRefresh }: { onRefresh?: () => void
 
             {/* Add Modal */}
             {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
                     <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
                         className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh] overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">

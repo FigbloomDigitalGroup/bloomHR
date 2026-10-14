@@ -383,12 +383,12 @@ export default function AdvanceDeductionModule({ onRefresh }: { onRefresh?: () =
             {/* New Advance Modal */}
             <AnimatePresence>
                 {showModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-gray-900/50 backdrop-blur-sm">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-y-auto">
                         <motion.div
                             initial={{ scale: 0.95, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0.95, opacity: 0 }}
-                            className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden flex flex-col relative z-10"
+                            className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-y-auto flex flex-col relative z-10 max-h-[90vh]"
                         >
                             <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-white">
                                 <div>

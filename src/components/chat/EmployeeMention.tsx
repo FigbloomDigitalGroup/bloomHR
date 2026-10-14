@@ -69,7 +69,7 @@ export function MentionPopover({
   if (filteredEmployees.length === 0) {
     return (
       <div 
-        className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg min-w-80 max-w-sm max-h-96 overflow-hidden"
+        className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[min(20rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] sm:max-w-sm max-h-96 overflow-hidden"
         style={{ top: position.top, left: position.left }}
       >
         <div className="p-3 border-b border-gray-100">
@@ -96,7 +96,7 @@ export function MentionPopover({
 
   return (
     <div 
-      className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg min-w-80 max-w-sm max-h-96 overflow-hidden"
+      className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[min(20rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] sm:max-w-sm max-h-96 overflow-hidden"
       style={{ top: position.top, left: position.left }}
     >
       {/* Header with Search */}
