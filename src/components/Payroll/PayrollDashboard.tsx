@@ -1317,6 +1317,14 @@ export default function PayrollDashboard() {
 
   // demo paying (PAYMENTS_DEMO): who would be paid how, and who was "paid" this month, in memory only (gone on reload)
   const demoPayEnabled = PAYMENTS_DEMO && monthRun?.status === "approved";
+  // the Pay buttons always show in demo mode; before the month is approved they say why they can't pay yet
+  const demoPayBlockedReason = demoPayEnabled
+    ? null
+    : monthRun?.status === "paid"
+      ? `${periodLabel} is already marked paid`
+      : monthRun
+        ? `Approve ${periodLabel}'s payroll first, then pay`
+        : `Start and approve ${periodLabel}'s payroll first, then pay`;
   const demoLines = useMemo(() => demoPayLines(payrollRecords, employees), [payrollRecords, employees]);
   const demoLineByNumber = useMemo(() => new Map(demoLines.map((l) => [l.employeeNumber, l])), [demoLines]);
   const demoPaidNow = demoPaid.period === actualPeriod ? demoPaid.numbers : new Set<string>();
@@ -1839,7 +1847,9 @@ This can't be undone: the payslips stay locked for good.`,
           handlePageChange={handlePageChange}
           itemsPerPage={itemsPerPage}
           demoPay={{
+            shown: PAYMENTS_DEMO,
             enabled: demoPayEnabled,
+            blockedReason: demoPayBlockedReason,
             lineFor: (employeeNumber) => demoLineByNumber.get(String(employeeNumber ?? "")),
             isPaid: (employeeNumber) => demoPaidNow.has(employeeNumber),
             onPaid: (employeeNumber) => markDemoPaid([employeeNumber]),
