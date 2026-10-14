@@ -8,6 +8,7 @@ import * as api from './api';
 import PipelineBoard from './PipelineBoard';
 import CandidateView from './CandidateView';
 import StageEditor from './StageEditor';
+import { CareersToggle } from '../../Settings/CareersSettings';
 import { Candidate, CompanyUser, Interview, Stage, StageMove, candidateName, sortStages } from './types';
 
 const GENERAL = 'general'; // applications with no job posting use the company's default stages
@@ -117,6 +118,12 @@ export default function RecruitmentPipeline() {
         <div className="sm:w-64">
           <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search candidates..." aria-label="Search candidates" />
         </div>
+        {posting && (
+          <CareersToggle
+            posting={{ id: posting.id, job_title: posting.job_title, is_public: !!posting.is_public }}
+            onChange={(isPublic) => setPostings((list) => list.map((p) => (p.id === posting.id ? { ...p, is_public: isPublic } : p)))}
+          />
+        )}
         <Button variant="secondary" onClick={() => setEditingStages(true)} icon={<Settings2 className="w-3.5 h-3.5" />}>
           {postingId ? 'Edit stages' : 'Default stages'}
         </Button>

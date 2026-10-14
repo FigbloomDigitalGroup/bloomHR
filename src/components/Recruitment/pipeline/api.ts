@@ -15,12 +15,13 @@ export interface JobPostingOption {
   job_title: string;
   department: string | null;
   status: string | null;
+  is_public?: boolean; // shown on the careers page (FIG-838)
 }
 
 export async function loadPostings(): Promise<JobPostingOption[]> {
   const { data, error } = await supabase
     .from('job_postings')
-    .select('id, job_title, department, status')
+    .select('id, job_title, department, status, is_public')
     .order('posted_at', { ascending: false });
   fail(error);
   return (data || []) as JobPostingOption[];
