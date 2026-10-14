@@ -2,6 +2,7 @@ import { CheckCircle, Loader, Lock, RefreshCw, RotateCcw, Trash2, Wallet } from 
 import { Card, StatusPill } from '../UI';
 import type { StatusTone } from '../UI';
 import type { PayrollRun, PayrollRunStatus } from '../../lib/payrollRuns';
+import { IN_APP_PAYMENTS } from '../../lib/inAppPayments';
 
 const STATUS: Record<PayrollRunStatus, { label: string; tone: StatusTone }> = {
   draft: { label: 'Draft', tone: 'warning' },
@@ -55,6 +56,8 @@ export default function PayrollRunBar({
   } else if (run?.status === 'approved') {
     pill = STATUS.approved;
     message = `Approved${run.approved_at ? ` on ${date(run.approved_at)}` : ''}. Payslips are locked and staff can see them.`;
+    // finance pays by uploading the downloaded files to the bank, then marks the month paid here
+    if (!IN_APP_PAYMENTS) message += ' Pay staff by uploading the bank and M-Pesa files below to the bank, then mark as paid.';
   } else if (run?.status === 'paid') {
     pill = STATUS.paid;
     message = `Paid on ${date(run.paid_at)}. Payslips are locked.`;
