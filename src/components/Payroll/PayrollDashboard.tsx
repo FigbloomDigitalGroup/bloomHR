@@ -16,7 +16,6 @@ import {
   ArrowRight,
   Search,
   Smartphone,
-  TabletSmartphone,
   Send,
   FileSpreadsheet,
   Loader,
@@ -62,8 +61,9 @@ import {
 import PayrollRunBar from "./PayrollRunBar";
 import VoluntaryDeductionsModal from "./VoluntaryDeductionsModal";
 import MissingPayrollDetailsModal from "./MissingPayrollDetailsModal";
-import RunPaymentsPanel from "./RunPaymentsPanel";
-import PayrollExportsPanel, { downloadP10 } from "./PayrollExportsPanel";
+import { downloadP10 } from "./PayrollExportsPanel";
+import { ApprovedRunPanels, BulkPayButton } from "./RunPayActions";
+import { IN_APP_PAYMENTS, IN_APP_PAYMENTS_OFF_MESSAGE } from "../../lib/inAppPayments";
 import ReturnsReadiness from "./ReturnsReadiness";
 import { returnsReadiness } from "../../lib/payrollExports";
 import { employeesMissingDetails } from "../../lib/missingPayrollDetails";
@@ -2600,6 +2600,11 @@ export default function PayrollDashboard() {
 
   // UPDATED: Approve payment with comment
   const approvePayment = async (payment: any, comment = "") => {
+    // approving sends the money, so with in-app paying off it is refused
+    if (!IN_APP_PAYMENTS) {
+      toast.error(IN_APP_PAYMENTS_OFF_MESSAGE);
+      return;
+    }
     try {
       const {
         data: { user },
@@ -2777,6 +2782,7 @@ export default function PayrollDashboard() {
   };
 
   const processSingleMpesaPayment = async (employee: any) => {
+    if (!IN_APP_PAYMENTS) throw new Error(IN_APP_PAYMENTS_OFF_MESSAGE);
     try {
       const phoneNumber = employee.employeeNu;
       if (!phoneNumber) {
@@ -2824,6 +2830,7 @@ export default function PayrollDashboard() {
   };
 
   const processBulkMpesaPayment = async (requested: any) => {
+    if (!IN_APP_PAYMENTS) throw new Error(IN_APP_PAYMENTS_OFF_MESSAGE);
     const results = [];
     const selectedEmployees = (requested ?? []).filter(isPaidByMpesa);
     const skipped = (requested ?? []).filter((employee: PayRecipient) => !isPaidByMpesa(employee));
@@ -3422,7 +3429,8 @@ This can't be undone: the payslips stay locked for good.`,
     }
   };
 
-  if (currentView === "mpesa-spreadsheet") {
+  // the spreadsheet page sends M-Pesa payments itself, so it is off with the other in-app paying
+  if (IN_APP_PAYMENTS && currentView === "mpesa-spreadsheet") {
     return (
       <MPesaSpreadsheetFullPage
         onBack={() => setCurrentView("dashboard")}
@@ -3447,7 +3455,7 @@ This can't be undone: the payslips stay locked for good.`,
 
       {/* WALLET UI REMOVED - Commented out as requested */}
 
-      {showApprovalQueue &&
+      {IN_APP_PAYMENTS && showApprovalQueue &&
         (userRole === "checker" || userRole === "credit_analyst_officer") && (
           <div className="bg-gradient-to-r from-blue-100 to-indigo-100 border border-indigo-200 rounded-[10px] p-6">
             <div className="flex justify-between items-center mb-6">
@@ -3739,7 +3747,7 @@ This can't be undone: the payslips stay locked for good.`,
               >
                 Statutory Rates
               </GlowButtonss>
-              {(userRole === "checker" ||
+              {IN_APP_PAYMENTS && (userRole === "checker" ||
                 userRole === "credit_analyst_officer") && (
                   <GlowButtonss
                     variant="secondary"
@@ -3831,8 +3839,8 @@ This can't be undone: the payslips stay locked for good.`,
 
         <div className="flex-1" />
 
-        <button
-          type="button"
+        <BulkPayButton
+          label={userRole === "credit_analyst_officer" ? "M-PESA Bulk Pay" : "Make Bulk Pay"}
           onClick={handleBulkMpesaPayment}
           // an approved month is paid with "Pay staff" below, which records every payment; never both
           disabled={finalFilteredRecords.length === 0 || monthRun?.status === "approved" || monthRun?.status === "paid"}
@@ -3841,11 +3849,7 @@ This can't be undone: the payslips stay locked for good.`,
               ? `Pay ${periodLabel}'s approved payroll with "Pay staff" below: it records every payment`
               : undefined
           }
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-tile bg-brand text-white text-xs font-bold hover:bg-brand-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <TabletSmartphone className="w-3.5 h-3.5" />
-          {userRole === "credit_analyst_officer" ? "M-PESA Bulk Pay" : "Make Bulk Pay"}
-        </button>
+        />
       </div>
 
       <PayrollRunBar
@@ -3862,8 +3866,7 @@ This can't be undone: the payslips stay locked for good.`,
       />
 
       {(!monthRun || monthRun.status === "draft") && <ReturnsReadiness employees={onPayroll} />}
-      {monthRun && (monthRun.status === "approved" || monthRun.status === "paid") && <RunPaymentsPanel run={monthRun} />}
-      {monthRun && (monthRun.status === "approved" || monthRun.status === "paid") && <PayrollExportsPanel run={monthRun} />}
+      {monthRun && <ApprovedRunPanels run={monthRun} />}
 
       {/* Filters, search and the less-used payroll tools */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -3911,14 +3914,14 @@ This can't be undone: the payslips stay locked for good.`,
 
         <div className="flex-1" />
 
-        <button
+        {IN_APP_PAYMENTS && <button
           type="button"
           onClick={() => setCurrentView("mpesa-spreadsheet")}
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-muted-foreground hover:bg-secondary hover:text-ink transition-colors"
         >
           <FileSpreadsheet className="w-3 h-3" />
           M-PESA Spreadsheet
-        </button>
+        </button>}
         <button
           type="button"
           onClick={() => setShowDeductions(true)}
@@ -3966,7 +3969,7 @@ This can't be undone: the payslips stay locked for good.`,
           <Upload className="w-3 h-3" />
           Upload History
         </button>
-        {(userRole === "checker" || userRole === "credit_analyst_officer") && (
+        {IN_APP_PAYMENTS && (userRole === "checker" || userRole === "credit_analyst_officer") && (
           <button
             type="button"
             onClick={() => setShowApprovalQueue(true)}
@@ -4046,13 +4049,15 @@ This can't be undone: the payslips stay locked for good.`,
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <button
-                              type="button"
-                              onClick={() => handleSingleMpesaPayment(record)}
-                              className="px-2.5 py-1 rounded-[7px] bg-green-tint text-brand-dark text-[10.5px] font-bold hover:bg-[#d3e6d9] transition-colors"
-                            >
-                              {userRole === "credit_analyst_officer" ? "M-Pesa" : "Pay"}
-                            </button>
+                            {IN_APP_PAYMENTS && (
+                              <button
+                                type="button"
+                                onClick={() => handleSingleMpesaPayment(record)}
+                                className="px-2.5 py-1 rounded-[7px] bg-green-tint text-brand-dark text-[10.5px] font-bold hover:bg-[#d3e6d9] transition-colors"
+                              >
+                                {userRole === "credit_analyst_officer" ? "M-Pesa" : "Pay"}
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={(e) => {
@@ -4254,7 +4259,7 @@ This can't be undone: the payslips stay locked for good.`,
         />
       )}
 
-      {selectedEmployeeForMpesa && (
+      {IN_APP_PAYMENTS && selectedEmployeeForMpesa && (
         <MpesaSinglePaymentModal
           isOpen={showSingleMpesaModal}
           onClose={() => setShowSingleMpesaModal(false)}
@@ -4265,7 +4270,7 @@ This can't be undone: the payslips stay locked for good.`,
       )}
 
       <MpesaBulkPaymentModal
-        isOpen={showBulkMpesaModal}
+        isOpen={IN_APP_PAYMENTS && showBulkMpesaModal}
         onClose={() => setShowBulkMpesaModal(false)}
         employees={finalFilteredRecords}
         onConfirm={handleConfirmBulkPayment}
@@ -4274,7 +4279,7 @@ This can't be undone: the payslips stay locked for good.`,
 
       <PaymentDetailsModal
         payment={selectedPaymentForDetails}
-        isOpen={showPaymentDetails}
+        isOpen={IN_APP_PAYMENTS && showPaymentDetails}
         onClose={() => setShowPaymentDetails(false)}
         onApprove={() => handleSingleApprove(selectedPaymentForDetails)}
         onReject={() => {

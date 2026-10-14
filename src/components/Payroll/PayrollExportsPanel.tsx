@@ -8,10 +8,11 @@ import { fetchAll } from '../../lib/fetchAll';
 import { getRunPayslips, type PayrollRun } from '../../lib/payrollRuns';
 import type { EmployeeRecord } from '../../lib/profileCompleteness';
 import { type ExportFile, type Rates, bankFile, equityFile, lastDayOf, mpesaFile, nssfFile, p10File, shaFile, toCsv } from '../../lib/payrollExports';
+import { XLSX_TYPE, toXlsx } from '../../lib/xlsxExport';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
 // For an approved (or paid) month: download the KRA P10, SHA and NSSF returns and the M-Pesa and bank bulk-payment
-// files as CSV, each with everyone on that month's payroll, ready to upload. Before each one, who is missing what.
+// files as CSV or Excel, each with everyone on that month's payroll, ready to upload. Before each one, who is missing what.
 
 interface Files {
   p10: ExportFile;
@@ -25,6 +26,8 @@ interface Files {
 }
 
 type FileKey = Exclude<keyof Files, 'debitAccount'>;
+
+type Format = 'csv' | 'xlsx';
 
 const FILES: { key: FileKey; label: string; name: string; what: string }[] = [
   { key: 'p10', label: 'KRA PAYE (P10)', name: 'kra-p10', what: 'iTax P10 return' },
@@ -74,14 +77,16 @@ export async function loadExportFiles(run: PayrollRun): Promise<Files> {
   };
 }
 
-/** Saves one file as CSV, named after it and the month (kra-p10-2026-10.csv). */
-const saveCsv = (f: ExportFile, name: string, payPeriod: string) =>
-  saveAs(new Blob([toCsv(f.headers, f.rows)], { type: 'text/csv;charset=utf-8' }), `${name}-${payPeriod}.csv`);
+/** Saves one file as CSV or Excel, named after it and the month (kra-p10-2026-10.csv, kra-p10-2026-10.xlsx). */
+const saveFile = (f: ExportFile, name: string, payPeriod: string, format: Format, sheet: string) =>
+  format === 'xlsx'
+    ? saveAs(new Blob([toXlsx(f.headers, f.rows, sheet)], { type: XLSX_TYPE }), `${name}-${payPeriod}.xlsx`)
+    : saveAs(new Blob([toCsv(f.headers, f.rows)], { type: 'text/csv;charset=utf-8' }), `${name}-${payPeriod}.csv`);
 
-/** The payroll page's P10 button: the month's KRA P10 as CSV. Returns who is missing details the return needs. */
-export async function downloadP10(run: PayrollRun) {
+/** The payroll page's P10 button: the month's KRA P10 (CSV unless asked). Returns who is missing details the return needs. */
+export async function downloadP10(run: PayrollRun, format: Format = 'csv') {
   const files = await loadExportFiles(run);
-  saveCsv(files.p10, 'kra-p10', run.pay_period);
+  saveFile(files.p10, 'kra-p10', run.pay_period, format, 'KRA P10');
   return files.p10.problems;
 }
 
@@ -109,9 +114,9 @@ export default function PayrollExportsPanel({ run }: { run: PayrollRun }) {
     }
   };
 
-  const download = (key: FileKey, name: string) => {
+  const download = (key: FileKey, name: string, format: Format, sheet: string) => {
     if (!files) return;
-    saveCsv(files[key], name, run.pay_period);
+    saveFile(files[key], name, run.pay_period, format, sheet);
   };
 
   return (
@@ -121,7 +126,7 @@ export default function PayrollExportsPanel({ run }: { run: PayrollRun }) {
         <h3 className="text-sm font-semibold text-ink">Statutory returns and bulk payments, {run.pay_period}</h3>
       </div>
       <p className="text-xs text-muted-foreground mb-3">
-        CSV files with everyone on this month’s payroll, ready to upload to iTax, SHA, NSSF, M-Pesa or the bank.
+        CSV or Excel files with everyone on this month’s payroll, ready to upload to iTax, SHA, NSSF, M-Pesa or the bank.
       </p>
 
       {problem && <p role="alert" className="text-sm text-status-danger">{problem}</p>}
@@ -147,11 +152,19 @@ export default function PayrollExportsPanel({ run }: { run: PayrollRun }) {
                       {f.problems.length} missing details
                     </button>
                   )}
-                  <button type="button" disabled={f.rows.length === 0 || (key === 'equity' && !files.debitAccount)} onClick={() => download(key, name)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-tile border border-border bg-white text-[11px] font-semibold text-ink hover:bg-secondary disabled:opacity-50">
-                    <Download className="w-3 h-3" />
-                    Download CSV
-                  </button>
+                  {/* CSV or Excel: the same rows; in Excel every cell is text so account and phone numbers stay as typed */}
+                  <div className="inline-flex items-stretch rounded-tile border border-border bg-white text-[11px] font-semibold text-ink overflow-hidden">
+                    <span className="inline-flex items-center px-2 text-muted-foreground" aria-hidden>
+                      <Download className="w-3 h-3" />
+                    </span>
+                    {(['csv', 'xlsx'] as const).map((format) => (
+                      <button key={format} type="button" aria-label={format === 'csv' ? 'Download CSV' : 'Download Excel'}
+                        disabled={f.rows.length === 0 || (key === 'equity' && !files.debitAccount)} onClick={() => download(key, name, format, label)}
+                        className="px-2.5 py-1.5 border-l border-border hover:bg-secondary disabled:opacity-50">
+                        {format === 'csv' ? 'CSV' : 'Excel'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 {key === 'equity' && (
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">

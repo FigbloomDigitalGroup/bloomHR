@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import * as XLSX from 'xlsx';
 
 const data = vi.hoisted(() => ({
   payslips: [] as Record<string, unknown>[],
@@ -37,6 +38,13 @@ const readBlob = (blob: Blob) =>
     reader.readAsText(blob);
   });
 
+const readBytes = (blob: Blob) =>
+  new Promise<ArrayBuffer>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.readAsArrayBuffer(blob);
+  });
+
 const run = { id: 'r1', pay_period: '2026-10', status: 'approved' } as never;
 
 beforeEach(() => {
@@ -72,6 +80,22 @@ describe('PayrollExportsPanel', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /Download CSV/ })[3]); // M-Pesa
     expect(saved.files.map((f) => f.name)).toEqual(['bulk-pay-mpesa-2026-10.csv']);
     expect(await readBlob(saved.files[0].blob)).toBe('Phone Number,Name,Amount,Reference,Payroll Number\r\n254712345678,Amina Wanjiru,40000.00,Salary 2026-10,PR-00001\r\n');
+  });
+
+  it('offers each file as Excel too, with the same rows and every cell as text', async () => {
+    render(<PayrollExportsPanel run={run} />);
+    await screen.findByText('KRA PAYE (P10)');
+    expect(screen.getAllByRole('button', { name: /Download Excel/ })).toHaveLength(6);
+    fireEvent.click(screen.getAllByRole('button', { name: /Download Excel/ })[3]); // M-Pesa
+    expect(saved.files.map((f) => f.name)).toEqual(['bulk-pay-mpesa-2026-10.xlsx']);
+    const book = XLSX.read(await readBytes(saved.files[0].blob), { type: 'array' });
+    expect(book.SheetNames).toEqual(['M-Pesa bulk pay']);
+    const sheet = book.Sheets[book.SheetNames[0]];
+    expect(XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 })).toEqual([
+      ['Phone Number', 'Name', 'Amount', 'Reference', 'Payroll Number'],
+      ['254712345678', 'Amina Wanjiru', '40000.00', 'Salary 2026-10', 'PR-00001'],
+    ]);
+    expect(sheet.A2.t).toBe('s');
   });
 
   it('shows who is missing what before the download', async () => {
