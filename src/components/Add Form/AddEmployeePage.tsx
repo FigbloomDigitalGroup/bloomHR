@@ -17,6 +17,9 @@ import { employeeTypeOptions } from '../../lib/employmentTypes';
 import { STARTER_DEPARTMENTS, ensureBranchListed, loadEmployeeFieldValues, optionsWithStarters } from '../../lib/employeeOptions';
 import { PAYMENT_METHODS } from '../../lib/paymentMethods';
 import { useEmployeeNumbering } from '../../hooks/useEmployeeNumbering';
+import { useJobGroups } from '../../hooks/useJobGroups';
+import JobGroupPicker from './JobGroupPicker';
+import { lockedPayFields } from '../../lib/jobGroups';
 
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'Work Mobile': string | null;
@@ -73,6 +76,8 @@ const AddEmployeePage = () => {
   const isHR = user?.role === 'HR';
   // the company's own numbers are typed in; otherwise the system gives the next one when saved
   const { numbering, ownNumbers } = useEmployeeNumbering();
+  // the company's job groups (null when this person may not see them: the free-text "Job Group" stays)
+  const jobGroups = useJobGroups();
 
   const [newEmployee, setNewEmployee] = useState<Partial<Employee>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -1154,15 +1159,23 @@ const AddEmployeePage = () => {
                       icon={CreditCard}
                     />
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-                      <FormField
-                        label="Job Group"
-                        name="Job Group"
-                        type="select"
-                        creatable
-                        value={newEmployee['Job Group'] || ''}
-                        onChange={handleInputChange}
-                        options={dropdownOptions.jobGroup}
-                      />
+                      {jobGroups?.length ? (
+                        <JobGroupPicker
+                          groups={jobGroups}
+                          values={newEmployee as Record<string, unknown>}
+                          onChange={(patch) => setNewEmployee(prev => ({ ...prev, ...patch }) as Partial<Employee>)}
+                        />
+                      ) : (
+                        <FormField
+                          label="Job Group"
+                          name="Job Group"
+                          type="select"
+                          creatable
+                          value={newEmployee['Job Group'] || ''}
+                          onChange={handleInputChange}
+                          options={dropdownOptions.jobGroup}
+                        />
+                      )}
                       {isAdmin && (
                         <FormField
                           label="Basic Salary"
@@ -1176,6 +1189,7 @@ const AddEmployeePage = () => {
                               "Basic Salary": numValue
                             }));
                           }}
+                          disabled={lockedPayFields(jobGroups, newEmployee as Record<string, unknown>).includes('Basic Salary')}
                         />
                       )}
                       <FormField
@@ -1190,6 +1204,7 @@ const AddEmployeePage = () => {
                     <EmployerPayFields
                       values={newEmployee as Record<string, unknown>}
                       onChange={(field, value) => setNewEmployee(prev => ({ ...prev, [field]: value }))}
+                      locked={lockedPayFields(jobGroups, newEmployee as Record<string, unknown>)}
                     />
                   </div>
                 )}
