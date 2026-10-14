@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { AccessibilityButton } from '../Accessibility/AccessibilityModal';
-import { Bell, X, Trash2, CheckCircle, UserPlus, Calendar, Image, Upload, MapPin, ChevronDown, AlertTriangle, Clock, HelpCircle, Menu } from 'lucide-react';
+import { Bell, X, Trash2, CheckCircle, UserPlus, Calendar, MapPin, ChevronDown, AlertTriangle, Clock, HelpCircle, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -11,6 +11,7 @@ import CompanySwitcher from '../Company/CompanySwitcher';
 import { useOnlinePeople } from '../chat/lib/presence';
 import { useMyCompanies } from '../../hooks/useMyCompanies';
 import { OPEN_COMPANY_PROFILE, COMPANY_PROFILE_SAVED } from '../Dashboard/GetStarted';
+import { loadCompanyIdentity, type CompanyIdentity } from '../../lib/companyProfile';
 
 interface HeaderProps {
   user?: { email: string; role: string };
@@ -43,13 +44,6 @@ interface NotificationState {
   hr: number;
   lastUpdated: Date | null;
   items: NotificationItem[];
-}
-
-interface CompanyProfile {
-  id: number;
-  image_url: string | null;
-  company_name: string | null;
-  company_tagline: string | null;
 }
 
 // Custom Premium Dropdown for Header - Defined outside to prevent re-creation and flickering
@@ -141,7 +135,6 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
   const { checkAndNotify } = useHRNotifications();
   const [showNotificationDot, setShowNotificationDot] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
   const locationRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -152,14 +145,7 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [locationOpen]);
-  const [companyProfile, setCompanyProfile] = useState<CompanyProfile | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [newProfile, setNewProfile] = useState({
-    company_name: '',
-    company_tagline: ''
-  });
+  const [companyProfile, setCompanyProfile] = useState<CompanyIdentity | null>(null);
   const navigate = useNavigate();
 
   // Create notification item helper
@@ -246,149 +232,12 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
     }
   };
 
-  // Fetch company profile
+  // the company's name and logo, from its profile (Settings > Company profile)
   const fetchCompanyProfile = async () => {
     try {
-      const { data, error } = await supabase
-        .from('company_logo')
-        .select('*')
-        .order('id', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error && error.code !== 'PGRST116') { // Ignore "no rows" error
-        throw error;
-      }
-
-      if (data) {
-        setCompanyProfile(data);
-        setNewProfile({
-          company_name: data.company_name || '',
-          company_tagline: data.company_tagline || ''
-        });
-      }
+      setCompanyProfile(await loadCompanyIdentity());
     } catch (error) {
       console.error('Error fetching company profile:', error);
-      toast.error('Failed to load company profile');
-    }
-  };
-
-  // Handle file selection for preview
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Create preview URL
-    const previewUrl = URL.createObjectURL(file);
-    setLogoPreview(previewUrl);
-    setSelectedFile(file);
-  };
-
-  // Upload logo to storage
-  const uploadLogo = async (file: File): Promise<string> => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    // Upload to Supabase storage
-    const { error: uploadError } = await supabase.storage
-      .from('company-logo')
-      .upload(filePath, file);
-
-    if (uploadError) throw uploadError;
-
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('company-logo')
-      .getPublicUrl(filePath);
-
-    return publicUrl;
-  };
-
-  // Update company profile
-  const updateCompanyProfile = async (updates: Partial<CompanyProfile>) => {
-    try {
-      let updatedProfile;
-      let imageUrl = companyProfile?.image_url || null;
-
-      // Upload new logo if selected
-      if (selectedFile) {
-        imageUrl = await uploadLogo(selectedFile);
-      }
-
-      if (companyProfile) {
-        // Update existing profile
-        const { data, error } = await supabase
-          .from('company_logo')
-          .update({
-            ...updates,
-            image_url: imageUrl || companyProfile.image_url,
-            created_at: new Date().toISOString()
-          })
-          .eq('id', companyProfile.id)
-          .select()
-          .single();
-
-        if (error) throw error;
-        updatedProfile = data;
-      } else {
-        // Create new profile
-        const { data, error } = await supabase
-          .from('company_logo')
-          .insert([{
-            ...updates,
-            image_url: imageUrl,
-            company_name: newProfile.company_name,
-            company_tagline: newProfile.company_tagline
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        updatedProfile = data;
-      }
-
-      setCompanyProfile(updatedProfile);
-      window.dispatchEvent(new Event(COMPANY_PROFILE_SAVED)); // the "Get started" checklist ticks it off
-      toast.success('Profile updated successfully!');
-      return updatedProfile;
-    } catch (error) {
-      console.error('Error updating company profile:', error);
-      toast.error('Failed to update profile');
-      throw error;
-    }
-  };
-
-  // Save profile changes
-  const handleSaveProfile = async () => {
-    try {
-      setUploading(true);
-      await updateCompanyProfile({
-        company_name: newProfile.company_name,
-        company_tagline: newProfile.company_tagline
-      });
-      // Clear preview state after successful save
-      setLogoPreview(null);
-      setSelectedFile(null);
-      setProfileModalOpen(false);
-    } catch (error) {
-      console.error('Error saving profile:', error);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // Cancel profile editing
-  const handleCancelProfile = () => {
-    setLogoPreview(null);
-    setSelectedFile(null);
-    setProfileModalOpen(false);
-    // Reset form to current company profile
-    if (companyProfile) {
-      setNewProfile({
-        company_name: companyProfile.company_name || '',
-        company_tagline: companyProfile.company_tagline || ''
-      });
     }
   };
 
@@ -456,28 +305,20 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
       supabase.removeChannel(staffChannel);
       supabase.removeChannel(leaveChannel);
       clearInterval(interval);
-      // Clean up preview URLs
-      if (logoPreview) {
-        URL.revokeObjectURL(logoPreview);
-      }
     };
   }, [checkAndNotify]);
 
-  // "Get started" on the dashboard asks for the company profile to open
+  // "Get started" on the dashboard asks for the company profile; it is read again once saved
   useEffect(() => {
-    const open = () => setProfileModalOpen(true);
+    const open = () => navigate('/settings/company');
+    const saved = () => void fetchCompanyProfile();
     window.addEventListener(OPEN_COMPANY_PROFILE, open);
-    return () => window.removeEventListener(OPEN_COMPANY_PROFILE, open);
-  }, []);
-
-  // Clean up preview URLs when component unmounts
-  useEffect(() => {
+    window.addEventListener(COMPANY_PROFILE_SAVED, saved);
     return () => {
-      if (logoPreview) {
-        URL.revokeObjectURL(logoPreview);
-      }
+      window.removeEventListener(OPEN_COMPANY_PROFILE, open);
+      window.removeEventListener(COMPANY_PROFILE_SAVED, saved);
     };
-  }, [logoPreview]);
+  }, [navigate]);
 
   const handleBellClick = () => {
     setShowNotificationDot(false);
@@ -566,7 +407,7 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
           <CompanySwitcher
             name={companyProfile?.company_name || currentCompanyName || 'Figbloom HR'}
             logoUrl={companyProfile?.image_url}
-            onOpenProfile={() => setProfileModalOpen(true)}
+            onOpenProfile={() => navigate('/settings/company')}
           />
         </div>
 
@@ -667,176 +508,6 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
           </motion.button>
         </div>
       </motion.header>
-
-      {/* Company Profile Modal - Updated with curved design */}
-      <AnimatePresence>
-        {profileModalOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={handleCancelProfile}
-              className="fixed inset-0 bg-black bg-opacity-50 z-50"
-            />
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="fixed inset-0 flex items-center justify-center z-50 p-4"
-            >
-              <div
-                className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto"
-                style={{
-                  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)'
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold text-gray-900" style={{ fontFamily: "'Poppins', sans-serif" }}>
-                      {companyProfile ? 'Edit Company Profile' : 'Create Company Profile'}
-                    </h2>
-                    <button
-                      onClick={handleCancelProfile}
-                      className="text-gray-500 hover:text-gray-700 transition-colors rounded-lg p-1 hover:bg-gray-100"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  {/* Logo Upload */}
-                  <div className="mb-6">
-                    <label className="block text-xs font-medium text-gray-700 mb-2" style={{ fontFamily: "'Poppins', sans-serif" }}>
-                      Company Logo
-                    </label>
-                    <div className="flex items-center space-x-4">
-                      <div className="relative">
-                        {logoPreview ? (
-                          <>
-                            <img
-                              src={logoPreview}
-                              alt="Logo Preview"
-                              className="w-16 h-16 rounded-xl object-cover shadow"
-                            />
-                            <button
-                              onClick={() => {
-                                setLogoPreview(null);
-                                setSelectedFile(null);
-                              }}
-                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
-                              title="Remove logo"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </>
-                        ) : companyProfile?.image_url ? (
-                          <img
-                            src={companyProfile.image_url}
-                            alt="Current Logo"
-                            className="w-16 h-16 rounded-xl object-cover shadow"
-                          />
-                        ) : (
-                          <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center">
-                            <Image className="w-6 h-6 text-gray-400" />
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <label className="cursor-pointer">
-                          <div className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl flex items-center space-x-2 transition-colors">
-                            <Upload className="w-4 h-4" />
-                            <span style={{ fontFamily: "'Poppins', sans-serif" }}>
-                              {logoPreview ? 'Change Logo' : 'Upload Logo'}
-                            </span>
-                            <input
-                              type="file"
-                              className="hidden"
-                              accept="image/*"
-                              onChange={handleFileSelect}
-                              disabled={uploading}
-                            />
-                          </div>
-                        </label>
-                        <p className="text-xs text-gray-500 mt-1" style={{ fontFamily: "'Poppins', sans-serif" }}>
-                          Recommended size: 256x256px
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Company Name */}
-                  <div className="mb-4">
-                    <label htmlFor="company_name" className="block text-xs font-medium text-gray-700 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>
-                      Company Name
-                    </label>
-                    <input
-                      type="text"
-                      id="company_name"
-                      value={newProfile.company_name}
-                      onChange={(e) => setNewProfile({ ...newProfile, company_name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                      style={{ fontFamily: "'Poppins', sans-serif" }}
-                      placeholder="Enter company name"
-                    />
-                  </div>
-
-                  {/* Company Tagline */}
-                  <div className="mb-6">
-                    <label htmlFor="company_tagline" className="block text-xs font-medium text-gray-700 mb-1" style={{ fontFamily: "'Poppins', sans-serif" }}>
-                      Tagline
-                    </label>
-                    <input
-                      type="text"
-                      id="company_tagline"
-                      value={newProfile.company_tagline}
-                      onChange={(e) => setNewProfile({ ...newProfile, company_tagline: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                      style={{ fontFamily: "'Poppins', sans-serif" }}
-                      placeholder="Enter company tagline"
-                    />
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex justify-end space-x-3">
-                    <button
-                      onClick={handleCancelProfile}
-                      className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
-                      style={{ fontFamily: "'Poppins', sans-serif" }}
-                      disabled={uploading}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSaveProfile}
-                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl transition-colors flex items-center space-x-1"
-                      style={{ fontFamily: "'Poppins', sans-serif" }}
-                      disabled={uploading || (!newProfile.company_name && !newProfile.company_tagline && !selectedFile)}
-                    >
-                      {uploading ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          {companyProfile ? 'Updating...' : 'Creating...'}
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="w-4 h-4" />
-                          <span>{companyProfile ? 'Update Profile' : 'Create Profile'}</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
 
       {/* Notification Sidebar - Updated with curved design */}
       <AnimatePresence>
