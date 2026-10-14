@@ -23,6 +23,7 @@ import FigbloomLoader from './components/UI/FigbloomLoader';
 import { useCompanySwitching } from './hooks/useMyCompanies';
 import { isStaleChunkError, reloadOnceForStaleChunk } from './lib/staleChunk';
 import { welcomeMessage } from './lib/welcome';
+import { isHiddenModule } from './lib/hiddenModules';
 
 // Route-level code splitting: each page is fetched when first visited.
 const AdminVideoUpload = lazy(() => import('./components/training/Training'));
@@ -1044,7 +1045,7 @@ function App() {
                                 <Route path="/loanadmin" element={<LoanRequestsAdmin />} />
                                 <Route path="/asset" element={<AssetManagement />} />
                                 <Route path="/asset/scan" element={<QRScanner />} />
-                                <Route path="/expenses" element={<ExpenseModule selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />} />
+                                {!isHiddenModule('expenses') && <Route path="/expenses" element={<ExpenseModule selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />} />}
                                 <Route path="/tasks" element={<MicrofinanceTodoList />} />
                                 <Route path="/sms" element={<SMSCenter />} />
                                 <Route path="/reports" element={<ReportsList />} />
