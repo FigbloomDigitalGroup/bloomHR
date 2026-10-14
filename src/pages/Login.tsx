@@ -98,7 +98,8 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     e.preventDefault();
     setResetLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail);
+      // the link opens the page that sets the new password, whatever Site URL Supabase has
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, { redirectTo: `${window.location.origin}/update-password` });
       if (error) throw error;
       toast.success('Reset link sent to your email');
       setShowForgotPassword(false);

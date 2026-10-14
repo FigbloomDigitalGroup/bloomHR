@@ -2,14 +2,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
-const auth = vi.hoisted(() => ({ signIn: vi.fn(), from: vi.fn() }));
+const auth = vi.hoisted(() => ({ signIn: vi.fn(), from: vi.fn(), reset: vi.fn() }));
 
 vi.mock('../lib/supabase', () => ({
   supabase: {
     auth: {
       getSession: () => Promise.resolve({ data: { session: null } }),
       signInWithPassword: (...a: unknown[]) => auth.signIn(...a),
-      resetPasswordForEmail: vi.fn(),
+      resetPasswordForEmail: (...a: unknown[]) => auth.reset(...a),
     },
     from: (...a: unknown[]) => auth.from(...a),
   },
@@ -51,5 +51,17 @@ describe('Login', () => {
     fireEvent.click(screen.getByRole('button', { name: /Sign In/ }));
     await waitFor(() => expect(auth.signIn).toHaveBeenCalledWith({ email: 'a@b.co', password: 'secret123' }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Invalid login credentials'));
+  });
+
+  it('sends a reset link that opens the set-new-password page', async () => {
+    auth.reset.mockResolvedValue({ error: null });
+    open();
+    fireEvent.click(screen.getByRole('button', { name: 'Forgot?' }));
+    const emails = screen.getAllByPlaceholderText('name@company.com');
+    fireEvent.change(emails[emails.length - 1], { target: { value: 'a@b.co' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send Link' }));
+    await waitFor(() =>
+      expect(auth.reset).toHaveBeenCalledWith('a@b.co', { redirectTo: `${window.location.origin}/update-password` })
+    );
   });
 });
