@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { isHiddenModule } from '../../lib/hiddenModules';
 import {
   UsersRound,
@@ -96,9 +96,13 @@ interface SidebarProps {
   isCollapsed: boolean;
   onToggle: (collapsed: boolean) => void;
   onLogout?: () => void;
+  /** below md the sidebar is an off-canvas drawer: these say whether it's open and close it */
+  isMobile?: boolean;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: SidebarProps) {
+export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobile = false, mobileOpen = false, onMobileClose }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
@@ -202,13 +206,43 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
     }
   };
 
-  const isExpanded = !isCollapsed;
+  // the phone drawer always shows the full menu; collapsing only applies to the docked sidebar
+  const isExpanded = isMobile || !isCollapsed;
+  const drawerOpen = isMobile && mobileOpen;
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  // the drawer closes on Escape, and takes focus when it opens so keyboard users land inside it
+  useEffect(() => {
+    if (!drawerOpen) return;
+    closeButtonRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onMobileClose?.();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawerOpen, onMobileClose]);
   const userRole = user?.role || 'Admin';
   const avatarUrl = myPreferences?.avatarUrl ?? null;
   const userInitial = user?.email?.[0]?.toUpperCase() || 'A';
 
   return (
-    <div className="fixed left-0 top-0 h-screen z-50 flex flex-col select-none">
+    <>
+    {drawerOpen && (
+      <div
+        data-testid="sidebar-backdrop"
+        className="fixed inset-0 z-40 bg-black/40 md:hidden"
+        onClick={onMobileClose}
+        aria-hidden="true"
+      />
+    )}
+    {/* below md the sidebar slides off-screen (and out of the tab order) until the menu button opens it */}
+    <div
+      id="app-sidebar"
+      aria-label="Main navigation"
+      role={isMobile ? 'dialog' : undefined}
+      aria-modal={drawerOpen ? true : undefined}
+      className={`fixed left-0 top-0 h-screen z-50 flex flex-col select-none transition-[transform,visibility] duration-300 ${mobileOpen ? '' : 'max-md:-translate-x-full max-md:invisible'}`}
+    >
       <motion.div
         initial="expanded"
         animate={isExpanded ? "expanded" : "collapsed"}
@@ -246,8 +280,9 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
 
           {/* Collapse/Expand Toggle: chevron when open, hamburger when collapsed */}
           <motion.button
-            onClick={() => onToggle(!isCollapsed)}
-            aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+            ref={closeButtonRef}
+            onClick={() => (isMobile ? onMobileClose?.() : onToggle(!isCollapsed))}
+            aria-label={isMobile ? 'Close menu' : isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
             className={`p-2 rounded-xl hover:bg-shell-fg/10 transition-all duration-300 group border border-transparent hover:border-shell-fg/10 hover:shadow-sm ${!isExpanded ? 'bg-shell-fg/5' : ''}`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -431,5 +466,6 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
         </div>
       </motion.div>
     </div>
+    </>
   );
 }

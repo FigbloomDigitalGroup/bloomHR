@@ -9,12 +9,15 @@ const UserProfileDropdown = ({
   onPasswordReset,
   loginStatus,
   userName,
-  setActiveTab
+  setActiveTab,
+  compact = false
 }: {
   onPasswordReset: () => void,
   loginStatus: { isLoggedIn: boolean; lastLogin: string | null },
   userName: string,
-  setActiveTab?: (tab: string) => void
+  setActiveTab?: (tab: string) => void,
+  /** phone header: just the initial, with the menu floating below it */
+  compact?: boolean
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
@@ -153,6 +156,19 @@ const UserProfileDropdown = ({
 
   return (
     <div className="relative">
+      {compact ? (
+      <button
+        ref={buttonRef}
+        type="button"
+        className="w-8 h-8 rounded-full bg-green-tint border border-green-tint flex items-center justify-center text-brand font-bold text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+        onClick={handleButtonClick}
+        aria-expanded={isOpen}
+        aria-haspopup="true"
+        aria-label="Account menu"
+      >
+        {userName[0]?.toUpperCase()}
+      </button>
+      ) : (
       <button
         ref={buttonRef}
         className="flex items-center w-full p-3 text-left rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
@@ -173,12 +189,15 @@ const UserProfileDropdown = ({
         </div>
         <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
+      )}
 
       {/* Dropdown positioned above the button since it's at bottom of sidebar */}
       {isOpen && (
         <div
           ref={dropdownRef}
-          className=" bg-white rounded-lg shadow-xl border border-gray-200  min-w-full"
+          className={compact
+            ? 'absolute right-0 top-full mt-2 w-56 max-w-[calc(100vw-2rem)] z-50 bg-white rounded-lg shadow-xl border border-gray-200'
+            : ' bg-white rounded-lg shadow-xl border border-gray-200  min-w-full'}
         >
 
           {setActiveTab && (

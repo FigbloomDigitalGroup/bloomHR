@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import { CheckCircle2, Download, ExternalLink, Loader, Upload } from 'lucide-react';
-import { SearchInput } from '../UI';
+import { SearchInput, TableScroll } from '../UI';
 import { readEmployeeRows } from '../../lib/employeeSheet';
 import { runErrorMessage } from '../../lib/payrollRuns';
 import type { EmployeeRecord } from '../../lib/profileCompleteness';
@@ -210,10 +210,11 @@ export default function MissingPayrollDetailsModal({ employees, onClose, onChang
           {/* list */}
           {missing.length > 0 && (
             <>
-              <div className="w-64">
+              <div className="w-full sm:w-64">
                 <SearchInput placeholder="Search employee or detail" value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
               <div className="rounded-xl border border-border overflow-hidden">
+                <TableScroll>
                 <table className="min-w-full text-xs">
                   <thead className="bg-gray-50 border-b border-border">
                     <tr className="text-left text-[10px] font-bold uppercase text-subtle">
@@ -260,6 +261,7 @@ export default function MissingPayrollDetailsModal({ employees, onClose, onChang
                     ))}
                   </tbody>
                 </table>
+                </TableScroll>
               </div>
             </>
           )}

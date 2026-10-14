@@ -506,7 +506,7 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
             initial={{ opacity: 0, y: -20, x: 100 }}
             animate={{ opacity: 1, y: 0, x: 0 }}
             exit={{ opacity: 0, y: -20, x: 100 }}
-            className="fixed top-5 right-5 p-4 rounded-xl text-white z-[1000] shadow-2xl bg-red-500 flex items-center"
+            className="fixed top-5 right-5 max-w-[calc(100vw-2rem)] p-4 rounded-xl text-white z-[1000] shadow-2xl bg-red-500 flex items-center"
           >
             <AlertCircle className="w-4 h-4 mr-2" />
             <span className="text-sm font-medium">Unauthorized access</span>
@@ -518,7 +518,7 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
             initial={{ opacity: 0, y: -20, x: 100 }}
             animate={{ opacity: 1, y: 0, x: 0 }}
             exit={{ opacity: 0, y: -20, x: 100 }}
-            className="fixed top-5 right-5 p-4 rounded-xl text-white z-[1000] shadow-2xl bg-primary flex items-center"
+            className="fixed top-5 right-5 max-w-[calc(100vw-2rem)] p-4 rounded-xl text-white z-[1000] shadow-2xl bg-primary flex items-center"
           >
             <Phone className="w-4 h-4 mr-2" />
             <span className="text-sm font-medium">Support: 0700594586</span>
@@ -549,7 +549,7 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
         <TodaysBirthdayWishes className="mb-4" />
 
         {/* Filters & Tabs */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <TabBar
             items={[{ id: 'overview', label: 'Overview' }, { id: 'analytics', label: 'Analytics' }]}
             activeId={activeTab}

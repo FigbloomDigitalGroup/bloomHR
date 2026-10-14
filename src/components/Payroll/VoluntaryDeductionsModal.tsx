@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import { Download, Loader, Pause, Pencil, Play, Plus, Trash2, Upload } from 'lucide-react';
 import EmployeePicker from '../UI/EmployeePicker';
-import { SearchInput } from '../UI';
+import { SearchInput, TableScroll } from '../UI';
 import { useEmployeeDirectory } from '../../hooks/useEmployeeDirectory';
 import { readEmployeeRows } from '../../lib/employeeSheet';
 import { runErrorMessage } from '../../lib/payrollRuns';
@@ -400,8 +400,8 @@ export default function VoluntaryDeductionsModal({ onClose, onChanged, draftNoti
               </div>
             </section>
           ) : (
-            <div className="flex items-center gap-2">
-              <div className="w-64">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="w-full sm:w-64">
                 <SearchInput placeholder="Search employee or deduction" value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
               <div className="flex-1" />
@@ -420,6 +420,7 @@ export default function VoluntaryDeductionsModal({ onClose, onChanged, draftNoti
 
           {/* list */}
           <div className="rounded-xl border border-border overflow-hidden">
+            <TableScroll>
             <table className="min-w-full text-xs">
               <thead className="bg-gray-50 border-b border-border">
                 <tr className="text-left text-[10px] font-bold uppercase text-subtle">
@@ -494,6 +495,7 @@ export default function VoluntaryDeductionsModal({ onClose, onChanged, draftNoti
                 })}
               </tbody>
             </table>
+            </TableScroll>
           </div>
         </div>
       </div>

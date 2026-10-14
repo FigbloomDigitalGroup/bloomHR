@@ -417,6 +417,16 @@ const GlowButton = ({
   );
 };
 
+// "2026-10" is October's run, which pays for September: the label shows the month worked
+const workedMonthLabel = (period: string | null | undefined) => {
+  if (!period) return 'N/A';
+  const [year, month] = String(period).split('-').map(Number);
+  let prevMonth = month - 1;
+  let prevYear = year;
+  if (prevMonth === 0) { prevMonth = 12; prevYear = year - 1; }
+  return new Date(prevYear, prevMonth - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+};
+
 // PayslipModal Component (Updated with advance deduction)
 const PayslipModal = ({
   record,
@@ -437,7 +447,9 @@ const PayslipModal = ({
       margin: 0.5,
       filename: `payslip_${record["Employee ID"] || record.employee_id}_${record["Pay Period"] || record.pay_period}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
+      // windowWidth makes html2canvas lay the copy out as on a desktop screen, so the PDF keeps the
+      // two-column desktop layout even when downloaded from a phone
+      html2canvas: { scale: 2, useCORS: true, windowWidth: 1280 },
       jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
     };
 
@@ -447,9 +459,9 @@ const PayslipModal = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-lg w-full max-w-6xl max-h-[90vh] overflow-auto">
-        <div className="sticky top-0 bg-white p-4 border-b border-gray-200 flex justify-between items-center z-10">
-          <h2 className="text-xl font-semibold text-gray-900">Modern Payslip</h2>
-          <div className="flex gap-2">
+        <div className="sticky top-0 bg-white p-4 border-b border-gray-200 flex flex-wrap gap-2 justify-between items-center z-10">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Modern Payslip</h2>
+          <div className="flex flex-wrap gap-2">
             <GlowButton
               variant="secondary"
               icon={Download}
@@ -471,18 +483,18 @@ const PayslipModal = ({
 
         <div className="p-2 bg-gray-50 payslip-container print:p-0 print:w-[210mm] print:h-[297mm]">
           <div id="payslip-content" className="bg-white border text-black border-gray-300 text-xs leading-tight mx-auto" style={{ maxWidth: '800px', boxShadow: '0 4px 15px rgba(0, 0, 0, 0.05)', fontFamily: 'Calibri, Helvetica, sans-serif' }}>
-            <div className="bg-white text-black p-6 flex justify-between items-end border-b-[3px] border-double border-gray-300">
-              <div className="flex items-center">
+            <div className="bg-white text-black p-6 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-end border-b-[3px] border-double border-gray-300">
+              <div className="flex items-center min-w-0">
                 {companyInfo?.image_url && (
-                  <img src={companyInfo.image_url} alt="Company Logo" className="h-16 w-16 mr-4 object-contain" />
+                  <img src={companyInfo.image_url} alt="Company Logo" className="h-16 w-16 mr-4 object-contain shrink-0" />
                 )}
-                <div>
-                  <h1 className="text-2xl font-bold uppercase text-gray-900">{companyInfo?.company_name || 'Your Company Name'}</h1>
+                <div className="min-w-0">
+                  <h1 className="text-xl sm:text-2xl font-bold uppercase text-gray-900 break-words">{companyInfo?.company_name || 'Your Company Name'}</h1>
                   <div className="text-gray-600 text-sm font-semibold mt-1">{companyInfo?.company_tagline || 'Excellence in service'}</div>
                 </div>
               </div>
-              <div className="text-right">
-                <h2 className="text-3xl font-bold uppercase text-gray-900 mb-1">PAYSLIP</h2>
+              <div className="sm:text-right">
+                <h2 className="text-2xl sm:text-3xl font-bold uppercase text-gray-900 mb-1">PAYSLIP</h2>
                 <div className="text-gray-600 font-semibold text-sm">
                   {payPeriod ? (() => {
                     const [year, month] = String(payPeriod).split('-').map(Number);
@@ -496,7 +508,7 @@ const PayslipModal = ({
             </div>
 
             <div className="p-6">
-              <div className="grid grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                 <div className="border border-gray-300 p-4">
                   <h3 className="font-bold border-b border-gray-300 pb-2 mb-3 text-gray-900 text-sm">Employee information</h3>
                   <div className="space-y-1.5 text-black">
@@ -526,7 +538,7 @@ const PayslipModal = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                 <div className="border border-gray-300">
                   <div className="bg-gray-100 border-b border-gray-300 font-bold p-3 text-gray-900">Earnings</div>
                   <div className="p-3 space-y-2 text-black">
@@ -573,7 +585,7 @@ const PayslipModal = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-8 mb-4 text-center text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-4 text-center text-xs">
                 <div className="p-2 pt-8">
                   <div className="border-t border-gray-300 pt-2 font-bold text-gray-800">Employee signature</div>
                   <div className="text-gray-500 mt-1">Date: ________________________</div>
@@ -976,7 +988,45 @@ const PayslipViewer = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* phones: one card per payslip; the 12-column table needs more room than a phone has */}
+        <ul className="sm:hidden divide-y divide-gray-200" aria-label="Payslips">
+          {filteredPayslips.length === 0 ? (
+            <li className="px-4 py-8 text-center text-xs text-gray-500">
+              No payslips found. {payslips.length === 0 ? 'You have no payslip records yet.' : 'Try adjusting your search filters.'}
+            </li>
+          ) : (
+            filteredPayslips.map((payslip: any, index: number) => {
+              const payPeriod = payslip["Pay Period"] || payslip.pay_period || null;
+              const calculated = calculatePayrollValues(payslip, overrideStatutoryChecks, salaryAdvances as never[], payPeriod);
+              return (
+                <li key={payslip.id} className="p-4 text-xs">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <span className="font-semibold text-sm text-gray-900 min-w-0 truncate">{workedMonthLabel(payPeriod)}</span>
+                    <GlowButton variant="primary" icon={Eye} size="sm" onClick={() => handleViewPayslip(payslip, index)}>
+                      View
+                    </GlowButton>
+                  </div>
+                  <dl className="grid grid-cols-3 gap-2">
+                    <div className="min-w-0">
+                      <dt className="text-gray-500">Gross</dt>
+                      <dd className="font-bold text-status-success break-words">KSh {calculated.grossPay.toLocaleString()}</dd>
+                    </div>
+                    <div className="min-w-0">
+                      <dt className="text-gray-500">Deductions</dt>
+                      <dd className="font-bold text-status-danger break-words">KSh {calculated.totalDeductions.toLocaleString()}</dd>
+                    </div>
+                    <div className="min-w-0">
+                      <dt className="text-gray-500">Net pay</dt>
+                      <dd className="font-bold text-status-success break-words">KSh {Math.round(calculated.netPay).toLocaleString()}</dd>
+                    </div>
+                  </dl>
+                </li>
+              );
+            })
+          )}
+        </ul>
+
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-xs">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>

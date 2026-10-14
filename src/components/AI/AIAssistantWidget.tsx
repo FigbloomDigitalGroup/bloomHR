@@ -26,7 +26,7 @@ export default function AIAssistantWidget(props: TownProps) {
           role="dialog"
           aria-label="HR AI Assistant"
           aria-hidden={!open}
-          className={`${open ? 'flex' : 'hidden'} fixed bottom-24 right-6 z-50 h-[560px] max-h-[calc(100vh-8rem)] w-[380px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-2xl`}
+          className={`${open ? 'flex' : 'hidden'} fixed bottom-20 right-4 sm:bottom-24 sm:right-6 z-50 h-[560px] max-h-[calc(100vh-7rem)] sm:max-h-[calc(100vh-8rem)] w-[380px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-border bg-white shadow-2xl`}
         >
           <div className="flex items-center gap-2.5 bg-brand px-4 py-3 text-white">
             <Wand2 className="h-4 w-4" />
@@ -45,9 +45,9 @@ export default function AIAssistantWidget(props: TownProps) {
         onClick={toggle}
         aria-label={open ? 'Close the AI assistant' : 'Open the AI assistant'}
         aria-expanded={open}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-lg transition-transform hover:scale-105 hover:bg-brand-dark"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 flex h-11 w-11 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-brand text-white shadow-lg transition-transform hover:scale-105 hover:bg-brand-dark"
       >
-        {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
+        {open ? <X className="h-5 w-5 sm:h-6 sm:w-6" /> : <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" />}
       </button>
     </>
   );

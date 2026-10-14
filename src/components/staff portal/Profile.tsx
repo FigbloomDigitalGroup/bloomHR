@@ -148,9 +148,9 @@ const Profile = () => {
     <div className="p-6">
       {/* Profile Image Section */}
       <div className="bg-white rounded-lg p-6 border border-gray-200 mb-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="relative">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center space-x-4 min-w-0">
+            <div className="relative shrink-0">
               {profileImage ? (
                 <img 
                   src={profileImage} 
@@ -181,11 +181,11 @@ const Profile = () => {
                 disabled={imageUploading}
               />
             </div>
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">
+            <div className="min-w-0">
+              <h3 className="text-lg font-medium text-gray-900 truncate">
                 {employeeData["First Name"]} {employeeData["Last Name"]}
               </h3>
-              <p className="text-xs text-gray-500">{employeeData["Employee Number"]}</p>
+              <p className="text-xs text-gray-500 truncate">{employeeData["Employee Number"]}</p>
             </div>
           </div>
           <button

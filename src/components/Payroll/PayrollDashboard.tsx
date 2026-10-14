@@ -43,7 +43,7 @@ import html2pdf from "html2pdf.js";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import SearchableDropdown from "../UI/SearchableDropdown";
-import { Card, SearchInput } from "../UI";
+import { Card, Modal, SearchInput, TableScroll } from "../UI";
 import MPesaSpreadsheetFullPage from "./MpesaSpreadSheet";
 import useStatutoryRates from "../../hooks/useStatutoryRates";
 import StatutoryRatesModal from "./StatutoryRatesModal";
@@ -460,7 +460,7 @@ const PendingPaymentCard = ({
         <StatusBadge status={payment.status} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
         <div>
           <p className="text-xs text-gray-600">Total Amount</p>
           <p className="font-bold text-lg text-primary">
@@ -654,6 +654,7 @@ const PaymentDetailsModal = ({
 
             {payment.type === "bulk" && payment.employees_data ? (
               <div className="max-h-60 overflow-y-auto">
+                <TableScroll>
                 <table className="w-full text-xs">
                   <thead className="bg-gray-50">
                     <tr>
@@ -683,11 +684,12 @@ const PaymentDetailsModal = ({
                     ))}
                   </tbody>
                 </table>
+                </TableScroll>
               </div>
             ) : (
               payment.employee_data && (
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs text-gray-600">Employee Name</p>
                       <p className="font-medium">
@@ -1521,7 +1523,7 @@ const ExportModal = ({
             <label className="block text-xs font-medium text-gray-700 mb-2">
               Export Format
             </label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
                 <input
                   type="radio"
@@ -1659,7 +1661,8 @@ const PayslipModal = ({
       margin: 0.5,
       filename: `payslip_${record.employee_id}_${record.pay_period}.pdf`,
       image: { type: "jpeg", quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
+      // windowWidth lays the copy out as on a desktop screen, so a PDF downloaded on a phone keeps the desktop layout
+      html2canvas: { scale: 2, useCORS: true, windowWidth: 1280 },
       jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
     };
 
@@ -1669,11 +1672,11 @@ const PayslipModal = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-lg w-full max-w-6xl max-h-[90vh] overflow-auto">
-        <div className="sticky top-0 bg-white p-4 border-b border-gray-200 flex justify-between items-center z-10">
-          <h2 className="text-xl font-semibold text-gray-900">
+        <div className="sticky top-0 bg-white p-4 border-b border-gray-200 flex flex-wrap gap-2 justify-between items-center z-10">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
             Modern Payslip
           </h2>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <GlowButtonss
               variant="secondary"
               icon={Download}
@@ -1694,17 +1697,17 @@ const PayslipModal = ({
             className="bg-white border text-black border-gray-300 text-xs leading-tight mx-auto"
             style={{ maxWidth: '800px', boxShadow: '0 4px 15px rgba(0, 0, 0, 0.05)', fontFamily: 'Calibri, Helvetica, sans-serif' }}
           >
-            <div className="bg-white text-black p-6 flex justify-between items-end border-b-[3px] border-double border-gray-300">
-              <div className="flex items-center">
+            <div className="bg-white text-black p-6 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-end border-b-[3px] border-double border-gray-300">
+              <div className="flex items-center min-w-0">
                 {companyInfo?.image_url && (
                   <img
                     src={companyInfo.image_url}
                     alt="Company Logo"
-                    className="h-16 w-16 mr-4 object-contain"
+                    className="h-16 w-16 mr-4 object-contain shrink-0"
                   />
                 )}
-                <div>
-                  <h1 className="text-2xl font-bold uppercase text-gray-900">
+                <div className="min-w-0">
+                  <h1 className="text-xl sm:text-2xl font-bold uppercase text-gray-900 break-words">
                     {companyInfo?.company_name || "Your Company Name"}
                   </h1>
                   <div className="text-gray-600 text-sm font-semibold mt-1">
@@ -1712,8 +1715,8 @@ const PayslipModal = ({
                   </div>
                 </div>
               </div>
-              <div className="text-right">
-                <h2 className="text-3xl font-bold uppercase text-gray-900 mb-1">PAYSLIP</h2>
+              <div className="sm:text-right">
+                <h2 className="text-2xl sm:text-3xl font-bold uppercase text-gray-900 mb-1">PAYSLIP</h2>
                 <div className="text-gray-600 font-semibold text-sm">
                   {(() => {
                     const now = new Date();
@@ -1730,7 +1733,7 @@ const PayslipModal = ({
             </div>
 
             <div className="p-6">
-              <div className="grid grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                 <div className="border border-gray-300 p-4">
                   <h3 className="font-bold border-b border-gray-300 pb-2 mb-3 text-gray-900 text-sm">
                     Employee information
@@ -1794,7 +1797,7 @@ const PayslipModal = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                 <div className="border border-gray-300">
                   <div className="bg-gray-100 border-b border-gray-300 font-bold p-3 text-gray-900">Earnings</div>
                   <div className="p-3 space-y-2 text-black">
@@ -1891,7 +1894,7 @@ const PayslipModal = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-8 mb-4 text-center text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-4 text-center text-xs">
                 <div className="p-2 pt-8">
                   <div className="border-t border-gray-300 pt-2 font-bold text-gray-800">
                     Employee signature
@@ -3644,21 +3647,22 @@ This can't be undone: the payslips stay locked for good.`,
           </div>
         )}
 
-      {showQuickActions && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Quick Actions
-              </h3>
+      <Modal
+        open={showQuickActions}
+        onClose={() => setShowQuickActions(false)}
+        title="Quick Actions"
+        size="md"
+        className="bg-white rounded-xl shadow-lg p-6"
+      >
               <button
+                type="button"
                 onClick={() => setShowQuickActions(false)}
-                className="text-gray-500 hover:text-gray-700"
+                aria-label="Close quick actions"
+                className="absolute top-6 right-6 text-gray-500 hover:text-gray-700"
               >
                 <X className="w-5 h-5" />
               </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <GlowButtonss
                 icon={Calculator}
                 size="sm"
@@ -3762,9 +3766,7 @@ This can't be undone: the payslips stay locked for good.`,
                 Upload History
               </GlowButtonss>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
 
       {/* ── TOOLBAR (FIG-544): pay period, statutory override, reports, bulk pay ── */}
       <div className="flex items-center gap-2.5 flex-wrap">

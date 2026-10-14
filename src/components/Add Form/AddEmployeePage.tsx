@@ -1216,7 +1216,7 @@ const AddEmployeePage = () => {
                   />
                   <div className="grid grid-cols-1 gap-6 mt-4">
                     {statutoryDeductions.map((deduction, index) => (
-                      <div key={index} className="flex items-center gap-4">
+                      <div key={index} className="flex flex-wrap items-center gap-x-4 gap-y-2">
                         <div className="flex items-center">
                           <button
                             type="button"
