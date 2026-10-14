@@ -466,8 +466,8 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
     try {
       setLoading(true);
       
-      if (!newEmployee["Employee Number"] || !newEmployee["First Name"] || !newEmployee["Last Name"]) {
-        toast.error('Employee Number, First Name and Last Name are required.');
+      if (!newEmployee["First Name"] || !newEmployee["Last Name"]) {
+        toast.error('First Name and Last Name are required.');
         return;
       }
       // the invitation to join goes to the work email, and their login finds this record by it
@@ -479,7 +479,8 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
 
       const { data, error } = await supabase
         .from('employees')
-        .insert([{ ...newEmployee, "Work Email": normaliseWorkEmail(newEmployee["Work Email"]) }])
+        // the employee number is given by the system when saved (PR-00001, ...)
+        .insert([{ ...newEmployee, "Employee Number": undefined, "Work Email": normaliseWorkEmail(newEmployee["Work Email"]) }])
         .select();
 
       if (error) {
@@ -605,14 +606,17 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
   const generateBulkUploadPreview = async (data: any[]): Promise<BulkUploadPreview> => {
     const operations: UploadOperation[] = [];
     const emailsInSheet = new Set<string>();
-    const numbersInSheet = new Set<string>();
+    const matchedInSheet = new Set<string>();
 
-    // the employee numbers already in the company, read once (not one request per row)
-    const existingNumbers = new Set(
-      (await fetchAll<{ 'Employee Number': string }>((from, to) =>
-        supabase.from('employees').select('id, "Employee Number"').order('id').range(from, to)
-      )).map((e) => String(e['Employee Number']).trim())
+    // the company's employees, read once (not one request per row): a row updates the one its number or work email
+    // belongs to; any other row is a new employee, who gets the next number from the system
+    const existing = await fetchAll<{ 'Employee Number': string; 'Work Email': string | null }>((from, to) =>
+      supabase.from('employees').select('id, "Employee Number", "Work Email"').order('id').range(from, to)
     );
+    const numberOfEmail = new Map(
+      existing.filter((e) => e['Work Email']).map((e) => [String(e['Work Email']).trim().toLowerCase(), String(e['Employee Number']).trim()])
+    );
+    const existingNumbers = new Set(existing.map((e) => String(e['Employee Number']).trim()));
 
     for (const [index, row] of data.entries()) {
       const lineNo = index + 2; // the header is row 1, as in Excel
@@ -645,35 +649,40 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
         };
 
         // Validate required fields
-        if (!employeeData["Employee Number"] || !employeeData["First Name"] || !employeeData["Last Name"]) {
+        if (!employeeData["First Name"] || !employeeData["Last Name"]) {
           operations.push({
             employee: employeeData,
             operation: 'error',
             line: lineNo,
-            error: `${line}: missing Employee Number, First Name or Last Name`
+            error: `${line}: missing First Name or Last Name`
           });
           continue;
         }
 
-        const number = String(employeeData["Employee Number"]).trim();
-        if (numbersInSheet.has(number)) {
-          operations.push({ employee: employeeData, operation: 'error', line: lineNo, error: `${line} (${number}): Employee Number ${number} is used by another row` });
+        // the employee this row is about, if they're already in the company: by their number, else their work email
+        const workEmail = employeeData["Work Email"];
+        const typedNumber = String(employeeData["Employee Number"] ?? '').trim();
+        const matched = existingNumbers.has(typedNumber) ? typedNumber : (workEmail && numberOfEmail.get(workEmail)) || null;
+        // a new employee's number comes from the system, never from the sheet (no missing, mistyped or odd numbers)
+        employeeData["Employee Number"] = matched ?? '';
+        const who = matched ?? workEmail ?? `${employeeData["First Name"]} ${employeeData["Last Name"]}`;
+
+        if (matched && matchedInSheet.has(matched)) {
+          operations.push({ employee: employeeData, operation: 'error', line: lineNo, error: `${line} (${who}): another row is about the same employee` });
           continue;
         }
-        numbersInSheet.add(number);
-
-        const workEmail = employeeData["Work Email"];
+        if (matched) matchedInSheet.add(matched);
         if (workEmail && emailsInSheet.has(workEmail)) {
-          operations.push({ employee: employeeData, operation: 'error', line: lineNo, error: `${line} (${number}): work email ${workEmail} is used by another row` });
+          operations.push({ employee: employeeData, operation: 'error', line: lineNo, error: `${line} (${who}): work email ${workEmail} is used by another row` });
           continue;
         }
         if (workEmail) emailsInSheet.add(workEmail);
 
-        const exists = existingNumbers.has(number);
+        const exists = !!matched;
         // a new employee needs a work email (the invitation to join is sent there); an update may leave it blank
         const emailProblem = exists && !workEmail ? null : workEmailProblem(workEmail);
         if (emailProblem) {
-          operations.push({ employee: employeeData, operation: 'error', line: lineNo, error: `${line} (${number}): ${emailProblem}` });
+          operations.push({ employee: employeeData, operation: 'error', line: lineNo, error: `${line} (${who}): ${emailProblem}` });
           continue;
         }
 
@@ -1043,8 +1052,8 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
               <h2 className="text-sm font-semibold text-gray-900">Add employees from a spreadsheet</h2>
               <ol className="mt-1 list-decimal pl-5 text-xs text-gray-700 space-y-0.5">
                 <li>Download the template.</li>
-                <li>Fill in one row per employee. Employee Number, First Name, Last Name and Work Email are needed; the employee fills in their own details when they accept the invitation.</li>
-                <li>Upload it, check the preview, and confirm. Each new employee is emailed an invitation to join and complete their onboarding. A row whose Employee Number already exists updates that employee instead.</li>
+                <li>Fill in one row per employee: First Name, Last Name and Work Email are needed. Employee numbers are given by the system. The employee fills in their own details when they accept the invitation.</li>
+                <li>Upload it, check the preview, and confirm. Each new employee is emailed an invitation to join and complete their onboarding. A row for someone already in the company (same Work Email or Employee Number) updates them instead.</li>
               </ol>
             </div>
             <button type="button" aria-label="Close" onClick={() => setSearchParams({})} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
@@ -1259,9 +1268,9 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
                   <input
                     type="text"
                     className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-emerald-500 focus:border-emerald-500"
-                    value={newEmployee["Employee Number"] || ''}
-                    onChange={(e) => setNewEmployee({...newEmployee, "Employee Number": e.target.value})}
-                    placeholder="Employee Number *"
+                    value=""
+                    disabled
+                    placeholder="Given when saved"
                   />
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">

@@ -4,10 +4,10 @@ import { STANDARD_EMPLOYEE_TYPES } from './employmentTypes';
 /**
  * The bulk-add template: only what HR has to give. The employee fills in their own ID, KRA PIN, NSSF and SHA numbers,
  * phone, date of birth and bank details when they accept the invitation sent to their work email.
- * The first four are required for a new employee; the rest may be left blank.
+ * The first three are required; the rest may be left blank. Employee numbers are given by the system (PR-00001, ...),
+ * so there is no column for them.
  */
 export const TEMPLATE_COLUMNS = [
-  'Employee Number',
   'First Name',
   'Last Name',
   'Work Email',
@@ -18,20 +18,20 @@ export const TEMPLATE_COLUMNS = [
   'Manager Email',
 ] as const;
 
-const EXAMPLE = ['EMP001', 'Jane', 'Wanjiru', 'jane.wanjiru@company.co.ke', 'Accountant', 'Permanent', '85000', 'Nairobi', 'manager@company.co.ke'];
+const EXAMPLE = ['Jane', 'Wanjiru', 'jane.wanjiru@company.co.ke', 'Accountant', 'Permanent', '85000', 'Nairobi', 'manager@company.co.ke'];
 
 const HOW_TO_FILL = [
   ['How to fill the Employees sheet'],
   [],
-  ['Needed for every new employee: Employee Number, First Name, Last Name, Work Email.'],
+  ['Needed for every employee: First Name, Last Name, Work Email.'],
+  ['Employee numbers are given by the system (PR-00001, PR-00002, ...): there is nothing to fill in for them.'],
   ['Each new employee is emailed an invitation at their Work Email and fills in their own ID, KRA PIN, NSSF and SHA numbers, phone, date of birth and bank details.'],
-  ['A row whose Employee Number already exists updates that employee instead of adding a new one.'],
+  ['A row with the Work Email of someone already in the company updates that employee instead of adding a new one.'],
   [],
   ['Job Title, Employee Type, Basic Salary, Town and Manager Email may be left blank and filled in later.'],
   [`Employee Type: one of ${STANDARD_EMPLOYEE_TYPES.join(', ')}.`],
   ['Basic Salary: the monthly amount in KSh, e.g. 85000 (commas are fine).'],
   ['Manager Email: the work email of the person they report to (their supervisor).'],
-  ['Employee numbers that start with 0 (e.g. 0012): format the column as Text first, or Excel drops the zeros.'],
   [],
   ['Example row:'],
   [...TEMPLATE_COLUMNS],
