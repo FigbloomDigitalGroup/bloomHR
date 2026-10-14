@@ -319,8 +319,11 @@ function App() {
     }
   }, [session, user, handleUserActivity, resetInactivityTimer, shouldExcludeFromInactivityTimer, clearAllTimers]);
 
-  // Fetch branches and regions from Supabase
+  // Fetch the company's branches and regions once someone is signed in (signed out there are none to see), and again
+  // when a different user signs in
+  const signedInUserId = session?.user?.id;
   useEffect(() => {
+    if (!signedInUserId) return;
     const fetchBranchesAndRegions = async () => {
       if (isFetchingBranches) return;
 
@@ -347,21 +350,20 @@ function App() {
         setFilteredTowns(branchNames); // Initially show all towns
 
       } catch (error) {
+        // no made-up towns: the filters stay empty rather than offer places the company doesn't have
         console.error('Error fetching branches:', error);
-        const fallbackTowns = ['Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Thika'];
-        const fallbackRegions = ['All Regions', 'HQ', 'Coastal', 'Western', 'Rift Valley'];
-
-        setBranches(fallbackTowns);
-        setRegions(fallbackRegions);
-        setFilteredTowns(fallbackTowns);
-        toast.error('Failed to load branch data. Using fallback data.');
+        setBranches([]);
+        setRegions(['All Regions']);
+        setFilteredTowns([]);
+        toast.error('Failed to load branches and regions.');
       } finally {
         setIsFetchingBranches(false);
       }
     };
 
     fetchBranchesAndRegions();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- isFetchingBranches only guards against overlapping loads
+  }, [signedInUserId]);
 
   // Handler for region change
   const handleRegionChange = useCallback(async (regionName: string) => {
