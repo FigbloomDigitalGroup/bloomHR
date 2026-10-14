@@ -6,7 +6,9 @@ import { AccessibilityButton } from '../Accessibility/AccessibilityModal';
 // the form on white on the right. One place, so every sign-in step looks the same.
 
 /** the brand panel's photo; replace the file to change it everywhere */
-export const AUTH_PHOTO = '/leaf.jpg';
+export const AUTH_PHOTO = '/hr.jpg';
+/** which part of the photo the narrow panel keeps: the HR manager and the new starter, right of centre */
+const PHOTO_FOCUS = '82% center';
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
@@ -17,11 +19,12 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       {/* Left side - Visual & Brand */}
       <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden bg-gray-900">
         <div className="absolute inset-0 z-0">
-          <img src={AUTH_PHOTO} alt="" className="absolute inset-0 w-full h-full object-cover opacity-50" />
-          <div className="absolute inset-0 bg-black/40" />
+          <img src={AUTH_PHOTO} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: PHOTO_FOCUS }} />
+          {/* dark at the top for the logo and at the bottom for the words; the people in the middle stay clear */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent via-35% to-black/90" />
         </div>
 
-        <div className="relative z-10 w-full flex flex-col justify-between p-16">
+        <div className="relative z-10 w-full flex flex-col justify-between p-12 xl:p-16">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center shadow-lg shadow-black/20">
               <img src="/bloom-mark.png" alt="Company Logo" className="w-6 h-6 object-contain brightness-0 invert" />
@@ -29,25 +32,25 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             <span className="text-white font-bold text-2xl tracking-tight">Figbloom<span className="text-gray-400">HR</span></span>
           </div>
 
-          <div className="space-y-6">
+          <div className="mt-auto space-y-6 pb-8">
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
-              <h1 className="text-5xl font-extrabold text-white leading-tight">
+              <h1 className="text-4xl xl:text-5xl font-extrabold text-white leading-tight">
                 Automate Your <br />
-                <span className="text-gray-400">Payroll & HR Workflows</span>
+                <span className="text-white/70">Payroll & HR Workflows</span>
               </h1>
-              <p className="mt-4 text-gray-400 text-xs max-w-md">
+              <p className="mt-4 text-white/75 text-xs max-w-md">
                 Manage staff records, automate compensation, and handle branch operations with a single, unified business dashboard.
               </p>
             </motion.div>
 
-            <div className="flex gap-12 pt-8">
+            <div className="flex gap-12 pt-4">
               <div className="flex flex-col">
                 <span className="text-white font-bold text-2xl">99.9%</span>
-                <span className="text-gray-500 text-xs uppercase tracking-widest font-bold">Uptime</span>
+                <span className="text-white/60 text-xs uppercase tracking-widest font-bold">Uptime</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-white font-bold text-2xl">24/7</span>
-                <span className="text-gray-500 text-xs uppercase tracking-widest font-bold">Support</span>
+                <span className="text-white/60 text-xs uppercase tracking-widest font-bold">Support</span>
               </div>
             </div>
           </div>
