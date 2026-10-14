@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
+import { isHiddenModule } from '../../lib/hiddenModules';
 import { Card, Button, SearchInput } from '../UI';
 import { queryClient, queryKeys } from '../../lib/queryClient';
 import FigbloomLoader from '../UI/FigbloomLoader';
@@ -81,7 +82,7 @@ export default function RolePermissions() {
                 .order('module_name', { ascending: true });
 
             if (error) throw error;
-            setPermissions(data || []);
+            setPermissions((data || []).filter(p => !isHiddenModule(p.module_id)));
         } catch (error) {
             console.error('Error fetching permissions:', error);
             toast.error('Failed to load permissions');

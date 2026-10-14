@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { isHiddenModule } from '../../lib/hiddenModules';
 import {
   UsersRound,
   CalendarRange,
@@ -302,6 +303,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
                 {/* Items */}
                 <div className="space-y-1">
                   {group.items.filter(item =>
+                    !isHiddenModule(item.permission) &&
                     item.label.toLowerCase().includes(searchQuery.toLowerCase())
                   ).map((item) => {
                     const isActive = currentPath.startsWith(item.path);

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { 
   FileText, 
   DollarSign, 
-  TrendingUp, 
   MessageSquare, 
   CreditCard, 
   Scale,
@@ -91,14 +90,6 @@ const REPORTS_LIST: ReportItem[] = [
     icon: MessageSquare,
     category: 'Communication',
     path: '/reports/sms-reports'
-  },
-  {
-    id: 'expense-report',
-    title: 'Expense Report',
-    description: 'Track and analyze company expenses across departments',
-    icon: TrendingUp,
-    category: 'Finance',
-    path: '/reports/expense-report'
   },
   {
     id: 'termination-report',
