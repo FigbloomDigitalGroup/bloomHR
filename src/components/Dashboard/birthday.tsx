@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { sendSingleSms } from '../../lib/smsApi';
 import { Cake, Send, Phone, Calendar, CheckCircle, Loader, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { fetchAll } from '../../lib/fetchAll';
 import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
 import toast from 'react-hot-toast';
 import FigbloomLoader from '../UI/FigbloomLoader';
@@ -71,7 +72,8 @@ export default function BirthdaySMS() {
       const currentDay = today.getDate();
       
       // Get employees with ALL phone fields like your SMS system
-      const { data: employees, error } = await supabase
+      // every employee, a page at a time (one request is capped at 1000 rows)
+      const employees = await fetchAll((from, to) => supabase
         .from('employees')
         .select(`
           "Employee Number",
@@ -88,9 +90,10 @@ export default function BirthdaySMS() {
           "Office",
           "Town"
         `)
-        .not('Date of Birth', 'is', null);
-
-      if (error) throw error;
+        .not('Date of Birth', 'is', null)
+        .order('"Employee Number"')
+        .order('id')
+        .range(from, to));
 
       const birthdaysToday = employees.filter(emp => {
         if (!emp['Date of Birth']) return false;

@@ -1,3 +1,4 @@
+import { fetchAllResult } from './fetchAll';
 import { supabase } from './supabase';
 
 /**
@@ -79,8 +80,16 @@ export const matchEmployees = (list: DirectoryEmployee[], query: string): Direct
 export const loadEmployeeDirectory = async (): Promise<DirectoryEmployee[]> => {
   // employee_directory is the intended source (any role, tenant-scoped). If this database does not have it
   // yet, or the request fails, fall back to the employees table, which roles that manage staff can read.
+  // every row, a page at a time (one request is capped at 1000 rows)
   const read = (table: string) =>
-    supabase.from(table).select(COLUMNS).order('First Name', { ascending: true }).limit(5000);
+    fetchAllResult((from, to) =>
+      supabase
+        .from(table)
+        .select(COLUMNS)
+        .order('First Name', { ascending: true })
+        .order('Employee Number', { ascending: true })
+        .range(from, to)
+    );
 
   let { data, error } = await read('employee_directory');
   if (error) {

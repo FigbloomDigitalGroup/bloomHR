@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Cake, CalendarDays, PartyPopper } from 'lucide-react';
 import { BirthdayWishes, type Me } from '../Celebrations/BirthdayWishes';
 import { supabase } from '../../lib/supabase';
+import { fetchAllResult } from '../../lib/fetchAll';
 import { upcomingBirthdays, upcomingEventsAndHolidays, whenLabel, type UpcomingItem } from '../../lib/celebrations';
 
 const WITHIN_DAYS = 30;
@@ -22,7 +23,10 @@ export default function CelebrationsCard() {
     let cancelled = false;
     (async () => {
       const [people, events, holidays, session] = await Promise.all([
-        supabase.from('employee_directory').select('"First Name", "Last Name", "Date of Birth", "Work Email"'),
+        // every employee, a page at a time (one request is capped at 1000 rows)
+        fetchAllResult((from, to) =>
+          supabase.from('employee_directory').select('"First Name", "Last Name", "Date of Birth", "Work Email"').order('"Employee Number"').range(from, to)
+        ),
         supabase.from('company_events').select('title, date, description'),
         supabase.from('holidays').select('name, date, recurring'),
         supabase.auth.getSession(),

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import EmployeePicker from '../UI/EmployeePicker';
 import { supabase } from '../../lib/supabase';
+import { IN_LIST_SIZE, chunks, fetchAll, fetchAllResult } from '../../lib/fetchAll';
 import toast from 'react-hot-toast';
 import { sendEmail } from '../../services/email';
 import { queryAI } from '../../services/ai';
@@ -86,10 +87,13 @@ export default function WarningModule() {
     try {
       console.log('Fetching employees...');
 
-      const { data, error } = await supabase
+      // every employee, a page at a time (one request is capped at 1000 rows)
+      const { data, error } = await fetchAllResult((from, to) => supabase
         .from('employees')
         .select('*')
-        .order('"Employee Number"', { ascending: true });
+        .order('"Employee Number"', { ascending: true })
+        .order('id')
+        .range(from, to));
 
       if (error) {
         console.error('Error fetching employees:', error);
@@ -141,29 +145,31 @@ export default function WarningModule() {
 
   const fetchWarnings = async () => {
     try {
-      const { data: warningsData, error: warningsError } = await supabase
+      // every warning, newest first, a page at a time (one request is capped at 1000 rows)
+      const warningsData = await fetchAll((from, to) => supabase
         .from("warnings")
         .select("*")
-        .order("issued_at", { ascending: false });
-
-      if (warningsError) throw warningsError;
+        .order("issued_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, to));
 
       // Get all unique employee numbers from warnings
       const employeeNumbers = [...new Set(warningsData.map(w => w.employee_id))].filter(Boolean);
 
-      // Fetch employee data for these employee numbers
+      // Fetch employee data for these employee numbers, a chunk per request: thousands do not fit one filter
       let employeesData = [];
-      if (employeeNumbers.length > 0) {
+      for (const numbers of chunks(employeeNumbers, IN_LIST_SIZE)) {
         const { data: empData, error: empError } = await supabase
           .from('employees')
           .select('*')
-          .in('"Employee Number"', employeeNumbers);
+          .in('"Employee Number"', numbers);
 
         if (empError) {
           console.error('Error fetching employee details:', empError);
-        } else {
-          employeesData = empData || [];
+          employeesData = [];
+          break;
         }
+        employeesData.push(...(empData || []));
       }
 
       // Combine warnings with employee data

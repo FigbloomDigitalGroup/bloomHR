@@ -33,6 +33,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import bloomMark from '../../../public/bloom-mark.png';
 import { usePermissions } from '../../hooks/usePermissions';
 import { supabase } from '../../lib/supabase';
+import { IN_LIST_SIZE, chunks, fetchAll } from '../../lib/fetchAll';
 import { SearchInput } from '../UI';
 
 // Grouping structure
@@ -149,27 +150,37 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout }: Sideb
         }
         const myName = `${me["First Name"]} ${me["Last Name"]}`;
 
-        const { data: allEmployees } = await supabase
-          .from('employee_directory')
-          .select('"Employee Number", "Leave Approver", "Alternate Approver"');
-
-        const myReportNumbers = (allEmployees || [])
-          .filter((e: any) => e["Leave Approver"] === myName || e["Alternate Approver"] === myName)
-          .map((e: any) => e["Employee Number"]);
+        // only the people I approve for, every page of them (one request is capped at 1000 rows)
+        const reportsBy = (column: 'Leave Approver' | 'Alternate Approver') =>
+          fetchAll((from, to) =>
+            supabase
+              .from('employee_directory')
+              .select('"Employee Number"')
+              .eq(column, myName)
+              .order('"Employee Number"')
+              .range(from, to)
+          );
+        const [approverOf, alternateOf] = await Promise.all([reportsBy('Leave Approver'), reportsBy('Alternate Approver')]);
+        const myReportNumbers = [...new Set([...approverOf, ...alternateOf].map((e: any) => e["Employee Number"]))];
 
         if (myReportNumbers.length === 0) {
           setPendingLeaveCount(0);
           return;
         }
 
-        const { count } = await supabase
-          .from('leave_application')
-          .select('id', { count: 'exact', head: true })
-          .ilike('status', 'pending')
-          .is('recstatus', null)
-          .in('"Employee Number"', myReportNumbers);
+        // a chunk of employee numbers per count: thousands do not fit one filter
+        let total = 0;
+        for (const numbers of chunks(myReportNumbers, IN_LIST_SIZE)) {
+          const { count } = await supabase
+            .from('leave_application')
+            .select('id', { count: 'exact', head: true })
+            .ilike('status', 'pending')
+            .is('recstatus', null)
+            .in('"Employee Number"', numbers);
+          total += count || 0;
+        }
 
-        setPendingLeaveCount(count || 0);
+        setPendingLeaveCount(total);
       } catch (err) {
         console.error('Error fetching pending leave count:', err);
       }

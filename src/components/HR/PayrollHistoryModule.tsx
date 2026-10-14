@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DollarSign, Search, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { fetchAll, fetchAllResult } from '../../lib/fetchAll';
+import { groupBy } from '../../lib/utils';
 import toast from 'react-hot-toast';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
@@ -44,25 +46,31 @@ export default function PayrollHistoryModule() {
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const { data: emps, error: empErr } = await supabase
+            // every row, a page at a time (one request is capped at 1000 rows)
+            const emps = await fetchAll((from, to) => supabase
                 .from('employees')
                 .select('"Employee Number", "First Name", "Last Name", "Job Title", "Branch", "Basic Salary"')
-                .order('"Employee Number"', { ascending: true });
+                .order('"Employee Number"', { ascending: true })
+                .order('id')
+                .range(from, to));
 
-            if (empErr) throw empErr;
-
-            const { data: hist } = await supabase
+            const { data: hist } = await fetchAllResult((from, to) => supabase
                 .from('salary_history')
                 .select('*')
-                .order('pay_period', { ascending: false });
+                .order('pay_period', { ascending: false })
+                .order('id')
+                .range(from, to));
+
+            // each employee's records, newest first (a lookup, as there is a record per employee per month)
+            const recordsByEmployee = groupBy((hist || []) as any[], (h) => h.employee_id);
 
             // Build grouped structure from employee data
-            const grouped: GroupedEmployee[] = (emps || []).map(e => ({
+            const grouped: GroupedEmployee[] = emps.map(e => ({
                 "Employee Number": e['Employee Number'],
                 name: `${e['First Name'] || ''} ${e['Last Name'] || ''}`.trim(),
                 jobTitle: e['Job Title'] || '—',
                 branch: e['Branch'] || '—',
-                records: (hist || []).filter((h: any) => h.employee_id === e['Employee Number']),
+                records: recordsByEmployee.get(e['Employee Number']) || [],
                 currentSalary: e['Basic Salary'],
                 expanded: false,
             }));

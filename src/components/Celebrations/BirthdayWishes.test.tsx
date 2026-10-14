@@ -9,7 +9,11 @@ const state = vi.hoisted(() => ({
 
 vi.mock('../../lib/supabase', () => ({
   supabase: {
-    from: () => ({ select: () => Promise.resolve({ data: state.people }) }),
+    from: () => ({
+      select: () => ({
+        order: () => ({ range: (from: number, to: number) => Promise.resolve({ data: state.people.slice(from, to + 1), error: null }) }),
+      }),
+    }),
     auth: { getSession: () => Promise.resolve({ data: { session: { user: { id: 'u-admin', email: 'admin@farm.co.ke' } } } }) },
   },
 }));

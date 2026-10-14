@@ -8,6 +8,7 @@ import {
     ChevronLeft, ChevronDown, MapPin, Building2
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { fetchAllResult } from '../../lib/fetchAll';
 import toast from 'react-hot-toast';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
@@ -232,8 +233,9 @@ export default function EmploymentStatusModule({ onRefresh, initialSearch = '' }
         try {
             const [settingsRes, statusRes, empRes] = await Promise.all([
                 supabase.from('hr_contract_settings').select('*').single(),
-                supabase.from('hr_employment_status').select('*').order('id', { ascending: false }),
-                supabase.from('employees').select('"Employee Number", "First Name", "Last Name", "Job Title", "Branch", "Town"')
+                // every row, a page at a time (one request is capped at 1000 rows)
+                fetchAllResult((from, to) => supabase.from('hr_employment_status').select('*').order('id', { ascending: false }).range(from, to)),
+                fetchAllResult((from, to) => supabase.from('employees').select('"Employee Number", "First Name", "Last Name", "Job Title", "Branch", "Town"').order('"Employee Number"').order('id').range(from, to))
             ]);
 
             const emps = (empRes.data || []) as Employee[];

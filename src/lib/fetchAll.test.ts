@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chunks, fetchAll } from './fetchAll';
+import { chunks, fetchAll, fetchAllResult } from './fetchAll';
 
 /** A fake table of `total` rows that, like the API, returns the requested range capped at `cap` rows. */
 const table = (total: number, cap = 1000) => {
@@ -39,6 +39,20 @@ describe('fetchAll', () => {
   it('stops at the first error', async () => {
     const failure = { message: 'permission denied' };
     await expect(fetchAll(() => Promise.resolve({ data: null, error: failure }))).rejects.toBe(failure);
+  });
+});
+
+describe('fetchAllResult', () => {
+  it('returns every row as data', async () => {
+    const t = table(1500);
+    const { data, error } = await fetchAllResult(t.page);
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1500);
+  });
+
+  it('returns the first error instead of throwing', async () => {
+    const failure = { message: 'permission denied' };
+    expect(await fetchAllResult(() => Promise.resolve({ data: null, error: failure }))).toEqual({ data: null, error: failure });
   });
 });
 

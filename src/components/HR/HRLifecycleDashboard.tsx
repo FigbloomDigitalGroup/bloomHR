@@ -56,38 +56,30 @@ export default function HRLifecycleDashboard() {
             const in30Days = new Date(today); in30Days.setDate(today.getDate() + 30);
             const in30Str = in30Days.toISOString().split('T')[0];
 
-            const [empStatus, suspensions, terminations, interviews] = await Promise.all([
-                supabase.from('hr_employment_status').select('*'),
-                supabase.from('hr_suspensions').select('*').eq('is_active', true),
-                supabase.from('hr_terminations').select('*').gte('created_at', new Date(Date.now() - 90 * 86400000).toISOString()),
-                supabase.from('hr_termination_interviews').select('*').eq('is_completed', false)
+            // counts only, worked out by the database (loading the rows would stop at 1000)
+            const statuses = () => supabase.from('hr_employment_status').select('*', { count: 'exact', head: true });
+            const unconfirmed = 'is_confirmed.is.null,is_confirmed.eq.false';
+
+            const results = await Promise.all([
+                statuses().eq('employment_type', 'Probation').or(unconfirmed).gt('probation_end_date', todayStr),
+                statuses().eq('employment_type', 'Contract').gte('contract_end_date', todayStr).lte('contract_end_date', in30Str),
+                statuses().in('employment_type', ['Probation', 'Contract']).is('joining_date', null),
+                statuses().eq('employment_type', 'Probation').or(unconfirmed).lte('probation_end_date', todayStr),
+                supabase.from('hr_suspensions').select('*', { count: 'exact', head: true }).eq('is_active', true),
+                supabase.from('hr_terminations').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 90 * 86400000).toISOString()),
+                supabase.from('hr_termination_interviews').select('*', { count: 'exact', head: true }).eq('is_completed', false)
             ]);
-
-            const empData = empStatus.data || [];
-            const suspData = suspensions.data || [];
-            const termData = terminations.data || [];
-            const intData = interviews.data || [];
-
-            const onProbation = empData.filter(e => e.employment_type === 'Probation' && !e.is_confirmed &&
-                e.probation_end_date && e.probation_end_date > todayStr).length;
-
-            const contractsExpiring = empData.filter(e => e.employment_type === 'Contract' &&
-                e.contract_end_date && e.contract_end_date >= todayStr && e.contract_end_date <= in30Str).length;
-
-            const missingDates = empData.filter(e =>
-                (e.employment_type === 'Probation' || e.employment_type === 'Contract') && !e.joining_date).length;
-
-            const pendingConfirmations = empData.filter(e => e.employment_type === 'Probation' &&
-                !e.is_confirmed && e.probation_end_date && e.probation_end_date <= todayStr).length;
+            const [onProbation, contractsExpiring, missingDates, pendingConfirmations, suspended, terminated, pendingInterview] =
+                results.map(r => r.count || 0);
 
             setStats({
                 on_probation: onProbation,
                 contracts_expiring: contractsExpiring,
-                suspended: suspData.length,
-                terminated: termData.length,
+                suspended,
+                terminated,
                 missing_joining_date: missingDates,
                 pending_confirmations: pendingConfirmations,
-                pending_interview: intData.length,
+                pending_interview: pendingInterview,
             });
         } catch (error) {
             console.error('Error fetching dashboard stats:', error);

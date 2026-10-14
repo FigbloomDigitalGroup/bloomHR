@@ -11,7 +11,13 @@ const state = vi.hoisted(() => ({
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (table: string) => ({
-      select: () => Promise.resolve({ data: table === 'employee_directory' ? state.people : [] }),
+      select: () => {
+        const data = table === 'employee_directory' ? state.people : [];
+        // awaited as is, or read a page at a time
+        return Object.assign(Promise.resolve({ data }), {
+          order: () => ({ range: (from: number, to: number) => Promise.resolve({ data: data.slice(from, to + 1), error: null }) }),
+        });
+      },
     }),
     auth: { getSession: () => Promise.resolve({ data: { session: { user: { id: 'u-me', email: state.myEmail } } } }) },
   },

@@ -27,10 +27,18 @@ import {
 import { createClient } from '@supabase/supabase-js';
 import { TownProps } from '../../types/supabase';
 import FigbloomLoader from '../UI/FigbloomLoader';
+import { fetchAllResult } from '../../lib/fetchAll';
+import { groupBy } from '../../lib/utils';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// every salary advance, newest first, a page at a time (one request is capped at 1000 rows)
+const loadAdvances = () =>
+  fetchAllResult((from, to) =>
+    supabase.from('salary_advance').select('*').order('time_added', { ascending: false }).order('id').range(from, to)
+  );
 
 interface ReportFilters {
   town: string;
@@ -998,10 +1006,14 @@ const BaseReport: React.FC<BaseReportProps> = ({
         setLoading(true);
 
         // Fetch towns from employees
-        const { data: townsData } = await supabase
+        // (every page of each list: one request is capped at 1000 rows)
+        const { data: townsData } = await fetchAllResult((from, to) => supabase
           .from('employees')
           .select('Town')
-          .not('Town', 'is', null);
+          .not('Town', 'is', null)
+          .order('"Employee Number"')
+          .order('id')
+          .range(from, to));
 
         if (townsData) {
           const uniqueTowns = [...new Set(townsData.map(t => t.Town))].filter(Boolean);
@@ -1009,7 +1021,7 @@ const BaseReport: React.FC<BaseReportProps> = ({
         }
 
         // Fetch all employees
-        const { data: employeesData } = await supabase
+        const { data: employeesData } = await fetchAllResult((from, to) => supabase
           .from('employees')
           .select(`
             "Employee Number",
@@ -1021,13 +1033,14 @@ const BaseReport: React.FC<BaseReportProps> = ({
             "Work Email",
             "Job Title"
           `)
-          .order('"First Name"');
+          .order('"First Name"')
+          .order('"Employee Number"')
+          .order('id')
+          .range(from, to));
 
         // Fetch salary advances
-        const { data: advancesData, error: advancesError } = await supabase
-          .from('salary_advance')
-          .select('*')
-          .order('time_added', { ascending: false });
+        const { data: advancesData, error: advancesError } = await loadAdvances();
+        const advancesByEmployee = groupBy(advancesData || [], (advance) => advance["Employee Number"]);
 
         console.log('Advances fetch error:', advancesError);
         console.log('Advances data sample:', advancesData?.[0]);
@@ -1036,9 +1049,7 @@ const BaseReport: React.FC<BaseReportProps> = ({
           const employeeTableData: SalaryAdvanceData[] = [];
 
           employeesData.forEach(emp => {
-            const employeeAdvances = advancesData?.filter(
-              advance => advance["Employee Number"] === emp['Employee Number']
-            ) || [];
+            const employeeAdvances = advancesByEmployee.get(emp['Employee Number']) || [];
 
             if (employeeAdvances.length > 0) {
               // Create an entry for each advance
@@ -1148,17 +1159,13 @@ const BaseReport: React.FC<BaseReportProps> = ({
 
     // Update report data with filtered employees and their advances
     const fetchFilteredData = async () => {
-      const { data: advancesData } = await supabase
-        .from('salary_advance')
-        .select('*')
-        .order('time_added', { ascending: false });
+      const { data: advancesData } = await loadAdvances();
+      const advancesByEmployee = groupBy(advancesData || [], (advance) => advance["Employee Number"]);
 
       const filteredReportData: SalaryAdvanceData[] = [];
 
       filtered.forEach(emp => {
-        const employeeAdvances = advancesData?.filter(
-          advance => advance["Employee Number"] === emp['Employee Number']
-        ) || [];
+        const employeeAdvances = advancesByEmployee.get(emp['Employee Number']) || [];
 
         if (employeeAdvances.length > 0) {
           employeeAdvances.forEach(advance => {

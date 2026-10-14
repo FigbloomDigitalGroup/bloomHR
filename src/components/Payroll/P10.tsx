@@ -33,15 +33,11 @@ const P10FormGenerator: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
   const fetchPayrollData = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('payroll_records')
-        .select('*')
-        .like('pay_period', `${selectedYear}%`);
+      // a record per employee per month: every page (one request returns at most 1000)
+      const data = await fetchAll((from, to) =>
+        supabase.from('payroll_records').select('*').like('pay_period', `${selectedYear}%`).order('id').range(from, to)
+      );
 
-      if (error) {
-        throw error;
-      }
-      
       if (data) {
         setPayrollData(data);
         return data;

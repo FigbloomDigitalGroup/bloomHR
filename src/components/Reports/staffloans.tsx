@@ -16,6 +16,8 @@ import {
 import { createClient } from '@supabase/supabase-js';
 import { TownProps } from '../../types/supabase';
 import FigbloomLoader from '../UI/FigbloomLoader';
+import { fetchAllResult } from '../../lib/fetchAll';
+import { groupBy } from '../../lib/utils';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -515,18 +517,22 @@ const StaffLoansReport: React.FC<BaseReportProps> = ({
         setLoading(true);
 
         // Fetch towns from employees
-        const { data: townsData } = await supabase
+        // (every page of each list: one request is capped at 1000 rows)
+        const { data: townsData } = await fetchAllResult((from, to) => supabase
           .from('employees')
           .select('Town')
-          .not('Town', 'is', null);
-        
+          .not('Town', 'is', null)
+          .order('"Employee Number"')
+          .order('id')
+          .range(from, to));
+
         if (townsData) {
           const uniqueTowns = [...new Set(townsData.map(t => t.Town))].filter(Boolean);
           setTowns(uniqueTowns as string[]);
         }
 
         // Fetch all employees
-        const { data: employeesData } = await supabase
+        const { data: employeesData } = await fetchAllResult((from, to) => supabase
           .from('employees')
           .select(`
             "Employee Number",
@@ -538,35 +544,41 @@ const StaffLoansReport: React.FC<BaseReportProps> = ({
             "Work Email",
             "Job Title"
           `)
-          .order('"First Name"');
+          .order('"First Name"')
+          .order('"Employee Number"')
+          .order('id')
+          .range(from, to));
 
         // Fetch staff loans
-        const { data: loansData } = await supabase
+        const { data: loansData } = await fetchAllResult((from, to) => supabase
           .from('staff_loans')
           .select('*')
-          .order('application_date', { ascending: false });
+          .order('application_date', { ascending: false })
+          .order('id')
+          .range(from, to));
 
         // Fetch M-Pesa transactions
-        const { data: mpesaData } = await supabase
+        const { data: mpesaData } = await fetchAllResult((from, to) => supabase
           .from('mpesa_transactions')
           .select('*')
-          .order('transaction_date', { ascending: false });
+          .order('transaction_date', { ascending: false })
+          .order('id')
+          .range(from, to));
+
+        const loansByEmployee = groupBy(loansData || [], (loan) => loan.employee_number);
+        const transactionsByLoan = groupBy(mpesaData || [], (transaction) => transaction.loan_id);
 
         if (employeesData) {
           // Combine employee data with their loans and M-Pesa transactions
           const loanTableData: StaffLoanData[] = [];
-          
+
           employeesData.forEach(emp => {
-            const employeeLoans = loansData?.filter(
-              loan => loan.employee_number === emp['Employee Number']
-            ) || [];
+            const employeeLoans = loansByEmployee.get(emp['Employee Number']) || [];
 
             if (employeeLoans.length > 0) {
               // Create an entry for each loan
               employeeLoans.forEach(loan => {
-                const loanMpesaTransactions = mpesaData?.filter(
-                  transaction => transaction.loan_id === loan.id
-                ) || [];
+                const loanMpesaTransactions = transactionsByLoan.get(loan.id) || [];
 
                 loanTableData.push({
                   id: `${emp['Employee Number']}-${loan.id}`,

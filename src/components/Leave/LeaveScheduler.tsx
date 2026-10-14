@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
+import { fetchAll } from '../../lib/fetchAll';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
 interface LeaveSchedulerProps {
@@ -103,30 +104,31 @@ const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSche
         setLoading(true);
         try {
             // 1. Fetch Employees
-            let employeeQuery = supabase
-                .from('employees')
-                .select('*');
+            // (every page: one request is capped at 1000 rows)
+            const empData = await fetchAll((from, to) => {
+                let employeeQuery = supabase
+                    .from('employees')
+                    .select('*');
 
-            if (selectedTown && selectedTown !== 'ADMIN_ALL') {
-                employeeQuery = employeeQuery.eq('Town', selectedTown);
-            }
-
-            const { data: empData, error: empError } = await employeeQuery;
-            if (empError) throw empError;
+                if (selectedTown && selectedTown !== 'ADMIN_ALL') {
+                    employeeQuery = employeeQuery.eq('Town', selectedTown);
+                }
+                return employeeQuery.order('"Employee Number"').order('id').range(from, to);
+            });
 
             // 2. Fetch Leaves
             // `status` casing is inconsistent across rows ('Rejected' from
             // older/Staff-Portal rows, 'rejected' from LeaveManagement's own
             // writes) - a plain .neq('status', 'rejected') let capitalized
             // "Rejected" rows back in, since it's a case-sensitive comparison.
-            const { data: leaveData, error: leaveError } = await supabase
+            const leaveData = await fetchAll((from, to) => supabase
                 .from('leave_application')
                 .select('*')
                 .not('status', 'ilike', 'rejected')
                 .lte('Start Date', monthEnd.toISOString())
-                .gte('End Date', monthStart.toISOString());
-
-            if (leaveError) throw leaveError;
+                .gte('End Date', monthStart.toISOString())
+                .order('id')
+                .range(from, to));
 
             // Sort employees by name (Accessing correct columns)
             const sortedEmps = (empData || []).sort((a, b) =>

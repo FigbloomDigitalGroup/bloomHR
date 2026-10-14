@@ -3,6 +3,7 @@ import { Cake, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { chatService } from '../chat/services/chatServices';
 import { supabase } from '../../lib/supabase';
+import { fetchAllResult } from '../../lib/fetchAll';
 import { upcomingBirthdays, type UpcomingItem } from '../../lib/celebrations';
 
 export interface Me {
@@ -116,7 +117,10 @@ export function TodaysBirthdayWishes({ className = '' }: { className?: string })
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      supabase.from('employee_directory').select('"First Name", "Last Name", "Date of Birth", "Work Email"'),
+      // every employee, a page at a time (one request is capped at 1000 rows)
+      fetchAllResult((from, to) =>
+        supabase.from('employee_directory').select('"First Name", "Last Name", "Date of Birth", "Work Email"').order('"Employee Number"').range(from, to)
+      ),
       supabase.auth.getSession(),
     ])
       .then(([people, session]) => {

@@ -33,6 +33,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@supabase/supabase-js';
+import { WRITE_BATCH_SIZE, chunks, fetchAll, fetchAllResult } from '../../lib/fetchAll';
+import { groupBy } from '../../lib/utils';
 import { TownProps } from '../../types/supabase';
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 import { useUser } from '../ProtectedRoutes/UserContext';
@@ -1465,9 +1467,9 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
     const loadMappings = async () => {
       try {
         // Fetch the area-town mapping from the database
-        const { data: employeesData, error: employeesError } = await supabase
-          .from('employees')
-          .select('Branch, Town');
+        const { data: employeesData, error: employeesError } = await fetchAllResult((from, to) =>
+          supabase.from('employees').select('Branch, Town').order('"Employee Number"').order('id').range(from, to)
+        );
 
         if (employeesError) {
           console.error("Error loading area-town mapping:", employeesError);
@@ -1795,13 +1797,11 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
   useEffect(() => {
     const fetchEmployees = async () => {
       try {
-        const { data, error } = await supabase
-          .from('employees')
-          .select('*')
-          .order('First Name');
-
-        if (error) throw error;
-        setEmployees(data || []);
+        // every employee, a page at a time (one request is capped at 1000 rows)
+        const data = await fetchAll((from, to) =>
+          supabase.from('employees').select('*').order('First Name').order('"Employee Number"').order('id').range(from, to)
+        );
+        setEmployees(data);
       } catch (err) {
         console.error('Error fetching employees:', err);
       }
@@ -1834,16 +1834,22 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
           return;
         }
 
-        const { data: rawRows, error: balancesError } = await supabase
-          .from('leave_balances')
-          .select('*')
-          .eq('year', currentYear)
-          .in('month', [0, currentMonth]);
-
-        if (balancesError) throw balancesError;
+        // one row per employee and leave type, so read every page (one request is capped at 1000 rows);
+        // a short read would make existing balances look missing
+        const rawRows = await fetchAll((from, to) =>
+          supabase
+            .from('leave_balances')
+            .select('*')
+            .eq('year', currentYear)
+            .in('month', [0, currentMonth])
+            .order('id')
+            .range(from, to)
+        );
 
         // employees whose yearly days differ from the policy's (a missing table just means none yet)
-        const { data: ownAllowances } = await supabase.from('leave_entitlements').select('employee_number, leave_type_id, days_allotted');
+        const { data: ownAllowances } = await fetchAllResult((from, to) =>
+          supabase.from('leave_entitlements').select('employee_number, leave_type_id, days_allotted').order('id').range(from, to)
+        );
         const allowanceByKey = new Map<string, number>(
           (ownAllowances || []).map((a: any) => [`${a.employee_number}::${a.leave_type_id}`, Number(a.days_allotted)])
         );
@@ -1863,20 +1869,22 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
             .map(leaveType => ({ employee, leaveType }))
         );
 
-        let bootstrapped: any[] = [];
+        const bootstrapped: any[] = [];
         if (missing.length > 0) {
           // `status` casing is inconsistent across rows (older/Staff-Portal
           // rows store 'Approved', this file's own writes use lowercase
           // 'approved') - match case-insensitively so historical usage
           // isn't undercounted on bootstrap.
-          const { data: applicationsData } = await supabase
-            .from('leave_application')
-            .select('*')
-            .ilike('status', 'approved');
+          const { data: applicationsData } = await fetchAllResult((from, to) =>
+            supabase.from('leave_application').select('*').ilike('status', 'approved').order('id').range(from, to)
+          );
+
+          // each employee's applications, looked up rather than searched (thousands of each)
+          const approvedByEmployee = groupBy(applicationsData || [], (app: any) => app["Employee Number"]);
 
           const rowsToInsert = missing.map(({ employee, leaveType }) => {
             const isMonthly = leaveType.accrual_method === 'monthly_non_cumulative';
-            const usedDays = (applicationsData || [])
+            const usedDays = (approvedByEmployee.get(employee["Employee Number"]) || [])
               .filter((app: any) => {
                 if (app["Employee Number"] !== employee["Employee Number"] || app["Leave Type"] !== leaveType.name) return false;
                 const start = new Date(app["Start Date"]);
@@ -1899,17 +1907,21 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
             };
           });
 
-          const { data: inserted, error: insertError } = await supabase
-            .from('leave_balances')
-            .upsert(rowsToInsert, { onConflict: 'employee_number,leave_type_id,year,month', ignoreDuplicates: true })
-            .select();
+          // in batches, so a large company's rows fit in each request and each reply
+          for (const batch of chunks(rowsToInsert, WRITE_BATCH_SIZE)) {
+            const { data: inserted, error: insertError } = await supabase
+              .from('leave_balances')
+              .upsert(batch, { onConflict: 'employee_number,leave_type_id,year,month', ignoreDuplicates: true })
+              .select();
 
-          if (insertError) throw insertError;
-          bootstrapped = inserted || [];
+            if (insertError) throw insertError;
+            bootstrapped.push(...(inserted || []));
+          }
         }
 
+        const employeeByNumber = new Map(employees.map(e => [e["Employee Number"], e]));
         const balances: EmployeeLeaveBalance[] = [...existingRows, ...bootstrapped].map((row: any) => {
-          const employee = employees.find(e => e["Employee Number"] === row.employee_number);
+          const employee = employeeByNumber.get(row.employee_number);
           const leaveType = deductibleLeaveTypes.find(lt => lt.id === row.leave_type_id);
           const isMonthly = leaveType?.accrual_method === 'monthly_non_cumulative';
           const annualAccrual = isMonthly ? 0 : (leaveType?.max_days || 0);
@@ -2029,20 +2041,23 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
       try {
         console.log('[DEBUG] Fetching applications for town:', currentTown);
 
-        // Build base query
-        let query = supabase
-          .from('leave_application')
-          .select('*')
-          .order('time_added', { ascending: false });
+        // Build the query for one page (one request is capped at 1000 rows), newest first
+        const page = (from: number, to: number) => {
+          let query = supabase
+            .from('leave_application')
+            .select('*')
+            .order('time_added', { ascending: false })
+            .order('id', { ascending: false });
 
-        // Apply Office Branch filter if selected
-        if (currentTown && currentTown !== 'ADMIN_ALL') {
-          console.log('[DEBUG] Applying filter for town:', currentTown);
-          query = query.eq('"Office Branch"', currentTown.trim());
-        }
+          // Apply Office Branch filter if selected
+          if (currentTown && currentTown !== 'ADMIN_ALL') {
+            query = query.eq('"Office Branch"', currentTown.trim());
+          }
+          return query.range(from, to);
+        };
 
-        // Execute query
-        const { data, error } = await query;
+        // Read every page
+        const { data, error } = await fetchAllResult(page);
 
         console.log('[DEBUG] Query results:', data);
 
