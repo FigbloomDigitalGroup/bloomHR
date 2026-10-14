@@ -135,5 +135,19 @@ export const onboardingMissing = (e: EmployeeRecord, contacts: OnboardingContact
   ...employerPartMissing(e),
 ];
 
-/** Only approved employees are paid; everyone else is still being onboarded. */
-export const isPayrollReady = (e: EmployeeRecord) => e['onboarding_status'] === 'approved';
+const thisPeriod = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+/**
+ * Someone who left before the pay period ('YYYY-MM'): their Termination Date is in an earlier month. They are paid for
+ * the month they leave in (their final dues), never after; the database refuses those payslips too (FIG-832).
+ */
+export function leftBefore(e: EmployeeRecord, period: string = thisPeriod()): boolean {
+  const left = /^(\d{4}-\d{2})-\d{2}/.exec(String(e['Termination Date'] ?? '').trim());
+  return !!left && left[1] < period;
+}
+
+/** Only approved employees are paid (everyone else is still being onboarded), and not after the month they left. */
+export const isPayrollReady = (e: EmployeeRecord) => e['onboarding_status'] === 'approved' && !leftBefore(e);

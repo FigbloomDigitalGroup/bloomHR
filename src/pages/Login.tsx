@@ -77,7 +77,12 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             .eq('"Work Email"', email)
             .maybeSingle();
 
-          if (empData && (empData.Status === 'Inactive' || empData['Termination Date'])) {
+          // left: Inactive/Terminated, or their termination date has come (an exit approved for a later day keeps
+          // them signed in until then; it ends their access the day after their last day, FIG-832)
+          const left = String(empData?.['Termination Date'] ?? '').slice(0, 10);
+          const now = new Date();
+          const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+          if (empData && (['inactive', 'terminated'].includes(String(empData.Status ?? '').toLowerCase()) || (left && left < todayStr))) {
             await supabase.auth.signOut();
             toast.error('Your employment account has been deactivated. Please contact HR for assistance.');
             setLoading(false);
