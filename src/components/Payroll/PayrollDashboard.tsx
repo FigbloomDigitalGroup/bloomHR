@@ -49,6 +49,7 @@ import { employeesMissingDetails } from "../../lib/missingPayrollDetails";
 import { isPaidByMpesa, paymentMethodLabel } from "../../lib/paymentMethods";
 import { fetchAll } from "../../lib/fetchAll";
 import { isPayrollReady } from "../../lib/onboardingValidation";
+import { loadCompanyIdentity } from "../../lib/companyProfile";
 import { useNavigate } from "react-router-dom";
 import { deductionsForPeriod, loadDeductionSetup, totalOf } from "../../lib/voluntaryDeductions";
 import { checkSMSBalance, formatPhoneNumber, sendSMSWithRetry, smsTemplates } from "../../lib/payrollSms";
@@ -573,18 +574,8 @@ export default function PayrollDashboard() {
   useEffect(() => {
     const fetchCompanyInfo = async () => {
       try {
-        const { data, error } = await supabase
-          .from("company_logo")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-
-        if (error && error.code !== "PGRST116") {
-          console.error("Error fetching company info:", error);
-          return;
-        }
-
+        // name, logo and tagline from the company profile (FIG-825)
+        const data = await loadCompanyIdentity();
         if (data) {
           setCompanyInfo(data);
         }
