@@ -3744,11 +3744,9 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         data.push(...(rows ?? []));
       }
 
-      const jobTitleMap: Record<string, string> = {};
       const branchManagerMap: Record<string, boolean> = {};
 
       data?.forEach(emp => {
-        jobTitleMap[emp["Employee Number"]] = emp["Job Title"] || '';
 
         const jobTitle = emp["Job Title"]?.toLowerCase() || '';
         const isManager = jobTitle.includes('branch manager') ||
@@ -3759,7 +3757,7 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         branchManagerMap[emp["Employee Number"]] = isManager;
       });
 
-      setEmployeeJobTitles(jobTitleMap);
+      // (job titles aren't kept: only the branch-manager flags are used; setting the titles threw, so the flags were never set)
       setIsBranchManagerMap(branchManagerMap);
 
     } catch (error) {
