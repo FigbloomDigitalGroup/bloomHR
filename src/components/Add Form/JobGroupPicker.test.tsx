@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import JobGroupPicker from './JobGroupPicker';
 import { JobGroup, lockedPayFields } from '../../lib/jobGroups';
 
@@ -16,12 +17,21 @@ let latest: Record<string, unknown> = {};
 function Form({ initial }: { initial: Record<string, unknown> }) {
   const [values, setValues] = useState(initial);
   latest = values;
-  return <JobGroupPicker groups={[FIXED, BAND, RETIRED]} values={values} onChange={(patch) => setValues((v) => ({ ...v, ...patch }))} />;
+  return (
+    <MemoryRouter>
+      <JobGroupPicker groups={[FIXED, BAND, RETIRED]} values={values} onChange={(patch) => setValues((v) => ({ ...v, ...patch }))} />
+    </MemoryRouter>
+  );
 }
 
 afterEach(() => cleanup());
 
 describe('Job group picker', () => {
+  it('links to where job groups are managed', () => {
+    render(<Form initial={{}} />);
+    expect(screen.getByRole('link', { name: 'Manage job groups' }).getAttribute('href')).toBe('/settings/job-groups');
+  });
+
   it('choosing a group fills the basic salary and allowances, and locks them', () => {
     render(<Form initial={{ 'Basic Salary': 1000 }} />);
     expect(screen.queryByRole('option', { name: /OLD/ })).toBeNull();

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Field, TextField } from '../Onboarding/Fields';
 import { JobGroup, basicLabel, formatKsh, payFromGroup } from '../../lib/jobGroups';
 
@@ -37,17 +38,23 @@ export default function JobGroupPicker({ groups, values, onChange, disabled }: P
 
   return (
     <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
-      <Field label="Job Group" hint={current ? undefined : 'Set up job groups and their pay in Settings'}>
-        <select value={current?.id ?? ''} onChange={(e) => choose(e.target.value)} disabled={disabled} className={selectClass}>
-          <option value="">No job group</option>
-          {choices.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name !== g.code ? `${g.code} – ${g.name}` : g.code}
-              {g.active ? '' : ' (inactive)'}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <div>
+        <Field label="Job Group">
+          <select value={current?.id ?? ''} onChange={(e) => choose(e.target.value)} disabled={disabled} className={selectClass}>
+            <option value="">No job group</option>
+            {choices.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name !== g.code ? `${g.code} – ${g.name}` : g.code}
+                {g.active ? '' : ' (inactive)'}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {/* only people who may manage job groups get this picker (the groups are hidden from anyone else) */}
+        <Link to="/settings/job-groups" className="mt-1 inline-block text-xs text-brand hover:underline">
+          Manage job groups
+        </Link>
+      </div>
 
       {current && (
         <div className="md:col-span-2 rounded-lg border border-border bg-secondary/40 p-3 text-xs text-ink">
