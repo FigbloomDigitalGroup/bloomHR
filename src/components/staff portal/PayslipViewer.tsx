@@ -25,6 +25,7 @@ import { paymentMethodLabel } from '../../lib/paymentMethods';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import DownloadP9 from '../Payroll/DownloadP9';
 import { loadMyP9 } from '../../lib/p9';
+import { loadCompanyIdentity, type CompanyIdentity } from '../../lib/companyProfile';
 
 // HARDCODED STATUTORY SETTINGS - Updated to match payroll dashboard
 const statutorySettings = {
@@ -630,7 +631,7 @@ const PayslipViewer = () => {
   const [currentPayslipIndex, setCurrentPayslipIndex] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState<Date | null>(null);
-  const [companyInfo, setCompanyInfo] = useState(null);
+  const [companyInfo, setCompanyInfo] = useState<CompanyIdentity | null>(null);
   const [expandedRows, setExpandedRows] = useState(new Set());
   const [showSummary] = useState(false);
   const [overrideStatutoryChecks] = useState(true);
@@ -745,18 +746,8 @@ const PayslipViewer = () => {
 
   const fetchCompanyInfo = async () => {
     try {
-      const { data, error } = await supabase
-        .from('company_logo')
-        .select('*')
-        .order('id', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching company info:', error);
-        return;
-      }
-
+      // name, logo and tagline from the company profile (FIG-825)
+      const data = await loadCompanyIdentity();
       if (data) {
         setCompanyInfo(data);
       }

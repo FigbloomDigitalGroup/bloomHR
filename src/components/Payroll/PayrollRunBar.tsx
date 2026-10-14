@@ -4,7 +4,7 @@ import type { StatusTone } from '../UI';
 import type { PayrollRun, PayrollRunStatus } from '../../lib/payrollRuns';
 import { IN_APP_PAYMENTS } from '../../lib/inAppPayments';
 
-const STATUS: Record<PayrollRunStatus, { label: string; tone: StatusTone }> = {
+export const RUN_STATUS: Record<PayrollRunStatus, { label: string; tone: StatusTone }> = {
   draft: { label: 'Draft', tone: 'warning' },
   approved: { label: 'Approved', tone: 'info' },
   paid: { label: 'Paid', tone: 'success' },
@@ -51,26 +51,26 @@ export default function PayrollRunBar({
     pill = { label: 'Loading', tone: 'neutral' };
     message = `Loading payroll for ${periodLabel}…`;
   } else if (run?.status === 'draft') {
-    pill = STATUS.draft;
+    pill = RUN_STATUS.draft;
     message = 'Draft: staff can\'t see these payslips yet. Recalculate after changing employee details, then approve.';
   } else if (run?.status === 'approved') {
-    pill = STATUS.approved;
+    pill = RUN_STATUS.approved;
     message = `Approved${run.approved_at ? ` on ${date(run.approved_at)}` : ''}. Payslips are locked and staff can see them.`;
     // finance pays by uploading the downloaded files to the bank, then marks the month paid here
-    if (!IN_APP_PAYMENTS) message += ' Pay staff by uploading the bank and M-Pesa files below to the bank, then mark as paid.';
+    if (!IN_APP_PAYMENTS) message += ' Pay staff by uploading the bank and M-Pesa files from the Files tab to the bank, then mark as paid.';
   } else if (run?.status === 'paid') {
-    pill = STATUS.paid;
+    pill = RUN_STATUS.paid;
     message = `Paid on ${date(run.paid_at)}. Payslips are locked.`;
   }
 
   return (
     <Card padding="sm" className="!rounded-xl">
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap min-w-0 w-full sm:w-auto sm:flex-1">
           {run && run.status !== 'draft' && <Lock className="w-3.5 h-3.5 text-subtle shrink-0" aria-hidden />}
           <span className="text-xs font-bold text-ink whitespace-nowrap">Payroll {periodLabel}</span>
           <StatusPill label={pill.label} tone={pill.tone} />
-          <span className="text-[11.5px] text-muted-foreground">{message}</span>
+          <span className="text-[11.5px] text-muted-foreground w-full sm:w-auto">{message}</span>
         </div>
 
         {!loading && (

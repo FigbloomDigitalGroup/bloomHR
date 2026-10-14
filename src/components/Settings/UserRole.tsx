@@ -16,7 +16,8 @@ import {
   X,
   MoreVertical,
   Key,
-  MapPin
+  MapPin,
+  Building2
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { assertEmployeeForStaffLogin } from '../../lib/staffEmployee';
@@ -816,6 +817,22 @@ export default function UserRolesSettings() {
 
         {/* two-step sign-in, per company (FIG-834) */}
         <TwoStepSignInCard />
+
+        {/* Company profile: its own page */}
+        <Link to="/settings/company" className="block">
+          <Card className="flex items-center justify-between gap-4 transition-colors hover:bg-secondary">
+            <div className="flex items-center gap-3">
+              <div className="w-[38px] h-[38px] shrink-0 rounded-tile flex items-center justify-center bg-green-tint text-brand">
+                <Building2 className="w-[17px] h-[17px]" strokeWidth={1.8} />
+              </div>
+              <div>
+                <h2 className="m-0 text-[13.5px] font-bold text-ink">Company profile</h2>
+                <p className="m-0 text-[11.5px] text-muted-foreground">Logo, colours, business and contact details, address, fiscal year</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-subtle shrink-0" />
+          </Card>
+        </Link>
 
         <EmployeeNumberingCard className="" />
 

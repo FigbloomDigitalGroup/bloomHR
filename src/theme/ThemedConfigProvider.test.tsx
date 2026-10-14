@@ -21,7 +21,7 @@ describe('antd follows the chosen theme', () => {
     const t = buildAntdTheme('#1F5FBF');
     expect(t.token?.colorPrimary).toBe('#1F5FBF');
     expect(t.token?.colorLink).toBe('#1F5FBF');
-    expect(t.token?.fontFamily).toContain('Figtree');
+    expect(t.token?.fontFamily).toContain('Outfit');
   });
 
   it('uses the default green until a theme is chosen, then switches live', () => {

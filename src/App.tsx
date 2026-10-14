@@ -47,6 +47,7 @@ const EditEmployeePage = lazy(() => import('./components/Add Form/EditEmployee')
 const OnboardingReview = lazy(() => import('./components/Onboarding/OnboardingReview'));
 const OnboardingPrint = lazy(() => import('./components/Onboarding/OnboardingPrint'));
 const UserRolesSettings = lazy(() => import('./components/Settings/UserRole'));
+const CompanyProfilePage = lazy(() => import('./components/Settings/CompanyProfile'));
 const SalaryAdvanceAdmin = lazy(() => import('./components/Settings/SalaryAdmin'));
 const IncidentReportsManagement = lazy(() => import('./components/Settings/IncidentReportsManagement'));
 const WarningModule = lazy(() => import('./components/Warning/StaffCheck'));
@@ -1096,6 +1097,15 @@ function App() {
                                   element={
                                     <AuthRoute allowedRoles={['ADMIN', 'CHECKER']}>
                                       <UserRolesSettings />
+                                    </AuthRoute>
+                                  }
+                                />
+                                {/* everyone in the company reads it; ADMIN and Settings change it */}
+                                <Route
+                                  path="/settings/company"
+                                  element={
+                                    <AuthRoute>
+                                      <CompanyProfilePage />
                                     </AuthRoute>
                                   }
                                 />
