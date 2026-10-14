@@ -44,7 +44,7 @@ export const buildAntdTheme = (brandHex: string = '#17402A', surfaces: AntdSurfa
     borderRadius: 10,
     borderRadiusLG: 14,
     borderRadiusSM: 8,
-    fontFamily: "'Figtree', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif",
+    fontFamily: "'Outfit', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif",
   },
   components: {
     Button: {

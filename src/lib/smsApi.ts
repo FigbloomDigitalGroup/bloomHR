@@ -6,7 +6,7 @@ const API_URL =
   import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? '/api' : 'http://localhost:3001/api');
 
 /** What the message is for. The server ties each purpose to a permission (or, for 'mfa', to your own number). */
-export type SmsPurpose = 'sms-center' | 'salary-advance' | 'birthday' | 'mfa';
+export type SmsPurpose = 'sms-center' | 'salary-advance' | 'birthday' | 'mfa' | 'payroll';
 
 export interface SmsMessage {
   phone: string;

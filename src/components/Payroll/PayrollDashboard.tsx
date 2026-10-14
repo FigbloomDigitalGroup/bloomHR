@@ -63,6 +63,7 @@ import VoluntaryDeductionsModal from "./VoluntaryDeductionsModal";
 import MissingPayrollDetailsModal from "./MissingPayrollDetailsModal";
 import { downloadP10 } from "./PayrollExportsPanel";
 import { ApprovedRunPanels, BulkPayButton } from "./RunPayActions";
+import { getSmsBalance, sendSingleSms } from "../../lib/smsApi";
 import { IN_APP_PAYMENTS, IN_APP_PAYMENTS_OFF_MESSAGE } from "../../lib/inAppPayments";
 import { advanceDeductionFor } from "../../lib/salaryAdvance";
 import ReturnsReadiness from "./ReturnsReadiness";
@@ -76,84 +77,18 @@ import { useNavigate } from "react-router-dom";
 import { deductionsForPeriod, loadDeductionSetup, payslipDeductionLines, totalOf } from "../../lib/voluntaryDeductions";
 import BulkSalaryHistoryUpload from "./BulkSalaryHistoryUpload";
 
-// SMS Service Configuration for SMS Leopard
-const SMS_LEOPARD_CONFIG = {
-  baseUrl: "https://api.smsleopard.com/v1",
-  username: import.meta.env.VITE_SMS_LEOPARD_USERNAME || '',
-  password: import.meta.env.VITE_SMS_LEOPARD_PASSWORD || '',
-  source: "sms_Leopard",
-};
-
-// Utility function to add query parameters
-const addQueryParams = (url: string, params: Record<string, string | number | boolean | (string | number | boolean)[]>) => {
-  const queryString = Object.entries(params)
-    .flatMap(([key, value]) =>
-      Array.isArray(value)
-        ? value.map(
-          (val) => `${encodeURIComponent(key)}=${encodeURIComponent(val)}`,
-        )
-        : `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
-    )
-    .join("&");
-
-  return `${url}?${queryString}`;
-};
-
-// SMS Service Functions for SMS Leopard
+// SMS goes through the server (/api/sms), which holds the provider's credentials; the browser never sees them
 const sendSMSLeopard = async (phoneNumber: string, message: string) => {
   try {
     const formattedPhone = formatPhoneNumber(phoneNumber);
-
     if (!formattedPhone || !message) {
       throw new Error("Phone number and message are required");
     }
-
-    const endpoint = addQueryParams(`${SMS_LEOPARD_CONFIG.baseUrl}/sms/send`, {
-      username: SMS_LEOPARD_CONFIG.username,
-      password: SMS_LEOPARD_CONFIG.password,
-      message: message,
-      destination: formattedPhone,
-      source: SMS_LEOPARD_CONFIG.source,
-    });
-
-    const credentials = btoa(
-      `${SMS_LEOPARD_CONFIG.username}:${SMS_LEOPARD_CONFIG.password}`,
-    );
-
-    const response = await fetch(endpoint, {
-      method: "GET",
-      headers: {
-        Authorization: `Basic ${credentials}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`SMS service error: ${response.status} - ${errorText}`);
-    }
-
-    const result = await response.json();
-
-    if (result.status === "success" || response.ok) {
-      return {
-        success: true,
-        message: "SMS sent successfully",
-        timestamp: new Date().toISOString(),
-        rawResponse: result,
-      };
-    } else {
-      throw new Error(result.message || "Failed to send SMS");
-    }
+    const result = await sendSingleSms(formattedPhone, message, { purpose: "payroll" });
+    if (!result?.success) throw new Error(result?.error || "Failed to send SMS");
+    return { success: true, message: "SMS sent successfully", timestamp: new Date().toISOString(), rawResponse: result };
   } catch (error) {
     console.error("SMS sending error:", error);
-
-    console.log("SMS would have been sent:", {
-      to: formatPhoneNumber(phoneNumber),
-      message: message,
-      provider: "SMS Leopard",
-    });
-
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -165,35 +100,10 @@ const sendSMSLeopard = async (phoneNumber: string, message: string) => {
 
 const checkSMSBalance = async () => {
   try {
-    const endpoint = `${SMS_LEOPARD_CONFIG.baseUrl}/balance`;
-    const credentials = btoa(
-      `${SMS_LEOPARD_CONFIG.username}:${SMS_LEOPARD_CONFIG.password}`,
-    );
-
-    const response = await fetch(endpoint, {
-      method: "GET",
-      headers: {
-        Authorization: `Basic ${credentials}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to check balance: ${response.status}`);
-    }
-
-    const result = await response.json();
-
-    if (result.balance !== undefined) {
-      return `KSh ${result.balance}`;
-    } else if (result.data && result.data.balance !== undefined) {
-      return `KSh ${result.data.balance}`;
-    } else {
-      return "Balance information not available";
-    }
-  } catch (error) {
-    console.error("SMS balance check error:", error);
-    return "Service unavailable";
+    return await getSmsBalance();
+  } catch {
+    // not configured, or this user may not read it: show no balance rather than an error
+    return null;
   }
 };
 
