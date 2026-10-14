@@ -56,12 +56,15 @@ describe('save_employees_batch', () => {
       { row: 2, data: { 'Employee Number': 'E-100', 'First Name': 'Amina', 'Last Name': 'Otieno', 'Work Email': 'amina@a.co', 'Basic Salary': 50000, 'ID Number': 12345678 } },
       { row: 3, data: { 'Employee Number': 'E-OLD', 'Job Title': 'Driver' } },
     ]);
-    expect(result.map((r) => [r.row_no, r.employee_number, r.outcome, r.work_email])).toEqual([
-      [2, 'E-100', 'created', 'amina@a.co'],
-      [3, 'E-OLD', 'updated', 'old@a.co'],
+    // a new employee's number comes from the system (the typed E-100 belongs to nobody, so it is ignored)
+    expect(result.map((r) => [r.row_no, r.outcome, r.work_email])).toEqual([
+      [2, 'created', 'amina@a.co'],
+      [3, 'updated', 'old@a.co'],
     ]);
+    expect(result[0].employee_number).toMatch(/^MCL-\d{6}$/);
+    expect(result[1].employee_number).toBe('E-OLD');
     expect(result[0].employee_id).toMatch(/^[0-9a-f-]{36}$/);
-    const [created] = await rows<Record<string, unknown>>(`select * from employees where "Employee Number" = 'E-100'`);
+    const [created] = await rows<Record<string, unknown>>(`select * from employees where "Work Email" = 'amina@a.co'`);
     expect(created).toMatchObject({ 'First Name': 'Amina', 'ID Number': '12345678', tenant_id: A, onboarding_status: 'draft' });
     expect(created['Payroll Number']).toMatch(/^PR-\d+$/); // the employees triggers still run
     expect(await rows(`select "Job Title", "First Name" from employees where "Employee Number" = 'E-OLD'`)).toEqual([{ 'Job Title': 'Driver', 'First Name': 'Old' }]);
@@ -75,19 +78,19 @@ describe('save_employees_batch', () => {
       { row: 5, data: { 'First Name': 'No number' } },
       { row: 6, data: { 'Employee Number': 'E-203', 'First Name': 'Fine', 'Last Name': 'Row', 'Work Email': 'fine@a.co' } },
     ]);
-    expect(result.map((r) => r.outcome)).toEqual(['error', 'error', 'error', 'error', 'created']);
+    // row 3's work email is Amina's: it is about her, so it updates her rather than adding a second employee
+    expect(result.map((r) => r.outcome)).toEqual(['error', 'updated', 'error', 'error', 'created']);
     expect(result[0].error_message).toMatch(/no work email/);
-    expect(result[1]).toMatchObject({ error_code: '23505' });
-    expect(result[1].error_message).toMatch(/Work Email/);
     expect(result[2].error_message).toMatch(/KRA PIN/);
-    expect(result[3].error_message).toMatch(/missing Employee Number/);
-    expect(await rows(`select "Employee Number" from employees where "Employee Number" like 'E-20%' order by 1`)).toEqual([{ 'Employee Number': 'E-203' }]);
+    expect(result[3].error_message).toMatch(/no work email/);
+    expect(await rows(`select "First Name" from employees where "Work Email" = 'amina@a.co'`)).toEqual([{ 'First Name': 'Dup' }]);
+    expect(await rows(`select 1 from employees where "Work Email" in ('pin@a.co', 'fine@a.co')`)).toHaveLength(1);
   });
 
   it('cannot set the keys or the onboarding state, and runs as the caller (staff cannot add employees)', async () => {
     const [r] = await save(HR, [{ row: 2, data: { 'Employee Number': 'E-300', 'First Name': 'X', 'Last Name': 'Y', 'Work Email': 'x@a.co', tenant_id: B, onboarding_status: 'approved' } }]);
     expect(r.outcome).toBe('created');
-    expect(await rows(`select tenant_id, onboarding_status from employees where "Employee Number" = 'E-300'`)).toEqual([{ tenant_id: A, onboarding_status: 'draft' }]);
+    expect(await rows(`select tenant_id, onboarding_status from employees where "Work Email" = 'x@a.co'`)).toEqual([{ tenant_id: A, onboarding_status: 'draft' }]);
     const [denied] = await save(STAFF, [{ row: 2, data: { 'Employee Number': 'E-301', 'First Name': 'X', 'Last Name': 'Y', 'Work Email': 'y@a.co' } }]);
     expect(denied.outcome).toBe('error');
     expect(denied.error_message).toMatch(/row-level security/);
@@ -266,11 +269,11 @@ describe('start_onboarding_by_email', () => {
     ]);
     const n = await asUser(db, HR, async () => (await rows<{ n: number }>(`select start_onboarding_by_email(array['O1@a.co', 'o2@a.co', 'nobody@a.co']) n`))[0].n);
     expect(n).toBe(2);
-    expect(await rows(`select onboarding_status from employees where "Employee Number" in ('O-1', 'O-2')`)).toEqual([
+    expect(await rows(`select onboarding_status from employees where "Work Email" in ('o1@a.co', 'o2@a.co')`)).toEqual([
       { onboarding_status: 'invited' },
       { onboarding_status: 'invited' },
     ]);
-    expect(await rows(`select r.action, r.actor from employee_onboarding_reviews r join employees e on e.id = r.employee_id where e."Employee Number" = 'O-1'`)).toEqual([
+    expect(await rows(`select r.action, r.actor from employee_onboarding_reviews r join employees e on e.id = r.employee_id where e."Work Email" = 'o1@a.co'`)).toEqual([
       { action: 'invited', actor: HR },
     ]);
     // already invited: not again

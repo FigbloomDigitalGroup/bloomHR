@@ -13,14 +13,15 @@ describe('employee bulk-add template', () => {
 
   it('a filled-in template reads back with the names the upload maps', () => {
     const wb = employeeTemplateWorkbook();
-    XLSX.utils.sheet_add_aoa(wb.Sheets.Employees, [['EMP7', 'Ann', 'Otieno', 'ann@co.ke', 'Clerk', 'Contract', '45,000', 'Kisumu', 'boss@co.ke']], { origin: 'A2' });
+    XLSX.utils.sheet_add_aoa(wb.Sheets.Employees, [['Ann', 'Otieno', 'ann@co.ke', 'Clerk', 'Contract', '45,000', 'Kisumu', 'boss@co.ke']], { origin: 'A2' });
     const data = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
     const [row] = readEmployeeRows(data);
     expect(row).toMatchObject({
-      'Employee Number': 'EMP7', 'First Name': 'Ann', 'Last Name': 'Otieno', 'Work Email': 'ann@co.ke',
+      'First Name': 'Ann', 'Last Name': 'Otieno', 'Work Email': 'ann@co.ke',
       'Job Title': 'Clerk', 'Employee Type': 'Contract', 'Basic Salary': '45,000', Town: 'Kisumu', 'Manager Email': 'boss@co.ke',
     });
     expect(parseAmount(row['Basic Salary'])).toBe(45000);
+    expect(row['Employee Number']).toBeUndefined();
   });
 });
 
