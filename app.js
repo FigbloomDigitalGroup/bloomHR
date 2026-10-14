@@ -6,6 +6,7 @@ import emailRouter from "./email_routes.js";
 import smsRouter from "./sms_routes.js";
 import adminRouter from "./admin_routes.js";
 import inviteRouter from "./invite_routes.js";
+import mfaRouter from "./mfa_routes.js";
 import aiRouter from "./ai_routes.js";
 import payrollPaymentsRouter from "./payroll_payments.js";
 
@@ -28,6 +29,8 @@ export function buildApp({ mpesaRouter, routes = [] } = {}) {
   app.use("/api/sms", smsRouter);
   app.use("/api/admin", adminRouter);
   app.use("/api/invites", inviteRouter);
+  // two-step sign-in codes, made and checked here (FIG-834)
+  app.use("/api/mfa", mfaRouter);
   app.use("/api/ai", aiRouter);
   // queueing and retrying payroll payments only writes to the database; the money moves where the workers run
   app.use("/api/payroll-payments", payrollPaymentsRouter);
