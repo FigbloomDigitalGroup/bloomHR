@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import { Download, Loader, Pause, Pencil, Play, Plus, Trash2, Upload } from 'lucide-react';
 import EmployeePicker from '../UI/EmployeePicker';
-import { SearchInput, TableScroll } from '../UI';
+import { Card, SearchInput, TableScroll } from '../UI';
 import { useEmployeeDirectory } from '../../hooks/useEmployeeDirectory';
 import { readEmployeeRows } from '../../lib/employeeSheet';
 import { runErrorMessage } from '../../lib/payrollRuns';
@@ -21,8 +21,10 @@ import {
   type ParsedDeductionRow,
 } from '../../lib/voluntaryDeductions';
 
-interface VoluntaryDeductionsModalProps {
-  onClose: () => void;
+// The Deductions tab (was the "Deductions" pop-up): the company's own deduction types (SACCO, welfare...) and what
+// each employee has taken from pay every month.
+
+interface PayrollDeductionsTabProps {
   /** called after any change, so the payroll figures are worked out again */
   onChanged: () => void;
   /** how changes reach this month's payroll run, if it has one */
@@ -60,7 +62,7 @@ const input = 'w-full px-2.5 py-1.5 rounded-tile border border-border bg-white t
 const label = 'block text-[10px] font-bold uppercase text-subtle mb-1';
 
 /** The company's voluntary deductions (SACCO, insurance, welfare...) and what each employee has taken every month. */
-export default function VoluntaryDeductionsModal({ onClose, onChanged, draftNotice }: VoluntaryDeductionsModalProps) {
+export default function PayrollDeductionsTab({ onChanged, draftNotice }: PayrollDeductionsTabProps) {
   const { employees } = useEmployeeDirectory();
   const [types, setTypes] = useState<DeductionType[]>([]);
   const [deductions, setDeductions] = useState<EmployeeDeduction[]>([]);
@@ -201,26 +203,16 @@ export default function VoluntaryDeductionsModal({ onClose, onChanged, draftNoti
   const activeTypes = types.filter((t) => t.active || t.id === form?.deduction_type_id);
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-[10px] border border-gray-200 shadow-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
-        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between shrink-0">
-          <div>
-            <h2 className="text-sm font-semibold text-gray-800">Voluntary deductions</h2>
+    <Card padding="none">
+        <div className="px-4 sm:px-5 py-3 border-b border-border flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-sm font-bold text-ink">Voluntary deductions</h2>
             <p className="text-[11px] text-muted-foreground">SACCO, insurance, welfare, loan repayments… taken from pay every month.</p>
           </div>
-          <div className="flex items-center gap-2">
-            {busy && <Loader className="w-3.5 h-3.5 animate-spin text-subtle" aria-label="Saving" />}
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-xs text-gray-400 hover:text-gray-600 px-3 py-1 rounded-[25px] hover:bg-gray-100 transition-colors border border-gray-200"
-            >
-              Close
-            </button>
-          </div>
+          {busy && <Loader className="w-3.5 h-3.5 animate-spin text-subtle shrink-0" aria-label="Saving" />}
         </div>
 
-        <div className="overflow-y-auto p-5 space-y-5">
+        <div className="p-4 sm:p-5 space-y-5">
           {draftNotice && (
             <div className="rounded-tile bg-orange-tint-alt text-orange-text-alt text-[11.5px] font-semibold px-3 py-2">{draftNotice}</div>
           )}
@@ -498,7 +490,6 @@ export default function VoluntaryDeductionsModal({ onClose, onChanged, draftNoti
             </TableScroll>
           </div>
         </div>
-      </div>
-    </div>
+    </Card>
   );
 }

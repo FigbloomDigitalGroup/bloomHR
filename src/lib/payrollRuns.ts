@@ -28,6 +28,13 @@ export const getPayrollRun = async (payPeriod: string): Promise<PayrollRun | nul
   return data;
 };
 
+/** Every payroll run the company has, newest month first (the History tab). */
+export const listPayrollRuns = async (): Promise<PayrollRun[]> => {
+  const { data, error } = await supabase.from('payroll_runs').select('*').order('pay_period', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+};
+
 export const getRunPayslips = async (runId: string) =>
   fetchAll((from, to) => supabase.from('salary_history').select('*').eq('run_id', runId).order('id').range(from, to));
 
