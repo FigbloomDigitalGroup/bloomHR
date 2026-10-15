@@ -31,6 +31,7 @@ import FigbloomLoader from '../UI/FigbloomLoader';
 import EmployeeNumberingCard from './EmployeeNumbering';
 import ApprovalWorkflowsCard from './ApprovalWorkflows';
 import TwoStepSignInCard from './TwoStepSignIn';
+import CareersSettingsCard from './CareersSettings';
 
 import { confirmDialog } from '../../lib/confirmDialog';
 // Role definitions
@@ -856,6 +857,9 @@ export default function UserRolesSettings() {
         <EmployeeNumberingCard className="" />
 
         <ApprovalWorkflowsCard />
+
+        {/* the company's careers page, embed and API (FIG-838) */}
+        <CareersSettingsCard />
 
         {/* Org structure */}
         <Card className="flex flex-wrap items-center justify-between gap-4">

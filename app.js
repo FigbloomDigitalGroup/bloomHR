@@ -9,6 +9,7 @@ import inviteRouter from "./invite_routes.js";
 import mfaRouter from "./mfa_routes.js";
 import aiRouter from "./ai_routes.js";
 import payrollPaymentsRouter from "./payroll_payments.js";
+import careersRouter from "./careers_routes.js";
 
 /**
  * @param {{ mpesaRouter?: import("express").Router, routes?: { path: string, router: import("express").Router }[] }} options
@@ -18,6 +19,10 @@ import payrollPaymentsRouter from "./payroll_payments.js";
  */
 export function buildApp({ mpesaRouter, routes = [] } = {}) {
   const app = express();
+
+  // each company's public careers API (FIG-838) answers CORS itself, from the websites that company allows, so it is
+  // mounted before the app-wide CORS below
+  app.use("/api/careers", careersRouter);
 
   // CORS_ORIGIN (comma separated) limits which sites may call the API; unset allows any, as before.
   const origins = (process.env.CORS_ORIGIN || "").split(",").map((o) => o.trim()).filter(Boolean);
