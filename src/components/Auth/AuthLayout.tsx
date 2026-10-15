@@ -30,7 +30,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center shadow-lg shadow-black/20">
               <img src="/bloom-mark.png" alt="Company Logo" className="w-6 h-6 object-contain brightness-0 invert" />
             </div>
-            <span className="text-white font-semibold text-2xl tracking-tight">Figbloom<span className="font-thin text-white/80">HR</span></span>
+            <span className="text-white font-semibold text-2xl tracking-tight">Figbloom<span className="font-light text-white/80">HR</span></span>
           </div>
 
           <div className="mt-auto space-y-6 pb-8">
@@ -69,7 +69,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
               <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
                 <img src="/bloom-mark.png" alt="Logo" className="w-5 h-5 object-contain brightness-0 invert" />
               </div>
-              <span className="text-2xl font-semibold text-gray-900 tracking-tight">Figbloom<span className="font-thin text-gray-500">HR</span></span>
+              <span className="text-2xl font-semibold text-gray-900 tracking-tight">Figbloom<span className="font-light text-gray-500">HR</span></span>
             </div>
           </div>
           {children}
