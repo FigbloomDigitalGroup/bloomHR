@@ -37,7 +37,7 @@ const StaffSignupRequests = lazy(() => import('./pages/admin'));
 const StaffPortalLanding = lazy(() => import('./components/staff portal/StaffPortal'));
 const RecruitmentDashboard = lazy(() => import('./components/Recruitment/RecruitmentDashboard'));
 const LeaveManagementSystem = lazy(() => import('./components/Leave/LeaveManagement'));
-const PerformanceDashboard = lazy(() => import('./components/Perfomance/PerfomanceDashboard'));
+const PerformanceDashboard = lazy(() => import('./components/Perfomance/KpiPerformancePage'));
 const AddEmployeePage = lazy(() => import('./components/Add Form/AddEmployeePage'));
 const ViewEmployeePage = lazy(() => import('./components/view_form/EmployeeDetails'));
 const ManagerAssignment = lazy(() => import('./components/Employees/ManagerAssignment'));
