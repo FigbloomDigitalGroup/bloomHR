@@ -25,6 +25,10 @@ export interface CompanyProfile {
   postal_code: string | null;
   fiscal_year_start_month: number;
   week_start_day: string;
+  /** an uploaded letterhead image shown at the top of offer letters instead of the generated one (20261016600000) */
+  letterhead_header_url: string | null;
+  /** an optional image at the bottom of offer letters */
+  letterhead_footer_url: string | null;
 }
 
 /** What the page edits: every field but the key. */
@@ -129,6 +133,8 @@ export function cleanProfile(p: CompanyProfileFields): CompanyProfileFields {
     address_line2: blankToNull(p.address_line2),
     city: blankToNull(p.city),
     postal_code: blankToNull(p.postal_code),
+    letterhead_header_url: blankToNull(p.letterhead_header_url),
+    letterhead_footer_url: blankToNull(p.letterhead_footer_url),
   };
 }
 
@@ -200,11 +206,28 @@ export function logoFileError(file: File): string | null {
   return null;
 }
 
-/** Uploads a logo to the company-logo bucket (as the top bar did) and returns its public URL. */
-export async function uploadCompanyLogo(file: File): Promise<string> {
+/** Uploads an image to the company-logo bucket (as the top bar did) and returns its public URL. */
+async function uploadCompanyImage(file: File, failure: string): Promise<string> {
   const ext = (file.name.split('.').pop() || 'png').toLowerCase();
   const path = `${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from('company-logo').upload(path, file);
-  if (error) fail(error, 'The logo was not uploaded.');
+  if (error) fail(error, failure);
   return supabase.storage.from('company-logo').getPublicUrl(path).data.publicUrl;
 }
+
+/** Uploads a logo and returns its public URL. */
+export const uploadCompanyLogo = (file: File) => uploadCompanyImage(file, 'The logo was not uploaded.');
+
+// An offer letter's own letterhead: a header (and optional footer) image the width of an A4 page
+export const LETTERHEAD_TYPES = ['image/png', 'image/jpeg'];
+export const LETTERHEAD_MAX_BYTES = 2 * 1024 * 1024;
+
+/** What is wrong with a letterhead image file, or null. */
+export function letterheadFileError(file: File): string | null {
+  if (!LETTERHEAD_TYPES.includes(file.type)) return 'Use a PNG or JPG image';
+  if (file.size > LETTERHEAD_MAX_BYTES) return 'Use an image of 2 MB or less';
+  return null;
+}
+
+/** Uploads a letterhead header or footer image (same bucket as the logo) and returns its public URL. */
+export const uploadLetterheadImage = (file: File) => uploadCompanyImage(file, 'The letterhead image was not uploaded.');

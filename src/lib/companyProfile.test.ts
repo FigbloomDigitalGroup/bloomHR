@@ -18,7 +18,7 @@ const base = {
   company_name: 'Acme', tagline: null, logo_url: null, primary_color: null, secondary_color: null, description: null,
   registration_no: null, business_type: null, industry: null, country: 'Kenya', base_currency: 'KES', official_phone: null,
   official_email: null, website: null, address_line1: null, address_line2: null, city: null, postal_code: null,
-  fiscal_year_start_month: 1, week_start_day: 'monday',
+  fiscal_year_start_month: 1, week_start_day: 'monday', letterhead_header_url: null, letterhead_footer_url: null,
 };
 
 describe('loadCompanyIdentity', () => {
