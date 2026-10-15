@@ -47,6 +47,7 @@ export async function loadBranding(): Promise<LetterBranding> {
     name: p.company_name, logo_url: p.logo_url, tagline: p.tagline, primary_color: p.primary_color, secondary_color: p.secondary_color,
     address_line1: p.address_line1, address_line2: p.address_line2, city: p.city, postal_code: p.postal_code, country: p.country,
     phone: p.official_phone, email: p.official_email, website: p.website,
+    letterhead_header_url: p.letterhead_header_url, letterhead_footer_url: p.letterhead_footer_url,
   };
 }
 

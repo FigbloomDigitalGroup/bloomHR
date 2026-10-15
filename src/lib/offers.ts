@@ -98,6 +98,10 @@ export interface LetterBranding {
   phone?: string | null;
   email?: string | null;
   website?: string | null;
+  /** the company's own letterhead image: replaces the generated one at the top */
+  letterhead_header_url?: string | null;
+  /** an image at the bottom of the letter */
+  letterhead_footer_url?: string | null;
 }
 
 /** What the candidate's page shows (offer_by_token). */
@@ -430,8 +434,25 @@ export async function respondToOffer(token: string, accept: boolean, reason?: st
   return data as OfferStatus;
 }
 
+/**
+ * Waits until every image in the element has loaded (or failed), so the PDF doesn't catch a letterhead half drawn.
+ * Gives up after `timeoutMs` so a stalled image never blocks the download.
+ */
+export async function imagesLoaded(element: HTMLElement, timeoutMs = 10000) {
+  const pending = Array.from(element.querySelectorAll('img')).filter((img) => !img.complete);
+  if (!pending.length) return;
+  const all = Promise.all(pending.map((img) => new Promise<void>((done) => {
+    img.addEventListener('load', () => done(), { once: true });
+    img.addEventListener('error', () => done(), { once: true });
+  })));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([all, new Promise<void>((done) => { timer = setTimeout(done, timeoutMs); })]);
+  clearTimeout(timer);
+}
+
 /** Downloads the element (the rendered letter) as an A4 PDF, as payslips are. */
 export async function downloadLetterPdf(element: HTMLElement, filename: string) {
+  await imagesLoaded(element);
   const { default: html2pdf } = await import('html2pdf.js');
   await html2pdf()
     .from(element)
