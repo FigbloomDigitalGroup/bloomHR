@@ -69,6 +69,7 @@ const HRLifecycleDashboard = lazy(() => import('./components/HR/HRLifecycleDashb
 const CompanyCalendar = lazy(() => import('./components/Calendar/CompanyCalendar'));
 const AIAssistantWidget = lazy(() => import('./components/AI/AIAssistantWidget'));
 const AIAssistantPage = lazy(() => import('./components/AI/AIAssistantPage').then((m) => ({ default: m.AIAssistantPage })));
+const SetupAssistant = lazy(() => import('./components/AI/SetupAssistant'));
 const MicrofinanceTodoList = lazy(() => import('./components/Task Manager/TaskManager').then((m) => ({ default: m.MicrofinanceTodoList })));
 const SMSCenter = lazy(() => import('./components/SMS/Sms').then((m) => ({ default: m.SMSCenter })));
 const JoinCompany = lazy(() => import('./pages/JoinCompany'));
@@ -1206,6 +1207,7 @@ function App() {
                                 } />
                                 <Route path="/leaves" element={<LeaveManagementSystem selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />} />
                                 <Route path="/training" element={<AdminVideoUpload />} />
+                                <Route path="/setup-assistant" element={<SetupAssistant />} />
                                 <Route path="/ai-assistant" element={<AIAssistantPage selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />} />
 
                                 <Route path="/fogs" element={<EmployeeDataTable selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />} />
