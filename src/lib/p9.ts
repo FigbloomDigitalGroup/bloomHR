@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+// the table plugin is called directly: since jspdf-autotable 5 importing it no longer adds doc.autoTable
+import { autoTable } from 'jspdf-autotable';
 import { supabase } from './supabase';
 import type { EmployeeRecord } from './profileCompleteness';
 import { lastDayOf, p10Figures } from './payrollExports';
@@ -87,14 +88,14 @@ export function downloadP9Pdf(p9: P9) {
   doc.setFontSize(9);
   doc.text(`Employer: ${p9.employer.name || '-'}    Employer PIN: ${p9.employer.pin || 'not set'}`, 40, 60);
   doc.text(`Employee: ${p9.employee.name || '-'}    Employee PIN: ${p9.employee.pin || '-'}    Payroll number: ${p9.employee.payrollNumber || '-'}`, 40, 74);
-  (doc as unknown as { autoTable: (o: Record<string, unknown>) => void }).autoTable({
+  autoTable(doc, {
     startY: 88,
     head: [P9_COLUMNS as unknown as string[]],
     body: [...p9.rows.map((r) => [r.month, ...r.values.map(money)]), ['Total', ...p9.totals.map(money)]],
     styles: { fontSize: 7, cellPadding: 3 },
     headStyles: { fillColor: [14, 79, 39] },
     columnStyles: Object.fromEntries(P9_COLUMNS.slice(1).map((_, i) => [i + 1, { halign: 'right' }])),
-    didParseCell: (data: { row: { index: number }; cell: { styles: Record<string, unknown> } }) => {
+    didParseCell: (data) => {
       if (data.row.index === 12) data.cell.styles.fontStyle = 'bold';
     },
   });

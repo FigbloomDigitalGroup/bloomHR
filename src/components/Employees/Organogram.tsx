@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, ChevronDown, ChevronRight, ListTree, Minus, Network, Plus, Printer, RotateCcw, Users } from 'lucide-react';
+import { Building2, ChevronDown, ChevronRight, ListTree, Maximize2, Minimize2, Minus, Network, Plus, Printer, RotateCcw, Scan, Users } from 'lucide-react';
 import { Button, Card, EmptyState, PageHeader, SearchInput } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import { useEmployeeDirectory } from '../../hooks/useEmployeeDirectory';
@@ -88,17 +88,19 @@ interface TreeProps {
 }
 
 /** The chart: boxes with their reports below, joined by lines. */
-function ChartLevel({ forest, isOpen, toggle }: TreeProps) {
+/** One level of the chart. The top level (`root`) wraps onto new rows: people with nobody above them are not
+ * siblings, so they need no joining rail, and a flat company would otherwise be one very long row. */
+function ChartLevel({ forest, isOpen, toggle, root = false }: TreeProps & { root?: boolean }) {
   return (
-    <div className="flex items-start justify-center">
+    <div className={root ? 'flex flex-wrap items-start justify-center gap-y-4' : 'flex items-start justify-center'}>
       {forest.map((node, i) => {
         const open = isOpen(node.item.id);
         const below = node.children.length;
         return (
-          <div key={node.item.id} className="relative flex flex-col items-center px-2 pt-5 break-inside-avoid">
+          <div key={node.item.id} className={`relative flex flex-col items-center px-2 ${root ? '' : 'pt-5'} break-inside-avoid`}>
             {/* the lines up to the parent: a stub, and the rail joining the siblings */}
-            <span aria-hidden className="absolute top-0 left-1/2 h-5 w-px bg-border" />
-            {forest.length > 1 && (
+            {!root && <span aria-hidden className="absolute top-0 left-1/2 h-5 w-px bg-border" />}
+            {!root && forest.length > 1 && (
               <span aria-hidden className="absolute top-0 h-px bg-border" style={{ left: i === 0 ? '50%' : 0, right: i === forest.length - 1 ? '50%' : 0 }} />
             )}
             <div data-testid="org-box" className="w-[200px] rounded-card border border-border bg-white shadow-sm px-3 py-2.5 flex items-center gap-2.5 text-left">
@@ -180,6 +182,8 @@ export default function Organogram() {
   const [toggled, setToggled] = useState<Set<string>>(new Set());
   const [openAll, setOpenAll] = useState(false);
   const [zoom, setZoom] = useState(1);
+  // full screen: the chart fills the window (Escape or the button leaves)
+  const [fullScreen, setFullScreen] = useState(false);
 
   const staff = useMemo(() => employees.filter((e) => e.id && isCurrentEmployee(e)), [employees]);
   const deptName = useMemo(() => new Map(departments.map((d) => [d.id, d.name])), [departments]);
@@ -269,6 +273,37 @@ export default function Organogram() {
 
   // drag to pan the chart
   const scroller = useRef<HTMLDivElement>(null);
+  const chart = useRef<HTMLDivElement>(null);
+
+  /** zooms so the whole chart's width fits the window (never larger than 100%) */
+  const fitToScreen = () => {
+    const room = scroller.current?.clientWidth;
+    const width = chart.current?.scrollWidth; // the chart's own width, overflow included: the zoom transform does not change it
+    if (!room || !width) return;
+    setZoom(Math.max(MIN_ZOOM, Math.min(1, +((room - 8) / width).toFixed(2))));
+  };
+
+  const enterFullScreen = () => {
+    setLayout('chart');
+    setOpenAll(true);
+    setFullScreen(true);
+    // once the chart has opened up and the window is full size
+    setTimeout(fitToScreen, 80);
+  };
+
+  useEffect(() => {
+    if (!fullScreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFullScreen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = overflow;
+    };
+  }, [fullScreen]);
   const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
   const onPointerDown = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest('button, a') || !scroller.current) return;
@@ -310,10 +345,17 @@ export default function Organogram() {
               </Link>
             )}
             <Button variant="secondary" onClick={print} icon={<Printer className="w-3.5 h-3.5" strokeWidth={2} />}>Print</Button>
+            <Button onClick={enterFullScreen} icon={<Maximize2 className="w-3.5 h-3.5" strokeWidth={2} />}>Full screen</Button>
           </div>
         }
       />
 
+      <div
+        className={fullScreen ? 'fixed inset-0 z-50 flex flex-col bg-page p-3 sm:p-4' : undefined}
+        role={fullScreen ? 'dialog' : undefined}
+        aria-modal={fullScreen || undefined}
+        aria-label={fullScreen ? 'Organogram, full screen' : undefined}
+      >
       <div className="flex flex-col lg:flex-row lg:items-center gap-2.5 mb-3 print:hidden">
         <div role="group" aria-label="View by" className="inline-flex rounded-tile bg-secondary p-0.5 self-start">
           {toggleButton(view === 'people', () => setView('people'), <Users className="w-3.5 h-3.5" />, 'People')}
@@ -334,12 +376,16 @@ export default function Organogram() {
               <span className="w-10 text-center text-[11.5px] text-muted-foreground" aria-live="polite">{Math.round(zoom * 100)}%</span>
               <Button variant="secondary" aria-label="Zoom in" onClick={() => setZoom((z) => Math.min(MAX_ZOOM, +(z + 0.1).toFixed(2)))} icon={<Plus className="w-3.5 h-3.5" />}>{''}</Button>
               <Button variant="ghost" aria-label="Reset zoom" onClick={() => setZoom(1)} icon={<RotateCcw className="w-3.5 h-3.5" />}>{''}</Button>
+              <Button variant="secondary" onClick={fitToScreen} icon={<Scan className="w-3.5 h-3.5" />}>Fit</Button>
             </>
+          )}
+          {fullScreen && (
+            <Button onClick={() => setFullScreen(false)} icon={<Minimize2 className="w-3.5 h-3.5" />}>Exit full screen</Button>
           )}
         </div>
       </div>
 
-      <Card className="!p-0 overflow-hidden print:border-0 print:shadow-none">
+      <Card className={`!p-0 overflow-hidden print:border-0 print:shadow-none ${fullScreen ? 'flex-1 min-h-0 flex flex-col' : ''}`}>
         {loading ? (
           <div className="flex justify-center p-8"><FigbloomLoader label="Loading the organogram" /></div>
         ) : peopleError ? (
@@ -353,18 +399,19 @@ export default function Organogram() {
         ) : (
           <div
             ref={scroller}
-            className="overflow-auto max-h-[75vh] cursor-grab active:cursor-grabbing select-none print:max-h-none print:overflow-visible"
+            className={`overflow-auto ${fullScreen ? 'flex-1 min-h-0' : 'max-h-[75vh]'} cursor-grab active:cursor-grabbing select-none print:max-h-none print:overflow-visible`}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={endDrag}
             onPointerLeave={endDrag}
           >
-            <div role="tree" aria-label="Organogram" className="inline-block min-w-full p-4 origin-top-left print:!transform-none" style={{ transform: `scale(${zoom})` }}>
-              <ChartLevel forest={shown} isOpen={isOpen} toggle={toggle} />
+            <div ref={chart} role="tree" aria-label="Organogram" className="w-full p-4 origin-top-left print:!transform-none" style={{ transform: `scale(${zoom})` }}>
+              <ChartLevel forest={shown} isOpen={isOpen} toggle={toggle} root />
             </div>
           </div>
         )}
       </Card>
+      </div>
     </div>
   );
 }

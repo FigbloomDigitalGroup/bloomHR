@@ -68,6 +68,7 @@ import {
   type PayRecipient,
 } from "./PaymentApprovalModals";
 import { ExportModal, P9FormGenerator } from "./PayrollToolModals";
+import { downloadPayrollRegisterPdf } from "../../lib/payrollPdf";
 import { PayslipModal } from "./PayrollPayslipModal";
 import { confirmDialog, type DialogOptions } from "../../lib/confirmDialog";
 import { PAYROLL_TABS, usePayrollTab } from "./payrollTabs";
@@ -1743,6 +1744,13 @@ export default function PayrollDashboard() {
       {tab === "run" && (dataLoading ? loader : (
         <PayrollRunTab
           periodLabel={periodLabel}
+          onDownloadPdf={() => {
+            try {
+              downloadPayrollRegisterPdf(finalFilteredRecords, { periodLabel, companyName: companyInfo?.company_name });
+            } catch {
+              toast.error("The PDF was not made. Try again.");
+            }
+          }}
           monthRun={monthRun}
           runLoading={runLoading}
           runBusy={runBusy}
@@ -1808,6 +1816,7 @@ export default function PayrollDashboard() {
       {tab === "deductions" && (
         <PayrollDeductionsTab
           onChanged={() => setDeductionsVersion((v) => v + 1)}
+          rates={rates}
           draftNotice={
             monthRun?.status === "draft"
               ? `Payroll for ${periodLabel} is a draft: press Recalculate to apply deduction changes to it.`
@@ -1989,6 +1998,8 @@ export default function PayrollDashboard() {
         isOpen={showExportModal}
         onClose={() => setShowExportModal(false)}
         records={finalFilteredRecords}
+        periodLabel={periodLabel}
+        companyName={companyInfo?.company_name}
       />
 
 

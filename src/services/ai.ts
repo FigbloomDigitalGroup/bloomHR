@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import type { PayItemKind, TaxTreatment } from '../lib/kenyaTaxTreatment';
 
 // Client for the backend AI API (ai_routes.js). The model API key lives on the server; the browser authenticates
 // with the caller's own session token, and the server checks the caller may use this feature.
@@ -19,22 +20,18 @@ export interface AIHistoryMessage {
   content: string;
 }
 
-export const queryAI = async (
-  prompt: string,
-  context: string,
-  purpose: AIPurpose = 'hr-assistant',
-  history: AIHistoryMessage[] = []
-): Promise<AIResponse> => {
+/** POSTs to the AI API as the signed-in user; returns the JSON answer, or throws the server's error message. */
+const post = async <T>(path: string, body: unknown): Promise<T> => {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new Error('You are not signed in');
 
   let response: Response;
   try {
-    response = await fetch(`${API_URL}/ai/chat`, {
+    response = await fetch(`${API_URL}/ai/${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ purpose, prompt, context, history }),
+      body: JSON.stringify(body),
     });
   } catch {
     throw new Error('Could not reach the server. Is the backend running?');
@@ -42,5 +39,25 @@ export const queryAI = async (
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || `AI request failed (${response.status})`);
-  return payload as AIResponse;
+  return payload as T;
 };
+
+export const queryAI = (
+  prompt: string,
+  context: string,
+  purpose: AIPurpose = 'hr-assistant',
+  history: AIHistoryMessage[] = []
+): Promise<AIResponse> => post<AIResponse>('chat', { purpose, prompt, context, history });
+
+/** The AI's suggestion of how a pay item is treated for Kenyan PAYE (ai_routes.js, feature "tax_treatment"). */
+export interface AITaxSuggestion {
+  treatment: TaxTreatment;
+  explanation: string;
+  legal_basis: string;
+  confidence: 'high' | 'medium' | 'low';
+  caveats: string[];
+}
+
+/** A suggestion only: show it labelled as one, and never apply it without the user confirming. */
+export const askTaxTreatment = (kind: PayItemKind, name: string, description?: string): Promise<AITaxSuggestion> =>
+  post<AITaxSuggestion>('tax-treatment', { kind, name, ...(description ? { description } : {}) });

@@ -5,8 +5,7 @@ import { supabase } from "../../lib/supabase";
 import toast from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
+import { downloadPayrollRegisterPdf } from "../../lib/payrollPdf";
 import SearchableDropdown from "../UI/SearchableDropdown";
 import { downloadP9Pdf, loadEmployerPin, loadP9For, saveEmployerPin } from "../../lib/p9";
 import { payslipEarningLines } from "../../lib/earnings";
@@ -156,10 +155,15 @@ export const ExportModal = ({
   isOpen,
   onClose,
   records,
+  periodLabel,
+  companyName,
 }: {
   isOpen: boolean;
   onClose: () => void;
   records: any[];
+  /** e.g. "October 2026", printed on the PDF */
+  periodLabel?: string;
+  companyName?: string | null;
 }) => {
   const [exportFormat, setExportFormat] = useState("excel");
   const [isExporting, setIsExporting] = useState(false);
@@ -254,42 +258,7 @@ export const ExportModal = ({
   const exportToPDF = () => {
     setIsExporting(true);
     try {
-      const doc = new jsPDF();
-
-      doc.setFontSize(16);
-      doc.text("Payroll Report", 14, 22);
-      doc.setFontSize(12);
-      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 32);
-
-      const tableData = records.map((record: any) => [
-        record.employee_id,
-        record.employee_name,
-        record.department,
-        `KSh ${record.gross_pay.toLocaleString()}`,
-        `KSh ${Math.round(record.paye_tax).toLocaleString()}`,
-        `KSh ${record.total_deductions.toLocaleString()}`,
-        `KSh ${Math.round(record.net_pay).toLocaleString()}`,
-      ]);
-
-      (doc as any).autoTable({
-        head: [
-          [
-            "ID",
-            "Name",
-            "Department",
-            "Gross Pay",
-            "PAYE",
-            "Total Deductions",
-            "Net Pay",
-          ],
-        ],
-        body: tableData,
-        startY: 40,
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [34, 197, 94] },
-      });
-
-      doc.save(`payroll_${new Date().toISOString().slice(0, 10)}.pdf`);
+      downloadPayrollRegisterPdf(records, { periodLabel: periodLabel || "Payroll", companyName });
       toast.success("PDF file exported successfully!");
     } catch {
       toast.error("Failed to export PDF file");
