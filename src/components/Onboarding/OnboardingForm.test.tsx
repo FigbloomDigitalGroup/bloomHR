@@ -96,9 +96,9 @@ describe('OnboardingForm', () => {
   });
 
   it('lists documents still to upload, and says they can be submitted later', async () => {
-    api.loadMyOnboarding.mockResolvedValue({ ...record({}), missing: { employee: [], employer: [], documentsOutstanding: ['Updated CV', 'HELB compliance certificate'] } });
+    api.loadMyOnboarding.mockResolvedValue({ ...record({}), missing: { employee: [], employer: [], documentsOutstanding: ['Updated CV', 'HELB clearance certificate'] } });
     render(<OnboardingForm />);
-    expect(await screen.findByText('Updated CV, HELB compliance certificate')).toBeTruthy();
+    expect(await screen.findByText('Updated CV, HELB clearance certificate')).toBeTruthy();
     expect(screen.getByText(/You can submit without them/)).toBeTruthy();
     expect((screen.getByRole('button', { name: /Submit to HR/ }) as HTMLButtonElement).disabled).toBe(false);
   });

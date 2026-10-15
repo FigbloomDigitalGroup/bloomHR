@@ -6,7 +6,7 @@ import { supabase } from '../../../lib/supabase';
 import { openPrivateFile } from '../../../lib/privateFiles';
 import * as api from './api';
 import PipelineBoard from './PipelineBoard';
-import CandidateView from './CandidateView';
+import CandidateView, { isInterviewStage } from './CandidateView';
 import StageEditor from './StageEditor';
 import { CareersToggle } from '../../Settings/CareersSettings';
 import { Candidate, CompanyUser, Interview, Stage, StageMove, candidateName, sortStages } from './types';
@@ -25,6 +25,8 @@ export default function RecruitmentPipeline() {
   const [loading, setLoading] = useState(true);
   const [editingStages, setEditingStages] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  // the candidate opened because they were just shortlisted: show the Schedule interview form first
+  const [scheduleOnOpen, setScheduleOnOpen] = useState(false);
   const [detail, setDetail] = useState<{ candidate: Candidate; history: StageMove[]; interviews: Interview[] } | null>(null);
 
   const postingId = postingKey === GENERAL ? null : postingKey;
@@ -146,7 +148,13 @@ export default function RecruitmentPipeline() {
           onOpen={(c) => setOpenId(c.id)}
           onMove={async (c, stageId) => {
             try {
-              await withToast(() => api.moveCandidate(c.id, stageId), `${candidateName(c)} moved to ${stages.find((s) => s.id === stageId)?.name}`);
+              const stage = stages.find((s) => s.id === stageId);
+              await withToast(() => api.moveCandidate(c.id, stageId), `${candidateName(c)} moved to ${stage?.name}`);
+              // shortlisted: open them with the Schedule interview form ready
+              if (isInterviewStage(stage)) {
+                setScheduleOnOpen(true);
+                setOpenId(c.id);
+              }
             } catch (err) {
               toast.error((err as Error).message);
             }
@@ -175,7 +183,7 @@ export default function RecruitmentPipeline() {
         />
       </Modal>
 
-      <Modal open={!!openId} onClose={() => setOpenId(null)} title="Candidate" hideTitle size="5xl" className="bg-background rounded-2xl shadow-xl p-4 sm:p-6">
+      <Modal open={!!openId} onClose={() => { setOpenId(null); setScheduleOnOpen(false); }} title="Candidate" hideTitle size="5xl" className="bg-background rounded-2xl shadow-xl p-4 sm:p-6">
         {!detail ? (
           <p className="text-[13px] text-muted-foreground">Loading candidate...</p>
         ) : (
@@ -186,6 +194,7 @@ export default function RecruitmentPipeline() {
             interviews={detail.interviews}
             users={users}
             currentUserId={me}
+            startScheduling={scheduleOnOpen}
             onMove={(stageId, note) => withToast(() => api.moveCandidate(detail.candidate.id, stageId, note), 'Moved')}
             onSchedule={async (input, emailCandidate) => {
               await api.saveInterview(input);

@@ -136,7 +136,8 @@ const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSche
             );
 
             setEmployees(sortedEmps);
-            setLeaves(leaveData || []);
+            // the column is `status` (any case); the bars read Status, lower case, as Leave Management does
+            setLeaves((leaveData || []).map((l) => ({ ...l, Status: String(l.status ?? l.Status ?? 'pending').toLowerCase() })));
 
         } catch (err) {
             console.error("Error fetching scheduler data:", err);
@@ -185,7 +186,8 @@ const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSche
     // --- Gantt Bar Calculation ---
     const getLeaveBars = (employeeNumber: string) => {
         // Both tables use "Employee Number" so this maps correctly
-        const empLeaves = leaves.filter(l => l["Employee Number"] === employeeNumber);
+        // a leave without both dates can't be drawn (and would break the date formatting)
+        const empLeaves = leaves.filter(l => l["Employee Number"] === employeeNumber && l["Start Date"] && l["End Date"]);
 
         return empLeaves.map(leave => {
             const startDate = parseISO(leave["Start Date"]);
@@ -473,7 +475,7 @@ const LeaveScheduler = ({ selectedTown, onSelectDate, onAssignLeave }: LeaveSche
                                                             >
                                                                 <div className="flex flex-col leading-none overflow-hidden w-full">
                                                                     <div className="flex items-center justify-between mb-0.5">
-                                                                        <span className="text-[8px] font-bold text-white/80 uppercase tracking-wider">{bar.Status.slice(0, 3)}</span>
+                                                                        <span className="text-[8px] font-bold text-white/80 uppercase tracking-wider">{(bar.Status || 'pending').slice(0, 3)}</span>
                                                                     </div>
                                                                     <span className="text-[10px] font-bold text-white whitespace-nowrap overflow-hidden text-ellipsis truncate w-full">
                                                                         {bar["Leave Type"].split(' ')[0]}

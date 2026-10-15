@@ -20,8 +20,30 @@ export interface DemoPayLine {
 }
 
 const text = (value: unknown) => (value === null || value === undefined ? '' : String(value).trim());
-/** a name compared without case or spaces */
-const squash = (value: unknown) => text(value).toLowerCase().replace(/\s+/g, '');
+/** the words of a name, lower case, without accents or punctuation */
+const nameWords = (value: unknown) =>
+  text(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z]+/)
+    .filter((w) => w && !TITLES.has(w));
+const TITLES = new Set(['mr', 'mrs', 'ms', 'miss', 'dr', 'prof', 'eng', 'hon']);
+
+/**
+ * Whether a bank account's name is this employee's name, the way banks write names: in any order, any case, with or
+ * without the middle name, and with initials ("WANJIRU AMINA", "Amina W. Wanjiru", "A. Wanjiru"). Every word of the
+ * account name must be one of the employee's names (or an initial of one), and at least two of the employee's names
+ * must appear in full, or the one name they have.
+ */
+export function accountNameMatches(accountName: unknown, employee: EmployeeRecord): boolean {
+  const own = [...nameWords(employee['First Name']), ...nameWords(employee['Middle Name']), ...nameWords(employee['Last Name'])];
+  const account = nameWords(accountName);
+  if (!own.length || !account.length) return false;
+  const full = account.filter((w) => w.length > 1 && own.includes(w));
+  const allKnown = account.every((w) => own.includes(w) || (w.length === 1 && own.some((o) => o.startsWith(w))));
+  return allKnown && new Set(full).size >= Math.min(2, new Set(own).size);
+}
 
 /** Why an employee's salary could not be sent, in the words payroll uses (empty when it could). */
 export function paymentProblems(employee: EmployeeRecord): string[] {
@@ -33,11 +55,10 @@ export function paymentProblems(employee: EmployeeRecord): string[] {
     const accountName = text(employee['account_number_name']);
     if (!accountName) problems.push('Account name');
     else {
-      const first = squash(employee['First Name']);
-      const last = squash(employee['Last Name']);
-      const middle = squash(employee['Middle Name']);
-      const names = [first + last, first + middle + last].filter(Boolean);
-      if (!names.includes(squash(accountName))) problems.push("Account name doesn't match the employee's name");
+      if (!accountNameMatches(accountName, employee)) {
+        const name = [employee['First Name'], employee['Middle Name'], employee['Last Name']].map(text).filter(Boolean).join(' ');
+        problems.push(`Account name "${accountName}" doesn't match the employee's name "${name}"`);
+      }
     }
   }
   return problems;

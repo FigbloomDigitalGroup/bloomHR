@@ -45,7 +45,13 @@ interface CandidateViewProps extends CandidateActions {
   interviews: Interview[];
   users: CompanyUser[];
   currentUserId: string | null;
+  /** open with the Schedule interview form showing (the candidate was just shortlisted) */
+  startScheduling?: boolean;
 }
+
+/** A stage after which the next step is an interview: shortlisted or interview stages, by name. */
+export const isInterviewStage = (stage: { name: string; kind?: string } | undefined) =>
+  !!stage && stage.kind !== 'hired' && stage.kind !== 'rejected' && /shortlist|interview/i.test(stage.name);
 
 const DETAILS: [string, string][] = [
   ['email', 'Email'],
@@ -275,12 +281,12 @@ function InterviewCard({
 
 /** Everything about one candidate: details and CV, where they are, how they got there, interviews, scores, decision. */
 export default function CandidateView(props: CandidateViewProps) {
-  const { candidate, stages, history, interviews, users, currentUserId, ...actions } = props;
+  const { candidate, stages, history, interviews, users, currentUserId, startScheduling = false, ...actions } = props;
   const [stageId, setStageId] = useState('');
   const [note, setNote] = useState('');
   const [moving, setMoving] = useState(false);
   const [moveError, setMoveError] = useState('');
-  const [scheduling, setScheduling] = useState(false);
+  const [scheduling, setScheduling] = useState(startScheduling);
 
   const ordered = sortStages(stages);
   const current = ordered.find((s) => s.id === candidate.current_stage_id);
@@ -292,6 +298,8 @@ export default function CandidateView(props: CandidateViewProps) {
     setMoveError('');
     try {
       await actions.onMove(stageId, note);
+      // shortlisted: the next step is booking the interview
+      if (isInterviewStage(stages.find((s) => s.id === stageId))) setScheduling(true);
       setStageId('');
       setNote('');
     } catch (err) {
