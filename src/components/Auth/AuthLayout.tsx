@@ -6,9 +6,9 @@ import { AccessibilityButton } from '../Accessibility/AccessibilityModal';
 // the form on white on the right. One place, so every sign-in step looks the same.
 
 /** the brand panel's photo; replace the file to change it everywhere */
-export const AUTH_PHOTO = '/hr.jpg';
-/** which part of the photo the narrow panel keeps: the HR manager and the new starter, right of centre */
-const PHOTO_FOCUS = '82% center';
+export const AUTH_PHOTO = '/auth-team.jpg';
+/** which part of the photo the narrow panel keeps: the two women at the table, left of centre */
+const PHOTO_FOCUS = '38% center';
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
