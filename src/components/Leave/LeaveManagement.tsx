@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { useState, useEffect, useRef } from 'react';
 import { earnedToDate, isYearlyMethod } from '../../lib/leaveAccrual';
 import EmployeePicker from '../UI/EmployeePicker';
@@ -1464,7 +1465,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
       const failed = results.find(r => r.error);
       if (failed?.error) throw failed.error;
 
-      alert('Leave balance settings saved successfully!');
+      toast.success('Leave balance settings saved successfully!');
     } catch (err) {
       setError('Failed to save balance changes. Please try again.');
       console.error(err);
@@ -1982,7 +1983,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
 
       if (error) throw error;
 
-      alert('Leave assigned successfully!');
+      toast.success('Leave assigned successfully!');
       setShowLeaveApplicationForm(false);
       setNewLeaveApplication({
         "Employee Number": '',
@@ -2041,7 +2042,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
       const { data, error } = await supabase.rpc('run_leave_year_end_reminders');
       if (error) throw error;
       setShowAccrualSettings(false);
-      alert(Number(data) > 0 ? `Sent ${data} reminder${Number(data) === 1 ? '' : 's'}.` : 'No reminders to send right now (outside the reminder window, or nobody has enough unused days).');
+      toast.success(Number(data) > 0 ? `Sent ${data} reminder${Number(data) === 1 ? '' : 's'}.` : 'No reminders to send right now (outside the reminder window, or nobody has enough unused days).');
     } catch (err) {
       setError('Failed to send the reminders. Please try again.');
       console.error(err);

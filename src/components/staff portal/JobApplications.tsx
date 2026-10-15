@@ -23,6 +23,7 @@ import StatusPill from '../UI/StatusPill';
 import type { StatusTone } from '../UI/StatusPill';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 interface JobPosting {
     id: string;
     job_title: string;
@@ -209,7 +210,7 @@ const JobApplications = () => {
     };
 
     const withdrawApplication = async (applicationId: string) => {
-        if (!confirm('Are you sure you want to withdraw this application?')) return;
+        if (!(await confirmDialog({ title: 'Withdraw this application?', confirmLabel: 'Withdraw', tone: 'danger' }))) return;
 
         try {
             const { data: savedRows, error } = await supabase

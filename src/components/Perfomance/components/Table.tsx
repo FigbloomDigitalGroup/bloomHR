@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Edit, Search, Upload, Download } from 'lucide-react';
 
@@ -477,7 +478,7 @@ export const EmployeePerformanceTable = ({
   const handleSave = (updatedData: any) => {
     if (!selectedPerf || !selectedPerf.id) {
       console.error('No selected performance record or missing ID');
-      alert('Cannot save: Invalid performance record');
+      toast.error('Cannot save: Invalid performance record');
       return;
     }
     

@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 const MPesaSpreadsheetFullPage = ({ onBack, userRole }) => {
   const [rows, setRows] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -201,8 +202,8 @@ const MPesaSpreadsheetFullPage = ({ onBack, userRole }) => {
   };
 
   // Clear all rows
-  const clearAllRows = () => {
-    if (rows.length > 0 && window.confirm('Are you sure you want to clear all rows?')) {
+  const clearAllRows = async () => {
+    if (rows.length > 0 && (await confirmDialog({ title: 'Clear all rows?', confirmLabel: 'Clear', tone: 'danger' }))) {
       setRows([]);
       setSelectedRows(new Set());
       toast.success('All rows cleared');

@@ -104,16 +104,21 @@ const PageLoader = () => (
 );
 
 class ErrorBoundaryClass extends React.Component<
-  { children: React.ReactNode },
+  { children: React.ReactNode; resetKey?: string },
   { hasError: boolean; error: Error | null }
 > {
-  constructor(props: { children: React.ReactNode }) {
+  constructor(props: { children: React.ReactNode; resetKey?: string }) {
     super(props);
     this.state = { hasError: false, error: null };
   }
 
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
+  }
+
+  // going to another page clears the error: a slip while signing in (/login -> /mfa -> /dashboard) must not stay up
+  componentDidUpdate(prev: { resetKey?: string }) {
+    if (this.state.hasError && prev.resetKey !== this.props.resetKey) this.setState({ hasError: false, error: null });
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
@@ -125,21 +130,21 @@ class ErrorBoundaryClass extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-page">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Something went wrong</h1>
-            <p className="text-gray-600 mb-4">Please refresh the page to continue</p>
+        <div className="min-h-screen flex items-center justify-center bg-page px-4">
+          <div className="text-center max-w-md">
+            <h1 className="text-2xl font-bold text-ink mb-2">Something went wrong</h1>
+            <p className="text-sm text-muted-foreground mb-5">Please refresh the page to continue.</p>
             {this.state.error?.message && (
-              <p className="text-xs text-gray-400 mb-4 max-w-md mx-auto break-words">{this.state.error.message}</p>
+              <p className="text-xs text-subtle mb-5 break-words">{this.state.error.message}</p>
             )}
             <button
               onClick={() => {
                 this.setState({ hasError: false, error: null });
                 window.location.reload();
               }}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              className="px-5 py-2.5 rounded-tile bg-brand text-white text-xs font-bold hover:bg-brand-dark transition-colors"
             >
-              Refresh Page
+              Refresh page
             </button>
           </div>
         </div>
@@ -151,7 +156,8 @@ class ErrorBoundaryClass extends React.Component<
 }
 
 const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
-  return <ErrorBoundaryClass>{children}</ErrorBoundaryClass>;
+  const { pathname } = useLocation();
+  return <ErrorBoundaryClass resetKey={pathname}>{children}</ErrorBoundaryClass>;
 };
 
 function App() {
@@ -755,7 +761,9 @@ function App() {
 
     initializeAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Never await supabase inside this callback: the client holds its auth lock until the callback returns, so a
+    // query waited on here can stall every other supabase call (sign-in hangs). Lookups go in a setTimeout instead.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       // FIRST: Check if we're in password recovery mode - if so, don't interfere
       const currentPath = location.pathname;
       const urlHasRecoveryToken = window.location.href.includes('type=recovery') ||
@@ -832,19 +840,22 @@ function App() {
           setSelectedTown(userData.town);
           localStorage.setItem('selectedTown', userData.town);
 
-          try {
-            const { data } = await supabase
-              .from('kenya_branches')
-              .select('"Area"')
-              .eq('"Branch Office"', userData.town)
-              .single();
+          const town = userData.town;
+          setTimeout(async () => {
+            try {
+              const { data } = await supabase
+                .from('kenya_branches')
+                .select('"Area"')
+                .eq('"Branch Office"', town)
+                .single();
 
-            if (data) {
-              setSelectedRegion(data.Area);
+              if (data) {
+                setSelectedRegion(data.Area);
+              }
+            } catch (error) {
+              console.error('Error finding region for town:', error);
             }
-          } catch (error) {
-            console.error('Error finding region for town:', error);
-          }
+          }, 0);
         }
 
         // Only show welcome toast and navigate for actual sign-in events, not token refreshes

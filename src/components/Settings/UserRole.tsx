@@ -33,6 +33,7 @@ import ApprovalWorkflowsCard from './ApprovalWorkflows';
 import TwoStepSignInCard from './TwoStepSignIn';
 import CareersSettingsCard from './CareersSettings';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 // Role definitions
 const ROLES = {
   ADMIN: {
@@ -713,7 +714,7 @@ export default function UserRolesSettings() {
   const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
 
   const handleDeleteUser = async (user: any) => {
-    if (!window.confirm(`Are you sure you want to delete ${user.email}? This action cannot be undone.`)) {
+    if (!(await confirmDialog({ title: `Delete ${user.email}?`, message: 'This cannot be undone.', confirmLabel: 'Delete', tone: 'danger' }))) {
       return;
     }
 

@@ -19,6 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import { utils, writeFile } from 'xlsx';
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 type Asset = Database['public']['Tables']['assets']['Row'];
 type Employee = Database['public']['Tables']['employees']['Row'];
 
@@ -293,7 +294,7 @@ const AssetManagement: React.FC = () => {
   };
 
   const handleDeleteAsset = async (assetId: string) => {
-    if (window.confirm('Are you sure you want to delete this asset?')) {
+    if (await confirmDialog({ title: 'Delete this asset?', message: 'This cannot be undone.', confirmLabel: 'Delete', tone: 'danger' })) {
       try {
         const { error } = await supabase
           .from('assets')

@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 // ChatArea.tsx
 import { Hash, MoreVertical, Search, Users, Bell, BellOff, Video, Phone, Home, User, Settings } from "lucide-react";
 import { Button } from "./ui/button";
@@ -38,11 +39,11 @@ export function ChatArea({ channel, messages, currentUserId, onSendMessage, onTo
   };
 
   const handleVideoCall = () => {
-    alert('Start video call functionality');
+    toast('Video calls are coming soon.');
   };
 
   const handleVoiceCall = () => {
-    alert('Start voice call functionality');
+    toast('Voice calls are coming soon.');
   };
 
   const handleNavigateHome = () => {
@@ -50,11 +51,11 @@ export function ChatArea({ channel, messages, currentUserId, onSendMessage, onTo
   };
 
   const handleViewProfile = () => {
-    alert('View profile functionality');
+    toast('Profiles in chat are coming soon.');
   };
 
   const handleSettings = () => {
-    alert('Settings functionality');
+    toast('Chat settings are coming soon.');
   };
 
   return (

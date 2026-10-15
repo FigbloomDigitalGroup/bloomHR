@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { Check, PartyPopper, Send } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -28,7 +29,7 @@ const SuccessPage = () => {
 
   const handleSendContract = () => {
     // Implement contract sending logic here
-    alert(`Contract link would be sent for employee ${employeeNumber}`);
+    toast(`Sending a contract link for ${employeeNumber} is coming soon.`);
   };
 
   if (isPageLoading) {

@@ -12,6 +12,7 @@ import {
   unknownPlaceholders,
 } from '../../lib/offers';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 // The company's offer letter templates: a title and a body with placeholders. The default one starts every new offer.
 
 type Draft = Pick<OfferTemplate, 'title' | 'body' | 'is_default' | 'active'> & { id: string | null };
@@ -46,7 +47,7 @@ export default function OfferTemplatesModal({ onClose }: { onClose: () => void }
   };
 
   const remove = async (t: OfferTemplate) => {
-    if (!window.confirm(`Delete the template “${t.title}”? Offers already written keep their text.`)) return;
+    if (!(await confirmDialog({ title: `Delete the template “${t.title}”?`, message: 'Offers already written keep their text.', confirmLabel: 'Delete', tone: 'danger' }))) return;
     try {
       await deleteOfferTemplate(t.id);
       await load();

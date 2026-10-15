@@ -6,6 +6,7 @@ import { companyApi, inviteLink, Invitation, INVITABLE_ROLES } from '../../lib/c
 import { sendInvitations, summariseInvites } from '../../lib/employeeInvite';
 import EmployeeNumberingCard from './EmployeeNumbering';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 const roleLabel = (role: string) => role.charAt(0) + role.slice(1).toLowerCase();
 
 const effectiveStatus = (inv: Invitation): { label: string; tone: StatusTone } => {
@@ -95,7 +96,7 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
   /** Sends every unused invitation again, one after another. Each gets a new link; the old links stop working. */
   const resendAll = async () => {
     if (due.length === 0) return;
-    if (!window.confirm(`Send ${due.length} invitation(s) again? Each person gets a new link, and their old link stops working.`)) return;
+    if (!(await confirmDialog({ title: `Send ${due.length} ${due.length === 1 ? 'invitation' : 'invitations'} again?`, message: 'Each person gets a new link, and their old link stops working.', confirmLabel: 'Send again' }))) return;
     setResending({ done: 0, total: due.length });
     const outcomes = await sendInvitations(
       due.map((inv) => ({ email: inv.email, role: inv.role })),

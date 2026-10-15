@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { ArrowRight, CircleNotch } from '@phosphor-icons/react';
 import { MfaError, sendMfaCode, verifyMfaCode, type TwoStepMethod } from '../lib/mfaApi';
+import AuthLayout from '../components/Auth/AuthLayout';
 
 // Two-step sign-in (FIG-834, FIG-658). The server makes the code, sends it (by email, or SMS where the company chose
 // it) and checks it; a right code is recorded against this sign-in on the server, which is what lets the app in. This
@@ -126,31 +128,27 @@ export default function MFAVerification() {
   const where = method === 'sms' ? 'texted' : 'emailed';
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-8 px-4 sm:px-6" style={{ background: 'linear-gradient(135deg, #022c22 0%, #065f46 50%, #4ade80 100%)' }}>
-      <div className="w-full max-w-md">
-        <div className="bg-white p-5 sm:p-8 rounded-2xl shadow-lg border border-gray-100">
-          <div className="flex justify-center mb-5">
-            <div className="p-4 rounded-full" style={{ background: 'linear-gradient(135deg, #022c22 0%, #4ade80 100%)' }}>
-              <img src="/bloom-mark.png" alt="Company Logo" className="h-10 w-10 sm:h-12 sm:w-12 object-contain" />
-            </div>
-          </div>
-
-          <h1 className="text-center text-2xl sm:text-3xl font-bold text-gray-900">Check your {method === 'sms' ? 'phone' : 'email'}</h1>
-          <p className="mt-2 text-center text-sm text-gray-600" role="status" aria-live="polite">
+    <AuthLayout>
+      <div className="space-y-8">
+        <div className="space-y-2">
+          <h2 className="text-3xl font-bold text-gray-900">Check your {method === 'sms' ? 'phone' : 'email'}</h2>
+          <p className="text-gray-500 text-xs font-medium" role="status" aria-live="polite">
             {destination
-              ? <>We {where} a 6-digit code to <span className="font-semibold text-gray-900 break-all">{destination}</span>. It expires in 10 minutes.</>
+              ? <>We {where} a 6-digit code to <span className="font-bold text-gray-900 break-all">{destination}</span>. It expires in 10 minutes.</>
               : sending ? 'Sending your code...' : 'Enter the 6-digit code we sent you.'}
           </p>
+        </div>
 
-          <form
-            className="mt-6 space-y-5"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void verify(codes.join(''));
-            }}
-          >
-            <fieldset className="flex justify-center gap-1.5 sm:gap-3">
-              <legend className="sr-only">Sign-in code</legend>
+        <form
+          className="space-y-6"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void verify(codes.join(''));
+          }}
+        >
+          <fieldset className="space-y-1.5">
+            <legend className="text-xs font-bold text-gray-500 ml-1 mb-1.5">Sign-in code</legend>
+            <div className="flex justify-between gap-2">
               {codes.map((digit, index) => (
                 <input
                   key={index}
@@ -166,44 +164,54 @@ export default function MFAVerification() {
                   onKeyDown={(e) => onKeyDown(index, e)}
                   autoFocus={index === 0}
                   disabled={busy || needsNewCode}
-                  className="w-10 h-12 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-semibold bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 shadow-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full min-w-0 h-14 text-center text-xl font-bold text-gray-900 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 hover:border-gray-300 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               ))}
-            </fieldset>
-
-            {error && (
-              <p className="m-0 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-center text-sm" role="alert">{error}</p>
-            )}
-            {notice && !error && <p className="m-0 text-center text-sm text-green-700">{notice}</p>}
-
-            <button
-              type="submit"
-              disabled={busy || needsNewCode || codes.some((c) => c === '')}
-              className="w-full flex justify-center py-3 px-4 rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-green-600 to-cyan-600 hover:from-green-700 hover:to-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {verifying ? 'Checking...' : 'Verify'}
-            </button>
-
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-between items-center gap-3 pt-2">
-              <button type="button" onClick={() => void backToLogin()} className="text-sm text-green-700 hover:text-green-600 font-medium">
-                Back to sign in
-              </button>
-              <button
-                type="button"
-                onClick={() => void send(true)}
-                disabled={sending || cooldown > 0}
-                className="text-sm text-green-700 hover:text-green-600 font-medium disabled:text-gray-400 disabled:cursor-not-allowed"
-              >
-                {sending ? 'Sending...' : cooldown > 0 ? `Send a new code in ${cooldown}s` : 'Send a new code'}
-              </button>
             </div>
-          </form>
+          </fieldset>
+
+          {error && (
+            <p className="m-0 p-3 bg-red-50 border border-red-100 text-red-700 rounded-lg text-xs font-medium" role="alert">{error}</p>
+          )}
+          {notice && !error && <p className="m-0 text-xs font-medium text-gray-700">{notice}</p>}
+
+          <button
+            type="submit"
+            disabled={busy || needsNewCode || codes.some((c) => c === '')}
+            className="w-full flex justify-center items-center gap-2 py-4 px-4 rounded-lg text-xs font-bold text-white shadow-lg transition-all bg-gray-900 hover:bg-gray-800 shadow-gray-900/20 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed"
+          >
+            {verifying ? (
+              <>
+                <CircleNotch size={20} className="animate-spin" />
+                <span>Checking...</span>
+              </>
+            ) : (
+              <>
+                <span>Verify</span>
+                <ArrowRight size={18} weight="bold" />
+              </>
+            )}
+          </button>
+        </form>
+
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-between items-center gap-3 pt-6 border-t border-gray-100">
+          <button type="button" onClick={() => void backToLogin()} className="text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors">
+            Back to sign in
+          </button>
+          <button
+            type="button"
+            onClick={() => void send(true)}
+            disabled={sending || cooldown > 0}
+            className="text-xs font-bold text-gray-900 underline decoration-gray-200 underline-offset-4 disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed"
+          >
+            {sending ? 'Sending...' : cooldown > 0 ? `Send a new code in ${cooldown}s` : 'Send a new code'}
+          </button>
         </div>
 
-        <p className="mt-4 text-center text-xs text-white/80">
+        <p className="text-center text-xs text-gray-400">
           {method === 'sms' ? 'No text? Check the number with your administrator.' : 'No email? Check your spam folder, or send a new code.'}
         </p>
       </div>
-    </div>
+    </AuthLayout>
   );
 }

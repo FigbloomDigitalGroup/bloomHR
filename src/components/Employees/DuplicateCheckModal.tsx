@@ -1,3 +1,4 @@
+import toast from 'react-hot-toast';
 import React, { useMemo, useState } from 'react';
 import { X, Mail, CreditCard, AlertTriangle, Users, ChevronDown, ChevronUp, Copy, Trash2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -92,7 +93,7 @@ const DuplicateCheckModal: React.FC<DuplicateCheckModalProps> = ({ isOpen, onClo
             onRefresh(); // Refresh the list
         } catch (err) {
             console.error('Error deleting employee:', err);
-            alert('Failed to delete employee');
+            toast.error('Failed to delete employee');
         } finally {
             setIsDeleting(false);
         }

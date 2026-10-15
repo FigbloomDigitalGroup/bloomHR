@@ -26,6 +26,7 @@ import { useJobGroups } from '../../hooks/useJobGroups';
 import JobGroupPicker from './JobGroupPicker';
 import { lockedPayFields } from '../../lib/jobGroups';
 
+import { confirmDialog } from '../../lib/confirmDialog';
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'SHIF Number'?: string | null;
   'NSSF Number'?: string | null;
@@ -264,7 +265,7 @@ const EditEmployeePage = () => {
   };
 
   const handleRemovePhoto = async () => {
-    if (!window.confirm('Remove this photo? The employee will be asked to upload a new one.')) return;
+    if (!(await confirmDialog({ title: 'Remove this photo?', message: 'The employee will be asked to upload a new one.', confirmLabel: 'Remove', tone: 'danger' }))) return;
     try {
       await removeEmployeePhoto(String(employee['Employee Number']));
       setPreviewImage(null);
