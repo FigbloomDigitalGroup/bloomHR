@@ -12,7 +12,7 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 import { DemoPayAllDialog, DemoPayButton } from './DemoPayments';
-import { demoPayLines, paymentProblems } from '../../lib/demoPayments';
+import { accountNameMatches, demoPayLines, paymentProblems } from '../../lib/demoPayments';
 
 const fetchSpy = vi.fn();
 
@@ -49,6 +49,21 @@ const RECORDS = [
 ];
 const lines = () => demoPayLines(RECORDS, EMPLOYEES);
 
+describe('accountNameMatches', () => {
+  const amina = { 'First Name': 'Amina', 'Middle Name': 'Njeri', 'Last Name': 'Wanjiru' };
+  it('accepts the name as banks write it: any order, case, punctuation, initials, with or without the middle name', () => {
+    for (const name of ['Amina Wanjiru', 'WANJIRU AMINA', 'Amina Njeri Wanjiru', 'Wanjiru, Amina N.', 'A. Njeri Wanjiru', 'Mrs Amina Wanjiru', 'amina  wanjiru'])
+      expect(accountNameMatches(name, amina)).toBe(true);
+  });
+  it('refuses another person, a single shared name, or an extra unknown name', () => {
+    for (const name of ['Peter Kamau', 'Amina Kamau', 'Amina', 'Amina Wanjiru Kamau', 'A. W.'])
+      expect(accountNameMatches(name, amina)).toBe(false);
+  });
+  it('works for someone with one name on record', () => {
+    expect(accountNameMatches('Wanjiru', { 'First Name': 'Wanjiru' })).toBe(true);
+  });
+});
+
 describe('paymentProblems', () => {
   it('passes complete details, with the account name matched without case or spaces', () => {
     expect(paymentProblems(EMPLOYEES[0])).toEqual([]);
@@ -56,7 +71,7 @@ describe('paymentProblems', () => {
   });
 
   it('flags an account in another name, a bad M-Pesa number and missing details', () => {
-    expect(paymentProblems(EMPLOYEES[2])).toEqual(["Account name doesn't match the employee's name"]);
+    expect(paymentProblems(EMPLOYEES[2])).toEqual([`Account name "Peter Kamau" doesn't match the employee's name "Otieno Wanjiru"`]);
     expect(paymentProblems(EMPLOYEES[3])).toEqual(['Phone number is not a valid M-Pesa number']);
     expect(paymentProblems({ 'Employee Number': 'E5', payment_method: 'Bank Transfer' })).toEqual(
       expect.arrayContaining(['KRA PIN', 'Bank', 'Bank branch', 'Account number', 'Account name'])
@@ -73,7 +88,7 @@ describe('DemoPayAllDialog', () => {
     expect(screen.getByText('M-Pesa')).toBeTruthy();
     expect(screen.getByText(/2 can't be paid until their details are fixed/)).toBeTruthy();
     expect(screen.getByText('Otieno Wanjiru')).toBeTruthy();
-    expect(screen.getByText(/Account name doesn't match/)).toBeTruthy();
+    expect(screen.getByText(/Account name "Peter Kamau" doesn't match/)).toBeTruthy();
     expect(screen.getByText('Wairimu Wanjiru')).toBeTruthy();
     expect(screen.getByText(/Demo mode/)).toBeTruthy();
   });
@@ -102,7 +117,7 @@ describe('DemoPayButton', () => {
     const onPaid = vi.fn();
     render(<DemoPayButton line={lines()[2]} paid={false} onPaid={onPaid} />);
     fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
-    expect(screen.getByRole('alert').textContent).toBe("Otieno Wanjiru can't be paid: Account name doesn't match the employee's name");
+    expect(screen.getByRole('alert').textContent).toBe(`Otieno Wanjiru can't be paid: Account name "Peter Kamau" doesn't match the employee's name "Otieno Wanjiru"`);
     expect(toasts.error).toHaveLength(1);
     act(() => {
       vi.advanceTimersByTime(5000);

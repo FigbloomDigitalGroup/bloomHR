@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import PipelineBoard from './PipelineBoard';
-import CandidateView, { CandidateActions } from './CandidateView';
+import CandidateView, { CandidateActions, isInterviewStage } from './CandidateView';
 import ScorecardForm from './ScorecardForm';
 import { Candidate, Interview, Stage, summariseScores } from './types';
 
@@ -248,6 +248,31 @@ describe('CandidateView', () => {
     fireEvent.change(screen.getByLabelText('Meeting code'), { target: { value: 'abc-123' } });
     fireEvent.click(screen.getByText('Link transcript'));
     await waitFor(() => expect(a.onLinkMeeting).toHaveBeenCalledWith('i1', 'abc-123'));
+  });
+
+  it('opens the Schedule interview form once a candidate is moved to the interview stage', async () => {
+    const a = actions();
+    view(a, { current_stage_id: 's-applied' });
+    expect(screen.queryByText('Cancel')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Move to stage'), { target: { value: 's-interview' } });
+    fireEvent.click(screen.getByText('Move'));
+    await waitFor(() => expect(a.onMove).toHaveBeenCalledWith('s-interview', ''));
+    expect(await screen.findByLabelText('Meeting link')).toBeTruthy();
+  });
+
+  it('can open with the Schedule interview form showing', () => {
+    render(
+      <CandidateView candidate={candidate({ current_stage_id: 's-interview' })} stages={stages} history={[]} interviews={[]} users={users}
+        currentUserId="u-me" startScheduling {...actions()} />
+    );
+    expect(screen.getByLabelText('Meeting link')).toBeTruthy();
+  });
+
+  it('knows which stages lead to an interview', () => {
+    expect(isInterviewStage({ name: 'Shortlisted', kind: 'open' })).toBe(true);
+    expect(isInterviewStage({ name: 'Interview', kind: 'open' })).toBe(true);
+    expect(isInterviewStage({ name: 'Screening', kind: 'open' })).toBe(false);
+    expect(isInterviewStage(undefined)).toBe(false);
   });
 
   it('schedules an interview with a panel', async () => {
