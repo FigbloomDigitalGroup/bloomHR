@@ -18,7 +18,8 @@ import {
   Key,
   MapPin,
   Building2,
-  Layers
+  Layers,
+  History
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { assertEmployeeForStaffLogin } from '../../lib/staffEmployee';
@@ -848,6 +849,22 @@ export default function UserRolesSettings() {
               <div>
                 <h2 className="m-0 text-[13.5px] font-bold text-ink">Job groups</h2>
                 <p className="m-0 text-[11.5px] text-muted-foreground">Job groups and what each pays: basic salary and allowances</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-subtle shrink-0" />
+          </Card>
+        </Link>
+
+        {/* Audit trail: its own page */}
+        <Link to="/settings/audit-trail" className="block">
+          <Card className="flex items-center justify-between gap-4 transition-colors hover:bg-secondary">
+            <div className="flex items-center gap-3">
+              <div className="w-[38px] h-[38px] shrink-0 rounded-tile flex items-center justify-center bg-green-tint text-brand">
+                <History className="w-[17px] h-[17px]" strokeWidth={1.8} />
+              </div>
+              <div>
+                <h2 className="m-0 text-[13.5px] font-bold text-ink">Audit trail</h2>
+                <p className="m-0 text-[11.5px] text-muted-foreground">Who changed what and when, across employees, payroll and settings</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-subtle shrink-0" />

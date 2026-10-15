@@ -51,6 +51,7 @@ const OnboardingPrint = lazy(() => import('./components/Onboarding/OnboardingPri
 const UserRolesSettings = lazy(() => import('./components/Settings/UserRole'));
 const CompanyProfilePage = lazy(() => import('./components/Settings/CompanyProfile'));
 const JobGroupsPage = lazy(() => import('./components/Settings/JobGroups'));
+const AuditTrailPage = lazy(() => import('./components/Settings/AuditTrail'));
 const SalaryAdvanceAdmin = lazy(() => import('./components/Settings/SalaryAdmin'));
 const IncidentReportsManagement = lazy(() => import('./components/Settings/IncidentReportsManagement'));
 const WarningModule = lazy(() => import('./components/Warning/StaffCheck'));
@@ -1128,6 +1129,15 @@ function App() {
                                   element={
                                     <AuthRoute>
                                       <CompanyProfilePage />
+                                    </AuthRoute>
+                                  }
+                                />
+                                {/* ADMIN and Settings; the page tells anyone else they may not see it */}
+                                <Route
+                                  path="/settings/audit-trail"
+                                  element={
+                                    <AuthRoute>
+                                      <AuditTrailPage />
                                     </AuthRoute>
                                   }
                                 />
