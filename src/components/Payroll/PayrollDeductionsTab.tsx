@@ -22,6 +22,8 @@ import {
 } from '../../lib/voluntaryDeductions';
 
 import { confirmDialog } from '../../lib/confirmDialog';
+import type { Rates } from '../../lib/statutoryCalc';
+import TaxTreatmentHint from './TaxTreatmentHint';
 // The Deductions tab (was the "Deductions" pop-up): the company's own deduction types (SACCO, welfare...) and what
 // each employee has taken from pay every month.
 
@@ -30,6 +32,8 @@ interface PayrollDeductionsTabProps {
   onChanged: () => void;
   /** how changes reach this month's payroll run, if it has one */
   draftNotice: string | null;
+  /** the statutory rates in force, so the tax hints can show caps in KSh */
+  rates?: Rates | null;
 }
 
 interface FormState {
@@ -63,7 +67,7 @@ const input = 'w-full px-2.5 py-1.5 rounded-tile border border-border bg-white t
 const label = 'block text-[10px] font-bold uppercase text-subtle mb-1';
 
 /** The company's voluntary deductions (SACCO, insurance, welfare...) and what each employee has taken every month. */
-export default function PayrollDeductionsTab({ onChanged, draftNotice }: PayrollDeductionsTabProps) {
+export default function PayrollDeductionsTab({ onChanged, draftNotice, rates }: PayrollDeductionsTabProps) {
   const { employees } = useEmployeeDirectory();
   const [types, setTypes] = useState<DeductionType[]>([]);
   const [deductions, setDeductions] = useState<EmployeeDeduction[]>([]);
@@ -263,6 +267,11 @@ export default function PayrollDeductionsTab({ onChanged, draftNotice }: Payroll
                 </button>
               </span>
             </div>
+            {newType.trim() && (
+              <div className="mt-2 max-w-xl">
+                <TaxTreatmentHint kind="deduction" name={newType} rates={rates} />
+              </div>
+            )}
           </section>
 
           {/* bulk upload */}
@@ -383,6 +392,9 @@ export default function PayrollDeductionsTab({ onChanged, draftNotice }: Payroll
                 </div>
               </div>
               <p className="text-[11px] text-muted-foreground">Leave From empty to start now, and Until empty to keep taking it until removed.</p>
+              {typeById.get(form.deduction_type_id) && (
+                <TaxTreatmentHint kind="deduction" name={typeById.get(form.deduction_type_id)!.name} rates={rates} debounceMs={0} />
+              )}
               <div className="flex gap-2">
                 <button type="button" className={primary} onClick={handleSave} disabled={busy}>
                   Save

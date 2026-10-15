@@ -204,3 +204,110 @@ describe('asking the model', () => {
     expect(state.modelCalls).toHaveLength(1);
   });
 });
+
+describe('tax_treatment: how a pay item is taxed (a suggestion only)', () => {
+  const askTax = (token: string | null, body: Record<string, unknown>) =>
+    fetch(`${base}/tax-treatment`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(body),
+    });
+  const item = { kind: 'deduction', name: 'Gym membership' };
+  const good = {
+    treatment: 'not_taxable',
+    explanation: 'Taken from pay after tax.',
+    legal_basis: 'KRA guidance',
+    confidence: 'medium',
+    caveats: ['Check with KRA.'],
+  };
+  const replyWith = (content: unknown) => {
+    state.modelReply = { ok: true, status: 200, json: { choices: [{ message: { content } }], usage: { total_tokens: 9 } } };
+  };
+
+  beforeEach(() => {
+    state.permissions[0] = { tenant_id: TENANT, role_name: 'HR', permissions: ['ai-assistant', 'payroll'] };
+    replyWith(JSON.stringify(good));
+  });
+
+  it('needs a signed-in caller with payroll', async () => {
+    expect((await askTax(null, item)).status).toBe(401);
+    expect((await askTax(who('staff'), item)).status).toBe(403);
+    expect(state.modelCalls).toHaveLength(0);
+    expect((await askTax(who('hr'), item)).status).toBe(200);
+    expect((await askTax(who('admin'), item)).status).toBe(200);
+  });
+
+  it('sends a fixed Kenyan-law instruction and the item as data, asking for JSON', async () => {
+    const res = await askTax(who('hr'), { ...item, name: '  Gym membership ', description: 'Paid to a gym' });
+    expect(await res.json()).toEqual(good);
+    const { body } = state.modelCalls[0];
+    expect(body.response_format).toEqual({ type: 'json_object' });
+    expect(body.max_completion_tokens).toBe(600);
+    expect(body.messages).toHaveLength(2);
+    expect(body.messages[0].role).toBe('system');
+    expect(body.messages[0].content).toContain('Kenyan law');
+    expect(body.messages[0].content).toContain('"depends"');
+    expect(body.messages[0].content).toContain('Never invent section numbers');
+    expect(JSON.parse(body.messages[1].content)).toEqual({ kind: 'deduction', name: 'Gym membership', description: 'Paid to a gym' });
+  });
+
+  it('rejects bad input before calling the model', async () => {
+    const admin = who('admin');
+    expect((await askTax(admin, { ...item, kind: 'salary' })).status).toBe(400);
+    expect((await askTax(admin, { ...item, name: '' })).status).toBe(400);
+    expect((await askTax(admin, { ...item, name: 'x' })).status).toBe(400);
+    expect((await askTax(admin, { ...item, name: 42 })).status).toBe(400);
+    expect((await askTax(admin, { ...item, name: 'x'.repeat(101) })).status).toBe(400);
+    expect((await askTax(admin, { ...item, description: 'x'.repeat(501) })).status).toBe(400);
+    expect((await askTax(admin, { ...item, description: {} })).status).toBe(400);
+    expect(state.modelCalls).toHaveLength(0);
+  });
+
+  it('tidies a valid answer: case, spacing, code fences and missing caveats', async () => {
+    replyWith(
+      '```json\n' +
+        JSON.stringify({ ...good, treatment: ' Depends ', confidence: 'LOW', explanation: 'It  depends\non use.', caveats: undefined }) +
+        '\n```'
+    );
+    expect(await (await askTax(who('admin'), item)).json()).toEqual({
+      ...good,
+      treatment: 'depends',
+      confidence: 'low',
+      explanation: 'It depends on use.',
+      caveats: [],
+    });
+  });
+
+  it.each([
+    ['not JSON', 'It is taxable.'],
+    ['an unknown treatment', JSON.stringify({ ...good, treatment: 'exempt' })],
+    ['an unknown confidence', JSON.stringify({ ...good, confidence: 'certain' })],
+    ['no explanation', JSON.stringify({ ...good, explanation: '' })],
+    ['no legal basis', JSON.stringify({ ...good, legal_basis: undefined })],
+    ['caveats that are not strings', JSON.stringify({ ...good, caveats: [{ x: 1 }] })],
+    ['an array', JSON.stringify([good])],
+  ])('rejects an answer with %s', async (_, content) => {
+    replyWith(content);
+    const res = await askTax(who('admin'), item);
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'The AI service gave an unexpected answer' });
+  });
+
+  it("does not pass the model's error text on", async () => {
+    state.modelReply = { ok: false, status: 500, json: {} };
+    const res = await askTax(who('admin'), item);
+    expect(res.status).toBe(502);
+    expect(JSON.stringify(await res.json())).not.toContain('secret internal detail');
+  });
+
+  it('has its own hourly budget of 60', async () => {
+    const admin = who('admin');
+    expect((await askTax(admin, item)).status).toBe(200);
+    expect(state.budgetCalls).toEqual([
+      { p_tenant: TENANT, p_bucket: `ai:tax_treatment:${admin}`, p_cost: 1, p_limit: 60, p_window_seconds: 3600 },
+    ]);
+    state.budgets.set(`${TENANT}/ai:tax_treatment:${admin}`, 60);
+    expect((await askTax(admin, item)).status).toBe(429);
+    expect(state.modelCalls).toHaveLength(1);
+  });
+});
