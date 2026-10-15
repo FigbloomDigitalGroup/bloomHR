@@ -1,6 +1,7 @@
 import type { EmployeeRecord } from './profileCompleteness';
 import { paymentKind } from './paymentMethods';
 import { employeeInputs, statutoryFor } from './statutoryCalc';
+import { nonTaxableEarningsOf, pensionableAdjustmentOf } from './earnings';
 import { isValidIdNumber, isValidKraPin, isValidNssfNumber, isValidOnboardingPhone, isValidShaNumber } from './onboardingValidation';
 
 // Upload files built from a month's approved payroll run: the KRA PAYE (iTax P10), SHA and NSSF returns, and the
@@ -87,8 +88,15 @@ const problemsOf = (ls: Line[], check: (e: EmployeeRecord) => string[]) =>
 
 const need = (checks: [string, boolean][]) => checks.filter(([, ok]) => !ok).map(([label]) => label);
 
-/** Cash pay as the returns report it: gross pay less the non-taxable per diem (what SHIF, NSSF and AHL are worked on). */
-export const cashPayOf = (payslip: Payslip) => Math.max(0, num(payslip.gross_pay) - num(payslip.per_diem));
+/**
+ * Cash pay as the returns report it: gross pay less the non-taxable per diem and any earnings that are not taxed
+ * (lib/earnings). What SHIF, NSSF and AHL are worked on, unless the payslip has untaxed or non-pensionable earnings.
+ */
+export const cashPayOf = (payslip: Payslip) =>
+  Math.max(0, num(payslip.gross_pay) - num(payslip.per_diem) - nonTaxableEarningsOf(payslip));
+
+/** The pay NSSF was worked out on: cash pay, adjusted for earnings that are pensionable but untaxed, or the reverse. */
+export const pensionablePayOf = (payslip: Payslip) => Math.max(0, cashPayOf(payslip) + pensionableAdjustmentOf(payslip));
 
 /**
  * The P10 figures for one payslip: SHIF, NSSF, AHL and PAYE as the payslip has them, and taxable pay worked out the
@@ -172,7 +180,7 @@ export function nssfFile(payslips: Payslip[], employees: EmployeeRecord[]): Expo
     headers: NSSF_HEADERS,
     rows: ls.map(({ payslip, employee: e }) => [
       text(e['Payroll Number']), text(e['Last Name']), [e['First Name'], e['Middle Name']].map(text).filter(Boolean).join(' '),
-      text(e['ID Number']), text(e['Tax PIN']), text(e['NSSF Number']), amount(cashPayOf(payslip)), amount(num(e['nssf_voluntary_contribution'])),
+      text(e['ID Number']), text(e['Tax PIN']), text(e['NSSF Number']), amount(pensionablePayOf(payslip)), amount(num(e['nssf_voluntary_contribution'])),
     ]),
     problems: problemsOf(ls, (e) =>
       need([

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { payslipDeductionLines } from '../../lib/voluntaryDeductions';
+import { nonTaxableEarningsOf, payslipEarningLines } from '../../lib/earnings';
 import html2pdf from 'html2pdf.js';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -136,10 +137,11 @@ const savedPayslipValues = (saved: Record<string, any>) => {
     welfareDeduction: n(saved.welfare_deduction),
     otherDeductions: n(saved.other_deductions),
     deductionLines: payslipDeductionLines(saved),
+    earningLines: payslipEarningLines(saved),
     totalDeductions: n(saved.total_deductions),
     netPay: n(saved.net_pay),
-    taxableGross: grossPay - perDiem,
-    taxableIncomeForPAYE: grossPay - perDiem - nssfDeduction - housingLevy,
+    taxableGross: grossPay - perDiem - nonTaxableEarningsOf(saved),
+    taxableIncomeForPAYE: grossPay - perDiem - nonTaxableEarningsOf(saved) - nssfDeduction - housingLevy,
     employeeId: saved.employee_id
   };
 };
@@ -309,6 +311,7 @@ const calculatePayrollValues = (employee, overrideStatutoryChecks = true, salary
     welfareDeduction,
     otherDeductions,
     deductionLines: payslipDeductionLines({ loan_deduction: loanDeduction, welfare_deduction: welfareDeduction, other_deductions: otherDeductions }),
+    earningLines: payslipEarningLines({ commission, bonus }),
     totalDeductions,
     netPay,
     taxableGross,
@@ -549,8 +552,9 @@ const PayslipModal = ({
                     <div className="flex justify-between"><span>Medical</span><span className="font-semibold">KSh {calculated.medicalAllowance.toLocaleString()}</span></div>
                     <div className="flex justify-between"><span>Other</span><span className="font-semibold">KSh {calculated.otherAllowances.toLocaleString()}</span></div>
                     <div className="flex justify-between"><span>Overtime</span><span className="font-semibold">KSh {calculated.overtimePay.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Commission</span><span className="font-semibold">KSh {calculated.commission.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Bonus</span><span className="font-semibold">KSh {calculated.bonus.toLocaleString()}</span></div>
+                    {calculated.earningLines.map((line, i) => (
+                      <div key={`${line.name}-${i}`} className="flex justify-between"><span>{line.name}{line.taxable ? '' : ' (not taxed)'}</span><span className="font-semibold">KSh {line.amount.toLocaleString()}</span></div>
+                    ))}
                     <div className="flex justify-between bg-gray-50 p-1 border border-gray-200 mt-2"><span>Per diem</span><span className="font-bold">KSh {calculated.perDiem.toLocaleString()}</span></div>
                   </div>
                 </div>
