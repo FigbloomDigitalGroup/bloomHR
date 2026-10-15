@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+// the table plugin is called directly: since jspdf-autotable 5 importing it no longer adds doc.autoTable
+import { autoTable } from 'jspdf-autotable';
 import { earnedToDate } from './leaveAccrual';
 import { toCsv } from './payrollExports';
 import type { DeductionItem } from './voluntaryDeductions';
@@ -190,7 +191,7 @@ export function downloadStatementPdf(heading: StatementHeading, lines: FinalDues
     40,
     74
   );
-  (doc as unknown as { autoTable: (o: Record<string, unknown>) => void }).autoTable({
+  autoTable(doc, {
     startY: 88,
     head: [STATEMENT_HEADERS as unknown as string[]],
     body: statementRows(lines),

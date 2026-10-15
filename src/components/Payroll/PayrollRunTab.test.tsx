@@ -22,7 +22,7 @@ const record = {
 };
 
 const props = (demoPay: Partial<Parameters<typeof PayrollRunTab>[0]['demoPay']> = {}, run: PayrollRun | null = null) => ({
-  periodLabel: 'October 2026', monthRun: run, runLoading: false, runBusy: false,
+  periodLabel: 'October 2026', onDownloadPdf: vi.fn(), monthRun: run, runLoading: false, runBusy: false,
   onStart: vi.fn(), onApprove: vi.fn(), onReopen: vi.fn(), onMarkPaid: vi.fn(), onDiscard: vi.fn(),
   onPayroll: [], onOpenFiles: vi.fn(), userRole: 'admin', handleBulkMpesaPayment: vi.fn(),
   onOpenSpreadsheet: vi.fn(), onOpenApprovals: vi.fn(), pendingCount: 0,
@@ -67,6 +67,13 @@ describe('PayrollRunTab', () => {
     fireEvent.click(screen.getByText('Pay all employees'));
     expect(p.demoPay.onPayAll).toHaveBeenCalledOnce();
     expect(toasts.error).toEqual([]);
+  });
+
+  it('saves the listed payslips as a PDF from the list header', () => {
+    const p = props();
+    render(<PayrollRunTab {...p} />);
+    fireEvent.click(screen.getByRole('button', { name: /Download PDF/ }));
+    expect(p.onDownloadPdf).toHaveBeenCalledOnce();
   });
 
   it('hides the Pay buttons when demo paying is off', () => {
