@@ -25,7 +25,7 @@ import {
   Mails,
   ShieldHalf,
   HeartHandshake,
-  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature
+  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature, History
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useMyPreferences } from '../../hooks/useMyPreferences';
@@ -90,6 +90,7 @@ const menuGroups = [
       { id: 'incident-reports', label: 'Incidents', icon: ShieldAlert, path: '/incident-reports', permission: 'incident-reports' },
       { id: 'settings', label: 'Settings', icon: Settings, path: '/settings', permission: 'settings' },
       { id: 'departments', label: 'Departments', icon: Building2, path: '/departments', permission: 'employees' },
+      { id: 'audit-trail', label: 'Audit Trail', icon: History, path: '/settings/audit-trail', permission: 'settings' },
       { id: 'role-permissions', label: 'Role Permissions', icon: ShieldHalf, path: '/role-permissions', permission: 'role-permissions' },
       { id: 'appearance', label: 'Appearance', icon: Palette, path: '/appearance' },
     ]
