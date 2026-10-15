@@ -1,6 +1,6 @@
 // @vitest-environment node
 //
-// The FAVOR FARM, Kajiado demo seeds (scripts/seed_favour_farm_*.sql) run against the real schema, stop on a second run, and
+// The FAVOR FARM demo seeds (scripts/seed_favour_farm_*.sql) run against the real schema, stop on a second run, and
 // their clean-up removes what they added.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -25,8 +25,8 @@ const count = async (sql: string) => Number((await db.query<{ n: number }>(sql))
 beforeAll(async () => {
   db = await bootDb();
   await db.exec(`
-    insert into tenants (id, name, slug) values ('${FARM}', 'FAVOR FARM, Kajiado', 'favor-farm-kajiado'),
-      ('${OTHER}', 'FAVOR FARM', 'favor-farm');
+    insert into tenants (id, name, slug) values ('${FARM}', 'FAVOR FARM', 'favor-farm'),
+      ('${OTHER}', 'FAVOR FARM, Kajiado', 'favor-farm-kajiado');
     insert into auth.users (id, email) values ('${ADMIN}', 'admin@favorfarm.co.ke'), ('${HR}', 'hr@favorfarm.co.ke');
     insert into memberships (user_id, tenant_id, role) values ('${ADMIN}', '${FARM}', 'ADMIN'), ('${HR}', '${FARM}', 'HR');
   `);

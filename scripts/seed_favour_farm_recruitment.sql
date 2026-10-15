@@ -1,8 +1,8 @@
--- Demo recruitment data for FAVOR FARM, Kajiado: 3 jobs, 12 candidates across the pipeline, interviews (done, upcoming,
+-- Demo recruitment data for FAVOR FARM: 3 jobs, 12 candidates across the pipeline, interviews (done, upcoming,
 -- cancelled, no-show) with panels, scorecards and a transcript.
 --
 -- Run once in the Supabase SQL editor (it runs as postgres, so RLS is skipped). It is not a migration: the data is
--- for this one company's demo. It finds the company by its slug, favor-farm-kajiado, and stops if it isn't found or the demo jobs are already there.
+-- for this one company's demo. It finds the company by its slug, favor-farm (not "FAVOR FARM, Kajiado"), and stops if it isn't found or the demo jobs are already there.
 --   * jobs are marked posted_by = 'demo-seed' and kept off the public careers page (is_public = false)
 --   * candidates are marked source = 'demo-seed', with @example.com emails, so nothing reaches a real person
 --   * the panel is up to 3 people who can already sign in to the company; with nobody, interviews have no panel
@@ -25,9 +25,9 @@ declare
   applied timestamptz;
   n int := 0;
 begin
-  select id into t from public.tenants where slug = 'favor-farm-kajiado';
+  select id into t from public.tenants where slug = 'favor-farm';
   if t is null then
-    raise exception 'No company with the slug favor-farm-kajiado (FAVOR FARM, Kajiado) found';
+    raise exception 'No company with the slug favor-farm (FAVOR FARM) found';
   end if;
   if exists (select 1 from public.job_postings where tenant_id = t and posted_by = 'demo-seed') then
     raise notice 'Demo recruitment data is already there for this company; nothing done';
@@ -205,6 +205,6 @@ end $$;
 -- To remove the demo data (candidates first; their interviews, scores and history go with them):
 -- ---------------------------------------------------------------------------------------------
 -- delete from public.job_applications a using public.tenants t
---   where a.tenant_id = t.id and t.slug = 'favor-farm-kajiado' and a.source = 'demo-seed';
+--   where a.tenant_id = t.id and t.slug = 'favor-farm' and a.source = 'demo-seed';
 -- delete from public.job_postings p using public.tenants t
---   where p.tenant_id = t.id and t.slug = 'favor-farm-kajiado' and p.posted_by = 'demo-seed';
+--   where p.tenant_id = t.id and t.slug = 'favor-farm' and p.posted_by = 'demo-seed';

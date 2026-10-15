@@ -1,9 +1,9 @@
--- Demo payroll data for FAVOR FARM, Kajiado: job groups and their pay, 15 staff ready for payroll (approved, with KRA PIN,
+-- Demo payroll data for FAVOR FARM: job groups and their pay, 15 staff ready for payroll (approved, with KRA PIN,
 -- SHIF and NSSF numbers, M-Pesa or bank details), SACCO / welfare / loan deductions, a salary advance, and this
 -- month's harvesting on the piece-rate screens.
 --
 -- Run once in the Supabase SQL editor (it runs as postgres, so RLS is skipped). It is not a migration: the data is
--- for this one company's demo. It finds the company by its slug, favor-farm-kajiado, and stops if it isn't found or the demo staff are already there.
+-- for this one company's demo. It finds the company by its slug, favor-farm (not "FAVOR FARM, Kajiado"), and stops if it isn't found or the demo staff are already there.
 -- Nothing is paid here: open Payroll and press Start for this month to run it live.
 --   * staff have work emails @demo.favorfarm.example, which is how the clean-up finds them; no invitation is sent
 --   * KRA PINs, SHIF, NSSF, ID and account numbers are made up (A99... / CR99... / 99...), never real people's
@@ -26,9 +26,9 @@ declare
   harvesters text[] := '{}';
   num text;
 begin
-  select id into t from public.tenants where slug = 'favor-farm-kajiado';
+  select id into t from public.tenants where slug = 'favor-farm';
   if t is null then
-    raise exception 'No company with the slug favor-farm-kajiado (FAVOR FARM, Kajiado) found';
+    raise exception 'No company with the slug favor-farm (FAVOR FARM) found';
   end if;
   if exists (select 1 from public.employees where tenant_id = t and "Work Email" ilike '%@demo.favorfarm.example') then
     raise notice 'Demo payroll data is already there for this company; nothing done';
@@ -151,7 +151,7 @@ end $$;
 -- ---------------------------------------------------------------------------------------------
 -- create temp table demo_staff as select e.tenant_id, e."Employee Number" as num from public.employees e
 --   join public.tenants t on t.id = e.tenant_id
---   where t.slug = 'favor-farm-kajiado' and e."Work Email" ilike '%@demo.favorfarm.example';
+--   where t.slug = 'favor-farm' and e."Work Email" ilike '%@demo.favorfarm.example';
 -- delete from public.salary_history h using demo_staff s where h.tenant_id = s.tenant_id and h.employee_id = s.num;
 -- delete from public.work_entries w using demo_staff s where w.tenant_id = s.tenant_id and w.employee_number = s.num;
 -- delete from public.employee_deductions x using demo_staff s where x.tenant_id = s.tenant_id and x.employee_number = s.num;
