@@ -21,7 +21,8 @@ import {
   Warning as PhWarning,
   ClipboardText as PhClipboardText,
   ListChecks as PhListChecks,
-  SignOut as PhSignOut
+  SignOut as PhSignOut,
+  Target as PhTarget
 } from '@phosphor-icons/react';
 
 // Keep Lucide icons for UI elements only
@@ -57,6 +58,7 @@ import { supabase } from '../../lib/supabase';
 import { loadCompanyIdentity } from '../../lib/companyProfile';
 import { useNavigate } from 'react-router-dom';
 import TrainingModule from './Training';
+import MyKpis from '../Perfomance/kpis/MyKpis';
 import Profile from './Profile';
 import { ChatLayout } from '../chat/ChatLayout';
 import { useOnlinePeople } from '../chat/lib/presence';
@@ -1166,6 +1168,7 @@ const staffMenuGroups: MenuGroup[] = [
   {
     title: "Work & Development",
     items: [
+      { id: 'my-kpis', label: 'My KPIs', icon: PhTarget },
       { id: 'training', label: 'Training', icon: PhGraduationCap },
       { id: 'job-applications', label: 'Job Opportunities', icon: PhTrendUp },
       { id: 'incident-report', label: 'Report Incident', icon: PhShieldCheck },
@@ -1922,6 +1925,7 @@ const StaffPortal = () => {
               {activeTab === 'payslips' && <PayslipViewer />}
               {activeTab === 'loan' && <LoanRequest />}
               {activeTab === 'training' && <TrainingModule />}
+              {activeTab === 'my-kpis' && <MyKpis />}
               {activeTab === 'leave' && <LeaveApplicationForm />}
               {activeTab === 'leave-history' && <LeaveApplicationsList />}
               {activeTab === 'contract' && <MyContract />}
