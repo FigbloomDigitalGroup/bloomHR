@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import ShowPasswordButton from '../components/UI/ShowPasswordButton';
 import { Check, X, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
+import AuthShell, { AuthButton } from '../components/Company/AuthShell';
 
 const UpdatePasswordPage = () => {
   const [password, setPassword] = useState('');
@@ -83,157 +84,127 @@ const UpdatePasswordPage = () => {
     });
   };
 
-  const bgStyle = { background: 'linear-gradient(135deg, #022c22 0%, #065f46 50%, #4ade80 100%)' };
-
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={bgStyle}>
-        <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-10 max-w-md w-full text-center border border-white/10">
-          <div className="flex justify-center mb-6">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-              <CheckCircle2 className="h-10 w-10 text-green-600" />
-            </div>
+      <AuthShell
+        title="Password updated"
+        subtitle={backToInvite
+          ? 'Your password has been updated. Sign in on your invitation to join the company.'
+          : 'Your password has been updated. You can now sign in with your new password.'}
+      >
+        <div className="space-y-6">
+          <div className="flex items-center gap-3 p-4 rounded-lg bg-gray-50 border border-gray-200">
+            <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+            <span className="text-xs font-medium text-gray-700">Use your new password from now on.</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Password Updated!</h1>
-          <p className="text-sm text-gray-500 mb-8">
-            {backToInvite
-              ? 'Your password has been updated. Sign in on your invitation to join the company.'
-              : 'Your password has been successfully updated. You can now sign in with your new credentials.'}
-          </p>
-          <button
-            onClick={() => navigate(backToInvite ?? '/login')}
-            className="w-full py-3 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 transition-all shadow-lg shadow-green-100"
-          >
-            {backToInvite ? 'Back to your invitation' : 'Sign In Now'}
-          </button>
+          <AuthButton onClick={() => navigate(backToInvite ?? '/login')}>
+            {backToInvite ? 'Back to your invitation' : 'Sign in'}
+          </AuthButton>
         </div>
-      </div>
+      </AuthShell>
     );
   }
 
   if (isValidating) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center" style={bgStyle}>
-        <Loader2 className="animate-spin h-10 w-10 text-white mb-4" />
-        <p className="text-sm font-semibold text-white/70 uppercase tracking-widest">Securing Session...</p>
-      </div>
+      <AuthShell title="Checking your link" subtitle="One moment while we check your reset link.">
+        <div className="flex justify-center py-6">
+          <Loader2 className="animate-spin h-8 w-8 text-gray-400" />
+        </div>
+      </AuthShell>
     );
   }
 
   if (!isValidSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={bgStyle}>
-        <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-10 max-w-md w-full text-center border border-white/10">
-          <div className="flex justify-center mb-6">
-            <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center">
-              <X className="h-10 w-10 text-red-500" />
-            </div>
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Link Expired</h2>
-          <p className="text-sm text-gray-500 mb-8">Your security link may have expired or was already used. Please request a new one from the login page.</p>
-          <button
-            onClick={() => navigate('/login')}
-            className="flex items-center justify-center gap-2 mx-auto text-sm text-green-600 font-semibold hover:text-green-700 transition-colors"
-          >
-            <ArrowLeft size={16} /> Back to Login
-          </button>
-        </div>
-      </div>
+      <AuthShell
+        title="Link expired"
+        subtitle="Your reset link may have expired or was already used. Ask for a new one from the sign-in page."
+      >
+        <AuthButton onClick={() => navigate('/login')}>
+          <ArrowLeft size={16} /> Back to sign in
+        </AuthButton>
+      </AuthShell>
     );
   }
 
   const allMet = Object.values(passwordStrength).every(v => v);
   const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
+  const input = 'block w-full px-4 py-3 pr-11 bg-gray-50 border rounded-lg text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 transition-all hover:border-gray-300';
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={bgStyle}>
-      <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full border border-white/10">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <div className="p-3 rounded-full" style={{ background: 'linear-gradient(135deg, #022c22 0%, #4ade80 100%)' }}>
-              <img src="/bloom-mark.png" alt="Logo" className="h-10 w-10 object-contain" />
-            </div>
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900">Set New Password</h2>
-          <p className="text-sm text-gray-500 mt-1">Create a strong, secure password for your account</p>
-        </div>
-
-        <form onSubmit={handlePasswordUpdate} className="space-y-4">
-          {/* New Password */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">New password</label>
-            <div className="relative">
+    <AuthShell title="Set a new password" subtitle="Choose a strong password for your account.">
+      <form onSubmit={handlePasswordUpdate} className="space-y-6">
+        <div className="space-y-1.5">
+          <label htmlFor="new-password" className="block text-xs font-bold text-gray-500 ml-1">New password</label>
+          <div className="relative">
             <input
+              id="new-password"
               type={showPassword ? 'text' : 'password'}
               placeholder="Enter new password"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none text-sm transition-all bg-gray-50 focus:bg-white"
+              autoComplete="new-password"
+              className={`${input} border-gray-200 focus:border-gray-900 focus:ring-gray-900`}
               value={password}
               autoFocus
               onChange={(e) => { setPassword(e.target.value); validate(e.target.value); }}
               required
             />
             <ShowPasswordButton shown={showPassword} onToggle={() => setShowPassword(!showPassword)} />
-            </div>
           </div>
+        </div>
 
-          {/* Strength checker */}
-          {password.length > 0 && (
-            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-1.5">
-              <p className="text-xs font-semibold text-gray-600 mb-2">Password requirements:</p>
-              <CheckRow met={passwordStrength.minLength} label="At least 8 characters" />
-              <CheckRow met={passwordStrength.hasUppercase} label="One uppercase letter (A–Z)" />
-              <CheckRow met={passwordStrength.hasLowercase} label="One lowercase letter (a–z)" />
-              <CheckRow met={passwordStrength.hasNumber} label="At least one number" />
-              <CheckRow met={passwordStrength.hasSpecial} label="One special character (!@#...)" />
-            </div>
-          )}
+        {password.length > 0 && (
+          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-1.5">
+            <p className="text-xs font-bold text-gray-500 mb-2">Your password needs</p>
+            <CheckRow met={passwordStrength.minLength} label="At least 8 characters" />
+            <CheckRow met={passwordStrength.hasUppercase} label="One uppercase letter (A–Z)" />
+            <CheckRow met={passwordStrength.hasLowercase} label="One lowercase letter (a–z)" />
+            <CheckRow met={passwordStrength.hasNumber} label="At least one number" />
+            <CheckRow met={passwordStrength.hasSpecial} label="One special character (!@#...)" />
+          </div>
+        )}
 
-          {/* Confirm Password */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">Confirm password</label>
-            <div className="relative">
+        <div className="space-y-1.5">
+          <label htmlFor="confirm-password" className="block text-xs font-bold text-gray-500 ml-1">Confirm password</label>
+          <div className="relative">
             <input
+              id="confirm-password"
               type={showConfirm ? 'text' : 'password'}
               placeholder="Re-enter your new password"
-              className={`w-full px-4 py-3 border rounded-xl focus:ring-2 outline-none text-sm transition-all bg-gray-50 focus:bg-white ${
+              autoComplete="new-password"
+              className={`${input} ${
                 passwordsMatch
-                  ? 'border-green-400 focus:ring-green-500 focus:border-green-500'
+                  ? 'border-green-400 focus:border-green-600 focus:ring-green-600'
                   : confirmPassword && !passwordsMatch
-                  ? 'border-red-300 focus:ring-red-400 focus:border-red-400'
-                  : 'border-gray-200 focus:ring-green-500 focus:border-green-500'
+                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                    : 'border-gray-200 focus:border-gray-900 focus:ring-gray-900'
               }`}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
             />
             <ShowPasswordButton shown={showConfirm} onToggle={() => setShowConfirm(!showConfirm)} />
-            </div>
-            {confirmPassword.length > 0 && (
-              <p className={`text-xs mt-1.5 flex items-center gap-1 font-medium ${passwordsMatch ? 'text-green-600' : 'text-red-500'}`}>
-                {passwordsMatch ? <Check size={12} /> : <X size={12} />}
-                {passwordsMatch ? 'Passwords match' : 'Passwords do not match'}
-              </p>
-            )}
           </div>
+          {confirmPassword.length > 0 && (
+            <p className={`text-xs ml-1 flex items-center gap-1 font-medium ${passwordsMatch ? 'text-green-600' : 'text-red-600'}`}>
+              {passwordsMatch ? <Check size={12} /> : <X size={12} />}
+              {passwordsMatch ? 'Passwords match' : 'Passwords do not match'}
+            </p>
+          )}
+        </div>
 
-          <button
-            type="submit"
-            disabled={loading || !allMet || !passwordsMatch}
-            className="w-full py-3 bg-green-600 text-white rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-green-100 mt-2"
-          >
-            {loading ? 'Updating...' : 'Update Password'}
-          </button>
-        </form>
-      </div>
-    </div>
+        <AuthButton type="submit" disabled={loading || !allMet || !passwordsMatch}>
+          {loading ? 'Updating...' : 'Update password'}
+        </AuthButton>
+      </form>
+    </AuthShell>
   );
 };
 
 const CheckRow = ({ met, label }: { met: boolean; label: string }) => (
   <div className={`flex items-center gap-2.5 text-xs font-medium ${met ? 'text-green-600' : 'text-gray-400'}`}>
     {met
-      ? <Check size={13} className="text-green-500 flex-shrink-0" />
+      ? <Check size={13} className="text-green-600 flex-shrink-0" />
       : <div className="w-3.5 h-3.5 rounded-full border-2 border-gray-300 flex-shrink-0" />}
     {label}
   </div>
