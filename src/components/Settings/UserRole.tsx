@@ -32,6 +32,7 @@ import EmployeeNumberingCard from './EmployeeNumbering';
 import ApprovalWorkflowsCard from './ApprovalWorkflows';
 import TwoStepSignInCard from './TwoStepSignIn';
 import CareersSettingsCard from './CareersSettings';
+import LoanSettingsCard from '../Loans/LoanSettingsCard';
 
 import { confirmDialog } from '../../lib/confirmDialog';
 // Role definitions
@@ -857,6 +858,9 @@ export default function UserRolesSettings() {
         <EmployeeNumberingCard className="" />
 
         <ApprovalWorkflowsCard />
+
+        {/* staff loans: interest rate, terms and loan types */}
+        <LoanSettingsCard />
 
         {/* the company's careers page, embed and API (FIG-838) */}
         <CareersSettingsCard />

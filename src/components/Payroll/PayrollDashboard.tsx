@@ -52,6 +52,8 @@ import { advanceDeductionFor } from "../../lib/salaryAdvance";
 import { loadCompanyIdentity } from "../../lib/companyProfile";
 import { useNavigate } from "react-router-dom";
 import { deductionsForPeriod, loadDeductionSetup, totalOf } from "../../lib/voluntaryDeductions";
+import { loanDeductionsFor } from "../../lib/loans";
+import { loadPayrollLoans } from "../../lib/loansApi";
 import { checkSMSBalance, formatPhoneNumber, sendSMSWithRetry, smsTemplates } from "../../lib/payrollSms";
 import BulkSalaryHistoryUpload from "./BulkSalaryHistoryUpload";
 import {
@@ -914,6 +916,13 @@ export default function PayrollDashboard() {
         // showing (and letting someone save) payslips without them
         const deductionSetup = await loadDeductionSetup();
         const voluntaryByEmployee = deductionsForPeriod(deductionSetup.types, deductionSetup.deductions, actualPeriod);
+        // disbursed staff loans and what each has repaid: this month's instalment (and any shortfall carried from
+        // earlier months) comes off pay, never more than the pay left (src/lib/loans.ts)
+        const payrollLoans = await loadPayrollLoans().catch((err) => {
+          // a database without the loans tables yet (migration 20261016700000): no loans to take
+          if (["42P01", "PGRST205"].includes(err?.code)) return [];
+          throw err;
+        });
 
         if (data) {
           setEmployees(data);
@@ -1022,11 +1031,21 @@ export default function PayrollDashboard() {
                 actualPeriod,
               );
 
-              // voluntary deductions are itemised (deduction_items); loan and welfare are kept for older payslips
-              const deductionItems = [...pensionItems, ...(voluntaryByEmployee.get(employeeId) ?? [])];
-              const loanDeduction = 0;
+              // voluntary deductions are itemised (deduction_items); welfare is kept for older payslips
+              const voluntaryItems = [...pensionItems, ...(voluntaryByEmployee.get(employeeId) ?? [])];
               const welfareDeduction = 0;
-              const otherDeductions = totalOf(deductionItems);
+              const otherDeductions = totalOf(voluntaryItems);
+              // loan instalments come last, out of what is left, so they never take net pay below 0; what doesn't fit
+              // is still owed next month. Each is a "Loan repayment: <type>" line (with its loan_id, which approving
+              // the month records as repaid) and their total is loan_deduction.
+              const loanItems = loanDeductionsFor(
+                payrollLoans,
+                employeeId,
+                actualPeriod,
+                grossPay - (payeTax + nhifDeduction + nssfDeduction + housingLevy + advanceDeduction + welfareDeduction + otherDeductions),
+              );
+              const loanDeduction = totalOf(loanItems);
+              const deductionItems = [...voluntaryItems, ...loanItems];
 
               // Total deductions include statutory and advance deduction
               const totalDeductions =

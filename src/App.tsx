@@ -52,6 +52,7 @@ const UserRolesSettings = lazy(() => import('./components/Settings/UserRole'));
 const CompanyProfilePage = lazy(() => import('./components/Settings/CompanyProfile'));
 const JobGroupsPage = lazy(() => import('./components/Settings/JobGroups'));
 const SalaryAdvanceAdmin = lazy(() => import('./components/Settings/SalaryAdmin'));
+const LoansAdmin = lazy(() => import('./components/Loans/LoansAdmin'));
 const IncidentReportsManagement = lazy(() => import('./components/Settings/IncidentReportsManagement'));
 const WarningModule = lazy(() => import('./components/Warning/StaffCheck'));
 const BaseReport = lazy(() => import('./components/Reports/BaseReport'));
@@ -1152,6 +1153,15 @@ function App() {
                                         onTownChange={handleTownChange}
                                         onRegionChange={handleRegionChange}
                                       />
+                                    </AuthRoute>
+                                  }
+                                />
+                                {/* HR, admins and payroll manage loans; the database shows anyone else nothing */}
+                                <Route
+                                  path="/loans"
+                                  element={
+                                    <AuthRoute>
+                                      <LoansAdmin />
                                     </AuthRoute>
                                   }
                                 />

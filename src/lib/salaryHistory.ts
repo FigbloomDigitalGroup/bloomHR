@@ -28,7 +28,7 @@ export interface SalaryHistoryRecord {
     advance_deduction?: number;
     welfare_deduction?: number;
     other_deductions?: number;
-    /** voluntary deductions on this payslip, itemised (their total is other_deductions) */
+    /** voluntary deductions and loan repayments on this payslip, itemised (their totals are other_deductions and loan_deduction) */
     deduction_items?: DeductionItem[];
     payment_method?: string;
     bank_name?: string;
