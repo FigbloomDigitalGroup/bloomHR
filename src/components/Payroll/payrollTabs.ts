@@ -7,6 +7,7 @@ export const PAYROLL_TABS = [
   { id: 'run', label: 'Run' },
   { id: 'employees', label: "Employees' pay" },
   { id: 'deductions', label: 'Deductions' },
+  { id: 'earnings', label: 'Earnings' },
   { id: 'rates', label: 'Rates' },
   { id: 'files', label: 'Files' },
   { id: 'history', label: 'History' },

@@ -2,6 +2,7 @@ import React from "react";
 import { Download, ArrowLeft, ArrowRight, X } from "lucide-react";
 import html2pdf from "html2pdf.js";
 import { payslipDeductionLines } from "../../lib/voluntaryDeductions";
+import { payslipEarningLines } from "../../lib/earnings";
 
 // One employee's payslip for the month (view, previous / next, PDF), moved from PayrollDashboard.
 
@@ -236,14 +237,15 @@ export const PayslipModal = ({
                         KSh {((record.overtime_hours || 0) * (record.overtime_rate || 0)).toLocaleString()}
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Commission</span>
-                      <span className="font-semibold">KSh {(record.commission || 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Bonus</span>
-                      <span className="font-semibold">KSh {(record.bonus || 0).toLocaleString()}</span>
-                    </div>
+                    {payslipEarningLines(record).map((line, i) => (
+                      <div key={`${line.name}-${i}`} className="flex justify-between">
+                        <span>
+                          {line.name}
+                          {!line.taxable && <span className="text-gray-500 text-xs"> (not taxed)</span>}
+                        </span>
+                        <span className="font-semibold">KSh {line.amount.toLocaleString()}</span>
+                      </div>
+                    ))}
                     <div className="flex justify-between bg-gray-50 p-1 border border-gray-200 mt-2">
                       <span>Per diem</span>
                       <span className="font-bold">KSh {(record.per_diem || 0).toLocaleString()}</span>

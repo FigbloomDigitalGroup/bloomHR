@@ -3,6 +3,8 @@
 // Payroll, payslips and the KRA P10 download all use this, so they agree.
 //
 //   cash pay            what SHIF, NSSF and AHL are worked out on: gross pay less the non-taxable per diem
+//                       (an earning that is not taxed still counts for SHIF and AHL, and NSSF is worked out on
+//                       pensionable pay when given: see lib/earnings)
 //   taxable pay         cash pay + taxable non-cash benefits − NSSF − SHIF and AHL (when deductible that month)
 //                       − pension, post-retirement medical fund and mortgage interest (each up to its cap)
 //                       − the PWD exemption, for a person with a disability with an exemption certificate
@@ -24,8 +26,12 @@ export interface Benefits {
 }
 
 export interface StatutoryInput {
-  /** gross pay less the per diem */
+  /** gross pay less the per diem (and less any earnings that are not taxed) */
   cashPay: number;
+  /** earnings that are cash pay for SHIF and AHL but not taxed (lib/earnings); 0 when not given */
+  nonTaxableCashPay?: number;
+  /** the pay NSSF is worked out on, when it differs from cash pay (lib/earnings); cash pay when not given */
+  pensionablePay?: number;
   benefits?: Benefits;
   pension?: number;
   prmf?: number;
@@ -90,11 +96,14 @@ export const missingRates = (rates: Rates) => REQUIRED_RATES.filter((code) => ra
 export function statutoryFor(input: StatutoryInput, rates: Rates): StatutoryResult {
   const apply = { shif: true, nssf: true, ahl: true, paye: true, ...input.apply };
   const cash = amount(input.cashPay);
+  // SHIF and AHL are on all cash pay, taxed or not; NSSF on pensionable pay
+  const shifAhlPay = cash + amount(input.nonTaxableCashPay);
+  const pensionable = input.pensionablePay === undefined ? cash : amount(input.pensionablePay);
 
-  const shif = apply.shif && cash > 0 ? round2(Math.max(cash * rateOf(rates, 'shif_rate'), rateOf(rates, 'shif_minimum'))) : 0;
+  const shif = apply.shif && shifAhlPay > 0 ? round2(Math.max(shifAhlPay * rateOf(rates, 'shif_rate'), rateOf(rates, 'shif_minimum'))) : 0;
   // NSSF tiers I and II at the same rate: everything up to the upper earnings limit
-  const nssf = apply.nssf ? round2(Math.min(cash, rateOf(rates, 'nssf_upper_limit', Infinity)) * rateOf(rates, 'nssf_rate')) : 0;
-  const ahl = apply.ahl ? round2(cash * rateOf(rates, 'ahl_rate')) : 0;
+  const nssf = apply.nssf ? round2(Math.min(pensionable, rateOf(rates, 'nssf_upper_limit', Infinity)) * rateOf(rates, 'nssf_rate')) : 0;
+  const ahl = apply.ahl ? round2(shifAhlPay * rateOf(rates, 'ahl_rate')) : 0;
 
   // non-cash benefits up to the exempt limit are not taxed; meals are taxed only above theirs
   const b = input.benefits ?? {};

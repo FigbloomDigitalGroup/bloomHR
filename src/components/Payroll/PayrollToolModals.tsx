@@ -9,6 +9,7 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 import SearchableDropdown from "../UI/SearchableDropdown";
 import { downloadP9Pdf, loadEmployerPin, loadP9For, saveEmployerPin } from "../../lib/p9";
+import { payslipEarningLines } from "../../lib/earnings";
 
 // The P9 tax card and the payroll table export, moved from PayrollDashboard.
 
@@ -178,6 +179,9 @@ export const ExportModal = ({
           "Medical Allowance": record.medical_allowance,
           "Overtime Hours": record.overtime_hours,
           "Overtime Pay": record.overtime_hours * record.overtime_rate,
+          Commission: record.commission || 0,
+          "Bonus & Other Earnings": record.bonus || 0,
+          Earnings: payslipEarningLines(record).map((l) => `${l.name} ${l.amount}`).join("; "),
           "Gross Pay": record.gross_pay,
           "PAYE Tax": Math.round(record.paye_tax),
           NHIF: record.nhif_deduction,
@@ -221,6 +225,9 @@ export const ExportModal = ({
           "Medical Allowance": record.medical_allowance,
           "Overtime Hours": record.overtime_hours,
           "Overtime Pay": record.overtime_hours * record.overtime_rate,
+          Commission: record.commission || 0,
+          "Bonus & Other Earnings": record.bonus || 0,
+          Earnings: payslipEarningLines(record).map((l) => `${l.name} ${l.amount}`).join("; "),
           "Gross Pay": record.gross_pay,
           "PAYE Tax": Math.round(record.paye_tax),
           NHIF: record.nhif_deduction,

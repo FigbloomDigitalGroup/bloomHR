@@ -21,6 +21,7 @@ import type { PayrollRun } from "../../lib/payrollRuns";
 import type { EmployeeRecord } from "../../lib/profileCompleteness";
 import { IN_APP_PAYMENTS } from "../../lib/inAppPayments";
 import { payslipDeductionLines } from "../../lib/voluntaryDeductions";
+import { payslipEarningLines } from "../../lib/earnings";
 import PayrollRunBar from "./PayrollRunBar";
 import ReturnsReadiness from "./ReturnsReadiness";
 import { BulkPayButton } from "./RunPayActions";
@@ -116,6 +117,9 @@ function PayBreakdown({ record }: { record: any }) {
         {line("House allowance", record.house_allowance)}
         {line("Transport allowance", record.transport_allowance)}
         {line("Overtime", (record.overtime_hours || 0) * (record.overtime_rate || 0))}
+        {payslipEarningLines(record).map((l, i) => (
+          <React.Fragment key={`${l.name}-${i}`}>{line(l.name, l.amount)}</React.Fragment>
+        ))}
         {line("Per diem", record.per_diem || 0)}
       </div>
       <div className="space-y-1.5">
