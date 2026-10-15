@@ -28,6 +28,8 @@ export interface EmployeeDeduction {
 export interface DeductionItem {
   name: string;
   amount: number;
+  /** a loan repayment line: the loan it repays (recorded as repaid when the month is approved) */
+  loan_id?: string;
 }
 
 export type NewEmployeeDeduction = Omit<EmployeeDeduction, 'id'>;

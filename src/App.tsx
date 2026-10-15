@@ -37,7 +37,7 @@ const StaffSignupRequests = lazy(() => import('./pages/admin'));
 const StaffPortalLanding = lazy(() => import('./components/staff portal/StaffPortal'));
 const RecruitmentDashboard = lazy(() => import('./components/Recruitment/RecruitmentDashboard'));
 const LeaveManagementSystem = lazy(() => import('./components/Leave/LeaveManagement'));
-const PerformanceDashboard = lazy(() => import('./components/Perfomance/PerfomanceDashboard'));
+const PerformanceDashboard = lazy(() => import('./components/Perfomance/KpiPerformancePage'));
 const AddEmployeePage = lazy(() => import('./components/Add Form/AddEmployeePage'));
 const ViewEmployeePage = lazy(() => import('./components/view_form/EmployeeDetails'));
 const ManagerAssignment = lazy(() => import('./components/Employees/ManagerAssignment'));
@@ -53,6 +53,7 @@ const CompanyProfilePage = lazy(() => import('./components/Settings/CompanyProfi
 const JobGroupsPage = lazy(() => import('./components/Settings/JobGroups'));
 const AuditTrailPage = lazy(() => import('./components/Settings/AuditTrail'));
 const SalaryAdvanceAdmin = lazy(() => import('./components/Settings/SalaryAdmin'));
+const LoansAdmin = lazy(() => import('./components/Loans/LoansAdmin'));
 const IncidentReportsManagement = lazy(() => import('./components/Settings/IncidentReportsManagement'));
 const WarningModule = lazy(() => import('./components/Warning/StaffCheck'));
 const BaseReport = lazy(() => import('./components/Reports/BaseReport'));
@@ -1162,6 +1163,15 @@ function App() {
                                         onTownChange={handleTownChange}
                                         onRegionChange={handleRegionChange}
                                       />
+                                    </AuthRoute>
+                                  }
+                                />
+                                {/* HR, admins and payroll manage loans; the database shows anyone else nothing */}
+                                <Route
+                                  path="/loans"
+                                  element={
+                                    <AuthRoute>
+                                      <LoansAdmin />
                                     </AuthRoute>
                                   }
                                 />

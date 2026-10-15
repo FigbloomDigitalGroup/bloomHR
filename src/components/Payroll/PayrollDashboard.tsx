@@ -52,6 +52,10 @@ import { advanceDeductionFor } from "../../lib/salaryAdvance";
 import { loadCompanyIdentity } from "../../lib/companyProfile";
 import { useNavigate } from "react-router-dom";
 import { deductionsForPeriod, loadDeductionSetup, totalOf } from "../../lib/voluntaryDeductions";
+import { loanDeductionsFor } from "../../lib/loans";
+import { loadPayrollLoans } from "../../lib/loansApi";
+import { earningsForPeriod, statutoryPayWith, summariseEarnings } from "../../lib/earnings";
+import { loadEarningSetup } from "../../lib/earningsDb";
 import { checkSMSBalance, formatPhoneNumber, sendSMSWithRetry, smsTemplates } from "../../lib/payrollSms";
 import BulkSalaryHistoryUpload from "./BulkSalaryHistoryUpload";
 import {
@@ -71,11 +75,12 @@ import { PAYROLL_TABS, usePayrollTab } from "./payrollTabs";
 import PayrollRunTab from "./PayrollRunTab";
 import PayrollEmployeesTab from "./PayrollEmployeesTab";
 import PayrollDeductionsTab from "./PayrollDeductionsTab";
+import PayrollEarningsTab from "./PayrollEarningsTab";
 import PayrollRatesTab from "./PayrollRatesTab";
 import PayrollFilesTab from "./PayrollFilesTab";
 import PayrollHistoryTab from "./PayrollHistoryTab";
 
-// The payroll page: a month picker and six tabs (Run, Employees' pay, Deductions, Rates, Files, History). This shell
+// The payroll page: a month picker and seven tabs (Run, Employees' pay, Deductions, Earnings, Rates, Files, History). This shell
 // works out the month's figures and owns the run, the shared state and the pop-ups; each tab only shows its part.
 
 const PAYSLIP_AMOUNTS = [
@@ -92,6 +97,7 @@ const toSalaryHistory = (record: any): SalaryHistoryRecord => ({
   employee_name: record.employee_name,
   pay_period: record.pay_period,
   deduction_items: record.deduction_items ?? [],
+  earning_items: record.earning_items ?? [],
   payment_method: record.payment_method || "",
   bank_name: record.bank_name || "",
   account_number: record.account_number || "",
@@ -105,6 +111,7 @@ const fromSalaryHistory = (saved: any, live: any | undefined) => ({
   employee_name: saved.employee_name || live?.employee_name || saved.employee_id,
   pay_period: saved.pay_period,
   deduction_items: saved.deduction_items ?? [],
+  earning_items: saved.earning_items ?? [],
   payment_method: paymentMethodLabel(saved.payment_method),
   bank_name: saved.bank_name || "",
   account_number: saved.account_number || "",
@@ -915,6 +922,16 @@ export default function PayrollDashboard() {
         // showing (and letting someone save) payslips without them
         const deductionSetup = await loadDeductionSetup();
         const voluntaryByEmployee = deductionsForPeriod(deductionSetup.types, deductionSetup.deductions, actualPeriod);
+        // disbursed staff loans and what each has repaid: this month's instalment (and any shortfall carried from
+        // earlier months) comes off pay, never more than the pay left (src/lib/loans.ts)
+        const payrollLoans = await loadPayrollLoans().catch((err) => {
+          // a database without the loans tables yet (migration 20261016700000): no loans to take
+          if (["42P01", "PGRST205"].includes(err?.code)) return [];
+          throw err;
+        });
+        // bonuses, commissions and incentives for this month (lib/earnings), the same way
+        const earningSetup = await loadEarningSetup();
+        const earningsByEmployee = earningsForPeriod(earningSetup.types, earningSetup.earnings, actualPeriod);
 
         if (data) {
           setEmployees(data);
@@ -965,8 +982,10 @@ export default function PayrollDashboard() {
 
               const medicalAllowance = employee.medical_allowance || 0;
               const otherAllowances = 0;
-              const commission = 0;
-              const bonus = 0;
+              // this month's earnings: commissions in commission, every other earning in bonus (lib/earnings)
+              const earnings = summariseEarnings(earningsByEmployee.get(employeeId) ?? []);
+              const commission = earnings.commission;
+              const bonus = earnings.bonus;
 
               // Per diem is PART of basic salary (33%), not extra payment
               const perDiem = basicSalary * 0.33;
@@ -984,15 +1003,15 @@ export default function PayrollDashboard() {
                 commission +
                 bonus;
 
-              // Taxable amount EXCLUDES the per diem portion
-              const taxableGross = grossPay - perDiem;
+              // Taxable amount EXCLUDES the per diem portion and earnings that are not taxed
+              const taxableGross = grossPay - perDiem - earnings.nonTaxable;
 
               // SHIF, NSSF, AHL and PAYE with this month's rates (lib/statutoryCalc): pension, PRMF and mortgage
               // interest come off taxable pay, insurance relief and the PWD exemption apply. A deduction is left out
               // while its number or PIN is missing, unless statutory checks are overridden.
               const statutory = statutoryFor(
                 {
-                  cashPay: taxableGross,
+                  ...statutoryPayWith(taxableGross - earnings.taxable, earnings.items),
                   ...employeeInputs(employee),
                   apply: {
                     shif: overrideStatutoryChecks || Boolean(nhifNumber),
@@ -1023,11 +1042,21 @@ export default function PayrollDashboard() {
                 actualPeriod,
               );
 
-              // voluntary deductions are itemised (deduction_items); loan and welfare are kept for older payslips
-              const deductionItems = [...pensionItems, ...(voluntaryByEmployee.get(employeeId) ?? [])];
-              const loanDeduction = 0;
+              // voluntary deductions are itemised (deduction_items); welfare is kept for older payslips
+              const voluntaryItems = [...pensionItems, ...(voluntaryByEmployee.get(employeeId) ?? [])];
               const welfareDeduction = 0;
-              const otherDeductions = totalOf(deductionItems);
+              const otherDeductions = totalOf(voluntaryItems);
+              // loan instalments come last, out of what is left, so they never take net pay below 0; what doesn't fit
+              // is still owed next month. Each is a "Loan repayment: <type>" line (with its loan_id, which approving
+              // the month records as repaid) and their total is loan_deduction.
+              const loanItems = loanDeductionsFor(
+                payrollLoans,
+                employeeId,
+                actualPeriod,
+                grossPay - (payeTax + nhifDeduction + nssfDeduction + housingLevy + advanceDeduction + welfareDeduction + otherDeductions),
+              );
+              const loanDeduction = totalOf(loanItems);
+              const deductionItems = [...voluntaryItems, ...loanItems];
 
               // Total deductions include statutory and advance deduction
               const totalDeductions =
@@ -1073,6 +1102,7 @@ export default function PayrollDashboard() {
                 welfare_deduction: welfareDeduction,
                 other_deductions: otherDeductions,
                 deduction_items: deductionItems,
+                earning_items: earnings.items,
                 total_deductions: totalDeductions,
                 net_pay: netPay,
                 pay_period: actualPeriod,
@@ -1792,6 +1822,21 @@ export default function PayrollDashboard() {
               ? `Payroll for ${periodLabel} is a draft: press Recalculate to apply deduction changes to it.`
               : monthRun
                 ? `Payroll for ${periodLabel} is ${monthRun.status}, so changes apply from the next month you run.`
+                : null
+          }
+        />
+      )}
+
+      {tab === "earnings" && (
+        <PayrollEarningsTab
+          payPeriod={actualPeriod}
+          periodLabel={periodLabel}
+          onChanged={() => setDeductionsVersion((v) => v + 1)}
+          draftNotice={
+            monthRun?.status === "draft"
+              ? `Payroll for ${periodLabel} is a draft: press Recalculate to apply earning changes to it.`
+              : monthRun
+                ? `Payroll for ${periodLabel} is ${monthRun.status}: its payslips keep the earnings they were approved with.`
                 : null
           }
         />

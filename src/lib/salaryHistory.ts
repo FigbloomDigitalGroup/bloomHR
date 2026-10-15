@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { WRITE_BATCH_SIZE, chunks } from './fetchAll';
 import type { DeductionItem } from './voluntaryDeductions';
+import type { EarningItem } from './earnings';
 
 export interface SalaryHistoryRecord {
     employee_id: string;
@@ -28,8 +29,10 @@ export interface SalaryHistoryRecord {
     advance_deduction?: number;
     welfare_deduction?: number;
     other_deductions?: number;
-    /** voluntary deductions on this payslip, itemised (their total is other_deductions) */
+    /** voluntary deductions and loan repayments on this payslip, itemised (their totals are other_deductions and loan_deduction) */
     deduction_items?: DeductionItem[];
+    /** bonuses, commissions and incentives on this payslip, itemised (their total is commission + bonus) */
+    earning_items?: EarningItem[];
     payment_method?: string;
     bank_name?: string;
     account_number?: string;

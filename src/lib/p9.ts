@@ -4,6 +4,7 @@ import { autoTable } from 'jspdf-autotable';
 import { supabase } from './supabase';
 import type { EmployeeRecord } from './profileCompleteness';
 import { lastDayOf, p10Figures } from './payrollExports';
+import { nonTaxableEarningsOf } from './earnings';
 import { bandsOf, taxByBands, type Rates } from './statutoryCalc';
 
 // The P9 (tax deduction card, FIG-773): an employee's pay and tax month by month for a year, from their payslips
@@ -13,7 +14,7 @@ import { bandsOf, taxByBands, type Rates } from './statutoryCalc';
 type Payslip = Record<string, unknown>;
 
 export const P9_COLUMNS = [
-  'Month', 'Gross pay', 'Per diem (not taxed)', 'Cash pay', 'Non-cash benefits', 'NSSF', 'SHIF', 'Housing levy',
+  'Month', 'Gross pay', 'Per diem & other untaxed pay', 'Cash pay', 'Non-cash benefits', 'NSSF', 'SHIF', 'Housing levy',
   'Pension & PRMF', 'Mortgage interest', 'Taxable pay', 'Tax charged', 'Personal relief', 'Insurance relief', 'PAYE',
 ] as const;
 
@@ -57,7 +58,7 @@ export function buildP9(
     return {
       month,
       values: [
-        num(p.gross_pay), num(p.per_diem), f.cashPay, f.benefits, f.nssf, f.shif, f.ahl, f.pension + f.prmf, f.mortgage,
+        num(p.gross_pay), num(p.per_diem) + nonTaxableEarningsOf(p), f.cashPay, f.benefits, f.nssf, f.shif, f.ahl, f.pension + f.prmf, f.mortgage,
         f.taxablePay, taxByBands(f.taxablePay, bandsOf(rates)), f.personalRelief, f.insuranceRelief, f.paye,
       ].map(round2),
     };

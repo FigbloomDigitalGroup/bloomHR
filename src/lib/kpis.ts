@@ -1,0 +1,203 @@
+// Scoring for custom KPIs (migration 20261016900000). Pure: no database, no React.
+//
+//   achievement %   how much of the target was reached:
+//                     higher is better   actual / target          (a target of 0 or less: met when actual >= target)
+//                     lower is better    target / actual          (an actual of 0 or less: the cap when the target is
+//                                                                  above 0, otherwise met when actual <= target)
+//                     yes/no             100 for yes, 0 for no    (reversed when lower is better: "had an incident")
+//                     rating 1-5         rating / 5               (the target is not used)
+//                   never below 0, never above ACHIEVEMENT_CAP
+//   overall score   the weighted average of the scored KPIs' achievement: sum(achievement x weight) / sum(weight)
+//   rating band     Exceeds, Meets or Below, from RATING_BANDS
+//   weights check   an employee's weights in a period should total 100 (a warning only)
+
+export type KpiUnit = 'number' | 'percent' | 'currency_ksh' | 'yes_no' | 'rating_1_5';
+export type KpiDirection = 'higher_is_better' | 'lower_is_better';
+export type KpiFrequency = 'monthly' | 'quarterly' | 'annual';
+export type PeriodStatus = 'draft' | 'open' | 'closed';
+
+export const ACHIEVEMENT_CAP = 150;
+export const WEIGHTS_TOTAL = 100;
+
+export const UNIT_LABEL: Record<KpiUnit, string> = {
+  number: 'Number',
+  percent: 'Percent (%)',
+  currency_ksh: 'Amount (KSh)',
+  yes_no: 'Yes / No',
+  rating_1_5: 'Rating (1-5)',
+};
+export const DIRECTION_LABEL: Record<KpiDirection, string> = {
+  higher_is_better: 'Higher is better',
+  lower_is_better: 'Lower is better',
+};
+export const FREQUENCY_LABEL: Record<KpiFrequency, string> = { monthly: 'Monthly', quarterly: 'Quarterly', annual: 'Annual' };
+export const PERIOD_STATUS_LABEL: Record<PeriodStatus, string> = { draft: 'Draft', open: 'Open', closed: 'Closed' };
+export const KPI_CATEGORIES = ['Financial', 'Customer', 'Process', 'People'] as const;
+
+export type BandId = 'exceeds' | 'meets' | 'below';
+export interface RatingBand {
+  id: BandId;
+  label: string;
+  /** the lowest score in the band */
+  min: number;
+}
+/** Highest first: a score is in the first band whose minimum it reaches. */
+export const RATING_BANDS: readonly RatingBand[] = [
+  { id: 'exceeds', label: 'Exceeds', min: 110 },
+  { id: 'meets', label: 'Meets', min: 90 },
+  { id: 'below', label: 'Below', min: -Infinity },
+];
+
+const clamp = (n: number) => Math.min(ACHIEVEMENT_CAP, Math.max(0, n));
+const isNum = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
+
+export interface ScoreInput {
+  unit: KpiUnit;
+  direction: KpiDirection;
+  target: number | null | undefined;
+  actual: number | null | undefined;
+}
+
+/** Achievement as a percentage (0 to ACHIEVEMENT_CAP), or null when there is nothing to score yet. */
+export function achievement({ unit, direction, target, actual }: ScoreInput): number | null {
+  if (!isNum(actual)) return null;
+  const lower = direction === 'lower_is_better';
+  if (unit === 'yes_no') {
+    const yes = actual >= 1;
+    return (lower ? !yes : yes) ? 100 : 0;
+  }
+  if (unit === 'rating_1_5') return clamp((actual / 5) * 100);
+  if (!isNum(target)) return null;
+  if (!lower) {
+    if (target <= 0) return actual >= target ? 100 : 0;
+    return clamp((actual / target) * 100);
+  }
+  if (actual <= 0) {
+    if (target > 0) return ACHIEVEMENT_CAP;
+    return actual <= target ? 100 : 0;
+  }
+  if (target <= 0) return 0;
+  return clamp((target / actual) * 100);
+}
+
+export interface WeightedItem {
+  weight: number | null | undefined;
+  /** achievement %, null when not scored yet */
+  achievement: number | null | undefined;
+}
+
+export interface OverallScore {
+  /** the weighted score, null when nothing weighted has been scored */
+  score: number | null;
+  /** how many KPIs have a score */
+  scored: number;
+  total: number;
+}
+
+/** The weighted average of the scored KPIs (unscored ones and those of weight 0 are left out). */
+export function overallScore(items: readonly WeightedItem[]): OverallScore {
+  let sum = 0;
+  let weights = 0;
+  let scored = 0;
+  for (const it of items) {
+    if (!isNum(it.achievement)) continue;
+    scored += 1;
+    const w = isNum(it.weight) ? it.weight : 0;
+    if (w <= 0) continue;
+    sum += it.achievement * w;
+    weights += w;
+  }
+  return { score: weights > 0 ? round1(sum / weights) : null, scored, total: items.length };
+}
+
+/** The band a score falls in, or null without a score. */
+export function ratingBand(score: number | null | undefined): RatingBand | null {
+  if (!isNum(score)) return null;
+  return RATING_BANDS.find((b) => score >= b.min) ?? null;
+}
+
+export interface WeightsCheck {
+  total: number;
+  ok: boolean;
+  /** what to tell HR when they don't add up, or null */
+  warning: string | null;
+}
+
+/** Whether an employee's weights for a period add up to 100. */
+export function checkWeights(weights: readonly (number | null | undefined)[]): WeightsCheck {
+  const total = round1(weights.reduce<number>((s, w) => s + (isNum(w) ? w : 0), 0));
+  const ok = Math.abs(total - WEIGHTS_TOTAL) < 0.01;
+  return {
+    total,
+    ok,
+    warning: ok
+      ? null
+      : `Weights add up to ${formatNumber(total)}%, not ${WEIGHTS_TOTAL}%. ${total > WEIGHTS_TOTAL ? 'Lower' : 'Raise'} some so the overall score reflects what matters most.`,
+  };
+}
+
+export const round1 = (n: number) => Math.round(n * 10) / 10;
+
+export const formatNumber = (n: number) => n.toLocaleString('en-KE', { maximumFractionDigits: 2 });
+
+/** A target or actual as people read it for the KPI's unit. */
+export function formatValue(unit: KpiUnit, v: number | null | undefined): string {
+  if (!isNum(v)) return '—';
+  switch (unit) {
+    case 'percent':
+      return `${formatNumber(v)}%`;
+    case 'currency_ksh':
+      return `KSh ${formatNumber(v)}`;
+    case 'yes_no':
+      return v >= 1 ? 'Yes' : 'No';
+    case 'rating_1_5':
+      return `${formatNumber(v)} / 5`;
+    default:
+      return formatNumber(v);
+  }
+}
+
+export const formatPercent = (v: number | null | undefined) => (isNum(v) ? `${formatNumber(round1(v))}%` : '—');
+
+export interface KpiTemplate {
+  name: string;
+  description: string;
+  unit: KpiUnit;
+  direction: KpiDirection;
+  default_target: number | null;
+  default_weight: number;
+  frequency: KpiFrequency;
+  category: string;
+}
+
+/** Starter KPIs offered on an empty library. */
+export const KPI_TEMPLATES: readonly KpiTemplate[] = [
+  { name: 'Sales revenue', description: 'Revenue closed in the period.', unit: 'currency_ksh', direction: 'higher_is_better', default_target: 1_000_000, default_weight: 30, frequency: 'quarterly', category: 'Financial' },
+  { name: 'Customer satisfaction', description: 'Average customer rating from surveys or feedback.', unit: 'rating_1_5', direction: 'higher_is_better', default_target: 4, default_weight: 20, frequency: 'quarterly', category: 'Customer' },
+  { name: 'Attendance rate', description: 'Days present as a share of working days.', unit: 'percent', direction: 'higher_is_better', default_target: 95, default_weight: 15, frequency: 'monthly', category: 'People' },
+  { name: 'Tasks completed on time', description: 'Share of assigned tasks delivered by their due date.', unit: 'percent', direction: 'higher_is_better', default_target: 90, default_weight: 20, frequency: 'monthly', category: 'Process' },
+  { name: 'Quality / error rate', description: 'Share of work returned or with errors.', unit: 'percent', direction: 'lower_is_better', default_target: 2, default_weight: 15, frequency: 'monthly', category: 'Process' },
+];
+
+/** A number from a form field (commas allowed), or null when it is empty or not a number. */
+export const parseNumber = (s: string): number | null => {
+  const t = s.replace(/,/g, '').trim();
+  if (t === '') return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+};
+
+/** The period to show first: an open one, else the first (the latest). */
+export const defaultPeriodId = (periods: readonly { id: string; status: PeriodStatus }[]) =>
+  (periods.find((p) => p.status === 'open') ?? periods[0])?.id ?? '';
+
+const pad = (n: number) => String(n).padStart(2, '0');
+const isoDay = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+/** The quarter a day is in, as a draft review period: "Q4 2026", 1 Oct to 31 Dec. */
+export function currentQuarter(today = new Date()): { name: string; starts_on: string; ends_on: string; status: PeriodStatus } {
+  const q = Math.floor(today.getMonth() / 3);
+  const start = new Date(today.getFullYear(), q * 3, 1);
+  const end = new Date(today.getFullYear(), q * 3 + 3, 0);
+  return { name: `Q${q + 1} ${today.getFullYear()}`, starts_on: isoDay(start), ends_on: isoDay(end), status: 'draft' };
+}

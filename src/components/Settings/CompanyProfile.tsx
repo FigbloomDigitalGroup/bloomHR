@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Building2, ChevronRight, ImagePlus, RotateCcw } from 'lucide-react';
+import { Building2, ChevronRight, ImagePlus, RotateCcw, Trash2 } from 'lucide-react';
 import { Card, Button, PageHeader } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -16,15 +16,18 @@ import {
   DEFAULT_SECONDARY_COLOR,
   HEX_PATTERN,
   INDUSTRIES,
+  LETTERHEAD_TYPES,
   MONTHS,
   WEEK_DAYS,
   loadCompanyAdmin,
   loadCompanyProfile,
   loadEmployerPinForProfile,
+  letterheadFileError,
   logoFileError,
   profileErrors,
   saveCompanyProfile,
   uploadCompanyLogo,
+  uploadLetterheadImage,
 } from '../../lib/companyProfile';
 
 const inputClass =
@@ -35,7 +38,7 @@ const EMPTY: CompanyProfileFields = {
   company_name: '', tagline: null, logo_url: null, primary_color: null, secondary_color: null, description: null,
   registration_no: null, business_type: null, industry: null, country: 'Kenya', base_currency: 'KES',
   official_phone: null, official_email: null, website: null, address_line1: null, address_line2: null, city: null,
-  postal_code: null, fiscal_year_start_month: 1, week_start_day: 'monday',
+  postal_code: null, fiscal_year_start_month: 1, week_start_day: 'monday', letterhead_header_url: null, letterhead_footer_url: null,
 };
 
 const fieldsOf = (p: CompanyProfileFields & { tenant_id?: string }): CompanyProfileFields => {
@@ -101,6 +104,59 @@ function ColorField({ label, hint, value, fallback, error, disabled, onChange }:
   );
 }
 
+/** A letterhead image picked but not saved yet: the file and its preview (an object URL). */
+interface PickedImage {
+  file: File;
+  preview: string;
+}
+
+/** One letterhead image (header or footer): a wide preview, Upload/Change and Remove. */
+function LetterheadImage({ label, hint, url, picked, error, disabled, onPick, onRemove }: {
+  label: string; hint: string; url: string | null; picked: PickedImage | null; error: string; disabled: boolean;
+  onPick: (file: File | undefined) => void; onRemove: () => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const shown = picked?.preview ?? url;
+  return (
+    <div className="sm:col-span-2 min-w-0">
+      <span className="block text-[12px] font-semibold text-ink mb-1">{label}</span>
+      <div className="w-full min-h-[64px] rounded-card border border-border bg-secondary flex items-center justify-center overflow-hidden">
+        {shown ? (
+          <img src={shown} alt={`${label} preview`} className="block w-full h-auto" />
+        ) : (
+          <span className="text-[11.5px] text-subtle">No image: offer letters use the generated letterhead</span>
+        )}
+      </div>
+      <input
+        ref={ref}
+        type="file"
+        accept={LETTERHEAD_TYPES.join(',')}
+        className="hidden"
+        aria-label={`${label} file`}
+        onChange={(e) => {
+          onPick(e.target.files?.[0]);
+          e.target.value = '';
+        }}
+      />
+      {!disabled && (
+        <span className="mt-2 flex flex-wrap items-center gap-2">
+          <Button variant="secondary" icon={<ImagePlus className="w-3.5 h-3.5" />} onClick={() => ref.current?.click()}>
+            {shown ? `Change ${label.toLowerCase()}` : `Upload ${label.toLowerCase()}`}
+          </Button>
+          {shown && (
+            <Button variant="ghost" icon={<Trash2 className="w-3.5 h-3.5" />} onClick={onRemove}>
+              Remove {label.toLowerCase()}
+            </Button>
+          )}
+        </span>
+      )}
+      <p className={`mt-1 mb-0 text-[11px] ${error ? 'text-red-600' : 'text-muted-foreground'}`} role={error ? 'alert' : undefined}>
+        {error || hint}
+      </p>
+    </div>
+  );
+}
+
 /**
  * Settings > Company profile: the company's brand, business details, contact details, address and calendar.
  * Everyone in the company can open it; ADMIN and people with Settings change it. The employer KRA PIN is payroll's
@@ -120,6 +176,10 @@ export default function CompanyProfilePage() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoError, setLogoError] = useState('');
+  const [header, setHeader] = useState<PickedImage | null>(null);
+  const [footer, setFooter] = useState<PickedImage | null>(null);
+  const [headerError, setHeaderError] = useState('');
+  const [footerError, setFooterError] = useState('');
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -148,6 +208,12 @@ export default function CompanyProfilePage() {
   useEffect(() => () => {
     if (logoPreview) URL.revokeObjectURL(logoPreview);
   }, [logoPreview]);
+  useEffect(() => () => {
+    if (header) URL.revokeObjectURL(header.preview);
+  }, [header]);
+  useEffect(() => () => {
+    if (footer) URL.revokeObjectURL(footer.preview);
+  }, [footer]);
 
   if (loadError) {
     return (
@@ -176,8 +242,8 @@ export default function CompanyProfilePage() {
   const cleanPin = pin.replace(/\s/g, '').toUpperCase();
   const pinChanged = canEditPin && cleanPin !== savedPin;
   const pinError = pinChanged && cleanPin && !KRA_PIN.test(cleanPin) ? 'A KRA PIN is a letter, 9 digits and a letter, like P051234567X' : undefined;
-  const changed = JSON.stringify(form) !== JSON.stringify(saved) || !!logoFile || pinChanged;
-  const invalid = Object.keys(errors).length > 0 || !!pinError || !!logoError;
+  const changed = JSON.stringify(form) !== JSON.stringify(saved) || !!logoFile || !!header || !!footer || pinChanged;
+  const invalid = Object.keys(errors).length > 0 || !!pinError || !!logoError || !!headerError || !!footerError;
 
   const pickLogo = (file: File | undefined) => {
     if (!file) return;
@@ -188,11 +254,21 @@ export default function CompanyProfilePage() {
     setLogoPreview(URL.createObjectURL(file));
   };
 
+  const pickLetterhead = (file: File | undefined, setPicked: (p: PickedImage | null) => void, setError: (e: string) => void) => {
+    if (!file) return;
+    const problem = letterheadFileError(file);
+    setError(problem ?? '');
+    if (problem) return;
+    setPicked({ file, preview: URL.createObjectURL(file) });
+  };
+
   const save = async () => {
     setBusy(true);
     try {
       let fields = form;
       if (logoFile) fields = { ...fields, logo_url: await uploadCompanyLogo(logoFile) };
+      if (header) fields = { ...fields, letterhead_header_url: await uploadLetterheadImage(header.file) };
+      if (footer) fields = { ...fields, letterhead_footer_url: await uploadLetterheadImage(footer.file) };
       if (pinChanged && cleanPin) setSavedPin(await saveEmployerPin(cleanPin));
       if (canEdit) {
         const p = fieldsOf(await saveCompanyProfile(fields));
@@ -201,6 +277,8 @@ export default function CompanyProfilePage() {
       }
       setLogoFile(null);
       setLogoPreview(null);
+      setHeader(null);
+      setFooter(null);
       window.dispatchEvent(new Event(COMPANY_PROFILE_SAVED)); // the top bar and the "Get started" checklist look again
       toast.success('Company profile saved');
     } catch (e) {
@@ -224,7 +302,7 @@ export default function CompanyProfilePage() {
         subtitle={canEdit ? 'Your organisation’s details, used across the app and on documents.' : 'Only an admin or someone with Settings can change these.'}
         actions={(canEdit || canEditPin) && (
           <>
-            <Button variant="secondary" disabled={busy || !changed} onClick={() => { setForm(saved); setPin(savedPin); setLogoFile(null); setLogoPreview(null); setLogoError(''); }}>
+            <Button variant="secondary" disabled={busy || !changed} onClick={() => { setForm(saved); setPin(savedPin); setLogoFile(null); setLogoPreview(null); setLogoError(''); setHeader(null); setFooter(null); setHeaderError(''); setFooterError(''); }}>
               Discard
             </Button>
             <Button onClick={() => void save()} disabled={busy || !changed || (canEdit && invalid) || (!canEdit && !!pinError)}>
@@ -276,6 +354,29 @@ export default function CompanyProfilePage() {
           <Field label="Description" hint="What the company does, in a few lines" error={errors.description} className="sm:col-span-2">
             <textarea className={`${inputClass} min-h-[84px]`} maxLength={1000} {...text('description')} />
           </Field>
+        </Section>
+
+        <Section title="Offer letter letterhead" hint="Your own designed letterhead for offer letters. Without one, letters use a letterhead made from your logo, name, address and colours.">
+          <LetterheadImage
+            label="Header"
+            hint="PNG or JPG, up to 2 MB. The full width of an A4 page works best, about 2480 × 400 px. It replaces the logo, name and address at the top."
+            url={form.letterhead_header_url}
+            picked={header}
+            error={headerError}
+            disabled={!canEdit}
+            onPick={(f) => pickLetterhead(f, setHeader, setHeaderError)}
+            onRemove={() => { setHeader(null); setHeaderError(''); set('letterhead_header_url', null); }}
+          />
+          <LetterheadImage
+            label="Footer"
+            hint="Optional. PNG or JPG, up to 2 MB, about 2480 × 250 px. Shown at the bottom of the letter."
+            url={form.letterhead_footer_url}
+            picked={footer}
+            error={footerError}
+            disabled={!canEdit}
+            onPick={(f) => pickLetterhead(f, setFooter, setFooterError)}
+            onRemove={() => { setFooter(null); setFooterError(''); set('letterhead_footer_url', null); }}
+          />
         </Section>
 
         <Section title="Business details" hint="How the company is registered.">

@@ -25,6 +25,7 @@ import {
   Mails,
   ShieldHalf,
   HeartHandshake,
+  HandCoins,
   LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature, History
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
@@ -78,6 +79,8 @@ const menuGroups = [
       { id: 'job-groups', label: 'Job groups', icon: Layers, path: '/settings/job-groups', anyPermission: ['payroll', 'employees'] },
       { id: 'expense', label: 'Expenses', icon: Receipt, path: '/expenses', permission: 'expenses' },
       { id: 'advanced', label: 'Salary Advance', icon: Landmark, path: '/salaryadmin', permission: 'salaryadmin' },
+      // HR and payroll (and admins): staff loans with interest
+      { id: 'loans', label: 'Loans', icon: HandCoins, path: '/loans', anyPermission: ['payroll'], orRoles: ['HR'] },
       { id: 'asset', label: 'Assets', icon: Package, path: '/asset', permission: 'asset' },
       { id: 'mpesa-zap', label: 'Mpesa Zap', icon: Smartphone, path: '/mpesa-zap', permission: 'mpesa-zap' },
     ]
@@ -116,7 +119,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
   const [searchQuery, setSearchQuery] = useState('');
 
   // Use permissions hook for dynamic access control
-  const { hasPermission, hasAnyPermission, loading: permissionsLoading } = usePermissions();
+  const { hasPermission, hasAnyPermission, userRole: permissionRole, loading: permissionsLoading } = usePermissions();
   const { data: myPreferences } = useMyPreferences(user?.email);
 
   // Badge on "Time Off" (FIG-575): count of pending leave applications that
@@ -364,7 +367,9 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
                     // Once loaded, hide items the user doesn't have access to
                     if (!permissionsLoading && item.permission && !hasPermission(item.permission)) return null;
                     const anyOf = (item as { anyPermission?: string[] }).anyPermission;
-                    if (!permissionsLoading && anyOf && !hasAnyPermission(anyOf)) return null;
+                    // or anyone with one of these roles, whatever their permissions
+                    const orRoles = (item as { orRoles?: string[] }).orRoles;
+                    if (!permissionsLoading && anyOf && !hasAnyPermission(anyOf) && !(orRoles && permissionRole && orRoles.includes(permissionRole))) return null;
 
                     return (
                       <motion.button

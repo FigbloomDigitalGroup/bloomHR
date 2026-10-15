@@ -3,6 +3,7 @@ import React from 'react';
 import { Download, Printer, Share2, X, ArrowLeft, ArrowRight, Shield, Award, Building2 } from 'lucide-react';
 import GlowButton from '../UI/GlowButton';
 import { paymentMethodLabel } from '../../lib/paymentMethods';
+import { payslipEarningLines } from '../../lib/earnings';
 
 interface PayslipModalProps {
   record: any;
@@ -723,14 +724,12 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, onClose, onPrevious
                       <td>Overtime ({record.overtime_hours} hrs @ {record.overtime_rate}/hr)</td>
                       <td className="amount">{(record.overtime_hours * record.overtime_rate).toLocaleString()}</td>
                     </tr>
-                    <tr>
-                      <td>Performance Commission</td>
-                      <td className="amount">{record.commission.toLocaleString()}</td>
-                    </tr>
-                    <tr>
-                      <td>Bonus & Incentives</td>
-                      <td className="amount">{record.bonus.toLocaleString()}</td>
-                    </tr>
+                    {payslipEarningLines(record).map((line, i) => (
+                      <tr key={`${line.name}-${i}`}>
+                        <td>{line.name}{line.taxable ? '' : ' (not taxed)'}</td>
+                        <td className="amount">{line.amount.toLocaleString()}</td>
+                      </tr>
+                    ))}
                     <tr className="total-row">
                       <td><strong>Total Gross Earnings</strong></td>
                       <td className="amount"><strong>{record.gross_pay.toLocaleString()}</strong></td>
