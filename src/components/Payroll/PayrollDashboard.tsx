@@ -1786,6 +1786,7 @@ export default function PayrollDashboard() {
       {tab === "deductions" && (
         <PayrollDeductionsTab
           onChanged={() => setDeductionsVersion((v) => v + 1)}
+          rates={rates}
           draftNotice={
             monthRun?.status === "draft"
               ? `Payroll for ${periodLabel} is a draft: press Recalculate to apply deduction changes to it.`
