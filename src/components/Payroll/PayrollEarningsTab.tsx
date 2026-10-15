@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import { Download, Loader, Pause, Pencil, Play, Plus, Trash2, Upload } from 'lucide-react';
 import EmployeePicker from '../UI/EmployeePicker';
+import TaxTreatmentHint from './TaxTreatmentHint';
 import { Card, SearchInput, TableScroll } from '../UI';
 import { useEmployeeDirectory } from '../../hooks/useEmployeeDirectory';
 import { readEmployeeRows } from '../../lib/employeeSheet';
@@ -353,6 +354,17 @@ export default function PayrollEarningsTab({ payPeriod, periodLabel, onChanged, 
                   />
                   Counts for NSSF
                 </label>
+              </div>
+              {/* whether an item like this is taxed in Kenya: a rule, or an AI suggestion on request; "Use this" sets Taxed */}
+              <div className="md:col-span-4">
+                <TaxTreatmentHint
+                  kind="earning"
+                  name={newType.name}
+                  description={newType.description}
+                  onUse={(t) => {
+                    if (t === 'taxable' || t === 'not_taxable') setNewType((f) => (f ? { ...f, taxable: t === 'taxable' } : f));
+                  }}
+                />
               </div>
               <div className="md:col-span-4 flex gap-2">
                 <button type="button" className={primary} onClick={handleAddType} disabled={busy || !newType.name.trim()}>

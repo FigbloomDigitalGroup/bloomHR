@@ -150,4 +150,15 @@ describe('PayrollEarningsTab', () => {
       expect(db.addEarningType).toHaveBeenCalledWith({ name: '13th month pay', taxable: true, pensionable: false, description: '' })
     );
   });
+
+  it('says whether a new earning type is taxed in Kenya, and "Use this" sets Taxed', async () => {
+    renderTab();
+    await screen.findByText('Ann Wanjiru');
+    fireEvent.click(screen.getByRole('button', { name: /New type/ }));
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Christmas bonus' } });
+    fireEvent.click(screen.getByLabelText('Taxed (PAYE)')); // untick it
+    expect(await screen.findByText(/Taxable/, {}, { timeout: 2000 })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Use this/ }));
+    expect((screen.getByLabelText('Taxed (PAYE)') as HTMLInputElement).checked).toBe(true);
+  });
 });
