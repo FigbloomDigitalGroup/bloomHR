@@ -20,8 +20,9 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden bg-gray-900">
         <div className="absolute inset-0 z-0">
           <img src={AUTH_PHOTO} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: PHOTO_FOCUS }} />
-          {/* dark at the top for the logo and at the bottom for the words; the people in the middle stay clear */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent via-35% to-black/90" />
+          {/* a light wash over the whole photo, then dark at the top for the logo and at the bottom for the words */}
+          <div className="absolute inset-0 bg-black/25" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent via-35% to-black/90" />
         </div>
 
         <div className="relative z-10 w-full flex flex-col justify-between p-12 xl:p-16">
@@ -29,12 +30,12 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center shadow-lg shadow-black/20">
               <img src="/bloom-mark.png" alt="Company Logo" className="w-6 h-6 object-contain brightness-0 invert" />
             </div>
-            <span className="text-white font-bold text-2xl tracking-tight">Figbloom<span className="text-gray-400">HR</span></span>
+            <span className="text-white font-semibold text-2xl tracking-tight">Figbloom<span className="font-thin text-white/80">HR</span></span>
           </div>
 
           <div className="mt-auto space-y-6 pb-8">
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
-              <h1 className="text-4xl xl:text-5xl font-extrabold text-white leading-tight">
+              <h1 className="text-4xl xl:text-5xl font-semibold text-white leading-tight">
                 Automate Your <br />
                 <span className="text-white/70">Payroll & HR Workflows</span>
               </h1>
@@ -68,7 +69,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
               <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
                 <img src="/bloom-mark.png" alt="Logo" className="w-5 h-5 object-contain brightness-0 invert" />
               </div>
-              <span className="text-2xl font-bold text-gray-900 tracking-tight">Figbloom<span className="text-gray-500">HR</span></span>
+              <span className="text-2xl font-semibold text-gray-900 tracking-tight">Figbloom<span className="font-thin text-gray-500">HR</span></span>
             </div>
           </div>
           {children}
