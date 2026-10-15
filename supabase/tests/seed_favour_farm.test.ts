@@ -1,6 +1,6 @@
 // @vitest-environment node
 //
-// The Favour Farm demo seeds (scripts/seed_favour_farm_*.sql) run against the real schema, stop on a second run, and
+// The FAVOR FARM, Kajiado demo seeds (scripts/seed_favour_farm_*.sql) run against the real schema, stop on a second run, and
 // their clean-up removes what they added.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -11,6 +11,8 @@ import { bootDb } from './db';
 const FARM = '00000000-0000-0000-0000-00000000fa01';
 const ADMIN = '00000000-0000-0000-0000-00000000fa11';
 const HR = '00000000-0000-0000-0000-00000000fa12';
+// the other company with the same name, which must be left alone
+const OTHER = '00000000-0000-0000-0000-00000000fa02';
 
 const script = (name: string) => readFileSync(join(__dirname, '..', '..', 'scripts', name), 'utf8');
 /** the commented-out clean-up block at the end of a seed script */
@@ -23,8 +25,9 @@ const count = async (sql: string) => Number((await db.query<{ n: number }>(sql))
 beforeAll(async () => {
   db = await bootDb();
   await db.exec(`
-    insert into tenants (id, name, slug) values ('${FARM}', 'Favour Farm Ltd', 'favour-farm');
-    insert into auth.users (id, email) values ('${ADMIN}', 'admin@favourfarm.co.ke'), ('${HR}', 'hr@favourfarm.co.ke');
+    insert into tenants (id, name, slug) values ('${FARM}', 'FAVOR FARM, Kajiado', 'favor-farm-kajiado'),
+      ('${OTHER}', 'FAVOR FARM', 'favor-farm');
+    insert into auth.users (id, email) values ('${ADMIN}', 'admin@favorfarm.co.ke'), ('${HR}', 'hr@favorfarm.co.ke');
     insert into memberships (user_id, tenant_id, role) values ('${ADMIN}', '${FARM}', 'ADMIN'), ('${HR}', '${FARM}', 'HR');
   `);
 }, 180000);
@@ -44,6 +47,7 @@ describe('recruitment seed', () => {
     expect(await count(`select count(*) n from interview_scorecards where tenant_id = '${FARM}'`)).toBeGreaterThan(0);
     expect(await count(`select count(*) n from scorecard_ratings where tenant_id = '${FARM}'`)).toBeGreaterThan(0);
     expect(await count(`select count(*) n from interview_transcripts where tenant_id = '${FARM}'`)).toBe(2);
+    expect(await count(`select count(*) n from job_postings where tenant_id = '${OTHER}'`)).toBe(0);
     // every candidate's history starts with Applied, in date order
     expect(await count(`
       select count(*) n from job_applications a where a.tenant_id = '${FARM}' and (
@@ -66,7 +70,7 @@ describe('recruitment seed', () => {
 
 describe('payroll seed', () => {
   const sql = script('seed_favour_farm_payroll.sql');
-  const demo = `tenant_id = '${FARM}' and "Work Email" ilike '%@demo.favourfarm.example'`;
+  const demo = `tenant_id = '${FARM}' and "Work Email" ilike '%@demo.favorfarm.example'`;
 
   it('adds staff ready for payroll, paid by their job group', async () => {
     await db.exec(sql);
@@ -84,6 +88,7 @@ describe('payroll seed', () => {
     expect(await count(`select count(*) n from salary_advance where tenant_id = '${FARM}' and status = 'paid' and payment_processed = 'true'`)).toBe(1);
     expect(await count(`select count(*) n from work_entries where tenant_id = '${FARM}' and status = 'approved'`)).toBeGreaterThanOrEqual(0);
     expect(await count(`select count(*) n from payroll_runs where tenant_id = '${FARM}'`)).toBe(0);
+    expect(await count(`select count(*) n from employees where tenant_id = '${OTHER}'`)).toBe(0);
   });
 
   it('does nothing the second time', async () => {
