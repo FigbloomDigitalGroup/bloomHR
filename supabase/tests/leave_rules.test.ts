@@ -59,6 +59,12 @@ beforeAll(async () => {
     insert into employees ("Employee Number", "First Name", "Last Name", "Work Email", tenant_id) values
       ('E1', 'Ann', 'One', 'e1@a.co', '${A}'), ('E2', 'Ben', 'Two', 'e2@a.co', '${A}'), ('E-HR', 'Hana', 'Hr', 'hr@a.co', '${A}');
     select seed_default_leave_types('${A}');
+    -- the sums below use 24 days of annual leave, and compassionate leave of 3 days a month
+    update leave_policies set days_allotted = 24
+      where leave_type_id = (select id from leave_types where tenant_id = '${A}' and name = 'Annual Leave');
+    insert into leave_types (tenant_id, name, is_deductible) values ('${A}', 'Compassionate Leave', true);
+    insert into leave_policies (tenant_id, leave_type_id, days_allotted, accrual_method)
+      select '${A}', id, 3, 'monthly_non_cumulative' from leave_types where tenant_id = '${A}' and name = 'Compassionate Leave';
     insert into holidays (name, date, recurring, tenant_id) values ('Madaraka', '2030-06-01', true, '${A}'), ('One-off', '2030-03-05', false, '${A}');
   `);
 }, 120000);

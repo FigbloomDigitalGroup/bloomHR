@@ -38,17 +38,19 @@ beforeAll(async () => {
     select seed_default_leave_types('${B}');
   `);
   annual = (await rows<{ id: string }>(`select id from leave_types where tenant_id = '${A}' and name = 'Annual Leave'`))[0].id;
+  // the arithmetic below uses 24 days (2 a month); new companies start on 21 (checked on company B)
+  await db.exec(`update leave_policies set days_allotted = 24 where leave_type_id = '${annual}'`);
 }, 120000);
 
 describe('standard leave types', () => {
   it('a company gets the standard set once, with Annual Leave earned monthly and reminders on', async () => {
     const types = await rows<{ name: string }>(`select name from leave_types where tenant_id = '${A}' order by name`);
     expect(types.map((t) => t.name)).toContain('Annual Leave');
-    const policy = (await rows<{ days_allotted: string; accrual_method: string; carry_forward_max_days: string; reminder_days_before_year_end: number; reminder_min_remaining: string }>(
-      `select * from current_leave_policies where leave_type_id = '${annual}'`
+    const policy = (await rows<{ days_allotted: string; accrual_method: string; carry_forward_max_days: string; reminder_days_before_year_end: number; reminder_min_remaining: string; service_months_before_use: number }>(
+      `select p.* from current_leave_policies p join leave_types t on t.id = p.leave_type_id where t.tenant_id = '${B}' and t.name = 'Annual Leave'`
     ))[0];
-    expect(policy).toMatchObject({ accrual_method: 'monthly_cumulative', reminder_days_before_year_end: 60 });
-    expect(Number(policy.days_allotted)).toBe(24);
+    expect(policy).toMatchObject({ accrual_method: 'monthly_cumulative', reminder_days_before_year_end: 60, service_months_before_use: 2 });
+    expect(Number(policy.days_allotted)).toBe(21);
     expect(Number(policy.carry_forward_max_days)).toBe(0);
     expect(Number(policy.reminder_min_remaining)).toBe(14);
     await db.exec(`select seed_default_leave_types('${A}')`);
