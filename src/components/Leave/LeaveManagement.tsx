@@ -1,6 +1,6 @@
 import toast from 'react-hot-toast';
-import { useState, useEffect, useRef } from 'react';
-import { earnedToDate, isYearlyMethod } from '../../lib/leaveAccrual';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { employeeJoined, isYearlyMethod, yearAllowance } from '../../lib/leaveAccrual';
 import { BALANCE_RULE_LABELS, BalanceRule, CountDays, useLeaveCheck } from '../../lib/leaveRules';
 import EmployeePicker from '../UI/EmployeePicker';
 import {
@@ -72,6 +72,8 @@ type LeaveType = {
   balance_rule?: BalanceRule;
   count_days?: CountDays;
   one_per_month?: boolean;
+  // months after joining before it can be taken (FIG-878); days still build up meanwhile
+  service_months_before_use?: number;
 };
 
 type Holiday = {
@@ -808,6 +810,21 @@ const LeaveTypeFormModal = ({
                 />
               </div>
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Can be taken after (months of service)</label>
+                <input
+                  type="number"
+                  value={newLeaveType.service_months_before_use ?? 0}
+                  onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, service_months_before_use: Math.min(60, Math.max(0, Number(e.target.value))) }))}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                  min="0"
+                  max="60"
+                  placeholder="0 = from the first day"
+                />
+                <p className="mt-1 text-[11px] text-gray-500">Counted from the employee's start date. Days still build up meanwhile.</p>
+              </div>
+            </div>
             <div className="flex items-center mt-3">
               <input
                 type="checkbox"
@@ -1452,6 +1469,8 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
   );
   const totalApplicationPages = Math.ceil(leaveApplications.length / applicationsPerPage);
 
+  // leave is counted from when people joined (FIG-878): who has no date the database can read
+  const withoutStartDate = useMemo(() => employees.filter((e) => !employeeJoined(e as Record<string, unknown>)), [employees]);
   const paginatedBalances = leaveBalances.slice(
     (balancesPage - 1) * balancesPerPage,
     balancesPage * balancesPerPage
@@ -1684,9 +1703,12 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
               leave_type_id: leaveType.id,
               year: currentYear,
               month: bucketFor(leaveType),
+              // from when they joined, as the database counts it (leave_seed_days)
               accrued_days: leaveType.accrual_method === 'monthly_cumulative'
-                ? earnedToDate(allowanceByKey.get(`${employee["Employee Number"]}::${leaveType.id}`) ?? leaveType.max_days ?? 0, currentMonth)
-                : (allowanceByKey.get(`${employee["Employee Number"]}::${leaveType.id}`) ?? leaveType.max_days ?? 0),
+                ? yearAllowance(allowanceByKey.get(`${employee["Employee Number"]}::${leaveType.id}`) ?? leaveType.max_days ?? 0, employeeJoined(employee), currentYear, currentMonth)
+                : leaveType.accrual_method === 'annual'
+                  ? yearAllowance(allowanceByKey.get(`${employee["Employee Number"]}::${leaveType.id}`) ?? leaveType.max_days ?? 0, employeeJoined(employee), currentYear, 12)
+                  : (allowanceByKey.get(`${employee["Employee Number"]}::${leaveType.id}`) ?? leaveType.max_days ?? 0),
               used_days: usedDays,
               carried_over_days: 0,
               monthly_accrual: 0
@@ -1785,6 +1807,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
             balance_rule: policy?.balance_rule ?? 'full_year',
             count_days: policy?.count_days ?? 'working',
             one_per_month: policy?.one_per_month ?? false,
+            service_months_before_use: policy?.service_months_before_use ?? 0,
           };
         });
 
@@ -2147,6 +2170,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
           balance_rule: type.balance_rule || 'full_year',
           count_days: type.count_days || 'working',
           one_per_month: type.one_per_month ?? false,
+          service_months_before_use: type.service_months_before_use ?? 0,
           effective_from: new Date().toISOString().split('T')[0]
         }], { onConflict: 'leave_type_id,effective_from' });
 
@@ -2406,6 +2430,16 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
           </div>
         </div>
       </div>
+      {withoutStartDate.length > 0 && (
+        <div className="mx-4 md:mx-6 mt-4 rounded-lg border border-orange-text-alt/30 bg-orange-tint-alt px-3 py-2" role="status">
+          <p className="text-xs text-orange-text-alt">
+            {withoutStartDate.length} employee{withoutStartDate.length === 1 ? ' has' : 's have'} no start date (YYYY-MM-DD) on file, so
+            their leave is counted from 1 January and any service rule can't be checked:{' '}
+            {withoutStartDate.slice(0, 8).map((e) => `${e["First Name"] ?? ''} ${e["Last Name"] ?? ''}`.trim() || e["Employee Number"]).join(', ')}
+            {withoutStartDate.length > 8 ? ` and ${withoutStartDate.length - 8} more` : ''}. Add it in Employees → Edit.
+          </p>
+        </div>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
