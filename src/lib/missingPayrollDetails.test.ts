@@ -39,6 +39,7 @@ const complete = {
   'Bank Branch': 'Moi Avenue',
   'Account Number': '1100223344',
   'Mobile Number': '0712345678',
+  account_number_name: 'OTIENO ACHIENG',
 };
 
 describe('missingDetails', () => {
@@ -54,6 +55,12 @@ describe('missingDetails', () => {
       'Bank',
       'Account number',
     ]);
+  });
+
+  it('a bank account in someone else’s name, or with no name, needs fixing too', () => {
+    expect(missingDetails({ ...complete, account_number_name: 'Michael Kiruti' })).toEqual(["Account name doesn't match"]);
+    expect(missingDetails({ ...complete, account_number_name: '' })).toEqual(['Account name']);
+    expect(missingDetails({ ...complete, account_number_name: 'Achieng Otieno' })).toEqual([]);
   });
 
   it('accepts an old NHIF number as the SHA number', () => {
@@ -75,8 +82,8 @@ describe('employeesMissingDetails', () => {
   it('keeps only employees with gaps, by name, and skips rows without an employee number', () => {
     const list = employeesMissingDetails([
       complete,
-      { ...complete, 'Employee Number': 'EMP-003', 'First Name': 'Zawadi', 'Tax PIN': '' },
-      { ...complete, 'Employee Number': 'EMP-002', 'First Name': 'Brian', 'NSSF Number': '' },
+      { ...complete, 'Employee Number': 'EMP-003', 'First Name': 'Zawadi', account_number_name: 'Zawadi Otieno', 'Tax PIN': '' },
+      { ...complete, 'Employee Number': 'EMP-002', 'First Name': 'Brian', account_number_name: 'Brian Otieno', 'NSSF Number': '' },
       { ...complete, 'Employee Number': '', 'Tax PIN': '' },
     ]);
     expect(list).toEqual([
