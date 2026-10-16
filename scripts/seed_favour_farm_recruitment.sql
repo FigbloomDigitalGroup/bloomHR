@@ -1,8 +1,8 @@
--- Demo recruitment data for Favour Farm: 3 jobs, 12 candidates across the pipeline, interviews (done, upcoming,
+-- Demo recruitment data for FAVOR FARM: 3 jobs, 12 candidates across the pipeline, interviews (done, upcoming,
 -- cancelled, no-show) with panels, scorecards and a transcript.
 --
 -- Run once in the Supabase SQL editor (it runs as postgres, so RLS is skipped). It is not a migration: the data is
--- for this one company's demo. It stops if the company isn't found or the demo jobs are already there.
+-- for this one company's demo. It finds the company by its slug, favor-farm (not "FAVOR FARM, Kajiado"), and stops if it isn't found or the demo jobs are already there.
 --   * jobs are marked posted_by = 'demo-seed' and kept off the public careers page (is_public = false)
 --   * candidates are marked source = 'demo-seed', with @example.com emails, so nothing reaches a real person
 --   * the panel is up to 3 people who can already sign in to the company; with nobody, interviews have no panel
@@ -25,9 +25,9 @@ declare
   applied timestamptz;
   n int := 0;
 begin
-  select id into t from public.tenants where name ilike '%favour%farm%' order by created_at limit 1;
+  select id into t from public.tenants where slug = 'favor-farm';
   if t is null then
-    raise exception 'No company named like "Favour Farm" found';
+    raise exception 'No company with the slug favor-farm (FAVOR FARM) found';
   end if;
   if exists (select 1 from public.job_postings where tenant_id = t and posted_by = 'demo-seed') then
     raise notice 'Demo recruitment data is already there for this company; nothing done';
@@ -44,12 +44,12 @@ begin
                                    requirements, responsibilities, salary_range, benefits, application_deadline,
                                    status, posted_by, is_public)
   values
-    (t, 'Farm Supervisor', 'Operations', 'Limuru', 'Full-time', 'Mid-level',
-     'Lead a team of 25 field workers across our tea and vegetable blocks.',
+    (t, 'Farm Supervisor', 'Operations', 'Kajiado', 'Full-time', 'Mid-level',
+     'Lead a team of 25 field workers across our greenhouses and open-field vegetable blocks.',
      'Diploma in Agriculture or related field; 3+ years supervising farm teams; basic computer skills.',
-     'Plan daily work, track picking and output, keep attendance, enforce safety and quality standards.',
+     'Plan daily work, track harvesting and output, keep attendance, enforce safety and quality standards.',
      'KES 45,000 - 60,000', 'Housing allowance, medical cover, transport', current_date + 21, 'open', 'demo-seed', false),
-    (t, 'Agronomist', 'Production', 'Limuru', 'Full-time', 'Senior',
+    (t, 'Agronomist', 'Production', 'Kajiado', 'Full-time', 'Senior',
      'Own crop health, soil fertility and spraying programmes for 120 acres.',
      'BSc Agronomy or Horticulture; 4+ years in commercial farming; PCPB pesticide handling certificate.',
      'Soil and leaf testing, fertiliser and spray plans, pest scouting, training field staff.',
@@ -69,7 +69,7 @@ begin
       (1, 'Peter',   'Kamau',    'Kiambu',   '6 years as field supervisor, Kakuzi',              'KES 55,000',  '4'),
       (1, 'Grace',   'Wanjiru',  'Nakuru',   '4 years team lead, flower farm in Naivasha',       'KES 50,000',  '3'),
       (1, 'Samuel',  'Otieno',   'Kisumu',   '3 years sugarcane outgrower supervisor',           'KES 48,000',  '2'),
-      (1, 'Esther',  'Chebet',   'Kericho',  '5 years tea estate supervisor',                    'KES 52,000',  'hired'),
+      (1, 'Esther',  'Chebet',   'Kericho',  '5 years greenhouse supervisor, Isinya',                    'KES 52,000',  'hired'),
       (1, 'Brian',   'Mutua',    'Machakos', '1 year farm hand',                                 'KES 45,000',  'rejected'),
       (2, 'Faith',   'Njeri',    'Nyeri',    '5 years agronomist, horticulture exporter',        'KES 110,000', '3'),
       (2, 'Dennis',  'Kiprono',  'Uasin Gishu', '4 years crop protection, agrochemical company', 'KES 100,000', '5'),
@@ -103,7 +103,7 @@ begin
             case c.job when 2 then 'BSc Agronomy' when 3 then 'BCom / CPA' else 'Diploma in Agriculture' end,
             case c.job when 2 then 'Soil testing, IPM, spray programmes'
                        when 3 then 'Excel, QuickBooks, PAYE and statutory returns'
-                       else 'Team leadership, attendance tracking, picking targets' end,
+                       else 'Team leadership, attendance tracking, harvest targets' end,
             'English, Kiswahili',
             'I want to grow with a farm that is investing in its people and systems.',
             'Please find my application for the role. I am available to start within a month.',
@@ -153,8 +153,8 @@ begin
                    else date_trunc('hour', now()) - ((n % 6 + 2) || ' days')::interval + interval '10 hours' end,
               45,
               case when c.job = 3 then 'video' else 'in_person' end,
-              case when c.job = 3 then null else 'Favour Farm office, Limuru' end,
-              case when c.job = 3 then 'https://meet.example.com/favour-farm-' || n end,
+              case when c.job = 3 then null else 'Favor Farm office, Kajiado' end,
+              case when c.job = 3 then 'https://meet.example.com/favor-farm-' || n end,
               case when c.at_stage = '3' and c.first_name in ('Grace', 'Faith', 'Lucy') then 'scheduled'
                    when c.first_name = 'Brian' then 'no_show'
                    when c.first_name = 'John' then 'cancelled'
@@ -189,8 +189,8 @@ begin
       if c.first_name in ('Peter', 'Esther') then
         insert into public.interview_transcripts (tenant_id, interview_id, kind, title, body, created_by)
         values (t, iv, 'text', 'Interview notes',
-                'Q: How do you keep a picking team on target?' || chr(10) ||
-                'A: Daily targets per block, weighing at the collection point twice a day, and recognising the top pickers.' || chr(10) ||
+                'Q: How do you keep a harvesting team on target?' || chr(10) ||
+                'A: Daily targets per block, weighing at the collection point twice a day, and recognising the top harvesters.' || chr(10) ||
                 'Q: How do you handle absenteeism?' || chr(10) ||
                 'A: Track attendance from the first day, talk to the worker early, and follow the disciplinary policy.',
                 panel[1]);
@@ -205,6 +205,6 @@ end $$;
 -- To remove the demo data (candidates first; their interviews, scores and history go with them):
 -- ---------------------------------------------------------------------------------------------
 -- delete from public.job_applications a using public.tenants t
---   where a.tenant_id = t.id and t.name ilike '%favour%farm%' and a.source = 'demo-seed';
+--   where a.tenant_id = t.id and t.slug = 'favor-farm' and a.source = 'demo-seed';
 -- delete from public.job_postings p using public.tenants t
---   where p.tenant_id = t.id and t.name ilike '%favour%farm%' and p.posted_by = 'demo-seed';
+--   where p.tenant_id = t.id and t.slug = 'favor-farm' and p.posted_by = 'demo-seed';

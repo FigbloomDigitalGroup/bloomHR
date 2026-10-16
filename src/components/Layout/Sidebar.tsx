@@ -26,7 +26,7 @@ import {
   ShieldHalf,
   HeartHandshake,
   HandCoins,
-  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature, History
+  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature, History, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useMyPreferences } from '../../hooks/useMyPreferences';
@@ -92,6 +92,7 @@ const menuGroups = [
       { id: 'email admin', label: 'Email Admin', icon: ShieldEllipsis, path: '/adminconfirm', permission: 'adminconfirm' },
       { id: 'incident-reports', label: 'Incidents', icon: ShieldAlert, path: '/incident-reports', permission: 'incident-reports' },
       { id: 'settings', label: 'Settings', icon: Settings, path: '/settings', permission: 'settings' },
+      { id: 'setup-assistant', label: 'Set up with AI', icon: Sparkles, path: '/setup-assistant', permission: 'settings' },
       { id: 'departments', label: 'Departments', icon: Building2, path: '/departments', permission: 'employees' },
       { id: 'audit-trail', label: 'Audit Trail', icon: History, path: '/settings/audit-trail', permission: 'settings' },
       { id: 'role-permissions', label: 'Role Permissions', icon: ShieldHalf, path: '/role-permissions', permission: 'role-permissions' },

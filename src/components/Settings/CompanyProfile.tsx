@@ -14,6 +14,7 @@ import {
   CompanyProfileFields,
   DEFAULT_PRIMARY_COLOR,
   DEFAULT_SECONDARY_COLOR,
+  EMPTY_PROFILE,
   HEX_PATTERN,
   INDUSTRIES,
   LETTERHEAD_TYPES,
@@ -25,6 +26,7 @@ import {
   letterheadFileError,
   logoFileError,
   profileErrors,
+  profileFields,
   saveCompanyProfile,
   uploadCompanyLogo,
   uploadLetterheadImage,
@@ -34,22 +36,8 @@ const inputClass =
   'w-full rounded-tile border border-border bg-white px-3 py-2 text-[12.5px] text-ink outline-none focus:border-brand disabled:bg-secondary disabled:text-muted-foreground';
 const KRA_PIN = /^[AP]\d{9}[A-Z]$/;
 
-const EMPTY: CompanyProfileFields = {
-  company_name: '', tagline: null, logo_url: null, primary_color: null, secondary_color: null, description: null,
-  registration_no: null, business_type: null, industry: null, country: 'Kenya', base_currency: 'KES',
-  official_phone: null, official_email: null, website: null, address_line1: null, address_line2: null, city: null,
-  postal_code: null, fiscal_year_start_month: 1, week_start_day: 'monday', letterhead_header_url: null, letterhead_footer_url: null,
-};
-
-const fieldsOf = (p: CompanyProfileFields & { tenant_id?: string }): CompanyProfileFields => {
-  const { tenant_id: _key, ...rest } = p;
-  void _key;
-  const out = { ...EMPTY };
-  for (const k of Object.keys(EMPTY) as (keyof CompanyProfileFields)[]) {
-    if (rest[k] !== undefined) (out as Record<string, unknown>)[k] = rest[k];
-  }
-  return out;
-};
+const EMPTY = EMPTY_PROFILE;
+const fieldsOf = profileFields;
 
 function Field({ label, hint, error, children, className = '', group = false }: {
   label: string; hint?: string; error?: string; children: ReactNode; className?: string;

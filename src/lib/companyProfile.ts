@@ -41,6 +41,23 @@ export interface CompanyIdentity {
   company_tagline: string | null;
 }
 
+/** A company with no profile yet: every field blank, Kenya, KES, January, Monday. */
+export const EMPTY_PROFILE: CompanyProfileFields = {
+  company_name: '', tagline: null, logo_url: null, primary_color: null, secondary_color: null, description: null,
+  registration_no: null, business_type: null, industry: null, country: 'Kenya', base_currency: 'KES',
+  official_phone: null, official_email: null, website: null, address_line1: null, address_line2: null, city: null,
+  postal_code: null, fiscal_year_start_month: 1, week_start_day: 'monday', letterhead_header_url: null, letterhead_footer_url: null,
+};
+
+/** A saved profile as the fields the page edits (the key dropped, anything missing blank). */
+export const profileFields = (p: CompanyProfileFields & { tenant_id?: string }): CompanyProfileFields => {
+  const out = { ...EMPTY_PROFILE };
+  for (const k of Object.keys(EMPTY_PROFILE) as (keyof CompanyProfileFields)[]) {
+    if (p[k] !== undefined) (out as Record<string, unknown>)[k] = p[k];
+  }
+  return out;
+};
+
 export const DEFAULT_PRIMARY_COLOR = '#17402A';
 export const DEFAULT_SECONDARY_COLOR = '#F26A1B';
 
