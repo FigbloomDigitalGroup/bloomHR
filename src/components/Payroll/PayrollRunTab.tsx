@@ -23,6 +23,7 @@ import type { EmployeeRecord } from "../../lib/profileCompleteness";
 import { IN_APP_PAYMENTS } from "../../lib/inAppPayments";
 import { payslipDeductionLines } from "../../lib/voluntaryDeductions";
 import { payslipEarningLines } from "../../lib/earnings";
+import { leaveLineLabel, payslipLeaveLines } from "../../lib/leavePay";
 import PayrollRunBar from "./PayrollRunBar";
 import ReturnsReadiness from "./ReturnsReadiness";
 import { BulkPayButton } from "./RunPayActions";
@@ -117,6 +118,9 @@ function PayBreakdown({ record }: { record: any }) {
       <div className="space-y-1.5">
         <h4 className="text-[10px] font-bold uppercase text-subtle">Earnings</h4>
         {line("Basic salary", record.basic_salary)}
+        {payslipLeaveLines(record).map((l, i) => (
+          <React.Fragment key={`leave-${l.name}-${i}`}>{line(leaveLineLabel(l), -l.amount, "text-status-danger")}</React.Fragment>
+        ))}
         {line("House allowance", record.house_allowance)}
         {line("Transport allowance", record.transport_allowance)}
         {line("Overtime", (record.overtime_hours || 0) * (record.overtime_rate || 0))}

@@ -19,6 +19,7 @@ import {
 import toast from 'react-hot-toast';
 import { payslipDeductionLines } from '../../lib/voluntaryDeductions';
 import { nonTaxableEarningsOf, payslipEarningLines } from '../../lib/earnings';
+import { leaveLineLabel, leaveLineWorking, payslipLeaveLines, type LeaveItem } from '../../lib/leavePay';
 import html2pdf from 'html2pdf.js';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -138,6 +139,7 @@ const savedPayslipValues = (saved: Record<string, any>) => {
     otherDeductions: n(saved.other_deductions),
     deductionLines: payslipDeductionLines(saved),
     earningLines: payslipEarningLines(saved),
+    leaveLines: payslipLeaveLines(saved),
     totalDeductions: n(saved.total_deductions),
     netPay: n(saved.net_pay),
     taxableGross: grossPay - perDiem - nonTaxableEarningsOf(saved),
@@ -312,6 +314,7 @@ const calculatePayrollValues = (employee, overrideStatutoryChecks = true, salary
     otherDeductions,
     deductionLines: payslipDeductionLines({ loan_deduction: loanDeduction, welfare_deduction: welfareDeduction, other_deductions: otherDeductions }),
     earningLines: payslipEarningLines({ commission, bonus }),
+    leaveLines: [] as LeaveItem[],
     totalDeductions,
     netPay,
     taxableGross,
@@ -547,6 +550,9 @@ const PayslipModal = ({
                   <div className="bg-gray-100 border-b border-gray-300 font-bold p-3 text-gray-900">Earnings</div>
                   <div className="p-3 space-y-2 text-black">
                     <div className="flex justify-between"><span>Basic</span><span className="font-semibold">KSh {calculated.basicSalary.toLocaleString()}</span></div>
+                    {calculated.leaveLines.map((line, i) => (
+                      <div key={`leave-${line.name}-${i}`} className="flex justify-between gap-3"><span>{leaveLineLabel(line)}<span className="block text-gray-500 text-xs">{leaveLineWorking(line)}</span></span><span className="font-semibold text-red-700 whitespace-nowrap">−KSh {line.amount.toLocaleString()}</span></div>
+                    ))}
                     <div className="flex justify-between"><span>House</span><span className="font-semibold">KSh {calculated.houseAllowance.toLocaleString()}</span></div>
                     <div className="flex justify-between"><span>Transport</span><span className="font-semibold">KSh {calculated.transportAllowance.toLocaleString()}</span></div>
                     <div className="flex justify-between"><span>Medical</span><span className="font-semibold">KSh {calculated.medicalAllowance.toLocaleString()}</span></div>
@@ -1149,6 +1155,12 @@ const PayslipViewer = () => {
                                   <span>Basic Salary:</span>
                                   <span>KSh {calculated.basicSalary.toLocaleString()}</span>
                                 </div>
+                                {calculated.leaveLines.map((line, i) => (
+                                  <div key={`leave-${line.name}-${i}`} className="flex justify-between">
+                                    <span>{leaveLineLabel(line)}:</span>
+                                    <span className="text-status-danger">−KSh {line.amount.toLocaleString()}</span>
+                                  </div>
+                                ))}
                                 <div className="flex justify-between">
                                   <span>House Allowance:</span>
                                   <span>KSh {calculated.houseAllowance.toLocaleString()}</span>

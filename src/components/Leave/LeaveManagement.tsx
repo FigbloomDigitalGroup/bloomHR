@@ -85,6 +85,8 @@ type LeaveType = {
   followup_within_days?: number;
   // days at half pay once the full-pay days are used (FIG-879), e.g. sick leave 30 + 15
   half_pay_days?: number;
+  // false for leave without pay: payroll deducts a day's pay for each day (FIG-880). On the type, not its policy.
+  paid?: boolean;
 };
 
 /** A leave type's document rule, as the documents list reads it. */
@@ -692,7 +694,11 @@ const LeaveTypeFormModal = ({
             <input
               type="text"
               value={newLeaveType.name}
-              onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, name: e.target.value }))}
+              onChange={(e) => {
+                const name = e.target.value;
+                // a new "Unpaid ..." type starts unpaid, as the database does
+                setNewLeaveType((prev: any) => ({ ...prev, name, ...(!prev.id && /^\s*unpaid/i.test(name) ? { paid: false } : {}) }));
+              }}
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
               placeholder="e.g., Annual Leave"
             />
@@ -982,6 +988,24 @@ const LeaveTypeFormModal = ({
             <p className="mt-2 text-[11px] text-gray-500">
               "With the application": employees can't apply without it. HR entering leave for someone may add it later.
               Missing documents show as overdue on the application.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Pay</label>
+            <select
+              aria-label="Paid or unpaid"
+              value={newLeaveType.paid === false ? 'unpaid' : 'paid'}
+              onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, paid: e.target.value === 'paid' }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
+            >
+              <option value="paid">Paid</option>
+              <option value="unpaid">Unpaid</option>
+            </select>
+            <p className="mt-1 text-[11px] text-gray-500">
+              {newLeaveType.paid === false
+                ? "Payroll deducts a day's pay for each day of approved leave of this type."
+                : 'Paid as normal (any half-pay days above are deducted at half a day each).'}
             </p>
           </div>
 
@@ -1972,6 +1996,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
             is_deductible: t.is_deductible,
             is_continuous: t.is_continuous,
             icon: t.icon,
+            paid: t.paid !== false,
             max_days: policy?.days_allotted ?? undefined,
             accrual_method: policy?.accrual_method || 'none',
             carry_forward_max_days: policy?.carry_forward_max_days ?? 0,
@@ -2326,7 +2351,8 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
             description: type.description,
             is_deductible: type.is_deductible,
             is_continuous: type.is_continuous,
-            icon: type.icon
+            icon: type.icon,
+            paid: type.paid !== false
           }])
           .select();
 
@@ -2340,7 +2366,8 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
             description: type.description,
             is_deductible: type.is_deductible,
             is_continuous: type.is_continuous,
-            icon: type.icon
+            icon: type.icon,
+            paid: type.paid !== false
           })
           .eq('id', type.id);
 
@@ -2525,6 +2552,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
                     <LeaveTypeIcon type={type} />
                     <div>
                       <p className="text-gray-900 font-base">{type.name}</p>
+                      {type.paid === false && <p className="text-[11px] text-orange-text-alt">Unpaid: deducted in payroll</p>}
                     </div>
                   </div>
                 </td>
