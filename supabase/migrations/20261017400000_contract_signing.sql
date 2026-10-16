@@ -6,7 +6,7 @@
 --       signed -> sent_back (HR says what needs fixing) -> signed again ...;  anything before accepted -> cancelled (HR)
 --   storage bucket employee-contracts (private)
 --       <company id>/<contract id>/original-<random>.<ext>   the contract HR sent
---       <company id>/<contract id>/signed-<random>.<ext>     the employee's signed copy (a new file on every upload)
+--       <company id>/<contract id>/signed-<random>.pdf       the employee's signed copy, a PDF (a new file on every upload)
 --
 -- Who does what (enforced here, not only by the screens):
 --   HR ('employees' or 'hr-lifecycle' module, and administrators)   sends, sees every contract in the company and its
@@ -17,8 +17,9 @@
 -- Sending is an insert (HR only); every later step goes through the functions in section 4, which check who is asking
 -- and what the contract allows. Nothing updates or deletes a contract directly.
 --
--- Notifications: the employee hears when a contract is sent, sent back or accepted; HR hears when a signed copy comes
--- in (contract_signed, shown in the admin bell and never to the employee).
+-- Notifications: the employee hears when a contract is sent, sent back, accepted or cancelled (with HR's reason, if
+-- given); HR hears when a signed copy comes in (contract_signed, shown in the admin bell and never to the employee).
+-- Signed copies are PDFs only; the contract HR sends may be a PDF or a Word file.
 
 -- ---------------------------------------------------------------------------------------------
 -- 1. who manages contracts
@@ -147,6 +148,9 @@ begin
      or split_part(new.file_path, '/', 3) not like 'original-%' or split_part(new.file_path, '/', 4) <> '' then
     raise exception 'The contract file must be saved in the contract''s own folder' using errcode = '23514';
   end if;
+  if lower(new.file_path) !~ '\.(pdf|docx?)$' then
+    raise exception 'The contract must be a PDF or Word file' using errcode = '23514';
+  end if;
   new.status := 'sent';
   new.sent_by := auth.uid();
   new.sent_at := now();
@@ -227,6 +231,9 @@ begin
      or split_part(p_path, '/', 3) not like 'signed-%' or split_part(p_path, '/', 4) <> '' then
     raise exception 'The signed copy must be saved in the contract''s own folder' using errcode = '23514';
   end if;
+  if lower(p_path) !~ '\.pdf$' then
+    raise exception 'The signed copy must be a PDF' using errcode = '23514';
+  end if;
 
   perform set_config('figbloom.contract_step', 'on', true);
   update public.employee_contracts
@@ -292,7 +299,7 @@ begin
   return c;
 end $$;
 
--- HR withdraws a contract that hasn't been accepted yet. The employee no longer sees it.
+-- HR withdraws a contract that hasn't been accepted yet. The employee no longer sees it, and is told (with the reason).
 create or replace function public.contract_cancel(p_id uuid, p_reason text default null)
 returns public.employee_contracts
 language plpgsql security definer set search_path = public as $$
@@ -319,6 +326,10 @@ begin
   where id = p_id
   returning * into c;
   perform set_config('figbloom.contract_step', 'off', true);
+
+  perform public.notify_employee_number(c.tenant_id, c.employee_number, 'contract_cancelled', 'Contract cancelled',
+    '"' || c.title || '" was cancelled' || coalesce(' by HR: ' || c.cancel_reason || '.', ' by HR.')
+    || ' You don''t need to sign it.');
   return c;
 end $$;
 
@@ -348,7 +359,7 @@ alter table public.hr_notifications add constraint hr_notifications_notification
   'exit_requested', 'exit_approved', 'exit_declined',
   'application_received',
   'loan_requested', 'loan_disbursed', 'loan_repaid',
-  'contract_sent', 'contract_sent_back', 'contract_accepted', 'contract_signed'
+  'contract_sent', 'contract_sent_back', 'contract_accepted', 'contract_cancelled', 'contract_signed'
 ));
 
 -- a signed copy to review is for HR (the employee's bell doesn't show it, and it isn't emailed to them)
@@ -370,13 +381,13 @@ begin
 
   insert into storage.buckets (id, name, public) values ('employee-contracts', 'employee-contracts', false)
   on conflict (id) do update set public = false;
-  -- PDFs, Word documents and scans/photos of a signed page, up to 20 MB (where storage has these settings)
+  -- PDFs and Word documents, up to 20 MB (where storage has these settings): the contract HR sends may be either;
+  -- signed copies are PDFs (the insert policy below and contract_submit_signed check that)
   if exists (select 1 from information_schema.columns
              where table_schema = 'storage' and table_name = 'buckets' and column_name = 'allowed_mime_types') then
     execute $u$update storage.buckets set file_size_limit = 20971520, allowed_mime_types = array[
       'application/pdf', 'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'image/jpeg', 'image/png'] where id = 'employee-contracts'$u$;
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'] where id = 'employee-contracts'$u$;
   end if;
 
   drop policy if exists employee_contracts_select on storage.objects;
@@ -392,7 +403,7 @@ begin
            or (storage.foldername(name))[2] in (select public.my_contract_ids()))
     );
 
-  -- HR saves the contracts it sends; the employee saves signed copies, only for their own contracts still open
+  -- HR saves the contracts it sends; the employee saves signed copies (PDFs), only for their own contracts still open
   create policy employee_contracts_insert on storage.objects for insert to authenticated
     with check (
       bucket_id = 'employee-contracts'
@@ -400,7 +411,8 @@ begin
       and array_length(storage.foldername(name), 1) = 2
       and ((select public.manages_contracts())
            or ((storage.foldername(name))[2] in (select public.my_open_contract_ids())
-               and storage.filename(name) like 'signed-%'))
+               and storage.filename(name) like 'signed-%'
+               and lower(storage.filename(name)) like '%.pdf'))
     );
 
   -- HR may remove files; the employee their own earlier signed copies while the contract is still open

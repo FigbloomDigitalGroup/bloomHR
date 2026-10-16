@@ -8,6 +8,7 @@ import {
   SIGNED_FILE_ACCEPT,
   STATUS_TONE,
   canUploadSigned,
+  contractFileProblem,
   dueState,
   listMyContracts,
   openContractFile,
@@ -35,6 +36,13 @@ function ContractCard({ contract, onChanged }: { contract: SigningContract; onCh
 
   const upload = async (file: File | undefined) => {
     if (!file) return;
+    // PDFs only: said straight away, before anything is uploaded
+    const problem = contractFileProblem(file, 'signed');
+    if (problem) {
+      toast.error(problem, { duration: 8000 });
+      if (fileInput.current) fileInput.current.value = '';
+      return;
+    }
     setBusy(true);
     try {
       await uploadSignedCopy(c, file);
@@ -76,7 +84,7 @@ function ContractCard({ contract, onChanged }: { contract: SigningContract; onCh
           ? `HR accepted your signed copy on ${day(c.reviewed_at)}.`
           : c.status === 'signed'
             ? 'HR has your signed copy and will review it. You can still replace it until they accept it.'
-            : 'Download the contract, sign it, then upload the signed copy (PDF, Word, or a clear photo of each page).'}
+            : 'Download the contract, sign it, then upload the signed copy as a PDF. Signed on paper? Scan it to PDF (most phone scanner apps can).'}
       </p>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -92,11 +100,11 @@ function ContractCard({ contract, onChanged }: { contract: SigningContract; onCh
               type="file"
               accept={SIGNED_FILE_ACCEPT}
               className="sr-only"
-              aria-label={`Signed copy of ${c.title}`}
+              aria-label={`Signed copy of ${c.title} (PDF)`}
               onChange={(e) => upload(e.target.files?.[0])}
             />
             <Button disabled={busy} onClick={() => fileInput.current?.click()} icon={<Upload className="w-3.5 h-3.5" />}>
-              {busy ? 'Uploading…' : c.signed_path ? 'Replace signed copy' : 'Upload signed copy'}
+              {busy ? 'Uploading…' : c.signed_path ? 'Replace signed copy (PDF)' : 'Upload signed copy (PDF)'}
             </Button>
           </>
         )}

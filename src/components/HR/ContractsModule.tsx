@@ -168,7 +168,7 @@ function ContractDetailModal({ contract, onClose, onChanged }: { contract: Signi
   const cancel = async () => {
     const ok = await confirmDialog({
       title: 'Cancel this contract?',
-      message: `${c.employee_name || c.employee_number} will no longer see "${c.title}" or be able to sign it.`,
+      message: `${c.employee_name || c.employee_number} will be told it was cancelled, and will no longer see "${c.title}" or be able to sign it.`,
       confirmLabel: 'Cancel contract',
       cancelLabel: 'Keep it',
       tone: 'danger',

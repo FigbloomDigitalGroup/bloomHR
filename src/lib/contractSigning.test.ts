@@ -4,15 +4,14 @@ import { MAX_FILE_BYTES, canCancel, canUploadSigned, contentTypeFor, contractFil
 const ALL: ContractSigningStatus[] = ['sent', 'viewed', 'signed', 'accepted', 'sent_back', 'cancelled'];
 
 describe('contentTypeFor', () => {
-  it('knows PDFs, Word files and photos, whatever the case', () => {
+  it('knows PDFs and Word files, whatever the case', () => {
     expect(contentTypeFor('Contract.PDF')).toBe('application/pdf');
     expect(contentTypeFor('a.doc')).toBe('application/msword');
     expect(contentTypeFor('a.docx')).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    expect(contentTypeFor('scan.jpeg')).toBe('image/jpeg');
-    expect(contentTypeFor('scan.png')).toBe('image/png');
   });
 
   it('refuses anything else, and names without an extension', () => {
+    expect(contentTypeFor('scan.jpg')).toBeNull();
     expect(contentTypeFor('notes.txt')).toBeNull();
     expect(contentTypeFor('pdf')).toBeNull();
     expect(contentTypeFor('run.exe')).toBeNull();
@@ -28,9 +27,12 @@ describe('contractFileProblem', () => {
     expect(contractFileProblem(file('c.jpg'), 'contract')).toBe('Choose a PDF or Word file');
   });
 
-  it('a signed copy may also be a photo', () => {
-    expect(contractFileProblem(file('signed.jpg'), 'signed')).toBeNull();
-    expect(contractFileProblem(file('signed.txt'), 'signed')).toMatch(/PDF, Word file or photo/);
+  it('a signed copy is a PDF only', () => {
+    expect(contractFileProblem(file('signed.pdf'), 'signed')).toBeNull();
+    expect(contractFileProblem(file('signed.PDF'), 'signed')).toBeNull();
+    for (const name of ['signed.jpg', 'signed.png', 'signed.docx', 'signed.doc', 'signed']) {
+      expect(contractFileProblem(file(name), 'signed')).toMatch(/must be a PDF/);
+    }
   });
 
   it('refuses empty files and files over 20 MB', () => {

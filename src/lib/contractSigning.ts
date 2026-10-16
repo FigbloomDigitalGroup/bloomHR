@@ -77,19 +77,16 @@ export const canCancel = (status: ContractSigningStatus) => status !== 'accepted
 // ---------------------------------------------------------------------------------------------
 // files
 // ---------------------------------------------------------------------------------------------
-/** The bucket takes PDFs, Word documents, and photos or scans of the signed pages, up to 20 MB. */
+/** The contract HR sends is a PDF or Word file; the signed copy is a PDF (the database refuses anything else). Up to 20 MB. */
 export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const CONTENT_TYPES: Record<string, string> = {
   pdf: 'application/pdf',
   doc: 'application/msword',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  png: 'image/png',
 };
 /** For the file pickers' accept attribute. */
 export const CONTRACT_FILE_ACCEPT = '.pdf,.doc,.docx';
-export const SIGNED_FILE_ACCEPT = '.pdf,.doc,.docx,.jpg,.jpeg,.png';
+export const SIGNED_FILE_ACCEPT = '.pdf';
 
 /** The content type to store a file with, from its name (browsers sometimes give none for Word files); null if not taken. */
 export function contentTypeFor(fileName: string): string | null {
@@ -97,12 +94,13 @@ export function contentTypeFor(fileName: string): string | null {
   return fileName.includes('.') ? CONTENT_TYPES[extension] ?? null : null;
 }
 
-/** Why a file can't be used, or null when it can. The contract HR sends is a PDF or Word file; a signed copy may also be a photo. */
+/** Why a file can't be used, or null when it can. The contract HR sends is a PDF or Word file; a signed copy is a PDF. */
 export function contractFileProblem(file: Pick<File, 'name' | 'size'>, kind: 'contract' | 'signed'): string | null {
   const type = contentTypeFor(file.name);
-  if (!type || (kind === 'contract' && type.startsWith('image/'))) {
-    return kind === 'contract' ? 'Choose a PDF or Word file' : 'Choose a PDF, Word file or photo (JPG or PNG)';
+  if (kind === 'signed' && type !== 'application/pdf') {
+    return 'The signed copy must be a PDF. If you signed on paper, scan it to PDF (most phone scanner apps can) and upload that.';
   }
+  if (!type) return 'Choose a PDF or Word file';
   if (file.size <= 0) return 'That file is empty';
   if (file.size > MAX_FILE_BYTES) return 'That file is larger than 20 MB';
   return null;
@@ -239,7 +237,7 @@ export async function openContractFile(contract: SigningContract, which: 'contra
   }
 }
 
-/** The employee uploads their signed copy (or a new one in place of the last). The old file is removed. */
+/** The employee uploads their signed copy, a PDF (or a new one in place of the last). The old file is removed. */
 export async function uploadSignedCopy(contract: SigningContract, file: File): Promise<SigningContract> {
   const problem = contractFileProblem(file, 'signed');
   if (problem) throw new Error(problem);

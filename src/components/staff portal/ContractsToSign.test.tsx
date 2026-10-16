@@ -6,13 +6,14 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   open: vi.fn(),
   upload: vi.fn(),
+  toastError: vi.fn(),
 }));
 
 vi.mock('../../lib/contractSigning', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/contractSigning')>();
   return { ...actual, listMyContracts: mocks.list, openContractFile: mocks.open, uploadSignedCopy: mocks.upload };
 });
-vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: mocks.toastError } }));
 
 import ContractsToSign from './ContractsToSign';
 
@@ -41,6 +42,7 @@ beforeEach(() => {
   mocks.list.mockReset();
   mocks.open.mockReset().mockResolvedValue(undefined);
   mocks.upload.mockReset().mockResolvedValue(base);
+  mocks.toastError.mockReset();
 });
 afterEach(() => cleanup());
 
@@ -62,9 +64,20 @@ describe('ContractsToSign', () => {
     fireEvent.click(screen.getByRole('button', { name: /Download contract/ }));
     await waitFor(() => expect(mocks.open).toHaveBeenCalledWith(base, 'contract', true));
 
+    const picker = screen.getByLabelText('Signed copy of Employment contract 2027 (PDF)') as HTMLInputElement;
+    expect(picker.accept).toBe('.pdf');
     const file = new File(['%PDF'], 'signed.pdf', { type: 'application/pdf' });
-    fireEvent.change(screen.getByLabelText('Signed copy of Employment contract 2027'), { target: { files: [file] } });
+    fireEvent.change(picker, { target: { files: [file] } });
     await waitFor(() => expect(mocks.upload).toHaveBeenCalledWith(base, file));
+  });
+
+  it('a signed copy that is not a PDF is refused with a clear message, before uploading', async () => {
+    mocks.list.mockResolvedValue([base]);
+    render(<ContractsToSign />);
+    const picker = await screen.findByLabelText('Signed copy of Employment contract 2027 (PDF)');
+    fireEvent.change(picker, { target: { files: [new File(['x'], 'signed.jpg', { type: 'image/jpeg' })] } });
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith(expect.stringMatching(/must be a PDF/), expect.anything()));
+    expect(mocks.upload).not.toHaveBeenCalled();
   });
 
   it('sent back: shows what HR wants fixed, and lets them replace their copy', async () => {

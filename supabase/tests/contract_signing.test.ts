@@ -109,6 +109,11 @@ describe('sending', () => {
       as(HR, `insert into employee_contracts (id, employee_number, title, file_path) values ('${id}', 'E2', 'X', '${B}/${id}/original-x.pdf')`)
     ).rejects.toThrow(/own folder/);
     await expect(
+      as(HR, `insert into employee_contracts (id, employee_number, title, file_path) values ('${id}', 'E2', 'X', '${A}/${id}/original-x.jpg')`)
+    ).rejects.toThrow(/PDF or Word/);
+    await as(HR, `insert into employee_contracts (id, employee_number, title, file_path) values ('${id}', 'E2', 'Word', '${A}/${id}/original-x.docx')`);
+    await db.exec(`delete from employee_contracts where id = '${id}'`);
+    await expect(
       as(HR, `insert into employee_contracts (id, employee_number, title, file_path, sign_by) values ('${id}', 'E2', 'X', '${A}/${id}/original-x.pdf', current_date - 1)`)
     ).rejects.toThrow(/in the past/);
     await expect(
@@ -157,6 +162,9 @@ describe('the employee signs', () => {
     await expect(read(S1, `select public.contract_submit_signed('${C1}', '${A}/${C2}/signed-a.pdf', 'signed.pdf')`)).rejects.toThrow(/own folder/);
     await expect(read(S1, `select public.contract_submit_signed('${C1}', '${A}/${C1}/original-a.pdf', 'signed.pdf')`)).rejects.toThrow(/own folder/);
     await expect(read(S2, `select public.contract_submit_signed('${C1}', '${A}/${C1}/signed-a.pdf', 'signed.pdf')`)).rejects.toThrow(/not found/);
+    // PDFs only
+    await expect(read(S1, `select public.contract_submit_signed('${C1}', '${A}/${C1}/signed-a.jpg', 'signed.jpg')`)).rejects.toThrow(/must be a PDF/);
+    await expect(read(S1, `select public.contract_submit_signed('${C1}', '${A}/${C1}/signed-a.docx', 'signed.docx')`)).rejects.toThrow(/must be a PDF/);
     await read(S1, `select public.contract_submit_signed('${C1}', '${A}/${C1}/signed-a.pdf', 'signed.pdf')`);
     expect(await contract(C1)).toMatchObject({ status: 'signed', signed_path: `${A}/${C1}/signed-a.pdf` });
     const [n] = await notes('contract_signed', 'E1');
@@ -203,9 +211,12 @@ describe('HR reviews', () => {
     await expect(read(HR, `select public.contract_cancel('${C1}')`)).rejects.toThrow(/already accepted/);
   });
 
-  it('HR cancels a contract: the employee no longer sees it or can sign it', async () => {
+  it('HR cancels a contract: the employee is told why, and no longer sees it or can sign it', async () => {
     await read(HR, `select public.contract_cancel('${C3}', 'Wrong template')`);
     expect((await contract(C3)).status).toBe('cancelled');
+    const told = await read<{ title: string; message: string }>(S1, `select title, message from hr_notifications where notification_type = 'contract_cancelled'`);
+    expect(told).toEqual([{ title: 'Contract cancelled', message: `"Employment contract 2027" was cancelled by HR: Wrong template. You don't need to sign it.` }]);
+    expect((await rows<{ hr: boolean }>(`select public.hr_only_notification('contract_cancelled') hr`))[0].hr).toBe(false);
     expect((await read<{ id: string }>(S1, `select id from employee_contracts`)).map((r) => r.id)).toEqual([C1]);
     await expect(read(S1, `select public.contract_submit_signed('${C3}', '${A}/${C3}/signed-a.pdf', 'x.pdf')`)).rejects.toThrow(/not found/);
   });
@@ -238,6 +249,8 @@ describe('the files', () => {
     await asUser(db, S2, async () => {
       await expect(put(`${A}/${C2}/signed-a.pdf`)).resolves.toBeTruthy();
       await expect(put(`${A}/${C2}/original-y.pdf`)).rejects.toThrow(/row-level security/); // not as the contract
+      await expect(put(`${A}/${C2}/signed-b.jpg`)).rejects.toThrow(/row-level security/); // PDFs only
+      await expect(put(`${A}/${C2}/signed-b.docx`)).rejects.toThrow(/row-level security/);
       await expect(put(`${A}/${C1}/signed-a.pdf`)).rejects.toThrow(/row-level security/); // a colleague's
     });
     await asUser(db, S1, async () => {
