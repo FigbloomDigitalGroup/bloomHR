@@ -9,6 +9,34 @@ import { normalisePaymentMethod, paymentKind } from './paymentMethods';
 
 const text = (value: unknown) => (value === null || value === undefined ? '' : String(value).trim());
 
+/** the words of a name, lower case, without accents or punctuation */
+const nameWords = (value: unknown) =>
+  text(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z]+/)
+    .filter((w) => w && !TITLES.has(w));
+const TITLES = new Set(['mr', 'mrs', 'ms', 'miss', 'dr', 'prof', 'eng', 'hon']);
+
+/**
+ * Whether a bank account's name is this employee's name, the way banks write names: in any order, any case, with or
+ * without the middle name, and with initials ("WANJIRU AMINA", "Amina W. Wanjiru", "A. Wanjiru"). Every word of the
+ * account name must be one of the employee's names (or an initial of one), and at least two of the employee's names
+ * must appear in full, or the one name they have.
+ */
+export function accountNameMatches(accountName: unknown, employee: EmployeeRecord): boolean {
+  const own = [...nameWords(employee['First Name']), ...nameWords(employee['Middle Name']), ...nameWords(employee['Last Name'])];
+  const account = nameWords(accountName);
+  if (!own.length || !account.length) return false;
+  const full = account.filter((w) => w.length > 1 && own.includes(w));
+  const allKnown = account.every((w) => own.includes(w) || (w.length === 1 && own.some((o) => o.startsWith(w))));
+  return allKnown && new Set(full).size >= Math.min(2, new Set(own).size);
+}
+
+/** shown when a bank-paid employee's account name isn't their name (the bank would refuse or misdirect the payment) */
+export const ACCOUNT_NAME_MISMATCH = "Account name doesn't match";
+
 /** What is missing for one employee, in the words shown on screen and in the spreadsheet. */
 export function missingDetails(employee: EmployeeRecord): string[] {
   const missing: string[] = [];
@@ -21,6 +49,8 @@ export function missingDetails(employee: EmployeeRecord): string[] {
     if (!text(employee['Bank'])) missing.push('Bank');
     if (!text(employee['Bank Branch'])) missing.push('Bank branch');
     if (!text(employee['Account Number'])) missing.push('Account number');
+    if (!text(employee['account_number_name'])) missing.push('Account name');
+    else if (!accountNameMatches(employee['account_number_name'], employee)) missing.push(ACCOUNT_NAME_MISMATCH);
   }
   return missing;
 }

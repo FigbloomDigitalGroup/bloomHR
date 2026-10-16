@@ -1355,6 +1355,16 @@ export default function PayrollDashboard() {
       : monthRun
         ? `Approve ${periodLabel}'s payroll first, then pay`
         : `Start and approve ${periodLabel}'s payroll first, then pay`;
+  // the payment details are read again whenever the pay window opens, so a bank name corrected on the employee's
+  // record since this page loaded is the one checked
+  useEffect(() => {
+    if (!showDemoPayAll) return;
+    let stale = false;
+    fetchAll((from, to) => supabase.from("employees").select("*").order('"Employee Number"').order("id").range(from, to))
+      .then((data) => { if (!stale && data) setEmployees(data); })
+      .catch((err) => console.error("Could not reload employees for paying:", err));
+    return () => { stale = true; };
+  }, [showDemoPayAll]);
   const demoLines = useMemo(() => demoPayLines(payrollRecords, employees), [payrollRecords, employees]);
   const demoLineByNumber = useMemo(() => new Map(demoLines.map((l) => [l.employeeNumber, l])), [demoLines]);
   const demoPaidNow = demoPaid.period === actualPeriod ? demoPaid.numbers : new Set<string>();
