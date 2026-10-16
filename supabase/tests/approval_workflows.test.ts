@@ -83,6 +83,10 @@ beforeAll(async () => {
     update employees set "Leave Approver" = 'lea  approver', "Alternate Approver" = 'Otto Other', manager_email = ' MGR@a.co '
       where "Employee Number" in ('E-ME', 'E-CTO', 'E-OTHER') and tenant_id = '${A}';
     update employees set "Alternate Approver" = null where "Employee Number" = 'E-OTHER';
+    -- the leave types applications name; balances are not what these tests are about (leave_rules.test.ts)
+    select seed_default_leave_types('${A}');
+    select seed_default_leave_types('${B}');
+    update leave_policies set balance_rule = 'none';
   `);
 }, 120000);
 

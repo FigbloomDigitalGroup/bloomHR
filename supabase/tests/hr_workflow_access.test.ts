@@ -123,6 +123,7 @@ describe('leave_application', () => {
         ('E-ME', 'Me', 'Annual Leave', 'Pending', '${A}'),
         ('E-THEM', 'Them', 'Annual Leave', 'Pending', '${A}'),
         ('E-ME', 'Me (B)', 'Annual Leave', 'Pending', '${B}');
+      select seed_default_leave_types('${A}');
     `);
   });
 
@@ -134,7 +135,8 @@ describe('leave_application', () => {
   });
   it('an employee can apply for leave (Pending) but not for a colleague', async () => {
     await asUser(db, U.STAFF, async () => {
-      expect(await attempt(`insert into leave_application ("Employee Number", status) values ('E-ME', 'Pending')`)).toBe(true);
+      expect(await attempt(`insert into leave_application ("Employee Number", "Leave Type", "Start Date", "End Date", status)
+                            values ('E-ME', 'Sick Leave', '2030-03-04', '2030-03-04', 'Pending')`)).toBe(true);
       expect(await attempt(`insert into leave_application ("Employee Number", status) values ('E-THEM', 'Pending')`)).toBe(false);
     });
   });

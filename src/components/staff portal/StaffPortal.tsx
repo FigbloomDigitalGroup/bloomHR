@@ -73,7 +73,8 @@ import MyDocumentsPage from '../Onboarding/MyDocumentsPage';
 import Appearance from '../Settings/Appearance';
 import MyContract from './MyContract';
 import MyResignation from './MyResignation';
-import { leaveDays, NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
+import { NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
+import { useLeaveCheck } from '../../lib/leaveRules';
 import CompleteProfileCard from './CompleteProfileCard';
 import OnboardingForm from '../Onboarding/OnboardingForm';
 import MyFirstWeeks from '../AfterHiring/MyFirstWeeks';
@@ -394,11 +395,6 @@ const LeaveApplicationForm = () => {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Tracked but never displayed anywhere (pre-existing) - only the setter is
-  // used, so the read binding is intentionally skipped rather than kept
-  // unused.
-  const [, setUserLeavesThisMonth] = useState(0);
-  const [userLeaveTypesThisMonth, setUserLeaveTypesThisMonth] = useState<string[]>([]);
   // Real leave types from the leave_types catalog (see FIG-564) - replaces a
   // hardcoded dropdown whose lowercase values ("sick", "maternity", "month")
   // never matched the catalog's real names, silently breaking balance
@@ -451,7 +447,6 @@ const LeaveApplicationForm = () => {
               "Office Branch": officeBranch
             }));
 
-            await checkLeaveRules(data["Employee Number"]);
           }
         } catch (error) {
           console.error('Error fetching employee data:', error);
@@ -462,36 +457,10 @@ const LeaveApplicationForm = () => {
     fetchEmployeeData();
   }, []);
 
-  // Personal rate limit only: an employee can't apply for the same leave
-  // type twice in the same calendar month. The previous per-branch
-  // "only one person on leave at a time" restriction was removed - the
-  // leave_balances/carry-forward system (FIG-563/565) is the real
-  // constraint on how much leave someone can take.
-  const checkLeaveRules = async (employeeNumber: string) => {
-    try {
-      const now = new Date();
-      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-      const { data: userLeaves } = await supabase
-        .from('leave_application')
-        .select('*,"Leave Type"')
-        .eq('"Employee Number"', employeeNumber)
-        .gte('time_added', firstDayOfMonth.toISOString())
-        .lte('time_added', lastDayOfMonth.toISOString());
-
-      setUserLeavesThisMonth(userLeaves?.length || 0);
-
-      const types = userLeaves?.map(leave => leave["Leave Type"]) || [];
-      setUserLeaveTypesThisMonth(types);
-
-      console.log('User leaves this month:', userLeaves);
-      console.log('User leave types this month:', types);
-
-    } catch (error) {
-      console.error('Error checking leave rules:', error);
-    }
-  };
+  // The company's rules for this leave type (balance, most days per application, notice, once a month) and the days it
+  // covers, as the database will count them when it is submitted (FIG-875).
+  const { check, checking } = useLeaveCheck(formData["Employee Number"], formData["Leave Type"], formData["Start Date"], formData["End Date"]);
+  const problems = check?.problems ?? [];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -499,24 +468,13 @@ const LeaveApplicationForm = () => {
       ...prev,
       [name]: value
     }));
-
-    if (name === "Start Date" || name === "End Date") {
-      const days = leaveDays(
-        name === "Start Date" ? value : formData["Start Date"],
-        name === "End Date" ? value : formData["End Date"]
-      );
-      setFormData(prev => ({
-        ...prev,
-        "Days": days
-      }));
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (userLeaveTypesThisMonth.includes(formData["Leave Type"])) {
-      toast.error(`You have already applied for ${formData["Leave Type"]} this month.`);
+    if (problems.length) {
+      toast.error(problems[0]);
       return;
     }
 
@@ -528,7 +486,7 @@ const LeaveApplicationForm = () => {
       return;
     }
 
-    if (formData["Days"] <= 0) {
+    if (!check || check.days <= 0) {
       toast.error('Choose a start date, and an end date that is the same day or later');
       setIsSubmitting(false);
       return;
@@ -550,7 +508,8 @@ const LeaveApplicationForm = () => {
           "Leave Type": formData["Leave Type"],
           "Start Date": formData["Start Date"],
           "End Date": formData["End Date"],
-          "days": formData["Days"],
+          // the database works the days out again from the dates and the leave type
+          "days": check.days,
           "type": formData["Type"],
           "Application Type": formData["Application Type"],
           "reason": formData["Reason"],
@@ -579,7 +538,8 @@ const LeaveApplicationForm = () => {
 
     } catch (error) {
       console.error('Error submitting leave application:', error);
-      toast.error('Failed to submit leave application');
+      // the database refuses an application that breaks one of the company's leave rules, and says which
+      toast.error((error as { message?: string })?.message || 'Failed to submit leave application');
     } finally {
       setIsSubmitting(false);
     }
@@ -589,7 +549,7 @@ const LeaveApplicationForm = () => {
   const isSubmitDisabled = () => {
     if (isSubmitting) return true;
 
-    if (userLeaveTypesThisMonth.includes(formData["Leave Type"])) {
+    if (checking || !check || problems.length > 0) {
       return true;
     }
 
@@ -601,15 +561,7 @@ const LeaveApplicationForm = () => {
     return false;
   };
 
-  // Get the current restriction message
-  const getRestrictionMessage = () => {
-    if (userLeaveTypesThisMonth.includes(formData["Leave Type"])) {
-      return `You have already applied for ${formData["Leave Type"]} this month`;
-    }
-    return null;
-  };
-
-  const restrictionMessage = getRestrictionMessage();
+  const restrictionMessage = problems.length ? "Can't submit yet - see above" : null;
 
   return (
     <div className="p-6">
@@ -617,18 +569,22 @@ const LeaveApplicationForm = () => {
         <h2 className="text-2xl font-semibold text-gray-800">Leave Application</h2>
         <div className="flex items-center mt-2">
           <div className="h-1 w-8 bg-brand rounded-full mr-2"></div>
-          <p className="text-xs text-brand">Staff members accrue two leave days each calendar month.</p>
+          <p className="text-xs text-brand">
+            {check && check.available !== null
+              ? `${formData["Leave Type"]}: ${check.available} day${check.available === 1 ? '' : 's'} free to book`
+              : 'Choose the leave type and dates to see what you have left.'}
+          </p>
         </div>
 
-        {/* Show warning messages */}
-        {userLeaveTypesThisMonth.includes(formData["Leave Type"]) && (
+        {/* what stops this application, from the company's leave rules */}
+        {problems.length > 0 && (
           <div className="mt-4 bg-orange-tint-alt border-l-4 border-orange-text-alt p-4 rounded-r-lg">
             <div className="flex">
               <PhWarning className="h-5 w-5 text-orange-text-alt" weight="duotone" />
-              <div className="ml-3">
-                <p className="text-xs text-orange-text-alt">
-                  You have already applied for {formData["Leave Type"]} this month.
-                </p>
+              <div className="ml-3 space-y-1">
+                {problems.map((p) => (
+                  <p key={p} className="text-xs text-orange-text-alt">{p}</p>
+                ))}
               </div>
             </div>
           </div>
@@ -685,9 +641,6 @@ const LeaveApplicationForm = () => {
                   <option key={type.id} value={type.name}>{type.name}</option>
                 ))}
               </select>
-              {userLeaveTypesThisMonth.includes(formData["Leave Type"]) && (
-                <p className="text-xs text-status-purple mt-1">You've already applied for this leave type this month</p>
-              )}
             </div>
             <div className="space-y-1">
               <label className="block text-xs font-medium text-gray-700">Application Type</label>
@@ -715,7 +668,6 @@ const LeaveApplicationForm = () => {
                 onChange={handleChange}
                 className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                 required
-                min={new Date().toISOString().split('T')[0]}
               />
             </div>
             <div className="space-y-1">
@@ -727,7 +679,7 @@ const LeaveApplicationForm = () => {
                 onChange={handleChange}
                 className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                 required
-                min={formData["Start Date"] || new Date().toISOString().split('T')[0]}
+                min={formData["Start Date"] || undefined}
               />
             </div>
             <div className="space-y-1">
@@ -735,7 +687,7 @@ const LeaveApplicationForm = () => {
               <input
                 type="number"
                 name="Days"
-                value={formData["Days"]}
+                value={check?.days ?? 0}
                 className="w-full px-4 py-2 text-xs border border-gray-300 rounded-lg bg-gray-50"
                 readOnly
               />
