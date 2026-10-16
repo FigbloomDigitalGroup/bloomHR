@@ -66,11 +66,21 @@ describe('Approval workflows card', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(saveApprovalWorkflow).toHaveBeenCalled());
-    const [kind, steps, admins] = saveApprovalWorkflow.mock.calls[0];
+    const [kind, steps, admins, notify] = saveApprovalWorkflow.mock.calls[0];
+    expect(notify).toEqual([]);
     expect(kind).toBe('leave');
     expect(admins).toBe(true);
     expect(steps.map((s: { approver_type: string }) => s.approver_type)).toEqual(['reports_to', 'role', 'person']);
     expect(steps[2]).toMatchObject({ approver_employee_number: 'E-CTO', label: 'CTO' });
+  });
+
+  it('tells HR when a request is decided, without HR being a step', async () => {
+    render(<ApprovalWorkflowsCard />);
+    await screen.findByTestId('approval-preview');
+    fireEvent.click(screen.getByLabelText('HR', { selector: 'fieldset input' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(saveApprovalWorkflow).toHaveBeenCalled());
+    expect(saveApprovalWorkflow.mock.calls[0][3]).toEqual(['HR']);
   });
 
   it('reorders and removes steps', async () => {
