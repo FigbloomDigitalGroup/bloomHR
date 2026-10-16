@@ -2,6 +2,8 @@ import toast from 'react-hot-toast';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { employeeJoined, isYearlyMethod, yearAllowance } from '../../lib/leaveAccrual';
 import { BALANCE_RULE_LABELS, BalanceRule, CountDays, useLeaveCheck } from '../../lib/leaveRules';
+import { LEAVE_DOCUMENTS_BUCKET, LeaveDocumentRule, uploadLeaveDocument } from '../../lib/leaveDocuments';
+import LeaveDocuments from './LeaveDocuments';
 import EmployeePicker from '../UI/EmployeePicker';
 import {
   Calendar,
@@ -74,7 +76,28 @@ type LeaveType = {
   one_per_month?: boolean;
   // months after joining before it can be taken (FIG-878); days still build up meanwhile
   service_months_before_use?: number;
+  // the documents it asks for (FIG-876)
+  document_name?: string | null;
+  document_when?: 'with_application' | 'after';
+  document_within_days?: number;
+  document_if_longer_than?: number;
+  followup_document_name?: string | null;
+  followup_within_days?: number;
 };
+
+/** A leave type's document rule, as the documents list reads it. */
+const documentRuleOf = (t: LeaveType | undefined): LeaveDocumentRule | undefined =>
+  t && (t.document_name || t.followup_document_name)
+    ? {
+        leave_type: t.name,
+        name: t.document_name || null,
+        when: t.document_when || 'with_application',
+        within_days: t.document_within_days ?? 0,
+        if_longer_than: t.document_if_longer_than ?? 0,
+        followup_name: t.followup_document_name || null,
+        followup_within_days: t.followup_within_days ?? 14,
+      }
+    : undefined;
 
 type Holiday = {
   id: string;
@@ -101,6 +124,11 @@ type LeaveApplication = {
   recommendation_notes?: string;
   /** HR's note when approving or rejecting (the employee's own reason stays in Reason) */
   notes?: string;
+  // the documents with it (FIG-876)
+  document_path?: string | null;
+  document_name?: string | null;
+  followup_document_path?: string | null;
+  followup_document_name?: string | null;
 };
 
 type EmployeeLeaveBalance = {
@@ -369,9 +397,12 @@ const LeaveTypeIcon = ({ type }: { type: LeaveType }) => {
 // Detailed View Component
 // Detailed View Component
 // Detailed View Component
-const LeaveApplicationDetails = ({ application, onClose, chain, onDecided }: {
+const LeaveApplicationDetails = ({ application, onClose, chain, onDecided, documentRule, onDocumentsChanged }: {
   application: LeaveApplication,
   onClose: () => void,
+  // the documents its leave type asks for (FIG-876), and a reload after HR adds one
+  documentRule?: LeaveDocumentRule,
+  onDocumentsChanged?: () => void,
   // its approval chain (FIG-829); the current approver approves or rejects here
   chain?: ApprovalChainData,
   onDecided?: (status: 'pending' | 'approved' | 'rejected') => void | Promise<void>
@@ -452,6 +483,18 @@ const LeaveApplicationDetails = ({ application, onClose, chain, onDecided }: {
               <div>
                 <p className="text-xs text-gray-500 mb-2">Approvals</p>
                 <ApprovalChain chain={chain} onDecided={onDecided} />
+              </div>
+            )}
+
+            {(documentRule || application.document_path || application.followup_document_path) && (
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Documents</p>
+                <LeaveDocuments
+                  app={{ ...application, days: application.Days, status: application.Status }}
+                  rule={documentRule}
+                  canAdd
+                  onChanged={onDocumentsChanged}
+                />
               </div>
             )}
 
@@ -841,6 +884,90 @@ const LeaveTypeFormModal = ({
             </p>
           </div>
 
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-xs font-semibold text-gray-800 mb-3">Documents</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-gray-700 mb-1">Document needed</label>
+                <input
+                  type="text"
+                  value={newLeaveType.document_name ?? ''}
+                  maxLength={120}
+                  onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, document_name: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                  placeholder="None, or e.g. Report from a registered medical practitioner"
+                />
+              </div>
+              {(newLeaveType.document_name ?? '').trim() && (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">When</label>
+                    <select
+                      value={newLeaveType.document_when || 'with_application'}
+                      onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, document_when: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                    >
+                      <option value="with_application">With the application</option>
+                      <option value="after">Within some days of the leave starting</option>
+                    </select>
+                  </div>
+                  {newLeaveType.document_when === 'after' ? (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Within (days of the leave starting)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="365"
+                        value={newLeaveType.document_within_days ?? 0}
+                        onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, document_within_days: Math.min(365, Math.max(0, Number(e.target.value))) }))}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                      />
+                    </div>
+                  ) : <div />}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Only for leave longer than (days)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={newLeaveType.document_if_longer_than ?? 0}
+                      onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, document_if_longer_than: Math.max(0, Number(e.target.value)) }))}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                      placeholder="0 = always"
+                    />
+                  </div>
+                </>
+              )}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Follow-up document (after the leave starts)</label>
+                <input
+                  type="text"
+                  value={newLeaveType.followup_document_name ?? ''}
+                  maxLength={120}
+                  onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, followup_document_name: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                  placeholder="None, or e.g. Birth notification"
+                />
+              </div>
+              {(newLeaveType.followup_document_name ?? '').trim() && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Within (days of the leave starting)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={newLeaveType.followup_within_days ?? 14}
+                    onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, followup_within_days: Math.min(365, Math.max(0, Number(e.target.value))) }))}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                  />
+                </div>
+              )}
+            </div>
+            <p className="mt-2 text-[11px] text-gray-500">
+              "With the application": employees can't apply without it. HR entering leave for someone may add it later.
+              Missing documents show as overdue on the application.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex items-center">
               <input
@@ -1145,6 +1272,7 @@ const LeaveApplicationFormModal = ({
   useEffect(() => {
     setNewLeaveApplication((prev: any) => ({ ...prev, "Days": check?.days ?? 0 }));
   }, [check, setNewLeaveApplication]);
+  const docName = check?.document?.name;
 
   const handleEmployeeChange = (employeeNumber: string) => {
     const employee = employees.find((e) => e["Employee Number"] === employeeNumber);
@@ -1235,6 +1363,21 @@ const LeaveApplicationFormModal = ({
               )}
             </div>
           </div>
+
+          {docName && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1" htmlFor="assign-leave-document">
+                {docName} <span className="font-normal text-gray-500">(optional for HR: it can be added later)</span>
+              </label>
+              <input
+                id="assign-leave-document"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                onChange={(e) => setNewLeaveApplication((prev: any) => ({ ...prev, DocumentFile: e.target.files?.[0] ?? null }))}
+                className="block w-full text-xs text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-primary"
+              />
+            </div>
+          )}
 
           {problems.length > 0 && (
             <div className="rounded-lg border border-orange-text-alt/30 bg-orange-tint-alt px-3 py-2 space-y-1" role="alert">
@@ -1364,7 +1507,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
     date: new Date().toISOString().split('T')[0],
     recurring: true
   });
-  const [newLeaveApplication, setNewLeaveApplication] = useState<Omit<LeaveApplication, 'id' | 'time_added'>>({
+  const [newLeaveApplication, setNewLeaveApplication] = useState<Omit<LeaveApplication, 'id' | 'time_added'> & { DocumentFile?: File | null }>({
     "Employee Number": '',
     "Name": '',
     "Leave Type": '',
@@ -1561,6 +1704,18 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
 
   // After the signed-in approver approved or rejected through the chain (decide_approval writes the status,
   // the recommendation and the notifications, and the database takes the balance): show the application as it now is.
+  // after HR adds a document to an application: show it
+  const refreshApplicationDocuments = async (id: string) => {
+    const { data: row } = await supabase
+      .from('leave_application')
+      .select('document_path, document_name, followup_document_path, followup_document_name')
+      .eq('id', id)
+      .maybeSingle();
+    if (!row) return;
+    setLeaveApplications(prev => prev.map(app => app.id === id ? { ...app, ...row } : app));
+    setSelectedApplication(prev => prev && prev.id === id ? { ...prev, ...row } : prev);
+  };
+
   const handleApprovalDecided = async (application: LeaveApplication, status: 'pending' | 'approved' | 'rejected') => {
     try {
       const { data: row } = await supabase
@@ -1808,6 +1963,12 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
             count_days: policy?.count_days ?? 'working',
             one_per_month: policy?.one_per_month ?? false,
             service_months_before_use: policy?.service_months_before_use ?? 0,
+            document_name: policy?.document_name ?? null,
+            document_when: policy?.document_when ?? 'with_application',
+            document_within_days: policy?.document_within_days ?? 0,
+            document_if_longer_than: Number(policy?.document_if_longer_than ?? 0),
+            followup_document_name: policy?.followup_document_name ?? null,
+            followup_within_days: policy?.followup_within_days ?? 14,
           };
         });
 
@@ -1903,7 +2064,11 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
             "recstatus": app.recstatus || null,
             "time_added": app.time_added,
             "recommendation_notes": app.recommendation_notes || undefined,
-            "notes": app.notes || undefined
+            "notes": app.notes || undefined,
+            document_path: app.document_path ?? null,
+            document_name: app.document_name ?? null,
+            followup_document_path: app.followup_document_path ?? null,
+            followup_document_name: app.followup_document_name ?? null
           };
         });
 
@@ -2002,9 +2167,11 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
 
     if (!leaveType || !employee) return;
 
+    let uploaded: { path: string; name: string } | null = null;
     try {
       // the database works the days out again from the dates and the leave type
       const days = newLeaveApplication["Days"];
+      if (newLeaveApplication.DocumentFile) uploaded = await uploadLeaveDocument(newLeaveApplication.DocumentFile);
 
       // `leave_application` stores name/days/type/reason/status as lowercase
       // columns (see fetchLeaveApplications above); everything else is quoted/capitalized.
@@ -2023,6 +2190,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
           "reason": newLeaveApplication["Reason"],
           "status": newLeaveApplication["Status"],
           "recstatus": newLeaveApplication["recstatus"],
+          ...(uploaded ? { document_path: uploaded.path, document_name: uploaded.name } : {}),
           "time_added": new Date().toISOString()
         }])
         .select();
@@ -2048,6 +2216,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
 
     } catch (err) {
       // the database refuses leave that breaks one of the company's leave rules, and says which
+      if (uploaded) void supabase.storage.from(LEAVE_DOCUMENTS_BUCKET).remove([uploaded.path]);
       const message = (err as { message?: string })?.message;
       setError(message || 'Failed to submit leave application. Please try again.');
       toast.error(message || 'Failed to submit leave application');
@@ -2171,6 +2340,12 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
           count_days: type.count_days || 'working',
           one_per_month: type.one_per_month ?? false,
           service_months_before_use: type.service_months_before_use ?? 0,
+          document_name: type.document_name?.trim() || null,
+          document_when: type.document_when || 'with_application',
+          document_within_days: type.document_within_days ?? 0,
+          document_if_longer_than: type.document_if_longer_than ?? 0,
+          followup_document_name: type.followup_document_name?.trim() || null,
+          followup_within_days: type.followup_within_days ?? 14,
           effective_from: new Date().toISOString().split('T')[0]
         }], { onConflict: 'leave_type_id,effective_from' });
 
@@ -2923,6 +3098,8 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
           onClose={() => setSelectedApplication(null)}
           chain={chains[selectedApplication.id]}
           onDecided={(status) => handleApprovalDecided(selectedApplication, status)}
+          documentRule={documentRuleOf(leaveTypes.find((t) => t.name === selectedApplication["Leave Type"]))}
+          onDocumentsChanged={() => void refreshApplicationDocuments(selectedApplication.id)}
         />
       )}
 
