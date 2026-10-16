@@ -1,7 +1,7 @@
 import toast from 'react-hot-toast';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { employeeJoined, isYearlyMethod, yearAllowance } from '../../lib/leaveAccrual';
-import { BALANCE_RULE_LABELS, BalanceRule, CountDays, useLeaveCheck } from '../../lib/leaveRules';
+import { BALANCE_RULE_LABELS, BalanceRule, CountDays, describeFree, useLeaveCheck } from '../../lib/leaveRules';
 import { LEAVE_DOCUMENTS_BUCKET, LeaveDocumentRule, uploadLeaveDocument } from '../../lib/leaveDocuments';
 import LeaveDocuments from './LeaveDocuments';
 import EmployeePicker from '../UI/EmployeePicker';
@@ -83,6 +83,8 @@ type LeaveType = {
   document_if_longer_than?: number;
   followup_document_name?: string | null;
   followup_within_days?: number;
+  // days at half pay once the full-pay days are used (FIG-879), e.g. sick leave 30 + 15
+  half_pay_days?: number;
 };
 
 /** A leave type's document rule, as the documents list reads it. */
@@ -129,6 +131,8 @@ type LeaveApplication = {
   document_name?: string | null;
   followup_document_path?: string | null;
   followup_document_name?: string | null;
+  /** of an approved application's days, how many are at half pay (FIG-879) */
+  half_pay_days?: number;
 };
 
 type EmployeeLeaveBalance = {
@@ -450,7 +454,10 @@ const LeaveApplicationDetails = ({ application, onClose, chain, onDecided, docum
               </div>
               <div>
                 <p className="text-xs text-gray-500">Days</p>
-                <p className="font-medium">{application.Days}</p>
+                <p className="font-medium">
+                  {application.Days}
+                  {(application.half_pay_days ?? 0) > 0 && <span className="text-xs text-orange-text-alt"> ({application.half_pay_days} at half pay)</span>}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-gray-500">Type</p>
@@ -716,6 +723,16 @@ const LeaveTypeFormModal = ({
                 className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
                 placeholder="Unlimited"
               />
+              <label className="block text-xs font-medium text-gray-700 mb-1 mt-2">Then at half pay (days)</label>
+              <input
+                type="number"
+                min="0"
+                value={newLeaveType.half_pay_days ?? 0}
+                onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, half_pay_days: Math.max(0, Number(e.target.value)) }))}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                placeholder="0 = none"
+              />
+              <p className="mt-1 text-[11px] text-gray-500">Once the days above are used, e.g. sick leave: 30 at full pay, then 15 at half pay. Payroll deducts half a day for each.</p>
             </div>
 
             <div>
@@ -1359,7 +1376,10 @@ const LeaveApplicationFormModal = ({
                 className="w-full border border-gray-100 bg-gray-50 rounded-lg px-3 py-2 text-sm font-bold text-brand"
               />
               {check && check.available !== null && (
-                <p className="mt-1 text-[11px] text-gray-500">{check.available} day{check.available === 1 ? '' : 's'} free to book</p>
+                <p className="mt-1 text-[11px] text-gray-500">
+                  {describeFree(check)}
+                  {check.halfPayDays > 0 ? `; ${check.halfPayDays} of these at half pay` : ''}
+                </p>
               )}
             </div>
           </div>
@@ -1969,6 +1989,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
             document_if_longer_than: Number(policy?.document_if_longer_than ?? 0),
             followup_document_name: policy?.followup_document_name ?? null,
             followup_within_days: policy?.followup_within_days ?? 14,
+            half_pay_days: Number(policy?.half_pay_days ?? 0),
           };
         });
 
@@ -2068,7 +2089,8 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
             document_path: app.document_path ?? null,
             document_name: app.document_name ?? null,
             followup_document_path: app.followup_document_path ?? null,
-            followup_document_name: app.followup_document_name ?? null
+            followup_document_name: app.followup_document_name ?? null,
+            half_pay_days: Number(app.half_pay_days ?? 0)
           };
         });
 
@@ -2346,6 +2368,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
           document_if_longer_than: type.document_if_longer_than ?? 0,
           followup_document_name: type.followup_document_name?.trim() || null,
           followup_within_days: type.followup_within_days ?? 14,
+          half_pay_days: type.half_pay_days ?? 0,
           effective_from: new Date().toISOString().split('T')[0]
         }], { onConflict: 'leave_type_id,effective_from' });
 
