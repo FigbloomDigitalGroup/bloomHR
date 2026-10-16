@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
     Users, Clock, ShieldOff,
     XCircle, AlertTriangle, CheckCircle,
-    RefreshCw, Loader2, History, Bell, LogOut
+    RefreshCw, Loader2, History, Bell, LogOut, FileSignature
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
@@ -13,6 +13,7 @@ import LifecycleHistoryModule from './LifecycleHistoryModule';
 import SuspensionModule from './SuspensionModule';
 import HRReportsDashboard from './HRReportsDashboard';
 import ExitsModule from './ExitsModule';
+import ContractsModule from './ContractsModule';
 import { useHRNotifications, fetchAdminHRNotifications, markAdminNotificationRead, type HRNotification } from '../../hooks/useHRNotifications';
 
 interface DashboardStats {
@@ -29,6 +30,7 @@ const tabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'status', label: 'Employment Status' },
     { id: 'history', label: 'Lifecycle History' },
+    { id: 'contracts', label: 'Contracts' },
     { id: 'suspension', label: 'Suspension' },
     { id: 'exits', label: 'Exits' },
     { id: 'reports', label: 'Reports' },
@@ -120,6 +122,7 @@ export default function HRLifecycleDashboard() {
         { label: 'Lifecycle History', tab: 'history', icon: History, desc: 'View complete employee timelines' },
         { label: 'Record Suspension', tab: 'suspension', icon: ShieldOff, desc: 'Suspend or reactivate staff' },
         { label: 'Exits', tab: 'exits', icon: LogOut, desc: 'Resignations, terminations, clearance, final dues' },
+        { label: 'Contracts to sign', tab: 'contracts', icon: FileSignature, desc: 'Send contracts, review signed copies' },
     ];
 
     return (
@@ -174,7 +177,7 @@ export default function HRLifecycleDashboard() {
                                         <div className="flex items-center gap-2 ml-3">
                                             <button
                                                 type="button"
-                                                onClick={() => setActiveTab('status')}
+                                                onClick={() => setActiveTab(n.notification_type === 'contract_signed' ? 'contracts' : 'status')}
                                                 className="text-[10px] font-semibold text-orange-text bg-orange-tint-alt px-2 py-1 rounded-lg hover:bg-[#fbdcc5] transition-colors whitespace-nowrap"
                                             >
                                                 View →
@@ -267,6 +270,7 @@ export default function HRLifecycleDashboard() {
 
             {activeTab === 'status' && <EmploymentStatusModule onRefresh={fetchDashboardStats} initialSearch={searchParams.get('q') || ''} />}
             {activeTab === 'history' && <LifecycleHistoryModule />}
+            {activeTab === 'contracts' && <ContractsModule />}
             {activeTab === 'suspension' && <SuspensionModule onRefresh={fetchDashboardStats} />}
             {activeTab === 'exits' && <ExitsModule onRefresh={fetchDashboardStats} />}
             {activeTab === 'reports' && <HRReportsDashboard stats={stats} />}
