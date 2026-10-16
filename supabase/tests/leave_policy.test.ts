@@ -86,7 +86,9 @@ describe('earning a yearly allowance month by month', () => {
 
   it('days taken come off, and unused days simply stay available through the year', async () => {
     await asUser(db, HR, async () => {
-      await db.query(`select increment_leave_balance_used_days('E1', '${annual}', 2026, 5, 0)`);
+      // approved leave comes off the balance as it is approved (leave_rules.sql): Mon 2 to Fri 6 March, 5 days
+      await db.query(`insert into leave_application ("Employee Number", name, "Leave Type", "Start Date", "End Date", status)
+                      values ('E1', 'Ann One', 'Annual Leave', '2026-03-02', '2026-03-06', 'approved')`);
     });
     const b = await balance('E1', 2026);
     expect(Number(b.used_days)).toBe(5);

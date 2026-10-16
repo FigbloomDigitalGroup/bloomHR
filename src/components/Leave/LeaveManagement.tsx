@@ -1,6 +1,7 @@
 import toast from 'react-hot-toast';
 import { useState, useEffect, useRef } from 'react';
 import { earnedToDate, isYearlyMethod } from '../../lib/leaveAccrual';
+import { BALANCE_RULE_LABELS, BalanceRule, CountDays, useLeaveCheck } from '../../lib/leaveRules';
 import EmployeePicker from '../UI/EmployeePicker';
 import {
   Calendar,
@@ -65,6 +66,12 @@ type LeaveType = {
   // from this many days before the year ends, remind anyone with at least reminder_min_remaining unused days (0 = off)
   reminder_days_before_year_end?: number;
   reminder_min_remaining?: number;
+  // the company's rules for applying (FIG-875), checked by the database: see src/lib/leaveRules.ts
+  max_days_per_request?: number | null;
+  min_notice_days?: number;
+  balance_rule?: BalanceRule;
+  count_days?: CountDays;
+  one_per_month?: boolean;
 };
 
 type Holiday = {
@@ -281,35 +288,6 @@ const getIconComponent = (iconName: string) => {
     case 'Gift': return Gift;
     default: return FileText;
   }
-};
-
-const calculateWorkingDays = (startDate: string, endDate: string, holidays: Holiday[]) => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  let count = 0;
-
-  if (start.toDateString() === end.toDateString()) {
-    return 0.5;
-  }
-
-  const current = new Date(start);
-  while (current <= end) {
-    const dayOfWeek = current.getDay();
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-      const isHoliday = holidays.some(h => {
-        const holidayDate = new Date(h.date);
-        return holidayDate.getDate() === current.getDate() &&
-          holidayDate.getMonth() === current.getMonth() &&
-          holidayDate.getFullYear() === current.getFullYear();
-      });
-      if (!isHoliday) {
-        count++;
-      }
-    }
-    current.setDate(current.getDate() + 1);
-  }
-
-  return count;
 };
 
 const formatDate = (dateString: string) => {
@@ -781,6 +759,71 @@ const LeaveTypeFormModal = ({
             </div>
           )}
 
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-xs font-semibold text-gray-800 mb-3">Rules for applying</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">How far ahead of the balance</label>
+                <select
+                  value={newLeaveType.balance_rule || 'full_year'}
+                  onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, balance_rule: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                >
+                  {(Object.keys(BALANCE_RULE_LABELS) as BalanceRule[]).map((r) => (
+                    <option key={r} value={r}>{BALANCE_RULE_LABELS[r]}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Count days as</label>
+                <select
+                  value={newLeaveType.count_days || 'working'}
+                  onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, count_days: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                >
+                  <option value="working">Working days (Mon-Fri, less holidays)</option>
+                  <option value="calendar">Calendar days (every day)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Most days in one application</label>
+                <input
+                  type="number"
+                  value={newLeaveType.max_days_per_request ?? ''}
+                  onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, max_days_per_request: e.target.value === '' ? null : Math.max(1, Number(e.target.value)) }))}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                  min="1"
+                  placeholder="No limit (all at once is fine)"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Notice needed (days)</label>
+                <input
+                  type="number"
+                  value={newLeaveType.min_notice_days ?? 0}
+                  onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, min_notice_days: Math.max(0, Number(e.target.value)) }))}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                  min="0"
+                  placeholder="0 = none"
+                />
+              </div>
+            </div>
+            <div className="flex items-center mt-3">
+              <input
+                type="checkbox"
+                checked={!!newLeaveType.one_per_month}
+                onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, one_per_month: e.target.checked }))}
+                className="rounded border-gray-300 text-brand focus:ring-brand"
+              />
+              <label className="ml-2 text-xs text-gray-700">Only one application a month</label>
+            </div>
+            <p className="mt-2 text-[11px] text-gray-500">
+              Employees applying for themselves must keep to these. HR entering leave for someone may skip the notice,
+              most-days and once-a-month rules, but never the balance. With no notice, people can apply for days already
+              past (e.g. sick leave afterwards).
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex items-center">
               <input
@@ -1064,7 +1107,6 @@ const LeaveApplicationFormModal = ({
   setNewLeaveApplication,
   employees,
   leaveTypes,
-  holidays,
   handleApplyLeave
 }: {
   isOpen: boolean;
@@ -1073,18 +1115,19 @@ const LeaveApplicationFormModal = ({
   setNewLeaveApplication: React.Dispatch<React.SetStateAction<any>>;
   employees: Employee[];
   leaveTypes: LeaveType[];
-  holidays: Holiday[];
   handleApplyLeave: () => void;
 }) => {
+  // the days (working or calendar, per the leave type, less holidays) and the company's leave rules, as the database
+  // applies them when this is saved. HR entering leave for someone else may skip the notice, per-application and
+  // once-a-month rules, never the balance.
+  const { check, checking } = useLeaveCheck(
+    newLeaveApplication["Employee Number"], newLeaveApplication["Leave Type"],
+    newLeaveApplication["Start Date"], newLeaveApplication["End Date"]
+  );
+  const problems = check?.problems ?? [];
   useEffect(() => {
-    if (!isOpen) return;
-    const days = calculateWorkingDays(
-      newLeaveApplication["Start Date"],
-      newLeaveApplication["End Date"],
-      holidays
-    );
-    setNewLeaveApplication((prev: any) => ({ ...prev, "Days": days }));
-  }, [newLeaveApplication["Start Date"], newLeaveApplication["End Date"], holidays, isOpen, setNewLeaveApplication]);
+    setNewLeaveApplication((prev: any) => ({ ...prev, "Days": check?.days ?? 0 }));
+  }, [check, setNewLeaveApplication]);
 
   const handleEmployeeChange = (employeeNumber: string) => {
     const employee = employees.find((e) => e["Employee Number"] === employeeNumber);
@@ -1162,7 +1205,7 @@ const LeaveApplicationFormModal = ({
 
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Working Days
+                Days
               </label>
               <input
                 type="number"
@@ -1170,8 +1213,19 @@ const LeaveApplicationFormModal = ({
                 readOnly
                 className="w-full border border-gray-100 bg-gray-50 rounded-lg px-3 py-2 text-sm font-bold text-brand"
               />
+              {check && check.available !== null && (
+                <p className="mt-1 text-[11px] text-gray-500">{check.available} day{check.available === 1 ? '' : 's'} free to book</p>
+              )}
             </div>
           </div>
+
+          {problems.length > 0 && (
+            <div className="rounded-lg border border-orange-text-alt/30 bg-orange-tint-alt px-3 py-2 space-y-1" role="alert">
+              {problems.map((p) => (
+                <p key={p} className="text-xs text-orange-text-alt">{p}</p>
+              ))}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <PremiumSearchableDropdown
@@ -1223,7 +1277,8 @@ const LeaveApplicationFormModal = ({
           </button>
           <button
             onClick={handleApplyLeave}
-            className="px-6 py-2.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-lg shadow-primary/20 active:scale-[0.98] transition-all"
+            disabled={checking || !check || problems.length > 0}
+            className="px-6 py-2.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-sm font-semibold flex items-center gap-2 shadow-lg shadow-primary/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save className="w-4 h-4" />
             Confirm Assignment
@@ -1486,8 +1541,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
   };
 
   // After the signed-in approver approved or rejected through the chain (decide_approval writes the status,
-  // the recommendation and the notifications): show the application as it now is, and take the leave from the
-  // balance once it is finally approved, as approving did before.
+  // the recommendation and the notifications, and the database takes the balance): show the application as it now is.
   const handleApprovalDecided = async (application: LeaveApplication, status: 'pending' | 'approved' | 'rejected') => {
     try {
       const { data: row } = await supabase
@@ -1507,43 +1561,10 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
       }
       await refreshChains([application.id]);
 
-      // Deduct from the real leave_balances row on approval (see FIG-563).
-      // Rejecting needs no reversal here: nothing is deducted until
-      // approval, so there's nothing to undo on rejection.
+      // The database takes approved leave off the balance as the final approval is saved (and refuses an approval
+      // that would overdraw it): reload the balances to show it.
       if (status === 'approved') {
-        const leaveType = application ? leaveTypes.find(lt => lt.name === application["Leave Type"]) : undefined;
-
-        if (application && leaveType?.is_deductible) {
-          const startDate = new Date(application["Start Date"]);
-          const isMonthly = leaveType.accrual_method === 'monthly_non_cumulative';
-
-          const { data: updatedBalance, error: balanceError } = await supabase.rpc(
-            'increment_leave_balance_used_days',
-            {
-              p_employee_number: application["Employee Number"],
-              p_leave_type_id: leaveType.id,
-              p_year: startDate.getFullYear(),
-              p_days: application.Days,
-              p_month: isMonthly ? startDate.getMonth() + 1 : 0
-            }
-          );
-
-          if (balanceError) {
-            console.error('Failed to update leave balance:', balanceError);
-            setError('Status updated, but the leave balance could not be adjusted. Check the Balances tab.');
-          } else if (updatedBalance) {
-            setLeaveBalances(prev => {
-              const exists = prev.some(b => b.id === updatedBalance.id);
-              if (!exists) return prev; // balance is for a different period than what's loaded
-              return prev.map(b => b.id === updatedBalance.id ? {
-                ...b,
-                accrued_days: updatedBalance.accrued_days,
-                used_days: updatedBalance.used_days,
-                remaining_days: updatedBalance.remaining_days
-              } : b);
-            });
-          }
-        }
+        setBalancesRefreshKey(k => k + 1);
       }
 
     } catch (err) {
@@ -1759,6 +1780,11 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
             carry_forward_max_days: policy?.carry_forward_max_days ?? 0,
             reminder_days_before_year_end: policy?.reminder_days_before_year_end ?? 0,
             reminder_min_remaining: policy?.reminder_min_remaining ?? 0,
+            max_days_per_request: policy?.max_days_per_request ?? null,
+            min_notice_days: policy?.min_notice_days ?? 0,
+            balance_rule: policy?.balance_rule ?? 'full_year',
+            count_days: policy?.count_days ?? 'working',
+            one_per_month: policy?.one_per_month ?? false,
           };
         });
 
@@ -1954,11 +1980,8 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
     if (!leaveType || !employee) return;
 
     try {
-      const days = calculateWorkingDays(
-        newLeaveApplication["Start Date"],
-        newLeaveApplication["End Date"],
-        holidays
-      );
+      // the database works the days out again from the dates and the leave type
+      const days = newLeaveApplication["Days"];
 
       // `leave_application` stores name/days/type/reason/status as lowercase
       // columns (see fetchLeaveApplications above); everything else is quoted/capitalized.
@@ -2001,7 +2024,10 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
       });
 
     } catch (err) {
-      setError('Failed to submit leave application. Please try again.');
+      // the database refuses leave that breaks one of the company's leave rules, and says which
+      const message = (err as { message?: string })?.message;
+      setError(message || 'Failed to submit leave application. Please try again.');
+      toast.error(message || 'Failed to submit leave application');
       console.error(err);
     }
   };
@@ -2116,6 +2142,11 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
           carry_forward_max_days: type.carry_forward_max_days ?? 0,
           reminder_days_before_year_end: type.reminder_days_before_year_end ?? 0,
           reminder_min_remaining: type.reminder_min_remaining ?? 0,
+          max_days_per_request: type.max_days_per_request || null,
+          min_notice_days: type.min_notice_days ?? 0,
+          balance_rule: type.balance_rule || 'full_year',
+          count_days: type.count_days || 'working',
+          one_per_month: type.one_per_month ?? false,
           effective_from: new Date().toISOString().split('T')[0]
         }], { onConflict: 'leave_type_id,effective_from' });
 
@@ -2870,7 +2901,6 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
           setNewLeaveApplication={setNewLeaveApplication}
           employees={employees}
           leaveTypes={leaveTypes}
-          holidays={holidays}
           handleApplyLeave={handleApplyLeave}
         />
       )}
