@@ -16,6 +16,7 @@ import {
 } from '../../theme/themes';
 import { rgbToHex } from '../../theme/color';
 import ProfilePicture from './ProfilePicture';
+import EmailNotifications from './EmailNotifications';
 import { saveMyTheme } from '../../lib/preferences';
 import AccessibilityPanel from '../Accessibility/AccessibilityPanel';
 
@@ -116,7 +117,7 @@ export default function Appearance() {
     <div>
       <PageHeader
         title="Appearance"
-        subtitle="Choose how Figbloom HR looks for you. This only changes your own view, not anyone else's."
+        subtitle="Choose how Figbloom HR looks for you and what is emailed to you. This only changes your own settings, not anyone else's."
         actions={
           <Button variant="secondary" onClick={restoreDefault}>
             Reset to default
@@ -125,6 +126,8 @@ export default function Appearance() {
       />
 
       <ProfilePicture />
+
+      <EmailNotifications />
 
       <Card className="mb-4">
         <h2 className="m-0 text-[14px] font-bold text-ink">Themes</h2>

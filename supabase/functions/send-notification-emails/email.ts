@@ -1,5 +1,6 @@
-// The notification email (FIG-771): one email per employee with every notification not yet emailed. Plain
-// TypeScript with no Deno or Node APIs, so the Edge Function uses it and vitest tests it.
+// The notification emails (FIG-771, FIG-890): one email per person with every notification not yet emailed to them,
+// the same for HR's alerts, and the unread chat digest. Plain TypeScript with no Deno or Node APIs, so the Edge
+// Function uses it and vitest tests it.
 
 export interface NotificationItem {
   type: string;
@@ -16,45 +17,182 @@ export interface NotificationEmail {
   appUrl: string;
 }
 
+/** One conversation in a chat digest (claim_chat_digest_emails()). */
+export interface ChatDigestItem {
+  channel_id: string;
+  kind: 'dm' | 'channel';
+  /** the channel's name, or for a direct message the person who wrote */
+  name: string | null;
+  unread: number;
+  mentions: number;
+  latest_at?: string;
+}
+
+export interface ChatDigestEmail {
+  firstName: string | null;
+  companyName: string | null;
+  items: ChatDigestItem[];
+  /** where the chat is for this person */
+  link: string;
+}
+
 const escape = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 /** One line, no line breaks (a header). */
 const oneLine = (s: string) => s.replace(/[\r\n]+/g, ' ').trim();
 
-export function subjectFor({ items, companyName }: Pick<NotificationEmail, 'items' | 'companyName'>): string {
-  const from = companyName ? ` - ${oneLine(companyName)}` : '';
-  if (items.length === 1) return `${oneLine(items[0].title)}${from}`.slice(0, 200);
-  return `${items.length} updates from HR${from}`.slice(0, 200);
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** The app's address without its path (https only), e.g. for HR pages when APP_URL is the staff portal. */
+export function appOrigin(appUrl: string): string {
+  if (!/^https:\/\//.test(appUrl)) return '';
+  try {
+    return new URL(appUrl).origin;
+  } catch {
+    return '';
+  }
 }
 
-export function htmlFor({ firstName, companyName, items, appUrl }: NotificationEmail): string {
+/** The page an HR alert is handled on: the one all the items share, else the app's start page. */
+const HR_PAGES: Record<string, string> = {
+  leave_recommended: '/leaves',
+  application_received: '/recruitment',
+  loan_requested: '/loans',
+  contract_expiring: '/hr-lifecycle',
+  probation_expiring: '/hr-lifecycle',
+  contract_signed: '/hr-lifecycle',
+  exit_requested: '/hr-lifecycle',
+};
+
+export function hrAlertLink(appUrl: string, items: Pick<NotificationItem, 'type'>[]): string {
+  const origin = appOrigin(appUrl);
+  if (!origin) return '';
+  const pages = [...new Set(items.map((i) => HR_PAGES[i.type] ?? '/'))];
+  return origin + (pages.length === 1 ? pages[0] : '/');
+}
+
+/** Staff read the chat in the staff portal (APP_URL); everyone else in Teams. */
+export function chatLink(appUrl: string, role: string | null): string {
+  if (!role || role === 'STAFF') return /^https:\/\//.test(appUrl) ? appUrl : '';
+  const origin = appOrigin(appUrl);
+  return origin ? `${origin}/teams` : '';
+}
+
+interface Layout {
+  companyName: string | null;
+  firstName: string | null;
+  intro: string;
+  rows: { title: string; message?: string }[];
+  link: string;
+  button: string;
+  footer: string;
+}
+
+/** The shared look: the company's name in a green band, a greeting, one row per item, a button, a small footer. */
+function layout({ companyName, firstName, intro, rows, link, button, footer }: Layout): string {
   const company = escape(companyName || 'Figbloom HR');
   const hello = firstName ? `Hi ${escape(firstName)},` : 'Hi,';
-  const intro = items.length === 1 ? 'There is an update for you:' : `There are ${items.length} updates for you:`;
-  const rows = items
+  const body = rows
     .map(
       (n) => `
       <tr><td style="padding:12px 16px;border-top:1px solid #E5E7EB">
-        <div style="font-weight:600;color:#16201A;font-size:14px">${escape(n.title)}</div>
-        <div style="color:#4B5563;font-size:13px;line-height:1.5;margin-top:4px">${escape(n.message)}</div>
+        <div style="font-weight:600;color:#16201A;font-size:14px">${escape(n.title)}</div>${
+          n.message ? `
+        <div style="color:#4B5563;font-size:13px;line-height:1.5;margin-top:4px">${escape(n.message)}</div>` : ''
+        }
       </td></tr>`
     )
     .join('');
-  const link = /^https:\/\//.test(appUrl) ? escape(appUrl) : '';
+  const href = /^https:\/\//.test(link) ? escape(link) : '';
   return `<!doctype html>
 <html><body style="margin:0;padding:24px;background:#F6F8F6;font-family:Arial,Helvetica,sans-serif">
   <table role="presentation" width="100%" style="max-width:560px;margin:0 auto;background:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;border-collapse:separate">
     <tr><td style="padding:20px 16px;background:#17402A;border-radius:12px 12px 0 0;color:#FFFFFF;font-size:16px;font-weight:700">${company}</td></tr>
-    <tr><td style="padding:16px;color:#16201A;font-size:14px">${hello}<br>${intro}</td></tr>
-    ${rows}
-    ${link ? `<tr><td style="padding:16px;border-top:1px solid #E5E7EB">
-      <a href="${link}" style="display:inline-block;background:#17402A;color:#FFFFFF;text-decoration:none;padding:10px 16px;border-radius:8px;font-size:14px;font-weight:600">Open the staff portal</a>
+    <tr><td style="padding:16px;color:#16201A;font-size:14px">${hello}<br>${escape(intro)}</td></tr>
+    ${body}
+    ${href ? `<tr><td style="padding:16px;border-top:1px solid #E5E7EB">
+      <a href="${href}" style="display:inline-block;background:#17402A;color:#FFFFFF;text-decoration:none;padding:10px 16px;border-radius:8px;font-size:14px;font-weight:600">${escape(button)}</a>
     </td></tr>` : ''}
     <tr><td style="padding:12px 16px;color:#9CA3AF;font-size:11px;border-top:1px solid #E5E7EB">
-      You get these emails for updates in the staff portal. You can turn them off from the bell in the portal
-      (warnings, suspensions and payslips are always emailed).
+      ${escape(footer)}
     </td></tr>
   </table>
 </body></html>`;
+}
+
+const from = (companyName: string | null) => (companyName ? ` - ${oneLine(companyName)}` : '');
+
+// ---- the employee's own notifications -----------------------------------------------------------------------------
+
+export function subjectFor({ items, companyName }: Pick<NotificationEmail, 'items' | 'companyName'>): string {
+  if (items.length === 1) return `${oneLine(items[0].title)}${from(companyName)}`.slice(0, 200);
+  return `${items.length} updates from HR${from(companyName)}`.slice(0, 200);
+}
+
+export function htmlFor({ firstName, companyName, items, appUrl }: NotificationEmail): string {
+  return layout({
+    companyName,
+    firstName,
+    intro: items.length === 1 ? 'There is an update for you:' : `There are ${items.length} updates for you:`,
+    rows: items,
+    link: appUrl,
+    button: 'Open the staff portal',
+    footer:
+      'You get these emails for updates in the staff portal. You can choose everything, important only or none from ' +
+      'the bell in the portal (warnings, suspensions and payslips are always emailed).',
+  });
+}
+
+// ---- HR alerts ------------------------------------------------------------------------------------------------------
+
+export function hrAlertSubject({ items, companyName }: Pick<NotificationEmail, 'items' | 'companyName'>): string {
+  if (items.length === 1) return `${oneLine(items[0].title)}${from(companyName)}`.slice(0, 200);
+  return `${items.length} things for HR to look at${from(companyName)}`.slice(0, 200);
+}
+
+export function hrAlertHtml({ firstName, companyName, items, appUrl }: NotificationEmail): string {
+  return layout({
+    companyName,
+    firstName,
+    intro: items.length === 1 ? 'There is something for you to look at:' : `There are ${items.length} things for you to look at:`,
+    rows: items,
+    link: hrAlertLink(appUrl, items),
+    button: 'Open Figbloom HR',
+    footer:
+      'You get these because your role looks after this in Figbloom HR. You can choose everything, important only or ' +
+      'none under Appearance > Email notifications.',
+  });
+}
+
+// ---- the unread chat digest -------------------------------------------------------------------------------------
+
+/** "3 new messages from Amina", "You were mentioned in #general", "5 new messages in #ops". */
+export function describeChat(c: ChatDigestItem): string {
+  const name = oneLine(c.name || '');
+  if (c.kind === 'dm') return `${plural(c.unread, 'new message')}${name ? ` from ${name}` : ''}`;
+  const where = name ? ` in #${name}` : '';
+  if (c.mentions > 0 && c.mentions === c.unread) return `You were mentioned${c.mentions > 1 ? ` ${c.mentions} times` : ''}${where}`;
+  if (c.mentions > 0) return `${plural(c.unread, 'new message')}${where}, ${c.mentions} mentioning you`;
+  return `${plural(c.unread, 'new message')}${where}`;
+}
+
+export function chatDigestSubject({ items, companyName }: Pick<ChatDigestEmail, 'items' | 'companyName'>): string {
+  if (items.length === 1) return `${describeChat(items[0])}${from(companyName)}`.slice(0, 200);
+  const total = items.reduce((n, c) => n + c.unread, 0);
+  return `${plural(total, 'unread message')} in ${items.length} conversations${from(companyName)}`.slice(0, 200);
+}
+
+export function chatDigestHtml({ firstName, companyName, items, link }: ChatDigestEmail): string {
+  return layout({
+    companyName,
+    firstName,
+    intro: 'You have unread messages in the chat:',
+    rows: items.map((c) => ({ title: describeChat(c) })),
+    link,
+    button: 'Open the chat',
+    footer:
+      'You get this when messages are still unread 10 minutes after they were sent, at most every 30 minutes. Mute a ' +
+      'chat with its bell, or choose everything, direct messages and mentions only, or none in your email settings.',
+  });
 }

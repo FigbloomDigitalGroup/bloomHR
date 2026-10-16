@@ -118,7 +118,15 @@ export function ChatArea({ channel, messages, currentUserId, onSendMessage, onTo
                 </Button>
               </>
             )}
-            <Button variant="ghost" size="icon" onClick={handleToggleMute} className="text-gray-500 hover:text-orange-600 hover:bg-orange-50">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleToggleMute}
+              title={isMuted ? 'Emails for this chat are muted: unmute' : 'Mute emails about this chat'}
+              aria-label={isMuted ? 'Unmute emails for this chat' : 'Mute emails for this chat'}
+              aria-pressed={isMuted}
+              className="text-gray-500 hover:text-orange-600 hover:bg-orange-50"
+            >
               {isMuted ? <BellOff className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
             </Button>
             <Button variant="ghost" size="icon" onClick={handleSearch} className="hidden sm:inline-flex text-gray-500 hover:text-green-600 hover:bg-green-50">
