@@ -40,6 +40,8 @@ export interface ApprovalStep {
 export interface ApprovalWorkflow {
   kind: ApprovalKind;
   admins_can_act: boolean;
+  /** roles told when a request is finally approved or rejected, without being a step (FIG-878) */
+  notify_roles?: string[];
   department_head_available: boolean;
   steps: ApprovalStep[];
 }
@@ -109,7 +111,7 @@ export async function loadApprovalWorkflow(kind: ApprovalKind): Promise<Approval
 }
 
 /** Saves the steps in order. Throws with the reason when refused. */
-export async function saveApprovalWorkflow(kind: ApprovalKind, steps: ApprovalStep[], adminsCanAct: boolean): Promise<void> {
+export async function saveApprovalWorkflow(kind: ApprovalKind, steps: ApprovalStep[], adminsCanAct: boolean, notifyRoles: string[] = []): Promise<void> {
   const payload = steps.map((s) => ({
     label: s.label?.trim() || null,
     approver_type: s.approver_type,
@@ -120,7 +122,12 @@ export async function saveApprovalWorkflow(kind: ApprovalKind, steps: ApprovalSt
     alternate_employee_number: s.alternate_type === 'person' ? s.alternate_employee_number : null,
     skip_if_requester: s.skip_if_requester ?? true,
   }));
-  const { error } = await supabase.rpc('save_approval_workflow', { p_kind: kind, p_steps: payload, p_admins_can_act: adminsCanAct });
+  const { error } = await supabase.rpc('save_approval_workflow', {
+    p_kind: kind,
+    p_steps: payload,
+    p_admins_can_act: adminsCanAct,
+    p_notify_roles: notifyRoles,
+  });
   if (error) throw new Error(error.message);
 }
 

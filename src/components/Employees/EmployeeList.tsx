@@ -476,7 +476,9 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                 {!selectionAction && (
                   <div className="flex flex-col items-end gap-1">
                     <StatusPill label={isInactive ? 'Inactive' : 'Active'} tone={isInactive ? 'warning' : 'success'} />
-                    {employee.onboarding_status !== 'approved' && (
+                    {employee.worker_kind === 'casual' ? (
+                      <StatusPill label="Casual" tone="purple" />
+                    ) : employee.onboarding_status !== 'approved' && (
                       <StatusPill label={statusLabel(employee.onboarding_status)} tone={statusTone(employee.onboarding_status)} />
                     )}
                   </div>

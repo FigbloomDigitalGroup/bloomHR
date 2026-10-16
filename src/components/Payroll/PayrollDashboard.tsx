@@ -48,6 +48,9 @@ import { employeesMissingDetails } from "../../lib/missingPayrollDetails";
 import { isPaidByMpesa, paymentMethodLabel } from "../../lib/paymentMethods";
 import { fetchAll } from "../../lib/fetchAll";
 import { isPayrollReady } from "../../lib/onboardingValidation";
+import { isCasual } from "../../lib/casualPay";
+
+const withoutCasuals = <T extends Record<string, unknown>>(rows: T[] | null | undefined): T[] => (rows ?? []).filter((e) => !isCasual(e));
 import { advanceDeductionFor } from "../../lib/salaryAdvance";
 import { loadCompanyIdentity } from "../../lib/companyProfile";
 import { useNavigate } from "react-router-dom";
@@ -908,8 +911,9 @@ export default function PayrollDashboard() {
       try {
         setIsLoading(true);
         // every employee, a page at a time (one request returns at most 1000)
+        // casual workers are paid by the day from their own page, never on the monthly payroll
         const { data, error } = await fetchAll((from, to) => supabase.from("employees").select("*").order('"Employee Number"').order("id").range(from, to)).then(
-          (rows) => ({ data: rows, error: null }),
+          (rows) => ({ data: withoutCasuals(rows), error: null }),
           (err) => ({ data: null, error: err }),
         );
 
@@ -1361,7 +1365,7 @@ export default function PayrollDashboard() {
     if (!showDemoPayAll) return;
     let stale = false;
     fetchAll((from, to) => supabase.from("employees").select("*").order('"Employee Number"').order("id").range(from, to))
-      .then((data) => { if (!stale && data) setEmployees(data); })
+      .then((data) => { if (!stale && data) setEmployees(withoutCasuals(data)); })
       .catch((err) => console.error("Could not reload employees for paying:", err));
     return () => { stale = true; };
   }, [showDemoPayAll]);
@@ -1482,7 +1486,7 @@ export default function PayrollDashboard() {
       const data = await fetchAll((from, to) => supabase.from("employees").select("*").order('"Employee Number"').order("id").range(from, to));
 
       if (data) {
-        setEmployees(data);
+        setEmployees(withoutCasuals(data));
       }
 
       toast.success("Dashboard refreshed successfully!");
