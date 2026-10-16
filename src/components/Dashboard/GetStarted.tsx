@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Sparkles } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { companyApi } from '../../lib/companyApi';
 import { useMyCompanies } from '../../hooks/useMyCompanies';
@@ -143,6 +144,13 @@ export default function GetStarted() {
       <div className="mt-2 h-1.5 rounded-pill bg-secondary overflow-hidden" aria-hidden>
         <div className="h-full bg-brand transition-all" style={{ width: `${(completed / steps.length) * 100}%` }} />
       </div>
+      <Link
+        to="/setup-assistant"
+        className="mt-3 flex items-center gap-2 rounded-tile border border-brand/20 bg-green-tint px-3 py-2.5 text-[12.5px] font-semibold text-brand hover:border-brand/40"
+      >
+        <Sparkles className="w-4 h-4 flex-shrink-0" aria-hidden />
+        <span className="flex-1">Set up by chatting: tell the AI about your business and apply its suggestions</span>
+      </Link>
       <ul className="mt-3 divide-y divide-border">
         {steps.map((s) => (
           <li key={s.id} className="flex items-center gap-3 py-2.5">

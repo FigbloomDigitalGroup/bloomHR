@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import type { PayItemKind, TaxTreatment } from '../lib/kenyaTaxTreatment';
+import type { SetupProposal } from '../lib/setupAssistant';
 
 // Client for the backend AI API (ai_routes.js). The model API key lives on the server; the browser authenticates
 // with the caller's own session token, and the server checks the caller may use this feature.
@@ -57,6 +58,21 @@ export interface AITaxSuggestion {
   confidence: 'high' | 'medium' | 'low';
   caveats: string[];
 }
+
+/** One turn of the set-up chat; the AI's own turns are sent back as the JSON it gave, with each proposal's status. */
+export interface AISetupMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+/** The set-up chat's answer: what to say, and changes the person may apply (src/lib/setupAssistant.ts applies them). */
+export interface AISetupAnswer {
+  reply: string;
+  proposals: SetupProposal[];
+}
+
+export const askSetup = (messages: AISetupMessage[], company: unknown): Promise<AISetupAnswer> =>
+  post<AISetupAnswer>('setup', { messages, company });
 
 /** A suggestion only: show it labelled as one, and never apply it without the user confirming. */
 export const askTaxTreatment = (kind: PayItemKind, name: string, description?: string): Promise<AITaxSuggestion> =>
