@@ -93,7 +93,7 @@ describe('counting days', () => {
     expect(await apply(STAFF, 'E1', 'Sick Leave', '2030-03-04', '2030-03-10')).toBe('');
     expect(Number((await lastId('E1', 'Sick Leave')).days)).toBe(4);
     // a recurring holiday falls on the same day every year: Madaraka Day, Mon 1 June 2026
-    expect((await rows<{ n: number }>(`select leave_days_between('${A}', '2026-06-01', '2026-06-05', false) n`))[0].n).toBe(4);
+    expect(Number((await rows<{ n: string }>(`select leave_days_for('${A}', 'E1', '2026-06-01', '2026-06-05', false) n`))[0].n)).toBe(4);
     await clear('E1');
   });
 
@@ -104,7 +104,7 @@ describe('counting days', () => {
   });
 
   it('refuses dates that need no leave, dates the wrong way round, and unknown leave types', async () => {
-    expect(await apply(STAFF, 'E1', 'Sick Leave', '2030-03-09', '2030-03-10')).toMatch(/weekends or public holidays/);
+    expect(await apply(STAFF, 'E1', 'Sick Leave', '2030-03-09', '2030-03-10')).toMatch(/days off or public holidays/);
     expect(await apply(STAFF, 'E1', 'Sick Leave', '2030-03-10', '2030-03-04')).toMatch(/end date that is the same day or later/);
     expect(await apply(STAFF, 'E1', 'Holiday In Spain', '2030-03-04', '2030-03-04')).toMatch(/Choose a leave type/);
   });

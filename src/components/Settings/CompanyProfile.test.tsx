@@ -11,6 +11,8 @@ vi.mock('../../hooks/usePermissions', () => ({
   usePermissions: () => ({ loading: false, hasPermission: (p: string) => state.perms.includes(p) }),
 }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
+// the work week card has its own data and tests (WorkWeek.test.tsx)
+vi.mock('./WorkWeek', () => ({ default: () => null }));
 vi.mock('../Dashboard/GetStarted', () => ({ COMPANY_PROFILE_SAVED: 'profile-saved' }));
 vi.mock('../../lib/p9', () => ({ saveEmployerPin }));
 vi.mock('../../lib/companyProfile', async (importOriginal) => ({

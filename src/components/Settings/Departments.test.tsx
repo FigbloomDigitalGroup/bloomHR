@@ -100,10 +100,23 @@ describe('Departments page', () => {
     const dialog = await screen.findByRole('dialog');
     fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Money' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(updateDepartment).toHaveBeenCalledWith('fin', { name: 'Money', parent_id: 'hq', head_employee_id: 'e1' }));
+    await waitFor(() => expect(updateDepartment).toHaveBeenCalledWith('fin', { name: 'Money', parent_id: 'hq', head_employee_id: 'e1', work_week: null }));
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Deactivate' })[0]);
     await waitFor(() => expect(updateDepartment).toHaveBeenCalledWith('hq', { active: false }));
+  });
+
+  it('gives a department its own work week, e.g. Saturdays worked', async () => {
+    updateDepartment.mockResolvedValue(dept('fin', 'Finance', 'hq'));
+    show();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Finance' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByLabelText('Works different days from the company'));
+    fireEvent.change(within(dialog).getByLabelText('Saturday'), { target: { value: '0.5' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(updateDepartment).toHaveBeenCalledWith('fin', expect.objectContaining({ work_week: [1, 1, 1, 1, 1, 0.5, 0] }))
+    );
   });
 
   it('is read-only for people who cannot manage employees', () => {

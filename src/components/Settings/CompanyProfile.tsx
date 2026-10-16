@@ -7,6 +7,7 @@ import FigbloomLoader from '../UI/FigbloomLoader';
 import { usePermissions } from '../../hooks/usePermissions';
 import { COMPANY_PROFILE_SAVED } from '../Dashboard/GetStarted';
 import { saveEmployerPin } from '../../lib/p9';
+import WorkWeekCard from './WorkWeek';
 import {
   BUSINESS_TYPES,
   COUNTRIES,
@@ -448,6 +449,8 @@ export default function CompanyProfilePage() {
             </select>
           </Field>
         </Section>
+
+        <WorkWeekCard />
       </div>
     </div>
   );
