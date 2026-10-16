@@ -3,6 +3,7 @@ import { Download, ArrowLeft, ArrowRight, X } from "lucide-react";
 import html2pdf from "html2pdf.js";
 import { payslipDeductionLines } from "../../lib/voluntaryDeductions";
 import { payslipEarningLines } from "../../lib/earnings";
+import { leaveLineLabel, leaveLineWorking, payslipLeaveLines } from "../../lib/leavePay";
 
 // One employee's payslip for the month (view, previous / next, PDF), moved from PayrollDashboard.
 
@@ -215,6 +216,15 @@ export const PayslipModal = ({
                       <span>Basic</span>
                       <span className="font-semibold">KSh {(record.basic_salary || 0).toLocaleString()}</span>
                     </div>
+                    {payslipLeaveLines(record).map((line, i) => (
+                      <div key={`leave-${line.name}-${i}`} className="flex justify-between gap-3">
+                        <span>
+                          {leaveLineLabel(line)}
+                          <span className="block text-gray-500 text-xs">{leaveLineWorking(line)}</span>
+                        </span>
+                        <span className="font-semibold text-red-700 whitespace-nowrap">−KSh {line.amount.toLocaleString()}</span>
+                      </div>
+                    ))}
                     <div className="flex justify-between">
                       <span>House</span>
                       <span className="font-semibold">KSh {(record.house_allowance || 0).toLocaleString()}</span>

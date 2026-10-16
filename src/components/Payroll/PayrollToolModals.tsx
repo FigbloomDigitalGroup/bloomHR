@@ -9,6 +9,7 @@ import { downloadPayrollRegisterPdf } from "../../lib/payrollPdf";
 import SearchableDropdown from "../UI/SearchableDropdown";
 import { downloadP9Pdf, loadEmployerPin, loadP9For, saveEmployerPin } from "../../lib/p9";
 import { payslipEarningLines } from "../../lib/earnings";
+import { leaveLinesText } from "../../lib/leavePay";
 
 // The P9 tax card and the payroll table export, moved from PayrollDashboard.
 
@@ -186,6 +187,9 @@ export const ExportModal = ({
           Commission: record.commission || 0,
           "Bonus & Other Earnings": record.bonus || 0,
           Earnings: payslipEarningLines(record).map((l) => `${l.name} ${l.amount}`).join("; "),
+          // unpaid and half-pay leave, taken off gross pay (FIG-880)
+          "Leave Deduction": record.leave_deduction || 0,
+          "Leave Days": leaveLinesText(record),
           "Gross Pay": record.gross_pay,
           "PAYE Tax": Math.round(record.paye_tax),
           NHIF: record.nhif_deduction,
@@ -232,6 +236,9 @@ export const ExportModal = ({
           Commission: record.commission || 0,
           "Bonus & Other Earnings": record.bonus || 0,
           Earnings: payslipEarningLines(record).map((l) => `${l.name} ${l.amount}`).join("; "),
+          // unpaid and half-pay leave, taken off gross pay (FIG-880)
+          "Leave Deduction": record.leave_deduction || 0,
+          "Leave Days": leaveLinesText(record),
           "Gross Pay": record.gross_pay,
           "PAYE Tax": Math.round(record.paye_tax),
           NHIF: record.nhif_deduction,

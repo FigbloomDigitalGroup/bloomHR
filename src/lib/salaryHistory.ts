@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { WRITE_BATCH_SIZE, chunks } from './fetchAll';
 import type { DeductionItem } from './voluntaryDeductions';
 import type { EarningItem } from './earnings';
+import type { LeaveItem } from './leavePay';
 
 export interface SalaryHistoryRecord {
     employee_id: string;
@@ -33,6 +34,9 @@ export interface SalaryHistoryRecord {
     deduction_items?: DeductionItem[];
     /** bonuses, commissions and incentives on this payslip, itemised (their total is commission + bonus) */
     earning_items?: EarningItem[];
+    /** unpaid and half-pay leave taken off gross pay this month (FIG-880), and its lines */
+    leave_deduction?: number;
+    leave_items?: LeaveItem[];
     payment_method?: string;
     bank_name?: string;
     account_number?: string;

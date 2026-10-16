@@ -59,6 +59,9 @@ import { loanDeductionsFor } from "../../lib/loans";
 import { loadPayrollLoans } from "../../lib/loansApi";
 import { earningsForPeriod, statutoryPayWith, summariseEarnings } from "../../lib/earnings";
 import { loadEarningSetup } from "../../lib/earningsDb";
+import { basicAfterLeave, leavePayFor } from "../../lib/leavePay";
+import { loadLeavePay, loadLeaveRateBasis } from "../../lib/leavePayDb";
+import LeavePaySetting from "./LeavePaySetting";
 import { checkSMSBalance, formatPhoneNumber, sendSMSWithRetry, smsTemplates } from "../../lib/payrollSms";
 import BulkSalaryHistoryUpload from "./BulkSalaryHistoryUpload";
 import {
@@ -90,7 +93,7 @@ const PAYSLIP_AMOUNTS = [
   "basic_salary", "gross_pay", "net_pay", "total_deductions", "nssf_deduction", "nhif_deduction", "paye_tax",
   "housing_levy", "house_allowance", "transport_allowance", "medical_allowance", "other_allowances", "overtime_hours",
   "overtime_rate", "commission", "bonus", "per_diem", "tax_relief", "loan_deduction", "advance_deduction",
-  "welfare_deduction", "other_deductions",
+  "welfare_deduction", "other_deductions", "leave_deduction",
 ] as const;
 
 /** A calculated payroll row as the salary_history row saved for it */
@@ -101,6 +104,7 @@ const toSalaryHistory = (record: any): SalaryHistoryRecord => ({
   pay_period: record.pay_period,
   deduction_items: record.deduction_items ?? [],
   earning_items: record.earning_items ?? [],
+  leave_items: record.leave_items ?? [],
   payment_method: record.payment_method || "",
   bank_name: record.bank_name || "",
   account_number: record.account_number || "",
@@ -115,6 +119,7 @@ const fromSalaryHistory = (saved: any, live: any | undefined) => ({
   pay_period: saved.pay_period,
   deduction_items: saved.deduction_items ?? [],
   earning_items: saved.earning_items ?? [],
+  leave_items: saved.leave_items ?? [],
   payment_method: paymentMethodLabel(saved.payment_method),
   bank_name: saved.bank_name || "",
   account_number: saved.account_number || "",
@@ -936,6 +941,8 @@ export default function PayrollDashboard() {
         // bonuses, commissions and incentives for this month (lib/earnings), the same way
         const earningSetup = await loadEarningSetup();
         const earningsByEmployee = earningsForPeriod(earningSetup.types, earningSetup.earnings, actualPeriod);
+        // unpaid and half-pay leave days this month, from approved leave (lib/leavePay), and how a day's pay is worked out
+        const [leaveByEmployee, leaveBasis] = await Promise.all([loadLeavePay(actualPeriod), loadLeaveRateBasis()]);
 
         if (data) {
           setEmployees(data);
@@ -991,8 +998,13 @@ export default function PayrollDashboard() {
               const commission = earnings.commission;
               const bonus = earnings.bonus;
 
-              // Per diem is PART of basic salary (33%), not extra payment
-              const perDiem = basicSalary * 0.33;
+              // unpaid leave days, and half a day for each half-pay leave day, come off the basic salary earned this
+              // month, so gross pay and everything worked out from it (PAYE, NSSF, SHIF, housing levy) is on what is left
+              const leave = leavePayFor(leaveByEmployee.get(employeeId), basicSalary, leaveBasis);
+              const leaveDeduction = leave.total;
+
+              // Per diem is PART of basic salary (33%), not extra payment: 33% of the basic earned this month
+              const { perDiem } = basicAfterLeave(basicSalary, leaveDeduction);
 
               const overtimePay = overtimeHours * overtimeRate;
 
@@ -1005,7 +1017,8 @@ export default function PayrollDashboard() {
                 otherAllowances +
                 overtimePay +
                 commission +
-                bonus;
+                bonus -
+                leaveDeduction;
 
               // Taxable amount EXCLUDES the per diem portion and earnings that are not taxed
               const taxableGross = grossPay - perDiem - earnings.nonTaxable;
@@ -1107,6 +1120,8 @@ export default function PayrollDashboard() {
                 other_deductions: otherDeductions,
                 deduction_items: deductionItems,
                 earning_items: earnings.items,
+                leave_deduction: leaveDeduction,
+                leave_items: leave.items,
                 total_deductions: totalDeductions,
                 net_pay: netPay,
                 pay_period: actualPeriod,
@@ -1857,13 +1872,26 @@ export default function PayrollDashboard() {
       )}
 
       {tab === "rates" && (
-        <PayrollRatesTab
-          payPeriod={actualPeriod}
-          periodLabel={periodLabel}
-          canEdit={canEditRates}
-          onEdit={() => setShowStatutorySettings(true)}
-          version={ratesVersion}
-        />
+        <div className="space-y-4">
+          <PayrollRatesTab
+            payPeriod={actualPeriod}
+            periodLabel={periodLabel}
+            canEdit={canEditRates}
+            onEdit={() => setShowStatutorySettings(true)}
+            version={ratesVersion}
+          />
+          <LeavePaySetting
+            canEdit={canEditRates}
+            onChanged={() => setDeductionsVersion((v) => v + 1)}
+            draftNotice={
+              monthRun?.status === "draft"
+                ? `Payroll for ${periodLabel} is a draft: press Recalculate to apply the change to it.`
+                : monthRun
+                  ? `Payroll for ${periodLabel} is ${monthRun.status}: its payslips keep the deductions they were approved with.`
+                  : null
+            }
+          />
+        </div>
       )}
 
       {tab === "files" && (
