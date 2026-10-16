@@ -10,6 +10,9 @@ vi.mock('../../lib/supabase', () => ({
   },
 }));
 
+// the contracts to sign have their own tests (ContractsToSign.test.tsx)
+vi.mock('./ContractsToSign', () => ({ default: () => null }));
+
 import MyContract from './MyContract';
 
 beforeEach(() => {
