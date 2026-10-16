@@ -24,6 +24,18 @@ export interface LeaveCheck {
   problems: string[];
   /** the documents its leave type asks for (FIG-876); null when none */
   document: LeaveDocumentNeeded | null;
+  /** how many of its days would be at half pay (FIG-879) */
+  halfPayDays: number;
+  /** for a leave type with half-pay days: full-pay and half-pay days still free; null otherwise */
+  fullPayLeft: number | null;
+  halfPayLeft: number | null;
+}
+
+/** "5 full-pay + 15 half-pay days free", or "3 days free" */
+export function describeFree(c: Pick<LeaveCheck, 'available' | 'fullPayLeft' | 'halfPayLeft'>): string | null {
+  if (c.available === null) return null;
+  if (c.fullPayLeft !== null && c.halfPayLeft !== null) return `${c.fullPayLeft} full-pay + ${c.halfPayLeft} half-pay days free to book`;
+  return `${c.available} day${c.available === 1 ? '' : 's'} free to book`;
 }
 
 export async function checkLeaveRequest(employeeNumber: string, leaveType: string, start: string, end: string, half = false): Promise<LeaveCheck> {
@@ -35,12 +47,16 @@ export async function checkLeaveRequest(employeeNumber: string, leaveType: strin
     p_half: half,
   });
   if (error) throw new Error(error.message);
-  const r = (data || {}) as Partial<LeaveCheck>;
+  const r = (data || {}) as Partial<LeaveCheck> & { half_pay_days?: number; full_pay_left?: number | null; half_pay_left?: number | null };
+  const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
   return {
     days: Number(r.days ?? 0),
     available: r.available === null || r.available === undefined ? null : Number(r.available),
     problems: Array.isArray(r.problems) ? r.problems : [],
     document: r.document && (r.document.name || r.document.followup_name) ? r.document : null,
+    halfPayDays: Number(r.half_pay_days ?? 0),
+    fullPayLeft: num(r.full_pay_left),
+    halfPayLeft: num(r.half_pay_left),
   };
 }
 

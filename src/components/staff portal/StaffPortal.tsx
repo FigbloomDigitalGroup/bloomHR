@@ -74,7 +74,7 @@ import Appearance from '../Settings/Appearance';
 import MyContract from './MyContract';
 import MyResignation from './MyResignation';
 import { NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
-import { useLeaveCheck } from '../../lib/leaveRules';
+import { describeFree, useLeaveCheck } from '../../lib/leaveRules';
 import { LEAVE_DOCUMENTS_BUCKET, LeaveDocumentRule, loadLeaveDocumentRules, uploadLeaveDocument } from '../../lib/leaveDocuments';
 import LeaveDocuments from '../Leave/LeaveDocuments';
 import CompleteProfileCard from './CompleteProfileCard';
@@ -586,8 +586,8 @@ const LeaveApplicationForm = () => {
         <div className="flex items-center mt-2">
           <div className="h-1 w-8 bg-brand rounded-full mr-2"></div>
           <p className="text-xs text-brand">
-            {check && check.available !== null
-              ? `${formData["Leave Type"]}: ${check.available} day${check.available === 1 ? '' : 's'} free to book`
+            {check && describeFree(check)
+              ? `${formData["Leave Type"]}: ${describeFree(check)}${check.halfPayDays > 0 ? `. ${check.halfPayDays} of these days would be at half pay.` : ''}`
               : 'Choose the leave type and dates to see what you have left.'}
           </p>
         </div>
