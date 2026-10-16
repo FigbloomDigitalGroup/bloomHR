@@ -4,9 +4,9 @@ import { supabase } from './supabase';
 // asks storage for a short-lived signed link, which it only gives to someone the bucket's policies allow (see
 // 20261007000100_private_files_storage.sql). Records store the file's path in the bucket; older records stored the
 // file's public link, which still works here because the path is read back out of it. Interview transcripts are in
-// 20261015900000_recruitment_pipeline.sql.
+// 20261015900000_recruitment_pipeline.sql, contracts to sign in 20261017400000_contract_signing.sql.
 
-export type PrivateBucket = 'documents' | 'expense-receipts' | 'resumes' | 'interview-transcripts';
+export type PrivateBucket = 'documents' | 'expense-receipts' | 'resumes' | 'interview-transcripts' | 'employee-contracts';
 
 const SIGNED_LINK_SECONDS = 60 * 60;
 

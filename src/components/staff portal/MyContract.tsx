@@ -3,6 +3,7 @@ import { FileText } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Card, EmptyState, PageHeader } from '../UI';
 import { formatDay, parseDay, summarizeContract, type ContractRecord, type ContractState } from '../../lib/contract';
+import ContractsToSign from './ContractsToSign';
 
 const TONE: Record<ContractState, string> = {
   'no-end': 'bg-gray-100 text-gray-700',
@@ -14,7 +15,10 @@ const TONE: Record<ContractState, string> = {
 
 const COLUMNS = '"Employee Type", "Job Title", "Job Group", "Manager", "Start Date", "Contract Start Date", "Contract End Date"';
 
-/** The signed-in employee's own contract terms, read from their record. HR keeps these up to date under Employees. */
+/**
+ * The signed-in employee's contracts: any HR has sent them to sign (download, upload the signed copy), then their own
+ * contract terms, read from their record. HR keeps these up to date under Employees.
+ */
 export default function MyContract() {
   const [record, setRecord] = useState<ContractRecord | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'none' | 'error'>('loading');
@@ -59,7 +63,8 @@ export default function MyContract() {
 
   return (
     <div className="p-6">
-      <PageHeader title="My contract" subtitle="Your employment terms, as HR has them on record." />
+      <PageHeader title="My contract" subtitle="Contracts to sign, and your employment terms as HR has them on record." />
+      <ContractsToSign />
       <Card className="mb-4">
         <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${TONE[summary.state]}`}>{summary.headline}</span>
         <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
