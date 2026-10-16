@@ -459,7 +459,7 @@ const LeaveApplicationForm = () => {
 
   // The company's rules for this leave type (balance, most days per application, notice, once a month) and the days it
   // covers, as the database will count them when it is submitted (FIG-875).
-  const { check, checking } = useLeaveCheck(formData["Employee Number"], formData["Leave Type"], formData["Start Date"], formData["End Date"]);
+  const { check, checking } = useLeaveCheck(formData["Employee Number"], formData["Leave Type"], formData["Start Date"], formData["End Date"], formData["Type"] === 'Half Day');
   const problems = check?.problems ?? [];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {

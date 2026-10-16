@@ -23,12 +23,13 @@ export interface LeaveCheck {
   problems: string[];
 }
 
-export async function checkLeaveRequest(employeeNumber: string, leaveType: string, start: string, end: string): Promise<LeaveCheck> {
+export async function checkLeaveRequest(employeeNumber: string, leaveType: string, start: string, end: string, half = false): Promise<LeaveCheck> {
   const { data, error } = await supabase.rpc('leave_request_check', {
     p_employee_number: employeeNumber,
     p_leave_type: leaveType,
     p_start: start,
     p_end: end,
+    p_half: half,
   });
   if (error) throw new Error(error.message);
   const r = (data || {}) as Partial<LeaveCheck>;
@@ -39,8 +40,11 @@ export async function checkLeaveRequest(employeeNumber: string, leaveType: strin
   };
 }
 
-/** Checks a leave request as its fields change. null until there is enough to check (an employee, a type, both dates). */
-export function useLeaveCheck(employeeNumber: string, leaveType: string, start: string, end: string) {
+/**
+ * Checks a leave request as its fields change. null until there is enough to check (an employee, a type, both dates).
+ * `half`: a half-day application (one day), counted as half of that day.
+ */
+export function useLeaveCheck(employeeNumber: string, leaveType: string, start: string, end: string, half = false) {
   const [check, setCheck] = useState<LeaveCheck | null>(null);
   const [checking, setChecking] = useState(false);
 
@@ -51,7 +55,7 @@ export function useLeaveCheck(employeeNumber: string, leaveType: string, start: 
     }
     let stale = false;
     setChecking(true);
-    checkLeaveRequest(employeeNumber, leaveType, start, end)
+    checkLeaveRequest(employeeNumber, leaveType, start, end, half)
       .then((c) => { if (!stale) setCheck(c); })
       .catch((e) => {
         console.error('Leave check failed:', e);
@@ -59,7 +63,7 @@ export function useLeaveCheck(employeeNumber: string, leaveType: string, start: 
       })
       .finally(() => { if (!stale) setChecking(false); });
     return () => { stale = true; };
-  }, [employeeNumber, leaveType, start, end]);
+  }, [employeeNumber, leaveType, start, end, half]);
 
   return { check, checking };
 }

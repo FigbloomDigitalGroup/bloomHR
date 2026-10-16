@@ -17,6 +17,8 @@ import {
   flatten,
   updateDepartment,
 } from '../../lib/orgStructure';
+import { MONDAY_TO_FRIDAY, WorkWeek, describeWorkWeek, toWorkWeek, workWeekError } from '../../lib/workWeek';
+import { WorkWeekPicker } from './WorkWeek';
 
 const inputClass = 'w-full rounded-tile border border-border bg-white px-3 py-2 text-[12.5px] text-ink outline-none focus:border-brand';
 
@@ -25,6 +27,8 @@ interface Draft {
   name: string;
   parentId: string;
   headNumber: string;
+  /** its own work week, or null to follow the department above it / the company */
+  workWeek: WorkWeek | null;
 }
 
 /**
@@ -61,6 +65,7 @@ export default function Departments() {
       name: d?.name ?? '',
       parentId: d?.parent_id ?? '',
       headNumber: (d?.head_employee_id && byId.get(d.head_employee_id)?.employeeNumber) || '',
+      workWeek: toWorkWeek(d?.work_week),
     });
 
   // a department can't go under itself or its own sub-departments
@@ -75,10 +80,10 @@ export default function Departments() {
     try {
       const head = draft.headNumber ? employees.find((e) => e.employeeNumber === draft.headNumber)?.id || null : null;
       if (draft.id) {
-        await updateDepartment(draft.id, { name: draft.name.trim(), parent_id: draft.parentId || null, head_employee_id: head });
+        await updateDepartment(draft.id, { name: draft.name.trim(), parent_id: draft.parentId || null, head_employee_id: head, work_week: draft.workWeek });
       } else {
         const made = await addDepartment(draft.name, draft.parentId || null);
-        if (head) await updateDepartment(made.id, { head_employee_id: head });
+        if (head || draft.workWeek) await updateDepartment(made.id, { head_employee_id: head, work_week: draft.workWeek });
       }
       await reload();
       toast.success(draft.id ? 'Department saved' : 'Department added');
@@ -154,6 +159,7 @@ export default function Departments() {
                       <div className="text-[11.5px] text-muted-foreground truncate">
                         {headcount.get(d.id) || 0} {headcount.get(d.id) === 1 ? 'person' : 'people'}
                         {head ? ` · Head: ${head.fullName}` : ''}
+                        {toWorkWeek(d.work_week) ? ` · Works ${describeWorkWeek(toWorkWeek(d.work_week) as WorkWeek)}` : ''}
                       </div>
                     </div>
                   </div>
@@ -192,9 +198,29 @@ export default function Departments() {
               onChange={(e) => setDraft({ ...draft, headNumber: e?.employeeNumber || '' })}
               placeholder="Search for the head..."
             />
+            <div>
+              <span className="block text-[12px] font-semibold text-ink mb-1">Work week</span>
+              <label className="flex items-center gap-2 text-[12px] text-ink mb-2">
+                <input
+                  type="checkbox"
+                  className="accent-brand"
+                  checked={!!draft.workWeek}
+                  onChange={(e) => setDraft({ ...draft, workWeek: e.target.checked ? [...MONDAY_TO_FRIDAY] : null })}
+                />
+                Works different days from the company
+              </label>
+              {draft.workWeek ? (
+                <>
+                  <WorkWeekPicker value={draft.workWeek} onChange={(w) => setDraft({ ...draft, workWeek: w })} />
+                  {workWeekError(draft.workWeek) && <p className="mt-1 mb-0 text-[11.5px] text-red-600">{workWeekError(draft.workWeek)}</p>}
+                </>
+              ) : (
+                <p className="m-0 text-[11.5px] text-muted-foreground">Follows the department above it, or the company work week (Settings → Company).</p>
+              )}
+            </div>
             <div className="flex justify-end gap-2 pt-1">
               <Button variant="secondary" onClick={() => setDraft(null)}>Cancel</Button>
-              <Button onClick={() => void save()} disabled={busy || !draft.name.trim()}>{busy ? 'Saving...' : 'Save'}</Button>
+              <Button onClick={() => void save()} disabled={busy || !draft.name.trim() || (!!draft.workWeek && !!workWeekError(draft.workWeek))}>{busy ? 'Saving...' : 'Save'}</Button>
             </div>
           </div>
         </Modal>

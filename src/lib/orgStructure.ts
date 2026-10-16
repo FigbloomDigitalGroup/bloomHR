@@ -11,6 +11,8 @@ export interface Department {
   parent_id: string | null;
   head_employee_id: string | null;
   active: boolean;
+  /** its own work week (FIG-888), Monday first; null = the department above it, then the company */
+  work_week?: number[] | null;
 }
 
 /** A node of a tree: the item, its children (sorted) and how deep it sits (0 at the top). */
@@ -20,7 +22,7 @@ export interface TreeNode<T> {
   depth: number;
 }
 
-const DEPARTMENT_COLUMNS = 'id, name, parent_id, head_employee_id, active';
+const DEPARTMENT_COLUMNS = 'id, name, parent_id, head_employee_id, active, work_week';
 
 export async function loadDepartments(): Promise<Department[]> {
   const { data, error } = await supabase.from('departments').select(DEPARTMENT_COLUMNS).order('name');
@@ -48,7 +50,7 @@ export async function addDepartment(name: string, parentId: string | null = null
 
 export async function updateDepartment(
   id: string,
-  changes: Partial<Pick<Department, 'name' | 'parent_id' | 'head_employee_id' | 'active'>>
+  changes: Partial<Pick<Department, 'name' | 'parent_id' | 'head_employee_id' | 'active' | 'work_week'>>
 ): Promise<Department> {
   const { data, error } = await supabase.from('departments').update(changes).eq('id', id).select(DEPARTMENT_COLUMNS);
   if (error) throw new Error(departmentError(error));

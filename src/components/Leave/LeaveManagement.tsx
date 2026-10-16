@@ -783,7 +783,7 @@ const LeaveTypeFormModal = ({
                   onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, count_days: e.target.value }))}
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
                 >
-                  <option value="working">Working days (Mon-Fri, less holidays)</option>
+                  <option value="working">Working days (your work week, less holidays)</option>
                   <option value="calendar">Calendar days (every day)</option>
                 </select>
               </div>
@@ -1139,7 +1139,7 @@ const LeaveApplicationFormModal = ({
   // once-a-month rules, never the balance.
   const { check, checking } = useLeaveCheck(
     newLeaveApplication["Employee Number"], newLeaveApplication["Leave Type"],
-    newLeaveApplication["Start Date"], newLeaveApplication["End Date"]
+    newLeaveApplication["Start Date"], newLeaveApplication["End Date"], newLeaveApplication["Type"] === 'Half Day'
   );
   const problems = check?.problems ?? [];
   useEffect(() => {
