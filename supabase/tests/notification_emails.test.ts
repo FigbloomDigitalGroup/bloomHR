@@ -64,9 +64,10 @@ describe('claim_notification_emails', () => {
     expect(skipped).toEqual({ email_sent: true, email_error: 'not emailed: turned off by the employee' });
   });
 
-  it('never the reminders meant for HR', async () => {
+  it('never the reminders meant for HR to the employee (they go to HR: email_everything.test.ts)', async () => {
     await notify('contract_expiring', 'Contract ending');
     expect(await claim()).toEqual([]);
+    expect((await db.query(`select email_error from hr_notifications`)).rows[0]).toEqual({ email_error: 'not emailed: for HR (emailed to HR)' });
   });
 
   it('a failed send is tried again, up to 5 times', async () => {

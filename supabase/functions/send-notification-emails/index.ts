@@ -1,5 +1,11 @@
-// Sends the staff portal's notifications by email (FIG-771), then the queued company-wide emails (FIG-820). Run every
+// Sends the staff portal's notifications by email (FIG-771), HR's alerts to the HR people who look after them and the
+// unread chat digests (FIG-890, migration 20261017600000), then the queued company-wide emails (FIG-820). Run every
 // minute by pg_cron (migration 20261013800000), which calls it with the shared secret in the x-cron-secret header.
+//
+// claim_hr_alert_emails() / claim_chat_digest_emails() hand back one email per person, marked sent as they are claimed;
+// each person's copy is a row in notification_email_deliveries, put back with release_email_deliveries() when a send
+// fails (tried again on a later run, up to 5 times). All of these respect each person's email preferences and their
+// daily cap in the database.
 //
 // claim_notification_emails() hands back, per employee, every notification not yet emailed (once the latest is a
 // couple of minutes old) and marks them emailed in the same statement, so two runs never send the same one. A send
@@ -16,7 +22,10 @@
 // RESEND_MAX_RPS (optional: requests a second the Resend account allows, default 2).
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { htmlFor, subjectFor, type NotificationItem } from './email.ts';
+import {
+  chatDigestHtml, chatDigestSubject, chatLink, htmlFor, hrAlertHtml, hrAlertSubject, subjectFor,
+  type ChatDigestItem, type NotificationItem,
+} from './email.ts';
 import { createPacer, createResendSender, groupFailures, type Attachment, type OutgoingEmail } from './sending.ts';
 
 interface Claim {
@@ -27,6 +36,28 @@ interface Claim {
   company_name: string | null;
   ids: number[];
   items: NotificationItem[];
+}
+
+interface HrAlertClaim {
+  tenant_id: string;
+  user_id: string;
+  to_email: string | null;
+  first_name: string | null;
+  company_name: string | null;
+  role: string | null;
+  ids: number[];
+  items: NotificationItem[];
+}
+
+interface ChatClaim {
+  id: number;
+  tenant_id: string;
+  user_id: string;
+  to_email: string | null;
+  first_name: string | null;
+  company_name: string | null;
+  role: string | null;
+  items: ChatDigestItem[];
 }
 
 interface BulkClaim {
@@ -134,7 +165,77 @@ Deno.serve(async (req) => {
     if (claims.length < CLAIM_SIZE) break;
   }
 
-  // 2. company-wide emails ----------------------------------------------------------------------------------------
+  // 2. HR alerts and 3. unread chat digests: one delivery row (or several, for HR) per email ---------------------
+  const sendDeliveries = async <T extends { tenant_id: string; to_email: string | null }>(
+    name: string,
+    claimFn: () => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+    idsOf: (c: T) => number[],
+    build: (c: T) => { subject: string; html: string },
+    purpose: string,
+  ) => {
+    while (more()) {
+      const { data, error } = await claimFn();
+      if (error) {
+        console.error(`${name}:`, error.message);
+        break;
+      }
+      const claims = (data ?? []) as T[];
+      if (claims.length === 0) break;
+
+      // no email address: nothing to retry
+      const noEmail = claims.filter((c) => !EMAIL_RE.test((c.to_email ?? '').trim()));
+      if (noEmail.length) {
+        const { error: e } = await db.rpc('skip_email_deliveries', { p_ids: noEmail.flatMap(idsOf), p_error: 'not emailed: no email address' });
+        if (e) console.error('skip_email_deliveries:', e.message);
+      }
+      const ready = claims.filter((c) => EMAIL_RE.test((c.to_email ?? '').trim()));
+      const emails: OutgoingEmail[] = ready.map((c) => ({ from, to: (c.to_email ?? '').trim(), ...build(c) }));
+      const results = await sender.send(emails);
+
+      const log: Record<string, unknown>[] = [];
+      results.forEach((r, i) => {
+        if (!r.ok) return;
+        sent++;
+        log.push({
+          tenant_id: ready[i].tenant_id, provider: 'resend', provider_id: r.id, purpose,
+          sent_by: null, from_address: from, to_addresses: [emails[i].to], subject: emails[i].subject,
+        });
+      });
+      await logSent(log);
+      for (const g of groupFailures(ready, results)) {
+        failed += g.items.length;
+        const { error: e } = await db.rpc('release_email_deliveries', {
+          p_ids: g.items.flatMap(idsOf), p_error: g.error, p_count_attempt: g.countAttempt,
+        });
+        if (e) console.error('release_email_deliveries:', e.message);
+      }
+      if (claims.length < CLAIM_SIZE) break;
+    }
+  };
+
+  await sendDeliveries<HrAlertClaim>(
+    'claim_hr_alert_emails',
+    () => db.rpc('claim_hr_alert_emails', { p_limit: CLAIM_SIZE }),
+    (c) => c.ids,
+    (c) => {
+      const content = { firstName: c.first_name, companyName: c.company_name, items: c.items, appUrl };
+      return { subject: hrAlertSubject(content), html: hrAlertHtml(content) };
+    },
+    'hr-alert',
+  );
+
+  await sendDeliveries<ChatClaim>(
+    'claim_chat_digest_emails',
+    () => db.rpc('claim_chat_digest_emails', { p_limit: CLAIM_SIZE }),
+    (c) => [c.id],
+    (c) => {
+      const content = { firstName: c.first_name, companyName: c.company_name, items: c.items, link: chatLink(appUrl, c.role) };
+      return { subject: chatDigestSubject(content), html: chatDigestHtml(content) };
+    },
+    'chat-digest',
+  );
+
+  // 4. company-wide emails ----------------------------------------------------------------------------------------
   const bulkEmails = new Map<string, BulkEmail>();
   while (more()) {
     const { data, error } = await db.rpc('claim_bulk_emails', { p_limit: CLAIM_SIZE });

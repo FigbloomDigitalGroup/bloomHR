@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 const saveMyTheme = vi.hoisted(() => vi.fn());
 vi.mock('../../lib/preferences', () => ({ saveMyTheme }));
 vi.mock('./ProfilePicture', () => ({ default: () => null }));
+vi.mock('./EmailNotifications', () => ({ default: () => null }));
 
 import Appearance from './Appearance';
 import { loadStoredTheme, resetTheme } from '../../theme/applyTheme';
