@@ -5,7 +5,7 @@ import { ChatArea } from "./ChatArea";
 import { chatService } from "./services/chatServices";
 import { supabase } from "../../lib/supabase";
 import toast from "react-hot-toast";
-import { initialsOf } from "./lib/names";
+import { initialsOf, realChannelId } from "./lib/names";
 import { countsAsUnread, findChat, sortDirectMessages, withIncomingChannelMessage, withIncomingDirectMessage, type IncomingMessage } from "./lib/unread";
 import { canCreateChannels } from "./lib/permissions";
 import { usePermissions } from "../../hooks/usePermissions";
@@ -13,6 +13,7 @@ import { isOnline, useOnlinePeople } from "./lib/presence";
 import { ChatPeopleContext } from "./lib/chatPeople";
 import type { Employee, User, Channel, DirectMessage, Message } from "../chat/types/types";
 import FigbloomLoader from "../UI/FigbloomLoader";
+import { loadMutedChats, setChatMuted } from "../../lib/notificationPreferences";
 
 /** `onMessagesRead` tells the staff portal a conversation was read (opened, or a message arrived in it while open). */
 export function ChatLayout({ onMessagesRead }: { onMessagesRead?: (channelId: string) => void } = {}) {
@@ -27,6 +28,29 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: (channelId: st
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  // chats muted for email (FIG-890): the bell at the top of a chat; the chat itself is unaffected
+  const [mutedChats, setMutedChats] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    loadMutedChats().then(setMutedChats, () => undefined);
+  }, []);
+
+  const toggleMute = async (chatId: string) => {
+    const id = realChannelId(chatId);
+    const muted = !mutedChats.has(id);
+    try {
+      await setChatMuted(id, muted);
+      setMutedChats((prev) => {
+        const next = new Set(prev);
+        if (muted) next.add(id);
+        else next.delete(id);
+        return next;
+      });
+      toast.success(muted ? "You won't get emails about this chat" : 'Emails about this chat are back on');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Not saved');
+    }
+  };
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -576,9 +600,8 @@ const handleDMCreate = async (userId: string) => {
             messages={messages}
             currentUserId={currentUser.id}
             onSendMessage={handleSendMessage}
-            onToggleMute={(channelId) => {
-              console.log("🔇 Toggle mute for channel:", channelId);
-            }}
+            onToggleMute={(channelId) => void toggleMute(channelId)}
+            isMuted={mutedChats.has(realChannelId(liveActiveChannel.id))}
             employees={liveEmployees}
           />
         ) : (

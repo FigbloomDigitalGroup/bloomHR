@@ -23,7 +23,7 @@ export interface HRNotification {
     // CHECK constraint) - this type was never updated to match, so every
     // filter against those values silently compiled as "always false"
     // (TS2367) without the strict, real tsconfig catching it.
-    // the database's check constraint lists the same (migrations 20261013600000, 20261013700000, 20261015800000 ... 20261016700000)
+    // the database's check constraint lists the same (migrations 20261013600000, 20261013700000, 20261015800000 ... 20261017400000)
     notification_type:
         | 'contract_expiring' | 'probation_expiring' | 'leave_recommended' | 'leave_approved' | 'leave_rejected' | 'leave_year_end_reminder'
         | 'document_accepted' | 'document_rejected' | 'onboarding_approved' | 'onboarding_changes_requested' | 'photo_removed' | 'document_requested'
@@ -34,7 +34,9 @@ export interface HRNotification {
         | 'approval_needed' | 'approval_progress'
         | 'exit_requested' | 'exit_approved' | 'exit_declined'
         | 'application_received'
-        | 'loan_requested' | 'loan_disbursed' | 'loan_repaid';
+        | 'loan_requested' | 'loan_disbursed' | 'loan_repaid'
+        | 'contract_sent' | 'contract_sent_back' | 'contract_accepted' | 'contract_cancelled' | 'contract_signed'
+        | 'leave_exhausted' | 'casual_limit';
     title: string;
     message: string;
     // Nullable for leave notifications - only contract/probation reminders
