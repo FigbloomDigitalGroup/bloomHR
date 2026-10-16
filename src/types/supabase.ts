@@ -196,6 +196,8 @@ export type Database = {
           travel_allowance: number | null
           hardship: number | null
           onboarding_status: string | null
+          worker_kind: string
+          daily_rate: number | null
           onboarding_submitted_at: string | null
           onboarding_reviewed_by: string | null
           onboarding_reviewed_at: string | null
@@ -309,6 +311,8 @@ export type Database = {
           travel_allowance?: number | null
           hardship?: number | null
           onboarding_status?: string | null
+          worker_kind?: string
+          daily_rate?: number | null
           onboarding_submitted_at?: string | null
           onboarding_reviewed_by?: string | null
           onboarding_reviewed_at?: string | null
@@ -422,6 +426,8 @@ export type Database = {
           travel_allowance?: number | null
           hardship?: number | null
           onboarding_status?: string | null
+          worker_kind?: string
+          daily_rate?: number | null
           onboarding_submitted_at?: string | null
           onboarding_reviewed_by?: string | null
           onboarding_reviewed_at?: string | null

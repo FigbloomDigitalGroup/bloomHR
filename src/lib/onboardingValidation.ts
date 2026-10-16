@@ -149,5 +149,9 @@ export function leftBefore(e: EmployeeRecord, period: string = thisPeriod()): bo
   return !!left && left[1] < period;
 }
 
-/** Only approved employees are paid (everyone else is still being onboarded), and not after the month they left. */
-export const isPayrollReady = (e: EmployeeRecord) => e['onboarding_status'] === 'approved' && !leftBefore(e);
+/**
+ * Only approved employees are paid (everyone else is still being onboarded), and not after the month they left.
+ * Casual workers are paid by the day from their own page, never on the monthly payroll.
+ */
+export const isPayrollReady = (e: EmployeeRecord) =>
+  e['onboarding_status'] === 'approved' && !leftBefore(e) && e['worker_kind'] !== 'casual';

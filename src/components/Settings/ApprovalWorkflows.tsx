@@ -179,6 +179,8 @@ export default function ApprovalWorkflowsCard({ className = '' }: { className?: 
   const [saved, setSaved] = useState<ApprovalWorkflow | null>(null);
   const [steps, setSteps] = useState<ApprovalStep[]>([]);
   const [adminsCanAct, setAdminsCanAct] = useState(true);
+  // told when a request is finally approved or rejected, without being a step ("the manager approves, HR is told")
+  const [notifyRoles, setNotifyRoles] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -189,6 +191,7 @@ export default function ApprovalWorkflowsCard({ className = '' }: { className?: 
       setSaved(w);
       setSteps(w.steps);
       setAdminsCanAct(w.admins_can_act);
+      setNotifyRoles(w.notify_roles ?? []);
     });
     return () => {
       live = false;
@@ -208,7 +211,7 @@ export default function ApprovalWorkflowsCard({ className = '' }: { className?: 
   const save = async () => {
     setBusy(true);
     try {
-      await saveApprovalWorkflow(kind, steps, adminsCanAct);
+      await saveApprovalWorkflow(kind, steps, adminsCanAct, notifyRoles);
       toast.success(`${kindInfo.label} approvals saved`);
     } catch (e) {
       toast.error((e as Error).message);
@@ -260,6 +263,26 @@ export default function ApprovalWorkflowsCard({ className = '' }: { className?: 
             <input type="checkbox" checked={adminsCanAct} disabled={!canEdit} onChange={(e) => setAdminsCanAct(e.target.checked)} />
             Admins may approve or reject at any step
           </label>
+          <fieldset className="m-0 p-0 border-0">
+            <legend className="text-[12px] font-semibold text-ink mb-1">Also tell, when a request is approved or rejected</legend>
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+              {APPROVER_ROLES.map((r) => (
+                <label key={r} className="flex items-center gap-1.5 text-[12px] text-ink">
+                  <input
+                    type="checkbox"
+                    checked={notifyRoles.includes(r)}
+                    disabled={!canEdit}
+                    onChange={(e) => setNotifyRoles((prev) => (e.target.checked ? [...prev, r] : prev.filter((x) => x !== r)))}
+                  />
+                  {r}
+                </label>
+              ))}
+            </div>
+            <p className="m-0 mt-1 text-[11px] text-muted-foreground">
+              They get a notification (and an email) with the decision, without having to approve: for example, the line
+              manager approves and HR is told.
+            </p>
+          </fieldset>
           {canEdit && (
             <div className="flex flex-wrap gap-2">
               <Button
