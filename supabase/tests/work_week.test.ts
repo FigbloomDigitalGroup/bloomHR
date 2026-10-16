@@ -42,6 +42,8 @@ beforeAll(async () => {
       ('FARMER', 'Fred', 'Farm', 'farm@a.co', '${FARM}', '${A}'),
       ('PACKER', 'Pam', 'Pack', 'pack@a.co', '${PACKHOUSE}', '${A}');
     select seed_default_leave_types('${A}');
+    -- documents with leave are tested in leave_documents.test.ts
+    update leave_policies set document_name = null, followup_document_name = null;
   `);
 }, 120000);
 

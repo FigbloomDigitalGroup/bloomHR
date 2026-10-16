@@ -59,6 +59,8 @@ beforeAll(async () => {
     insert into employees ("Employee Number", "First Name", "Last Name", "Work Email", tenant_id) values
       ('E1', 'Ann', 'One', 'e1@a.co', '${A}'), ('E2', 'Ben', 'Two', 'e2@a.co', '${A}'), ('E-HR', 'Hana', 'Hr', 'hr@a.co', '${A}');
     select seed_default_leave_types('${A}');
+    -- documents with leave are tested in leave_documents.test.ts
+    update leave_policies set document_name = null, followup_document_name = null;
     -- the sums below use 24 days of annual leave, and compassionate leave of 3 days a month
     update leave_policies set days_allotted = 24
       where leave_type_id = (select id from leave_types where tenant_id = '${A}' and name = 'Annual Leave');
@@ -238,7 +240,7 @@ describe('checking before submitting', () => {
   it('gives the days, what is free and what is wrong, for one’s own leave', async () => {
     const r = (await asUser(db, STAFF, () =>
       rows<{ c: { days: number; available: number; problems: string[] } }>(`select leave_request_check('E1', 'Sick Leave', '2030-03-04', '2030-03-08') c`)))[0].c;
-    expect(r).toEqual({ days: 4, available: 14, problems: [] });
+    expect(r).toMatchObject({ days: 4, available: 14, problems: [] });
     const bad = (await asUser(db, STAFF, () =>
       rows<{ c: { problems: string[] } }>(`select leave_request_check('E1', 'Sick Leave', '2030-04-01', '2030-04-30') c`)))[0].c;
     expect(bad.problems[0]).toMatch(/Not enough Sick Leave left/);

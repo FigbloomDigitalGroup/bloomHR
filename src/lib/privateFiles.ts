@@ -6,7 +6,7 @@ import { supabase } from './supabase';
 // file's public link, which still works here because the path is read back out of it. Interview transcripts are in
 // 20261015900000_recruitment_pipeline.sql.
 
-export type PrivateBucket = 'documents' | 'expense-receipts' | 'resumes' | 'interview-transcripts';
+export type PrivateBucket = 'documents' | 'expense-receipts' | 'resumes' | 'interview-transcripts' | 'leave-documents';
 
 const SIGNED_LINK_SECONDS = 60 * 60;
 

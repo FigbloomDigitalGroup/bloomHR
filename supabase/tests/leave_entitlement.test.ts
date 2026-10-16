@@ -44,6 +44,8 @@ beforeAll(async () => {
       ('ODD', 'Odd', 'Date', 'odd@a.co', '5th Oct 2026', null, '${A}'),
       ('NEW', 'Nia', 'New', 'new@a.co', '2030-01-15', null, '${A}');
     select seed_default_leave_types('${A}');
+    -- documents with leave are tested in leave_documents.test.ts
+    update leave_policies set document_name = null, followup_document_name = null;
   `);
 }, 120000);
 

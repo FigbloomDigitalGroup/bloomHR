@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './supabase';
+import type { LeaveDocumentNeeded } from './leaveDocuments';
 
 // The leave rules a company sets per leave type (FIG-875). The database checks every new application against them
 // and works out its days (supabase/migrations/20261017000000_leave_rules.sql); leave_request_check gives the forms the
@@ -21,6 +22,8 @@ export interface LeaveCheck {
   available: number | null;
   /** what stops it being submitted; empty when it may go ahead */
   problems: string[];
+  /** the documents its leave type asks for (FIG-876); null when none */
+  document: LeaveDocumentNeeded | null;
 }
 
 export async function checkLeaveRequest(employeeNumber: string, leaveType: string, start: string, end: string, half = false): Promise<LeaveCheck> {
@@ -37,6 +40,7 @@ export async function checkLeaveRequest(employeeNumber: string, leaveType: strin
     days: Number(r.days ?? 0),
     available: r.available === null || r.available === undefined ? null : Number(r.available),
     problems: Array.isArray(r.problems) ? r.problems : [],
+    document: r.document && (r.document.name || r.document.followup_name) ? r.document : null,
   };
 }
 

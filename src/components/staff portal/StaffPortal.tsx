@@ -75,6 +75,8 @@ import MyContract from './MyContract';
 import MyResignation from './MyResignation';
 import { NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
 import { useLeaveCheck } from '../../lib/leaveRules';
+import { LEAVE_DOCUMENTS_BUCKET, LeaveDocumentRule, loadLeaveDocumentRules, uploadLeaveDocument } from '../../lib/leaveDocuments';
+import LeaveDocuments from '../Leave/LeaveDocuments';
 import CompleteProfileCard from './CompleteProfileCard';
 import OnboardingForm from '../Onboarding/OnboardingForm';
 import MyFirstWeeks from '../AfterHiring/MyFirstWeeks';
@@ -395,6 +397,8 @@ const LeaveApplicationForm = () => {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // the document the leave type asks for with the application (a doctor's report...), sent with it (FIG-876)
+  const [docFile, setDocFile] = useState<File | null>(null);
   // Real leave types from the leave_types catalog (see FIG-564) - replaces a
   // hardcoded dropdown whose lowercase values ("sick", "maternity", "month")
   // never matched the catalog's real names, silently breaking balance
@@ -461,6 +465,7 @@ const LeaveApplicationForm = () => {
   // covers, as the database will count them when it is submitted (FIG-875).
   const { check, checking } = useLeaveCheck(formData["Employee Number"], formData["Leave Type"], formData["Start Date"], formData["End Date"], formData["Type"] === 'Half Day');
   const problems = check?.problems ?? [];
+  const docNeededNow = !!check?.document?.name && check.document.when === 'with_application';
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -492,16 +497,25 @@ const LeaveApplicationForm = () => {
       return;
     }
 
+    if (docNeededNow && !docFile) {
+      toast.error(`Attach the ${check?.document?.name}`);
+      setIsSubmitting(false);
+      return;
+    }
+
     if (!formData["Reason"] || formData["Reason"].trim().length < 10) {
       toast.error('Please provide a detailed reason (minimum 10 characters)');
       setIsSubmitting(false);
       return;
     }
 
+    let uploaded: { path: string; name: string } | null = null;
     try {
+      if (docFile) uploaded = await uploadLeaveDocument(docFile);
       const { error } = await supabase
         .from('leave_application')
         .insert([{
+          ...(uploaded ? { document_path: uploaded.path, document_name: uploaded.name } : {}),
           "Employee Number": formData["Employee Number"],
           "name": formData["Name"],
           "Office Branch": formData["Office Branch"],
@@ -535,9 +549,11 @@ const LeaveApplicationForm = () => {
         "Reason": '',
         time_added: new Date().toISOString()
       }));
+      setDocFile(null);
 
     } catch (error) {
       console.error('Error submitting leave application:', error);
+      if (uploaded) void supabase.storage.from(LEAVE_DOCUMENTS_BUCKET).remove([uploaded.path]);
       // the database refuses an application that breaks one of the company's leave rules, and says which
       toast.error((error as { message?: string })?.message || 'Failed to submit leave application');
     } finally {
@@ -549,7 +565,7 @@ const LeaveApplicationForm = () => {
   const isSubmitDisabled = () => {
     if (isSubmitting) return true;
 
-    if (checking || !check || problems.length > 0) {
+    if (checking || !check || problems.length > 0 || (docNeededNow && !docFile)) {
       return true;
     }
 
@@ -722,6 +738,36 @@ const LeaveApplicationForm = () => {
             </div>
           </div>
 
+          {check?.document && (
+            <div className="space-y-1 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              {check.document.name && (
+                check.document.when === 'with_application' ? (
+                  <>
+                    <label className="block text-xs font-medium text-gray-700" htmlFor="leave-document">
+                      {check.document.name} <span className="text-red-500">(required)</span>
+                    </label>
+                    <input
+                      id="leave-document"
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                      onChange={(e) => setDocFile(e.target.files?.[0] ?? null)}
+                      className="block w-full text-xs text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-primary"
+                    />
+                  </>
+                ) : (
+                  <p className="m-0 text-xs text-gray-700">
+                    Add the {check.document.name.toLowerCase()} within {check.document.within_days} days of the leave starting (Leave History).
+                  </p>
+                )
+              )}
+              {check.document.followup_name && (
+                <p className="m-0 text-xs text-gray-700">
+                  Then add the {check.document.followup_name.toLowerCase()} within {check.document.followup_within_days} days of the leave starting (Leave History).
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="space-y-1">
             <label className="block text-xs font-medium text-gray-700">Reason</label>
             <textarea
@@ -773,6 +819,13 @@ const LeaveApplicationsList = () => {
   const [chains, setChains] = useState<Record<string, ApprovalChainData>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  // which documents each leave type asks for (FIG-876), and a reload after one is added
+  const [docRules, setDocRules] = useState<LeaveDocumentRule[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    loadLeaveDocumentRules().then(setDocRules).catch((e) => console.error('Error fetching leave document rules:', e));
+  }, []);
 
   useEffect(() => {
     const fetchLeaveApplications = async () => {
@@ -813,7 +866,7 @@ const LeaveApplicationsList = () => {
     };
 
     fetchLeaveApplications();
-  }, []);
+  }, [reloadKey]);
 
   const getStatusBadge = (status: string) => {
     switch ((status || '').toLowerCase()) {
@@ -893,6 +946,9 @@ const LeaveApplicationsList = () => {
                   Approvals
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Documents
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Submitted On
                 </th>
               </tr>
@@ -924,6 +980,14 @@ const LeaveApplicationsList = () => {
                   </td>
                   <td className="px-6 py-4">
                     {chains[app.id] ? <ApprovalChain chain={chains[app.id]} compact /> : <span className="text-xs text-gray-400">-</span>}
+                  </td>
+                  <td className="px-6 py-4">
+                    <LeaveDocuments
+                      app={app}
+                      rule={docRules.find((r) => r.leave_type === app["Leave Type"])}
+                      canAdd
+                      onChanged={() => setReloadKey((k) => k + 1)}
+                    />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
                     {parseApplicationDate(app).toLocaleDateString()}

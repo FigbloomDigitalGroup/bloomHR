@@ -124,6 +124,8 @@ describe('leave_application', () => {
         ('E-THEM', 'Them', 'Annual Leave', 'Pending', '${A}'),
         ('E-ME', 'Me (B)', 'Annual Leave', 'Pending', '${B}');
       select seed_default_leave_types('${A}');
+      -- documents with leave are tested in leave_documents.test.ts
+      update leave_policies set document_name = null, followup_document_name = null;
     `);
   });
 
