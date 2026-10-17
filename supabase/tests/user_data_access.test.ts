@@ -192,9 +192,9 @@ describe('tasks', () => {
         ('private for me',   '${U.COLLEAGUE}', '${U.STAFF}', true, '${A}');
     `);
   });
-  it('public tasks are visible to the company; private ones only to creator and assignee', async () => {
+  it('old tasks are visible only to their creator and assignee (20261019200000), whether private or not', async () => {
     await asUser(db, U.STAFF, async () => {
-      expect((await rows<{ title: string }>(`select title from todos order by title`)).map((x) => x.title)).toEqual(['my private', 'private for me', 'team task']);
+      expect((await rows<{ title: string }>(`select title from todos order by title`)).map((x) => x.title)).toEqual(['my private', 'private for me']);
     });
   });
   it('you create tasks as yourself; creator and assignee update; only the creator deletes', async () => {

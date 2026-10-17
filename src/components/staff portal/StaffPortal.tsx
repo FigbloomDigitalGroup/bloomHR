@@ -24,7 +24,8 @@ import {
   SignOut as PhSignOut,
   Target as PhTarget,
   UsersThree as PhUsersThree,
-  Buildings as PhBuildings
+  Buildings as PhBuildings,
+  Kanban as PhKanban
 } from '@phosphor-icons/react';
 
 // Keep Lucide icons for UI elements only
@@ -77,6 +78,7 @@ import MyContract from './MyContract';
 import MyResignation from './MyResignation';
 import MyOvertime from './MyOvertime';
 import MyTeam from './MyTeam';
+import TaskWorkspace from '../Tasks/TaskWorkspace';
 import { loadMyTeam, type TeamMember } from '../../lib/myTeamApi';
 import StaffCompany from './StaffCompany';
 import MyApprovalChain from './MyApprovalChain';
@@ -1196,6 +1198,7 @@ const staffMenuGroups: MenuGroup[] = [
   {
     title: "Work & Development",
     items: [
+      { id: 'tasks', label: 'Tasks', icon: PhKanban },
       { id: 'my-kpis', label: 'My KPIs', icon: PhTarget },
       { id: 'training', label: 'Training', icon: PhGraduationCap },
       { id: 'job-applications', label: 'Job Opportunities', icon: PhTrendUp },
@@ -1981,6 +1984,7 @@ const StaffPortal = () => {
               {activeTab === 'overtime' && <MyOvertime />}
               {activeTab === 'loan' && <LoanRequest />}
               {activeTab === 'training' && <TrainingModule />}
+              {activeTab === 'tasks' && <TaskWorkspace mode="staff" />}
               {activeTab === 'my-kpis' && <MyKpis />}
               {activeTab === 'my-team' && team.length > 0 && <MyTeam team={team} />}
               {activeTab === 'leave' && <LeaveApplicationForm />}
