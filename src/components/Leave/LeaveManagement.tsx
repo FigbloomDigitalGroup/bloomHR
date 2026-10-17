@@ -108,6 +108,8 @@ type Holiday = {
   name: string;
   date: string;
   recurring: boolean;
+  // 'auto': added from the country's public holidays (FIG-884); 'manual': added here
+  source?: 'manual' | 'auto';
 };
 
 type LeaveApplication = {
@@ -292,19 +294,6 @@ interface BranchAreaMapping {
 }
 
 // Sample holidays (Kenyan public holidays)
-const SAMPLE_HOLIDAYS: Holiday[] = [
-  { id: '1', name: 'New Year', date: '2024-01-01', recurring: true },
-  { id: '2', name: 'Good Friday', date: '2024-03-29', recurring: true },
-  { id: '3', name: 'Easter Monday', date: '2024-04-01', recurring: true },
-  { id: '4', name: 'Labour Day', date: '2024-05-01', recurring: true },
-  { id: '5', name: 'Madaraka Day', date: '2024-06-01', recurring: true },
-  { id: '6', name: 'Huduma Day', date: '2024-10-10', recurring: true },
-  { id: '7', name: 'Mashujaa Day', date: '2024-10-20', recurring: true },
-  { id: '8', name: 'Jamhuri Day', date: '2024-12-12', recurring: true },
-  { id: '9', name: 'Christmas Day', date: '2024-12-25', recurring: true },
-  { id: '10', name: 'Boxing Day', date: '2024-12-26', recurring: true },
-];
-
 // Helper functions
 const getInitials = (name: string) => {
   if (!name) return '??';
@@ -1506,7 +1495,12 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
   const [activeTab, setActiveTab] = useState('applications');
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
   const [leaveTypesError, setLeaveTypesError] = useState<string | null>(null);
-  const [holidays, setHolidays] = useState<Holiday[]>(SAMPLE_HOLIDAYS);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  // reloads the holidays after public holidays are added; the country they come from (FIG-884)
+  const [holidaysReloadKey, setHolidaysReloadKey] = useState(0);
+  const [holidayCountry, setHolidayCountry] = useState<{ country: string; supported: boolean } | null>(null);
+  const [holidayYear, setHolidayYear] = useState(new Date().getFullYear() + 1);
+  const [addingHolidays, setAddingHolidays] = useState(false);
   const [leaveApplications, setLeaveApplications] = useState<LeaveApplication[]>([]);
   const [leaveBalances, setLeaveBalances] = useState<EmployeeLeaveBalance[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -2040,19 +2034,18 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
           .order('date');
 
         if (error) throw error;
-        if (data && data.length > 0) {
-          setHolidays(data);
-        }
+        setHolidays(data || []);
       } catch (err) {
         console.error('Error fetching holidays:', err);
-        // Fallback to sample holidays if table doesn't exist
       }
+      const { data: country } = await supabase.rpc('public_holidays_country');
+      if (country) setHolidayCountry(country as { country: string; supported: boolean });
     };
 
     if (activeTab === 'holidays') {
       fetchHolidays();
     }
-  }, [activeTab]);
+  }, [activeTab, holidaysReloadKey]);
 
   // Fetch data from Supabase
   useEffect(() => {
@@ -2764,15 +2757,50 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
   );
 
   // Holidays Tab Content
+  // adds the country's public holidays for a year (days already on the list are left alone)
+  const addPublicHolidays = async () => {
+    setAddingHolidays(true);
+    try {
+      const { data, error } = await supabase.rpc('add_public_holidays', { p_year: holidayYear });
+      if (error) throw error;
+      toast.success(Number(data) > 0 ? `Added ${data} public holidays for ${holidayYear}` : `${holidayYear}'s public holidays are already on the list`);
+      setHolidaysReloadKey((k) => k + 1);
+    } catch (err) {
+      toast.error((err as { message?: string })?.message || 'Could not add the public holidays');
+    } finally {
+      setAddingHolidays(false);
+    }
+  };
+
   const renderHolidaysTab = () => (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 md:p-6 border-b border-gray-200">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-base text-gray-900">Holidays</h2>
-            <p className="text-gray-600 text-xs">{holidays.length} holidays configured</p>
+            <p className="text-gray-600 text-xs">{holidays.length} holidays configured. Leave in working days skips these.</p>
           </div>
           <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+            <div className="flex flex-wrap items-center gap-2">
+            {holidayCountry?.supported && (
+              <>
+                <select
+                  value={holidayYear}
+                  onChange={(e) => setHolidayYear(Number(e.target.value))}
+                  className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs"
+                  aria-label="Year"
+                >
+                  {[0, 1, 2].map((d) => new Date().getFullYear() + d).map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <button
+                  onClick={() => void addPublicHolidays()}
+                  disabled={addingHolidays}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 border border-primary text-primary hover:bg-primary/10 rounded-lg text-xs font-medium disabled:opacity-50"
+                >
+                  {addingHolidays ? 'Adding...' : `Add ${holidayCountry.country}'s public holidays`}
+                </button>
+              </>
+            )}
             <button
               onClick={() => setShowHolidayForm(true)}
               className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-medium"
@@ -2780,8 +2808,14 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
               <Plus className="w-3 h-3" />
               Add Holiday
             </button>
+            </div>
           </RoleButtonWrapper>
         </div>
+        <p className="mt-3 mb-0 text-[11px] text-gray-500">
+          {holidayCountry && !holidayCountry.supported
+            ? `We don't have ${holidayCountry.country}'s public holidays yet: add them here with Add Holiday.`
+            : `${holidayCountry?.country ?? 'Your country'}'s public holidays are added for this year and next, and every December for the year after. Eid al-Fitr and holidays gazetted at short notice can't be worked out ahead: add those here when they're announced.`}
+        </p>
       </div>
 
       <div className="overflow-x-auto">
@@ -2798,7 +2832,10 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
             {paginatedHolidays.map((holiday) => (
               <tr key={holiday.id} className="border-b border-gray-300 hover:bg-gray-50">
                 <td className="py-4 px-4">
-                  <p className="text-gray-900 font-base">{holiday.name}</p>
+                  <p className="text-gray-900 font-base">
+                    {holiday.name}
+                    {holiday.source === 'auto' && <span className="ml-2 text-[10px] text-gray-500 bg-gray-100 rounded px-1.5 py-0.5">Public holiday</span>}
+                  </p>
                 </td>
                 <td className="py-4 px-4">
                   <p className="text-gray-700">{formatDate(holiday.date)}</p>
