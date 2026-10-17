@@ -73,7 +73,7 @@ const CompanyCalendar = lazy(() => import('./components/Calendar/CompanyCalendar
 const AIAssistantWidget = lazy(() => import('./components/AI/AIAssistantWidget'));
 const AIAssistantPage = lazy(() => import('./components/AI/AIAssistantPage').then((m) => ({ default: m.AIAssistantPage })));
 const SetupAssistant = lazy(() => import('./components/AI/SetupAssistant'));
-const MicrofinanceTodoList = lazy(() => import('./components/Task Manager/TaskManager').then((m) => ({ default: m.MicrofinanceTodoList })));
+const TaskManager = lazy(() => import('./components/Task Manager/TaskManager'));
 const SMSCenter = lazy(() => import('./components/SMS/Sms').then((m) => ({ default: m.SMSCenter })));
 const JoinCompany = lazy(() => import('./pages/JoinCompany'));
 const OfferPage = lazy(() => import('./pages/OfferPage'));
@@ -1077,7 +1077,7 @@ function App() {
                                 <Route path="/asset" element={<AssetManagement />} />
                                 <Route path="/asset/scan" element={<QRScanner />} />
                                 {!isHiddenModule('expenses') && <Route path="/expenses" element={<ExpenseModule selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />} />}
-                                <Route path="/tasks" element={<MicrofinanceTodoList />} />
+                                <Route path="/tasks" element={<TaskManager />} />
                                 <Route path="/sms" element={<SMSCenter />} />
                                 <Route path="/reports" element={<ReportsList />} />
                                 <Route path="reports/base" element={<BaseReport

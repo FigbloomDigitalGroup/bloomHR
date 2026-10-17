@@ -14,12 +14,13 @@ import OvertimeWeekGrid from '../Overtime/OvertimeWeekGrid';
 import OvertimeWaiting from '../Overtime/OvertimeWaiting';
 import CasualDaysGrid from '../Casual/CasualDaysGrid';
 import LeaveAwaitingMe from '../Approvals/LeaveAwaitingMe';
+import TaskWorkspace from '../Tasks/TaskWorkspace';
 
 // My team (staff portal): for a staff member who supervises others (migration 20261018900000). The same screens HR
 // and managers use, limited to the supervisor's reports; the database decides what they may do (custom KPIs,
 // overtime, casual days and leave approvals all already allow a supervisor, whatever their role).
 
-type Tab = 'team' | 'kpis' | 'overtime' | 'casual' | 'leave';
+type Tab = 'team' | 'tasks' | 'kpis' | 'overtime' | 'casual' | 'leave';
 
 export default function MyTeam({ team }: { team: TeamMember[] }) {
   const [tab, setTab] = useState<Tab>('team');
@@ -32,6 +33,7 @@ export default function MyTeam({ team }: { team: TeamMember[] }) {
 
   const tabs = useMemo<TabBarItem[]>(() => [
     { id: 'team', label: 'Team' },
+    { id: 'tasks', label: 'Tasks' },
     { id: 'kpis', label: 'KPIs' },
     { id: 'overtime', label: 'Overtime' },
     ...(casuals.length ? [{ id: 'casual', label: 'Casual days' }] : []),
@@ -46,6 +48,7 @@ export default function MyTeam({ team }: { team: TeamMember[] }) {
       />
       <TabBar items={tabs} activeId={tab} onChange={(id) => setTab(id as Tab)} className="mb-4" />
       {tab === 'team' && <TeamList team={team} />}
+      {tab === 'tasks' && <TaskWorkspace mode="staff" teamNumbers={team.map((m) => m.employee_number)} />}
       {tab === 'kpis' && <TeamKpis team={team} />}
       {tab === 'overtime' && <TeamOvertime />}
       {tab === 'casual' && casuals.length > 0 && <CasualDaysGrid casuals={casuals} canApprove={false} hideMoney />}
