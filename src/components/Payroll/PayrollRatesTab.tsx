@@ -112,6 +112,13 @@ export function rateSections(rows: RateRow[]): Section[] {
   if (!nssf.length && rateRow) nssf.push({ label: RATE_LABELS.nssf_rate, value: valueText(rateRow), from: [rateRow] });
   if (employerRow) nssf.push({ label: RATE_LABELS.nssf_employer_rate, value: valueText(employerRow), from: [employerRow] });
 
+  // the NITA training levy: an employer cost per employee, never taken from pay (FIG-898)
+  const nitaRow = take('nita_levy');
+  const nita: Line[] = nitaRow
+    ? [{ label: 'Training levy (employer)', value: num(nitaRow) !== null ? `${ksh(num(nitaRow) as number)} per employee a month` : '—',
+         note: 'Paid by the employer for each employee on the payroll (not casual workers or contractors); not taken from pay', from: [nitaRow] }]
+    : [];
+
   const other = rows.filter((r) => !used.has(r.code)).map((r) => ({ label: RATE_LABELS[r.code] ?? r.code, value: valueText(r), from: [r] }));
 
   return [
@@ -119,6 +126,7 @@ export function rateSections(rows: RateRow[]): Section[] {
     { title: 'SHA (SHIF)', lines: present(sha) },
     { title: 'Housing levy', lines: present(housing) },
     { title: 'NSSF', lines: nssf },
+    { title: 'NITA', lines: nita },
     { title: 'Other limits and reliefs', lines: other },
   ].filter((s) => s.lines.length > 0);
 }

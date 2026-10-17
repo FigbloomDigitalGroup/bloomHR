@@ -7,7 +7,20 @@ import { supabase } from '../../lib/supabase';
 import { fetchAll } from '../../lib/fetchAll';
 import { getRunPayslips, type PayrollRun } from '../../lib/payrollRuns';
 import type { EmployeeRecord } from '../../lib/profileCompleteness';
-import { type ExportFile, type Rates, bankFile, equityFile, lastDayOf, mpesaFile, nssfFile, p10File, shaFile, toCsv } from '../../lib/payrollExports';
+import {
+  type ExportFile,
+  type Rates,
+  bankFile,
+  equityFile,
+  lastDayOf,
+  mpesaFile,
+  nitaFile,
+  nssfFile,
+  p10File,
+  remittanceTotals,
+  shaFile,
+  toCsv,
+} from '../../lib/payrollExports';
 import { XLSX_TYPE, toXlsx } from '../../lib/xlsxExport';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
@@ -21,11 +34,14 @@ interface Files {
   mpesa: ExportFile;
   bank: ExportFile;
   equity: ExportFile;
+  nita: ExportFile;
   /** the company's Equity account salaries are paid from ('' until payroll sets it) */
   debitAccount: string;
+  /** what the month owes KRA, SHA, NSSF, the housing levy and NITA */
+  totals: ReturnType<typeof remittanceTotals>;
 }
 
-type FileKey = Exclude<keyof Files, 'debitAccount'>;
+type FileKey = Exclude<keyof Files, 'debitAccount' | 'totals'>;
 
 type Format = 'csv' | 'xlsx';
 
@@ -36,6 +52,7 @@ const FILES: { key: FileKey; label: string; name: string; what: string }[] = [
   { key: 'mpesa', label: 'M-Pesa bulk pay', name: 'bulk-pay-mpesa', what: 'staff paid by M-Pesa' },
   { key: 'bank', label: 'Bank bulk pay', name: 'bulk-pay-bank', what: 'staff paid by bank' },
   { key: 'equity', label: 'Equity Bank (Eazzy Biz)', name: 'equity-eazzy-biz', what: 'everyone paid by bank or M-Pesa, from the company’s Equity account' },
+  { key: 'nita', label: 'NITA training levy', name: 'nita-levy', what: 'employer levy per employee (not taken from pay)' },
 ];
 
 /** The company's Equity account salaries are paid from (company_payroll_settings). */
@@ -73,7 +90,9 @@ export async function loadExportFiles(run: PayrollRun): Promise<Files> {
     mpesa: mpesaFile(ps, es, run.pay_period),
     bank: bankFile(ps, es, run.pay_period),
     equity: equityFile(ps, es, debitAccount),
+    nita: nitaFile(ps, es),
     debitAccount,
+    totals: remittanceTotals(ps, rates),
   };
 }
 
@@ -131,6 +150,8 @@ export default function PayrollExportsPanel({ run }: { run: PayrollRun }) {
 
       {problem && <p role="alert" className="text-sm text-status-danger">{problem}</p>}
       {!files && !problem && <FigbloomLoader label="Preparing files" size={48} />}
+
+      {files && <RemittanceTotals totals={files.totals} />}
 
       {files && (
         <div className="space-y-2">
@@ -203,5 +224,29 @@ export default function PayrollExportsPanel({ run }: { run: PayrollRun }) {
         </div>
       )}
     </Card>
+  );
+}
+
+const ksh = (n: number) => `KSh ${n.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/** The month's amounts to pay over: PAYE, SHIF, NSSF and housing levy (both shares), and the employer's NITA levy. */
+function RemittanceTotals({ totals }: { totals: Files['totals'] }) {
+  const items: { label: string; amount: number; note: string }[] = [
+    { label: 'PAYE (KRA)', amount: totals.paye, note: 'From employees' },
+    { label: 'SHIF (SHA)', amount: totals.shif, note: 'From employees' },
+    { label: 'NSSF', amount: totals.nssf.employee + totals.nssf.employer, note: `${ksh(totals.nssf.employee)} employees + ${ksh(totals.nssf.employer)} employer` },
+    { label: 'Housing levy', amount: totals.ahl.employee + totals.ahl.employer, note: `${ksh(totals.ahl.employee)} employees + ${ksh(totals.ahl.employer)} employer` },
+    { label: 'NITA levy', amount: totals.nita.total, note: `Employer only, ${totals.nita.employees} ${totals.nita.employees === 1 ? 'employee' : 'employees'}` },
+  ];
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-3" aria-label="Amounts to pay">
+      {items.map((i) => (
+        <div key={i.label} className="rounded-tile border border-border px-3 py-2">
+          <p className="text-[10px] font-bold uppercase text-subtle">{i.label}</p>
+          <p className="text-sm font-semibold text-ink">{ksh(i.amount)}</p>
+          <p className="text-[10.5px] text-muted-foreground">{i.note}</p>
+        </div>
+      ))}
+    </div>
   );
 }

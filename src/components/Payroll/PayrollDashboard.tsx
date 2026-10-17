@@ -49,6 +49,7 @@ import { isPaidByMpesa, paymentMethodLabel } from "../../lib/paymentMethods";
 import { fetchAll } from "../../lib/fetchAll";
 import { isPayrollReady } from "../../lib/onboardingValidation";
 import { isCasual } from "../../lib/casualPay";
+import { nitaLevyFor, nitaTotal } from "../../lib/nitaLevy";
 
 const withoutCasuals = <T extends Record<string, unknown>>(rows: T[] | null | undefined): T[] => (rows ?? []).filter((e) => !isCasual(e));
 import { advanceDeductionFor } from "../../lib/salaryAdvance";
@@ -132,6 +133,8 @@ const fromSalaryHistory = (saved: any, live: any | undefined) => ({
   leave_items: saved.leave_items ?? [],
   payslip_note: saved.payslip_note ?? null,
   overtime_items: saved.overtime_items ?? [],
+  // the employer's NITA levy the database saved on the payslip (FIG-898)
+  nita_levy: Number(saved.nita_levy) || 0,
   payment_method: paymentMethodLabel(saved.payment_method),
   bank_name: saved.bank_name || "",
   account_number: saved.account_number || "",
@@ -1150,6 +1153,8 @@ export default function PayrollDashboard() {
                 overtime_items: overtime.items,
                 total_deductions: totalDeductions,
                 net_pay: netPay,
+                // the employer's NITA training levy (FIG-898): an employer cost, not in deductions or net pay
+                nita_levy: nitaLevyFor(employee, rates),
                 pay_period: actualPeriod,
                 payment_method: paymentMethodLabel(employee.payment_method),
                 bank_name: employee.Bank || "",
@@ -1843,6 +1848,7 @@ export default function PayrollDashboard() {
           finalFilteredRecords={finalFilteredRecords}
           currentItems={currentItems}
           totals={{ totalGrossPay, totalDeductions, totalNetPay, totalPAYE, totalNHIF, totalNSSF, totalHousingLevy }}
+          nitaLevy={nitaTotal(payrollRecords)}
           expandedRows={expandedRows}
           toggleRowExpand={toggleRowExpand}
           smsSendingStatus={smsSendingStatus}

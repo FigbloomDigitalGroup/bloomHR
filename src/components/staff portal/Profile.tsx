@@ -8,6 +8,7 @@ import { NOT_SAVED_NOT_LINKED, requireUpdatedRows, saveFailureMessage } from '..
 import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import MyTwoStepCard from '../Settings/MyTwoStep';
+import MyContributions from './MyContributions';
 
 const Profile = () => {
   const [employeeData, setEmployeeData] = useState<any>(null);
@@ -228,7 +229,7 @@ const Profile = () => {
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          Voluntary Deductions
+          My contributions
         </button>
       </div>
 
@@ -312,6 +313,20 @@ const Profile = () => {
                     readOnly={!isEditing}
                   />
                 </div>
+                {/* the NITA training levy is paid by the employer (KES 50 a month), never taken from pay (FIG-898) */}
+                <div>
+                  <label htmlFor="profile-nita" className="block text-xs text-gray-600 mb-1">NITA number</label>
+                  <input
+                    id="profile-nita"
+                    type="text"
+                    value={employeeData["NITA"] || ''}
+                    placeholder="Not recorded"
+                    className="w-full px-3 py-2 text-xs border border-gray-300 rounded bg-gray-50"
+                    title="Set by HR"
+                    readOnly
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1">The NITA training levy is paid by your employer, not taken from your pay.</p>
+                </div>
                 {/* <div>
                   <label className="block text-xs text-gray-600 mb-1">Housing Levy</label>
                   <input
@@ -361,6 +376,13 @@ const Profile = () => {
       )}
 
       {activeSection === 'voluntary' && (
+        <div className="mb-6">
+          {/* contributions you ask payroll for (FIG-898) */}
+          <MyContributions />
+        </div>
+      )}
+
+      {activeSection === 'voluntary' && employeeData["Pension Deduction"] === "Yes" && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

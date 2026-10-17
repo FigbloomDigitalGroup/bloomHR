@@ -49,7 +49,7 @@ const run = { id: 'r1', pay_period: '2026-10', status: 'approved' } as never;
 
 beforeEach(() => {
   data.payslips = [
-    { employee_id: 'E1', gross_pay: 50000, net_pay: 40000, nhif_deduction: 1375, nssf_deduction: 3000, housing_levy: 750, paye_tax: 6000, tax_relief: 2400 },
+    { employee_id: 'E1', gross_pay: 50000, net_pay: 40000, nhif_deduction: 1375, nssf_deduction: 3000, housing_levy: 750, paye_tax: 6000, tax_relief: 2400, nita_levy: 50 },
     { employee_id: 'E2', gross_pay: 30000, net_pay: 25000, nhif_deduction: 825, nssf_deduction: 1800, housing_levy: 450, paye_tax: 2000, tax_relief: 2400 },
   ];
   data.employees = [
@@ -70,8 +70,20 @@ describe('PayrollExportsPanel', () => {
     render(<PayrollExportsPanel run={run} />);
     expect(await screen.findByText('KRA PAYE (P10)')).toBeTruthy();
     expect(screen.getAllByText(/2 rows/)).toHaveLength(4); // P10, SHA, NSSF, Equity (M-Pesa and bank together)
-    expect(screen.getAllByText(/1 row,/)).toHaveLength(2); // M-Pesa, bank
+    expect(screen.getAllByText(/1 row,/)).toHaveLength(3); // M-Pesa, bank, NITA levy (only E1 has a levy)
     expect(data.rateDays).toEqual(['2026-10-31']);
+  });
+
+  it('shows the month’s amounts to pay, the employer’s NITA levy among them, and a NITA file (FIG-898)', async () => {
+    render(<PayrollExportsPanel run={run} />);
+    await screen.findByText('NITA training levy');
+    const totals = screen.getByLabelText('Amounts to pay');
+    expect(totals.textContent).toContain('NITA levy');
+    expect(totals.textContent).toContain('KSh 50.00');
+    expect(totals.textContent).toContain('Employer only, 1 employee');
+    fireEvent.click(screen.getAllByRole('button', { name: /Download CSV/ })[6]);
+    expect(saved.files.map((f) => f.name)).toEqual(['nita-levy-2026-10.csv']);
+    expect(await readBlob(saved.files[0].blob)).toBe(['PAYROLL NUMBER,EMPLOYEE NAME,ID NO,KRA PIN,NITA NO,LEVY', 'PR-00001,Amina Wanjiru,,A012345678Z,,50.00', ''].join(String.fromCharCode(13, 10)));
   });
 
   it('downloads a CSV named after the file and month', async () => {
@@ -85,7 +97,7 @@ describe('PayrollExportsPanel', () => {
   it('offers each file as Excel too, with the same rows and every cell as text', async () => {
     render(<PayrollExportsPanel run={run} />);
     await screen.findByText('KRA PAYE (P10)');
-    expect(screen.getAllByRole('button', { name: /Download Excel/ })).toHaveLength(6);
+    expect(screen.getAllByRole('button', { name: /Download Excel/ })).toHaveLength(7);
     fireEvent.click(screen.getAllByRole('button', { name: /Download Excel/ })[3]); // M-Pesa
     expect(saved.files.map((f) => f.name)).toEqual(['bulk-pay-mpesa-2026-10.xlsx']);
     const book = XLSX.read(await readBytes(saved.files[0].blob), { type: 'array' });

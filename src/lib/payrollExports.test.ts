@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BANK_HEADERS, MPESA_HEADERS, NSSF_HEADERS, P10_HEADERS, SHA_HEADERS,
-  bankFile, equityFile, localBankCode, lastDayOf, mpesaFile, mpesaPhone, nssfFile, p10Figures, p10File, shaFile, toCsv,
+  bankFile, equityFile, localBankCode, lastDayOf, mpesaFile, mpesaPhone, nitaFile, nssfFile, p10Figures, p10File, remittanceTotals, shaFile, toCsv,
 } from './payrollExports';
 
 const rates = {
@@ -196,5 +196,24 @@ describe('Equity Bank Eazzy Biz file', () => {
     expect(localBankCode({ bank_code: '11', branch_code: '002' })).toBe('11002');
     expect(localBankCode({ bank_code: '', branch_code: '68000' })).toBe('68000');
     expect(localBankCode({ bank_code: '1', branch_code: '2' })).toBe('');
+  });
+});
+
+describe('NITA levy and the month\'s amounts to pay (FIG-898)', () => {
+  const payslips = [
+    { employee_id: 'E1', employee_name: 'Amina', paye_tax: 6000, nhif_deduction: 1375, nssf_deduction: 3000, housing_levy: 750, nita_levy: 50 },
+    { employee_id: 'C1', employee_name: 'Carl', paye_tax: 0, nhif_deduction: 0, nssf_deduction: 0, housing_levy: 0, nita_levy: 0 },
+  ];
+  const employees = [{ 'Employee Number': 'E1', 'Payroll Number': 'PR-1', 'First Name': 'Amina', 'Last Name': 'W', 'ID Number': '12345678', 'Tax PIN': 'A012345678Z', NITA: 'N-77' }];
+
+  it('the NITA file lists only payslips with a levy', () => {
+    const f = nitaFile(payslips, employees as never);
+    expect(f.rows).toEqual([['PR-1', 'Amina W', '12345678', 'A012345678Z', 'N-77', '50.00']]);
+  });
+
+  it('totals PAYE, SHIF, both shares of NSSF and the housing levy, and the employer\'s NITA levy', () => {
+    expect(remittanceTotals(payslips, { nssf_rate: 0.06, nssf_employer_rate: 0.06, ahl_rate: 0.015, ahl_employer_rate: 0.015 })).toEqual({
+      paye: 6000, shif: 1375, nssf: { employee: 3000, employer: 3000 }, ahl: { employee: 750, employer: 750 }, nita: { total: 50, employees: 1 },
+    });
   });
 });

@@ -78,6 +78,8 @@ interface PayrollRunTabProps {
     totalNSSF: number;
     totalHousingLevy: number;
   };
+  /** the month's NITA training levy, paid by the employer on top of pay (FIG-898) */
+  nitaLevy?: { total: number; employees: number };
   expandedRows: Set<unknown>;
   toggleRowExpand: (id: any, e: React.MouseEvent) => void;
   smsSendingStatus: Record<string, any>;
@@ -200,6 +202,7 @@ export default function PayrollRunTab({
   finalFilteredRecords,
   currentItems,
   totals: { totalGrossPay, totalDeductions, totalNetPay },
+  nitaLevy,
   expandedRows,
   toggleRowExpand,
   smsSendingStatus,
@@ -334,6 +337,18 @@ export default function PayrollRunTab({
             <button type="button" onClick={onOpenFiles} className="font-semibold text-brand">
               Open Files
             </button>
+          </div>
+        </Card>
+      )}
+
+      {nitaLevy && nitaLevy.total > 0 && (
+        <Card padding="sm" className="!rounded-xl">
+          <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="nita-levy-summary">
+            <Briefcase className="w-4 h-4 text-brand shrink-0" />
+            <span className="flex-1 min-w-0 basis-48 text-ink">
+              <span className="font-semibold">Employer contributions:</span> NITA training levy {ksh(nitaLevy.total)} for{" "}
+              {nitaLevy.employees} {nitaLevy.employees === 1 ? "employee" : "employees"}, payable to NITA for {periodLabel}. Not taken from pay.
+            </span>
           </div>
         </Card>
       )}
