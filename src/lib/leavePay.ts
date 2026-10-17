@@ -48,9 +48,10 @@ export interface LeavePayRow {
 
 /** One payslip line (salary_history.leave_items) */
 export interface LeaveItem {
-  /** e.g. "Unpaid Leave", "Sick Leave at half pay" (the payslip adds ": 3 days") */
+  /** e.g. "Unpaid Leave", "Sick Leave at half pay", "Unexcused absence" (the payslip adds ": 3 days") */
   name: string;
-  kind: 'unpaid' | 'half_pay';
+  /** 'absence': days of unexcused absence (FIG-881, lib/absencePay), at the same day's pay as unpaid leave */
+  kind: 'unpaid' | 'half_pay' | 'absence';
   leave_type: string;
   days: number;
   daily_rate: number;
@@ -137,7 +138,7 @@ export const payslipLeaveLines = (payslip: { leave_items?: unknown }): LeaveItem
     ? (payslip.leave_items as Partial<LeaveItem>[])
         .map((i) => ({
           name: String(i.name ?? 'Leave'),
-          kind: (i.kind === 'half_pay' ? 'half_pay' : 'unpaid') as LeaveItem['kind'],
+          kind: (i.kind === 'half_pay' || i.kind === 'absence' ? i.kind : 'unpaid') as LeaveItem['kind'],
           leave_type: String(i.leave_type ?? ''),
           days: num(i.days),
           daily_rate: num(i.daily_rate),
@@ -150,3 +151,49 @@ export const payslipLeaveLines = (payslip: { leave_items?: unknown }): LeaveItem
 /** One text cell for exports: "Unpaid Leave: 2 days -2000; Sick Leave at half pay: 3 days -1500" */
 export const leaveLinesText = (payslip: { leave_items?: unknown }) =>
   payslipLeaveLines(payslip).map((l) => `${leaveLineLabel(l)} -${l.amount}`).join('; ');
+
+// ---------------------------------------------------------------------------------------------
+// Leave paid out (FIG-877): days over a leave type's carry-forward cap that the company pays instead of losing. The
+// database (leave_payouts_due) lists the payouts payroll can pay this month; each is a taxable earning on the payslip,
+// "Leave paid out: 5 days", at the same daily rate as leave deductions. Approving the payroll month marks it paid.
+// ---------------------------------------------------------------------------------------------
+
+/** One payout payroll can pay this month (a row of leave_payouts_due) */
+export interface LeavePayoutDue {
+  id: string;
+  employee_number: string;
+  leave_type: string;
+  days: number;
+  year: number;
+  pay_period: string;
+  /** their working days that month (for the 'working_days' basis) */
+  month_working_days: number;
+}
+
+/** A payslip earning line for a payout (salary_history.earning_items, with the payout it pays) */
+export interface LeavePayoutItem {
+  name: string;
+  amount: number;
+  taxable: boolean;
+  pensionable: boolean;
+  leave_payout_id: string;
+}
+
+/** "Leave paid out: 5 days" */
+export const leavePayoutLabel = (days: number) => `Leave paid out: ${dayText(num(days))}`;
+
+/**
+ * The earning lines for one employee's payouts this month: days x a day's pay (the leave daily-rate basis), taxable
+ * and pensionable like the salary it stands in for. None without payouts or a basic salary.
+ */
+export function leavePayoutItems(payouts: LeavePayoutDue[] | undefined, basic: number, basis: LeaveRateBasis): LeavePayoutItem[] {
+  return (payouts ?? [])
+    .map((p) => ({
+      name: leavePayoutLabel(p.days),
+      amount: round2(num(p.days) * leaveDailyRate(basic, basis, p.month_working_days)),
+      taxable: true,
+      pensionable: true,
+      leave_payout_id: p.id,
+    }))
+    .filter((i) => i.amount > 0);
+}

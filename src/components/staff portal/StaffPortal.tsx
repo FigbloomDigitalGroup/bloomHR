@@ -78,6 +78,7 @@ import MyOvertime from './MyOvertime';
 import StaffCompany from './StaffCompany';
 import MyApprovalChain from './MyApprovalChain';
 import { isCompanySection } from '../../lib/staffCompany';
+import MyAbsences from './MyAbsences';
 import { NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
 import { describeFree, useLeaveCheck } from '../../lib/leaveRules';
 import { LEAVE_DOCUMENTS_BUCKET, LeaveDocumentRule, loadLeaveDocumentRules, uploadLeaveDocument } from '../../lib/leaveDocuments';
@@ -110,7 +111,7 @@ interface NotificationItem {
 }
 
 /** hr_notifications that are for HR, not the employee */
-const HR_ONLY_NOTIFICATIONS = ['contract_expiring', 'probation_expiring', 'leave_recommended', 'exit_requested', 'application_received', 'loan_requested', 'contract_signed', 'leave_exhausted', 'casual_limit'];
+const HR_ONLY_NOTIFICATIONS = ['contract_expiring', 'probation_expiring', 'leave_recommended', 'exit_requested', 'application_received', 'loan_requested', 'contract_signed', 'leave_exhausted', 'casual_limit', 'leave_document_overdue'];
 
 /** Marks an hr_notifications item ("hr-<id>") read, so it stays cleared; warnings are not stored as read. */
 const persistRead = (id: string) => {
@@ -1970,7 +1971,7 @@ const StaffPortal = () => {
               {activeTab === 'training' && <TrainingModule />}
               {activeTab === 'my-kpis' && <MyKpis />}
               {activeTab === 'leave' && <LeaveApplicationForm />}
-              {activeTab === 'leave-history' && <LeaveApplicationsList />}
+              {activeTab === 'leave-history' && <><LeaveApplicationsList /><MyAbsences /></>}
               {isCompanySection(activeTab) && (
                 <StaffCompany section={activeTab} onSectionChange={setActiveTab} employeeNumber={employeeNumber} />
               )}
