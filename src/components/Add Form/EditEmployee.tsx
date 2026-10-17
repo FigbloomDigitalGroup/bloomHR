@@ -25,6 +25,7 @@ import { PAYMENT_METHODS, paymentMethodOption } from '../../lib/paymentMethods';
 import { useJobGroups } from '../../hooks/useJobGroups';
 import JobGroupPicker from './JobGroupPicker';
 import { lockedPayFields } from '../../lib/jobGroups';
+import { activeTitleNames, useJobTitles } from '../../hooks/useJobTitles';
 
 import { confirmDialog } from '../../lib/confirmDialog';
 type Employee = Database['public']['Tables']['employees']['Row'] & {
@@ -86,6 +87,7 @@ const EditEmployeePage = () => {
   const isHR = user?.role === 'HR';
   // the company's job groups (null when this person may not see them: the free-text "Job Group" stays)
   const jobGroups = useJobGroups();
+  const jobTitles = useJobTitles();
   const [deleting, setDeleting] = useState(false);
 
   const [employee, setEmployee] = useState<Partial<Employee>>({});
@@ -982,7 +984,7 @@ const EditEmployeePage = () => {
                     creatable
                     value={employee['Job Title'] || ''}
                     onChange={handleInputChange}
-                    options={dropdownOptions.jobTitles}
+                    options={activeTitleNames(jobTitles, employee['Job Title']) ?? dropdownOptions.jobTitles}
                     disabled={!isEditMode}
                   />
                   {/* chosen under Salary Information when the company has job groups */}

@@ -17,7 +17,8 @@ import {
   type KpiPerson,
 } from '../../../lib/kpiApi';
 import type { Department } from '../../../lib/orgStructure';
-import { PeriodSelect, inputClass, labelClass, tdClass, thClass } from './shared';
+import { loadKpiTemplateNames } from '../../../lib/kpiTemplates';
+import { PeriodSelect, SourceNote, inputClass, labelClass, tdClass, thClass } from './shared';
 
 interface Props {
   kpis: Kpi[];
@@ -50,6 +51,7 @@ export default function AssignKpis({ kpis, periods, people, departments, access,
   const [busy, setBusy] = useState(false);
   const [assignments, setAssignments] = useState<KpiAssignment[]>([]);
   const [editing, setEditing] = useState<KpiAssignment | null>(null);
+  const [templateNames, setTemplateNames] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     if (!periodId && periods.length) setPeriodId(defaultPeriodId(periods));
@@ -66,6 +68,12 @@ export default function AssignKpis({ kpis, periods, people, departments, access,
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // names for the "from template" labels, once any KPI here came from one
+  const fromTemplates = assignments.some((a) => a.template_id);
+  useEffect(() => {
+    if (fromTemplates) void loadKpiTemplateNames().then(setTemplateNames);
+  }, [fromTemplates]);
 
   // a manager reaches only their own reports
   const reachable = useMemo(() => {
@@ -203,7 +211,7 @@ export default function AssignKpis({ kpis, periods, people, departments, access,
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
-          <p className="text-[12px] text-muted-foreground">{problem ?? 'Assigning again updates the target and weight.'}</p>
+          <p className="text-[12px] text-muted-foreground">{problem ?? 'Assigning again updates the target and weight. KPI templates (HR) give KPIs automatically.'}</p>
           <Button icon={<UserPlus size={14} />} disabled={busy || !!problem} onClick={submit}>Assign</Button>
         </div>
       </Card>
@@ -244,7 +252,10 @@ export default function AssignKpis({ kpis, periods, people, departments, access,
                     const k = kpiById.get(a.kpi_id);
                     return (
                       <tr key={a.id} className="border-t border-border">
-                        <td className={tdClass}>{k?.name ?? 'Unknown KPI'}</td>
+                        <td className={tdClass}>
+                          {k?.name ?? 'Unknown KPI'}
+                          <SourceNote a={a} templateNames={templateNames} />
+                        </td>
                         <td className={tdClass}>{k ? formatValue(k.unit, a.target) : a.target}</td>
                         <td className={tdClass}>{a.weight}%</td>
                         <td className={`${tdClass} text-right whitespace-nowrap`}>
@@ -323,6 +334,11 @@ function EditAssignment({ a, onDone, onCancel }: { a: KpiAssignment; onDone: () 
         <label htmlFor="edit-weight" className={labelClass}>Weight (%)</label>
         <input id="edit-weight" className={inputClass} inputMode="decimal" value={weight} onChange={(e) => setWeight(e.target.value)} />
       </div>
+      {a.assigned_via === 'template' && (
+        <p className="text-[12px] text-muted-foreground">
+          This KPI comes from a template. Your target and weight are kept for this person; later changes to the template won’t replace them.
+        </p>
+      )}
       {problem && <p className="text-[12px] text-status-danger">{problem}</p>}
       <div className="flex justify-end gap-2">
         <Button variant="secondary" onClick={onCancel} disabled={busy}>Cancel</Button>

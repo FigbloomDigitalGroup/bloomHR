@@ -15,7 +15,7 @@ import {
   type PeriodStatus,
 } from './kpis';
 
-// Reading and saving custom KPIs (migration 20261016900000). The database decides who may do what; these return its
+// Reading and saving custom KPIs (migrations 20261016900000, 20261019300000 for templates). The database decides who may do what; these return its
 // refusals as plain sentences.
 
 export interface Kpi {
@@ -50,7 +50,14 @@ export interface KpiAssignment {
   employee_number: string;
   target: number | null;
   weight: number;
-  assigned_via: AssignScope;
+  /** how it was given: by hand to one person or a group (assign_kpi), or by a KPI template */
+  assigned_via: AssignScope | 'template';
+  /** the template it came from (assigned_via 'template') */
+  template_id?: string | null;
+  /** a manager or HR changed its target or weight: templates no longer change it */
+  overridden?: boolean;
+  /** from a template that no longer fits the employee, kept because it has check-ins */
+  no_longer_matches?: boolean;
   self_value: number | null;
   self_comment: string | null;
   self_at: string | null;
@@ -131,7 +138,7 @@ export async function savePeriod(id: string | null, fields: KpiPeriodInput): Pro
 }
 
 const ASSIGNMENT_COLUMNS =
-  'id, period_id, kpi_id, employee_number, target, weight, assigned_via, self_value, self_comment, self_at, actual_value, manager_comment, scored_at';
+  'id, period_id, kpi_id, employee_number, target, weight, assigned_via, template_id, overridden, no_longer_matches, self_value, self_comment, self_at, actual_value, manager_comment, scored_at';
 
 const toAssignment = (r: Record<string, unknown>): KpiAssignment => ({
   ...(r as unknown as KpiAssignment),

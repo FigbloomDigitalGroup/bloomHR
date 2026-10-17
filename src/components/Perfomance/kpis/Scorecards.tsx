@@ -17,7 +17,7 @@ import {
   type Scorecard,
 } from '../../../lib/kpiApi';
 import type { Department } from '../../../lib/orgStructure';
-import { BandPill, PeriodSelect, ScoreText, inputClass, labelClass, tdClass, thClass } from './shared';
+import { BandPill, PeriodSelect, ScoreText, SourceNote, inputClass, labelClass, tdClass, thClass } from './shared';
 
 interface Props {
   kpis: Kpi[];
@@ -72,6 +72,7 @@ export default function Scorecards({ kpis, periods, people, departments, access,
     );
   }, [cards, department, search, deptOf]);
   const current = cards.find((c) => c.employeeNumber === openEmp) ?? null;
+  const offWeights = useMemo(() => shown.filter((c) => !checkWeights(c.lines.map((l) => l.assignment.weight)).ok), [shown]);
   const usedDepartments = departments.filter((d) => cards.some((c) => deptOf.get(c.employeeNumber) === d.id));
 
   const exportCsv = () => {
@@ -109,6 +110,17 @@ export default function Scorecards({ kpis, periods, people, departments, access,
           </div>
         </div>
       </Card>
+
+      {offWeights.length > 0 && (
+        <div role="alert" className="flex items-start gap-2 rounded-tile px-3 py-2 text-[12px] text-orange-text-alt bg-orange-tint-alt">
+          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+          <span>
+            {offWeights.length === 1 ? `${offWeights[0].name}'s KPI weights don't` : `${offWeights.length} people's KPI weights don't`} total 100%
+            {offWeights.length > 1 && offWeights.length <= 5 ? ` (${offWeights.map((c) => c.name).join(', ')})` : ''}. Their overall scores may
+            not reflect what matters most until the weights are adjusted.
+          </span>
+        </div>
+      )}
 
       {!access.manages && !teamMode && <p className="text-[12px] text-muted-foreground">Showing the people who report to you.</p>}
 
@@ -225,6 +237,7 @@ export function ScorecardDetail({
                   <td className={tdClass}>
                     <div className="font-semibold">{l.kpi?.name ?? 'Unknown KPI'}</div>
                     {l.kpi?.category && <div className="text-[11px] text-muted-foreground">{l.kpi.category}</div>}
+                    <SourceNote a={a} />
                   </td>
                   <td className={tdClass}>{unit === 'rating_1_5' ? '—' : formatValue(unit, a.target)}</td>
                   <td className={tdClass}>{a.weight}%</td>

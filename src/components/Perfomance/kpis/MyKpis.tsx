@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Target } from 'lucide-react';
+import { AlertTriangle, Target } from 'lucide-react';
 import { Button, Card, EmptyState, PageHeader } from '../../UI';
-import { DIRECTION_LABEL, formatPercent, formatValue } from '../../../lib/kpis';
+import { DIRECTION_LABEL, checkWeights, formatPercent, formatValue } from '../../../lib/kpis';
 import {
   addCheckin,
   buildScorecards,
@@ -66,6 +66,7 @@ export default function MyKpis({ embedded = false }: { embedded?: boolean }) {
   const period = periods.find((p) => p.id === periodId);
   const card = useMemo(() => buildScorecards(assignments, kpis, [])[0] ?? null, [assignments, kpis]);
   const open = period?.status === 'open';
+  const weights = card ? checkWeights(card.lines.map((l) => l.assignment.weight)) : null;
 
   const header = !embedded && <PageHeader title="My KPIs" subtitle="What you are measured on, and how you are doing" />;
 
@@ -97,6 +98,13 @@ export default function MyKpis({ embedded = false }: { embedded?: boolean }) {
           )}
         </div>
       </Card>
+
+      {weights && !weights.ok && (
+        <div role="alert" className="flex items-start gap-2 rounded-tile px-3 py-2 text-[12px] text-orange-text-alt bg-orange-tint-alt">
+          <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+          Your KPI weights add up to {weights.total}%, not 100%. Your manager or HR will adjust them; your overall score may change.
+        </div>
+      )}
 
       {!card ? (
         <Card>
