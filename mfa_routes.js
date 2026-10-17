@@ -130,8 +130,13 @@ async function policyFor(caller) {
   const { data, error } = await admin.rpc("two_step_policy", { p_tenant: caller.tenantId });
   if (error) throw new HttpError(500, "Could not read the two-step sign-in setting");
   const row = (Array.isArray(data) ? data[0] : data) || {};
-  if (!twoStepApplies(row.mode, caller.role)) throw fail(409, "Two-step sign-in is not on for your account", { reason: "not_required" });
-  return { method: row.method === "sms" ? "sms" : "email" };
+  if (twoStepApplies(row.mode, caller.role)) return { method: row.method === "sms" ? "sms" : "email" };
+  // not asked of their role: did they turn it on for themselves? (20261018500000, FIG-891)
+  const { data: own, error: ownError } = await admin.rpc("personal_two_step", { p_tenant: caller.tenantId, p_user: caller.id });
+  if (ownError) throw new HttpError(500, "Could not read the two-step sign-in setting");
+  const mine = (Array.isArray(own) ? own[0] : own) || {};
+  if (!mine.enabled) throw fail(409, "Two-step sign-in is not on for your account", { reason: "not_required" });
+  return { method: mine.method === "sms" ? "sms" : "email" };
 }
 
 router.post(

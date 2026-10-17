@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Lock } from 'lucide-react';
 import { Card, Button } from '../UI';
-import { loadTwoStepSettings, saveTwoStepSettings, type TwoStepMethod, type TwoStepMode, type TwoStepSettings } from '../../lib/mfaApi';
+import { loadTwoStepPeople, loadTwoStepSettings, resetTwoStep, saveTwoStepSettings, type TwoStepMethod, type TwoStepMode, type TwoStepPerson, type TwoStepSettings } from '../../lib/mfaApi';
 
 const MODES: { id: TwoStepMode; label: string; hint: string }[] = [
   { id: 'off', label: 'Off', hint: 'Everyone signs in with their password only.' },
@@ -23,6 +23,8 @@ export default function TwoStepSignInCard({ className = '' }: { className?: stri
   const [mode, setMode] = useState<TwoStepMode>('off');
   const [method, setMethod] = useState<TwoStepMethod>('email');
   const [busy, setBusy] = useState(false);
+  // people who turned it on for themselves (FIG-891), for the admin
+  const [people, setPeople] = useState<TwoStepPerson[]>([]);
 
   const show = (s: TwoStepSettings) => {
     setSaved(s);
@@ -34,6 +36,7 @@ export default function TwoStepSignInCard({ className = '' }: { className?: stri
     let live = true;
     loadTwoStepSettings().then((s) => {
       if (live && s) show(s);
+      if (live && s?.can_edit) loadTwoStepPeople().then((p) => live && setPeople(p));
     });
     return () => {
       live = false;
@@ -113,6 +116,36 @@ export default function TwoStepSignInCard({ className = '' }: { className?: stri
             <Button onClick={() => void save()} disabled={busy || !changed}>
               {busy ? 'Saving...' : 'Save'}
             </Button>
+          </div>
+
+          <div className="mt-4 border-t border-border pt-3">
+            <p className="m-0 text-[12px] font-semibold text-ink">People who turned it on for themselves ({people.length})</p>
+            {people.length === 0 ? (
+              <p className="m-0 mt-1 text-[11.5px] text-muted-foreground">Anyone can, from their own settings or profile.</p>
+            ) : (
+              <ul className="m-0 mt-2 p-0 list-none flex flex-col gap-1.5">
+                {people.map((p) => (
+                  <li key={p.user_id} className="flex items-center justify-between gap-3 text-[12px] text-ink">
+                    <span className="min-w-0 truncate">{p.name || p.email} <span className="text-muted-foreground">· {p.method === 'sms' ? 'SMS' : 'email'}</span></span>
+                    <Button
+                      variant="ghost"
+                      onClick={async () => {
+                        try {
+                          await resetTwoStep(p.user_id);
+                          setPeople((prev) => prev.filter((x) => x.user_id !== p.user_id));
+                          toast.success(`Reset for ${p.name || p.email}`);
+                        } catch (e) {
+                          toast.error((e as Error).message);
+                        }
+                      }}
+                    >
+                      Reset
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="m-0 mt-1 text-[11px] text-muted-foreground">Reset turns it off for someone who lost their phone or email, and removes their registered SMS number.</p>
           </div>
         </>
       )}

@@ -81,3 +81,47 @@ export async function saveTwoStepSettings(mode: TwoStepMode, method: TwoStepMeth
   if (error) throw new Error(error.message);
   return (Array.isArray(data) ? data[0] : data) as TwoStepSettings;
 }
+
+// ---------------------------------------------------------------------------------------------
+// a person's own setting (FIG-891, migration 20261018500000)
+// ---------------------------------------------------------------------------------------------
+
+export interface MyTwoStep {
+  enabled: boolean;
+  method: TwoStepMethod;
+  /** the company asks it of them: it can't be turned off */
+  company_requires: boolean;
+  company_method: TwoStepMethod;
+}
+
+export async function loadMyTwoStep(): Promise<MyTwoStep | null> {
+  const { data, error } = await supabase.rpc('my_two_step');
+  if (error) return null;
+  return ((Array.isArray(data) ? data[0] : data) as MyTwoStep | undefined) ?? null;
+}
+
+export async function saveMyTwoStep(enabled: boolean, method: TwoStepMethod): Promise<MyTwoStep> {
+  const { data, error } = await supabase.rpc('set_my_two_step', { p_enabled: enabled, p_method: method });
+  if (error) throw new Error(error.message);
+  return (Array.isArray(data) ? data[0] : data) as MyTwoStep;
+}
+
+export interface TwoStepPerson {
+  user_id: string;
+  name: string | null;
+  email: string | null;
+  method: TwoStepMethod;
+}
+
+/** ADMIN: who turned it on for themselves; [] when it cannot be read. */
+export async function loadTwoStepPeople(): Promise<TwoStepPerson[]> {
+  const { data, error } = await supabase.rpc('two_step_people');
+  if (error) return [];
+  return (data || []) as TwoStepPerson[];
+}
+
+/** ADMIN: turns someone's own setting off and removes their registered SMS number (they lost access). */
+export async function resetTwoStep(userId: string): Promise<void> {
+  const { error } = await supabase.rpc('reset_two_step', { p_user: userId });
+  if (error) throw new Error(error.message);
+}

@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase';
 import { NOT_SAVED_NOT_LINKED, requireUpdatedRows, saveFailureMessage } from '../../lib/requireUpdated';
 import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
 import FigbloomLoader from '../UI/FigbloomLoader';
+import MyTwoStepCard from '../Settings/MyTwoStep';
 
 const Profile = () => {
   const [employeeData, setEmployeeData] = useState<any>(null);
@@ -453,6 +454,9 @@ const Profile = () => {
           </button>
         </div>
       )}
+
+      {/* your own sign-in code (FIG-891) */}
+      <MyTwoStepCard className="mt-6" />
     </div>
   );
 };
