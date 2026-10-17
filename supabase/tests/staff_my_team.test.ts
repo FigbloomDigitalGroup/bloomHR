@@ -150,3 +150,22 @@ describe('a STAFF-role supervisor’s overtime and casual lists', () => {
     expect(await as(LEAD, `select * from casual_workers()`)).toHaveLength(0);
   });
 });
+
+describe('my_team_leave()', () => {
+  it("shows a supervisor their reports' approved leave in the range: dates and type only, nobody else's", async () => {
+    await db.exec(`
+      insert into leave_application ("Employee Number", name, "Leave Type", "Start Date", "End Date", days, status, reason, tenant_id) values
+        ('A-MO', 'Mo Report', 'Annual Leave', '2030-03-04', '2030-03-06', 3, 'approved', 'family trip', '${A}'),
+        ('A-RITA', 'Rita Report', 'Annual Leave', '2030-03-11', '2030-03-11', 1, 'pending', 'x', '${A}'),
+        ('A-PAT', 'Pat Peer', 'Sick Leave', '2030-03-04', '2030-03-04', 1, 'approved', 'x', '${A}'),
+        ('A-MO', 'Mo Report', 'Annual Leave', '2030-05-04', '2030-05-06', 3, 'approved', 'later', '${A}');
+    `);
+    const leave = await as<Record<string, unknown>>(LEAD, `select employee_number, name, leave_type, start_date::text, end_date::text, days::float8 days from my_team_leave('2030-03-01', '2030-03-31')`);
+    expect(leave).toEqual([{ employee_number: 'A-MO', name: 'Mo Report', leave_type: 'Annual Leave', start_date: '2030-03-04', end_date: '2030-03-06', days: 3 }]);
+    // no reason, notes or documents come back
+    const cols = await as<{ k: string }>(LEAD, `select jsonb_object_keys(to_jsonb(t)) k from my_team_leave('2030-03-01', '2030-03-31') t`);
+    expect(cols.map((c) => c.k).sort()).toEqual(['days', 'employee_number', 'end_date', 'leave_type', 'name', 'start_date']);
+    expect(await as(PAT, `select * from my_team_leave('2030-03-01', '2030-03-31')`)).toEqual([]);
+    expect(await as(LEAD_B, `select * from my_team_leave('2030-03-01', '2030-03-31')`)).toEqual([]);
+  });
+});

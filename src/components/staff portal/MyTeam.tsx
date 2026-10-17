@@ -7,7 +7,7 @@ import { loadKpiAccess, loadKpis, loadPeriods, type Kpi, type KpiAccess, type Kp
 import { loadOvertimePeople, loadWaitingOvertime, type OvertimeEntry, type OvertimePerson } from '../../lib/overtimeApi';
 import { loadCasuals } from '../../lib/casualApi';
 import type { CasualWorker } from '../../lib/casualPay';
-import { memberInitials, memberName, toKpiPerson, type TeamMember } from '../../lib/myTeamApi';
+import { loadTeamLeave, memberInitials, memberName, toKpiPerson, type TeamLeave, type TeamMember } from '../../lib/myTeamApi';
 import Scorecards from '../Perfomance/kpis/Scorecards';
 import AssignKpis from '../Perfomance/kpis/AssignKpis';
 import OvertimeWeekGrid from '../Overtime/OvertimeWeekGrid';
@@ -48,8 +48,13 @@ export default function MyTeam({ team }: { team: TeamMember[] }) {
       {tab === 'team' && <TeamList team={team} />}
       {tab === 'kpis' && <TeamKpis team={team} />}
       {tab === 'overtime' && <TeamOvertime />}
-      {tab === 'casual' && casuals.length > 0 && <CasualDaysGrid casuals={casuals} canApprove={false} />}
-      {tab === 'leave' && <LeaveAwaitingMe showEmpty />}
+      {tab === 'casual' && casuals.length > 0 && <CasualDaysGrid casuals={casuals} canApprove={false} hideMoney />}
+      {tab === 'leave' && (
+        <div className="flex flex-col gap-4">
+          <LeaveAwaitingMe showEmpty />
+          <TeamOnLeave />
+        </div>
+      )}
     </div>
   );
 }
@@ -183,3 +188,52 @@ function TeamOvertime() {
     </div>
   );
 }
+
+// who on the team is on approved leave this month (or another month): dates and type only (my_team_leave)
+function TeamOnLeave() {
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [rows, setRows] = useState<TeamLeave[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    setRows(null);
+    loadTeamLeave(month).then((r) => live && setRows(r)).catch(() => live && setRows([]));
+    return () => {
+      live = false;
+    };
+  }, [month]);
+  const shift = (by: number) => {
+    const [y, m] = month.split('-').map(Number);
+    const d = new Date(Date.UTC(y, m - 1 + by, 1));
+    setMonth(d.toISOString().slice(0, 7));
+  };
+  const label = new Date(`${month}-01T00:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  return (
+    <Card>
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <h3 className="m-0 text-[13.5px] font-bold text-ink">On leave in {label}</h3>
+        <div className="flex gap-1">
+          <button type="button" aria-label="Previous month" onClick={() => shift(-1)} className="rounded-md border border-border px-2 py-1 text-[12px]">‹</button>
+          <button type="button" aria-label="Next month" onClick={() => shift(1)} className="rounded-md border border-border px-2 py-1 text-[12px]">›</button>
+        </div>
+      </div>
+      {rows === null ? (
+        <p className="m-0 text-[12px] text-muted-foreground">Loading...</p>
+      ) : rows.length === 0 ? (
+        <p className="m-0 text-[12px] text-muted-foreground">Nobody on your team has approved leave this month.</p>
+      ) : (
+        <ul className="m-0 p-0 list-none flex flex-col gap-2">
+          {rows.map((r) => (
+            <li key={`${r.employee_number}-${r.start_date}`} className="flex flex-wrap items-center justify-between gap-2 text-[12.5px]">
+              <span className="font-semibold text-ink">{r.name}</span>
+              <span className="text-muted-foreground">
+                {r.leave_type} · {formatDay(r.start_date)}{r.end_date !== r.start_date ? ` to ${formatDay(r.end_date)}` : ''} · {r.days} {Number(r.days) === 1 ? 'day' : 'days'}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
+const formatDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });

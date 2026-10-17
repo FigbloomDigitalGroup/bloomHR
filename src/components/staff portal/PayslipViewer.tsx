@@ -1223,6 +1223,12 @@ const PayslipViewer = () => {
                                   <span>Housing Levy:</span>
                                   <span className="text-status-danger">KSh {calculated.housingLevy.toLocaleString()}</span>
                                 </div>
+                                {Number((payslip as Record<string, unknown>).nita_levy) > 0 && (
+                                  <div className="flex justify-between text-gray-500">
+                                    <span>NITA levy (paid by employer):</span>
+                                    <span>KSh {Number((payslip as Record<string, unknown>).nita_levy).toLocaleString()}</span>
+                                  </div>
+                                )}
                               </div>
 
                               <div className="space-y-2">

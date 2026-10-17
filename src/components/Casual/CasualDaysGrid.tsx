@@ -19,9 +19,11 @@ interface Props {
   casuals: CasualWorker[];
   canApprove: boolean;
   onChanged?: () => void;
+  /** days only, no daily rate or amounts (a supervisor in the staff portal) */
+  hideMoney?: boolean;
 }
 
-export default function CasualDaysGrid({ casuals, canApprove, onChanged }: Props) {
+export default function CasualDaysGrid({ casuals, canApprove, onChanged, hideMoney = false }: Props) {
   const [monday, setMonday] = useState(() => weekStart(today()));
   const [days, setDays] = useState<CasualDay[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,7 +118,7 @@ export default function CasualDaysGrid({ casuals, canApprove, onChanged }: Props
                   <tr key={c.employee_number} className="border-b border-border last:border-0">
                     <td className="px-3 py-2">
                       <div className="font-semibold text-ink">{casualName(c)}</div>
-                      <div className="text-[10.5px] text-subtle">{formatKsh(c.daily_rate)} a day</div>
+                      {!hideMoney && <div className="text-[10.5px] text-subtle">{formatKsh(c.daily_rate)} a day</div>}
                     </td>
                     {week.map((d) => {
                       const key = `${c.employee_number}|${d}`;
@@ -147,7 +149,7 @@ export default function CasualDaysGrid({ casuals, canApprove, onChanged }: Props
                       );
                     })}
                     <td className="px-3 py-2 text-right whitespace-nowrap">
-                      <div className="font-semibold text-ink">{formatKsh(t.amount)}</div>
+                      {!hideMoney && <div className="font-semibold text-ink">{formatKsh(t.amount)}</div>}
                       <div className="text-[10.5px] text-subtle">{t.full + t.half / 2} {t.full + t.half / 2 === 1 ? 'day' : 'days'}</div>
                     </td>
                   </tr>

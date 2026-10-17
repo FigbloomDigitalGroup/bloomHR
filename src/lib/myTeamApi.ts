@@ -54,3 +54,23 @@ export const toKpiPerson = (m: TeamMember): KpiPerson => ({
   status: m.status ?? '',
   jobGroup: '',
 });
+
+/** A report's approved leave (dates and type only). */
+export interface TeamLeave {
+  employee_number: string;
+  name: string;
+  leave_type: string;
+  start_date: string;
+  end_date: string;
+  days: number;
+}
+
+/** The team's approved leave that falls in a month ('YYYY-MM'). */
+export async function loadTeamLeave(month: string): Promise<TeamLeave[]> {
+  const [y, m] = month.split('-').map(Number);
+  const from = `${month}-01`;
+  const to = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+  const { data, error } = await supabase.rpc('my_team_leave', { p_from: from, p_to: to });
+  if (error) throw new Error(error.message);
+  return (data || []) as TeamLeave[];
+}
