@@ -61,6 +61,8 @@ import { earningsForPeriod, statutoryPayWith, summariseEarnings } from "../../li
 import { loadEarningSetup } from "../../lib/earningsDb";
 import { basicAfterLeave, leavePayFor, leavePayoutItems } from "../../lib/leavePay";
 import { loadLeavePay, loadLeavePayouts, loadLeaveRateBasis } from "../../lib/leavePayDb";
+import { withAbsencePay } from "../../lib/absencePay";
+import { loadAbsencePay } from "../../lib/leaveDisciplineApi";
 import LeavePaySetting from "./LeavePaySetting";
 import { overtimeForPayslip } from "../../lib/overtimePay";
 import { loadOvertimeMonth } from "../../lib/overtimeApi";
@@ -953,6 +955,8 @@ export default function PayrollDashboard() {
         const earningsByEmployee = earningsForPeriod(earningSetup.types, earningSetup.earnings, actualPeriod);
         // unpaid and half-pay leave days this month, from approved leave (lib/leavePay), and how a day's pay is worked out
         const [leaveByEmployee, leaveBasis] = await Promise.all([loadLeavePay(actualPeriod), loadLeaveRateBasis()]);
+        // days of unexcused absence this month (FIG-881, lib/absencePay): off pay like unpaid leave, unless turned off
+        const absenceByEmployee = await loadAbsencePay(actualPeriod);
         // leave over the carry-forward cap that the company pays out (FIG-877): a taxable "Leave paid out" earning
         const leavePayouts = await loadLeavePayouts(actualPeriod);
         // approved overtime this month, by kind of day, and the company's overtime settings (lib/overtimePay)
@@ -1020,7 +1024,7 @@ export default function PayrollDashboard() {
 
               // unpaid leave days, and half a day for each half-pay leave day, come off the basic salary earned this
               // month, so gross pay and everything worked out from it (PAYE, NSSF, SHIF, housing levy) is on what is left
-              const leave = leavePayFor(leaveByEmployee.get(employeeId), basicSalary, leaveBasis);
+              const leave = withAbsencePay(leavePayFor(leaveByEmployee.get(employeeId), basicSalary, leaveBasis), absenceByEmployee.get(employeeId), basicSalary, leaveBasis);
               const leaveDeduction = leave.total;
 
               // Per diem is PART of basic salary (33%), not extra payment: 33% of the basic earned this month
