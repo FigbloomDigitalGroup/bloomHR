@@ -12,23 +12,24 @@ import {
   addMonths,
   subMonths,
 } from 'date-fns';
-import { Cake, PartyPopper, CalendarPlus, ChevronLeft, ChevronRight, X, Trash2, Plane } from 'lucide-react';
+import { Cake, PartyPopper, CalendarPlus, ChevronLeft, ChevronRight, X, Trash2, Plane, ListTodo, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { fetchAllResult } from '../../lib/fetchAll';
 import { PageHeader, Card, Button, Modal } from '../UI';
 import { toDay } from '../../lib/celebrations';
+import {
+  comingUp, dayKey, holidayDates, myLeaveRanges, myOpenTasks, startOfDay,
+  type CalendarEntry, type HolidayRow, type LeaveRow, type TaskRow, type UpcomingKind,
+} from '../../lib/upcoming';
+import { currentEmployeeNumber, loadMyLeave, loadMyTasks } from '../../lib/upcomingApi';
+import ComingUpList, { type RangeChoice } from './ComingUpList';
 
 import { confirmDialog } from '../../lib/confirmDialog';
 interface BirthdayEntry {
   name: string;
   town?: string;
-}
-
-interface HolidayEntry {
-  name: string;
-  recurring: boolean;
 }
 
 interface CompanyEvent {
@@ -43,52 +44,52 @@ interface LeaveEntry {
   status: 'approved' | 'pending';
 }
 
+interface DueTask {
+  id: string;
+  title: string;
+  key?: string | null;
+  overdue: boolean;
+}
+
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 // a leave longer than this is drawn only for its first year (a typo in the end date would otherwise fill the calendar)
 const MAX_LEAVE_DAYS = 366;
 
-/** The employee's own approved and pending leave, by day ("yyyy-MM-dd"). */
-async function loadMyLeave(employeeNumber: string): Promise<Map<string, LeaveEntry[]>> {
-  const { data, error } = await supabase
-    .from('leave_application')
-    .select('"Leave Type", "Start Date", "End Date", status')
-    .eq('"Employee Number"', employeeNumber);
-  if (error) throw error;
-  const map = new Map<string, LeaveEntry[]>();
-  for (const l of (data || []) as Record<string, string | null>[]) {
-    const status = (l.status || '').trim().toLowerCase();
-    if (status !== 'approved' && status !== 'pending') continue;
-    const start = toDay(l['Start Date']);
-    const end = toDay(l['End Date']) || start;
-    if (!start || !end || end < start) continue;
-    const entry: LeaveEntry = { type: (l['Leave Type'] || 'Leave').trim(), status };
-    const day = new Date(start);
-    for (let i = 0; day <= end && i < MAX_LEAVE_DAYS; i++, day.setDate(day.getDate() + 1)) {
-      const key = format(day, 'yyyy-MM-dd');
-      map.set(key, [...(map.get(key) || []), entry]);
-    }
-  }
-  return map;
-}
+const KIND_FILTERS: { kind: UpcomingKind; label: string; dot: string }[] = [
+  { kind: 'event', label: 'Events', dot: 'bg-status-purple' },
+  { kind: 'holiday', label: 'Holidays', dot: 'bg-orange-text' },
+  { kind: 'birthday', label: 'Birthdays', dot: 'bg-brand' },
+  { kind: 'leave', label: 'My leave', dot: 'bg-status-info' },
+  { kind: 'task', label: 'My tasks', dot: 'bg-amber-500' },
+];
 
 interface CompanyCalendarProps {
   /** the staff portal: nothing can be added or removed, and birthdays do not link to the employee list */
   readOnly?: boolean;
   /** also show this employee's own approved and pending leave (the staff portal passes the signed-in employee's) */
   myEmployeeNumber?: string | null;
+  /** opens one of the viewer's tasks (the staff portal's Tasks); without it, the admin Tasks page opens */
+  onOpenTask?: (taskId: string) => void;
 }
 
 const leaveLabel = (l: LeaveEntry) => `My ${l.type}${l.status === 'pending' ? ' (pending)' : ''}`;
+const taskLabel = (t: DueTask) => `${t.overdue ? 'Overdue: ' : 'Due: '}${t.title}`;
 
-export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = null }: CompanyCalendarProps = {}) {
+export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = null, onOpenTask }: CompanyCalendarProps = {}) {
   const navigate = useNavigate();
-  const [myLeaveByDay, setMyLeaveByDay] = useState<Map<string, LeaveEntry[]>>(new Map());
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
   const [birthdaysByDay, setBirthdaysByDay] = useState<Map<string, BirthdayEntry[]>>(new Map());
-  const [holidaysByDay, setHolidaysByDay] = useState<Map<string, HolidayEntry[]>>(new Map());
-  const [eventsByDay, setEventsByDay] = useState<Map<string, CompanyEvent[]>>(new Map());
+  const [holidays, setHolidays] = useState<HolidayRow[]>([]);
+  const [events, setEvents] = useState<CompanyEvent[]>([]);
+  const [myLeave, setMyLeave] = useState<LeaveRow[]>([]);
+  const [myTasks, setMyTasks] = useState<TaskRow[]>([]);
+  // whose tasks are shown: the staff portal's employee, or the signed-in admin's own employee record
+  const [taskOwner, setTaskOwner] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  // the day tapped on the phone layout, whose entries are listed under the grid
+  // which kinds of entry are shown, on the grid and in "Coming up"
+  const [shown, setShown] = useState<Record<UpcomingKind, boolean>>({ event: true, holiday: true, birthday: true, leave: true, task: true });
+  const [range, setRange] = useState<RangeChoice>(90);
+  // the day tapped on the phone layout (whose entries are listed under the grid), or picked in "Coming up"
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [showEventForm, setShowEventForm] = useState(false);
   const [savingEvent, setSavingEvent] = useState(false);
@@ -97,7 +98,7 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
   const loadCalendarData = async () => {
     setLoading(true);
     try {
-      const [{ data: employees }, { data: holidays }, { data: events }] = await Promise.all([
+      const [{ data: employees }, { data: holidayRows }, { data: eventRows }] = await Promise.all([
         // every employee, a page at a time (one request is capped at 1000 rows)
         fetchAllResult((from, to) =>
           supabase.from('employee_directory').select('"First Name", "Last Name", "Date of Birth", Town').order('"Employee Number"').range(from, to)
@@ -108,9 +109,8 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
 
       const bdayMap = new Map<string, BirthdayEntry[]>();
       (employees || []).forEach((emp) => {
-        if (!emp['Date of Birth']) return;
-        const birthDate = new Date(emp['Date of Birth']);
-        if (isNaN(birthDate.getTime())) return;
+        const birthDate = toDay(emp['Date of Birth']);
+        if (!birthDate) return;
         // Key by month-day only, so a birthday shows every year it's viewed
         const key = `${birthDate.getMonth()}-${birthDate.getDate()}`;
         const entry: BirthdayEntry = {
@@ -120,32 +120,24 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
         bdayMap.set(key, [...(bdayMap.get(key) || []), entry]);
       });
       setBirthdaysByDay(bdayMap);
-
-      const holMap = new Map<string, HolidayEntry[]>();
-      (holidays || []).forEach((h: any) => {
-        if (!h.date) return;
-        const d = new Date(h.date);
-        if (isNaN(d.getTime())) return;
-        // Recurring holidays match every year by month-day; one-off ones match the exact date
-        const key = h.recurring ? `r-${d.getMonth()}-${d.getDate()}` : `d-${format(d, 'yyyy-MM-dd')}`;
-        holMap.set(key, [...(holMap.get(key) || []), { name: h.name, recurring: !!h.recurring }]);
-      });
-      setHolidaysByDay(holMap);
-
-      const evtMap = new Map<string, CompanyEvent[]>();
-      (events || []).forEach((e: any) => {
-        if (!e.date) return;
-        const key = format(new Date(e.date), 'yyyy-MM-dd');
-        evtMap.set(key, [...(evtMap.get(key) || []), e]);
-      });
-      setEventsByDay(evtMap);
+      setHolidays((holidayRows || []) as HolidayRow[]);
+      setEvents((eventRows || []) as CompanyEvent[]);
 
       if (myEmployeeNumber) {
         try {
-          setMyLeaveByDay(await loadMyLeave(myEmployeeNumber));
+          setMyLeave(await loadMyLeave(myEmployeeNumber));
         } catch (err) {
           console.error('Error loading your leave for the calendar:', err);
         }
+      }
+
+      // the viewer's own tasks with a due date (an admin's own, from their employee record, if they have one)
+      try {
+        const owner = myEmployeeNumber || (readOnly ? null : await currentEmployeeNumber());
+        setTaskOwner(owner);
+        setMyTasks(owner ? await loadMyTasks(owner) : []);
+      } catch (err) {
+        console.error('Error loading your tasks for the calendar:', err);
       }
     } catch (err) {
       console.error('Error loading company calendar data:', err);
@@ -166,19 +158,75 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
     return eachDayOfInterval({ start, end });
   }, [currentMonth]);
 
-  const getBirthdaysFor = (day: Date) => birthdaysByDay.get(`${day.getMonth()}-${day.getDate()}`) || [];
-  const getHolidaysFor = (day: Date) => [
-    ...(holidaysByDay.get(`r-${day.getMonth()}-${day.getDate()}`) || []),
-    ...(holidaysByDay.get(`d-${format(day, 'yyyy-MM-dd')}`) || []),
-  ];
-  const getEventsFor = (day: Date) => eventsByDay.get(format(day, 'yyyy-MM-dd')) || [];
-  const getLeaveFor = (day: Date) => myLeaveByDay.get(format(day, 'yyyy-MM-dd')) || [];
+  // the weeks on screen, by day ("yyyy-MM-dd"): recurring holidays by month and day, one-off ones on their date
+  const holidaysByDay = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const h of holidayDates(holidays, gridDays[0], gridDays[gridDays.length - 1])) {
+      const key = dayKey(h.date);
+      map.set(key, [...(map.get(key) || []), h.name]);
+    }
+    return map;
+  }, [holidays, gridDays]);
+  const eventsByDay = useMemo(() => {
+    const map = new Map<string, CompanyEvent[]>();
+    for (const e of events) {
+      const day = toDay(e.date);
+      if (!day) continue;
+      const key = dayKey(day);
+      map.set(key, [...(map.get(key) || []), e]);
+    }
+    return map;
+  }, [events]);
+  const myLeaveByDay = useMemo(() => {
+    const map = new Map<string, LeaveEntry[]>();
+    for (const l of myLeaveRanges(myLeave)) {
+      const entry: LeaveEntry = { type: l.type, status: l.pending ? 'pending' : 'approved' };
+      const day = new Date(l.start);
+      for (let i = 0; day <= l.end && i < MAX_LEAVE_DAYS; i++, day.setDate(day.getDate() + 1)) {
+        const key = dayKey(day);
+        map.set(key, [...(map.get(key) || []), entry]);
+      }
+    }
+    return map;
+  }, [myLeave]);
+  const tasksByDay = useMemo(() => {
+    const map = new Map<string, DueTask[]>();
+    const today = startOfDay(new Date());
+    for (const t of myOpenTasks(myTasks, taskOwner)) {
+      const key = dayKey(t.due);
+      map.set(key, [...(map.get(key) || []), { id: t.id, title: t.title, key: t.key, overdue: t.due < today }]);
+    }
+    return map;
+  }, [myTasks, taskOwner]);
+
+  const getBirthdaysFor = (day: Date) => (shown.birthday ? birthdaysByDay.get(`${day.getMonth()}-${day.getDate()}`) || [] : []);
+  const getHolidaysFor = (day: Date) => (shown.holiday ? holidaysByDay.get(dayKey(day)) || [] : []);
+  const getEventsFor = (day: Date) => (shown.event ? eventsByDay.get(dayKey(day)) || [] : []);
+  const getLeaveFor = (day: Date) => (shown.leave ? myLeaveByDay.get(dayKey(day)) || [] : []);
+  const getTasksFor = (day: Date) => (shown.task ? tasksByDay.get(dayKey(day)) || [] : []);
   const hasEntries = (day: Date) =>
-    getEventsFor(day).length > 0 || getHolidaysFor(day).length > 0 || getBirthdaysFor(day).length > 0 || getLeaveFor(day).length > 0;
+    getEventsFor(day).length > 0 || getHolidaysFor(day).length > 0 || getBirthdaysFor(day).length > 0 || getLeaveFor(day).length > 0 || getTasksFor(day).length > 0;
   // the days listed under the grid on phones
   const phoneListDays = selectedDay
     ? (hasEntries(selectedDay) ? [selectedDay] : [])
     : gridDays.filter((day) => isSameMonth(day, currentMonth) && hasEntries(day));
+
+  const upcoming = useMemo(
+    () => comingUp({ events, holidays, leave: myLeave, tasks: myTasks, employeeNumber: taskOwner }, new Date(), range).filter((i) => shown[i.kind]),
+    [events, holidays, myLeave, myTasks, taskOwner, range, shown]
+  );
+
+  const openTask = (taskId: string) => {
+    if (onOpenTask) onOpenTask(taskId);
+    else navigate(`/tasks?task=${encodeURIComponent(taskId)}`);
+  };
+  // a "Coming up" row: the calendar moves to its month and marks the day (a leave already under way: today)
+  const pick = (entry: CalendarEntry) => {
+    const day = startOfDay(entry.kind === 'leave' && entry.daysAway < 0 ? new Date() : entry.date);
+    setCurrentMonth(startOfMonth(day));
+    setSelectedDay(day);
+  };
+  const filterKinds = KIND_FILTERS.filter((f) => (f.kind === 'leave' ? !!myEmployeeNumber : f.kind === 'task' ? !!taskOwner : true));
 
   const handleAddEvent = async () => {
     if (!newEvent.title.trim() || !newEvent.date) {
@@ -219,10 +267,10 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
   };
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-7xl mx-auto">
       <PageHeader
         title="Company Calendar"
-        subtitle={myEmployeeNumber ? 'Birthdays, holidays, company events and your leave' : 'Birthdays, holidays and company events'}
+        subtitle={myEmployeeNumber ? 'Holidays, company events, birthdays, your leave and your tasks' : 'Birthdays, holidays and company events'}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="secondary" onClick={() => { setCurrentMonth((m) => subMonths(m, 1)); setSelectedDay(null); }} icon={<ChevronLeft className="w-3.5 h-3.5" />}>
@@ -241,6 +289,26 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
         }
       />
 
+      {/* show or hide each kind of entry */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-3" role="group" aria-label="Show on the calendar" data-testid="calendar-filters">
+        {filterKinds.map((f) => (
+          <button
+            key={f.kind}
+            type="button"
+            aria-pressed={shown[f.kind]}
+            onClick={() => setShown((s) => ({ ...s, [f.kind]: !s[f.kind] }))}
+            className={`inline-flex items-center gap-1.5 text-[11.5px] font-semibold rounded-full border px-2.5 py-1 transition-colors ${
+              shown[f.kind] ? 'bg-white text-ink border-border' : 'bg-secondary text-subtle border-transparent line-through'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${shown[f.kind] ? f.dot : 'bg-subtle/50'}`} aria-hidden />
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_320px] xl:gap-4 xl:items-start">
+      <div className="min-w-0">
       <Card padding="none" className="overflow-hidden">
         <div className="grid grid-cols-7 border-b border-border bg-secondary">
           {WEEKDAY_LABELS.map((label) => (
@@ -254,9 +322,10 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
           {gridDays.map((day) => {
             const inMonth = isSameMonth(day, currentMonth);
             const birthdays = getBirthdaysFor(day);
-            const holidays = getHolidaysFor(day);
-            const events = getEventsFor(day);
+            const holidayNames = getHolidaysFor(day);
+            const dayEvents = getEventsFor(day);
             const leave = getLeaveFor(day);
+            const tasks = getTasksFor(day);
             const isSelected = selectedDay !== null && isSameDay(day, selectedDay);
             const dayNumberClass = `text-[11px] font-semibold w-5 h-5 items-center justify-center rounded-full ${
               isToday(day) ? 'bg-brand text-white' : inMonth ? 'text-ink' : 'text-subtle'
@@ -264,7 +333,9 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
             return (
               <div
                 key={day.toISOString()}
-                className={`min-h-[52px] sm:min-h-[104px] border-b border-r border-border p-0.5 sm:p-1.5 last:border-r-0 ${inMonth ? 'bg-white' : 'bg-secondary/40'}`}
+                data-day={dayKey(day)}
+                data-selected={isSelected || undefined}
+                className={`min-h-[52px] sm:min-h-[104px] border-b border-r border-border p-0.5 sm:p-1.5 last:border-r-0 ${inMonth ? 'bg-white' : 'bg-secondary/40'} ${isSelected ? 'sm:ring-2 sm:ring-inset sm:ring-brand sm:bg-green-tint/30' : ''}`}
               >
                 {/* Phones: the columns are too narrow for event labels, so show the day and a dot per kind
                     of entry, and list the tapped day's entries under the grid */}
@@ -277,10 +348,11 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
                 >
                   <span className={`flex ${dayNumberClass}`}>{format(day, 'd')}</span>
                   <span className="flex items-center gap-0.5" aria-hidden>
-                    {events.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-status-purple" />}
-                    {holidays.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-orange-text" />}
+                    {dayEvents.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-status-purple" />}
+                    {holidayNames.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-orange-text" />}
                     {birthdays.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-brand" />}
                     {leave.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-status-info" />}
+                    {tasks.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
                   </span>
                 </button>
                 <div className={`hidden sm:flex ${dayNumberClass}`}>
@@ -293,7 +365,19 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
                       <span className="truncate">{leaveLabel(l)}</span>
                     </div>
                   ))}
-                  {readOnly && events.map((e) => (
+                  {tasks.map((t) => (
+                    <button
+                      key={`t-${t.id}`}
+                      type="button"
+                      onClick={() => openTask(t.id)}
+                      className={`flex items-center gap-1 text-[10px] font-medium rounded px-1 py-0.5 w-full truncate transition-colors ${t.overdue ? 'text-status-danger bg-red-50 hover:bg-red-100' : 'text-amber-800 bg-amber-50 hover:bg-amber-100'}`}
+                      title={`${taskLabel(t)}${t.key ? ` (${t.key})` : ''}: open in Tasks`}
+                    >
+                      {t.overdue ? <AlertTriangle className="w-2.5 h-2.5 flex-shrink-0" /> : <ListTodo className="w-2.5 h-2.5 flex-shrink-0" />}
+                      <span className="truncate">{t.title}</span>
+                    </button>
+                  ))}
+                  {readOnly && dayEvents.map((e) => (
                     <div
                       key={e.id}
                       className="flex items-center gap-1 text-[10px] font-medium text-status-purple bg-status-purple-tint rounded px-1 py-0.5 truncate"
@@ -303,7 +387,7 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
                       <span className="truncate">{e.title}</span>
                     </div>
                   ))}
-                  {!readOnly && events.map((e) => (
+                  {!readOnly && dayEvents.map((e) => (
                     <button
                       key={e.id}
                       type="button"
@@ -316,10 +400,10 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
                       <span className="truncate">{e.title}</span>
                     </button>
                   ))}
-                  {holidays.map((h, i) => (
-                    <div key={`h-${i}`} className="flex items-center gap-1 text-[10px] font-medium text-orange-text bg-orange-tint rounded px-1 py-0.5 truncate">
+                  {holidayNames.map((name, i) => (
+                    <div key={`h-${i}`} className="flex items-center gap-1 text-[10px] font-medium text-orange-text bg-orange-tint rounded px-1 py-0.5 truncate" title={`${name}: public holiday, office closed`}>
                       <PartyPopper className="w-2.5 h-2.5 flex-shrink-0" />
-                      <span className="truncate">{h.name}</span>
+                      <span className="truncate">{name}</span>
                     </div>
                   ))}
                   {readOnly && birthdays.slice(0, 2).map((b, i) => (
@@ -378,6 +462,18 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
                       <span className="min-w-0 break-words">{leaveLabel(l)}</span>
                     </div>
                   ))}
+                  {getTasksFor(day).map((t) => (
+                    <button
+                      key={`t-${t.id}`}
+                      type="button"
+                      onClick={() => openTask(t.id)}
+                      className={`flex items-start gap-1.5 text-left text-[12px] font-medium rounded px-2 py-1 w-full ${t.overdue ? 'text-status-danger bg-red-50' : 'text-amber-800 bg-amber-50'}`}
+                      title="Open in Tasks"
+                    >
+                      {t.overdue ? <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" /> : <ListTodo className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />}
+                      <span className="min-w-0 break-words">{taskLabel(t)}</span>
+                    </button>
+                  ))}
                   {getEventsFor(day).map((e) => (
                     <button
                       key={e.id}
@@ -394,10 +490,10 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
                       </span>
                     </button>
                   ))}
-                  {getHolidaysFor(day).map((h, i) => (
+                  {getHolidaysFor(day).map((name, i) => (
                     <div key={`h-${i}`} className="flex items-start gap-1.5 text-[12px] font-medium text-orange-text bg-orange-tint rounded px-2 py-1">
                       <PartyPopper className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-                      <span className="min-w-0 break-words">{h.name}</span>
+                      <span className="min-w-0 break-words">{name}</span>
                     </div>
                   ))}
                   {getBirthdaysFor(day).map((b, i) => (
@@ -418,8 +514,15 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
           </ul>
         )}
       </div>
+      </div>
 
-      {!loading && birthdaysByDay.size === 0 && holidaysByDay.size === 0 && eventsByDay.size === 0 && myLeaveByDay.size === 0 && (
+      {/* what is coming up: beside the grid on wide screens, under it otherwise */}
+      <div className="mt-4 xl:mt-0">
+        <ComingUpList items={upcoming} range={range} onRangeChange={setRange} onPick={pick} onOpenTask={taskOwner ? openTask : undefined} loading={loading} />
+      </div>
+      </div>
+
+      {!loading && birthdaysByDay.size === 0 && holidays.length === 0 && events.length === 0 && myLeave.length === 0 && (
         <p className="text-[11.5px] text-muted-foreground text-center mt-4">No birthdays, holidays or events on record yet.</p>
       )}
 

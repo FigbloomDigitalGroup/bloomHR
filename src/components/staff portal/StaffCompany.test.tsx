@@ -6,7 +6,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 const fx = vi.hoisted(() => {
   const now = new Date();
   const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  return { ym };
+  const ymd = (offset: number) => {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  return { ym, ymd };
 });
 
 const state = vi.hoisted(() => ({
@@ -59,11 +63,11 @@ const CHAIN = {
   admin_fallback: false,
 };
 
-const show = (section: CompanySection, onSectionChange = vi.fn()) =>
+const show = (section: CompanySection, onSectionChange = vi.fn(), onOpenTask = vi.fn()) =>
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
-        <StaffCompany section={section} onSectionChange={onSectionChange} employeeNumber="E-ME" />
+        <StaffCompany section={section} onSectionChange={onSectionChange} employeeNumber="E-ME" onOpenTask={onOpenTask} />
       </MemoryRouter>
     </QueryClientProvider>
   );
@@ -127,6 +131,32 @@ describe('Company area', () => {
     expect(state.eqCalls).toContainEqual(['leave_application', '"Employee Number"', 'E-ME']);
     expect(screen.queryByRole('button', { name: /New Event/ })).toBeNull();
     expect(within(list).getByText('Town hall').closest('button')?.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('calendar: a Coming up list with my leave and my tasks, and a task opens in Tasks', async () => {
+    state.tables = {
+      holidays: [{ name: 'Mashujaa Day', date: '2019-10-20', recurring: true }],
+      leave_application: [{ 'Leave Type': 'Annual Leave', 'Start Date': fx.ymd(20), 'End Date': fx.ymd(22), status: 'approved' }],
+      tasks: [
+        { id: 't1', key: 'OPS-7', title: 'Send the stock report', status: 'todo', due_date: fx.ymd(1), assignee_number: 'E-ME', is_group: false },
+      ],
+      company_events: [],
+    };
+    const onOpenTask = vi.fn();
+    show('company-calendar', vi.fn(), onOpenTask);
+    const panel = screen.getByTestId('coming-up');
+    expect(await within(panel).findByText('Send the stock report')).toBeTruthy();
+    expect(within(panel).getByText('Due Tomorrow')).toBeTruthy();
+    expect(within(panel).getByText('My Annual Leave')).toBeTruthy();
+    // a recurring holiday comes round within the year
+    fireEvent.click(within(panel).getByRole('button', { name: '1 year' }));
+    expect(within(panel).getByText('Mashujaa Day')).toBeTruthy();
+    // only my own tasks are asked for
+    expect(state.eqCalls).toContainEqual(['tasks', 'assignee_number', 'E-ME']);
+    expect(within(screen.getByTestId('calendar-filters')).getByRole('button', { name: 'My leave' })).toBeTruthy();
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Open task Send the stock report' }));
+    expect(onOpenTask).toHaveBeenCalledWith('t1');
   });
 
   it('organogram: from the safe company directory, with no links to records or settings', async () => {

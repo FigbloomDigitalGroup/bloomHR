@@ -82,6 +82,7 @@ import TaskWorkspace from '../Tasks/TaskWorkspace';
 import { loadMyTeam, type TeamMember } from '../../lib/myTeamApi';
 import StaffCompany from './StaffCompany';
 import MyApprovalChain from './MyApprovalChain';
+import LeavePlanningHints from './LeavePlanningHints';
 import { isCompanySection } from '../../lib/staffCompany';
 import MyAbsences from './MyAbsences';
 import { NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
@@ -391,7 +392,7 @@ function NotificationSidebar({
   );
 }
 
-const LeaveApplicationForm = () => {
+const LeaveApplicationForm = ({ onSeeCalendar }: { onSeeCalendar?: () => void }) => {
   const [formData, setFormData] = useState({
     "Employee Number": '',
     "Name": '',
@@ -720,6 +721,14 @@ const LeaveApplicationForm = () => {
               />
             </div>
           </div>
+
+          {/* the holidays, company events and the employee's tasks around the dates (only to inform) */}
+          <LeavePlanningHints
+            employeeNumber={formData["Employee Number"]}
+            startDate={formData["Start Date"]}
+            endDate={formData["End Date"]}
+            onSeeCalendar={onSeeCalendar}
+          />
 
           {/* who it will go to, before applying (the company's approval workflow for this employee) */}
           <MyApprovalChain compact />
@@ -1074,7 +1083,7 @@ const DashboardHome = ({ setActiveTab, userName }: { setActiveTab: (tab: string)
 
       <CompleteProfileCard onOpen={() => setActiveTab('onboarding')} />
 
-      <CelebrationsCard />
+      <CelebrationsCard onViewCalendar={() => setActiveTab('company-calendar')} />
 
       {/* Services Grid */}
       <div className="space-y-4">
@@ -1287,6 +1296,16 @@ const StaffPortal = () => {
   // shows this person as online in Teams on every page of the portal
   useOnlinePeople();
   const [activeTab, setActiveTab] = useState('home');
+  // a task to open when Tasks next shows (picked on the calendar)
+  const [taskToOpen, setTaskToOpen] = useState<string | null>(null);
+  const openTask = (taskId: string) => {
+    setTaskToOpen(taskId);
+    setActiveTab('tasks');
+  };
+  // only once: opening Tasks from the menu later starts on the list
+  useEffect(() => {
+    if (activeTab !== 'tasks') setTaskToOpen(null);
+  }, [activeTab]);
   const [showResetModal, setShowResetModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // For mobile
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
@@ -1984,13 +2003,13 @@ const StaffPortal = () => {
               {activeTab === 'overtime' && <MyOvertime />}
               {activeTab === 'loan' && <LoanRequest />}
               {activeTab === 'training' && <TrainingModule />}
-              {activeTab === 'tasks' && <TaskWorkspace mode="staff" />}
+              {activeTab === 'tasks' && <TaskWorkspace key={taskToOpen ?? 'tasks'} mode="staff" initialOpenId={taskToOpen} />}
               {activeTab === 'my-kpis' && <MyKpis />}
               {activeTab === 'my-team' && team.length > 0 && <MyTeam team={team} />}
-              {activeTab === 'leave' && <LeaveApplicationForm />}
+              {activeTab === 'leave' && <LeaveApplicationForm onSeeCalendar={() => setActiveTab('company-calendar')} />}
               {activeTab === 'leave-history' && <><LeaveApplicationsList /><MyAbsences /></>}
               {isCompanySection(activeTab) && (
-                <StaffCompany section={activeTab} onSectionChange={setActiveTab} employeeNumber={employeeNumber} />
+                <StaffCompany section={activeTab} onSectionChange={setActiveTab} employeeNumber={employeeNumber} onOpenTask={openTask} />
               )}
               {activeTab === 'contract' && <MyContract />}
               {activeTab === 'resignation' && <MyResignation />}

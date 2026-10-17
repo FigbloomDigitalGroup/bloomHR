@@ -5,15 +5,15 @@ import { supabase } from '../../lib/supabase';
 import { fetchAllResult } from '../../lib/fetchAll';
 import { upcomingBirthdays, upcomingEventsAndHolidays, whenLabel, type UpcomingItem } from '../../lib/celebrations';
 
-const WITHIN_DAYS = 30;
+const WITHIN_DAYS = 60;
 const SHOW = 5;
 
 /**
  * Birthdays (name and day only, never the year) and the company events and public holidays coming up in the next
- * 30 days, for everyone in the staff portal. HR and admins add events in the company calendar. When it is someone's
+ * 60 days, for everyone in the staff portal. HR and admins add events in the company calendar. When it is someone's
  * birthday today, a banner prompts everyone else to send them a wish, which arrives as a direct message in Chat.
  */
-export default function CelebrationsCard() {
+export default function CelebrationsCard({ onViewCalendar }: { onViewCalendar?: () => void } = {}) {
   const [birthdays, setBirthdays] = useState<UpcomingItem[]>([]);
   const [comingUp, setComingUp] = useState<UpcomingItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,7 +87,7 @@ export default function CelebrationsCard() {
       ) : (
         <ul className="divide-y divide-gray-100">
           {items.slice(0, SHOW).map(row)}
-          {items.length > SHOW && <li className="pt-2 text-xs text-gray-500">and {items.length - SHOW} more this month</li>}
+          {items.length > SHOW && <li className="pt-2 text-xs text-gray-500">and {items.length - SHOW} more</li>}
         </ul>
       )}
     </div>
@@ -95,9 +95,16 @@ export default function CelebrationsCard() {
 
   return (
     <section className="bg-white border border-gray-200 rounded-2xl p-4 md:p-6 shadow-sm">
-      <div className="mb-3">
-        <h3 className="text-base md:text-lg font-bold text-gray-900">Celebrations & events</h3>
-        <p className="text-[10px] md:text-xs text-gray-500 font-medium">The next 30 days at your company</p>
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base md:text-lg font-bold text-gray-900">Celebrations & events</h3>
+          <p className="text-[10px] md:text-xs text-gray-500 font-medium">The next 60 days at your company</p>
+        </div>
+        {onViewCalendar && (
+          <button type="button" onClick={onViewCalendar} className="text-xs font-semibold text-brand hover:underline whitespace-nowrap mt-1">
+            View calendar →
+          </button>
+        )}
       </div>
       {/* today's birthdays: a happy birthday, or a prompt to send a wish */}
       <div className="mb-4 empty:hidden">
@@ -105,8 +112,8 @@ export default function CelebrationsCard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
-        {column('Birthdays', birthdays, 'No birthdays in the next 30 days.')}
-        {column('Coming up', comingUp, 'No events or holidays in the next 30 days.')}
+        {column('Birthdays', birthdays, 'No birthdays in the next 60 days.')}
+        {column('Coming up', comingUp, 'No events or holidays in the next 60 days.')}
       </div>
     </section>
   );
