@@ -59,6 +59,7 @@ const HR_PAGES: Record<string, string> = {
   leave_recommended: '/leaves',
   application_received: '/recruitment',
   loan_requested: '/loans',
+  contribution_requested: '/payroll?tab=deductions',
   contract_expiring: '/hr-lifecycle',
   probation_expiring: '/hr-lifecycle',
   contract_signed: '/hr-lifecycle',

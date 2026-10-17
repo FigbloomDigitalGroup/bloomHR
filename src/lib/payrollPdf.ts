@@ -4,7 +4,8 @@ import { autoTable } from 'jspdf-autotable';
 import { payslipOvertimePay, round2 } from './overtimePay';
 
 // The month's payroll register as a PDF (A4 landscape): one row per payslip with the statutory columns, and the
-// totals at the foot. Built from the rows the payroll page already shows, so it matches the screen.
+// totals at the foot. Built from the rows the payroll page already shows, so it matches the screen. The last column
+// is the employer's NITA training levy (FIG-898): an employer cost, after net pay, not part of the deductions.
 
 /** The figures of one payslip row the register prints (the payroll page's records have these fields). */
 export interface PayrollRegisterRow {
@@ -28,10 +29,12 @@ export interface PayrollRegisterRow {
   housing_levy?: number | null;
   total_deductions?: number | null;
   net_pay?: number | null;
+  /** the employer's NITA training levy for the payslip (not taken from pay) */
+  nita_levy?: number | null;
 }
 
 export const REGISTER_COLUMNS = [
-  'No.', 'Employee', 'Department', 'Basic', 'Allowances', 'Overtime', 'Leave deduction', 'Gross pay', 'PAYE', 'SHIF', 'NSSF', 'Housing levy', 'Other deductions', 'Net pay',
+  'No.', 'Employee', 'Department', 'Basic', 'Allowances', 'Overtime', 'Leave deduction', 'Gross pay', 'PAYE', 'SHIF', 'NSSF', 'Housing levy', 'Other deductions', 'Net pay', 'NITA levy (employer)',
 ] as const;
 
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : Number(v) || 0);
@@ -54,10 +57,10 @@ export function registerFigures(rows: PayrollRegisterRow[]) {
       name: String(r.employee_name || ''),
       department: String((r.department === 'Branch Staff' ? r.branch : r.department) || ''),
       // gross pay = basic + allowances and earnings + overtime − leave
-      amounts: [basic, Math.max(0, round2(gross + leave - basic - overtime)), overtime, leave ? -leave : 0, gross, paye, shif, nssf, levy, Math.max(0, total - paye - shif - nssf - levy), num(r.net_pay)],
+      amounts: [basic, Math.max(0, round2(gross + leave - basic - overtime)), overtime, leave ? -leave : 0, gross, paye, shif, nssf, levy, Math.max(0, total - paye - shif - nssf - levy), num(r.net_pay), num(r.nita_levy)],
     };
   });
-  const totals = lines.reduce((sum, l) => sum.map((s, i) => s + l.amounts[i]), Array(11).fill(0) as number[]);
+  const totals = lines.reduce((sum, l) => sum.map((s, i) => s + l.amounts[i]), Array(12).fill(0) as number[]);
   return { lines, totals };
 }
 

@@ -24,6 +24,7 @@ import {
 import { confirmDialog } from '../../lib/confirmDialog';
 import type { Rates } from '../../lib/statutoryCalc';
 import TaxTreatmentHint from './TaxTreatmentHint';
+import ContributionRequests from './ContributionRequests';
 // The Deductions tab (was the "Deductions" pop-up): the company's own deduction types (SACCO, welfare...) and what
 // each employee has taken from pay every month.
 
@@ -208,6 +209,9 @@ export default function PayrollDeductionsTab({ onChanged, draftNotice, rates }: 
   const activeTypes = types.filter((t) => t.active || t.id === form?.deduction_type_id);
 
   return (
+    <div className="space-y-4">
+    {/* contributions staff asked for in the staff portal (FIG-898); approving one may add a deduction below */}
+    <ContributionRequests onChanged={() => { void reload(); onChanged(); }} />
     <Card padding="none">
         <div className="px-4 sm:px-5 py-3 border-b border-border flex items-center justify-between gap-3">
           <div className="min-w-0">
@@ -504,5 +508,6 @@ export default function PayrollDeductionsTab({ onChanged, draftNotice, rates }: 
           </div>
         </div>
     </Card>
+    </div>
   );
 }

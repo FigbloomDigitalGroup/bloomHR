@@ -26,6 +26,7 @@ export const RATE_LABELS: Record<string, string> = {
   nssf_employer_rate: 'NSSF rate (employer)',
   nssf_lower_limit: 'NSSF lower earnings limit',
   nssf_upper_limit: 'NSSF upper earnings limit',
+  nita_levy: 'NITA training levy (employer, per employee monthly)',
 };
 
 export interface RateRow {

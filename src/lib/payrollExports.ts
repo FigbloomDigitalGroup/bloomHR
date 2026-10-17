@@ -193,6 +193,46 @@ export function nssfFile(payslips: Payslip[], employees: EmployeeRecord[]): Expo
   };
 }
 
+// The employer's NITA training levy (FIG-898): one row per person the levy is paid for (payslips with a levy; not
+// casual workers or contractors), for the NITA levy return. Not taken from pay.
+export const NITA_HEADERS = ['PAYROLL NUMBER', 'EMPLOYEE NAME', 'ID NO', 'KRA PIN', 'NITA NO', 'LEVY'] as const;
+
+export function nitaFile(payslips: Payslip[], employees: EmployeeRecord[]): ExportFile {
+  const ls = lines(payslips.filter((p) => num(p.nita_levy) > 0), employees);
+  return {
+    headers: NITA_HEADERS,
+    rows: ls.map(({ payslip, employee: e }) => [
+      text(e['Payroll Number']), fullName(e) || text(payslip.employee_name), text(e['ID Number']), text(e['Tax PIN']), text(e['NITA']),
+      amount(num(payslip.nita_levy)),
+    ]),
+    // the levy is paid per employer, so a missing NITA number on an employee is not a problem for the return
+    problems: [],
+  };
+}
+
+/**
+ * What the month's payroll owes each body: PAYE to KRA; SHIF to SHA; NSSF and the housing levy, employee and employer
+ * shares (the employer's worked out from the employee's at the employer rate, as both are on the same pay); and the
+ * employer's NITA levy.
+ */
+export function remittanceTotals(payslips: Payslip[], rates: Rates) {
+  const sum = (key: string) => payslips.reduce((t, p) => t + num(p[key]), 0);
+  const round = (n: number) => Math.round(n * 100) / 100;
+  const share = (employee: number, employeeRate: string, employerRate: string) => {
+    const r = rate(rates, employeeRate);
+    return r > 0 ? round((employee * rate(rates, employerRate, r)) / r) : 0;
+  };
+  const nssf = round(sum('nssf_deduction'));
+  const ahl = round(sum('housing_levy'));
+  return {
+    paye: round(sum('paye_tax')),
+    shif: round(sum('nhif_deduction')),
+    nssf: { employee: nssf, employer: share(nssf, 'nssf_rate', 'nssf_employer_rate') },
+    ahl: { employee: ahl, employer: share(ahl, 'ahl_rate', 'ahl_employer_rate') },
+    nita: { total: round(sum('nita_levy')), employees: payslips.filter((p) => num(p.nita_levy) > 0).length },
+  };
+}
+
 /** A Kenyan mobile number as M-Pesa takes it (2547XXXXXXXX), or '' when it is not one. */
 export const mpesaPhone = (value: unknown) => {
   const digits = text(value).replace(/\D/g, '');

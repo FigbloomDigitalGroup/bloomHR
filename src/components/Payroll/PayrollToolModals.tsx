@@ -200,6 +200,8 @@ export const ExportModal = ({
           "Housing Levy": record.housing_levy,
           "Total Deductions": record.total_deductions,
           "Net Pay": Math.round(record.net_pay),
+          // the employer's NITA training levy: an employer cost, not taken from pay (FIG-898)
+          "NITA Levy (Employer)": Number(record.nita_levy) || 0,
           "Pay Period": record.pay_period,
         })),
       );
@@ -251,6 +253,7 @@ export const ExportModal = ({
           "Housing Levy": record.housing_levy,
           "Total Deductions": record.total_deductions,
           "Net Pay": Math.round(record.net_pay),
+          "NITA Levy (Employer)": Number(record.nita_levy) || 0,
           "Pay Period": record.pay_period,
         })),
       );
