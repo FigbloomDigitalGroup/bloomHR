@@ -59,6 +59,8 @@ beforeAll(async () => {
     insert into employees ("Employee Number", "First Name", "Last Name", "Work Email", tenant_id) values
       ('E1', 'Ann', 'One', 'e1@a.co', '${A}'), ('E2', 'Ben', 'Two', 'e2@a.co', '${A}'), ('E-HR', 'Hana', 'Hr', 'hr@a.co', '${A}');
     select seed_default_leave_types('${A}');
+    -- these tests pick dates near today: the country's public holidays are tested in public_holidays.test.ts
+    delete from holidays where source = 'auto';
     -- documents with leave are tested in leave_documents.test.ts
     update leave_policies set document_name = null, followup_document_name = null;
     -- the sums below use 24 days of annual leave, and compassionate leave of 3 days a month

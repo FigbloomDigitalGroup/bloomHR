@@ -67,7 +67,8 @@ const attempt = async (sql: string) => {
 
 beforeAll(async () => {
   db = await bootLiveDb();
-  await db.exec(`insert into tenants (id, name, slug) values ('${B}', 'Other Co', 'other-co');`);
+  // public holidays are added for every company (public_holidays.test.ts); these checks count one seeded row per company
+  await db.exec(`insert into tenants (id, name, slug) values ('${B}', 'Other Co', 'other-co'); delete from holidays where source = 'auto';`);
   for (const [role, mods] of Object.entries(ROLE_MODULES)) {
     await db.exec(`
       insert into auth.users (id, email) values ('${USER[role]}', '${role.toLowerCase()}@a.co');
