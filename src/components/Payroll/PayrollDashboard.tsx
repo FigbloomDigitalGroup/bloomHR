@@ -62,6 +62,9 @@ import { loadEarningSetup } from "../../lib/earningsDb";
 import { basicAfterLeave, leavePayFor } from "../../lib/leavePay";
 import { loadLeavePay, loadLeaveRateBasis } from "../../lib/leavePayDb";
 import LeavePaySetting from "./LeavePaySetting";
+import { overtimeForPayslip } from "../../lib/overtimePay";
+import { loadOvertimeMonth } from "../../lib/overtimeApi";
+import OvertimeSettingsCard from "../Overtime/OvertimeSettingsCard";
 import { checkSMSBalance, formatPhoneNumber, sendSMSWithRetry, smsTemplates } from "../../lib/payrollSms";
 import BulkSalaryHistoryUpload from "./BulkSalaryHistoryUpload";
 import {
@@ -93,7 +96,7 @@ const PAYSLIP_AMOUNTS = [
   "basic_salary", "gross_pay", "net_pay", "total_deductions", "nssf_deduction", "nhif_deduction", "paye_tax",
   "housing_levy", "house_allowance", "transport_allowance", "medical_allowance", "other_allowances", "overtime_hours",
   "overtime_rate", "commission", "bonus", "per_diem", "tax_relief", "loan_deduction", "advance_deduction",
-  "welfare_deduction", "other_deductions", "leave_deduction",
+  "welfare_deduction", "other_deductions", "leave_deduction", "overtime_pay",
 ] as const;
 
 /** A calculated payroll row as the salary_history row saved for it */
@@ -105,6 +108,7 @@ const toSalaryHistory = (record: any): SalaryHistoryRecord => ({
   deduction_items: record.deduction_items ?? [],
   earning_items: record.earning_items ?? [],
   leave_items: record.leave_items ?? [],
+  overtime_items: record.overtime_items ?? [],
   payment_method: record.payment_method || "",
   bank_name: record.bank_name || "",
   account_number: record.account_number || "",
@@ -120,6 +124,7 @@ const fromSalaryHistory = (saved: any, live: any | undefined) => ({
   deduction_items: saved.deduction_items ?? [],
   earning_items: saved.earning_items ?? [],
   leave_items: saved.leave_items ?? [],
+  overtime_items: saved.overtime_items ?? [],
   payment_method: paymentMethodLabel(saved.payment_method),
   bank_name: saved.bank_name || "",
   account_number: saved.account_number || "",
@@ -943,6 +948,8 @@ export default function PayrollDashboard() {
         const earningsByEmployee = earningsForPeriod(earningSetup.types, earningSetup.earnings, actualPeriod);
         // unpaid and half-pay leave days this month, from approved leave (lib/leavePay), and how a day's pay is worked out
         const [leaveByEmployee, leaveBasis] = await Promise.all([loadLeavePay(actualPeriod), loadLeaveRateBasis()]);
+        // approved overtime this month, by kind of day, and the company's overtime settings (lib/overtimePay)
+        const overtimeMonth = await loadOvertimeMonth(actualPeriod);
 
         if (data) {
           setEmployees(data);
@@ -983,8 +990,11 @@ export default function PayrollDashboard() {
 
               const houseAllowance = employee.house_allowance || 0;
               const transportAllowance = employee.travel_allowance || 0;
-              const overtimeHours = employee.overtime || 0;
-              const overtimeRate = employee["Overtime Rate"] || 0;
+              // approved overtime entries (a line per kind of day); the old employees.overtime field only in a month
+              // when the company has no approved overtime at all (lib/overtimePay)
+              const overtime = overtimeForPayslip(overtimeMonth, employee, basicSalary);
+              const overtimeHours = overtime.hours;
+              const overtimeRate = overtime.rate;
 
               const nhifNumber =
                 employee["NHIF Number"] || employee["SHIF Number"] || "";
@@ -1006,7 +1016,7 @@ export default function PayrollDashboard() {
               // Per diem is PART of basic salary (33%), not extra payment: 33% of the basic earned this month
               const { perDiem } = basicAfterLeave(basicSalary, leaveDeduction);
 
-              const overtimePay = overtimeHours * overtimeRate;
+              const overtimePay = overtime.pay;
 
               // Gross pay (basic salary already includes per diem)
               const grossPay =
@@ -1122,6 +1132,8 @@ export default function PayrollDashboard() {
                 earning_items: earnings.items,
                 leave_deduction: leaveDeduction,
                 leave_items: leave.items,
+                overtime_pay: overtimePay,
+                overtime_items: overtime.items,
                 total_deductions: totalDeductions,
                 net_pay: netPay,
                 pay_period: actualPeriod,
@@ -1891,6 +1903,7 @@ export default function PayrollDashboard() {
                   : null
             }
           />
+          <OvertimeSettingsCard canEdit={canEditRates} onChanged={() => setDeductionsVersion((v) => v + 1)} />
         </div>
       )}
 

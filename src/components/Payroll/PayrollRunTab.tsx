@@ -24,6 +24,7 @@ import { IN_APP_PAYMENTS } from "../../lib/inAppPayments";
 import { payslipDeductionLines } from "../../lib/voluntaryDeductions";
 import { payslipEarningLines } from "../../lib/earnings";
 import { leaveLineLabel, payslipLeaveLines } from "../../lib/leavePay";
+import { overtimeLineLabel, payslipOvertimeLines, payslipOvertimePay } from "../../lib/overtimePay";
 import PayrollRunBar from "./PayrollRunBar";
 import ReturnsReadiness from "./ReturnsReadiness";
 import { BulkPayButton } from "./RunPayActions";
@@ -123,7 +124,11 @@ function PayBreakdown({ record }: { record: any }) {
         ))}
         {line("House allowance", record.house_allowance)}
         {line("Transport allowance", record.transport_allowance)}
-        {line("Overtime", (record.overtime_hours || 0) * (record.overtime_rate || 0))}
+        {payslipOvertimeLines(record).length > 0
+          ? payslipOvertimeLines(record).map((l, i) => (
+              <React.Fragment key={`overtime-${l.day_type}-${i}`}>{line(overtimeLineLabel(l), l.amount)}</React.Fragment>
+            ))
+          : line("Overtime", payslipOvertimePay(record))}
         {payslipEarningLines(record).map((l, i) => (
           <React.Fragment key={`${l.name}-${i}`}>{line(l.name, l.amount)}</React.Fragment>
         ))}

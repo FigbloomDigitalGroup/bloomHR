@@ -73,6 +73,7 @@ import MyDocumentsPage from '../Onboarding/MyDocumentsPage';
 import Appearance from '../Settings/Appearance';
 import MyContract from './MyContract';
 import MyResignation from './MyResignation';
+import MyOvertime from './MyOvertime';
 import { NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
 import { describeFree, useLeaveCheck } from '../../lib/leaveRules';
 import { LEAVE_DOCUMENTS_BUCKET, LeaveDocumentRule, loadLeaveDocumentRules, uploadLeaveDocument } from '../../lib/leaveDocuments';
@@ -1204,6 +1205,7 @@ const staffMenuGroups: MenuGroup[] = [
         ]
       },
       { id: 'payslips', label: 'Payslips', icon: PhFileText },
+      { id: 'overtime', label: 'Overtime', icon: PhClock },
     ]
   },
   {
@@ -1939,6 +1941,7 @@ const StaffPortal = () => {
               {activeTab === 'first-weeks' && <MyFirstWeeks onOpenTraining={() => setActiveTab('training')} />}
               {activeTab === 'biodata' && <EmployeeBioPage />}
               {activeTab === 'payslips' && <PayslipViewer />}
+              {activeTab === 'overtime' && <MyOvertime />}
               {activeTab === 'loan' && <LoanRequest />}
               {activeTab === 'training' && <TrainingModule />}
               {activeTab === 'my-kpis' && <MyKpis />}
