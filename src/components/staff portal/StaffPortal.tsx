@@ -22,7 +22,8 @@ import {
   ClipboardText as PhClipboardText,
   ListChecks as PhListChecks,
   SignOut as PhSignOut,
-  Target as PhTarget
+  Target as PhTarget,
+  UsersThree as PhUsersThree
 } from '@phosphor-icons/react';
 
 // Keep Lucide icons for UI elements only
@@ -74,6 +75,8 @@ import Appearance from '../Settings/Appearance';
 import MyContract from './MyContract';
 import MyResignation from './MyResignation';
 import MyOvertime from './MyOvertime';
+import MyTeam from './MyTeam';
+import { loadMyTeam, type TeamMember } from '../../lib/myTeamApi';
 import { NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
 import { describeFree, useLeaveCheck } from '../../lib/leaveRules';
 import { LEAVE_DOCUMENTS_BUCKET, LeaveDocumentRule, loadLeaveDocumentRules, uploadLeaveDocument } from '../../lib/leaveDocuments';
@@ -1248,6 +1251,9 @@ const staffMenuGroups: MenuGroup[] = [
   }
 ];
 
+// Shown only to someone who supervises at least one person (migration 20261018900000)
+const myTeamGroup: MenuGroup = { title: 'My team', items: [{ id: 'my-team', label: 'My team', icon: PhUsersThree }] };
+
 // Main StaffPortal Component with Time Tracking
 const StaffPortal = () => {
   // shows this person as online in Teams on every page of the portal
@@ -1298,6 +1304,12 @@ const StaffPortal = () => {
   const [unreadByChannel, setUnreadByChannel] = useState<UnreadCounts>({});
   const unreadMessageCount = totalUnread(unreadByChannel);
   const myUserIdRef = useRef<string | null>(null);
+  // the people this staff member supervises: the My team section shows when there is at least one
+  const [team, setTeam] = useState<TeamMember[]>([]);
+  useEffect(() => {
+    loadMyTeam().then(setTeam).catch((e) => console.error('Could not load your team:', e));
+  }, []);
+  const menuGroups = team.length > 0 ? [staffMenuGroups[0], myTeamGroup, ...staffMenuGroups.slice(1)] : staffMenuGroups;
 
   const fetchCompanyProfile = async () => {
     try {
@@ -1644,7 +1656,7 @@ const StaffPortal = () => {
             {/* Navigation Area */}
             <div className="relative z-10 flex-1 overflow-y-auto px-3 pb-4 sidebar-scroll hover:overflow-y-auto overflow-hidden">
               <div className="space-y-6">
-                {staffMenuGroups.map((group) => {
+                {menuGroups.map((group) => {
                   const filteredItems = group.items.filter(item =>
                     item.label.toLowerCase().includes(searchQuery.toLowerCase())
                   );
@@ -1945,6 +1957,7 @@ const StaffPortal = () => {
               {activeTab === 'loan' && <LoanRequest />}
               {activeTab === 'training' && <TrainingModule />}
               {activeTab === 'my-kpis' && <MyKpis />}
+              {activeTab === 'my-team' && team.length > 0 && <MyTeam team={team} />}
               {activeTab === 'leave' && <LeaveApplicationForm />}
               {activeTab === 'leave-history' && <LeaveApplicationsList />}
               {activeTab === 'contract' && <MyContract />}

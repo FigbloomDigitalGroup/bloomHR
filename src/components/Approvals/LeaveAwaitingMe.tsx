@@ -7,11 +7,12 @@ const day = (d: string | null) => (d ? new Date(d).toLocaleDateString() : '');
 
 /**
  * Leave waiting on the signed-in person's decision (FIG-829): a line manager or named approver may not have the
- * Leave page, so they approve or reject here. Shows nothing when nothing is waiting.
+ * Leave page, so they approve or reject here. Shows nothing when nothing is waiting (or says so, with `showEmpty`).
  */
-export default function LeaveAwaitingMe() {
+export default function LeaveAwaitingMe({ showEmpty = false }: { showEmpty?: boolean } = {}) {
   const [items, setItems] = useState<Waiting[]>([]);
   const [chains, setChains] = useState<Record<string, Chain>>({});
+  const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -20,6 +21,8 @@ export default function LeaveAwaitingMe() {
       setChains(await loadApprovalChains('leave', waiting.map((w) => w.record_id)));
     } catch (e) {
       console.error('Could not load leave waiting on you:', e);
+    } finally {
+      setLoaded(true);
     }
   }, []);
 
@@ -27,7 +30,15 @@ export default function LeaveAwaitingMe() {
     load();
   }, [load]);
 
-  if (!items.length) return null;
+  if (!items.length) {
+    if (!showEmpty) return null;
+    return (
+      <Card>
+        <p className="m-0 text-[13px] font-bold text-ink">Waiting for your approval</p>
+        <p className="m-0 mt-1 text-[12px] text-muted-foreground">{loaded ? 'No leave is waiting for you to approve.' : 'Loading...'}</p>
+      </Card>
+    );
+  }
 
   return (
     <section className="mb-6" aria-labelledby="leave-awaiting-me">
