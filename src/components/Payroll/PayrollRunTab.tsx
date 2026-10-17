@@ -158,6 +158,14 @@ function PayBreakdown({ record }: { record: any }) {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
+// a payslip changed by hand in the month's draft run (FIG-883)
+const editedBadge = (record: any) =>
+  record.payslip_edited ? (
+    <span className="ml-1.5 align-middle rounded-full bg-amber-100 text-amber-800 px-1.5 py-0.5 text-[9px] font-bold uppercase" title="Edited by hand">
+      Edited
+    </span>
+  ) : null;
+
 const chip = "inline-flex items-center gap-1 px-2.5 py-1 rounded-[7px] text-[10.5px] font-semibold transition-colors";
 
 export default function PayrollRunTab({
@@ -448,7 +456,7 @@ export default function PayrollRunTab({
                   <div className="flex items-start gap-2">
                     {expandButton(record)}
                     <div className="min-w-0 flex-1">
-                      <div className="text-xs font-bold text-ink truncate">{record.employee_name}</div>
+                      <div className="text-xs font-bold text-ink truncate">{record.employee_name}{editedBadge(record)}</div>
                       <div className="text-[10px] text-subtle truncate">{subline(record)}</div>
                     </div>
                     <div className="text-right shrink-0">
@@ -487,7 +495,7 @@ export default function PayrollRunTab({
                             <div className="flex items-start gap-2">
                               {expandButton(record)}
                               <div className="min-w-0">
-                                <div className="font-bold">{record.employee_name}</div>
+                                <div className="font-bold">{record.employee_name}{editedBadge(record)}</div>
                                 <div className="text-[10px] text-subtle">{subline(record)}</div>
                               </div>
                             </div>

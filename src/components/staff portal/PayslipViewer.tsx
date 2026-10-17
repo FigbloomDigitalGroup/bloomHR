@@ -605,6 +605,14 @@ const PayslipModal = ({
                 </div>
               </div>
 
+              {/* a note payroll added when editing the payslip (FIG-883) */}
+              {record.payslip_note && (
+                <div className="border border-gray-300 p-3 mb-6 text-black">
+                  <span className="font-bold">Note: </span>
+                  <span className="whitespace-pre-line">{record.payslip_note}</span>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-4 text-center text-xs">
                 <div className="p-2 pt-8">
                   <div className="border-t border-gray-300 pt-2 font-bold text-gray-800">Employee signature</div>

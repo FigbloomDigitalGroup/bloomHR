@@ -79,6 +79,9 @@ import {
 import { ExportModal, P9FormGenerator } from "./PayrollToolModals";
 import { downloadPayrollRegisterPdf } from "../../lib/payrollPdf";
 import { PayslipModal } from "./PayrollPayslipModal";
+import { markEditedPayslips, statutoryContextFor } from "../../lib/payslipOverrides";
+import { withRunEdits } from "../../lib/payslipOverridesDb";
+import { usePayslipOverrides } from "../../hooks/usePayslipOverrides";
 import { confirmDialog, type DialogOptions } from "../../lib/confirmDialog";
 import { PAYROLL_TABS, usePayrollTab } from "./payrollTabs";
 import PayrollRunTab from "./PayrollRunTab";
@@ -108,6 +111,7 @@ const toSalaryHistory = (record: any): SalaryHistoryRecord => ({
   deduction_items: record.deduction_items ?? [],
   earning_items: record.earning_items ?? [],
   leave_items: record.leave_items ?? [],
+  payslip_note: record.payslip_note ?? null,
   overtime_items: record.overtime_items ?? [],
   payment_method: record.payment_method || "",
   bank_name: record.bank_name || "",
@@ -124,6 +128,7 @@ const fromSalaryHistory = (saved: any, live: any | undefined) => ({
   deduction_items: saved.deduction_items ?? [],
   earning_items: saved.earning_items ?? [],
   leave_items: saved.leave_items ?? [],
+  payslip_note: saved.payslip_note ?? null,
   overtime_items: saved.overtime_items ?? [],
   payment_method: paymentMethodLabel(saved.payment_method),
   bank_name: saved.bank_name || "",
@@ -1190,12 +1195,18 @@ export default function PayrollDashboard() {
   const runLoading = runPeriod !== actualPeriod;
   const monthRun = runLoading ? null : run;
 
+  // payslips edited by hand in the month's draft run (FIG-883, lib/payslipOverrides): applied on top of the
+  // calculation whenever the run is saved, and marked "Edited"
+  const payslipEdits = usePayslipOverrides(monthRun?.id, runVersion);
+  const payslipContext = (employeeNumber: string) =>
+    statutoryContextFor(employees.find((e) => e["Employee Number"] === employeeNumber), rates, overrideStatutoryChecks);
+
   // once the month's run is started, everything here (table, totals, exports, payslips, bulk pay) uses its saved figures
   const payrollRecords = useMemo(() => {
     if (!monthRun) return liveRecords;
     const liveByEmployee = new Map(liveRecords.map((r) => [r.employee_id, r]));
-    return runPayslips.map((saved) => fromSalaryHistory(saved, liveByEmployee.get(saved.employee_id)));
-  }, [monthRun, runPayslips, liveRecords]);
+    return markEditedPayslips(runPayslips.map((saved) => fromSalaryHistory(saved, liveByEmployee.get(saved.employee_id))), payslipEdits);
+  }, [monthRun, runPayslips, liveRecords, payslipEdits]);
 
   const applyAdditionalFilters = (records: any[]) => {
     return records.filter((record: any) => {
@@ -1338,9 +1349,11 @@ export default function PayrollDashboard() {
   // Start the month's run, or recalculate its draft: saves every employee's figures (whatever the filters show)
   const handleSaveRun = async () => {
     const unnumbered = liveRecords.filter((r) => !r.employee_id).length;
-    const records = liveRecords.filter((r) => r.employee_id).map((r) => toSalaryHistory({ ...r, pay_period: actualPeriod }));
     setRunBusy(true);
     try {
+      // with the payslips' hand edits applied again on top (FIG-883)
+      const calculated = await withRunEdits(monthRun?.id, liveRecords.filter((r) => r.employee_id), (r) => payslipContext(r.employee_id));
+      const records = calculated.map((r) => toSalaryHistory({ ...r, pay_period: actualPeriod }));
       await saveDraftRun(actualPeriod, records);
       toast.success(
         monthRun
@@ -1930,7 +1943,21 @@ export default function PayrollDashboard() {
 
       {selectedRecord && (
         <PayslipModal
-          record={selectedRecord}
+          record={
+            // the same payslip as reloaded (e.g. after editing it)
+            payrollRecords.find((r) => r.employee_id === selectedRecord.employee_id) ?? selectedRecord
+          }
+          edit={
+            monthRun && canEditRates
+              ? {
+                  run: monthRun,
+                  base: liveRecords.find((r) => r.employee_id === selectedRecord.employee_id) ?? null,
+                  override: payslipEdits.get(selectedRecord.employee_id) ?? null,
+                  context: payslipContext(selectedRecord.employee_id),
+                  onSaved: () => setRunVersion((v) => v + 1),
+                }
+              : undefined
+          }
           onClose={() => setSelectedRecord(null)}
           onPrevious={
             currentRecordIndex !== null && currentRecordIndex > 0
