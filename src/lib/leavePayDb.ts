@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { fetchAll } from './fetchAll';
-import type { LeavePayRow, LeaveRateBasis } from './leavePay';
+import type { LeavePayoutDue, LeavePayRow, LeaveRateBasis } from './leavePay';
 
 // The database side of leave on the payslip (lib/leavePay): the month's unpaid and half-pay days, and the company's
 // choice of a day's pay (company_payroll_settings.leave_daily_rate_basis).
@@ -35,4 +35,20 @@ export async function saveLeaveRateBasis(basis: LeaveRateBasis): Promise<void> {
     .from('company_payroll_settings')
     .upsert({ leave_daily_rate_basis: basis, updated_at: new Date().toISOString() }, { onConflict: 'tenant_id' });
   if (error) throw error;
+}
+
+/** Leave payouts payroll can pay in the pay period ('YYYY-MM'), by employee number (FIG-877). */
+export async function loadLeavePayouts(period: string): Promise<Map<string, LeavePayoutDue[]>> {
+  try {
+    const rows = await fetchAll<LeavePayoutDue>((from, to) =>
+      supabase.rpc('leave_payouts_due', { p_period: period }).order('employee_number').range(from, to),
+    );
+    const byEmployee = new Map<string, LeavePayoutDue[]>();
+    for (const r of rows) byEmployee.set(r.employee_number, [...(byEmployee.get(r.employee_number) ?? []), r]);
+    return byEmployee;
+  } catch (err) {
+    // a database without migration 20261018600000 yet: nothing to pay out
+    if (notThereYet(err)) return new Map();
+    throw err;
+  }
 }
