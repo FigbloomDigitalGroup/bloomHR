@@ -30,4 +30,6 @@ export const queryKeys = {
   myPermissions: ['my-permissions'] as const,
   myCompanies: ['my-companies'] as const,
   departments: ['departments'] as const,
+  /** the staff portal's organogram: current employees, safe columns only (company_directory) */
+  companyDirectory: ['company-directory'] as const,
 };
