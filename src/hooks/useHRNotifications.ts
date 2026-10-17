@@ -36,7 +36,8 @@ export interface HRNotification {
         | 'application_received'
         | 'loan_requested' | 'loan_disbursed' | 'loan_repaid'
         | 'contract_sent' | 'contract_sent_back' | 'contract_accepted' | 'contract_cancelled' | 'contract_signed'
-        | 'leave_exhausted' | 'casual_limit';
+        | 'leave_exhausted' | 'casual_limit'
+        | 'leave_document_overdue';
     title: string;
     message: string;
     // Nullable for leave notifications - only contract/probation reminders

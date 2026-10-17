@@ -23,7 +23,8 @@ import {
   ListChecks as PhListChecks,
   SignOut as PhSignOut,
   Target as PhTarget,
-  UsersThree as PhUsersThree
+  UsersThree as PhUsersThree,
+  Buildings as PhBuildings
 } from '@phosphor-icons/react';
 
 // Keep Lucide icons for UI elements only
@@ -77,6 +78,10 @@ import MyResignation from './MyResignation';
 import MyOvertime from './MyOvertime';
 import MyTeam from './MyTeam';
 import { loadMyTeam, type TeamMember } from '../../lib/myTeamApi';
+import StaffCompany from './StaffCompany';
+import MyApprovalChain from './MyApprovalChain';
+import { isCompanySection } from '../../lib/staffCompany';
+import MyAbsences from './MyAbsences';
 import { NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
 import { describeFree, useLeaveCheck } from '../../lib/leaveRules';
 import { LEAVE_DOCUMENTS_BUCKET, LeaveDocumentRule, loadLeaveDocumentRules, uploadLeaveDocument } from '../../lib/leaveDocuments';
@@ -109,7 +114,7 @@ interface NotificationItem {
 }
 
 /** hr_notifications that are for HR, not the employee */
-const HR_ONLY_NOTIFICATIONS = ['contract_expiring', 'probation_expiring', 'leave_recommended', 'exit_requested', 'application_received', 'loan_requested', 'contract_signed', 'leave_exhausted', 'casual_limit'];
+const HR_ONLY_NOTIFICATIONS = ['contract_expiring', 'probation_expiring', 'leave_recommended', 'exit_requested', 'application_received', 'loan_requested', 'contract_signed', 'leave_exhausted', 'casual_limit', 'leave_document_overdue'];
 
 /** Marks an hr_notifications item ("hr-<id>") read, so it stays cleared; warnings are not stored as read. */
 const persistRead = (id: string) => {
@@ -714,6 +719,9 @@ const LeaveApplicationForm = () => {
             </div>
           </div>
 
+          {/* who it will go to, before applying (the company's approval workflow for this employee) */}
+          <MyApprovalChain compact />
+
           <div className="space-y-1">
             <label className="block text-xs font-medium text-gray-700">Leave Duration Type</label>
             <div className="flex space-x-6 pt-2">
@@ -1222,6 +1230,23 @@ const staffMenuGroups: MenuGroup[] = [
         submenu: [
           { id: 'chat', label: 'Chat' },
           { id: 'VideoConf', label: 'Video Conference' }
+        ]
+      }
+    ]
+  },
+  {
+    title: "Company",
+    items: [
+      {
+        id: 'company',
+        label: 'Company',
+        icon: PhBuildings,
+        hasSubmenu: true,
+        submenu: [
+          { id: 'company-calendar', label: 'Calendar' },
+          { id: 'company-organogram', label: 'Organogram' },
+          { id: 'company-departments', label: 'Departments' },
+          { id: 'company-approvers', label: 'Who approves my leave' }
         ]
       }
     ]
@@ -1959,7 +1984,10 @@ const StaffPortal = () => {
               {activeTab === 'my-kpis' && <MyKpis />}
               {activeTab === 'my-team' && team.length > 0 && <MyTeam team={team} />}
               {activeTab === 'leave' && <LeaveApplicationForm />}
-              {activeTab === 'leave-history' && <LeaveApplicationsList />}
+              {activeTab === 'leave-history' && <><LeaveApplicationsList /><MyAbsences /></>}
+              {isCompanySection(activeTab) && (
+                <StaffCompany section={activeTab} onSectionChange={setActiveTab} employeeNumber={employeeNumber} />
+              )}
               {activeTab === 'contract' && <MyContract />}
               {activeTab === 'resignation' && <MyResignation />}
               {activeTab === 'details' && <Profile />}

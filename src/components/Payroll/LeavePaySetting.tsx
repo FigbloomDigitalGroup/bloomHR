@@ -4,6 +4,7 @@ import { Card } from '../UI';
 import { LEAVE_RATE_BASES, type LeaveRateBasis } from '../../lib/leavePay';
 import { loadLeaveRateBasis, saveLeaveRateBasis } from '../../lib/leavePayDb';
 import { runErrorMessage } from '../../lib/payrollRuns';
+import AbsencePaySetting from './AbsencePaySetting';
 
 // Payroll settings: how a day's pay is worked out when unpaid leave and half-pay leave days come off a payslip
 // (company_payroll_settings.leave_daily_rate_basis, lib/leavePay).
@@ -74,6 +75,7 @@ export default function LeavePaySetting({ canEdit, onChanged, draftNotice }: Lea
           </label>
         ))}
       </div>
+      <AbsencePaySetting canEdit={canEdit} onChanged={onChanged} />
       {draftNotice && (
         <div className="mt-3 rounded-tile bg-orange-tint-alt text-orange-text-alt text-[11.5px] font-semibold px-3 py-2">{draftNotice}</div>
       )}

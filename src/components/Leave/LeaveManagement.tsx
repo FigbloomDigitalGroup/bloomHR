@@ -1,6 +1,9 @@
 import toast from 'react-hot-toast';
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { employeeJoined, isYearlyMethod, yearAllowance } from '../../lib/leaveAccrual';
+import { OverCap, employeeJoined, isYearlyMethod, leaveMonthOf, leaveYearOf, yearAllowance } from '../../lib/leaveAccrual';
+import LeaveYearSetting from './LeaveYearSetting';
+import LeaveForfeitReport from './LeaveForfeitReport';
+import { loadLeaveYearSettings } from '../../lib/leaveYearDb';
 import { BALANCE_RULE_LABELS, BalanceRule, CountDays, describeFree, useLeaveCheck } from '../../lib/leaveRules';
 import { LEAVE_DOCUMENTS_BUCKET, LeaveDocumentRule, uploadLeaveDocument } from '../../lib/leaveDocuments';
 import LeaveDocuments from './LeaveDocuments';
@@ -65,6 +68,12 @@ type LeaveType = {
   // editable via the Leave Type form - see handleSaveLeaveType.
   accrual_method?: 'annual' | 'monthly_cumulative' | 'monthly_non_cumulative' | 'none';
   carry_forward_max_days?: number;
+  // carried-over days must be used within this many months of the leave year's start, else they are lost (0 = no limit),
+  // and what happens to the days over the cap at the yearly reset (FIG-877)
+  carry_forward_expiry_months?: number;
+  over_cap?: OverCap;
+  // remind employees with unused carried days from this many days before they expire
+  carry_expiry_reminder_days?: number;
   // from this many days before the year ends, remind anyone with at least reminder_min_remaining unused days (0 = off)
   reminder_days_before_year_end?: number;
   reminder_min_remaining?: number;
@@ -760,12 +769,12 @@ const LeaveTypeFormModal = ({
                 onChange={(e) => setNewLeaveType((prev: any) => ({
                   ...prev,
                   accrual_method: e.target.value,
-                  ...(!isYearlyMethod(e.target.value) ? { carry_forward_max_days: 0, reminder_days_before_year_end: 0, reminder_min_remaining: 0 } : {})
+                  ...(!isYearlyMethod(e.target.value) ? { carry_forward_max_days: 0, carry_forward_expiry_months: 0, reminder_days_before_year_end: 0, reminder_min_remaining: 0 } : {})
                 }))}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
               >
-                <option value="annual">Annual (whole allowance on Jan 1)</option>
-                <option value="monthly_cumulative">Earned monthly, builds up over the year (resets Jan 1)</option>
+                <option value="annual">Annual (whole allowance at the start of the leave year)</option>
+                <option value="monthly_cumulative">Earned monthly, builds up over the leave year</option>
                 <option value="monthly_non_cumulative">Monthly (resets every month, no carry-over)</option>
                 <option value="none">None (not accrual-based)</option>
               </select>
@@ -784,9 +793,54 @@ const LeaveTypeFormModal = ({
                 min="0"
                 placeholder="0"
               />
-              <p className="mt-1 text-[11px] text-gray-500">Unused days above this are lost at the new year (0 = none carry over).</p>
+              <p className="mt-1 text-[11px] text-gray-500">Unused days up to this many move to the next leave year (0 = none carry over).</p>
             </div>
           </div>
+
+          {isYearlyMethod(newLeaveType.accrual_method) && (newLeaveType.carry_forward_max_days ?? 0) > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Carried days must be used within (months)</label>
+                <input
+                  type="number"
+                  value={newLeaveType.carry_forward_expiry_months ?? 0}
+                  onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, carry_forward_expiry_months: Math.min(12, Math.max(0, Number(e.target.value))) }))}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
+                  min="0"
+                  max="12"
+                  placeholder="0 = no limit"
+                />
+                <p className="mt-1 text-[11px] text-gray-500">From the start of the leave year, e.g. 6 = by the end of month 6. Carried days are used first; any not used by then are lost (0 = no limit).</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Remind them (days before carried days expire)</label>
+                <input
+                  type="number"
+                  value={newLeaveType.carry_expiry_reminder_days ?? 30}
+                  onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, carry_expiry_reminder_days: Math.min(365, Math.max(0, Number(e.target.value))) }))}
+                  disabled={!(newLeaveType.carry_forward_expiry_months ?? 0)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand disabled:bg-gray-100 disabled:text-gray-400"
+                  min="0"
+                  placeholder="0 = no reminder"
+                />
+              </div>
+            </div>
+          )}
+
+          {isYearlyMethod(newLeaveType.accrual_method) && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Days over the cap at the end of the leave year</label>
+              <select
+                value={newLeaveType.over_cap || 'forfeit'}
+                onChange={(e) => setNewLeaveType((prev: any) => ({ ...prev, over_cap: e.target.value }))}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
+              >
+                <option value="forfeit">Lose them</option>
+                <option value="pay_out">Pay them out (on the next payroll, at the leave daily rate)</option>
+              </select>
+              <p className="mt-1 text-[11px] text-gray-500">Either way they show under Leave &gt; Forfeited &amp; paid out.</p>
+            </div>
+          )}
 
           {isYearlyMethod(newLeaveType.accrual_method) && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1165,7 +1219,8 @@ const AccrualSettingsModal = ({
   handleRunAnnualReset,
   handleRunMonthlyReset,
   handleRunAccrual,
-  handleSendReminders
+  handleSendReminders,
+  handleRunCarryExpiry
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -1175,6 +1230,7 @@ const AccrualSettingsModal = ({
   handleRunMonthlyReset: () => Promise<void>;
   handleRunAccrual: () => Promise<void>;
   handleSendReminders: () => Promise<void>;
+  handleRunCarryExpiry: () => Promise<void>;
 }) => {
   if (!isOpen) return null;
 
@@ -1182,6 +1238,7 @@ const AccrualSettingsModal = ({
   const earnedTypes = leaveTypes.filter(t => t.is_deductible && t.accrual_method === 'monthly_cumulative');
   const reminderTypes = leaveTypes.filter(t => t.is_deductible && isYearlyMethod(t.accrual_method) && (t.reminder_days_before_year_end ?? 0) > 0);
   const monthlyTypes = leaveTypes.filter(t => t.is_deductible && t.accrual_method === 'monthly_non_cumulative');
+  const expiringTypes = leaveTypes.filter(t => t.is_deductible && isYearlyMethod(t.accrual_method) && (t.carry_forward_max_days ?? 0) > 0 && (t.carry_forward_expiry_months ?? 0) > 0);
   const monthName = new Date().toLocaleDateString(undefined, { month: 'long' });
 
   return (
@@ -1200,7 +1257,8 @@ const AccrualSettingsModal = ({
           <div className="border border-gray-200 rounded-lg p-4 space-y-2">
             <p className="text-xs font-medium text-gray-800">Annual reset ({employees.length} employees)</p>
             <p className="text-xs text-gray-600">
-              Grants each type's yearly allotment, carrying forward unused days up to each type's cap.
+              Grants each type's yearly allotment for the current leave year, carrying forward unused days up to each type's cap
+              (the rest are lost or paid out, as the type says). Runs by itself on the first day of the leave year.
               Covers: {annualTypes.length ? annualTypes.map(t => t.name).join(', ') : 'no deductible annual leave types yet'}.
             </p>
             <button
@@ -1230,9 +1288,26 @@ const AccrualSettingsModal = ({
           </div>
 
           <div className="border border-gray-200 rounded-lg p-4 space-y-2">
+            <p className="text-xs font-medium text-gray-800">Carried days deadline</p>
+            <p className="text-xs text-gray-600">
+              Carried-over days not used by their deadline are lost (and listed under Forfeited &amp; paid out). Runs every night; safe to run again.
+              Covers: {expiringTypes.length ? expiringTypes.map(t => `${t.name} (${t.carry_forward_expiry_months} months)`).join(', ') : 'no leave types with a deadline for carried days'}.
+            </p>
+            <button
+              onClick={handleRunCarryExpiry}
+              disabled={expiringTypes.length === 0}
+              className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 bg-brand hover:bg-brand-dark disabled:opacity-50 text-white rounded-lg text-xs font-medium"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Run Now
+            </button>
+          </div>
+
+          <div className="border border-gray-200 rounded-lg p-4 space-y-2">
             <p className="text-xs font-medium text-gray-800">Year-end reminders</p>
             <p className="text-xs text-gray-600">
-              Tells employees with unused days that would be lost to take leave, once the year-end window opens (at most once a month).
+              Tells employees with unused days that would be lost to take leave, once the year-end window opens, and those with carried days
+              about to expire (at most once a month).
               Set per leave type. Covers: {reminderTypes.length ? reminderTypes.map(t => t.name).join(', ') : 'no leave types with reminders turned on'}.
             </p>
             <button
@@ -1493,6 +1568,13 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
 
   // Original state variables
   const [activeTab, setActiveTab] = useState('applications');
+  // the month the company's leave year starts in (FIG-877; 1 = January, the default)
+  const [leaveYearStartMonth, setLeaveYearStartMonth] = useState(1);
+  useEffect(() => {
+    loadLeaveYearSettings()
+      .then((s) => setLeaveYearStartMonth(s.start_month))
+      .catch((err) => console.error('Error loading the leave year:', err));
+  }, []);
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
   const [leaveTypesError, setLeaveTypesError] = useState<string | null>(null);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -1824,8 +1906,14 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
         const today = new Date();
         const currentYear = today.getFullYear();
         const currentMonth = today.getMonth() + 1;
+        // yearly balances are for the company's leave year (FIG-877; the calendar year when it starts in January);
+        // leave that resets monthly stays on calendar months
+        const todayUtc = new Date(Date.UTC(currentYear, today.getMonth(), today.getDate()));
+        const leaveYear = leaveYearOf(todayUtc, leaveYearStartMonth);
+        const leaveMonth = leaveMonthOf(todayUtc, leaveYearStartMonth);
         const deductibleLeaveTypes = leaveTypes.filter(type => type.is_deductible);
         const bucketFor = (lt: LeaveType) => lt.accrual_method === 'monthly_non_cumulative' ? currentMonth : 0;
+        const yearFor = (lt: LeaveType) => lt.accrual_method === 'monthly_non_cumulative' ? currentYear : leaveYear;
 
         if (deductibleLeaveTypes.length === 0 || employees.length === 0) {
           setLeaveBalances([]);
@@ -1838,7 +1926,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
           supabase
             .from('leave_balances')
             .select('*')
-            .eq('year', currentYear)
+            .in('year', [...new Set([leaveYear, currentYear])])
             .in('month', [0, currentMonth])
             .order('id')
             .range(from, to)
@@ -1854,7 +1942,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
 
         const existingRows = (rawRows || []).filter((r: any) => {
           const lt = deductibleLeaveTypes.find(t => t.id === r.leave_type_id);
-          return lt && r.month === bucketFor(lt);
+          return lt && r.month === bucketFor(lt) && r.year === yearFor(lt);
         });
 
         const existingByKey = new Set(
@@ -1886,21 +1974,22 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
               .filter((app: any) => {
                 if (app["Employee Number"] !== employee["Employee Number"] || app["Leave Type"] !== leaveType.name) return false;
                 const start = new Date(app["Start Date"]);
-                if (start.getFullYear() !== currentYear) return false;
-                return isMonthly ? start.getMonth() + 1 === currentMonth : true;
+                if (isMonthly) return start.getFullYear() === currentYear && start.getMonth() + 1 === currentMonth;
+                const startUtc = new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate()));
+                return leaveYearOf(startUtc, leaveYearStartMonth) === leaveYear;
               })
               .reduce((sum: number, app: any) => sum + (Number(app.days) || 0), 0);
 
             return {
               employee_number: employee["Employee Number"],
               leave_type_id: leaveType.id,
-              year: currentYear,
+              year: yearFor(leaveType),
               month: bucketFor(leaveType),
               // from when they joined, as the database counts it (leave_seed_days)
               accrued_days: leaveType.accrual_method === 'monthly_cumulative'
-                ? yearAllowance(allowanceByKey.get(`${employee["Employee Number"]}::${leaveType.id}`) ?? leaveType.max_days ?? 0, employeeJoined(employee), currentYear, currentMonth)
+                ? yearAllowance(allowanceByKey.get(`${employee["Employee Number"]}::${leaveType.id}`) ?? leaveType.max_days ?? 0, employeeJoined(employee), leaveYear, leaveMonth, leaveYearStartMonth)
                 : leaveType.accrual_method === 'annual'
-                  ? yearAllowance(allowanceByKey.get(`${employee["Employee Number"]}::${leaveType.id}`) ?? leaveType.max_days ?? 0, employeeJoined(employee), currentYear, 12)
+                  ? yearAllowance(allowanceByKey.get(`${employee["Employee Number"]}::${leaveType.id}`) ?? leaveType.max_days ?? 0, employeeJoined(employee), leaveYear, 12, leaveYearStartMonth)
                   : (allowanceByKey.get(`${employee["Employee Number"]}::${leaveType.id}`) ?? leaveType.max_days ?? 0),
               used_days: usedDays,
               carried_over_days: 0,
@@ -1960,7 +2049,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
     if (activeTab === 'balances') {
       fetchLeaveBalances();
     }
-  }, [activeTab, leaveTypes, employees, balancesRefreshKey]);
+  }, [activeTab, leaveTypes, employees, balancesRefreshKey, leaveYearStartMonth]);
 
   // Fetch leave types + their current policy from Supabase. Runs on mount
   // (not gated behind the "types" tab) since the new-application form's leave
@@ -1994,6 +2083,9 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
             max_days: policy?.days_allotted ?? undefined,
             accrual_method: policy?.accrual_method || 'none',
             carry_forward_max_days: policy?.carry_forward_max_days ?? 0,
+            carry_forward_expiry_months: policy?.carry_forward_expiry_months ?? 0,
+            over_cap: policy?.over_cap === 'pay_out' ? 'pay_out' : 'forfeit',
+            carry_expiry_reminder_days: policy?.carry_expiry_reminder_days ?? 30,
             reminder_days_before_year_end: policy?.reminder_days_before_year_end ?? 0,
             reminder_min_remaining: policy?.reminder_min_remaining ?? 0,
             max_days_per_request: policy?.max_days_per_request ?? null,
@@ -2271,7 +2363,10 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
   // safe no-op.
   const handleRunAnnualReset = async () => {
     try {
-      const { error } = await supabase.rpc('run_annual_leave_reset', { p_year: new Date().getFullYear() });
+      const today = new Date();
+      const { error } = await supabase.rpc('run_annual_leave_reset', {
+        p_year: leaveYearOf(new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())), leaveYearStartMonth)
+      });
       if (error) throw error;
       setBalancesRefreshKey(k => k + 1);
       setShowAccrualSettings(false);
@@ -2291,6 +2386,20 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
       setShowAccrualSettings(false);
     } catch (err) {
       setError('Failed to earn this month\'s leave days. Please try again.');
+      console.error(err);
+    }
+  };
+
+  // carried-over days past their deadline are lost (run_leave_carry_expiry; it also runs every night)
+  const handleRunCarryExpiry = async () => {
+    try {
+      const { data, error } = await supabase.rpc('run_leave_carry_expiry');
+      if (error) throw error;
+      setBalancesRefreshKey(k => k + 1);
+      setShowAccrualSettings(false);
+      toast.success(Number(data) > 0 ? `Carried days expired for ${data} balance${Number(data) === 1 ? '' : 's'}.` : 'No carried days have reached their deadline.');
+    } catch (err) {
+      setError('Failed to run the carried days deadline. Please try again.');
       console.error(err);
     }
   };
@@ -2374,6 +2483,9 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
           days_allotted: type.max_days ?? null,
           accrual_method: type.accrual_method || 'annual',
           carry_forward_max_days: type.carry_forward_max_days ?? 0,
+          carry_forward_expiry_months: (type.carry_forward_max_days ?? 0) > 0 ? type.carry_forward_expiry_months ?? 0 : 0,
+          over_cap: type.over_cap === 'pay_out' ? 'pay_out' : 'forfeit',
+          carry_expiry_reminder_days: type.carry_expiry_reminder_days ?? 30,
           reminder_days_before_year_end: type.reminder_days_before_year_end ?? 0,
           reminder_min_remaining: type.reminder_min_remaining ?? 0,
           max_days_per_request: type.max_days_per_request || null,
@@ -2559,7 +2671,9 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
                   <p className="text-gray-700">
                     {type.accrual_method === 'monthly_non_cumulative' && 'Monthly (no carry-over)'}
                     {type.accrual_method === 'annual' && (
-                      type.carry_forward_max_days ? `Annual · carries up to ${type.carry_forward_max_days}d` : 'Annual · no carry-over'
+                      type.carry_forward_max_days
+                        ? `Annual · carries up to ${type.carry_forward_max_days}d${type.carry_forward_expiry_months ? `, used within ${type.carry_forward_expiry_months} mo` : ''}${type.over_cap === 'pay_out' ? ' · rest paid out' : ''}`
+                        : `Annual · no carry-over${type.over_cap === 'pay_out' ? ' · paid out' : ''}`
                     )}
                     {(!type.accrual_method || type.accrual_method === 'none') && 'None'}
                   </p>
@@ -2891,7 +3005,9 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
   const renderSettingsTab = () => (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
       <div className="space-y-6">
-        <div>
+        <LeaveYearSetting onChange={setLeaveYearStartMonth} />
+
+        <div className="border-t border-gray-200 pt-6">
           <h3 className="text-lg font-base text-gray-900 mb-4">Leave Balance Resets</h3>
           <p className="text-xs text-gray-500 mb-4">
             Each leave type resets on its own schedule, defined per policy in the Types tab.
@@ -2974,6 +3090,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
               { id: 'scheduler', label: 'Scheduler' },
               { id: 'balances', label: 'Leave Balances' },
               { id: 'types', label: 'Leave Types' },
+              { id: 'forfeits', label: 'Forfeited & paid out' },
               { id: 'holidays', label: 'Holidays' },
               { id: 'settings', label: 'Settings' },
             ]}
@@ -3153,6 +3270,8 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
 
       {activeTab === 'types' && renderLeaveTypesTab()}
 
+      {activeTab === 'forfeits' && <LeaveForfeitReport startMonth={leaveYearStartMonth} />}
+
       {activeTab === 'holidays' && renderHolidaysTab()}
 
       {activeTab === 'settings' && renderSettingsTab()}
@@ -3232,6 +3351,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
           handleRunMonthlyReset={handleRunMonthlyReset}
           handleRunAccrual={handleRunAccrual}
           handleSendReminders={handleSendReminders}
+          handleRunCarryExpiry={handleRunCarryExpiry}
         />
       )}
 

@@ -12,12 +12,13 @@ import {
   addMonths,
   subMonths,
 } from 'date-fns';
-import { Cake, PartyPopper, CalendarPlus, ChevronLeft, ChevronRight, X, Trash2 } from 'lucide-react';
+import { Cake, PartyPopper, CalendarPlus, ChevronLeft, ChevronRight, X, Trash2, Plane } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { fetchAllResult } from '../../lib/fetchAll';
 import { PageHeader, Card, Button, Modal } from '../UI';
+import { toDay } from '../../lib/celebrations';
 
 import { confirmDialog } from '../../lib/confirmDialog';
 interface BirthdayEntry {
@@ -37,10 +38,51 @@ interface CompanyEvent {
   description: string | null;
 }
 
-const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+interface LeaveEntry {
+  type: string;
+  status: 'approved' | 'pending';
+}
 
-export default function CompanyCalendar() {
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+// a leave longer than this is drawn only for its first year (a typo in the end date would otherwise fill the calendar)
+const MAX_LEAVE_DAYS = 366;
+
+/** The employee's own approved and pending leave, by day ("yyyy-MM-dd"). */
+async function loadMyLeave(employeeNumber: string): Promise<Map<string, LeaveEntry[]>> {
+  const { data, error } = await supabase
+    .from('leave_application')
+    .select('"Leave Type", "Start Date", "End Date", status')
+    .eq('"Employee Number"', employeeNumber);
+  if (error) throw error;
+  const map = new Map<string, LeaveEntry[]>();
+  for (const l of (data || []) as Record<string, string | null>[]) {
+    const status = (l.status || '').trim().toLowerCase();
+    if (status !== 'approved' && status !== 'pending') continue;
+    const start = toDay(l['Start Date']);
+    const end = toDay(l['End Date']) || start;
+    if (!start || !end || end < start) continue;
+    const entry: LeaveEntry = { type: (l['Leave Type'] || 'Leave').trim(), status };
+    const day = new Date(start);
+    for (let i = 0; day <= end && i < MAX_LEAVE_DAYS; i++, day.setDate(day.getDate() + 1)) {
+      const key = format(day, 'yyyy-MM-dd');
+      map.set(key, [...(map.get(key) || []), entry]);
+    }
+  }
+  return map;
+}
+
+interface CompanyCalendarProps {
+  /** the staff portal: nothing can be added or removed, and birthdays do not link to the employee list */
+  readOnly?: boolean;
+  /** also show this employee's own approved and pending leave (the staff portal passes the signed-in employee's) */
+  myEmployeeNumber?: string | null;
+}
+
+const leaveLabel = (l: LeaveEntry) => `My ${l.type}${l.status === 'pending' ? ' (pending)' : ''}`;
+
+export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = null }: CompanyCalendarProps = {}) {
   const navigate = useNavigate();
+  const [myLeaveByDay, setMyLeaveByDay] = useState<Map<string, LeaveEntry[]>>(new Map());
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
   const [birthdaysByDay, setBirthdaysByDay] = useState<Map<string, BirthdayEntry[]>>(new Map());
   const [holidaysByDay, setHolidaysByDay] = useState<Map<string, HolidayEntry[]>>(new Map());
@@ -97,6 +139,14 @@ export default function CompanyCalendar() {
         evtMap.set(key, [...(evtMap.get(key) || []), e]);
       });
       setEventsByDay(evtMap);
+
+      if (myEmployeeNumber) {
+        try {
+          setMyLeaveByDay(await loadMyLeave(myEmployeeNumber));
+        } catch (err) {
+          console.error('Error loading your leave for the calendar:', err);
+        }
+      }
     } catch (err) {
       console.error('Error loading company calendar data:', err);
     } finally {
@@ -106,7 +156,9 @@ export default function CompanyCalendar() {
 
   useEffect(() => {
     loadCalendarData();
-  }, []);
+    // reloads when the employee is known (the staff portal finds them after the first render)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myEmployeeNumber]);
 
   const gridDays = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth));
@@ -120,8 +172,9 @@ export default function CompanyCalendar() {
     ...(holidaysByDay.get(`d-${format(day, 'yyyy-MM-dd')}`) || []),
   ];
   const getEventsFor = (day: Date) => eventsByDay.get(format(day, 'yyyy-MM-dd')) || [];
+  const getLeaveFor = (day: Date) => myLeaveByDay.get(format(day, 'yyyy-MM-dd')) || [];
   const hasEntries = (day: Date) =>
-    getEventsFor(day).length > 0 || getHolidaysFor(day).length > 0 || getBirthdaysFor(day).length > 0;
+    getEventsFor(day).length > 0 || getHolidaysFor(day).length > 0 || getBirthdaysFor(day).length > 0 || getLeaveFor(day).length > 0;
   // the days listed under the grid on phones
   const phoneListDays = selectedDay
     ? (hasEntries(selectedDay) ? [selectedDay] : [])
@@ -169,7 +222,7 @@ export default function CompanyCalendar() {
     <div className="max-w-6xl mx-auto">
       <PageHeader
         title="Company Calendar"
-        subtitle="Birthdays, holidays and company events"
+        subtitle={myEmployeeNumber ? 'Birthdays, holidays, company events and your leave' : 'Birthdays, holidays and company events'}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="secondary" onClick={() => { setCurrentMonth((m) => subMonths(m, 1)); setSelectedDay(null); }} icon={<ChevronLeft className="w-3.5 h-3.5" />}>
@@ -179,9 +232,11 @@ export default function CompanyCalendar() {
             <Button variant="secondary" onClick={() => { setCurrentMonth((m) => addMonths(m, 1)); setSelectedDay(null); }} icon={<ChevronRight className="w-3.5 h-3.5" />}>
               Next
             </Button>
-            <Button variant="primary" onClick={() => setShowEventForm(true)} icon={<CalendarPlus className="w-3.5 h-3.5" />}>
-              New Event
-            </Button>
+            {!readOnly && (
+              <Button variant="primary" onClick={() => setShowEventForm(true)} icon={<CalendarPlus className="w-3.5 h-3.5" />}>
+                New Event
+              </Button>
+            )}
           </div>
         }
       />
@@ -201,6 +256,7 @@ export default function CompanyCalendar() {
             const birthdays = getBirthdaysFor(day);
             const holidays = getHolidaysFor(day);
             const events = getEventsFor(day);
+            const leave = getLeaveFor(day);
             const isSelected = selectedDay !== null && isSameDay(day, selectedDay);
             const dayNumberClass = `text-[11px] font-semibold w-5 h-5 items-center justify-center rounded-full ${
               isToday(day) ? 'bg-brand text-white' : inMonth ? 'text-ink' : 'text-subtle'
@@ -224,13 +280,30 @@ export default function CompanyCalendar() {
                     {events.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-status-purple" />}
                     {holidays.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-orange-text" />}
                     {birthdays.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-brand" />}
+                    {leave.length > 0 && <span className="w-1.5 h-1.5 rounded-full bg-status-info" />}
                   </span>
                 </button>
                 <div className={`hidden sm:flex ${dayNumberClass}`}>
                   {format(day, 'd')}
                 </div>
                 <div className="mt-1 space-y-1 hidden sm:block">
-                  {events.map((e) => (
+                  {leave.map((l, i) => (
+                    <div key={`l-${i}`} className={`flex items-center gap-1 text-[10px] font-medium text-status-info bg-status-info-tint rounded px-1 py-0.5 truncate ${l.status === 'pending' ? 'border border-dashed border-status-info/50' : ''}`} title={leaveLabel(l)}>
+                      <Plane className="w-2.5 h-2.5 flex-shrink-0" />
+                      <span className="truncate">{leaveLabel(l)}</span>
+                    </div>
+                  ))}
+                  {readOnly && events.map((e) => (
+                    <div
+                      key={e.id}
+                      className="flex items-center gap-1 text-[10px] font-medium text-status-purple bg-status-purple-tint rounded px-1 py-0.5 truncate"
+                      title={`${e.title}${e.description ? ` — ${e.description}` : ''}`}
+                    >
+                      <CalendarPlus className="w-2.5 h-2.5 flex-shrink-0" />
+                      <span className="truncate">{e.title}</span>
+                    </div>
+                  ))}
+                  {!readOnly && events.map((e) => (
                     <button
                       key={e.id}
                       type="button"
@@ -249,7 +322,13 @@ export default function CompanyCalendar() {
                       <span className="truncate">{h.name}</span>
                     </div>
                   ))}
-                  {birthdays.slice(0, 2).map((b, i) => (
+                  {readOnly && birthdays.slice(0, 2).map((b, i) => (
+                    <div key={`b-${i}`} className="flex items-center gap-1 text-[10px] font-medium text-brand bg-green-tint rounded px-1 py-0.5 truncate" title={`${b.name}: birthday`}>
+                      <Cake className="w-2.5 h-2.5 flex-shrink-0" />
+                      <span className="truncate">{b.name}</span>
+                    </div>
+                  ))}
+                  {!readOnly && birthdays.slice(0, 2).map((b, i) => (
                     <button
                       key={`b-${i}`}
                       type="button"
@@ -293,13 +372,20 @@ export default function CompanyCalendar() {
               <li key={day.toISOString()} className="bg-white border border-border rounded-card p-3">
                 {!selectedDay && <p className="text-[11px] font-semibold text-muted-foreground mb-1.5">{format(day, 'EEE d MMM')}</p>}
                 <div className="space-y-1.5">
+                  {getLeaveFor(day).map((l, i) => (
+                    <div key={`l-${i}`} className="flex items-start gap-1.5 text-[12px] font-medium text-status-info bg-status-info-tint rounded px-2 py-1">
+                      <Plane className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                      <span className="min-w-0 break-words">{leaveLabel(l)}</span>
+                    </div>
+                  ))}
                   {getEventsFor(day).map((e) => (
                     <button
                       key={e.id}
                       type="button"
-                      onClick={() => handleDeleteEvent(e)}
-                      className="flex items-start gap-1.5 text-left text-[12px] font-medium text-status-purple bg-status-purple-tint rounded px-2 py-1 w-full"
-                      title="Tap to remove"
+                      onClick={readOnly ? undefined : () => handleDeleteEvent(e)}
+                      disabled={readOnly}
+                      className="flex items-start gap-1.5 text-left text-[12px] font-medium text-status-purple bg-status-purple-tint rounded px-2 py-1 w-full disabled:cursor-default"
+                      title={readOnly ? undefined : 'Tap to remove'}
                     >
                       <CalendarPlus className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
                       <span className="min-w-0 break-words">
@@ -318,8 +404,9 @@ export default function CompanyCalendar() {
                     <button
                       key={`b-${i}`}
                       type="button"
-                      onClick={() => navigate(`/employees?q=${encodeURIComponent(b.name)}`)}
-                      className="flex items-start gap-1.5 text-left text-[12px] font-medium text-brand bg-green-tint rounded px-2 py-1 w-full"
+                      onClick={readOnly ? undefined : () => navigate(`/employees?q=${encodeURIComponent(b.name)}`)}
+                      disabled={readOnly}
+                      className="flex items-start gap-1.5 text-left text-[12px] font-medium text-brand bg-green-tint rounded px-2 py-1 w-full disabled:cursor-default"
                     >
                       <Cake className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
                       <span className="min-w-0 break-words">{b.name}</span>
@@ -332,12 +419,12 @@ export default function CompanyCalendar() {
         )}
       </div>
 
-      {!loading && birthdaysByDay.size === 0 && holidaysByDay.size === 0 && eventsByDay.size === 0 && (
+      {!loading && birthdaysByDay.size === 0 && holidaysByDay.size === 0 && eventsByDay.size === 0 && myLeaveByDay.size === 0 && (
         <p className="text-[11.5px] text-muted-foreground text-center mt-4">No birthdays, holidays or events on record yet.</p>
       )}
 
       <Modal
-        open={showEventForm}
+        open={!readOnly && showEventForm}
         onClose={() => setShowEventForm(false)}
         closeOnBackdrop={!savingEvent}
         title="New Company Event"

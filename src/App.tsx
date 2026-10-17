@@ -55,6 +55,7 @@ const AuditTrailPage = lazy(() => import('./components/Settings/AuditTrail'));
 const SalaryAdvanceAdmin = lazy(() => import('./components/Settings/SalaryAdmin'));
 const LoansAdmin = lazy(() => import('./components/Loans/LoansAdmin'));
 const CasualWorkers = lazy(() => import('./components/Casual/CasualWorkers'));
+const LeaveDisciplinePage = lazy(() => import('./components/LeaveDiscipline/LeaveDisciplinePage'));
 const OvertimePage = lazy(() => import('./components/Overtime/OvertimePage'));
 const IncidentReportsManagement = lazy(() => import('./components/Settings/IncidentReportsManagement'));
 const WarningModule = lazy(() => import('./components/Warning/StaffCheck'));
@@ -1175,6 +1176,15 @@ function App() {
                                   element={
                                     <AuthRoute>
                                       <CasualWorkers />
+                                    </AuthRoute>
+                                  }
+                                />
+                                {/* HR, and supervisors for their team; the database shows each only what they may see */}
+                                <Route
+                                  path="/leave-discipline"
+                                  element={
+                                    <AuthRoute>
+                                      <LeaveDisciplinePage />
                                     </AuthRoute>
                                   }
                                 />
