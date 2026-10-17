@@ -299,6 +299,12 @@ export const PayslipModal = ({
                       <span>AHL</span>
                       <span className="font-semibold">KSh {(record.housing_levy || 0).toLocaleString()}</span>
                     </div>
+                    {Number(record.nita_levy) > 0 && (
+                      <div className="flex justify-between text-gray-500">
+                        <span>NITA levy (paid by employer)</span>
+                        <span>KSh {Number(record.nita_levy).toLocaleString()}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span>Advance</span>
                       <span className="font-semibold">KSh {(record.advance_deduction || 0).toLocaleString()}</span>
