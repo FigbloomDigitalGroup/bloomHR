@@ -5,6 +5,7 @@ import { payslipDeductionLines } from "../../lib/voluntaryDeductions";
 import { payslipEarningLines } from "../../lib/earnings";
 import { leaveLineLabel, leaveLineWorking, payslipLeaveLines } from "../../lib/leavePay";
 import { PayslipEditBar, type PayslipEditing } from "./PayslipEditModal";
+import { overtimeLineLabel, overtimeLineWorking, payslipOvertimeLines, payslipOvertimePay } from "../../lib/overtimePay";
 
 // One employee's payslip for the month (view, previous / next, PDF), moved from PayrollDashboard.
 
@@ -247,12 +248,22 @@ export const PayslipModal = ({
                       <span>Other</span>
                       <span className="font-semibold">KSh {(record.other_allowances || 0).toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Overtime</span>
-                      <span className="font-semibold">
-                        KSh {((record.overtime_hours || 0) * (record.overtime_rate || 0)).toLocaleString()}
-                      </span>
-                    </div>
+                    {payslipOvertimeLines(record).length > 0 ? (
+                      payslipOvertimeLines(record).map((line, i) => (
+                        <div key={`overtime-${line.day_type}-${i}`} className="flex justify-between gap-3">
+                          <span>
+                            {overtimeLineLabel(line)}
+                            <span className="block text-gray-500 text-xs">{overtimeLineWorking(line)}</span>
+                          </span>
+                          <span className="font-semibold whitespace-nowrap">KSh {line.amount.toLocaleString()}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="flex justify-between">
+                        <span>Overtime</span>
+                        <span className="font-semibold">KSh {payslipOvertimePay(record).toLocaleString()}</span>
+                      </div>
+                    )}
                     {payslipEarningLines(record).map((line, i) => (
                       <div key={`${line.name}-${i}`} className="flex justify-between">
                         <span>

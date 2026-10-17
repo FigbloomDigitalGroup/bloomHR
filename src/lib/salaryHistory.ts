@@ -3,6 +3,7 @@ import { WRITE_BATCH_SIZE, chunks } from './fetchAll';
 import type { DeductionItem } from './voluntaryDeductions';
 import type { EarningItem } from './earnings';
 import type { LeaveItem } from './leavePay';
+import type { OvertimeItem } from './overtimePay';
 
 export interface SalaryHistoryRecord {
     employee_id: string;
@@ -39,6 +40,9 @@ export interface SalaryHistoryRecord {
     leave_items?: LeaveItem[];
     /** a note payroll added when editing the payslip (FIG-883) */
     payslip_note?: string | null;
+    /** overtime paid this month from approved entries (FIG-889), and its lines (one per kind of day) */
+    overtime_pay?: number;
+    overtime_items?: OvertimeItem[];
     payment_method?: string;
     bank_name?: string;
     account_number?: string;

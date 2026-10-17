@@ -2,6 +2,7 @@ import { employeeInputs, statutoryFor, type Rates, type StatutoryInput } from '.
 import { statutoryPayWith, summariseEarnings, type EarningItem } from './earnings';
 import { basicAfterLeave } from './leavePay';
 import type { DeductionItem } from './voluntaryDeductions';
+import { payslipOvertimePay } from './overtimePay';
 
 /**
  * Edits to one payslip while its payroll run is a draft (FIG-883; table payslip_overrides). Pure: the database calls
@@ -123,8 +124,8 @@ export const normaliseOverride = (o: PayslipOverride | null | undefined): Paysli
 
 export const isEmptyOverride = (o: PayslipOverride | null | undefined) => normaliseOverride(o) === null;
 
-/** The overtime amount on a payslip (hours x rate). */
-export const overtimeOf = (record: Record<string, unknown>) => round2(num(record.overtime_hours) * num(record.overtime_rate));
+/** The overtime amount on a payslip: its overtime lines (FIG-889), else hours x rate. */
+export const overtimeOf = (record: Record<string, unknown>) => payslipOvertimePay(record);
 
 /** A payslip field's amount as the edit form shows it. */
 export const fieldValue = (record: Record<string, unknown>, field: EditableField) =>
@@ -159,6 +160,11 @@ export function applyPayslipOverride<T extends Payslip>(record: T, override: Pay
     delta += f.overtime_amount - overtimeOf(record);
     next.overtime_hours = hours;
     next.overtime_rate = f.overtime_amount / hours;
+    // the overtime lines become one edited line, so the payslip shows what is paid
+    next.overtime_pay = f.overtime_amount;
+    next.overtime_items = f.overtime_amount > 0
+      ? [{ name: 'Overtime (edited)', day_type: 'normal', hours, hourly_rate: round2(f.overtime_amount / hours), multiplier: 1, amount: f.overtime_amount }]
+      : [];
   }
 
   // earning lines (bonuses, commissions...) with their new amounts, then the one-offs

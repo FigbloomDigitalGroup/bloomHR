@@ -199,3 +199,22 @@ describe('before -> after', () => {
     expect(Object.keys(cols)).not.toContain('loan_deduction');
   });
 });
+
+describe('editing overtime paid from overtime entries (FIG-889)', () => {
+  it('replaces the overtime lines with one edited line, and gross moves by the difference', () => {
+    // 6 h on normal days at 177.78 x 1.5 and 4 h on rest days at 177.78 x 2 = 3,022.26 (hours x average rate on the payslip)
+    const base = calculate({ basic: 40000, hours: 10, rate: 302.226 });
+    const record = {
+      ...base,
+      overtime_pay: 3022.26,
+      overtime_items: [
+        { name: 'Overtime (normal days)', day_type: 'normal', hours: 6, hourly_rate: 177.78, multiplier: 1.5, amount: 1600.02 },
+        { name: 'Overtime (rest days)', day_type: 'rest', hours: 4, hourly_rate: 177.78, multiplier: 2, amount: 1422.24 },
+      ],
+    };
+    const edited = applyPayslipOverride(record, { fields: { overtime_amount: 2500 }, reason: 'Rest-day hours were 2, not 4' } as never, ctx) as typeof record;
+    expect(edited.overtime_pay).toBe(2500);
+    expect(edited.overtime_items).toEqual([{ name: 'Overtime (edited)', day_type: 'normal', hours: 10, hourly_rate: 250, multiplier: 1, amount: 2500 }]);
+    expect(edited.gross_pay).toBeCloseTo(record.gross_pay - 522.26, 2);
+  });
+});
