@@ -18,6 +18,10 @@ const api = vi.hoisted(() => ({
 const confirm = vi.hoisted(() => vi.fn());
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../../../lib/confirmDialog', () => ({ confirmDialog: confirm }));
+vi.mock('../../../lib/kpiTemplates', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../lib/kpiTemplates')>()),
+  loadKpiTemplateNames: () => Promise.resolve(new Map([['t1', 'Sales team']])),
+}));
 vi.mock('../../../lib/kpiApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../lib/kpiApi')>()),
   ...api,
@@ -156,6 +160,20 @@ describe('Assign', () => {
     expect(screen.getByRole('alert').textContent).toMatch(/80%, not 100%/);
   });
 
+  it('shows which KPIs came from a template, and which were adjusted or no longer match', async () => {
+    api.loadAssignments.mockResolvedValue([
+      row({ assigned_via: 'template', template_id: 't1', overridden: true }),
+      row({ id: 'a2', kpi_id: 'k2', weight: 40, assigned_via: 'template', template_id: 't1', no_longer_matches: true }),
+    ]);
+    page();
+    const revenue = (await screen.findByText('Sales revenue', { selector: 'td' })).closest('tr')!;
+    expect(await within(revenue).findByText(/From template: Sales team/)).toBeTruthy();
+    expect(within(revenue).getByText(/adjusted/)).toBeTruthy();
+    expect(within(screen.getByText('Error rate', { selector: 'td' }).closest('tr')!).getByText(/no longer matches/)).toBeTruthy();
+    fireEvent.click(within(revenue).getByRole('button', { name: /Edit Sales revenue/ }));
+    expect(screen.getByText(/comes from a template/)).toBeTruthy();
+  });
+
   it('removes an assignment after asking', async () => {
     api.loadAssignments.mockResolvedValue([row({})]);
     page();
@@ -184,6 +202,12 @@ describe('Scorecards', () => {
     expect(within(amina).getByText('2 / 2')).toBeTruthy();
     const brian = screen.getByText('Brian Test').closest('tr')!;
     expect(within(brian).getByText('Not scored')).toBeTruthy();
+  });
+
+  it('warns above the list about anyone whose weights don’t total 100', async () => {
+    api.loadAssignments.mockResolvedValue([row({}), row({ id: 'a3', employee_number: 'E2', weight: 100 })]);
+    page();
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Amina Test's KPI weights don't total 100%/);
   });
 
   it('filters by department', async () => {
@@ -245,6 +269,11 @@ describe('My KPIs (staff)', () => {
     fireEvent.change(screen.getByLabelText('Comment'), { target: { value: 'Two big deals' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.addCheckin).toHaveBeenCalledWith('a1', 'self', 950000, 'Two big deals'));
+  });
+
+  it('warns the employee when their weights don’t total 100', async () => {
+    render(<MyKpis />);
+    expect((await screen.findByRole('alert')).textContent).toMatch(/add up to 60%, not 100%/);
   });
 
   it('no self-assessment once the period is closed', async () => {

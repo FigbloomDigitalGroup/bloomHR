@@ -20,15 +20,17 @@ import ReviewPeriods from './kpis/ReviewPeriods';
 import AssignKpis from './kpis/AssignKpis';
 import Scorecards from './kpis/Scorecards';
 import MyKpis from './kpis/MyKpis';
+import KpiTemplates from './kpis/KpiTemplates';
 
 // The microfinance loan-target screens this page used to be; kept for companies that still use them.
 const LegacyLoanTargets = lazy(() => import('./PerfomanceDashboard'));
 
-type TabId = 'scorecards' | 'library' | 'periods' | 'assign' | 'mine' | 'legacy';
+type TabId = 'scorecards' | 'library' | 'templates' | 'periods' | 'assign' | 'mine' | 'legacy';
 
 /**
  * Performance, measured with each company's own KPIs (migration 20261016900000): the KPI library, review periods,
- * assigning KPIs and scorecards. HR sees everything; a manager their reports; everyone their own KPIs.
+ * KPI templates (given automatically per department, job title, job group or everyone), assigning KPIs and scorecards.
+ * HR sees everything; a manager their reports; everyone their own KPIs.
  */
 export default function KpiPerformancePage(props: TownProps) {
   const [access, setAccess] = useState<KpiAccess | null>(null);
@@ -66,7 +68,7 @@ export default function KpiPerformancePage(props: TownProps) {
     const list: TabBarItem[] = [];
     const leads = access.manages || access.team.length > 0;
     if (leads) list.push({ id: 'scorecards', label: access.manages ? 'Scorecards' : 'My team' });
-    if (access.manages) list.push({ id: 'library', label: 'KPI library' }, { id: 'periods', label: 'Review periods' });
+    if (access.manages) list.push({ id: 'library', label: 'KPI library' }, { id: 'templates', label: 'Templates' }, { id: 'periods', label: 'Review periods' });
     if (leads) list.push({ id: 'assign', label: 'Assign' });
     if (access.employeeNumber) list.push({ id: 'mine', label: 'My KPIs' });
     if (access.manages) list.push({ id: 'legacy', label: 'Loan targets (legacy)' });
@@ -87,6 +89,7 @@ export default function KpiPerformancePage(props: TownProps) {
           <TabBar items={tabs} activeId={active ?? ''} onChange={(id) => setTab(id as TabId)} className="mb-4" />
           {active === 'scorecards' && <Scorecards kpis={kpis} periods={periods} people={people} departments={departments} access={access} />}
           {active === 'library' && <KpiLibrary kpis={kpis} canManage={access.manages} onChanged={load} />}
+          {active === 'templates' && <KpiTemplates kpis={kpis} periods={periods} people={people} departments={departments} />}
           {active === 'periods' && <ReviewPeriods periods={periods} canManage={access.manages} onChanged={load} />}
           {active === 'assign' && <AssignKpis kpis={kpis} periods={periods} people={people} departments={departments} access={access} />}
           {active === 'mine' && <MyKpis embedded />}

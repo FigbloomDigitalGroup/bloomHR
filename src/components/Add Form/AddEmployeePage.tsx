@@ -21,7 +21,10 @@ import { PAYMENT_METHODS } from '../../lib/paymentMethods';
 import { useEmployeeNumbering } from '../../hooks/useEmployeeNumbering';
 import { useJobGroups } from '../../hooks/useJobGroups';
 import JobGroupPicker from './JobGroupPicker';
-import { lockedPayFields } from '../../lib/jobGroups';
+import { lockedPayFields, payFromGroup } from '../../lib/jobGroups';
+import { activeTitleNames, useJobTitles } from '../../hooks/useJobTitles';
+import { useDepartments } from '../../hooks/useDepartments';
+import { titleDefaults, titleKey } from '../../lib/jobTitles';
 
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'Work Mobile': string | null;
@@ -83,6 +86,8 @@ const AddEmployeePage = () => {
   const { numbering, ownNumbers } = useEmployeeNumbering();
   // the company's job groups (null when this person may not see them: the free-text "Job Group" stays)
   const jobGroups = useJobGroups();
+  const jobTitles = useJobTitles();
+  const { departments } = useDepartments();
 
   const [newEmployee, setNewEmployee] = useState<Partial<Employee>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -307,6 +312,23 @@ const AddEmployeePage = () => {
 
     // Validate on change
     validateField(name, value);
+  };
+
+  // choosing a job title from the list fills its usual department and job group when they are still empty
+  const handleJobTitleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    handleInputChange(e);
+    const title = jobTitles?.find((t) => titleKey(t.name) === titleKey(e.target.value));
+    const current = newEmployee as Record<string, unknown>;
+    const d = titleDefaults(title, { department_id: current.department_id as string | null, job_group_id: current.job_group_id as string | null });
+    const patch: Record<string, unknown> = {};
+    const dep = d.department_id ? departments.find((x) => x.id === d.department_id && x.active) : undefined;
+    if (dep) Object.assign(patch, { department_id: dep.id, 'Job Level': dep.name });
+    const group = d.job_group_id ? jobGroups?.find((g) => g.id === d.job_group_id && g.active) : undefined;
+    if (group) {
+      Object.assign(patch, { job_group_id: group.id, 'Job Group': group.code });
+      if (!current.pay_overridden) Object.assign(patch, payFromGroup(group, current['Basic Salary']) ?? {});
+    }
+    if (Object.keys(patch).length) setNewEmployee((prev) => ({ ...prev, ...patch }) as Partial<Employee>);
   };
 
   const handleEmergencyContactChange = (index: number, field: keyof EmergencyContact, value: string) => {
@@ -886,8 +908,8 @@ const AddEmployeePage = () => {
                     type="select"
                     creatable
                     value={newEmployee['Job Title'] || ''}
-                    onChange={handleInputChange}
-                    options={dropdownOptions.jobTitles}
+                    onChange={handleJobTitleChange}
+                    options={activeTitleNames(jobTitles) ?? dropdownOptions.jobTitles}
                     error={errors['Job Title']}
                   />
 

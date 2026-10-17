@@ -29,7 +29,7 @@ import {
   HandCoins,
   HardHat,
   Timer,
-  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature, History, Sparkles
+  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature, History, Sparkles, BriefcaseBusiness
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useMyPreferences } from '../../hooks/useMyPreferences';
@@ -103,6 +103,8 @@ const menuGroups = [
       { id: 'settings', label: 'Settings', icon: Settings, path: '/settings', permission: 'settings' },
       { id: 'setup-assistant', label: 'Set up with AI', icon: Sparkles, path: '/setup-assistant', permission: 'settings' },
       { id: 'departments', label: 'Departments', icon: Building2, path: '/departments', permission: 'employees' },
+      // the job titles list (KPI templates can be set per title): HR and the Employees module
+      { id: 'job-titles', label: 'Job titles', icon: BriefcaseBusiness, path: '/settings/job-titles', anyPermission: ['employees'], orRoles: ['HR'] },
       { id: 'audit-trail', label: 'Audit Trail', icon: History, path: '/settings/audit-trail', permission: 'settings' },
       { id: 'role-permissions', label: 'Role Permissions', icon: ShieldHalf, path: '/role-permissions', permission: 'role-permissions' },
       { id: 'appearance', label: 'Appearance', icon: Palette, path: '/appearance' },

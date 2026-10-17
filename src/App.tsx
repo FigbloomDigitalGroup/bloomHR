@@ -51,6 +51,7 @@ const OnboardingPrint = lazy(() => import('./components/Onboarding/OnboardingPri
 const UserRolesSettings = lazy(() => import('./components/Settings/UserRole'));
 const CompanyProfilePage = lazy(() => import('./components/Settings/CompanyProfile'));
 const JobGroupsPage = lazy(() => import('./components/Settings/JobGroups'));
+const JobTitlesPage = lazy(() => import('./components/Settings/JobTitles'));
 const AuditTrailPage = lazy(() => import('./components/Settings/AuditTrail'));
 const SalaryAdvanceAdmin = lazy(() => import('./components/Settings/SalaryAdmin'));
 const LoansAdmin = lazy(() => import('./components/Loans/LoansAdmin'));
@@ -1152,6 +1153,15 @@ function App() {
                                   element={
                                     <AuthRoute>
                                       <JobGroupsPage />
+                                    </AuthRoute>
+                                  }
+                                />
+                                {/* HR, ADMIN, Employees and Performance; the page tells anyone else they may not see it */}
+                                <Route
+                                  path="/settings/job-titles"
+                                  element={
+                                    <AuthRoute>
+                                      <JobTitlesPage />
                                     </AuthRoute>
                                   }
                                 />

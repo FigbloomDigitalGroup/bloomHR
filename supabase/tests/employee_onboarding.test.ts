@@ -331,7 +331,9 @@ describe('audit log', () => {
     const [row] = await rows<{ old_data: object; new_data: object; performed_by: string; action_type: string; record_key: string }>(
       `select old_data, new_data, performed_by, action_type, record_key from audit_log
        where table_name = 'employees' and new_data ? 'Job Title' order by performed_at desc limit 1`);
-    expect(row).toEqual({ old_data: { 'Job Title': 'Accountant' }, new_data: { 'Job Title': 'Senior Accountant' },
+    // (the job title link, job_title_id from 20261019300000, follows the text and is recorded with it)
+    expect(row).toEqual({ old_data: { 'Job Title': 'Accountant', job_title_id: expect.any(String) },
+      new_data: { 'Job Title': 'Senior Accountant', job_title_id: expect.any(String) },
       performed_by: U.HR, action_type: 'UPDATE', record_key: 'E-ME' });
   });
 

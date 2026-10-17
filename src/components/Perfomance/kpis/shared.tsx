@@ -1,6 +1,6 @@
 import { StatusPill, type StatusTone } from '../../UI';
 import { PERIOD_STATUS_LABEL, formatPercent, ratingBand, type BandId, type PeriodStatus } from '../../../lib/kpis';
-import type { KpiPeriod } from '../../../lib/kpiApi';
+import type { KpiAssignment, KpiPeriod } from '../../../lib/kpiApi';
 
 export const inputClass =
   'w-full min-w-0 border border-border rounded-tile bg-white px-3 py-2 text-[13px] text-ink outline-none focus:border-brand disabled:bg-secondary disabled:cursor-not-allowed';
@@ -49,6 +49,23 @@ export function PeriodSelect({
           </option>
         ))}
       </select>
+    </div>
+  );
+}
+
+/** Where an assignment came from: a template (adjusted or no longer matching), or nothing for one given by hand. */
+export function SourceNote({ a, templateNames }: { a: KpiAssignment; templateNames?: Map<string, string> }) {
+  if (a.assigned_via !== 'template') return null;
+  const name = a.template_id ? templateNames?.get(a.template_id) : undefined;
+  return (
+    <div className="text-[11px] text-muted-foreground">
+      {name ? `From template: ${name}` : 'From a template'}
+      {a.overridden && <span className="ml-1 font-semibold text-status-info">· adjusted</span>}
+      {a.no_longer_matches && (
+        <span className="ml-1 font-semibold text-orange-text-alt" title="The template no longer fits this person; kept because it has check-ins">
+          · no longer matches
+        </span>
+      )}
     </div>
   );
 }
