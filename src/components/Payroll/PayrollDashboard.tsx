@@ -59,8 +59,8 @@ import { loanDeductionsFor } from "../../lib/loans";
 import { loadPayrollLoans } from "../../lib/loansApi";
 import { earningsForPeriod, statutoryPayWith, summariseEarnings } from "../../lib/earnings";
 import { loadEarningSetup } from "../../lib/earningsDb";
-import { basicAfterLeave, leavePayFor } from "../../lib/leavePay";
-import { loadLeavePay, loadLeaveRateBasis } from "../../lib/leavePayDb";
+import { basicAfterLeave, leavePayFor, leavePayoutItems } from "../../lib/leavePay";
+import { loadLeavePay, loadLeavePayouts, loadLeaveRateBasis } from "../../lib/leavePayDb";
 import { withAbsencePay } from "../../lib/absencePay";
 import { loadAbsencePay } from "../../lib/leaveDisciplineApi";
 import LeavePaySetting from "./LeavePaySetting";
@@ -957,6 +957,8 @@ export default function PayrollDashboard() {
         const [leaveByEmployee, leaveBasis] = await Promise.all([loadLeavePay(actualPeriod), loadLeaveRateBasis()]);
         // days of unexcused absence this month (FIG-881, lib/absencePay): off pay like unpaid leave, unless turned off
         const absenceByEmployee = await loadAbsencePay(actualPeriod);
+        // leave over the carry-forward cap that the company pays out (FIG-877): a taxable "Leave paid out" earning
+        const leavePayouts = await loadLeavePayouts(actualPeriod);
         // approved overtime this month, by kind of day, and the company's overtime settings (lib/overtimePay)
         const overtimeMonth = await loadOvertimeMonth(actualPeriod);
 
@@ -1013,7 +1015,10 @@ export default function PayrollDashboard() {
               const medicalAllowance = employee.medical_allowance || 0;
               const otherAllowances = 0;
               // this month's earnings: commissions in commission, every other earning in bonus (lib/earnings)
-              const earnings = summariseEarnings(earningsByEmployee.get(employeeId) ?? []);
+              const earnings = summariseEarnings([
+                ...(earningsByEmployee.get(employeeId) ?? []),
+                ...leavePayoutItems(leavePayouts.get(employeeId), basicSalary, leaveBasis),
+              ]);
               const commission = earnings.commission;
               const bonus = earnings.bonus;
 
