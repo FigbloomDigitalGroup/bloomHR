@@ -25,6 +25,7 @@ import {
   Zap
 } from 'lucide-react';
 import FigbloomLoader from '../UI/FigbloomLoader';
+import { WARNING_TEMPLATES, fillWarningTemplate } from '../../lib/warningTemplates';
 
 export default function WarningModule() {
   const [employees, setEmployees] = useState<any[]>([]);
@@ -50,33 +51,10 @@ export default function WarningModule() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
 
-  // Predefined warning templates
-  const [warningTemplates, setWarningTemplates] = useState([
-    {
-      id: 1,
-      type: 'Tardiness',
-      subject: 'Warning Regarding Frequent Tardiness',
-      message: 'This is a formal warning regarding your frequent tardiness. Continued violations may result in further disciplinary action.'
-    },
-    {
-      id: 2,
-      type: 'Performance',
-      subject: 'Warning Regarding Performance Issues',
-      message: 'This is a formal warning regarding your recent performance which has not met the expected standards. We expect to see immediate improvement.'
-    },
-    {
-      id: 3,
-      type: 'Conduct',
-      subject: 'Warning Regarding Unprofessional Conduct',
-      message: 'This is a formal warning regarding your recent behavior which violates our code of conduct. Further incidents may lead to disciplinary action.'
-    },
-    {
-      id: 4,
-      type: 'Policy Violation',
-      subject: 'Warning Regarding Policy Violation',
-      message: 'This is a formal warning regarding your violation of company policy. Please review the employee handbook and ensure compliance moving forward.'
-    }
-  ]);
+  // Predefined warning templates (lib/warningTemplates; the leave discipline ones with their placeholders filled generically)
+  const [warningTemplates, setWarningTemplates] = useState(() =>
+    WARNING_TEMPLATES.map((t) => ({ ...t, message: fillWarningTemplate(t.message, {}) }))
+  );
 
   useEffect(() => {
     fetchEmployees();

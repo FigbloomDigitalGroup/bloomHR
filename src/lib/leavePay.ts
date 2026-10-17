@@ -48,9 +48,10 @@ export interface LeavePayRow {
 
 /** One payslip line (salary_history.leave_items) */
 export interface LeaveItem {
-  /** e.g. "Unpaid Leave", "Sick Leave at half pay" (the payslip adds ": 3 days") */
+  /** e.g. "Unpaid Leave", "Sick Leave at half pay", "Unexcused absence" (the payslip adds ": 3 days") */
   name: string;
-  kind: 'unpaid' | 'half_pay';
+  /** 'absence': days of unexcused absence (FIG-881, lib/absencePay), at the same day's pay as unpaid leave */
+  kind: 'unpaid' | 'half_pay' | 'absence';
   leave_type: string;
   days: number;
   daily_rate: number;
@@ -137,7 +138,7 @@ export const payslipLeaveLines = (payslip: { leave_items?: unknown }): LeaveItem
     ? (payslip.leave_items as Partial<LeaveItem>[])
         .map((i) => ({
           name: String(i.name ?? 'Leave'),
-          kind: (i.kind === 'half_pay' ? 'half_pay' : 'unpaid') as LeaveItem['kind'],
+          kind: (i.kind === 'half_pay' || i.kind === 'absence' ? i.kind : 'unpaid') as LeaveItem['kind'],
           leave_type: String(i.leave_type ?? ''),
           days: num(i.days),
           daily_rate: num(i.daily_rate),

@@ -9,6 +9,7 @@ import {
   Menu,
   ChevronLeft,
   ShieldAlert,
+  UserX,
   LayoutGrid,
   Landmark,
   Kanban,
@@ -66,6 +67,8 @@ const menuGroups = [
       { id: 'recruitment', label: 'Recruitment', icon: UserPlus2, path: '/recruitment', permission: 'recruitment' },
       { id: 'offers', label: 'Offers', icon: FileSignature, path: '/offers', anyPermission: ['employees', 'recruitment'] },
       { id: 'leaves', label: 'Time Off', icon: CalendarRange, path: '/leaves', permission: 'leaves' },
+      // absences, failures to notify, missing leave documents and warnings for them: HR, and supervisors for their team
+      { id: 'leave-discipline', label: 'Leave discipline', icon: UserX, path: '/leave-discipline', anyPermission: ['leaves', 'employees'], orRoles: ['MANAGER'] },
       { id: 'performance', label: 'Performance', icon: Target, path: '/performance', permission: 'performance' },
       { id: 'training', label: 'Training', icon: Award, path: '/training', permission: 'training' },
       { id: 'assign-managers', label: 'Assign Managers', icon: UserCheck, path: '/assign-managers', permission: 'assign-managers' },
