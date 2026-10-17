@@ -32,6 +32,7 @@ import FigbloomLoader from '../UI/FigbloomLoader';
 import EmployeeNumberingCard from './EmployeeNumbering';
 import ApprovalWorkflowsCard from './ApprovalWorkflows';
 import TwoStepSignInCard from './TwoStepSignIn';
+import MyTwoStepCard from './MyTwoStep';
 import CareersSettingsCard from './CareersSettings';
 import LoanSettingsCard from '../Loans/LoanSettingsCard';
 
@@ -823,6 +824,8 @@ export default function UserRolesSettings() {
 
         {/* two-step sign-in, per company (FIG-834) */}
         <TwoStepSignInCard />
+        {/* your own sign-in code (FIG-891) */}
+        <MyTwoStepCard />
 
         {/* Company profile: its own page */}
         <Link to="/settings/company" className="block">

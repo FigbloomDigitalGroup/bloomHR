@@ -19,6 +19,8 @@ const state = vi.hoisted(() => ({
   mfaNumbers: [] as Record<string, unknown>[],
   tenants: [{ id: 'tenant-a', name: 'Acme Ltd' }] as Record<string, unknown>[],
   policy: { mode: 'privileged', method: 'email' },
+  // people's own setting (personal_two_step), by user id
+  personal: {} as Record<string, { enabled: boolean; method: string }>,
   codes: [] as Code[],
   passes: [] as { user_id: string; session_id: string }[],
   budgets: new Map<string, number>(),
@@ -80,6 +82,7 @@ vi.mock('@supabase/supabase-js', () => {
         return { data: true, error: null };
       }
       if (fn === 'two_step_policy') return { data: [state.policy], error: null };
+      if (fn === 'personal_two_step') return { data: [state.personal[a.p_user] ?? { enabled: false, method: 'email' }], error: null };
       if (fn === 'mfa_issue_code') {
         for (const c of state.codes) if (c.user_id === a.p_user && c.session_id === a.p_session) c.used = true;
         const expires = new Date(Date.now() + a.p_ttl_seconds * 1000).toISOString();
@@ -179,6 +182,7 @@ beforeEach(() => {
   ];
   state.mfaNumbers = [];
   state.policy = { mode: 'privileged', method: 'email' };
+  state.personal = {};
   state.codes = [];
   state.passes = [];
   state.budgets = new Map();
@@ -247,6 +251,13 @@ describe('POST /send', () => {
     expect((await post('/send', jwt(ADMIN, 's1'))).status).toBe(409);
     state.policy = { mode: 'everyone', method: 'email' };
     expect((await post('/send', jwt(STAFF, 's1'))).status).toBe(200);
+  });
+
+  it('sends a code to someone who turned it on for themselves, by the way they chose', async () => {
+    state.personal[STAFF] = { enabled: true, method: 'email' };
+    const res = await post('/send', jwt(STAFF, 's1'));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ sent: true, method: 'email' });
   });
 
   it('sends by SMS to the registered number when the company chose SMS, else falls back to email', async () => {
