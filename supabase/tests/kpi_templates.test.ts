@@ -381,6 +381,115 @@ describe('applying templates', () => {
   });
 });
 
+describe('telling employees about their KPIs (20261019400000)', () => {
+  interface Note { tenant_id: string; employee_number: string; title: string; message: string }
+  let mark = 0;
+  const since = async () => {
+    const got = await rows<Note & { id: number }>(
+      `select id, tenant_id, employee_number, title, message from hr_notifications where notification_type = 'employment_update' and id > $1 order by id`, [mark]);
+    mark = Math.max(mark, ...got.map((n) => Number(n.id)));
+    return got;
+  };
+  const reset = async () => {
+    mark = Number((await one<{ m: number | null }>(`select max(id) m from hr_notifications`)).m ?? 0);
+  };
+
+  beforeAll(async () => {
+    // HR has an employee record too, in Sales
+    await db.query(`insert into employees ("Employee Number", "First Name", "Last Name", "Work Email", "Status", tenant_id, department_id)
+      values ('A-HR', 'Hana', 'HR', 'hr@a.co', 'Active', '${A}', $1)`, [salesDept]);
+  });
+
+  it('a new hire gets one notification for all their new KPIs, not one per KPI', async () => {
+    await reset();
+    await as(HR, `insert into employees ("Employee Number", "First Name", "Last Name", "Job Title", "Status", department_id, job_group_id)
+      values ('A-HIRE', 'Hal', 'Hire', 'Sales Representative', 'Active', $1, $2)`, [salesDept, jg1]);
+    const n = (await linesOf(q4, 'A-HIRE')).length;
+    expect(n).toBeGreaterThan(1);
+    const notes = (await since()).filter((x) => x.employee_number === 'A-HIRE');
+    expect(notes).toHaveLength(1);
+    expect(notes[0].title).toBe('New KPIs');
+    expect(notes[0].message).toBe(`You have ${n} new KPIs for the Q4 2026 review. See them under My KPIs.`);
+  });
+
+  it('a KPI assigned by hand to a group: one each, and never to the person who assigned it', async () => {
+    await reset();
+    const extra = (await as<{ id: string }>(HR, `insert into kpis (name) values ('Team spirit') returning id`))[0].id;
+    await as(HR, `select assign_kpi($1, $2, 'department', $3, 1, 0)`, [q4, extra, salesDept]);
+    const notes = await since();
+    const who = notes.map((x) => x.employee_number).sort();
+    expect(who).toContain('A-HIRE');
+    expect(who).not.toContain('A-HR'); // HR assigned it, to their own department too
+    expect(new Set(who).size).toBe(who.length);
+    expect(notes.find((x) => x.employee_number === 'A-HIRE')?.message).toMatch(/^You have 1 new KPI for/);
+  });
+
+  it('a manager changing a target or weight tells the employee once; re-applying templates says nothing', async () => {
+    await reset();
+    await as(BOSS, `update kpi_assignments set weight = weight + 0, target = 77 where period_id = $1 and employee_number = 'A-ME' and kpi_id in ($2, $3)`,
+      [q4, kpi.Revenue, kpi.Calls]);
+    const notes = await since();
+    expect(notes).toHaveLength(1);
+    expect(notes[0]).toMatchObject({ employee_number: 'A-ME', title: 'KPI targets changed' });
+    expect(notes[0].message).toMatch(/your KPIs Calls, Revenue for the Q4 2026 review changed/);
+    await as(HR, `select apply_kpi_templates()`);
+    expect(await since()).toHaveLength(0);
+    // a self-assessment is not a change of target
+    const id = (await one<{ id: string }>(`select id from kpi_assignments where period_id = $1 and employee_number = 'A-ME' and kpi_id = $2`, [q4, kpi.Revenue])).id;
+    await as(ME, `insert into kpi_checkins (assignment_id, kind, value) values ($1, 'self', 5)`, [id]);
+    expect(await since()).toHaveLength(0);
+  });
+
+  it('template KPIs taken off after a move: one notification naming them', async () => {
+    await reset();
+    await as(HR, `update employees set job_group_id = null where "Employee Number" = 'A-HIRE'`);
+    const notes = await since();
+    expect(notes).toHaveLength(1);
+    expect(notes[0]).toMatchObject({ employee_number: 'A-HIRE', title: 'KPIs removed' });
+    expect(notes[0].message).toMatch(/^The KPI Quality was taken off your Q4 2026 review/);
+    // removing one by hand is not announced
+    await as(HR, `delete from kpi_assignments where period_id = $1 and employee_number = 'A-HIRE' and kpi_id = $2`, [q4, kpi.Revenue]);
+    expect(await since()).toHaveLength(0);
+  });
+
+  it('nothing while a period is a draft; one notification per person when it opens', async () => {
+    await reset();
+    const p2 = (await as<{ id: string }>(HR, `insert into kpi_periods (name, starts_on, ends_on) values ('Q2 2027', '2027-04-01', '2027-06-30') returning id`))[0].id;
+    await as(HR, `select assign_kpi($1, $2, 'person', 'A-DEE', 1, 0)`, [p2, kpi.Safety]);
+    expect(await since()).toHaveLength(0);
+    await as(HR, `update kpi_periods set status = 'open' where id = $1`, [p2]);
+    const notes = await since();
+    const dee = notes.filter((x) => x.employee_number === 'A-DEE');
+    expect(dee).toHaveLength(1);
+    const n = (await linesOf(p2, 'A-DEE')).length;
+    expect(dee[0]).toMatchObject({ title: 'Your KPIs for Q2 2027' });
+    expect(dee[0].message).toMatch(new RegExp(`You have ${n} KPIs to work towards`));
+    expect(notes.some((x) => x.title === 'New KPIs')).toBe(false);
+    expect(notes.some((x) => x.employee_number === 'A-HR')).toBe(false); // HR opened it
+    expect(new Set(notes.map((x) => x.employee_number)).size).toBe(notes.length);
+    await as(HR, `update kpi_periods set status = 'closed' where id = $1`, [p2]);
+  });
+
+  it('each company’s employees only hear about their own KPIs', async () => {
+    await db.exec(`insert into employees ("Employee Number", "First Name", "Last Name", "Status", tenant_id) values ('B-2', 'Bo', 'Two', 'Active', '${B}')`);
+    await reset();
+    const k = (await as<{ id: string }>(ADMIN_B, `insert into kpis (name) values ('B metric') returning id`))[0].id;
+    await as(ADMIN_B, `select save_kpi_template(null, 'All of B', 'everyone', null, true, $1::jsonb)`, [JSON.stringify([{ kpi_id: k, weight: 100 }])]);
+    await as(ADMIN_B, `insert into kpi_periods (name, starts_on, ends_on, status) values ('B Q2', '2027-04-01', '2027-06-30', 'open')`);
+    const notes = await since();
+    expect(notes.map((x) => [x.tenant_id, x.employee_number])).toEqual([[B, 'B-2']]);
+    expect(await as(ADMIN_B, `select employee_number from hr_notifications where tenant_id = '${A}'`)).toHaveLength(0);
+  });
+
+  it('running the migration again does not double the notifications', async () => {
+    await db.exec(readFileSync(join(__dirname, '..', 'migrations', '20261019400000_kpi_notifications.sql'), 'utf8'));
+    await db.exec('reset search_path');
+    await reset();
+    await as(HR, `select assign_kpi($1, $2, 'person', 'A-DEE', 1, 0)`, [q4, kpi.Safety]);
+    expect((await since()).map((x) => x.employee_number)).toEqual(['A-DEE']);
+  });
+});
+
 describe('running the migration again', () => {
   it('a template removed while its period is closed just leaves its KPIs without a template', async () => {
     const t = await save2(HR, null, 'Short lived', 'everyone', null, [['Safety', 100]]);
