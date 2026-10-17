@@ -20,11 +20,14 @@ export default function StaffCompany({
   section,
   onSectionChange,
   employeeNumber,
+  onOpenTask,
 }: {
   section: CompanySection;
   onSectionChange: (section: CompanySection) => void;
-  /** the signed-in employee's number, for their own leave on the calendar ('' until known) */
+  /** the signed-in employee's number, for their own leave and tasks on the calendar ('' until known) */
   employeeNumber: string;
+  /** opens one of the employee's tasks in the portal's Tasks */
+  onOpenTask?: (taskId: string) => void;
 }) {
   return (
     <div className="pt-2 md:pt-0">
@@ -39,7 +42,7 @@ export default function StaffCompany({
         activeId={section}
         onChange={(id) => isCompanySection(id) && onSectionChange(id)}
       />
-      {section === 'company-calendar' && <CompanyCalendar readOnly myEmployeeNumber={employeeNumber || null} />}
+      {section === 'company-calendar' && <CompanyCalendar readOnly myEmployeeNumber={employeeNumber || null} onOpenTask={onOpenTask} />}
       {section === 'company-organogram' && <StaffOrganogram />}
       {section === 'company-departments' && <StaffDepartments />}
       {section === 'company-approvers' && <MyApprovalChain />}
