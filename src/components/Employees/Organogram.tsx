@@ -171,10 +171,22 @@ const mapTree = <T, U>(forest: TreeNode<T>[], f: (t: T) => U): TreeNode<U>[] =>
  * get the list; Print prints what is open.
  */
 export default function Organogram() {
-  const { employees, loading: peopleLoading, error: peopleError } = useEmployeeDirectory();
+  const { employees, loading, error } = useEmployeeDirectory();
+  return <OrganogramView employees={employees} loading={loading} error={error} />;
+}
+
+interface OrganogramViewProps {
+  employees: DirectoryEmployee[];
+  loading: boolean;
+  error: string | null;
+  /** the staff portal: no links to employee records or to the Departments settings, whatever the role */
+  readOnly?: boolean;
+}
+
+export function OrganogramView({ employees, loading: peopleLoading, error: peopleError, readOnly = false }: OrganogramViewProps) {
   const { departments, loading: deptLoading } = useDepartments();
   const { hasPermission } = usePermissions();
-  const canOpenRecords = hasPermission('employees');
+  const canOpenRecords = !readOnly && hasPermission('employees');
 
   const [view, setView] = useState<View>('people');
   const [layout, setLayout] = useState<Layout>(() => (isWide() ? 'chart' : 'list'));

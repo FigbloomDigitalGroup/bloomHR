@@ -22,7 +22,8 @@ import {
   ClipboardText as PhClipboardText,
   ListChecks as PhListChecks,
   SignOut as PhSignOut,
-  Target as PhTarget
+  Target as PhTarget,
+  Buildings as PhBuildings
 } from '@phosphor-icons/react';
 
 // Keep Lucide icons for UI elements only
@@ -74,6 +75,9 @@ import Appearance from '../Settings/Appearance';
 import MyContract from './MyContract';
 import MyResignation from './MyResignation';
 import MyOvertime from './MyOvertime';
+import StaffCompany from './StaffCompany';
+import MyApprovalChain from './MyApprovalChain';
+import { isCompanySection } from '../../lib/staffCompany';
 import MyAbsences from './MyAbsences';
 import { NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
 import { describeFree, useLeaveCheck } from '../../lib/leaveRules';
@@ -712,6 +716,9 @@ const LeaveApplicationForm = () => {
             </div>
           </div>
 
+          {/* who it will go to, before applying (the company's approval workflow for this employee) */}
+          <MyApprovalChain compact />
+
           <div className="space-y-1">
             <label className="block text-xs font-medium text-gray-700">Leave Duration Type</label>
             <div className="flex space-x-6 pt-2">
@@ -1220,6 +1227,23 @@ const staffMenuGroups: MenuGroup[] = [
         submenu: [
           { id: 'chat', label: 'Chat' },
           { id: 'VideoConf', label: 'Video Conference' }
+        ]
+      }
+    ]
+  },
+  {
+    title: "Company",
+    items: [
+      {
+        id: 'company',
+        label: 'Company',
+        icon: PhBuildings,
+        hasSubmenu: true,
+        submenu: [
+          { id: 'company-calendar', label: 'Calendar' },
+          { id: 'company-organogram', label: 'Organogram' },
+          { id: 'company-departments', label: 'Departments' },
+          { id: 'company-approvers', label: 'Who approves my leave' }
         ]
       }
     ]
@@ -1948,6 +1972,9 @@ const StaffPortal = () => {
               {activeTab === 'my-kpis' && <MyKpis />}
               {activeTab === 'leave' && <LeaveApplicationForm />}
               {activeTab === 'leave-history' && <><LeaveApplicationsList /><MyAbsences /></>}
+              {isCompanySection(activeTab) && (
+                <StaffCompany section={activeTab} onSectionChange={setActiveTab} employeeNumber={employeeNumber} />
+              )}
               {activeTab === 'contract' && <MyContract />}
               {activeTab === 'resignation' && <MyResignation />}
               {activeTab === 'details' && <Profile />}
