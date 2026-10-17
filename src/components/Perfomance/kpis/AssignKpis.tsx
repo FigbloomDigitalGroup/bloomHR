@@ -25,6 +25,8 @@ interface Props {
   people: KpiPerson[];
   departments: Department[];
   access: KpiAccess;
+  /** the staff portal's My team: pick one or more of the supervisor's reports instead of a scope */
+  teamMode?: boolean;
 }
 
 const SCOPES: { id: AssignScope; label: string }[] = [
@@ -37,11 +39,12 @@ const SCOPES: { id: AssignScope; label: string }[] = [
 const distinct = (values: string[]) =>
   [...new Map(values.filter(Boolean).map((v) => [v.toLowerCase(), v])).values()].sort((a, b) => a.localeCompare(b));
 
-export default function AssignKpis({ kpis, periods, people, departments, access }: Props) {
+export default function AssignKpis({ kpis, periods, people, departments, access, teamMode = false }: Props) {
   const [periodId, setPeriodId] = useState(() => defaultPeriodId(periods));
   const [kpiId, setKpiId] = useState('');
   const [scope, setScope] = useState<AssignScope>('person');
   const [value, setValue] = useState('');
+  const [picked, setPicked] = useState<string[]>([]);
   const [target, setTarget] = useState('');
   const [weight, setWeight] = useState('');
   const [busy, setBusy] = useState(false);
@@ -98,7 +101,7 @@ export default function AssignKpis({ kpis, periods, people, departments, access 
       ? 'This period is closed; reopen it to change its KPIs'
       : !kpiId
         ? 'Choose a KPI'
-        : !value
+        : (teamMode ? picked.length === 0 : !value)
           ? 'Choose who to assign it to'
           : weight.trim() && (weightNum === null || weightNum < 0 || weightNum > 100)
             ? 'The weight is from 0 to 100'
@@ -110,7 +113,14 @@ export default function AssignKpis({ kpis, periods, people, departments, access 
     if (problem) return;
     setBusy(true);
     try {
-      const n = await assignKpi({ periodId, kpiId, scope, value, target: parseNumber(target), weight: parseNumber(weight) });
+      const args = { periodId, kpiId, target: parseNumber(target), weight: parseNumber(weight) };
+      let n = 0;
+      if (teamMode) {
+        // one person at a time: the database reaches only the supervisor's own reports
+        for (const emp of picked) n += await assignKpi({ ...args, scope: 'person', value: emp });
+      } else {
+        n = await assignKpi({ ...args, scope, value });
+      }
       if (n === 0) toast.error('Nobody matched: no current employees there');
       else toast.success(`${kpi?.name ?? 'KPI'} assigned to ${n} ${n === 1 ? 'person' : 'people'}`);
       await reload();
@@ -125,11 +135,15 @@ export default function AssignKpis({ kpis, periods, people, departments, access 
   const personBy = useMemo(() => new Map(people.map((p) => [p.employeeNumber, p])), [people]);
   const grouped = useMemo(() => {
     const m = new Map<string, KpiAssignment[]>();
-    for (const a of assignments) m.set(a.employee_number, [...(m.get(a.employee_number) ?? []), a]);
+    for (const a of assignments) {
+      // My team shows the supervisor's reports only, even to someone who can see more
+      if (teamMode && !personBy.has(a.employee_number)) continue;
+      m.set(a.employee_number, [...(m.get(a.employee_number) ?? []), a]);
+    }
     return [...m.entries()]
       .map(([emp, list]) => ({ emp, name: personBy.get(emp)?.fullName ?? emp, list, weights: checkWeights(list.map((a) => a.weight)) }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [assignments, personBy]);
+  }, [assignments, personBy, teamMode]);
 
   const remove = async (a: KpiAssignment) => {
     const name = kpiById.get(a.kpi_id)?.name ?? 'this KPI';
@@ -158,19 +172,25 @@ export default function AssignKpis({ kpis, periods, people, departments, access 
               {activeKpis.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
             </select>
           </div>
-          <div className="min-w-0">
-            <label htmlFor="assign-scope" className={labelClass}>Assign to</label>
-            <select id="assign-scope" className={inputClass} value={scope} onChange={(e) => { setScope(e.target.value as AssignScope); setValue(''); }}>
-              {SCOPES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </select>
-          </div>
-          <div className="min-w-0">
-            <label htmlFor="assign-who" className={labelClass}>{SCOPES.find((s) => s.id === scope)?.label.replace(/^(One|A) /, '').replace(/^./, (c) => c.toUpperCase())}</label>
-            <select id="assign-who" className={inputClass} value={value} onChange={(e) => setValue(e.target.value)}>
-              <option value="">Choose…</option>
-              {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
+          {teamMode ? (
+            <TeamPicker people={reachable} picked={picked} onChange={setPicked} />
+          ) : (
+            <>
+              <div className="min-w-0">
+                <label htmlFor="assign-scope" className={labelClass}>Assign to</label>
+                <select id="assign-scope" className={inputClass} value={scope} onChange={(e) => { setScope(e.target.value as AssignScope); setValue(''); }}>
+                  {SCOPES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                </select>
+              </div>
+              <div className="min-w-0">
+                <label htmlFor="assign-who" className={labelClass}>{SCOPES.find((s) => s.id === scope)?.label.replace(/^(One|A) /, '').replace(/^./, (c) => c.toUpperCase())}</label>
+                <select id="assign-who" className={inputClass} value={value} onChange={(e) => setValue(e.target.value)}>
+                  <option value="">Choose…</option>
+                  {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+            </>
+          )}
           <div className="min-w-0">
             <label htmlFor="assign-target" className={labelClass}>Target</label>
             <input id="assign-target" className={inputClass} inputMode="decimal" value={target} onChange={(e) => setTarget(e.target.value)}
@@ -245,6 +265,33 @@ export default function AssignKpis({ kpis, periods, people, departments, access 
         {editing && <EditAssignment a={editing} onDone={async () => { setEditing(null); await reload(); }} onCancel={() => setEditing(null)} />}
       </Modal>
     </div>
+  );
+}
+
+/** Tick one or more of the supervisor's reports. */
+function TeamPicker({ people, picked, onChange }: { people: KpiPerson[]; picked: string[]; onChange: (ids: string[]) => void }) {
+  const all = people.length > 0 && people.every((p) => picked.includes(p.employeeNumber));
+  const toggle = (emp: string) => onChange(picked.includes(emp) ? picked.filter((x) => x !== emp) : [...picked, emp]);
+  return (
+    <fieldset className="min-w-0 sm:col-span-2 lg:col-span-3">
+      <legend className={labelClass}>Assign to</legend>
+      {people.length === 0 ? (
+        <p className="text-[12px] text-muted-foreground">Nobody reports to you.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <label className="inline-flex items-center gap-2 rounded-tile border border-border px-3 py-1.5 text-[12.5px] text-ink cursor-pointer">
+            <input type="checkbox" checked={all} onChange={() => onChange(all ? [] : people.map((p) => p.employeeNumber))} />
+            Everyone ({people.length})
+          </label>
+          {people.map((p) => (
+            <label key={p.employeeNumber} className="inline-flex items-center gap-2 rounded-tile border border-border px-3 py-1.5 text-[12.5px] text-ink cursor-pointer">
+              <input type="checkbox" checked={picked.includes(p.employeeNumber)} onChange={() => toggle(p.employeeNumber)} />
+              {p.fullName}
+            </label>
+          ))}
+        </div>
+      )}
+    </fieldset>
   );
 }
 

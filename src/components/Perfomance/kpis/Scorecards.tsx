@@ -25,9 +25,11 @@ interface Props {
   people: KpiPerson[];
   departments: Department[];
   access: KpiAccess;
+  /** the staff portal's My team: just the supervisor's reports, so no department filter */
+  teamMode?: boolean;
 }
 
-export default function Scorecards({ kpis, periods, people, departments, access }: Props) {
+export default function Scorecards({ kpis, periods, people, departments, access, teamMode = false }: Props) {
   const [periodId, setPeriodId] = useState(() => defaultPeriodId(periods));
   const [assignments, setAssignments] = useState<KpiAssignment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -55,7 +57,11 @@ export default function Scorecards({ kpis, periods, people, departments, access 
   }, [reload]);
 
   const period = periods.find((p) => p.id === periodId);
-  const cards = useMemo(() => buildScorecards(assignments, kpis, people), [assignments, kpis, people]);
+  const cards = useMemo(() => {
+    // My team shows the supervisor's reports only, even to someone who can see more
+    const team = new Set(people.map((p) => p.employeeNumber));
+    return buildScorecards(teamMode ? assignments.filter((a) => team.has(a.employee_number)) : assignments, kpis, people);
+  }, [assignments, kpis, people, teamMode]);
   const deptOf = useMemo(() => new Map(people.map((p) => [p.employeeNumber, p.departmentId])), [people]);
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -86,13 +92,15 @@ export default function Scorecards({ kpis, periods, people, departments, access 
       <Card padding="sm">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
           <PeriodSelect periods={periods} value={periodId} onChange={setPeriodId} id="scorecard-period" />
-          <div className="min-w-0">
-            <label htmlFor="scorecard-department" className={labelClass}>Department</label>
-            <select id="scorecard-department" className={inputClass} value={department} onChange={(e) => setDepartment(e.target.value)}>
-              <option value="">All departments</option>
-              {usedDepartments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-          </div>
+          {!teamMode && (
+            <div className="min-w-0">
+              <label htmlFor="scorecard-department" className={labelClass}>Department</label>
+              <select id="scorecard-department" className={inputClass} value={department} onChange={(e) => setDepartment(e.target.value)}>
+                <option value="">All departments</option>
+                {usedDepartments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>
+          )}
           <div className="min-w-0">
             <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search people" aria-label="Search people" />
           </div>
@@ -102,7 +110,7 @@ export default function Scorecards({ kpis, periods, people, departments, access 
         </div>
       </Card>
 
-      {!access.manages && <p className="text-[12px] text-muted-foreground">Showing the people who report to you.</p>}
+      {!access.manages && !teamMode && <p className="text-[12px] text-muted-foreground">Showing the people who report to you.</p>}
 
       {shown.length === 0 ? (
         <Card>
