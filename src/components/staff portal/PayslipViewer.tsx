@@ -20,6 +20,7 @@ import toast from 'react-hot-toast';
 import { payslipDeductionLines } from '../../lib/voluntaryDeductions';
 import { nonTaxableEarningsOf, payslipEarningLines } from '../../lib/earnings';
 import { leaveLineLabel, leaveLineWorking, payslipLeaveLines, type LeaveItem } from '../../lib/leavePay';
+import { overtimeLineLabel, overtimeLineWorking, payslipOvertimeLines, payslipOvertimePay, type OvertimeItem } from '../../lib/overtimePay';
 import html2pdf from 'html2pdf.js';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -123,7 +124,8 @@ const savedPayslipValues = (saved: Record<string, any>) => {
     otherAllowances: n(saved.other_allowances),
     overtimeHours: n(saved.overtime_hours),
     overtimeRate: n(saved.overtime_rate),
-    overtimePay: n(saved.overtime_hours) * n(saved.overtime_rate),
+    overtimePay: payslipOvertimePay(saved),
+    overtimeLines: payslipOvertimeLines(saved),
     commission: n(saved.commission),
     bonus: n(saved.bonus),
     perDiem,
@@ -315,6 +317,7 @@ const calculatePayrollValues = (employee, overrideStatutoryChecks = true, salary
     deductionLines: payslipDeductionLines({ loan_deduction: loanDeduction, welfare_deduction: welfareDeduction, other_deductions: otherDeductions }),
     earningLines: payslipEarningLines({ commission, bonus }),
     leaveLines: [] as LeaveItem[],
+    overtimeLines: [] as OvertimeItem[],
     totalDeductions,
     netPay,
     taxableGross,
@@ -557,7 +560,13 @@ const PayslipModal = ({
                     <div className="flex justify-between"><span>Transport</span><span className="font-semibold">KSh {calculated.transportAllowance.toLocaleString()}</span></div>
                     <div className="flex justify-between"><span>Medical</span><span className="font-semibold">KSh {calculated.medicalAllowance.toLocaleString()}</span></div>
                     <div className="flex justify-between"><span>Other</span><span className="font-semibold">KSh {calculated.otherAllowances.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Overtime</span><span className="font-semibold">KSh {calculated.overtimePay.toLocaleString()}</span></div>
+                    {calculated.overtimeLines.length > 0 ? (
+                      calculated.overtimeLines.map((line, i) => (
+                        <div key={`overtime-${line.day_type}-${i}`} className="flex justify-between gap-3"><span>{overtimeLineLabel(line)}<span className="block text-gray-500 text-xs">{overtimeLineWorking(line)}</span></span><span className="font-semibold whitespace-nowrap">KSh {line.amount.toLocaleString()}</span></div>
+                      ))
+                    ) : (
+                      <div className="flex justify-between"><span>Overtime</span><span className="font-semibold">KSh {calculated.overtimePay.toLocaleString()}</span></div>
+                    )}
                     {calculated.earningLines.map((line, i) => (
                       <div key={`${line.name}-${i}`} className="flex justify-between"><span>{line.name}{line.taxable ? '' : ' (not taxed)'}</span><span className="font-semibold">KSh {line.amount.toLocaleString()}</span></div>
                     ))}
@@ -1169,10 +1178,19 @@ const PayslipViewer = () => {
                                   <span>Transport Allowance:</span>
                                   <span>KSh {calculated.transportAllowance.toLocaleString()}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                  <span>Overtime Pay:</span>
-                                  <span>KSh {calculated.overtimePay.toLocaleString()}</span>
-                                </div>
+                                {calculated.overtimeLines.length > 0 ? (
+                                  calculated.overtimeLines.map((line, i) => (
+                                    <div key={`overtime-${line.day_type}-${i}`} className="flex justify-between">
+                                      <span>{overtimeLineLabel(line)}:</span>
+                                      <span>KSh {line.amount.toLocaleString()}</span>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="flex justify-between">
+                                    <span>Overtime Pay:</span>
+                                    <span>KSh {calculated.overtimePay.toLocaleString()}</span>
+                                  </div>
+                                )}
                                 <div className="flex justify-between font-bold bg-orange-tint-alt p-1">
                                   <span>Per Diem:</span>
                                   <span>KSh {calculated.perDiem.toLocaleString()}</span>

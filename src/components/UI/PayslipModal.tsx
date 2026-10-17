@@ -4,6 +4,7 @@ import { Download, Printer, Share2, X, ArrowLeft, ArrowRight, Shield, Award, Bui
 import GlowButton from '../UI/GlowButton';
 import { paymentMethodLabel } from '../../lib/paymentMethods';
 import { payslipEarningLines } from '../../lib/earnings';
+import { overtimeLineLabel, payslipOvertimeLines, payslipOvertimePay } from '../../lib/overtimePay';
 
 interface PayslipModalProps {
   record: any;
@@ -720,10 +721,19 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ record, onClose, onPrevious
                       <td>Other Allowances</td>
                       <td className="amount">{record.other_allowances.toLocaleString()}</td>
                     </tr>
-                    <tr>
-                      <td>Overtime ({record.overtime_hours} hrs @ {record.overtime_rate}/hr)</td>
-                      <td className="amount">{(record.overtime_hours * record.overtime_rate).toLocaleString()}</td>
-                    </tr>
+                    {payslipOvertimeLines(record).length > 0 ? (
+                      payslipOvertimeLines(record).map((line, i) => (
+                        <tr key={`overtime-${line.day_type}-${i}`}>
+                          <td>{overtimeLineLabel(line)}</td>
+                          <td className="amount">{line.amount.toLocaleString()}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td>Overtime ({record.overtime_hours} hrs @ {record.overtime_rate}/hr)</td>
+                        <td className="amount">{payslipOvertimePay(record).toLocaleString()}</td>
+                      </tr>
+                    )}
                     {payslipEarningLines(record).map((line, i) => (
                       <tr key={`${line.name}-${i}`}>
                         <td>{line.name}{line.taxable ? '' : ' (not taxed)'}</td>

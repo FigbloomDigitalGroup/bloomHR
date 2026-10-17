@@ -15,17 +15,27 @@ const rows = [
 describe('payroll register PDF', () => {
   it('works out allowances, other deductions and totals', () => {
     const { lines, totals } = registerFigures(rows);
-    expect(lines[0].amounts).toEqual([80000, 15000, 0, 95000, 17000, 2612.5, 5700, 1425, 3000, 65262.5]);
+    expect(lines[0].amounts).toEqual([80000, 15000, 0, 0, 95000, 17000, 2612.5, 5700, 1425, 3000, 65262.5]);
     expect(lines[1].department).toBe('Nakuru');
-    expect(lines[1].amounts[8]).toBe(1000);
-    expect(totals[3]).toBe(125000);
-    expect(totals[9]).toBe(89187.5);
+    expect(lines[1].amounts[9]).toBe(1000);
+    expect(totals[4]).toBe(125000);
+    expect(totals[10]).toBe(89187.5);
   });
 
   it('shows unpaid and half-pay leave as its own column, so allowances stay what they are (FIG-880)', () => {
     // basic 30,000, 5,000 allowances, 2,000 of unpaid leave: gross 33,000
     const { lines } = registerFigures([{ ...rows[1], house_allowance: 5000, gross_pay: 33000, leave_deduction: 2000 } as never]);
-    expect(lines[0].amounts.slice(0, 4)).toEqual([30000, 5000, -2000, 33000]);
+    expect(lines[0].amounts.slice(0, 5)).toEqual([30000, 5000, 0, -2000, 33000]);
+  });
+
+  it('shows overtime as its own column, from its lines or the old hours x rate (FIG-889)', () => {
+    // basic 30,000, 5,000 allowances, 3,022.26 overtime: gross 38,022.26
+    const items = [{ name: 'Overtime (normal days)', day_type: 'normal', hours: 6, hourly_rate: 177.78, multiplier: 1.5, amount: 1600.02 },
+      { name: 'Overtime (rest days)', day_type: 'rest', hours: 4, hourly_rate: 177.78, multiplier: 2, amount: 1422.24 }];
+    const { lines } = registerFigures([{ ...rows[1], gross_pay: 38022.26, overtime_items: items } as never]);
+    expect(lines[0].amounts.slice(0, 5)).toEqual([30000, 5000, 3022.26, 0, 38022.26]);
+    const old = registerFigures([{ ...rows[1], gross_pay: 31000, overtime_hours: 5, overtime_rate: 200 } as never]);
+    expect(old.lines[0].amounts.slice(0, 3)).toEqual([30000, 0, 1000]);
   });
 
   it('draws a real PDF with the table, its totals and the period', () => {

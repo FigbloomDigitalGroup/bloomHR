@@ -27,6 +27,7 @@ import {
   HeartHandshake,
   HandCoins,
   HardHat,
+  Timer,
   LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature, History, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
@@ -78,6 +79,8 @@ const menuGroups = [
       { id: 'payroll', label: 'Payroll', icon: Landmark, path: '/payroll', permission: 'payroll' },
       // people paid by the day, outside the monthly payroll: payroll, HR, and managers who supervise casuals
       { id: 'casual-workers', label: 'Casual workers', icon: HardHat, path: '/casual-workers', anyPermission: ['work-records', 'payroll', 'employees'], orRoles: ['HR', 'MANAGER'] },
+      // overtime hours per day, approved and paid with the month's salary: payroll, and managers for their team
+      { id: 'overtime', label: 'Overtime', icon: Timer, path: '/overtime', anyPermission: ['payroll', 'work-records'], orRoles: ['HR', 'MANAGER'] },
       // job groups and their pay: for Payroll and Employees, who can't open Settings
       { id: 'job-groups', label: 'Job groups', icon: Layers, path: '/settings/job-groups', anyPermission: ['payroll', 'employees'] },
       { id: 'expense', label: 'Expenses', icon: Receipt, path: '/expenses', permission: 'expenses' },

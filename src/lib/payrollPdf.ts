@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 // the table plugin is called directly: since jspdf-autotable 5 importing it no longer adds doc.autoTable
 import { autoTable } from 'jspdf-autotable';
+import { payslipOvertimePay, round2 } from './overtimePay';
 
 // The month's payroll register as a PDF (A4 landscape): one row per payslip with the statutory columns, and the
 // totals at the foot. Built from the rows the payroll page already shows, so it matches the screen.
@@ -16,6 +17,11 @@ export interface PayrollRegisterRow {
   gross_pay?: number | null;
   /** unpaid and half-pay leave taken off gross pay (FIG-880) */
   leave_deduction?: number | null;
+  /** overtime paid (FIG-889): its lines, or hours x rate on older payslips */
+  overtime_items?: unknown;
+  overtime_pay?: number | null;
+  overtime_hours?: number | null;
+  overtime_rate?: number | null;
   paye_tax?: number | null;
   nhif_deduction?: number | null;
   nssf_deduction?: number | null;
@@ -25,7 +31,7 @@ export interface PayrollRegisterRow {
 }
 
 export const REGISTER_COLUMNS = [
-  'No.', 'Employee', 'Department', 'Basic', 'Allowances', 'Leave deduction', 'Gross pay', 'PAYE', 'SHIF', 'NSSF', 'Housing levy', 'Other deductions', 'Net pay',
+  'No.', 'Employee', 'Department', 'Basic', 'Allowances', 'Overtime', 'Leave deduction', 'Gross pay', 'PAYE', 'SHIF', 'NSSF', 'Housing levy', 'Other deductions', 'Net pay',
 ] as const;
 
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : Number(v) || 0);
@@ -37,6 +43,7 @@ export function registerFigures(rows: PayrollRegisterRow[]) {
     const basic = num(r.basic_salary);
     const gross = num(r.gross_pay);
     const leave = num(r.leave_deduction);
+    const overtime = payslipOvertimePay(r);
     const paye = num(r.paye_tax);
     const shif = num(r.nhif_deduction);
     const nssf = num(r.nssf_deduction);
@@ -46,11 +53,11 @@ export function registerFigures(rows: PayrollRegisterRow[]) {
       number: String(r.employeeNu || r.employee_id || ''),
       name: String(r.employee_name || ''),
       department: String((r.department === 'Branch Staff' ? r.branch : r.department) || ''),
-      // gross pay = basic + allowances and earnings − leave
-      amounts: [basic, Math.max(0, gross + leave - basic), leave ? -leave : 0, gross, paye, shif, nssf, levy, Math.max(0, total - paye - shif - nssf - levy), num(r.net_pay)],
+      // gross pay = basic + allowances and earnings + overtime − leave
+      amounts: [basic, Math.max(0, round2(gross + leave - basic - overtime)), overtime, leave ? -leave : 0, gross, paye, shif, nssf, levy, Math.max(0, total - paye - shif - nssf - levy), num(r.net_pay)],
     };
   });
-  const totals = lines.reduce((sum, l) => sum.map((s, i) => s + l.amounts[i]), Array(10).fill(0) as number[]);
+  const totals = lines.reduce((sum, l) => sum.map((s, i) => s + l.amounts[i]), Array(11).fill(0) as number[]);
   return { lines, totals };
 }
 
