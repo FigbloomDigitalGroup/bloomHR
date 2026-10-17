@@ -37,6 +37,8 @@ export interface SalaryHistoryRecord {
     /** unpaid and half-pay leave taken off gross pay this month (FIG-880), and its lines */
     leave_deduction?: number;
     leave_items?: LeaveItem[];
+    /** a note payroll added when editing the payslip (FIG-883) */
+    payslip_note?: string | null;
     payment_method?: string;
     bank_name?: string;
     account_number?: string;

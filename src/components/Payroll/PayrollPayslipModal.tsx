@@ -4,6 +4,7 @@ import html2pdf from "html2pdf.js";
 import { payslipDeductionLines } from "../../lib/voluntaryDeductions";
 import { payslipEarningLines } from "../../lib/earnings";
 import { leaveLineLabel, leaveLineWorking, payslipLeaveLines } from "../../lib/leavePay";
+import { PayslipEditBar, type PayslipEditing } from "./PayslipEditModal";
 
 // One employee's payslip for the month (view, previous / next, PDF), moved from PayrollDashboard.
 
@@ -58,12 +59,15 @@ export const PayslipModal = ({
   onPrevious,
   onNext,
   companyInfo,
+  edit,
 }: {
   record: any;
   onClose: () => void;
   onPrevious?: () => void;
   onNext?: () => void;
   companyInfo: any;
+  /** payroll users, once the month has a run: edit this payslip while the run is a draft (FIG-883) */
+  edit?: PayslipEditing;
 }) => {
 
   const handleDownloadPDF = () => {
@@ -101,6 +105,8 @@ export const PayslipModal = ({
             </GlowButtonss>
           </div>
         </div>
+
+        {edit && <PayslipEditBar key={record.employee_id} record={record} edit={edit} />}
 
         <div className="p-2 bg-gray-50 payslip-container print:p-0 print:w-[210mm] print:h-[297mm]">
           <div
@@ -314,6 +320,13 @@ export const PayslipModal = ({
                   <span className="font-bold border-b-[3px] border-gray-400 border-double pb-0.5">KSh {Math.round(record.net_pay || 0).toLocaleString()}</span>
                 </div>
               </div>
+
+              {record.payslip_note && (
+                <div className="border border-gray-300 p-3 mb-6 text-black">
+                  <span className="font-bold">Note: </span>
+                  <span className="whitespace-pre-line">{record.payslip_note}</span>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-4 text-center text-xs">
                 <div className="p-2 pt-8">
