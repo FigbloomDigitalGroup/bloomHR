@@ -33,6 +33,7 @@ import type { DemoPayLine } from "../../lib/demoPayments";
 import { Pagination } from "./PayrollPagination";
 import { PayslipSettlementBlock, WhtDeductionLine, WorkEarningLines } from "./PayslipSettlement";
 import WorkSettlementCard from "./WorkSettlementCard";
+import MinimumWageWarning from "./MinimumWageWarning";
 
 // The Run tab: the month's payroll run (start, recalculate, approve, mark paid), the returns check, and the list of
 // employees on the payroll with their pay. The figures are worked out by PayrollDashboard; this only shows them.
@@ -346,6 +347,15 @@ export default function PayrollRunTab({
       />
 
       {(!monthRun || monthRun.status === "draft") && <ReturnsReadiness employees={onPayroll} />}
+      {/* a warning before approval, never a block (FIG-812 stage 6) */}
+      {!approved && payPeriod && (
+        <MinimumWageWarning
+          payslips={payrollRecords ?? finalFilteredRecords}
+          employees={onPayroll}
+          payPeriod={payPeriod}
+          periodLabel={periodLabel}
+        />
+      )}
       {approved && (
         <Card padding="sm" className="!rounded-xl">
           <div className="flex flex-wrap items-center gap-2 text-xs">

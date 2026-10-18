@@ -10,6 +10,8 @@ import CasualFormModal from './CasualFormModal';
 import CasualUploadModal from './CasualUploadModal';
 import CasualDaysGrid from './CasualDaysGrid';
 import CasualPayRuns from './CasualPayRuns';
+import { casualRateShortfall } from '../../lib/minimumWage';
+import { useMinimumWages } from '../../hooks/useMinimumWages';
 
 // Casual workers: people paid by the day who are not on the monthly payroll. Payroll and HR register them; their
 // supervisor and payroll record the days they work; payroll pays them in pay runs and downloads the payout files.
@@ -115,6 +117,8 @@ export default function CasualWorkers() {
     );
   }, [casuals, current, query, showFinished]);
   const alertFor = useMemo(() => new Map(alerts.map((a) => [a.employee_number, a])), [alerts]);
+  // daily rates below the per-day minimum wage today (FIG-812 stage 6): a badge, never a block
+  const wages = useMinimumWages(today());
 
   const tabs = [
     { id: 'casuals', label: `Casual workers (${current.length})` },
@@ -212,6 +216,9 @@ export default function CasualWorkers() {
                             <span className="font-semibold text-ink">{casualName(c)}</span>
                             {c.finished_on && <StatusPill label={`Finished ${longDate(c.finished_on)}`} />}
                             {alert && <StatusPill label={`${alert.days_in_a_row} days in a row`} tone={alert.level === 'over' ? 'danger' : 'warning'} />}
+                            {!c.finished_on && casualRateShortfall(c.daily_rate, wages.minimumFor(c.employee_number), wages.settings) !== null && (
+                              <StatusPill label="Below minimum wage" tone="warning" />
+                            )}
                           </div>
                           <div className="text-[10.5px] text-subtle">{c.employee_number}</div>
                         </td>

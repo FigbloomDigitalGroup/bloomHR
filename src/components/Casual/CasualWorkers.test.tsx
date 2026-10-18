@@ -16,6 +16,7 @@ const api = vi.hoisted(() => ({
   approveRun: vi.fn(),
   markRunPaid: vi.fn(),
 }));
+const wage = vi.hoisted(() => ({ monthly: null as number | null }));
 const perms = vi.hoisted(() => ({ modules: ['payroll'] as string[] }));
 const confirmDialog = vi.hoisted(() => vi.fn());
 const saveAs = vi.hoisted(() => vi.fn());
@@ -57,6 +58,11 @@ vi.mock('../../lib/casualApi', () => ({
   deleteRun: vi.fn(),
 }));
 
+vi.mock('../../lib/minimumWageApi', () => ({
+  loadCompanyMinimum: () => Promise.resolve({ enabled: true, daysPerMonth: 26, minimum: { country: 'Kenya', monthly: wage.monthly, currency: 'KES' } }),
+  loadEmployeeMinimums: () => Promise.resolve(new Map()),
+}));
+
 import CasualWorkers from './CasualWorkers';
 
 const monday = weekStart(today());
@@ -68,6 +74,7 @@ const casual = (n: string, first: string, patch: Partial<CasualWorker> = {}): Ca
 });
 
 beforeEach(() => {
+  wage.monthly = null;
   perms.modules = ['payroll'];
   api.casuals = [casual('C1', 'Wanjiku'), casual('C2', 'Kamau', { finished_on: '2026-02-01' }), casual('C3', 'Otieno')];
   api.alerts = [{ employee_number: 'C1', worker_name: 'Wanjiku Mwangi', days_in_a_row: 34, since: '2026-09-01', last_worked: today(), day_limit: 30, level: 'over' }];
@@ -153,5 +160,26 @@ describe('CasualWorkers', () => {
     expect(saveAs).toHaveBeenCalledWith(expect.any(Blob), 'casual-pay-2026-10-05-to-2026-10-11-mpesa.csv');
     fireEvent.click(screen.getByRole('button', { name: 'Mark paid' }));
     await waitFor(() => expect(api.markRunPaid).toHaveBeenCalledWith('r1', today()));
+  });
+
+  it('warns, without blocking, when a daily rate is below the per-day minimum wage', async () => {
+    wage.monthly = 15600; // 600 a day over 26 days
+    api.casuals = [casual('C1', 'Wanjiku', { daily_rate: 500 }), casual('C3', 'Otieno')];
+    api.lines = [{ ...api.lines[0], daily_rate: 500 }];
+    render(<CasualWorkers />);
+    expect(await screen.findByText('Below minimum wage')).toBeTruthy();
+    expect(screen.getAllByText('Below minimum wage')).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Register a casual' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Daily rate (KSh)'), { target: { value: '550' } });
+    expect((await within(dialog).findByTestId('casual-minimum-wage')).textContent).toMatch(/KES 600 a day in Kenya.*short by KES 50 a day/);
+    fireEvent.change(within(dialog).getByLabelText('Daily rate (KSh)'), { target: { value: '600' } });
+    expect(within(dialog).queryByTestId('casual-minimum-wage')).toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pay runs' }));
+    fireEvent.click(await screen.findByText('5 Oct 2026 to 11 Oct 2026'));
+    expect((await screen.findByTestId('casual-run-minimum-wage')).textContent).toMatch(/1 person has a daily rate below the minimum wage/);
   });
 });
