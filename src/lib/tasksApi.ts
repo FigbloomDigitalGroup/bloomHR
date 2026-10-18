@@ -93,6 +93,17 @@ export async function loadTasks(): Promise<Task[]> {
   return rows.map(toTask);
 }
 
+/** The open tasks assigned to this employee (not done, not cancelled), for the staff portal home. */
+export async function loadMyOpenTasks(employeeNumber: string): Promise<Task[]> {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select(TASK_COLUMNS)
+    .eq('assignee_number', employeeNumber)
+    .not('status', 'in', '(done,cancelled)');
+  if (error) fail(error, 'Could not load your tasks');
+  return ((data ?? []) as unknown as TaskRow[]).map(toTask);
+}
+
 export async function loadLabels(): Promise<TaskLabel[]> {
   const { data, error } = await supabase.from('task_labels').select('id, name, color').order('name');
   if (error) fail(error, 'Could not load labels');
