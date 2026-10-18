@@ -7,6 +7,8 @@ import { TownProps } from '../../types/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageHeader, StatCard, Card, TabBar, EmptyState, Button } from '../UI';
 import GetStarted from './GetStarted';
+import GroupOverview from './GroupOverview';
+import { money } from '../../lib/payroll/currency';
 import { TodaysBirthdayWishes } from '../Celebrations/BirthdayWishes';
 import { findBirthdays } from '../../lib/birthdays';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -41,6 +43,8 @@ interface ActivityItem {
   status: string;
   date: string;
   amount?: number;
+  /** the amount's currency (the employee's branch's); KES when not known */
+  currency?: string;
 }
 
 export default function DashboardMain({ selectedTown, onTownChange }: TownProps) {
@@ -585,6 +589,9 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
               <StatCard label="Active Branches" value={stats.activeBranches} icon={<MapPin className="w-[18px] h-[18px]" strokeWidth={1.8} />} tint="green" />
             </div>
 
+            {/* the group view: headcount by country and payroll money per currency (FIG-905) */}
+            <GroupOverview />
+
             {activeTab === 'analytics' ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
                 <Card>
@@ -673,7 +680,7 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
                           <div className="flex items-center gap-2">
                             {activity.amount && (
                               <span className="text-xs font-semibold text-gray-900 bg-gray-50 border border-gray-100 px-1.5 py-0.5 rounded shadow-sm">
-                                KSh {activity.amount.toLocaleString()}
+                                {money(activity.amount, activity.currency)}
                               </span>
                             )}
                             <span className={`text-[10px] font-medium px-2 py-0.5 rounded border

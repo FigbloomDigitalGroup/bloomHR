@@ -12,7 +12,8 @@ import {
   ChevronRight,
   UserX,
   CalendarDays,
-  Search
+  Search,
+  Globe
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { EmptyState } from '../UI';
@@ -36,6 +37,14 @@ const CATEGORY_TINTS: Record<string, string> = {
 
 const REPORTS_LIST: ReportItem[] = [
   {
+    id: 'group-report',
+    title: 'Group Report (all countries)',
+    description: 'Headcount and HR numbers across countries; payroll summary, statutory remittances and cost by branch per currency',
+    icon: Globe,
+    category: 'Payroll',
+    path: '/reports/group'
+  },
+  {
     id: 'salary-advance',
     title: 'Staff Salary Advance',
     description: 'View and manage employee salary advance requests and records',
@@ -54,7 +63,7 @@ const REPORTS_LIST: ReportItem[] = [
   {
     id: 'statutory-deductions',
     title: 'Staff Statutory Deductions',
-    description: 'Reports on PAYE, NSSF, NHIF, and other statutory deductions',
+    description: 'Kenya: reports on PAYE, NSSF, SHIF, and other statutory deductions',
     icon: Scale,
     category: 'Payroll',
     path: '/reports/statutory'

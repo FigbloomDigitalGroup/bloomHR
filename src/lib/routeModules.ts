@@ -45,6 +45,8 @@ export const SCREENS: ScreenAccess[] = [
   S('/dashboard', 'Dashboard', ['dashboard']),
   S('/calendar', 'Calendar', ['dashboard']),
   S('/reports', 'Reports', ['reports']),
+  // people numbers for reports or employees, the money tabs for payroll (FIG-905)
+  S('/reports/group', 'Group report', ['reports', 'employees', 'payroll']),
   sub('/reports/base', 'Base report', ['reports']),
   sub('/reports/staffloan', 'Staff loan report', ['reports']),
   sub('/reports/statutory', 'Statutory deductions report', ['reports']),
