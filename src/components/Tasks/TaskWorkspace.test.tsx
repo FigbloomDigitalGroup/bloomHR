@@ -87,3 +87,16 @@ describe('TaskWorkspace (staff)', () => {
     expect(screen.queryByRole('button', { name: /New task/ })).toBeNull();
   });
 });
+
+describe('TaskWorkspace (admin)', () => {
+  it('says who sees what, and an admin outside a project is told they only see the tasks they are involved in', async () => {
+    api.loadTaskViewer.mockResolvedValue({ userId: 'u-adm', employeeNumber: 'E-ADM', manages: true });
+    render(<TaskWorkspace mode="admin" />);
+    expect(await screen.findByText(/You see tasks you're involved in/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /All tasks/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Everything I can see/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /^OPS Operations/ }));
+    expect(screen.getByText(/You are not in this project/)).toBeTruthy();
+    expect(screen.getByText(/Add yourself as a member/)).toBeTruthy();
+  });
+});

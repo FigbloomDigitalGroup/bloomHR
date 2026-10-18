@@ -98,19 +98,22 @@ export default function TaskWorkspace({ mode, teamNumbers, initialOpenId = null 
   const projectById = useMemo(() => Object.fromEntries(projects.map((p) => [p.id, p])), [projects]);
   const labelById = useMemo(() => Object.fromEntries(labels.map((l) => [l.id, l])), [labels]);
 
+  // one of the project's people (sees all its tasks); running tasks alone is not membership
   const isMember = useCallback((p: TaskProject) => {
     if (!viewer) return false;
-    if (viewer.manages || p.created_by === viewer.userId) return true;
+    if (p.created_by === viewer.userId) return true;
     const me = viewer.employeeNumber;
     return !!me && (p.lead_number === me || (members[p.id] ?? []).includes(me) || (!!p.department_id && p.department_id === myDepartment));
   }, [viewer, members, myDepartment]);
+  // edits the project and its members: its lead, or the people who run tasks
   const leads = useCallback((p: TaskProject) => !!viewer && (viewer.manages || p.created_by === viewer.userId || (!!viewer.employeeNumber && p.lead_number === viewer.employeeNumber)), [viewer]);
 
   const sidebarProjects = useMemo(
     () => projects.filter((p) => (showArchived || !p.archived) && (mode === 'admin' || isMember(p) || tasks.some((t) => t.project_id === p.id))),
     [projects, showArchived, mode, isMember, tasks]
   );
-  const creatable = useMemo(() => projects.filter((p) => !p.archived && isMember(p)), [projects, isMember]);
+  // the people who run tasks may add a task to any project (they then see it, as its creator)
+  const creatable = useMemo(() => projects.filter((p) => !p.archived && (!!viewer?.manages || isMember(p))), [projects, isMember, viewer]);
 
   // what this scope shows, before the filters
   const scoped = useMemo(() => {
@@ -167,7 +170,7 @@ export default function TaskWorkspace({ mode, teamNumbers, initialOpenId = null 
 
   const open = openId ? tasks.find((t) => t.id === openId) ?? null : null;
   const currentProject = scope.startsWith('project:') ? projectById[scope.slice('project:'.length)] : null;
-  const title = team ? 'Team tasks' : scope === 'my' ? 'My tasks' : scope === 'all' ? (mode === 'admin' && viewer.manages ? 'All tasks' : 'Everything I can see') : scope === 'templates' ? 'Recurring tasks' : currentProject?.name ?? 'Tasks';
+  const title = team ? 'Team tasks' : scope === 'my' ? 'My tasks' : scope === 'all' ? 'Everything I can see' : scope === 'templates' ? 'Recurring tasks' : currentProject?.name ?? 'Tasks';
   const set = (patch: Partial<TaskFilters>) => setFilters((f) => ({ ...f, ...patch }));
 
   const navButton = (id: Scope, label: string, icon: ReactNode, count?: number) => (
@@ -204,11 +207,15 @@ export default function TaskWorkspace({ mode, teamNumbers, initialOpenId = null 
         }
       />
 
+      {!team && (
+        <p className="mb-3 text-[12px] text-muted-foreground">You see tasks you're involved in: yours, ones you created, your projects', and your team's.</p>
+      )}
+
       <div className="flex flex-col lg:flex-row gap-4">
         {!team && (
           <nav aria-label="Task views" className="lg:w-56 shrink-0 flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible">
             {navButton('my', 'My tasks', <User size={14} />, openCount((t) => !!viewer.employeeNumber && t.assignee_number === viewer.employeeNumber))}
-            {navButton('all', mode === 'admin' && viewer.manages ? 'All tasks' : 'Everything I can see', <Layers size={14} />)}
+            {navButton('all', 'Everything I can see', <Layers size={14} />)}
             {mode === 'admin' && viewer.manages && navButton('templates', 'Recurring', <Repeat size={14} />)}
             <p className="hidden lg:block mt-3 mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Projects</p>
             {sidebarProjects.map((p) => (
@@ -242,6 +249,12 @@ export default function TaskWorkspace({ mode, teamNumbers, initialOpenId = null 
                   <button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')} className={`px-2.5 py-1.5 text-xs inline-flex items-center gap-1 ${view === 'list' ? 'bg-secondary font-medium' : 'bg-white'}`}><List size={13} /> List</button>
                 </div>
               </div>
+
+              {currentProject && !isMember(currentProject) && (
+                <p className="mb-3 text-[12px] text-muted-foreground">
+                  You are not in this project, so you only see its tasks you're involved in.{leads(currentProject) ? ' Add yourself as a member to see all of them.' : ''}
+                </p>
+              )}
 
               <div className="flex flex-wrap items-center gap-2 mb-3" aria-label="Filters">
                 <SearchInput aria-label="Search tasks" placeholder="Search tasks" value={filters.search} onChange={(e) => set({ search: e.target.value })} className="w-full sm:w-56" />

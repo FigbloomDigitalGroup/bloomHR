@@ -301,8 +301,8 @@ export const activeFilterCount = (f: TaskFilters) =>
 // who may do what (the database decides; this only hides buttons that would fail)
 // ---------------------------------------------------------------------------------------------
 
+// no role-wide power: running tasks (viewer.manages) is about projects, labels and templates, not other people's tasks
 export function canEditTask(t: Task, viewer: TaskViewer, project?: TaskProject | null): boolean {
-  if (viewer.manages) return true;
   if (t.created_by && t.created_by === viewer.userId) return true;
   if (viewer.employeeNumber && t.assignee_number === viewer.employeeNumber) return true;
   if (project && (project.created_by === viewer.userId || (!!viewer.employeeNumber && project.lead_number === viewer.employeeNumber))) return true;
@@ -310,7 +310,6 @@ export function canEditTask(t: Task, viewer: TaskViewer, project?: TaskProject |
 }
 
 export function canDeleteTask(t: Task, viewer: TaskViewer, project?: TaskProject | null): boolean {
-  if (viewer.manages) return true;
   if (t.created_by && t.created_by === viewer.userId) return true;
   return !!project && (project.created_by === viewer.userId || (!!viewer.employeeNumber && project.lead_number === viewer.employeeNumber));
 }
