@@ -21,8 +21,8 @@ const text = (value: unknown) => (value === null || value === undefined ? '' : S
 // ---------------------------------------------------------------------------------------------
 export const normaliseKraPin = (value: unknown) => text(value).replace(/\s/g, '').toUpperCase();
 export const normaliseIdNumber = (value: unknown) => text(value).replace(/\s/g, '').toUpperCase();
-export const normaliseShaNumber = (value: unknown) => text(value).replace(/\s/g, '').toUpperCase();
-export const normaliseNssfNumber = (value: unknown) => text(value).replace(/[\s-]/g, '').toUpperCase();
+export const normaliseShaNumber = (value: unknown) => text(value).replace(/[\s/.]/g, '').toUpperCase();
+export const normaliseNssfNumber = (value: unknown) => text(value).replace(/[\s/.-]/g, '').toUpperCase();
 export const normalisePhone = (value: unknown) => text(value).replace(/[\s().-]/g, '');
 
 // ---------------------------------------------------------------------------------------------
@@ -47,9 +47,15 @@ export const isValidIdNumber = (type: unknown, value: unknown) =>
 export const isValidOnboardingPhone = (value: unknown) =>
   /^(0[17]\d{8}|\+?254[17]\d{8}|\+[1-9]\d{7,14})$/.test(normalisePhone(value));
 
-/** 5 to 12 characters, all digits except that the last may be X (a check character, e.g. 206593059X). */
-export const isValidNssfNumber = (value: unknown) => /^\d{4,11}[0-9X]$/.test(normaliseNssfNumber(value));
-export const isValidShaNumber = (value: unknown) => /^[A-Z0-9-]{4,20}$/.test(normaliseShaNumber(value));
+// NSSF and SHA don't publish a number format, and real numbers vary (e.g. 206593059X, CR1234567890123-1), so these
+// only catch typos: letters and digits (SHA also dashes), with at least one digit. Spaces, dashes, slashes and dots
+// are tidied away first. The database checks the same (nssf_number_ok, sha_number_ok in 20261021300000).
+const nssfOk = (v: string) => /^[A-Z0-9]{4,15}$/.test(v) && /\d/.test(v);
+export const isValidNssfNumber = (value: unknown) => nssfOk(normaliseNssfNumber(value));
+export const isValidShaNumber = (value: unknown) => {
+  const v = normaliseShaNumber(value);
+  return /^[A-Z0-9-]{4,25}$/.test(v) && /\d/.test(v);
+};
 
 // ---------------------------------------------------------------------------------------------
 // the statutory numbers of the employee's country (FIG-905), as the database checks them (tax_number_ok,
@@ -80,7 +86,7 @@ interface CountryNumbers {
 const NUMBERS: Record<'Kenya' | 'Tanzania' | 'Uganda', CountryNumbers> = {
   Kenya: {
     taxLabel: 'KRA PIN', taxOk: (v) => /^A\d{9}[A-Z]$/.test(v), taxHint: 'should look like A123456789B', taxPlaceholder: 'A123456789B',
-    nssfOk: (v) => /^\d{4,11}[0-9X]$/.test(v), nssfHint: 'should be 5 to 12 digits (the last may be X)', sha: true,
+    nssfOk, nssfHint: 'should be 4 to 15 letters and digits', sha: true,
   },
   // TRA TIN: 9 digits (written 123-456-789). NSSF Tanzania and Uganda don't publish a member number format: 6 to 15
   // letters and digits only catches typos. A NIDA number is 20 digits (written 19900101-12345-00001-12).

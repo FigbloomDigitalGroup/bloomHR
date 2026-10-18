@@ -12,6 +12,7 @@ import {
   isValidShaNumber,
   normaliseKraPin,
   normaliseNssfNumber,
+  normaliseShaNumber,
   normalisePhone,
   onboardingMissing,
 } from './onboardingValidation';
@@ -71,24 +72,32 @@ describe('phone number', () => {
 });
 
 describe('SHA and NSSF numbers', () => {
-  it('NSSF: digits only, dashes and spaces dropped', () => {
+  it('NSSF: letters and digits, spaces, dashes, slashes and dots dropped', () => {
     expect(normaliseNssfNumber('2012-345 678')).toBe('2012345678');
+    expect(normaliseNssfNumber('2012/345.678')).toBe('2012345678');
     expect(isValidNssfNumber('2012-345 678')).toBe(true);
-    expect(isValidNssfNumber('NS12345')).toBe(false);
-    expect(isValidNssfNumber('1234')).toBe(false);
+    expect(isValidNssfNumber('NS12345')).toBe(true);
+    expect(isValidNssfNumber('123')).toBe(false); // too short
+    expect(isValidNssfNumber('1234567890123456')).toBe(false); // too long
+    expect(isValidNssfNumber('ABCDEF')).toBe(false); // no digit
+    expect(isValidNssfNumber('12#45')).toBe(false);
   });
 
-  it('NSSF: the last character may be X (a check character), saved in upper case', () => {
+  it('NSSF: real numbers with a check letter pass, saved in upper case', () => {
     expect(isValidNssfNumber('206593059X')).toBe(true); // from finance's July 2026 NSSF return
     expect(normaliseNssfNumber('206593059x')).toBe('206593059X');
-    expect(isValidNssfNumber('2065X3059')).toBe(false);
+    expect(isValidNssfNumber('2065X3059')).toBe(true);
     expect(isValidNssfNumber('X')).toBe(false);
   });
 
-  it('SHA: letters, digits and dashes', () => {
+  it('SHA: letters, digits and dashes; spaces, slashes and dots dropped', () => {
     expect(isValidShaNumber('cr 1234567')).toBe(true);
     expect(isValidShaNumber('CR-123-4')).toBe(true);
+    expect(isValidShaNumber('CR1234567890123-1')).toBe(true);
+    expect(isValidShaNumber('CR/1234/567')).toBe(true);
+    expect(normaliseShaNumber('cr/1234 567')).toBe('CR1234567');
     expect(isValidShaNumber('CR#1')).toBe(false);
+    expect(isValidShaNumber('ABCD')).toBe(false); // no digit
   });
 });
 
