@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { X } from 'lucide-react';
 import { lastDayOf } from '../../lib/payrollExports';
-import { RATE_LABELS, type RateRow, ratesInForce, setCompanyRate } from '../../lib/statutoryRates';
+import { type RateRow, isPercentCode, rateLabel, ratesInForce, setCompanyRate } from '../../lib/statutoryRates';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import TableScroll from '../UI/TableScroll';
 
@@ -14,22 +14,22 @@ const formatValue = (r: RateRow) => {
     return r.bands.map((b, i) => `${b.upto === null ? `above ${r.bands?.[i - 1]?.upto?.toLocaleString() ?? 0}` : `to ${b.upto.toLocaleString()}`}: ${(b.rate * 100).toFixed(1)}%`).join(' · ');
   }
   const v = Number(r.value);
-  return /rate$/.test(r.code) ? `${+(v * 100).toFixed(3)}%` : v.toLocaleString();
+  return isPercentCode(r.code) ? `${+(v * 100).toFixed(3)}%` : v.toLocaleString();
 };
 
-export default function StatutoryRatesModal({ payPeriod, onClose, onChanged }: { payPeriod: string; onClose: () => void; onChanged: () => void }) {
+export default function StatutoryRatesModal({ payPeriod, onClose, onChanged, country = 'Kenya' }: { payPeriod: string; onClose: () => void; onChanged: () => void; country?: string }) {
   const [rows, setRows] = useState<RateRow[] | null>(null);
   const [editing, setEditing] = useState<{ code: string; value: string; from: string; source: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setRows(await ratesInForce(lastDayOf(payPeriod)));
+      setRows(await ratesInForce(lastDayOf(payPeriod), country));
     } catch (err) {
       setRows([]);
       toast.error(err instanceof Error ? err.message : 'Could not load the statutory rates.');
     }
-  }, [payPeriod]);
+  }, [payPeriod, country]);
 
   useEffect(() => {
     void load();
@@ -41,8 +41,8 @@ export default function StatutoryRatesModal({ payPeriod, onClose, onChanged }: {
     try {
       // percentages are typed as percentages and saved as fractions
       const typed = Number(editing.value);
-      const value = /rate$/.test(editing.code) ? typed / 100 : typed;
-      await setCompanyRate(editing.code, value, editing.from, editing.source);
+      const value = isPercentCode(editing.code) ? typed / 100 : typed;
+      await setCompanyRate(editing.code, value, editing.from, editing.source, country);
       toast.success('Rate saved. Recalculate draft months it affects.');
       setEditing(null);
       await load();
@@ -59,8 +59,12 @@ export default function StatutoryRatesModal({ payPeriod, onClose, onChanged }: {
       <div className="bg-white rounded-[10px] border border-border shadow-lg w-full max-w-3xl max-h-[90vh] flex flex-col">
         <div className="px-5 py-3 border-b border-border flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-ink">Kenya statutory rates for {payPeriod}</h2>
-            <p className="text-xs text-muted-foreground">What payroll uses for PAYE, SHIF, NSSF and the housing levy this month, and from when.</p>
+            <h2 className="text-sm font-semibold text-ink">{country} statutory rates for {payPeriod}</h2>
+            <p className="text-xs text-muted-foreground">
+              {country === 'Tanzania'
+                ? 'What payroll uses for PAYE, NSSF, HESLB, SDL and WCF this month, and from when.'
+                : 'What payroll uses for PAYE, SHIF, NSSF and the housing levy this month, and from when.'}
+            </p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="p-1 text-muted-foreground hover:text-ink"><X className="h-4 w-4" /></button>
         </div>
@@ -81,14 +85,14 @@ export default function StatutoryRatesModal({ payPeriod, onClose, onChanged }: {
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id} className="border-t border-border/60 align-top">
-                    <td className="py-1.5 pr-3 text-ink">{RATE_LABELS[r.code] ?? r.code}</td>
+                    <td className="py-1.5 pr-3 text-ink">{rateLabel(r.code, country)}</td>
                     <td className="py-1.5 pr-3 text-ink">{formatValue(r)}</td>
                     <td className="py-1.5 pr-3 text-muted-foreground">{r.effective_from}{r.effective_to ? ` to ${r.effective_to}` : ''}</td>
                     <td className="py-1.5 pr-3 text-muted-foreground">{r.tenant_id ? 'Your company' : r.source ?? 'Default'}</td>
                     <td className="py-1.5 text-right">
                       {!r.bands && (
                         <button type="button" className="text-brand font-semibold"
-                          onClick={() => setEditing({ code: r.code, value: String(/rate$/.test(r.code) ? +(Number(r.value) * 100).toFixed(4) : r.value), from: `${payPeriod}-01`, source: '' })}>
+                          onClick={() => setEditing({ code: r.code, value: String(isPercentCode(r.code) ? +(Number(r.value) * 100).toFixed(4) : r.value), from: `${payPeriod}-01`, source: '' })}>
                           Change
                         </button>
                       )}
@@ -102,10 +106,10 @@ export default function StatutoryRatesModal({ payPeriod, onClose, onChanged }: {
 
           {editing && (
             <div className="mt-4 rounded-lg border border-border p-3 space-y-2">
-              <p className="text-sm font-medium text-ink">{RATE_LABELS[editing.code] ?? editing.code} for your company</p>
+              <p className="text-sm font-medium text-ink">{rateLabel(editing.code, country)} for your company</p>
               <div className="flex flex-wrap gap-3">
                 <label className="text-xs text-ink">
-                  {/rate$/.test(editing.code) ? 'Rate (%)' : 'Amount'}
+                  {isPercentCode(editing.code) ? 'Rate (%)' : 'Amount'}
                   <input type="number" min={0} step="any" value={editing.value} onChange={(e) => setEditing({ ...editing, value: e.target.value })}
                     className="block mt-1 w-36 rounded-lg border border-border px-2 py-1 text-sm" />
                 </label>

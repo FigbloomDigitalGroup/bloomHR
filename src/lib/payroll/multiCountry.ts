@@ -123,8 +123,10 @@ export function calculateRun(
       notCalculated.push({ country: g.country, reason: reason ?? `${g.country} payroll can't be worked out yet`, waiting: !g.engine, employees: g.employees });
       continue;
     }
+    // the country's headcount on the run (Tanzania's SDL applies from a number of employees)
+    const countryCtx = { ...ctx, countryHeadcount: g.employees.length };
     for (const e of g.employees) {
-      const r = g.engine.calculate({ employee: e, ctx });
+      const r = g.engine.calculate({ employee: e, ctx: countryCtx });
       records.push({ ...r.record, country: g.engine.country, currency: g.engine.currency });
     }
   }

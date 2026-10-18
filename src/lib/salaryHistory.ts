@@ -57,6 +57,13 @@ export interface SalaryHistoryRecord {
     arrears_brought_forward?: number;
     arrears_carried_forward?: number;
     arrears_note?: string | null;
+    /** Tanzania (FIG-905): the HESLB loan repayment taken from pay, the employer's NSSF, SDL and WCF, and taxable pay */
+    heslb_deduction?: number;
+    nssf_employer?: number;
+    sdl_levy?: number;
+    wcf_levy?: number;
+    taxable_pay?: number | null;
+    tax_resident?: boolean | null;
     worker_kind?: string | null;
     work_settlement?: boolean;
     /** the payslip's country and currency (FIG-905): its employee's branch's when worked out */

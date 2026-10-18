@@ -16,6 +16,10 @@ import { User, Briefcase, CreditCard, Phone, MapPin } from 'lucide-react';
 import SearchableDropdown from '../UI/SearchableDropdown';
 import DepartmentPicker from '../UI/DepartmentPicker';
 import BranchPicker from '../UI/BranchPicker';
+import { useBranches } from '../../hooks/useBranches';
+import { employeeBranch } from '../../lib/branches';
+import { tidyCountry } from '../../lib/payroll/countries';
+import { isValidTin } from '../../lib/payroll/countries/tanzania';
 import EmployeePicker from '../UI/EmployeePicker';
 import { useEmployeeDirectory } from '../../hooks/useEmployeeDirectory';
 import { employeeTypeOptions } from '../../lib/employmentTypes';
@@ -40,6 +44,12 @@ type Employee = Database['public']['Tables']['employees']['Row'] & {
   reports_to_id?: string | null;
   // the branch (20261020500000): an office in a country; null = the default branch
   branch_id?: string | null;
+  // Tanzania payroll (20261021000000, FIG-905)
+  tz_tin?: string | null;
+  tz_nssf_number?: string | null;
+  heslb_borrower?: boolean | null;
+  heslb_index_number?: string | null;
+  secondary_employment?: boolean | null;
 };
 
 type DropdownOptions = {
@@ -96,6 +106,9 @@ const EditEmployeePage = () => {
   const [employee, setEmployee] = useState<Partial<Employee>>({});
   // the "Reports to" picker works by employee number; reports_to_id is what is saved
   const { employees: directory } = useEmployeeDirectory();
+  // the employee's branch's country (FIG-905): someone in Tanzania has a TRA TIN and Tanzania's payroll details
+  const { branches: companyBranches } = useBranches();
+  const inTanzania = tidyCountry(employeeBranch(employee as Record<string, unknown>, companyBranches)?.country) === 'Tanzania';
   const reportsToNumber = directory.find((e) => e.id && e.id === employee.reports_to_id)?.employeeNumber || '';
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -430,6 +443,12 @@ const EditEmployeePage = () => {
         }
       }
     });
+
+    // Tanzania (FIG-905): a TRA TIN is 9 digits
+    if (inTanzania && employee.tz_tin && !isValidTin(employee.tz_tin)) {
+      newErrors['deductiontz_tin'] = 'Invalid TIN (9 digits, e.g. 123-456-789)';
+      isValid = false;
+    }
 
     setErrors(newErrors);
     if (!isValid) {
@@ -1360,6 +1379,66 @@ const EditEmployeePage = () => {
                   ))}
                 </div>
               </div>
+
+              {inTanzania && (
+                <div data-testid="tanzania-payroll">
+                  <SectionHeader title="Tanzania payroll" icon={CreditCard} />
+                  <div className="grid grid-cols-1 gap-4 mt-4">
+                    <FormField
+                      label="TIN (TRA)"
+                      name="tz_tin"
+                      value={employee.tz_tin || ''}
+                      onChange={handleInputChange}
+                      error={errors['deductiontz_tin']}
+                      disabled={!isEditMode}
+                    />
+                    <FormField
+                      label="NSSF (Tanzania) number"
+                      name="tz_nssf_number"
+                      value={employee.tz_nssf_number || ''}
+                      onChange={handleInputChange}
+                      disabled={!isEditMode}
+                    />
+                    <label className="flex items-center gap-2 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        checked={employee.heslb_borrower === true}
+                        disabled={!isEditMode}
+                        onChange={(e) => setEmployee((prev) => ({ ...prev, heslb_borrower: e.target.checked }))}
+                      />
+                      Repays a HESLB student loan (15% of basic salary each month, after tax)
+                    </label>
+                    {employee.heslb_borrower === true && (
+                      <FormField
+                        label="HESLB Form Four index number"
+                        name="heslb_index_number"
+                        value={employee.heslb_index_number || ''}
+                        onChange={handleInputChange}
+                        disabled={!isEditMode}
+                      />
+                    )}
+                    <label className="flex items-center gap-2 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        checked={employee.secondary_employment === true}
+                        disabled={!isEditMode}
+                        onChange={(e) => setEmployee((prev) => ({ ...prev, secondary_employment: e.target.checked }))}
+                      />
+                      This is not their main job (secondary employment: PAYE at a flat 30%)
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        checked={/^non/i.test(String(employee.kra_residency ?? ''))}
+                        disabled={!isEditMode}
+                        onChange={(e) => setEmployee((prev) => ({ ...prev, kra_residency: e.target.checked ? 'Non-Resident' : 'Resident' }))}
+                      />
+                      Not resident in Tanzania for tax (PAYE at a flat 15% of gross)
+                    </label>
+                    <p className="text-xs text-muted-foreground">NHIF, where the employee has it, is added as a voluntary deduction.</p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

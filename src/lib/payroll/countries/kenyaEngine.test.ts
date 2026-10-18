@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { applyPayslipOverride, statutoryContextFor } from '../../payslipOverrides';
 import { KENYA_FIXTURES, KENYA_RATES, baseContext } from './kenyaFixtures';
 import golden from './kenyaGolden.json';
-import { engineFor, kenyaEngine, supportedCountries, tidyCountry, waitingLabel } from '.';
+import { engineFor, kenyaEngine, supportedCountries, tanzaniaEngine, tidyCountry, waitingLabel } from '.';
 
 // FIG-905 stage 2: Kenya's calculation moved behind the country engine without a single number changing.
 // kenyaGolden.json was written by lib/payslipCalc before the move, for every fixture in kenyaFixtures.ts.
@@ -77,13 +77,13 @@ describe('Kenya engine interface', () => {
 });
 
 describe('the registry', () => {
-  it('has Kenya, and nothing for countries without rules yet', () => {
+  it('has Kenya and Tanzania, and nothing for countries without rules yet', () => {
     expect(engineFor('Kenya')).toBe(kenyaEngine);
     expect(engineFor(' kenya ')).toBe(kenyaEngine);
-    expect(engineFor('Tanzania')).toBeNull();
+    expect(engineFor('Tanzania')).toBe(tanzaniaEngine);
     expect(engineFor('Uganda')).toBeNull();
     expect(engineFor('')).toBeNull();
-    expect(supportedCountries()).toEqual(['Kenya']);
+    expect(supportedCountries()).toEqual(['Kenya', 'Tanzania']);
   });
 
   it('says who is waiting for which rules', () => {

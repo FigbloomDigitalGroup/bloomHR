@@ -29,6 +29,29 @@ export const RATE_LABELS: Record<string, string> = {
   nita_levy: 'NITA training levy (employer, per employee monthly)',
 };
 
+/** Tanzania's rates (FIG-905, migration 20261021000000_tanzania_payroll.sql), labelled for people. */
+export const TANZANIA_RATE_LABELS: Record<string, string> = {
+  paye_bands: 'PAYE bands (resident)',
+  nonresident_paye_rate: 'PAYE rate for a non-resident (flat, on gross)',
+  secondary_paye_rate: 'PAYE rate for a secondary employment (flat)',
+  nssf_rate: 'NSSF rate (employee)',
+  nssf_employer_rate: 'NSSF rate (employer)',
+  nssf_deductible: 'NSSF deducted before PAYE (1 = yes)',
+  sdl_rate: 'SDL rate (employer, on gross emoluments)',
+  sdl_min_employees: 'SDL applies from this many employees',
+  wcf_rate: 'WCF rate (employer, on gross earnings)',
+  heslb_rate: 'HESLB loan repayment rate (on basic)',
+  wht_resident: 'Withholding tax on a resident contractor’s fees rate',
+  wht_nonresident: 'Withholding tax on a non-resident contractor’s fees rate',
+};
+
+/** A rate's label in a country (Kenya's labels by default). */
+export const rateLabel = (code: string, country = 'Kenya') =>
+  (country === 'Tanzania' ? TANZANIA_RATE_LABELS[code] : RATE_LABELS[code]) ?? RATE_LABELS[code] ?? code;
+
+/** A value that is typed and shown as a percentage (rates and the employee shares), not an amount or a count. */
+export const isPercentCode = (code: string) => /rate$/.test(code) || /^wht_(resident|nonresident)$/.test(code);
+
 export interface RateRow {
   id: string;
   tenant_id: string | null;
@@ -61,7 +84,8 @@ export async function ratesInForce(day: string, country = 'Kenya'): Promise<Rate
     const seen = byCode.get(r.code);
     if (!seen || (seen.tenant_id === null && r.tenant_id !== null)) byCode.set(r.code, r);
   }
-  return [...byCode.values()].sort((a, b) => Object.keys(RATE_LABELS).indexOf(a.code) - Object.keys(RATE_LABELS).indexOf(b.code));
+  const order = Object.keys(country === 'Tanzania' ? TANZANIA_RATE_LABELS : RATE_LABELS);
+  return [...byCode.values()].sort((a, b) => order.indexOf(a.code) - order.indexOf(b.code));
 }
 
 const dayBefore = (iso: string) => {
