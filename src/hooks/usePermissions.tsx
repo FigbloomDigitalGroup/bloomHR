@@ -2,7 +2,8 @@ import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { queryKeys } from '../lib/queryClient';
-import { fetchTrustedRole } from '../lib/trustedRole';
+import { fetchTrustedProfile } from '../lib/trustedRole';
+import { moduleAllowedForBase } from '../lib/roles';
 import FigbloomLoader from '../components/UI/FigbloomLoader';
 
 interface UsePermissionsReturn {
@@ -12,14 +13,34 @@ interface UsePermissionsReturn {
     hasAllPermissions: (permissions: string[]) => boolean;
     loading: boolean;
     userRole: string | null;
+    /** the role as the company names it: their own role (FIG-827) or the renamed system role; null when not known */
+    roleName: string | null;
 }
 
 interface MyPermissions {
     role: string | null;
     permissions: string[];
+    roleName?: string | null;
 }
 
 const NOBODY: MyPermissions = { role: null, permissions: [] };
+
+interface RoleRow {
+    role_key: string;
+    name: string;
+    base_role: string;
+    is_system: boolean;
+}
+
+/** One of the company's roles (by id, or a system role by its key), or null when it cannot be told. */
+async function loadCompanyRole(column: 'id' | 'role_key', value: string): Promise<RoleRow | null> {
+    try {
+        const { data, error } = await supabase.from('company_roles').select('role_key, name, base_role, is_system').eq(column, value).maybeSingle();
+        return error || !data ? null : (data as RoleRow);
+    } catch {
+        return null;
+    }
+}
 
 async function loadMyPermissions(): Promise<MyPermissions> {
     // Get current user
@@ -28,22 +49,29 @@ async function loadMyPermissions(): Promise<MyPermissions> {
 
     // The role in the company the person is working in, from user_profiles (user_metadata is editable by the
     // user and does not follow the company). Uppercase to match database role_name.
-    const role = await fetchTrustedRole(user.id);
-    if (!role) return NOBODY;
+    const profile = await fetchTrustedProfile(user.id);
+    if (!profile) return NOBODY;
+    const { role } = profile;
+
+    // a company's own role (FIG-827) gives its own modules, kept under its key; else the role's
+    const custom = profile.companyRoleId ? await loadCompanyRole('id', profile.companyRoleId) : null;
+    const useCustom = !!custom && !custom.is_system && custom.base_role === role;
+    const roleName = useCustom ? custom!.name : (await loadCompanyRole('role_key', role))?.name ?? null;
 
     // Get role permissions from database
     const { data: rolePermData, error: permError } = await supabase
         .from('role_permissions')
         .select('permissions')
-        .eq('role_name', role)
+        .eq('role_name', useCustom ? custom!.role_key : role)
         .single();
 
     if (permError) {
         // fail closed: the role is known, but nothing is granted
         console.error('Error fetching permissions:', permError);
-        return { role, permissions: [] };
+        return { role, permissions: [], roleName };
     }
-    return { role, permissions: rolePermData?.permissions || [] };
+    const granted: string[] = rolePermData?.permissions || [];
+    return { role, permissions: useCustom ? granted.filter((m) => moduleAllowedForBase(role, m)) : granted, roleName };
 }
 
 /**
@@ -76,7 +104,7 @@ export function usePermissions(): UsePermissionsReturn {
     }, [queryClient]);
 
     // an error reading the user is treated like nobody being signed in (fail closed)
-    const { role: userRole, permissions } = query.data ?? NOBODY;
+    const { role: userRole, permissions, roleName = null } = query.data ?? NOBODY;
     const loading = query.isLoading;
 
     const hasPermission = (permission: string): boolean => {
@@ -100,7 +128,8 @@ export function usePermissions(): UsePermissionsReturn {
         hasAnyPermission,
         hasAllPermissions,
         loading,
-        userRole
+        userRole,
+        roleName
     };
 }
 

@@ -145,7 +145,7 @@ export default function JoinCompany() {
   }
 
   const heading = `Join ${preview.company_name}`;
-  const about = `You have been invited as ${roleLabel(preview.role)}.`;
+  const about = `You have been invited as ${preview.role_name || roleLabel(preview.role)}.`;
 
   if (sessionEmail) {
     const matches = sessionEmail.toLowerCase() === preview.email.toLowerCase();
