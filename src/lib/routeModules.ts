@@ -89,6 +89,8 @@ export const SCREENS: ScreenAccess[] = [
 
   // pay and money
   S('/payroll', 'Payroll', ['payroll']),
+  // how payslips look (FIG-814): letterhead, contacts, footer, sections
+  S('/settings/payslip-design', 'Payslip design', ['payslip-design']),
   S('/casual-workers', 'Casual workers', ['work-records', 'payroll', 'employees', 'casual-overtime', 'team-work']),
   S('/piece-rate', 'Piece rate & jobs', ['work-records', 'payroll', 'team-work']),
   S('/overtime', 'Overtime', ['payroll', 'work-records', 'casual-overtime', 'team-work']),

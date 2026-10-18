@@ -55,7 +55,43 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 63363.5,
+    "tax_details": {
+      "not_taxed": [
+        {
+          "key": "per_diem",
+          "label": "Per diem (not taxed)",
+          "amount": 26400
+        }
+      ],
+      "taxable_benefits": [],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 4236
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 1941.5
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 1059
+        }
+      ],
+      "tax_before_reliefs": 13792.4,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   },
   "salaried with no KRA PIN, NSSF or SHA number": {
     "id": "id-KE-002",
@@ -113,7 +149,27 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 40200,
+    "tax_details": {
+      "not_taxed": [
+        {
+          "key": "per_diem",
+          "label": "Per diem (not taxed)",
+          "amount": 19800
+        }
+      ],
+      "taxable_benefits": [],
+      "before_tax": [],
+      "tax_before_reliefs": 6843.35,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   },
   "missing details with statutory override on": {
     "id": "id-KE-002",
@@ -171,7 +227,43 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 36079.5,
+    "tax_details": {
+      "not_taxed": [
+        {
+          "key": "per_diem",
+          "label": "Per diem (not taxed)",
+          "amount": 19800
+        }
+      ],
+      "taxable_benefits": [],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 2412
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 1105.5
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 603
+        }
+      ],
+      "tax_before_reliefs": 5607.2,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   },
   "approved overtime entries": {
     "id": "id-KE-003",
@@ -254,7 +346,43 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 30829.12,
+    "tax_details": {
+      "not_taxed": [
+        {
+          "key": "per_diem",
+          "label": "Per diem (not taxed)",
+          "amount": 14850
+        }
+      ],
+      "taxable_benefits": [],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 2061
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 944.63
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 515.25
+        }
+      ],
+      "tax_before_reliefs": 4107.28,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   },
   "old overtime fields on the record": {
     "id": "id-KE-004",
@@ -312,7 +440,43 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 39220.75,
+    "tax_details": {
+      "not_taxed": [
+        {
+          "key": "per_diem",
+          "label": "Per diem (not taxed)",
+          "amount": 19800
+        }
+      ],
+      "taxable_benefits": [],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 2622
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 1201.75
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 655.5
+        }
+      ],
+      "tax_before_reliefs": 6549.58,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   },
   "unpaid, half-pay leave and absence": {
     "id": "id-KE-005",
@@ -419,7 +583,43 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 32471.55,
+    "tax_details": {
+      "not_taxed": [
+        {
+          "key": "per_diem",
+          "label": "Per diem (not taxed)",
+          "amount": 17820
+        }
+      ],
+      "taxable_benefits": [],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 2170.8
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 994.95
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 542.7
+        }
+      ],
+      "tax_before_reliefs": 4524.81,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   },
   "unpaid leave on basic / 30": {
     "id": "id-KE-005",
@@ -526,7 +726,43 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 34395.79,
+    "tax_details": {
+      "not_taxed": [
+        {
+          "key": "per_diem",
+          "label": "Per diem (not taxed)",
+          "amount": 18876
+        }
+      ],
+      "taxable_benefits": [],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 2299.44
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 1053.91
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 574.86
+        }
+      ],
+      "tax_before_reliefs": 5102.09,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   },
   "leave paid out": {
     "id": "id-KE-006",
@@ -592,7 +828,43 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 44291.62,
+    "tax_details": {
+      "not_taxed": [
+        {
+          "key": "per_diem",
+          "label": "Per diem (not taxed)",
+          "amount": 18150
+        }
+      ],
+      "taxable_benefits": [],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 2961
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 1357.13
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 740.25
+        }
+      ],
+      "tax_before_reliefs": 8070.84,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   },
   "commission, bonus and an untaxed earning": {
     "id": "id-KE-007",
@@ -669,7 +941,48 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 60656.5,
+    "tax_details": {
+      "not_taxed": [
+        {
+          "key": "per_diem",
+          "label": "Per diem (not taxed)",
+          "amount": 23100
+        },
+        {
+          "key": "not_taxed",
+          "label": "Earnings not taxed",
+          "amount": 2500
+        }
+      ],
+      "taxable_benefits": [],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 3294
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 1908.5
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 1041
+        }
+      ],
+      "tax_before_reliefs": 12980.3,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   },
   "voluntary deductions, a loan and an advance": {
     "id": "id-KE-008",
@@ -749,7 +1062,53 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 24566.25,
+    "tax_details": {
+      "not_taxed": [
+        {
+          "key": "per_diem",
+          "label": "Per diem (not taxed)",
+          "amount": 16500
+        }
+      ],
+      "taxable_benefits": [],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 2010
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 921.25
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 502.5
+        },
+        {
+          "key": "pension",
+          "label": "Pension contribution",
+          "amount": 4000
+        },
+        {
+          "key": "prmf",
+          "label": "Post-retirement medical fund",
+          "amount": 1500
+        }
+      ],
+      "tax_before_reliefs": 2541.56,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   },
   "piece rate worker settled at month end": {
     "id": "id-KE-009",
@@ -814,7 +1173,37 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 37695,
+    "tax_details": {
+      "not_taxed": [],
+      "taxable_benefits": [],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 2520
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 1155
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 630
+        }
+      ],
+      "tax_before_reliefs": 6091.85,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   },
   "contractor paid per job with WHT": {
     "id": "id-KE-010",
@@ -993,7 +1382,84 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 0,
+    "tax_details": {
+      "not_taxed": [
+        {
+          "key": "per_diem",
+          "label": "Per diem (not taxed)",
+          "amount": 82500
+        }
+      ],
+      "taxable_benefits": [
+        {
+          "key": "car",
+          "label": "Car benefit",
+          "amount": 15000
+        },
+        {
+          "key": "housing",
+          "label": "Housing benefit",
+          "amount": 20000
+        },
+        {
+          "key": "meals",
+          "label": "Meals benefit",
+          "amount": 3000
+        },
+        {
+          "key": "non_cash",
+          "label": "Non-cash benefits",
+          "amount": 6000
+        }
+      ],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 6480
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 4606.25
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 2512.5
+        },
+        {
+          "key": "pension",
+          "label": "Pension contribution",
+          "amount": 30000
+        },
+        {
+          "key": "mortgage",
+          "label": "Mortgage interest",
+          "amount": 30000
+        },
+        {
+          "key": "pwd",
+          "label": "Disability exemption",
+          "amount": 137901.25
+        }
+      ],
+      "tax_before_reliefs": 0,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        },
+        {
+          "key": "insurance",
+          "label": "Insurance relief",
+          "amount": 900
+        }
+      ]
+    }
   },
   "high earner on the top band": {
     "id": "id-KE-013",
@@ -1051,7 +1517,43 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 650843.75,
+    "tax_details": {
+      "not_taxed": [
+        {
+          "key": "per_diem",
+          "label": "Per diem (not taxed)",
+          "amount": 313500
+        }
+      ],
+      "taxable_benefits": [],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 6480
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 18878.75
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 10297.5
+        }
+      ],
+      "tax_before_reliefs": 193807.57,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   },
   "low earner on the SHIF minimum": {
     "id": "id-KE-014",
@@ -1109,7 +1611,43 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 4658,
+    "tax_details": {
+      "not_taxed": [
+        {
+          "key": "per_diem",
+          "label": "Per diem (not taxed)",
+          "amount": 2640
+        }
+      ],
+      "taxable_benefits": [],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 321.6
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 300
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 80.4
+        }
+      ],
+      "tax_before_reliefs": 465.8,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   },
   "arrears over the two-thirds cap": {
     "id": "id-KE-015",
@@ -1167,7 +1705,37 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 8025,
+    "tax_details": {
+      "not_taxed": [],
+      "taxable_benefits": [],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 540
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 300
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 135
+        }
+      ],
+      "tax_before_reliefs": 802.5,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   },
   "arrears with the cap off": {
     "id": "id-KE-015",
@@ -1225,7 +1793,37 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 8025,
+    "tax_details": {
+      "not_taxed": [],
+      "taxable_benefits": [],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 540
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 300
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 135
+        }
+      ],
+      "tax_before_reliefs": 802.5,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   },
   "NITA not charged on a casual record": {
     "id": "id-KE-016",
@@ -1283,7 +1881,43 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 36079.5,
+    "tax_details": {
+      "not_taxed": [
+        {
+          "key": "per_diem",
+          "label": "Per diem (not taxed)",
+          "amount": 19800
+        }
+      ],
+      "taxable_benefits": [],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 2412
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 1105.5
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 603
+        }
+      ],
+      "tax_before_reliefs": 5607.2,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   },
   "Branch and office text": {
     "id": "id-KE-017",
@@ -1341,7 +1975,43 @@
     "pay_period": "2026-10",
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
-    "account_number": "0123456789"
+    "account_number": "0123456789",
+    "taxable_pay": 36079.5,
+    "tax_details": {
+      "not_taxed": [
+        {
+          "key": "per_diem",
+          "label": "Per diem (not taxed)",
+          "amount": 19800
+        }
+      ],
+      "taxable_benefits": [],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 2412
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 1105.5
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 603
+        }
+      ],
+      "tax_before_reliefs": 5607.2,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   },
   "payslip edited by hand": {
     "id": "id-KE-018",
@@ -1418,6 +2088,47 @@
     "payment_method": "Bank Transfer",
     "bank_name": "Equity Bank",
     "account_number": "0123456789",
-    "payslip_note": "Acting manager in October"
+    "payslip_note": "Acting manager in October",
+    "taxable_pay": 62097.1,
+    "tax_details": {
+      "not_taxed": [
+        {
+          "key": "per_diem",
+          "label": "Per diem (not taxed)",
+          "amount": 25740
+        },
+        {
+          "key": "not_taxed",
+          "label": "Earnings not taxed",
+          "amount": 1500
+        }
+      ],
+      "taxable_benefits": [],
+      "before_tax": [
+        {
+          "key": "nssf",
+          "label": "NSSF",
+          "amount": 4155.6
+        },
+        {
+          "key": "shif",
+          "label": "SHIF",
+          "amount": 1945.9
+        },
+        {
+          "key": "ahl",
+          "label": "Housing levy (AHL)",
+          "amount": 1061.4
+        }
+      ],
+      "tax_before_reliefs": 13412.48,
+      "reliefs": [
+        {
+          "key": "personal",
+          "label": "Personal relief",
+          "amount": 2400
+        }
+      ]
+    }
   }
 }

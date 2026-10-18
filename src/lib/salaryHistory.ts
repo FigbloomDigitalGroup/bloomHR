@@ -64,6 +64,8 @@ export interface SalaryHistoryRecord {
      */
     employer_nssf?: number;
     taxable_pay?: number | null;
+    /** how taxable pay and PAYE were worked out (FIG-814, lib/payroll/taxDetails) */
+    tax_details?: unknown;
     tax_resident?: boolean | null;
     /** Tanzania: the HESLB loan repayment taken from pay, and the employer's SDL and WCF */
     heslb_deduction?: number;

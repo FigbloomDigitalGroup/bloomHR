@@ -8,6 +8,7 @@ import { totalOf, type DeductionItem } from './voluntaryDeductions';
 import { loanDeductionsFor, type PayrollLoan } from './loans';
 import { nitaLevyFor } from './nitaLevy';
 import { paymentMethodLabel } from './paymentMethods';
+import { kenyaTaxDetails } from './payroll/taxDetails';
 import { NO_WORK, isContractor, round2, settlementFields, whtOn, whtRateFor, type WorkMonth, type WorkSettlementRow, workMonthOf } from './workSettlement';
 
 /**
@@ -167,10 +168,11 @@ export function calculatePayslip(employee: Record<string, any>, ctx: PayslipCont
     // interest come off taxable pay, insurance relief and the PWD exemption apply. A deduction is left out
     // while its number or PIN is missing, unless statutory checks are overridden. A contractor pays none of them:
     // withholding tax instead.
+    const inputs = employeeInputs(employee);
     const statutory = statutoryFor(
       {
         ...statutoryPayWith(taxableGross - earnings.taxable, earnings.items),
-        ...employeeInputs(employee),
+        ...inputs,
         apply: contractor
           ? { shif: false, nssf: false, ahl: false, paye: false }
           : {
@@ -192,7 +194,15 @@ export function calculatePayslip(employee: Record<string, any>, ctx: PayslipCont
     const whtTax = contractor ? whtOn(grossPay, whtRate) : 0;
     return {
       paye: payeTax, nssf: nssfDeduction, health: nhifDeduction, housingLevy, wht: whtTax, whtRate, taxRelief,
-      otherStatutory: {}, fields: {}, perDiem, cap: true,
+      otherStatutory: {},
+      // how taxable pay and PAYE were worked out, for the payslip (FIG-814); none for a contractor (WHT on gross)
+      fields: contractor
+        ? {}
+        : {
+            taxable_pay: statutory.taxablePay,
+            tax_details: kenyaTaxDetails(statutory, rates ?? {}, { perDiem, nonTaxable: earnings.nonTaxable, benefits: inputs.benefits }, contractor),
+          },
+      perDiem, cap: true,
     };
   }
   const { paye: payeTax, nssf: nssfDeduction, health: nhifDeduction, housingLevy, wht: whtTax, whtRate, taxRelief } = outcome;

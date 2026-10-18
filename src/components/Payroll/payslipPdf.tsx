@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import html2pdf from "html2pdf.js";
 import { PayslipDocument } from "./PayrollPayslipModal";
+import { loadPayslipExtras, type PayslipExtras } from "../../lib/payslipExtras";
 
 // A payslip as a PDF file (FIG-732), made the same way as the payslip's "Download PDF" button (html2pdf of the
 // PayslipDocument component), so the PDF emailed to an employee is the one payroll and staff already know.
@@ -41,15 +42,19 @@ const imagesLoaded = (el: HTMLElement) =>
     ),
   );
 
-/** One payslip as a PDF Blob, rendered off screen. */
-export async function renderPayslipPdf(record: any, companyInfo: any, password?: string | null): Promise<Blob> {
+/**
+ * One payslip as a PDF Blob, rendered off screen: the same PayslipDocument as on screen, with its employer block,
+ * employee numbers, year to date, run and the company's design (FIG-814; loaded here unless given).
+ */
+export async function renderPayslipPdf(record: any, companyInfo: any, password?: string | null, extras?: PayslipExtras | null): Promise<Blob> {
+  const details = extras === undefined ? await loadPayslipExtras(record, companyInfo).catch(() => null) : extras;
   const host = document.createElement("div");
   host.setAttribute("aria-hidden", "true");
   Object.assign(host.style, { position: "fixed", left: "-10000px", top: "0", width: "800px", pointerEvents: "none" });
   document.body.appendChild(host);
   const root = createRoot(host);
   try {
-    flushSync(() => root.render(<PayslipDocument record={record} companyInfo={companyInfo} />));
+    flushSync(() => root.render(<PayslipDocument record={record} companyInfo={companyInfo} extras={details} />));
     const el = host.firstElementChild as HTMLElement;
     await imagesLoaded(el);
     const blob: Blob = await html2pdf().set(payslipPdfOptions(record, password)).from(el).outputPdf("blob");

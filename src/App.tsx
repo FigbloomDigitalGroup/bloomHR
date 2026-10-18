@@ -34,6 +34,7 @@ const ExpenseModule = lazy(() => import('./components/Epense/Expense'));
 const EmployeeList = lazy(() => import('./components/Employees/EmployeeList'));
 const LoanRequestsAdmin = lazy(() => import('./components/Settings/StaffLoan'));
 const PayrollDashboard = lazy(() => import('./components/Payroll/PayrollDashboard'));
+const PayslipDesignPage = lazy(() => import('./components/Payroll/PayslipDesignPage'));
 const StaffSignupRequests = lazy(() => import('./pages/admin'));
 const StaffPortalLanding = lazy(() => import('./components/staff portal/StaffPortal'));
 const RecruitmentDashboard = lazy(() => import('./components/Recruitment/RecruitmentDashboard'));
@@ -1092,6 +1093,7 @@ function App() {
                                 {gate('/teams', <ChatLayout />)}
                                 {gate('/staffcheck', <WarningModule />)}
                                 {gate('/payroll', <PayrollDashboard />)}
+                                {gate('/settings/payslip-design', <PayslipDesignPage />)}
                                 {gate('/settings', <UserRolesSettings />)}
                                 {/* everyone in the company reads it; Settings changes it */}
                                 {gate('/settings/company', <CompanyProfilePage />)}

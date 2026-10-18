@@ -207,7 +207,8 @@ describe('the new modules', () => {
     expect(await mods('oldOpsNoPerf')).toEqual(['leaves']);
     expect(await mods('oldStaff')).toEqual(['kpi-admin', 'performance']);
     expect(await mods('oldReg')).toEqual(['employee-edit', 'performance']); // REGIONAL never managed KPIs
-    expect(await mods('oldAdmin')).toEqual(['dashboard', 'task-oversight']);
+    // (payslip-design comes from a later migration, 20261021600000_payslip_details.sql, given to ADMIN-based roles too)
+    expect(await mods('oldAdmin')).toEqual(['dashboard', 'payslip-design', 'task-oversight']);
   });
 
   it('a company created later copies them from the default company', async () => {
