@@ -30,6 +30,7 @@ import FigbloomLoader from '../UI/FigbloomLoader';
 import DownloadP9 from '../Payroll/DownloadP9';
 import { loadMyP9 } from '../../lib/p9';
 import { loadCompanyIdentity, type CompanyIdentity } from '../../lib/companyProfile';
+import { useBackToClose } from '../../hooks/useBackToClose';
 
 // HARDCODED STATUTORY SETTINGS - Updated to match payroll dashboard
 const statutorySettings = {
@@ -642,6 +643,8 @@ const PayslipViewer = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPayslip, setSelectedPayslip] = useState(null);
   const [currentPayslipIndex, setCurrentPayslipIndex] = useState(null);
+  // the phone's Back closes an open payslip first
+  useBackToClose(!!selectedPayslip, () => setSelectedPayslip(null));
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState<Date | null>(null);
   const [companyInfo, setCompanyInfo] = useState<CompanyIdentity | null>(null);

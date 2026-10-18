@@ -39,6 +39,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { supabase } from '../../lib/supabase';
 import { IN_LIST_SIZE, chunks, fetchAll } from '../../lib/fetchAll';
 import { SearchInput } from '../UI';
+import { onOverlayEntry } from '../../hooks/useBackToClose';
 
 // Grouping structure
 const menuGroups = [
@@ -386,7 +387,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
                     return (
                       <motion.button
                         key={item.id}
-                        onClick={() => navigate(item.path)}
+                        onClick={() => navigate(item.path, { replace: onOverlayEntry() })}
                         className={`relative w-full flex items-center min-h-9 px-3 rounded-[9px] transition-all duration-300 group overflow-hidden ${!isExpanded && 'justify-center px-0'
                           } ${isActive
                             ? 'bg-shell-active text-shell-active-fg font-semibold shadow-sm'
@@ -479,7 +480,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <button
                     type="button"
-                    onClick={() => navigate('/settings')}
+                    onClick={() => navigate('/settings', { replace: onOverlayEntry() })}
                     aria-label="Settings"
                     className="p-1.5 rounded-lg hover:bg-shell-fg/10 transition-colors"
                   >

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { X, Eye, EyeOff, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
+import { useBackToClose } from '../../hooks/useBackToClose';
 
 interface PasswordResetModalProps {
   isOpen: boolean;
@@ -20,6 +21,8 @@ const PasswordResetModal: React.FC<PasswordResetModalProps> = ({ isOpen, onClose
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // the phone's Back closes the dialog
+  useBackToClose(isOpen, onClose);
 
   if (!isOpen) return null;
 
