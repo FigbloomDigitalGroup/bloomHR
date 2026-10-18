@@ -58,6 +58,12 @@ export interface StatutoryContext {
   wht?: { rate: number };
   /** Employment Act s.19(3) two-thirds cap on a settlement payslip's deductions (default on) */
   cap?: boolean;
+  /**
+   * Another country's statutory deductions (FIG-905): given the payslip with its edited gross pay and earnings, gives
+   * it back with that country's tax and contributions worked out again (paye_tax, nssf_deduction, wht_tax...).
+   * Kenya's are worked out here when not given.
+   */
+  recalculate?: (payslip: Record<string, any>) => Record<string, any>;
 }
 
 /**
@@ -197,6 +203,7 @@ export function applyPayslipOverride<T extends Payslip>(record: T, override: Pay
   next.bonus = earnings.bonus;
 
   const grossPay = round2(num(record.gross_pay) + delta);
+  if (ctx.recalculate) return applyOtherCountry(record, next, grossPay, o, ctx);
   // the per diem is a share of the basic earned this month, not taxed (as payroll works it out)
   const { perDiem } = basicAfterLeave(num(next.basic_salary), num(record.leave_deduction));
   const statutory = statutoryFor(
@@ -239,6 +246,37 @@ export function applyPayslipOverride<T extends Payslip>(record: T, override: Pay
     payslip_note: o.note ?? null,
   });
   if (ctx.wht) Object.assign(next, { wht_rate: ctx.wht.rate, wht_tax: whtTax, tax_relief: 0 });
+  if (settlement) Object.assign(next, { arrears_carried_forward: settlement.carriedForward, arrears_note: arrearsNote(settlement) });
+  return next as EditablePayslip<T>;
+}
+
+/** applyPayslipOverride for a payslip of a country with its own statutory deductions (StatutoryContext.recalculate). */
+function applyOtherCountry<T extends Payslip>(record: T, edited: Payslip, grossPay: number, o: PayslipOverride, ctx: StatutoryContext): EditablePayslip<T> {
+  const oneOffDeductions = (o.one_off_deductions ?? []).map((d) => ({ name: d.label, amount: d.amount }));
+  const otherDeductions = round2(num(record.other_deductions) + oneOffDeductions.reduce((s, d) => s + d.amount, 0));
+  const next = ctx.recalculate!({ ...edited, gross_pay: grossPay });
+  const statutory = round2(
+    num(next.paye_tax) + num(next.nhif_deduction) + num(next.nssf_deduction) + num(next.housing_levy) + num(next.lst_deduction) + num(next.wht_tax),
+  );
+  const totalDeductions = round2(statutory + num(record.loan_deduction) + num(record.advance_deduction) + num(record.welfare_deduction) + otherDeductions);
+  const settlement = isSettlementPayslip(record)
+    ? settleMonth({
+        grossPay,
+        totalDeductions,
+        statutory,
+        paidOut: num(record.paid_out),
+        arrearsBroughtForward: num(record.arrears_brought_forward),
+        cap: ctx.cap !== false && !isContractorPayslip(record),
+      })
+    : null;
+  Object.assign(next, {
+    gross_pay: grossPay,
+    deduction_items: [...deductionItemsOf(record), ...oneOffDeductions],
+    other_deductions: otherDeductions,
+    total_deductions: totalDeductions,
+    net_pay: settlement ? settlement.netPay : round2(grossPay - totalDeductions),
+    payslip_note: o.note ?? null,
+  });
   if (settlement) Object.assign(next, { arrears_carried_forward: settlement.carriedForward, arrears_note: arrearsNote(settlement) });
   return next as EditablePayslip<T>;
 }

@@ -9,6 +9,8 @@ import { PayslipEditBar, type PayslipEditing } from "./PayslipEditModal";
 import { overtimeLineLabel, overtimeLineWorking, payslipOvertimeLines, payslipOvertimePay } from "../../lib/overtimePay";
 import { PayslipSettlementBlock, WhtDeductionLine, WorkEarningLines, netPayLabel } from "./PayslipSettlement";
 import { currencyOf, currencySymbol } from "../../lib/payroll/currency";
+import { CountryDeductionLines } from "./CountryPayslipLines";
+import { isKenyaPayslip } from "../../lib/payroll/payslipLines";
 
 /** The payslip's currency symbol (FIG-905): KSh, TSh, USh. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a payroll row from PayrollDashboard
@@ -226,16 +228,20 @@ export const PayslipDocument = ({ record, companyInfo, id }: { record: any; comp
               ))}
               {/* the month's piece rate work and contract jobs (FIG-812) */}
               <WorkEarningLines record={record} />
-              <div className="flex justify-between bg-gray-50 p-1 border border-gray-200 mt-2">
-                <span>Per diem</span>
-                <span className="font-bold">{cur(record)} {(record.per_diem || 0).toLocaleString()}</span>
-              </div>
+              {isKenyaPayslip(record) && (
+                <div className="flex justify-between bg-gray-50 p-1 border border-gray-200 mt-2">
+                  <span>Per diem</span>
+                  <span className="font-bold">{cur(record)} {(record.per_diem || 0).toLocaleString()}</span>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="border border-gray-300">
             <div className="bg-gray-100 border-b border-gray-300 font-bold p-3 text-gray-900">Deductions</div>
             <div className="p-3 space-y-2 text-black">
+              {isKenyaPayslip(record) ? (
+                <>
               <div className="flex justify-between">
                 <span>PAYE</span>
                 <span className="font-semibold">{cur(record)} {Math.round(record.paye_tax || 0).toLocaleString()}</span>
@@ -252,6 +258,10 @@ export const PayslipDocument = ({ record, companyInfo, id }: { record: any; comp
                 <span>AHL</span>
                 <span className="font-semibold">{cur(record)} {(record.housing_levy || 0).toLocaleString()}</span>
               </div>
+                </>
+              ) : (
+                <CountryDeductionLines record={record} />
+              )}
               <WhtDeductionLine record={record} />
               {Number(record.nita_levy) > 0 && (
                 <div className="flex justify-between text-gray-500">
@@ -269,10 +279,12 @@ export const PayslipDocument = ({ record, companyInfo, id }: { record: any; comp
                   <span className="font-semibold">{cur(record)} {line.amount.toLocaleString()}</span>
                 </div>
               ))}
-              <div className="flex justify-between text-gray-600 mt-2 border-t border-gray-200 pt-1">
-                <span>Tax relief:</span>
-                <span className="font-semibold">{cur(record)} -2400</span>
-              </div>
+              {isKenyaPayslip(record) && (
+                <div className="flex justify-between text-gray-600 mt-2 border-t border-gray-200 pt-1">
+                  <span>Tax relief:</span>
+                  <span className="font-semibold">{cur(record)} -2400</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

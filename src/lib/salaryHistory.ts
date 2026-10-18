@@ -59,6 +59,10 @@ export interface SalaryHistoryRecord {
     arrears_note?: string | null;
     worker_kind?: string | null;
     work_settlement?: boolean;
+    /** Uganda (FIG-905): Local Service Tax, the employer's NSSF and the chargeable income PAYE was worked out on */
+    lst_deduction?: number;
+    employer_nssf?: number;
+    chargeable_income?: number | null;
     /** the payslip's country and currency (FIG-905): its employee's branch's when worked out */
     country?: string;
     currency?: string;

@@ -70,7 +70,7 @@ export function rateSections(rows: RateRow[]): Section[] {
         : i === 0
           ? `First ${ksh(b.upto)}`
           : `${ksh(lower + 1)} to ${ksh(b.upto)}`;
-    return { label: `PAYE band: ${label}`, value: pct(Number(b.rate)), from: [bandsRow] };
+    return { label: `PAYE band: ${label}`, value: pct(Number(b.rate ?? 0)), from: [bandsRow] };
   });
   const paye = [
     ...bandLines,
@@ -131,6 +131,65 @@ export function rateSections(rows: RateRow[]): Section[] {
   ].filter((s) => s.lines.length > 0);
 }
 
+const ush = (n: number) => `USh ${Math.round(n).toLocaleString('en-UG')}`;
+
+/** Bands as lines: "First USh 335,000", "USh 335,001 to USh 410,000", "Above USh 485,000". */
+const bandLinesOf = (row: RateRow | undefined, prefix: string, value: (b: { rate?: number; amount?: number }) => string): Line[] =>
+  (row?.bands ?? []).map((b, i, all) => {
+    const lower = i === 0 ? 0 : all[i - 1].upto ?? 0;
+    const label = b.upto === null ? `Above ${ush(lower)}` : i === 0 ? `Up to ${ush(b.upto)}` : `${ush(lower + 1)} to ${ush(b.upto)}`;
+    return { label: `${prefix}: ${label}`, value: value(b), from: [row] };
+  });
+
+/** Uganda's rates (FIG-905): resident and non-resident PAYE with the extra 10%, NSSF, Local Service Tax, then the rest. */
+export function ugandaRateSections(rows: RateRow[]): Section[] {
+  const byCode = new Map(rows.map((r) => [r.code, r]));
+  const used = new Set<string>();
+  const take = (code: string) => {
+    used.add(code);
+    return byCode.get(code);
+  };
+  const line = (code: string, label = RATE_LABELS[code] ?? code, value?: (v: number) => string): Line | null => {
+    const r = take(code);
+    if (!r) return null;
+    const v = num(r);
+    return { label, value: value && v !== null ? value(v) : valueText(r), from: [r] };
+  };
+  const present = (lines: (Line | null)[]) => lines.filter((l): l is Line => l !== null);
+  const rate = (b: { rate?: number }) => pct(Number(b.rate ?? 0));
+  const threshold = take('paye_surcharge_threshold');
+  const surcharge = take('paye_surcharge_rate');
+  const extra: Line[] =
+    threshold && surcharge && num(threshold) !== null && num(surcharge) !== null
+      ? [{ label: 'Extra PAYE on high incomes', value: `${pct(num(surcharge) as number)} of income above ${ush(num(threshold) as number)} a month`, note: 'On top of the bands, residents and non-residents', from: [threshold, surcharge] }]
+      : [];
+  const paye = [...bandLinesOf(take('paye_bands'), 'Resident', rate), ...extra];
+  const nonResident = bandLinesOf(take('paye_bands_non_resident'), 'Non-resident', rate);
+  const nssf = present([
+    line('nssf_rate', 'NSSF (employee)', (v) => `${pct(v)} of gross pay`),
+    line('nssf_employer_rate', 'NSSF (employer)', (v) => `${pct(v)} of gross pay`),
+    line('nssf_deductible', 'NSSF deducted before PAYE', (v) => (v ? 'Yes' : 'No: PAYE is on gross pay')),
+  ]);
+  const lst = [
+    ...bandLinesOf(take('lst_bands'), 'Monthly gross pay', (b) => `${ush(Number(b.amount ?? 0))} a year`),
+    ...present([
+      line('lst_first_month', 'Collected from', (v) => new Date(2000, v - 1, 1).toLocaleString('en-GB', { month: 'long' })),
+      line('lst_months', 'Collected over', (v) => `${v} months`),
+      line('lst_deductible', 'LST deducted before PAYE', (v) => (v ? 'Yes, in the month it is taken' : 'No')),
+    ]),
+  ];
+  const wht = present([line('wht_contractual', 'Contractors (services)'), line('wht_professional', 'Professional fees')]);
+  const other = rows.filter((r) => !used.has(r.code)).map((r) => ({ label: RATE_LABELS[r.code] ?? r.code, value: r.bands ? `${r.bands.length} bands` : valueText(r), from: [r] }));
+  return [
+    { title: 'PAYE (resident)', lines: paye },
+    { title: 'PAYE (non-resident)', lines: nonResident },
+    { title: 'NSSF', lines: nssf },
+    { title: 'Local service tax (LST)', lines: lst },
+    { title: 'Withholding tax (contractors)', lines: wht },
+    { title: 'Other', lines: other },
+  ].filter((sec) => sec.lines.length > 0);
+}
+
 interface PayrollRatesTabProps {
   payPeriod: string;
   periodLabel: string;
@@ -139,9 +198,11 @@ interface PayrollRatesTabProps {
   onEdit: () => void;
   /** bumped after the editor saves, so the table reloads */
   version: number;
+  /** whose rates (FIG-905): Kenya by default */
+  country?: string;
 }
 
-export default function PayrollRatesTab({ payPeriod, periodLabel, canEdit, onEdit, version }: PayrollRatesTabProps) {
+export default function PayrollRatesTab({ payPeriod, periodLabel, canEdit, onEdit, version, country = 'Kenya' }: PayrollRatesTabProps) {
   const [rows, setRows] = useState<RateRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -149,26 +210,30 @@ export default function PayrollRatesTab({ payPeriod, periodLabel, canEdit, onEdi
     setRows(null);
     setError(null);
     try {
-      setRows(await ratesInForce(lastDayOf(payPeriod)));
+      setRows(await ratesInForce(lastDayOf(payPeriod), country));
     } catch (err) {
       setRows([]);
       setError(err instanceof Error ? err.message : 'Could not load the statutory rates.');
     }
-  }, [payPeriod]);
+  }, [payPeriod, country]);
 
   useEffect(() => {
     void load();
   }, [load, version]);
 
-  const sections = rows ? rateSections(rows) : [];
+  const uganda = country === 'Uganda';
+  const sections = rows ? (uganda ? ugandaRateSections(rows) : rateSections(rows)) : [];
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-bold text-ink">Kenya statutory rates for {periodLabel}</h2>
+          <h2 className="text-sm font-bold text-ink">{country} statutory rates for {periodLabel}</h2>
           <p className="text-[11.5px] text-muted-foreground">
-            What Kenya payroll uses this month for PAYE, SHA, the housing levy and NSSF, from when, and where each comes from. Each country has its own rates; Tanzania and Uganda come with their payroll.
+            {uganda
+              ? 'What Uganda payroll uses this month for PAYE, NSSF and the local service tax, in USh, from when, and where each comes from.'
+              : 'What Kenya payroll uses this month for PAYE, SHA, the housing levy and NSSF, from when, and where each comes from.'}{' '}
+            Each country has its own rates.
           </p>
         </div>
         {canEdit && (
@@ -225,7 +290,7 @@ export default function PayrollRatesTab({ payPeriod, periodLabel, canEdit, onEdi
         </Card>
       ))}
 
-      {rows && sections.some((s) => s.title === 'NSSF') && (
+      {rows && !uganda && sections.some((s) => s.title === 'NSSF') && (
         <p className="text-[11px] text-muted-foreground">
           NSSF tiers I and II are taken at the same rate, so together they come to the rate on pay up to the upper earnings limit.
         </p>

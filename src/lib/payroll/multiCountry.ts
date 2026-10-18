@@ -6,6 +6,7 @@ import { currencyFor, employeeBranch } from '../branches';
 import { type ExportFile, bankFile, equityFile, mpesaFile } from '../payrollExports';
 import { type CountryPayrollEngine, type EmployeeProblem, type PayslipRecord, engineFor, tidyCountry, waitingLabel } from './countries';
 import { currencyOf, moneyShort } from './currency';
+import { ugandaMobileMoneyFile } from './countries/uganda';
 
 // One payroll run for every country (FIG-905 stage 2): "run like they're one country but in the backend they're
 // different". The admin presses Run payroll and Approve once; behind that each employee is worked out by their
@@ -315,8 +316,12 @@ export function paymentFilesFor(currency: string, payslips: PayslipRecord[], emp
   const own = payslips.filter((p) => currencyOf(p) === currency);
   const code = currency.toLowerCase();
   if (currency !== 'KES') {
-    // (mobile money outside Kenya comes with each country's payroll)
-    return [{ key: `bank-${code}`, label: 'Bank bulk pay', name: `bulk-pay-bank-${code}`, what: `staff paid by bank, in ${currency}`, file: bankFile(own, employees, payPeriod) }];
+    const bank = { key: `bank-${code}`, label: 'Bank bulk pay', name: `bulk-pay-bank-${code}`, what: `staff paid by bank, in ${currency}`, file: bankFile(own, employees, payPeriod) };
+    // mobile money outside Kenya comes with each country's payroll: MTN MoMo and Airtel Money in Uganda
+    if (currency === 'UGX') {
+      return [bank, { key: 'mobile-ugx', label: 'Mobile money bulk pay', name: 'bulk-pay-mobile-ugx', what: 'staff paid by MTN MoMo or Airtel Money, in UGX', file: ugandaMobileMoneyFile(own, employees, payPeriod) }];
+    }
+    return [bank];
   }
   return [
     { key: 'mpesa', label: 'M-Pesa bulk pay', name: 'bulk-pay-mpesa', what: 'staff paid by M-Pesa', file: mpesaFile(own, employees, payPeriod) },

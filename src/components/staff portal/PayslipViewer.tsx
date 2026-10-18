@@ -33,6 +33,8 @@ import { loadCompanyIdentity, type CompanyIdentity } from '../../lib/companyProf
 import { useBackToClose } from '../../hooks/useBackToClose';
 import { currencyOf, currencySymbol } from '../../lib/payroll/currency';
 import { PayslipSettlementBlock, WhtDeductionLine, WorkEarningLines, netPayLabel } from '../Payroll/PayslipSettlement';
+import { CountryDeductionLines } from '../Payroll/CountryPayslipLines';
+import { isKenyaPayslip } from '../../lib/payroll/payslipLines';
 
 // HARDCODED STATUTORY SETTINGS - Updated to match payroll dashboard
 const statutorySettings = {
@@ -564,23 +566,29 @@ const PayslipModal = ({
                     ))}
                     {/* the month's piece rate work and contract jobs (FIG-812) */}
                     <WorkEarningLines record={record} />
-                    <div className="flex justify-between bg-gray-50 p-1 border border-gray-200 mt-2"><span>Per diem</span><span className="font-bold">{calculated.sym} {calculated.perDiem.toLocaleString()}</span></div>
+                    {isKenyaPayslip(record) && <div className="flex justify-between bg-gray-50 p-1 border border-gray-200 mt-2"><span>Per diem</span><span className="font-bold">{calculated.sym} {calculated.perDiem.toLocaleString()}</span></div>}
                   </div>
                 </div>
 
                 <div className="border border-gray-300">
                   <div className="bg-gray-100 border-b border-gray-300 font-bold p-3 text-gray-900">Deductions</div>
                   <div className="p-3 space-y-2 text-black">
-                    <div className="flex justify-between"><span>PAYE</span><span className="font-semibold">{calculated.sym} {Math.round(calculated.payeTax).toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>SHIF</span><span className="font-semibold">{calculated.sym} {calculated.nhifDeduction.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>NSSF</span><span className="font-semibold">{calculated.sym} {calculated.nssfDeduction.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>AHL</span><span className="font-semibold">{calculated.sym} {calculated.housingLevy.toLocaleString()}</span></div>
+                    {isKenyaPayslip(record) ? (
+                      <>
+                        <div className="flex justify-between"><span>PAYE</span><span className="font-semibold">{calculated.sym} {Math.round(calculated.payeTax).toLocaleString()}</span></div>
+                        <div className="flex justify-between"><span>SHIF</span><span className="font-semibold">{calculated.sym} {calculated.nhifDeduction.toLocaleString()}</span></div>
+                        <div className="flex justify-between"><span>NSSF</span><span className="font-semibold">{calculated.sym} {calculated.nssfDeduction.toLocaleString()}</span></div>
+                        <div className="flex justify-between"><span>AHL</span><span className="font-semibold">{calculated.sym} {calculated.housingLevy.toLocaleString()}</span></div>
+                      </>
+                    ) : (
+                      <CountryDeductionLines record={record} />
+                    )}
                     <WhtDeductionLine record={record} />
                     <div className="flex justify-between"><span>Advance</span><span className="font-semibold">{calculated.sym} {calculated.advanceDeduction.toLocaleString()}</span></div>
                     {calculated.deductionLines.map((line, i) => (
                       <div key={`${line.name}-${i}`} className="flex justify-between"><span>{line.name}</span><span className="font-semibold">{calculated.sym} {line.amount.toLocaleString()}</span></div>
                     ))}
-                    <div className="flex justify-between text-gray-600 mt-2 border-t border-gray-200 pt-1"><span>Tax relief:</span><span className="font-semibold">{calculated.sym} -2400</span></div>
+                    {isKenyaPayslip(record) && <div className="flex justify-between text-gray-600 mt-2 border-t border-gray-200 pt-1"><span>Tax relief:</span><span className="font-semibold">{calculated.sym} -2400</span></div>}
                   </div>
                 </div>
               </div>

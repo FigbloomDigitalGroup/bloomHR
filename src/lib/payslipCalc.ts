@@ -39,6 +39,9 @@ export interface PayslipContext {
   workByEmployee?: Map<string, WorkSettlementRow>;
   /** Employment Act s.19(3) two-thirds cap (company setting, on by default) */
   deductionCap?: boolean;
+  /** Uganda (FIG-905): Local Service Tax already paid this financial year, by employee number, and how it is collected */
+  lstPaidThisYear?: Map<string, number>;
+  lstCollection?: 'instalments' | 'lump_sum';
 }
 
 export function calculatePayslip(employee: Record<string, any>, ctx: PayslipContext): Record<string, any> {

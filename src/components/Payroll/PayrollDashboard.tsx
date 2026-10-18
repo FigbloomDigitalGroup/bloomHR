@@ -43,6 +43,8 @@ import {
 } from "../../lib/payroll/multiCountry";
 import { moneyRounded } from "../../lib/payroll/currency";
 import { loadDeductionCap, loadWorkSettlement } from "../../lib/workSettlementApi";
+import { loadLstCollection, loadLstPaidThisYear } from "../../lib/payroll/ugandaApi";
+import { recalculateUgandaPayslip } from "../../lib/payroll/countries/uganda";
 import type { SalaryHistoryRecord } from "../../lib/salaryHistory";
 import {
   type PayrollRun,
@@ -112,6 +114,7 @@ import PayrollEmployeesTab from "./PayrollEmployeesTab";
 import PayrollDeductionsTab from "./PayrollDeductionsTab";
 import PayrollEarningsTab from "./PayrollEarningsTab";
 import PayrollRatesTab from "./PayrollRatesTab";
+import UgandaLstSettings from "./UgandaLstSettings";
 import PayrollFilesTab from "./PayrollFilesTab";
 import PayrollHistoryTab from "./PayrollHistoryTab";
 
@@ -126,6 +129,8 @@ const PAYSLIP_AMOUNTS = [
   // the month-end settlement of piece rate work and contract jobs (FIG-812, lib/workSettlement)
   "work_pay", "jobs_pay", "paid_out", "ahl_withheld", "reserve_released", "wht_withheld", "wht_rate", "wht_tax",
   "arrears_brought_forward", "arrears_carried_forward",
+  // Uganda (FIG-905): Local Service Tax and the employer's NSSF
+  "lst_deduction", "employer_nssf",
 ] as const;
 
 /** A calculated payroll row as the salary_history row saved for it */
@@ -143,6 +148,7 @@ const toSalaryHistory = (record: any): SalaryHistoryRecord => ({
   arrears_note: record.arrears_note ?? null,
   worker_kind: record.worker_kind ?? null,
   work_settlement: record.work_settlement === true,
+  chargeable_income: record.chargeable_income ?? null,
   // the payslip's country and currency (FIG-905): worked out by that country's engine
   country: record.country || "Kenya",
   currency: record.currency || "KES",
@@ -167,6 +173,7 @@ const fromSalaryHistory = (saved: any, live: any | undefined) => ({
   arrears_note: saved.arrears_note ?? null,
   worker_kind: saved.worker_kind ?? live?.worker_kind ?? null,
   work_settlement: saved.work_settlement === true,
+  chargeable_income: saved.chargeable_income ?? null,
   // the employer's NITA levy the database saved on the payslip (FIG-898)
   nita_levy: Number(saved.nita_levy) || 0,
   country: saved.country || "Kenya",
@@ -214,6 +221,8 @@ export default function PayrollDashboard() {
   // the open tab (?tab=...), and a counter bumped when the rates editor saves so the Rates tab reloads
   const [tab, setTab] = usePayrollTab();
   const [ratesVersion, setRatesVersion] = useState(0);
+  // whose rates the Rates tab shows (FIG-905): one country at a time
+  const [ratesCountry, setRatesCountry] = useState("Kenya");
   const { hasPermission, loading: permissionsLoading } = usePermissions();
   // changing the company's rates needs payroll access (the statutory_rates policy checks the same)
   const canEditRates = !permissionsLoading && hasPermission("payroll");
@@ -1019,6 +1028,8 @@ export default function PayrollDashboard() {
         // the month's piece rate work and contract jobs, what payouts paid and held back, and arrears brought forward
         // (FIG-812, lib/workSettlement), and whether deductions are kept within two-thirds of wages
         const [workByEmployee, capOn] = await Promise.all([loadWorkSettlement(actualPeriod), loadDeductionCap()]);
+        // Uganda (FIG-905): LST already paid this financial year, and whether it is taken in instalments or at once
+        const [lstPaidThisYear, lstCollection] = await Promise.all([loadLstPaidThisYear(actualPeriod), loadLstCollection()]);
         setDeductionCap(capOn);
 
         if (data) {
@@ -1059,6 +1070,8 @@ export default function PayrollDashboard() {
             advanceFor: calculateAdvanceDeduction,
             workByEmployee,
             deductionCap: capOn,
+            lstPaidThisYear,
+            lstCollection,
           };
           const { records: payrollData, notCalculated: waiting } = calculateRun(data.filter(isPayrollReady), companyBranches, (country) => {
             const countryRates = ratesByCountry?.get(country);
@@ -1110,8 +1123,15 @@ export default function PayrollDashboard() {
   // payslips edited by hand in the month's draft run (FIG-883, lib/payslipOverrides): applied on top of the
   // calculation whenever the run is saved, and marked "Edited"
   const payslipEdits = usePayslipOverrides(monthRun?.id, runVersion);
-  const payslipContext = (employeeNumber: string) =>
-    statutoryContextFor(employees.find((e) => e["Employee Number"] === employeeNumber), rates, overrideStatutoryChecks, deductionCap);
+  const payslipContext = (employeeNumber: string) => {
+    const employee = employees.find((e) => e["Employee Number"] === employeeNumber);
+    // a Ugandan payslip is worked out again on Uganda's rates (FIG-905)
+    if (employee && payrollCountryOf(employee, companyBranches).country === "Uganda") {
+      const ugRates = ratesByCountry?.get("Uganda") ?? {};
+      return { ...statutoryContextFor(employee, ugRates, overrideStatutoryChecks, deductionCap), recalculate: (p: any) => recalculateUgandaPayslip(p, ugRates, employee) };
+    }
+    return statutoryContextFor(employee, rates, overrideStatutoryChecks, deductionCap);
+  };
 
   // once the month's run is started, everything here (table, totals, exports, payslips, bulk pay) uses its saved figures
   const payrollRecords = useMemo(() => {
@@ -1939,13 +1959,33 @@ export default function PayrollDashboard() {
 
       {tab === "rates" && (
         <div className="space-y-4">
+          {payrollCountries.length > 1 && (
+            <div className="flex gap-1" role="tablist" aria-label="Country">
+              {payrollCountries.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  role="tab"
+                  aria-selected={ratesCountry === c}
+                  onClick={() => setRatesCountry(c)}
+                  className={`px-3 py-1.5 rounded-tile border text-[11.5px] font-semibold ${ratesCountry === c ? "border-brand bg-brand/10 text-brand" : "border-border bg-white text-ink hover:bg-secondary"}`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
           <PayrollRatesTab
             payPeriod={actualPeriod}
             periodLabel={periodLabel}
             canEdit={canEditRates}
             onEdit={() => setShowStatutorySettings(true)}
             version={ratesVersion}
+            country={ratesCountry}
           />
+          {ratesCountry === "Uganda" && (
+            <UgandaLstSettings payPeriod={actualPeriod} canEdit={canEditRates} onChanged={() => setDeductionsVersion((v) => v + 1)} />
+          )}
           <LeavePaySetting
             canEdit={canEditRates}
             onChanged={() => setDeductionsVersion((v) => v + 1)}
@@ -2160,6 +2200,7 @@ export default function PayrollDashboard() {
       {showStatutorySettings && (
         <StatutoryRatesModal
           payPeriod={actualPeriod}
+          country={ratesCountry}
           onClose={() => setShowStatutorySettings(false)}
           onChanged={() => {
             void reloadRates();

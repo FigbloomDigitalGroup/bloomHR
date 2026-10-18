@@ -19,7 +19,7 @@ import {
   statusTone,
   submitMyOnboarding,
 } from '../../lib/onboarding';
-import { IDENTITY_TYPES, RESIDENCY_OPTIONS, fieldProblem } from '../../lib/onboardingValidation';
+import { IDENTITY_TYPES, RESIDENCY_OPTIONS, fieldProblem, taxNumberLabel } from '../../lib/onboardingValidation';
 import type { EmployeeRecord } from '../../lib/profileCompleteness';
 import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
 import { supabase } from '../../lib/supabase';
@@ -82,6 +82,23 @@ export default function OnboardingForm() {
   const [nextOfKin, setNextOfKin] = useState<Contact>(emptyContact());
   const [busy, setBusy] = useState<'save' | 'submit' | 'photo' | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  // the employee's country (their branch's, FIG-905): Uganda asks for a TIN and no SHA number
+  const [country, setCountry] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const { data } = await supabase.rpc('my_holiday_country');
+        if (live) setCountry(typeof data === 'string' ? data : null);
+      } catch {
+        // Kenya's details until it loads
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
+  const uganda = (country ?? '').toLowerCase() === 'uganda';
 
   const load = useCallback(async () => {
     try {
@@ -113,10 +130,10 @@ export default function OnboardingForm() {
   }, []);
 
   const set = (field: string) => (value: unknown) => setValues((v) => ({ ...v, [field]: value }));
-  const problemOf = (field: string) => fieldProblem(field, values[field], values);
+  const problemOf = (field: string) => fieldProblem(field, values[field], values, country);
   const hasFormatProblems = useMemo(
-    () => ['Tax PIN', 'ID Number', 'Mobile Number', 'NSSF Number', 'SHIF Number'].some((f) => fieldProblem(f, values[f], values)),
-    [values]
+    () => ['Tax PIN', 'ID Number', 'Mobile Number', 'NSSF Number', 'SHIF Number'].some((f) => fieldProblem(f, values[f], values, country)),
+    [values, country]
   );
 
   if (record === undefined) {
@@ -253,8 +270,8 @@ export default function OnboardingForm() {
         <Section title="Identity and statutory numbers" description="As they appear on your documents.">
           <SelectField label="Identity type" required value={values['Type of Identification']} options={IDENTITY_TYPES} onChange={set('Type of Identification')} />
           <TextField label="ID / passport number" required value={values['ID Number']} onChange={set('ID Number')} error={problemOf('ID Number')} />
-          <TextField label="KRA PIN" required value={values['Tax PIN']} onChange={set('Tax PIN')} error={problemOf('Tax PIN')} placeholder="A123456789B" />
-          <TextField label="SHA number" required value={values['SHIF Number']} onChange={set('SHIF Number')} error={problemOf('SHIF Number')} />
+          <TextField label={taxNumberLabel(country)} required value={values['Tax PIN']} onChange={set('Tax PIN')} error={problemOf('Tax PIN')} placeholder={uganda ? '1000123456' : 'A123456789B'} />
+          {!uganda && <TextField label="SHA number" required value={values['SHIF Number']} onChange={set('SHIF Number')} error={problemOf('SHIF Number')} />}
           <TextField label="NSSF number" required value={values['NSSF Number']} onChange={set('NSSF Number')} error={problemOf('NSSF Number')} />
           <SelectField label="Residency (for tax)" required value={values['kra_residency']} options={RESIDENCY_OPTIONS} onChange={set('kra_residency')} />
         </Section>

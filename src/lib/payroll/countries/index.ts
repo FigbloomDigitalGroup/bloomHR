@@ -1,14 +1,16 @@
 import { kenyaEngine } from './kenya';
+import { ugandaEngine } from './uganda';
 import type { CountryPayrollEngine } from './types';
 
 export type { CountryPayrollEngine, EmployeeProblem, PayrollInput, PayslipLine, PayslipRecord, PayslipResult, ReturnFile } from './types';
 export { kenyaEngine } from './kenya';
+export { ugandaEngine } from './uganda';
 
-// The registry of country payroll engines (FIG-905 stage 2). A country without one (Tanzania and Uganda until their
-// stages) is "not supported yet": its staff are worked out by nobody and shown as waiting for that country's rules,
+// The registry of country payroll engines (FIG-905 stage 2). A country without one (Tanzania until its
+// stage) is "not supported yet": its staff are worked out by nobody and shown as waiting for that country's rules,
 // never paid on another country's rules.
 
-const ENGINES: CountryPayrollEngine[] = [kenyaEngine];
+const ENGINES: CountryPayrollEngine[] = [kenyaEngine, ugandaEngine];
 
 /** "tanzania " -> "Tanzania"; the same spelling the database keeps (tidy_country). */
 export function tidyCountry(country: string | null | undefined): string {

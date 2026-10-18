@@ -18,13 +18,13 @@ import { currencyOf, money, moneyRounded, moneyShort } from './currency';
 
 const branch = (id: string, country: string, currency: string, is_default = false): Branch =>
   ({ id, name: id, country, currency, city: null, address: null, active: true, is_default });
-const branches = [branch('Nairobi', 'Kenya', 'KES', true), branch('Dar', 'Tanzania', 'TZS'), branch('Kampala', 'Uganda', 'UGX')];
+const branches = [branch('Nairobi', 'Kenya', 'KES', true), branch('Dar', 'Tanzania', 'TZS'), branch('Kigali', 'Rwanda', 'RWF')];
 
 const emp = (n: string, branch_id: string | null, extra: Record<string, unknown> = {}) => ({
   'Employee Number': n, 'First Name': `F${n}`, 'Last Name': `L${n}`, branch_id, 'Basic Salary': 60000,
   'Tax PIN': 'A012345678Z', 'NSSF Number': '1', 'SHIF Number': '2', payment_method: 'cash', ...extra,
 });
-const staff = [emp('K1', 'Nairobi'), emp('K2', null), emp('T1', 'Dar'), emp('T2', 'Dar'), emp('U1', 'Kampala')];
+const staff = [emp('K1', 'Nairobi'), emp('K2', null), emp('T1', 'Dar'), emp('T2', 'Dar'), emp('R1', 'Kigali')];
 const rates = new Map([['Kenya', KENYA_RATES]]);
 const ctxFor = (country: string) => (rates.get(country) ? { ...baseContext({ workByEmployee: undefined }), rates: rates.get(country)! } : null);
 
@@ -35,9 +35,9 @@ describe('countries from branches', () => {
     expect(payrollCountryOf(emp('X', null), [])).toMatchObject({ country: 'Kenya', currency: 'KES' });
   });
 
-  it('groups staff by country, Kenya first, with each engine (none for Tanzania and Uganda yet)', () => {
+  it('groups staff by country, Kenya first, with each engine (none for Tanzania and Rwanda yet)', () => {
     const g = groupByCountry(staff, branches);
-    expect(g.map((x) => [x.country, x.employees.length, !!x.engine])).toEqual([['Kenya', 2, true], ['Tanzania', 2, false], ['Uganda', 1, false]]);
+    expect(g.map((x) => [x.country, x.employees.length, !!x.engine])).toEqual([['Kenya', 2, true], ['Rwanda', 1, false], ['Tanzania', 2, false]]);
   });
 });
 
@@ -46,8 +46,8 @@ describe('one run for every country', () => {
     const { records, notCalculated } = calculateRun(staff, branches, ctxFor);
     expect(records.map((r) => [r.employee_id, r.country, r.currency])).toEqual([['K1', 'Kenya', 'KES'], ['K2', 'Kenya', 'KES']]);
     expect(notCalculated.map((n) => [n.country, n.waiting, n.reason, n.employees.length])).toEqual([
+      ['Rwanda', true, 'Waiting for Rwanda payroll rules', 1],
       ['Tanzania', true, 'Waiting for Tanzania payroll rules', 2],
-      ['Uganda', true, 'Waiting for Uganda payroll rules', 1],
     ]);
   });
 
@@ -87,12 +87,12 @@ describe('totals per currency', () => {
 describe('readiness and approval per country', () => {
   const { records } = calculateRun(staff, branches, ctxFor);
 
-  it('before approval: Kenya ready, Tanzania and Uganda waiting; one Approve approves the ready ones', () => {
+  it('before approval: Kenya ready, Tanzania and Rwanda waiting; one Approve approves the ready ones', () => {
     const r = countryReadiness({ employees: staff, branches, payslips: records, runCountries: [{ country: 'Kenya', status: 'draft' }], runStarted: true, ratesByCountry: rates });
-    expect(r.map((x) => [x.country, x.state])).toEqual([['Kenya', 'ready'], ['Tanzania', 'waiting'], ['Uganda', 'waiting']]);
+    expect(r.map((x) => [x.country, x.state])).toEqual([['Kenya', 'ready'], ['Rwanda', 'waiting'], ['Tanzania', 'waiting']]);
     expect(countriesToApprove(r)).toEqual(['Kenya']);
-    expect(approvalSummary(r)).toMatch(/^Kenya 2 payslips KSh \d+K ✓ · Tanzania 2 waiting for rules · Uganda 1 waiting for rules$/);
-    expect(r[1].waitingNames).toEqual(['FT1 LT1', 'FT2 LT2']);
+    expect(approvalSummary(r)).toMatch(/^Kenya 2 payslips KSh \d+K ✓ · Rwanda 1 waiting for rules · Tanzania 2 waiting for rules$/);
+    expect(r[2].waitingNames).toEqual(['FT1 LT1', 'FT2 LT2']);
   });
 
   it('warns (without blocking) about missing details and pay below the minimum wage', () => {

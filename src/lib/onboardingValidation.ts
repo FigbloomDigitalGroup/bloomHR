@@ -51,21 +51,31 @@ export const isValidOnboardingPhone = (value: unknown) =>
 export const isValidNssfNumber = (value: unknown) => /^\d{4,11}[0-9X]$/.test(normaliseNssfNumber(value));
 export const isValidShaNumber = (value: unknown) => /^[A-Z0-9-]{4,20}$/.test(normaliseShaNumber(value));
 
-/** Why a value can't be saved, or null when it can (blank is fine here; `onboardingMissing` says what is required). */
-export function fieldProblem(field: string, value: unknown, employee: EmployeeRecord = {}): string | null {
+/** The employee's tax number by its name in their country (FIG-905): a URA TIN in Uganda, else a KRA PIN. */
+export const taxNumberLabel = (country?: string | null) => (text(country).toLowerCase() === 'uganda' ? 'TIN' : 'KRA PIN');
+const inUganda = (country?: string | null) => text(country).toLowerCase() === 'uganda';
+
+/**
+ * Why a value can't be saved, or null when it can (blank is fine here; `onboardingMissing` says what is required).
+ * The employee's country (their branch's) picks the formats, as the database does: Uganda's TIN, NSSF and NIN.
+ */
+export function fieldProblem(field: string, value: unknown, employee: EmployeeRecord = {}, country?: string | null): string | null {
   if (!text(value)) return null;
   switch (field) {
     case 'Tax PIN':
+      if (inUganda(country)) return /^\d{10}$/.test(normaliseKraPin(value)) ? null : 'TIN should be 10 digits';
       return isValidKraPin(value) ? null : 'KRA PIN should look like A123456789B';
     case 'ID Number': {
       // no type is taken as a national ID, as the database does
       const type = text(employee['Type of Identification']) || 'National ID';
       if (!isIdentityType(type)) return 'Choose the identity type first';
+      if (inUganda(country) && type === 'National ID') return /^[A-Z0-9]{14}$/.test(normaliseIdNumber(value)) ? null : 'A NIN is 14 letters and digits';
       return isValidIdNumber(type, value) ? null : `This is not a valid ${type} number`;
     }
     case 'Mobile Number':
       return isValidOnboardingPhone(value) ? null : 'Phone number should look like 0712345678, or start with + and the country code';
     case 'NSSF Number':
+      if (inUganda(country)) return /^[A-Z0-9]{6,15}$/.test(normaliseNssfNumber(value)) ? null : 'NSSF number should be 6 to 15 letters and digits';
       return isValidNssfNumber(value) ? null : 'NSSF number should be 5 to 12 digits (the last may be X)';
     case 'SHIF Number':
       return isValidShaNumber(value) ? null : 'SHA number should be letters and digits only';

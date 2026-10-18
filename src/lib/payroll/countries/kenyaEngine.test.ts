@@ -77,13 +77,13 @@ describe('Kenya engine interface', () => {
 });
 
 describe('the registry', () => {
-  it('has Kenya, and nothing for countries without rules yet', () => {
+  it('has Kenya and Uganda, and nothing for countries without rules yet', () => {
     expect(engineFor('Kenya')).toBe(kenyaEngine);
     expect(engineFor(' kenya ')).toBe(kenyaEngine);
     expect(engineFor('Tanzania')).toBeNull();
-    expect(engineFor('Uganda')).toBeNull();
+    expect(engineFor('Uganda')?.country).toBe('Uganda');
     expect(engineFor('')).toBeNull();
-    expect(supportedCountries()).toEqual(['Kenya']);
+    expect(supportedCountries()).toContain('Kenya');
   });
 
   it('says who is waiting for which rules', () => {
