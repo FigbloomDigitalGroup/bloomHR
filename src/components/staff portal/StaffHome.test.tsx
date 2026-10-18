@@ -7,7 +7,7 @@ const state = vi.hoisted(() => ({
   events: [] as Record<string, unknown>[],
   holidays: [] as Record<string, unknown>[],
   leave: [] as Record<string, unknown>[],
-  people: [] as { name: string; dateOfBirth: string | null; email: string | null }[],
+  people: [] as { name: string; birthday: string | null; email: string | null }[],
   hidden: new Set<string>(),
   updateTask: vi.fn(),
   startDirectMessage: vi.fn(),
@@ -47,6 +47,8 @@ const inDays = (n: number, year?: number) => {
   d.setDate(d.getDate() + n);
   return `${year ?? d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
+/** A birthday as colleagues get it: 'MM-DD', never the year. */
+const monthDay = (n: number) => inDays(n).slice(5);
 
 let n = 0;
 const task = (title: string, due: string | null, extra: Record<string, unknown> = {}) => {
@@ -154,8 +156,8 @@ describe('StaffHome', () => {
     ];
     state.holidays = [{ name: 'Mashujaa Day', date: inDays(1), recurring: false }];
     state.people = [
-      { name: 'Amina Hassan', dateOfBirth: inDays(2, 1990), email: 'amina@farm.co.ke' },
-      { name: 'Far Away', dateOfBirth: inDays(8, 1985), email: 'far@farm.co.ke' },
+      { name: 'Amina Hassan', birthday: monthDay(2), email: 'amina@farm.co.ke' },
+      { name: 'Far Away', birthday: monthDay(8), email: 'far@farm.co.ke' },
     ];
     state.leave = [{ type: 'Annual Leave', start: inDays(3), end: inDays(5), status: 'approved' }];
     renderHome();
@@ -186,7 +188,7 @@ describe('StaffHome', () => {
   });
 
   it("prompts a wish for a colleague's birthday today and sends it in Chat", async () => {
-    state.people = [{ name: 'Amina Hassan', dateOfBirth: inDays(0, 1990), email: 'amina@farm.co.ke' }];
+    state.people = [{ name: 'Amina Hassan', birthday: monthDay(0), email: 'amina@farm.co.ke' }];
     state.startDirectMessage.mockResolvedValue('dm-1');
     state.sendMessage.mockResolvedValue({ id: 'm1' });
     renderHome();

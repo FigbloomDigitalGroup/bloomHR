@@ -18,7 +18,7 @@ import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { fetchAllResult } from '../../lib/fetchAll';
 import { PageHeader, Card, Button, Modal } from '../UI';
-import { toDay } from '../../lib/celebrations';
+import { birthdayMonthDay, toDay } from '../../lib/celebrations';
 import {
   comingUp, dayKey, holidayDates, myLeaveRanges, myOpenTasks, startOfDay,
   type CalendarEntry, type HolidayRow, type LeaveRow, type TaskRow, type UpcomingKind,
@@ -101,7 +101,7 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
       const [{ data: employees }, { data: holidayRows }, { data: eventRows }] = await Promise.all([
         // every employee, a page at a time (one request is capped at 1000 rows)
         fetchAllResult((from, to) =>
-          supabase.from('employee_directory').select('"First Name", "Last Name", "Date of Birth", Town').order('"Employee Number"').range(from, to)
+          supabase.from('employee_directory').select('"First Name", "Last Name", birthday, Town').order('"Employee Number"').range(from, to)
         ),
         supabase.from('holidays').select('name, date, recurring'),
         supabase.from('company_events').select('id, title, date, description').order('date'),
@@ -109,10 +109,11 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
 
       const bdayMap = new Map<string, BirthdayEntry[]>();
       (employees || []).forEach((emp) => {
-        const birthDate = toDay(emp['Date of Birth']);
-        if (!birthDate) return;
+        // 'MM-DD' only: colleagues never get the year
+        const born = birthdayMonthDay(emp.birthday);
+        if (!born) return;
         // Key by month-day only, so a birthday shows every year it's viewed
-        const key = `${birthDate.getMonth()}-${birthDate.getDate()}`;
+        const key = `${born.month}-${born.day}`;
         const entry: BirthdayEntry = {
           name: `${emp['First Name'] || ''} ${emp['Last Name'] || ''}`.trim(),
           town: emp.Town || undefined,
@@ -199,7 +200,13 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
     return map;
   }, [myTasks, taskOwner]);
 
-  const getBirthdaysFor = (day: Date) => (shown.birthday ? birthdaysByDay.get(`${day.getMonth()}-${day.getDate()}`) || [] : []);
+  const getBirthdaysFor = (day: Date) => {
+    if (!shown.birthday) return [];
+    const on = birthdaysByDay.get(`${day.getMonth()}-${day.getDate()}`) || [];
+    // 29 February birthdays are shown on the 28th in years without one
+    const isLeap = new Date(day.getFullYear(), 1, 29).getMonth() === 1;
+    return day.getMonth() === 1 && day.getDate() === 28 && !isLeap ? [...on, ...(birthdaysByDay.get('1-29') || [])] : on;
+  };
   const getHolidaysFor = (day: Date) => (shown.holiday ? holidaysByDay.get(dayKey(day)) || [] : []);
   const getEventsFor = (day: Date) => (shown.event ? eventsByDay.get(dayKey(day)) || [] : []);
   const getLeaveFor = (day: Date) => (shown.leave ? myLeaveByDay.get(dayKey(day)) || [] : []);
