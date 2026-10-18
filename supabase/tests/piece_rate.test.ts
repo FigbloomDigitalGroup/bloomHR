@@ -72,12 +72,15 @@ describe('kinds of work', () => {
 });
 
 describe('recording work', () => {
-  it("a supervisor records their team's work: approved at once, at the type's rate", async () => {
+  // stage 2 (20261019800000): what a supervisor submits waits for payroll by default (a company setting)
+  it("a supervisor records their team's work at the type's rate; it waits for payroll's approval", async () => {
     const id = await insertEntry(SUP, `(employee_number, work_date, work_type_id, quantity, source) values ('W1', current_date, ${TEA}, 42.5, 'self')`);
-    expect(await entry(id)).toEqual({ status: 'approved', source: 'supervisor', rate: '12.00', amount: '510.00', decided_by: SUP });
+    expect(await entry(id)).toEqual({ status: 'submitted', source: 'supervisor', rate: '12.00', amount: '510.00', decided_by: null });
+    await as(PAY, `update work_entries set status = 'approved' where id = '${id}'`);
+    expect(await entry(id)).toMatchObject({ status: 'approved', decided_by: PAY });
     // the regional manager counts as supervisor too
     const id2 = await insertEntry(SUP, `(employee_number, work_date, work_type_id, quantity, source) values ('W2', current_date, ${TEA}, 10, 'supervisor')`);
-    expect((await entry(id2)).status).toBe('approved');
+    expect((await entry(id2)).status).toBe('submitted');
   });
 
   it('a supervisor cannot record for someone outside their team, and staff cannot record for others', async () => {
@@ -104,7 +107,7 @@ describe('recording work', () => {
     await as(SUP, `update work_entries set status = 'approved' where id = '${id}'`);
     expect(await entry(id)).toMatchObject({ status: 'approved', decided_by: SUP });
     await expect(as(W1, `update work_entries set quantity = 99 where id = '${id}'`)).rejects.toThrow(/Approved work/);
-    await expect(as(W1, `delete from work_entries where id = '${id}'`)).rejects.toThrow(/Only payroll or the supervisor/);
+    await expect(as(W1, `delete from work_entries where id = '${id}'`)).rejects.toThrow(/only be removed by payroll/);
   });
 
   it('rejecting needs a reason; the worker corrects and sends it back', async () => {
