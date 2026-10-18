@@ -118,9 +118,9 @@ const CLEAN: Record<DetailColumn, (value: string) => { value: string } | { error
   'KRA PIN': (v) =>
     isValidKraPin(v) ? { value: normaliseKraPin(v) } : { error: `KRA PIN "${v}" should look like A123456789B` },
   'NSSF Number': (v) =>
-    isValidNssfNumber(v) ? { value: normaliseNssfNumber(v) } : { error: `NSSF number "${v}" should be digits (the last may be X)` },
+    isValidNssfNumber(v) ? { value: normaliseNssfNumber(v) } : { error: `NSSF number "${v}" should be 4 to 15 letters and digits` },
   'SHA Number': (v) =>
-    isValidShaNumber(v) ? { value: normaliseShaNumber(v) } : { error: `SHA number "${v}" should be letters and digits only` },
+    isValidShaNumber(v) ? { value: normaliseShaNumber(v) } : { error: `SHA number "${v}" should be 4 to 25 letters, digits and dashes` },
   'Payment Method': (v) => {
     const method = normalisePaymentMethod(v);
     return method ? { value: method } : { error: `payment method "${v}" should be M-Pesa, Airtel Money, Bank Transfer or Cash` };
