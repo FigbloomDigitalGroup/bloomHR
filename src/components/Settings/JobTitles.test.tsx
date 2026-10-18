@@ -32,7 +32,7 @@ const page = () => render(<MemoryRouter><JobTitles /></MemoryRouter>);
 
 beforeEach(() => {
   state.role = 'HR';
-  state.perms = [];
+  state.perms = ['employees', 'hr-admin', 'kpi-admin'];
   state.titles = [title({}), title({ id: 't2', name: 'Sales Rep.', department_id: null, job_group_id: null, employee_count: 1, template_count: 0 }), title({ id: 't3', name: 'Driver', active: false, employee_count: 0, template_count: 0, department_id: null, job_group_id: null })];
   api.saveJobTitle.mockReset().mockResolvedValue(undefined);
   api.mergeJobTitles.mockReset().mockResolvedValue(1);
@@ -41,17 +41,32 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('canManageJobTitles', () => {
-  it('HR, admins, the Employees module and Performance (not line managers)', () => {
+  it('the Employees module or Manage KPIs (as the database decides), never the role name', () => {
     const has = (list: string[]) => (m: string) => list.includes(m);
-    expect(canManageJobTitles('HR', has([]))).toBe(true);
-    expect(canManageJobTitles('CLERK', has(['employees']))).toBe(true);
-    expect(canManageJobTitles('ANALYST', has(['performance']))).toBe(true);
-    expect(canManageJobTitles('MANAGER', has(['performance']))).toBe(false);
-    expect(canManageJobTitles('STAFF', has(['dashboard']))).toBe(false);
+    expect(canManageJobTitles(has(['employees']))).toBe(true);
+    expect(canManageJobTitles(has(['kpi-admin']))).toBe(true);
+    expect(canManageJobTitles(has(['performance']))).toBe(false);
+    expect(canManageJobTitles(has(['dashboard', 'task-manager', 'teams']))).toBe(false);
+  });
+
+  it('the system roles keep what they had with their default modules', () => {
+    const has = (list: string[]) => (m: string) => list.includes(m);
+    expect(canManageJobTitles(has(['employees', 'hr-admin', 'kpi-admin']))).toBe(true); // HR
+    expect(canManageJobTitles(has(['employees', 'payroll']))).toBe(true); // CHECKER
+    expect(canManageJobTitles(has(['employees', 'employee-edit', 'performance']))).toBe(true); // MANAGER / REGIONAL
+    expect(canManageJobTitles(has(['employees', 'recruitment']))).toBe(true); // OPERATIONS
+    expect(canManageJobTitles(has(['dashboard', 'task-manager', 'teams']))).toBe(false); // STAFF
   });
 });
 
 describe('Job titles page', () => {
+  it('opens for a custom role with only Manage KPIs (based on Staff)', async () => {
+    state.role = 'STAFF';
+    state.perms = ['dashboard', 'kpi-admin'];
+    page();
+    expect(await screen.findByText('Sales Rep')).toBeTruthy();
+  });
+
   it('lists active titles with their usual department, job group and employees; inactive on request', async () => {
     page();
     const row = (await screen.findByText('Sales Rep')).closest('tr')!;
@@ -109,6 +124,7 @@ describe('Job titles page', () => {
 
   it('tells anyone else they may not manage job titles', () => {
     state.role = 'STAFF';
+    state.perms = ['dashboard', 'task-manager', 'teams'];
     page();
     expect(screen.getByRole('status').textContent).toMatch(/Only HR/);
     expect(screen.queryByRole('button', { name: 'Add job title' })).toBeNull();

@@ -17,7 +17,7 @@ import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import { useNavigate } from 'react-router-dom';
 import { utils, writeFile } from 'xlsx';
-import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
+import ModuleGate from '../ProtectedRoutes/ModuleGate';
 
 import { confirmDialog } from '../../lib/confirmDialog';
 type Asset = Database['public']['Tables']['assets']['Row'];
@@ -823,7 +823,7 @@ const AssetManagement: React.FC = () => {
                 Edit
               </Button>
 
-              <RoleButtonWrapper allowedRoles={['ADMIN', 'IT']}>
+              <ModuleGate anyOf={['asset']}>
                 <Button
                   variant="secondary"
                   className="!px-2.5 !py-1.5 !text-[11px] !text-status-danger !border-[#F6DCC7]"
@@ -832,7 +832,7 @@ const AssetManagement: React.FC = () => {
                 >
                   Delete
                 </Button>
-              </RoleButtonWrapper>
+              </ModuleGate>
             </div>
           </Card>
         ))}

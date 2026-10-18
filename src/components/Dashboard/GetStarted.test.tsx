@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 const state = vi.hoisted(() => ({
   role: 'ADMIN' as string | null,
+  modules: [] as string[],
   companies: [{ tenant_id: 't1', name: 'Favor Farm', slug: 'favor-farm', role: 'ADMIN', is_current: true }] as unknown,
   profileCount: 0,
   employeeCount: 0,
@@ -19,7 +20,13 @@ vi.mock('../../lib/supabase', () => ({
 }));
 vi.mock('../../lib/companyApi', () => ({ companyApi: { listInvitations: () => Promise.resolve(state.invitations) } }));
 vi.mock('../../hooks/useMyCompanies', () => ({ useMyCompanies: () => ({ data: state.companies }) }));
-vi.mock('../../hooks/usePermissions', () => ({ usePermissions: () => ({ userRole: state.role }) }));
+vi.mock('../../hooks/usePermissions', () => ({
+  usePermissions: () => ({
+    userRole: state.role,
+    loading: false,
+    hasAllPermissions: (ms: string[]) => state.role === 'ADMIN' || ms.every((m) => state.modules.includes(m)),
+  }),
+}));
 
 import GetStarted, { OPEN_COMPANY_PROFILE, COMPANY_PROFILE_SAVED } from './GetStarted';
 
@@ -33,6 +40,7 @@ const open = () =>
 beforeEach(() => {
   localStorage.clear();
   state.role = 'ADMIN';
+  state.modules = [];
   state.profileCount = 0;
   state.employeeCount = 0;
   state.invitations = [];
@@ -92,10 +100,24 @@ describe('GetStarted', () => {
     expect(screen.queryByText('Get Favor Farm set up')).toBeNull();
   });
 
-  it('is shown to administrators only', async () => {
+  it('is shown to administrators only by default: not HR (no Settings) nor Checker (no Invite people)', async () => {
     state.role = 'HR';
+    state.modules = ['employees', 'hr-admin', 'invite-people'];
     open();
     await new Promise((r) => setTimeout(r, 30));
     expect(screen.queryByText(/set up/)).toBeNull();
+    cleanup();
+    state.role = 'CHECKER';
+    state.modules = ['employees', 'payroll', 'settings'];
+    open();
+    await new Promise((r) => setTimeout(r, 30));
+    expect(screen.queryByText(/set up/)).toBeNull();
+  });
+
+  it('is shown to a role of the company’s own that holds Settings and Invite people', async () => {
+    state.role = 'HR';
+    state.modules = ['employees', 'invite-people', 'settings'];
+    open();
+    expect(await screen.findByText('Get Favor Farm set up')).toBeTruthy();
   });
 });

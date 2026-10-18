@@ -15,7 +15,9 @@ import { XCircle, Clock, Search, ChevronDown, Send, Users,
 } from 'lucide-react';
 
 
-import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
+import ModuleGate from '../ProtectedRoutes/ModuleGate';
+import { usePermissions } from '../../hooks/usePermissions';
+import { salaryWorkflowRole } from '../../lib/salaryWorkflowRole';
 import AdvanceApplicationManager from './staffSetting';
 import SearchableDropdown from '../UI/SearchableDropdown';
 import TransactionStatusChecker from './TransactionStatusChecker';
@@ -171,16 +173,8 @@ const SMSService = {
   }
 };
 
-// Role mapping - Connect your actual roles to SalaryAdvanceAdmin roles
-const ROLE_MAPPING = {
-  'ADMIN': 'credit_analyst_officer',      // Full admin access
-  'CHECKER': 'checker',                   // Payment approver
-  'OPERATIONS': 'maker',                  // Request creator  
-  'STAFF': 'maker',                       // Request creator
-  'MANAGER': 'branch_manager',           // Branch manager
-  'REGIONAL': 'regional_manager',        // Regional manager
-  'HR': 'maker'                          // Request creator
-};
+// The workflow's roles (credit_analyst_officer, checker, branch_manager, regional_manager, maker) come from the base
+// role and the Payroll module: see lib/salaryWorkflowRole.
 
 // Status Badge Component for Maker-Checker
 const StatusBadge = ({ status }: { status: string }) => {
@@ -3272,8 +3266,10 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
   // Maker-Checker Payment Flow State
   const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
-  const [userRole, setUserRole] = useState('maker');
-  const [, setActualUserRole] = useState('STAFF');
+  // the base role (user_profiles.role); the workflow role follows it and the Payroll module ('maker' until both are known)
+  const [actualUserRole, setActualUserRole] = useState<string | null>(null);
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
+  const userRole = actualUserRole && !permissionsLoading ? salaryWorkflowRole(actualUserRole, hasPermission) : 'maker';
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [, setUserEmail] = useState<string>('');
   const [showApprovalQueue, setShowApprovalQueue] = useState(false);
@@ -3458,7 +3454,6 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       setUserEmail(user.email || '');
 
       const actualRole = (await fetchTrustedRole(user.id)) || 'STAFF';
-      const mappedRole = ROLE_MAPPING[actualRole] || 'maker';
 
       let userTown = '';
       let userRegion = '';
@@ -3508,13 +3503,11 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
       console.log('🎯 Final result:', {
         email: user.email,
         actualRole,
-        mappedRole,
         userTown,
         userRegion
       });
 
       setActualUserRole(actualRole);
-      setUserRole(mappedRole);
       setUserTown(userTown);
       setUserRegion(userRegion);
 
@@ -3530,7 +3523,6 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
 
     } catch (error) {
       console.error('❌ Error fetching user profile:', error);
-      setUserRole('maker');
       setActualUserRole('STAFF');
     }
   };
@@ -5427,20 +5419,21 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
                   <Activity className="w-3 h-3" /> All applications
                 </button>
 
-                <RoleButtonWrapper allowedRoles={['ADMIN', 'CHECKER']}>
+                <ModuleGate anyOf={['mpesa-zap']}>
                   <button type="button" aria-pressed={activeTab === 'callbacks'} onClick={() => setActiveTab('callbacks')} className={tabClass('callbacks')}>
                     <Smartphone className="w-3 h-3" /> M-Pesa Results
                   </button>
                   <button type="button" aria-pressed={activeTab === 'transaction_status'} onClick={() => setActiveTab('transaction_status')} className={tabClass('transaction_status')}>
                     <RefreshCw className="w-3 h-3" /> Transaction Status
                   </button>
-                </RoleButtonWrapper>
+                </ModuleGate>
 
-                <RoleButtonWrapper allowedRoles={['ADMIN']}>
+                {/* the advance application settings: HR administration and Payroll together (by default only administrators) */}
+                <ModuleGate allOf={['hr-admin', 'payroll']}>
                   <button type="button" aria-pressed={activeTab === 'settings'} onClick={() => setActiveTab('settings')} className={tabClass('settings')}>
                     <Settings className="w-3 h-3" /> Settings
                   </button>
-                </RoleButtonWrapper>
+                </ModuleGate>
               </>
             );
           })()}

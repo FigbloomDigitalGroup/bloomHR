@@ -84,8 +84,9 @@ interface NewLoanForm {
 }
 
 export default function LoansAdmin() {
-  const { userRole, hasPermission, loading: permissionsLoading } = usePermissions();
-  const canManage = !permissionsLoading && (userRole === 'ADMIN' || userRole === 'HR' || hasPermission('payroll'));
+  const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
+  // Staff loans or Payroll (administrators hold every module)
+  const canManage = !permissionsLoading && hasAnyPermission(['loans', 'payroll']);
 
   const [loans, setLoans] = useState<EmployeeLoan[]>([]);
   const [schedules, setSchedules] = useState<Record<string, LoanInstalment[]>>({});

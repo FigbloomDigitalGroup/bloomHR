@@ -43,7 +43,7 @@ import { createClient } from '@supabase/supabase-js';
 import { WRITE_BATCH_SIZE, chunks, fetchAll, fetchAllResult } from '../../lib/fetchAll';
 import { groupBy } from '../../lib/utils';
 import { TownProps } from '../../types/supabase';
-import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
+import ModuleGate from '../ProtectedRoutes/ModuleGate';
 import LeaveScheduler from './LeaveScheduler';
 import ApprovalChain from '../Approvals/ApprovalChain';
 import { ApprovalChain as ApprovalChainData, loadApprovalChains } from '../../lib/approvals';
@@ -2653,7 +2653,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
             <h2 className="text-lg font-base text-gray-900">Leave Types</h2>
             <p className="text-gray-600 text-xs">{leaveTypes.length} leave types configured</p>
           </div>
-          <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+          <ModuleGate anyOf={['hr-admin']}>
             <button
               onClick={() => setShowLeaveTypeForm(true)}
               className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-medium"
@@ -2661,7 +2661,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
               <Plus className="w-3 h-3" />
               Add Leave Type
             </button>
-          </RoleButtonWrapper>
+          </ModuleGate>
         </div>
         {leaveTypesError && (
           <div className="mt-4 flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
@@ -2727,7 +2727,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
                 </td>
                 <td className="py-4 px-4">
                   <div className="flex justify-center gap-1">
-                    <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+                    <ModuleGate anyOf={['hr-admin']}>
                       <button
                         onClick={() => {
                           setNewLeaveType(type);
@@ -2738,8 +2738,8 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
                         <Edit className="w-3 h-3" />
                         Edit
                       </button>
-                    </RoleButtonWrapper>
-                    <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+                    </ModuleGate>
+                    <ModuleGate anyOf={['hr-admin']}>
                       <button
                         onClick={() => handleDeleteLeaveType(type.id)}
                         className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs"
@@ -2747,7 +2747,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
                         <Trash2 className="w-3 h-3" />
                         Delete
                       </button>
-                    </RoleButtonWrapper>
+                    </ModuleGate>
                   </div>
                 </td>
               </tr>
@@ -2929,7 +2929,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
             <h2 className="text-lg font-base text-gray-900">Holidays</h2>
             <p className="text-gray-600 text-xs">{holidays.length} holidays configured. Leave in working days skips these.</p>
           </div>
-          <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+          <ModuleGate anyOf={['hr-admin']}>
             <div className="flex flex-wrap items-center gap-2">
             {holidayCountry?.supported && (
               <>
@@ -2958,7 +2958,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
               Add Holiday
             </button>
             </div>
-          </RoleButtonWrapper>
+          </ModuleGate>
         </div>
         <p className="mt-3 mb-0 text-[11px] text-gray-500">
           {holidayCountry && !holidayCountry.supported
@@ -3003,7 +3003,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
                 </td>
                 <td className="py-4 px-4">
                   <div className="flex justify-center gap-1">
-                    <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+                    <ModuleGate anyOf={['hr-admin']}>
                       <button
                         onClick={() => {
                           setNewHoliday(holiday);
@@ -3014,8 +3014,8 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
                         <Edit className="w-3 h-3" />
                         Edit
                       </button>
-                    </RoleButtonWrapper>
-                    <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+                    </ModuleGate>
+                    <ModuleGate anyOf={['hr-admin']}>
                       <button
                         onClick={() => handleDeleteHoliday(holiday.id)}
                         className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded text-xs"
@@ -3023,7 +3023,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
                         <Trash2 className="w-3 h-3" />
                         Delete
                       </button>
-                    </RoleButtonWrapper>
+                    </ModuleGate>
                   </div>
                 </td>
               </tr>

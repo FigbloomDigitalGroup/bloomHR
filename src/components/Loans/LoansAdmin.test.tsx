@@ -15,9 +15,20 @@ vi.mock('../../lib/loansApi', () => ({
   saveLoanSettings: vi.fn(),
   saveLoanProduct: vi.fn(),
 }));
-const perms = { role: 'HR', payroll: false };
+const HR_MODULES = ['dashboard', 'employees', 'hr-admin', 'leaves', 'loans'];
+const perms = { role: 'HR', modules: HR_MODULES };
 vi.mock('../../hooks/usePermissions', () => ({
-  usePermissions: () => ({ userRole: perms.role, hasPermission: (p: string) => p === 'payroll' && perms.payroll, loading: false }),
+  usePermissions: () => {
+    const has = (p: string) => perms.role === 'ADMIN' || perms.modules.includes(p);
+    return {
+      userRole: perms.role,
+      permissions: perms.modules,
+      hasPermission: has,
+      hasAnyPermission: (ps: string[]) => ps.some(has),
+      hasAllPermissions: (ps: string[]) => ps.every(has),
+      loading: false,
+    };
+  },
 }));
 vi.mock('../UI/EmployeePicker', () => ({
   default: ({ onChange }: { onChange: (e: { employeeNumber: string } | null) => void }) => (
@@ -60,7 +71,7 @@ const LOANS = [
 beforeEach(() => {
   vi.clearAllMocks();
   perms.role = 'HR';
-  perms.payroll = false;
+  perms.modules = HR_MODULES;
   mocked.loadAllLoans.mockResolvedValue(LOANS);
   mocked.loadLoanSettings.mockResolvedValue(DEFAULT_LOAN_SETTINGS);
   mocked.loadLoanProducts.mockResolvedValue([]);
@@ -155,6 +166,33 @@ describe('the loans page', () => {
 
   it('someone who may not manage loans sees no buttons', async () => {
     perms.role = 'MANAGER';
+    perms.modules = ['dashboard', 'employees', 'employee-edit', 'leaves', 'expenses', 'salaryadmin', 'team-work'];
+    render(<LoansAdmin />);
+    const card = await screen.findByTestId('loan-r1');
+    expect(within(card).queryByRole('button', { name: 'Approve' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'New loan' })).toBeNull();
+  });
+
+  it('the Payroll module manages loans (Checker by default)', async () => {
+    perms.role = 'CHECKER';
+    perms.modules = ['dashboard', 'employees', 'payroll', 'settings'];
+    render(<LoansAdmin />);
+    const card = await screen.findByTestId('loan-r1');
+    expect(within(card).getByRole('button', { name: 'Approve' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'New loan' })).toBeTruthy();
+  });
+
+  it('a custom role based on Manager with Staff loans manages loans', async () => {
+    perms.role = 'MANAGER';
+    perms.modules = ['dashboard', 'employees', 'loans'];
+    render(<LoansAdmin />);
+    const card = await screen.findByTestId('loan-r1');
+    expect(within(card).getByRole('button', { name: 'Approve' })).toBeTruthy();
+  });
+
+  it('HR whose role lost Staff loans (and has no Payroll) does not', async () => {
+    perms.role = 'HR';
+    perms.modules = HR_MODULES.filter((m) => m !== 'loans');
     render(<LoansAdmin />);
     const card = await screen.findByTestId('loan-r1');
     expect(within(card).queryByRole('button', { name: 'Approve' })).toBeNull();

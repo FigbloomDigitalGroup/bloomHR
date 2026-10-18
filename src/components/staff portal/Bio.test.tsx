@@ -49,6 +49,20 @@ vi.mock('../../lib/supabase', () => {
     },
   };
 });
+// a staff member: the default Staff modules (no HR administration)
+vi.mock('../../hooks/usePermissions', () => {
+  const modules = ['dashboard', 'task-manager', 'teams'];
+  return {
+    usePermissions: () => ({
+      userRole: 'STAFF',
+      permissions: modules,
+      loading: false,
+      hasPermission: (m: string) => modules.includes(m),
+      hasAnyPermission: (ms: string[]) => ms.some((m) => modules.includes(m)),
+      hasAllPermissions: (ms: string[]) => ms.every((m) => modules.includes(m)),
+    }),
+  };
+});
 vi.mock('react-hot-toast', () => ({ default: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }) }));
 
 import toast from 'react-hot-toast';

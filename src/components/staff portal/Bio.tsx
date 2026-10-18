@@ -5,7 +5,8 @@ import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import { describeSaveError, isValidPhone, summarizeErrors } from '../../lib/formValidation';
-import { canEditEmployeeField, isHrOrAdmin, normalizeRole } from '../../lib/employeeFieldAccess';
+import { canEditEmployeeField } from '../../lib/employeeFieldAccess';
+import { usePermissions } from '../../hooks/usePermissions';
 import { NOT_SAVED_NOT_LINKED, requireUpdatedRows } from '../../lib/requireUpdated';
 import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
 import { Database } from '../../types/supabase';
@@ -130,7 +131,10 @@ const EmployeeBioPage = () => {
   const [statutoryDeductions, setStatutoryDeductions] = useState<StatutoryDeduction[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isEditMode, setIsEditMode] = useState(false);
-  const [userRole, setUserRole] = useState<string>('employee'); // Track user role
+  // HR administration changes any field; pay shows to HR administration with Payroll (by default administrators)
+  const { hasPermission, hasAllPermissions, loading: permissionsLoading } = usePermissions();
+  const hrAdmin = !permissionsLoading && hasPermission('hr-admin');
+  const seesPay = !permissionsLoading && hasAllPermissions(['hr-admin', 'payroll']);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // the company's branches (FIG-905): the profile shows the employee's branch and its country
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -147,7 +151,7 @@ const EmployeeBioPage = () => {
 
   // Check if a field should be editable based on user role
   const canEditField = (fieldName: string): boolean =>
-    canEditEmployeeField(fieldName, { role: userRole, isEditMode, readOnlyFields: READ_ONLY_FIELDS, currentValue: employee[fieldName as keyof typeof employee] });
+    canEditEmployeeField(fieldName, { hrAdmin, isEditMode, readOnlyFields: READ_ONLY_FIELDS, currentValue: employee[fieldName as keyof typeof employee] });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -157,17 +161,6 @@ const EmployeeBioPage = () => {
 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user?.email) return;
-
-        // Fetch user role
-        const { data: userProfile } = await supabase
-          .from('user_profiles') // Adjust to your actual table name
-          .select('role')
-          .eq('user_id', user.id)
-          .single();
-
-        if (userProfile?.role) {
-          setUserRole(normalizeRole(userProfile.role));
-        }
 
         const { data: employeeData } = await supabase
           .from('employees')
@@ -316,7 +309,7 @@ const EmployeeBioPage = () => {
     const { name, value } = e.target;
 
     // Only allow editing if field is editable for this user
-    if (!canEditField(name) && !isHrOrAdmin(userRole)) {
+    if (!canEditField(name) && !hrAdmin) {
       return;
     }
 
@@ -331,7 +324,7 @@ const EmployeeBioPage = () => {
 
   const handleDateChange = (name: string, value: string) => {
     // Only allow editing if field is editable for this user
-    if (!canEditField(name) && !isHrOrAdmin(userRole)) {
+    if (!canEditField(name) && !hrAdmin) {
       return;
     }
 
@@ -503,7 +496,7 @@ const EmployeeBioPage = () => {
       const updateData = { ...employee };
 
       // If user is not HR/Admin, don't update read-only fields
-      if (!isHrOrAdmin(userRole)) {
+      if (!hrAdmin) {
         READ_ONLY_FIELDS.forEach(field => {
           delete updateData[field];
         });
@@ -782,7 +775,7 @@ const EmployeeBioPage = () => {
                 </h1>
                 <p className="text-white mt-1">
                   <span className="font-medium">Employee ID:</span> {employee['Employee Number']}
-                  {isHrOrAdmin(userRole) ? ' (HR/Admin View)' : ' (Employee View)'}
+                  {hrAdmin ? ' (HR/Admin View)' : ' (Employee View)'}
                 </p>
               </div>
             </div>
@@ -1438,7 +1431,7 @@ const EmployeeBioPage = () => {
                 </div>
               </div>
 
-              {userRole === 'admin' && (
+              {seesPay && (
                 <div>
                   <SectionHeader
                     title="Salary Information"

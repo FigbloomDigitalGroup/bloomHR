@@ -16,7 +16,7 @@ const METHODS: { id: TwoStepMethod; label: string; hint: string }[] = [
 
 /**
  * The company's two-step sign-in (FIG-834): off, on for admins, HR and payroll, or on for everyone; codes by email or
- * SMS. Only an ADMIN changes it (the database checks); others see what is set.
+ * SMS. Only people whose role has Sign-in security change it (the database checks); others see what is set.
  */
 export default function TwoStepSignInCard({ className = '' }: { className?: string }) {
   const [saved, setSaved] = useState<TwoStepSettings | null>(null);
