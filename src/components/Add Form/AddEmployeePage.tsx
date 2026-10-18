@@ -14,6 +14,7 @@ import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
 import SearchableDropdown from '../UI/SearchableDropdown';
 import DepartmentPicker from '../UI/DepartmentPicker';
+import BranchPicker from '../UI/BranchPicker';
 import EmployeePicker from '../UI/EmployeePicker';
 import { employeeTypeOptions } from '../../lib/employmentTypes';
 import { STARTER_DEPARTMENTS, ensureBranchListed, loadEmployeeFieldValues, optionsWithStarters } from '../../lib/employeeOptions';
@@ -38,6 +39,8 @@ type Employee = Database['public']['Tables']['employees']['Row'] & {
   // org structure (20261016200000): the department and who they report to
   department_id?: string | null;
   reports_to_id?: string | null;
+  // the branch (20261020500000): an office in a country; null = the default branch
+  branch_id?: string | null;
 };
 
 type DropdownOptions = {
@@ -913,14 +916,10 @@ const AddEmployeePage = () => {
                     error={errors['Job Title']}
                   />
 
-                  <FormField
-                    label="Branch"
-                    name="Branch"
-                    type="select"
-                    creatable
-                    value={newEmployee.Branch || ''}
-                    onChange={handleInputChange}
-                    options={dropdownOptions.branches}
+                  {/* an office in a country (FIG-905): holidays and the minimum wage follow it */}
+                  <BranchPicker
+                    value={newEmployee.branch_id}
+                    onChange={(b) => setNewEmployee(prev => ({ ...prev, branch_id: b?.id ?? null, Branch: b?.name ?? null }))}
                   />
                   <FormField
                     label="Office"

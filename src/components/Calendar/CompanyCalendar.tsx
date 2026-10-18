@@ -20,10 +20,10 @@ import { fetchAllResult } from '../../lib/fetchAll';
 import { PageHeader, Card, Button, Modal } from '../UI';
 import { toDay } from '../../lib/celebrations';
 import {
-  comingUp, dayKey, holidayDates, myLeaveRanges, myOpenTasks, startOfDay,
+  comingUp, dayKey, holidayDates, holidaysForCountry, myLeaveRanges, myOpenTasks, startOfDay, withCountryTags,
   type CalendarEntry, type HolidayRow, type LeaveRow, type TaskRow, type UpcomingKind,
 } from '../../lib/upcoming';
-import { currentEmployeeNumber, loadMyLeave, loadMyTasks } from '../../lib/upcomingApi';
+import { currentEmployeeNumber, loadMyLeave, loadMyTasks, myHolidayCountry } from '../../lib/upcomingApi';
 import ComingUpList, { type RangeChoice } from './ComingUpList';
 
 import { confirmDialog } from '../../lib/confirmDialog';
@@ -103,7 +103,7 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
         fetchAllResult((from, to) =>
           supabase.from('employee_directory').select('"First Name", "Last Name", "Date of Birth", Town').order('"Employee Number"').range(from, to)
         ),
-        supabase.from('holidays').select('name, date, recurring'),
+        supabase.from('holidays').select('name, date, recurring, country'),
         supabase.from('company_events').select('id, title, date, description').order('date'),
       ]);
 
@@ -120,7 +120,9 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
         bdayMap.set(key, [...(bdayMap.get(key) || []), entry]);
       });
       setBirthdaysByDay(bdayMap);
-      setHolidays((holidayRows || []) as HolidayRow[]);
+      // staff see their own country's holidays (FIG-905); people who run the company see every country's, tagged
+      const allHolidays = (holidayRows || []) as HolidayRow[];
+      setHolidays(readOnly ? holidaysForCountry(allHolidays, await myHolidayCountry()) : withCountryTags(allHolidays));
       setEvents((eventRows || []) as CompanyEvent[]);
 
       if (myEmployeeNumber) {

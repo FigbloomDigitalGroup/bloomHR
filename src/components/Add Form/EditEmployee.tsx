@@ -15,6 +15,7 @@ import GlowButton from '../UI/GlowButton';
 import { User, Briefcase, CreditCard, Phone, MapPin } from 'lucide-react';
 import SearchableDropdown from '../UI/SearchableDropdown';
 import DepartmentPicker from '../UI/DepartmentPicker';
+import BranchPicker from '../UI/BranchPicker';
 import EmployeePicker from '../UI/EmployeePicker';
 import { useEmployeeDirectory } from '../../hooks/useEmployeeDirectory';
 import { employeeTypeOptions } from '../../lib/employmentTypes';
@@ -37,6 +38,8 @@ type Employee = Database['public']['Tables']['employees']['Row'] & {
   // org structure (20261016200000): the department and who they report to
   department_id?: string | null;
   reports_to_id?: string | null;
+  // the branch (20261020500000): an office in a country; null = the default branch
+  branch_id?: string | null;
 };
 
 type DropdownOptions = {
@@ -998,14 +1001,10 @@ const EditEmployeePage = () => {
                     options={dropdownOptions.jobGroup}
                     disabled={!isEditMode || !!jobGroups?.length}
                   />
-                  <FormField
-                    label="Branch"
-                    name="Branch"
-                    type={isEditMode ? "select" : "text"}
-                    creatable
-                    value={employee.Branch || ''}
-                    onChange={handleInputChange}
-                    options={dropdownOptions.branches}
+                  {/* an office in a country (FIG-905): holidays and the minimum wage follow it */}
+                  <BranchPicker
+                    value={employee.branch_id}
+                    onChange={(b) => setEmployee(prev => ({ ...prev, branch_id: b?.id ?? null, Branch: b?.name ?? null }))}
                     disabled={!isEditMode}
                   />
                   <FormField

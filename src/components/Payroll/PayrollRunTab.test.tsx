@@ -94,3 +94,34 @@ describe('PayrollRunTab minimum wage warning', () => {
     expect(screen.queryByTestId('minimum-wage-slot')).toBeNull();
   });
 });
+
+describe('PayrollRunTab: branches in other countries (FIG-905)', () => {
+  const branches = [
+    { id: 'hq', name: 'Nairobi HQ', country: 'Kenya', currency: 'KES', city: null, address: null, active: true, is_default: true },
+    { id: 'dar', name: 'Dar es Salaam', country: 'Tanzania', currency: 'TZS', city: null, address: null, active: true, is_default: false },
+  ];
+  const tzRecord = { ...record, id: 'r2', employee_id: 'E2', employee_name: 'Baraka Mushi' };
+
+  it('shows each employee’s branch and country, and flags staff outside Kenya with a notice', () => {
+    const p = { ...props(), finalFilteredRecords: [record, tzRecord], currentItems: [record, tzRecord] };
+    render(
+      <PayrollRunTab
+        {...p}
+        onPayroll={[{ 'Employee Number': 'E1', branch_id: null }, { 'Employee Number': 'E2', branch_id: 'dar' }]}
+        companyBranches={branches}
+      />
+    );
+    const notice = screen.getByRole('alert', { name: 'Staff outside Kenya' });
+    expect(notice.textContent).toContain('Payroll for Tanzania and Uganda staff comes next; their payslips are calculated with Kenya rules until then');
+    expect(notice.textContent).toContain('1 person is in a branch outside Kenya (1 in Tanzania)');
+    expect(screen.getAllByText(/Nairobi HQ \(Kenya\)/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Dar es Salaam \(Tanzania\)/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Tanzania: Kenya rules').length).toBeGreaterThan(0);
+  });
+
+  it('says nothing when everyone is in Kenya', () => {
+    render(<PayrollRunTab {...props()} onPayroll={[{ 'Employee Number': 'E1' }]} companyBranches={branches} />);
+    expect(screen.queryByRole('alert', { name: 'Staff outside Kenya' })).toBeNull();
+    expect(screen.queryByText(/Kenya rules/)).toBeNull();
+  });
+});
