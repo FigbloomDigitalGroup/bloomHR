@@ -43,6 +43,11 @@ import {
   totalsByCurrency,
 } from "../../lib/payroll/multiCountry";
 import { moneyRounded } from "../../lib/payroll/currency";
+import { isUsdPayslip, localPayslip, paidInUsd } from "../../lib/payroll/usdPay";
+import { type FxRate, loadFxRates, saveFxRate } from "../../lib/payroll/usdPayApi";
+import { usePayCurrencies } from "../../hooks/usePayCurrencies";
+import UsdRatePanel from "./UsdRatePanel";
+import PayCurrencySetting from "./PayCurrencySetting";
 import { loadDeductionCap, loadWorkSettlement } from "../../lib/workSettlementApi";
 import { loadLstCollection, loadLstPaidThisYear } from "../../lib/payroll/ugandaApi";
 import { recalculateUgandaPayslip } from "../../lib/payroll/countries/uganda";
@@ -153,6 +158,10 @@ const toSalaryHistory = (record: any): SalaryHistoryRecord => ({
   // the payslip's country and currency (FIG-905): worked out by that country's engine
   country: record.country || "Kenya",
   currency: record.currency || "KES",
+  // paid in USD (FIG-906): the month's rate and the local statutory figures the returns are filed from
+  fx_rate: record.fx_rate ?? null,
+  local_currency: record.local_currency ?? null,
+  local_amounts: record.local_amounts ?? null,
   // the pay PAYE was worked out on (Tanzania's taxable pay, Uganda's chargeable income) and the residency it was taxed on
   taxable_pay: record.taxable_pay ?? null,
   tax_resident: record.tax_resident ?? null,
@@ -181,6 +190,9 @@ const fromSalaryHistory = (saved: any, live: any | undefined) => ({
   nita_levy: Number(saved.nita_levy) || 0,
   country: saved.country || "Kenya",
   currency: saved.currency || "KES",
+  fx_rate: saved.fx_rate == null ? null : Number(saved.fx_rate),
+  local_currency: saved.local_currency ?? null,
+  local_amounts: saved.local_amounts ?? null,
   taxable_pay: saved.taxable_pay ?? null,
   tax_resident: saved.tax_resident ?? null,
   payment_method: paymentMethodLabel(saved.payment_method),
@@ -200,6 +212,11 @@ export default function PayrollDashboard() {
   const [employees, setEmployees] = useState<any[]>([]);
   // the company's branches (FIG-905): the Run tab shows each employee's branch and flags staff outside Kenya
   const { branches: companyBranches, loading: branchesLoading } = useBranches();
+  // the currency each country is paid in, and this month's USD rates (FIG-906)
+  const { payCurrencies, loading: payCurrenciesLoading } = usePayCurrencies();
+  const [fx, setFx] = useState<{ period: string; confirmed: Map<string, FxRate>; previous: Map<string, FxRate> } | null>(null);
+  const [fxVersion, setFxVersion] = useState(0);
+  const [heldBack, setHeldBack] = useState<RunCalculation["heldBack"]>([]);
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [departments, setDepartments] = useState(["all"]);
@@ -519,6 +536,11 @@ export default function PayrollDashboard() {
   };
 
   const actualPeriod = getPeriodString(selectedPeriod);
+  // the month's confirmed USD rate per country (null while loading)
+  const fxRates = useMemo(
+    () => (fx && fx.period === actualPeriod ? new Map([...fx.confirmed].map(([c, r]) => [c, r.rate])) : null),
+    [fx, actualPeriod],
+  );
   // the statutory rates in force this month for each country with a payroll engine (statutory_rates by country);
   // `rates` is Kenya's (the deductions and payslip editing screens use it)
   const payrollCountries = useMemo(() => supportedCountries(), []);
@@ -1079,13 +1101,20 @@ export default function PayrollDashboard() {
             lstPaidThisYear,
             lstCollection,
           };
-          const { records: payrollData, notCalculated: waiting } = calculateRun(data.filter(isPayrollReady), companyBranches, (country) => {
-            const countryRates = ratesByCountry?.get(country);
-            return countryRates ? { ...month, rates: countryRates } : null;
-          });
+          const { records: payrollData, notCalculated: waiting, heldBack: held } = calculateRun(
+            data.filter(isPayrollReady),
+            companyBranches,
+            (country) => {
+              const countryRates = ratesByCountry?.get(country);
+              return countryRates ? { ...month, rates: countryRates } : null;
+            },
+            // a country paid in USD is worked out at this month's confirmed rate, and held back without one (FIG-906)
+            { payCurrencies, fxRates },
+          );
 
           setLiveRecords(payrollData);
           setNotCalculated(waiting);
+          setHeldBack(held);
         }
       } catch (err) {
         console.error("Error:", err);
@@ -1096,11 +1125,26 @@ export default function PayrollDashboard() {
     };
 
     // once every country's rates and the branches are loaded; a country missing a rate is held back (calculateRun)
-    if (ratesByCountry && !branchesLoading) {
+    if (ratesByCountry && !branchesLoading && !payCurrenciesLoading && fxRates) {
       fetchEmployees();
     }
     // runVersion: worked out again after each start / recalculate / approve, so payouts or work approved meanwhile count
-  }, [actualPeriod, ratesByCountry, companyBranches, branchesLoading, overrideStatutoryChecks, salaryAdvances, deductionsVersion, detailsVersion, runVersion]);
+  }, [actualPeriod, ratesByCountry, companyBranches, branchesLoading, overrideStatutoryChecks, salaryAdvances, deductionsVersion, detailsVersion, runVersion, payCurrencies, payCurrenciesLoading, fxRates]);
+
+  // this month's USD rates (and the last ones, as suggestions), reloaded after one is confirmed
+  useEffect(() => {
+    let cancelled = false;
+    loadFxRates(actualPeriod)
+      .then((r) => { if (!cancelled) setFx({ period: actualPeriod, ...r }); })
+      .catch((err) => {
+        if (cancelled) return;
+        setFx({ period: actualPeriod, confirmed: new Map(), previous: new Map() });
+        toast.error(runErrorMessage(err, "Could not load the USD rates."));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [actualPeriod, fxVersion]);
 
   // the month's payroll run, reloaded after each start/recalculate/approve/...
   useEffect(() => {
@@ -1297,10 +1341,15 @@ export default function PayrollDashboard() {
     setRunBusy(true);
     try {
       // with the payslips' hand edits applied again on top (FIG-883)
-      const calculated = await withRunEdits(monthRun?.id, liveRecords.filter((r) => r.employee_id), (r) => payslipContext(r.employee_id));
+      // (USD payslips are never edited by hand: they are worked out again from the USD figures and the month's rate)
+      const numbered = liveRecords.filter((r) => r.employee_id);
+      const calculated = [
+        ...(await withRunEdits(monthRun?.id, numbered.filter((r) => !isUsdPayslip(r)), (r) => payslipContext(r.employee_id))),
+        ...numbered.filter((r) => isUsdPayslip(r)),
+      ];
       const all = calculated.map((r) => toSalaryHistory({ ...r, pay_period: actualPeriod }));
-      // a payslip never goes out in another currency than its country's (the database refuses it too)
-      const mismatch = all.map(currencyMismatch).find(Boolean);
+      // a payslip never goes out in another currency than the one its country is paid in (the database refuses it too)
+      const mismatch = all.map((r) => currencyMismatch(r, payCurrencies)).find(Boolean);
       if (mismatch) {
         toast.error(mismatch);
         return;
@@ -1429,8 +1478,16 @@ export default function PayrollDashboard() {
         runStarted: !!monthRun,
         ratesByCountry: ratesByCountry ?? new Map(),
         belowMinimum,
+        payCurrencies,
+        fxRates,
+        heldBack,
       }),
-    [onPayroll, companyBranches, payrollRecords, runCountries, monthRun, ratesByCountry, belowMinimum],
+    [onPayroll, companyBranches, payrollRecords, runCountries, monthRun, ratesByCountry, belowMinimum, payCurrencies, fxRates, heldBack],
+  );
+  // the countries on this month's payroll paid in USD: each needs the month's rate (FIG-906)
+  const usdCountries = useMemo(
+    () => [...new Set(onPayroll.map((e) => payrollCountryOf(e, companyBranches).country))].filter((c) => paidInUsd(c, payCurrencies)).sort(),
+    [onPayroll, companyBranches, payCurrencies],
   );
   const readyCountries = countriesToApprove(readiness);
   const countriesIn = (status: PayrollRunStatus) =>
@@ -1856,6 +1913,20 @@ export default function PayrollDashboard() {
           setSelectedCountry={setSelectedCountry}
           payrollRecords={payrollRecords}
           returnsEmployees={kenyaOnPayroll}
+          usdRates={
+            <UsdRatePanel
+              countries={usdCountries}
+              periodLabel={periodLabel}
+              confirmed={fx && fx.period === actualPeriod ? fx.confirmed : new Map()}
+              previous={fx && fx.period === actualPeriod ? fx.previous : new Map()}
+              locked={approvedCountries}
+              canEdit={canEditRates}
+              onConfirm={async (country, rate) => {
+                await saveFxRate(actualPeriod, country, rate);
+                setFxVersion((v) => v + 1);
+              }}
+            />
+          }
           onBelowMinimum={setBelowMinimum}
           onDownloadPdf={() => {
             try {
@@ -2009,6 +2080,11 @@ export default function PayrollDashboard() {
             }
           />
           <OvertimeSettingsCard canEdit={canEditRates} onChanged={() => setDeductionsVersion((v) => v + 1)} />
+          <PayCurrencySetting
+            countries={[...new Set(companyBranches.filter((b) => b.active).map((b) => b.country))]}
+            canEdit={canEditRates}
+            onChanged={() => setFxVersion((v) => v + 1)}
+          />
           <DeductionCapSetting canEdit={canEditRates} onChanged={() => setDeductionsVersion((v) => v + 1)} />
           <MinimumWageCard canEdit={canEditRates} />
           <PayslipEmailSetting canEdit={canEditRates} />
@@ -2169,7 +2245,7 @@ export default function PayrollDashboard() {
         isOpen={showP9Modal}
         onClose={() => setShowP9Modal(false)}
         // the P9 is Kenya's tax card
-        records={payrollRecords.filter((r: any) => payslipCountry(r) === "Kenya")}
+        records={payrollRecords.filter((r: any) => payslipCountry(r) === "Kenya").map((r: any) => localPayslip(r))}
         companyInfo={companyInfo}
       />
 

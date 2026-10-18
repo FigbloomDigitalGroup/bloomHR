@@ -77,7 +77,8 @@ export async function loadExportFiles(run: PayrollRun, runCountries?: PayrollRun
   return {
     countries: files,
     debitAccount,
-    totals: new Map(files.map((c) => [c.country, remittanceTotals(c.payslips, ratesByCountry.get(c.country) ?? {})])),
+    // what is remitted is in local currency, a USD payslip's local figures included (FIG-906)
+    totals: new Map(files.map((c) => [c.country, remittanceTotals(c.statutoryPayslips, ratesByCountry.get(c.country) ?? {})])),
   };
 }
 

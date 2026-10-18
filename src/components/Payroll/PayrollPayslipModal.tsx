@@ -10,6 +10,8 @@ import { overtimeLineLabel, overtimeLineWorking, payslipOvertimeLines, payslipOv
 import { PayslipSettlementBlock, WhtDeductionLine, WorkEarningLines, netPayLabel } from "./PayslipSettlement";
 import { currencyOf, currencySymbol } from "../../lib/payroll/currency";
 import { CountryDeductionLines, CountryEmployerLines, hasCountryLines } from "./CountryPayslipLines";
+import LocalStatutorySection from "./LocalStatutorySection";
+import { isUsdPayslip } from "../../lib/payroll/usdPay";
 
 /** The payslip's currency symbol (FIG-905): KSh, TSh, USh. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a payroll row from PayrollDashboard
@@ -283,7 +285,7 @@ export const PayslipDocument = ({ record, companyInfo, id }: { record: any; comp
               ) : (
                 <div className="flex justify-between text-gray-600 mt-2 border-t border-gray-200 pt-1">
                   <span>Tax relief:</span>
-                  <span className="font-semibold">{cur(record)} -2400</span>
+                  <span className="font-semibold">{cur(record)} {isUsdPayslip(record) ? (-(Number(record.tax_relief) || 0)).toLocaleString() : "-2400"}</span>
                 </div>
               )}
             </div>
@@ -291,6 +293,8 @@ export const PayslipDocument = ({ record, companyInfo, id }: { record: any; comp
         </div>
 
         <PayslipSettlementBlock record={record} />
+        {/* paid in USD (FIG-906): the statutory figures in the local currency at the month's rate */}
+        <LocalStatutorySection record={record} />
 
         <div className="border border-gray-300 p-4 mb-8 bg-gray-50">
           <div className="flex justify-between border-b border-gray-300 pb-2 mb-2 text-sm text-black">
@@ -389,7 +393,12 @@ export const PayslipModal = ({
           </div>
         </div>
 
-        {edit && <PayslipEditBar key={record.employee_id} record={record} edit={edit} />}
+        {edit && !isUsdPayslip(record) && <PayslipEditBar key={record.employee_id} record={record} edit={edit} />}
+        {edit && isUsdPayslip(record) && (
+          <p className="px-4 py-2 text-xs text-gray-600 border-b border-gray-200" data-testid="usd-no-edit">
+            USD payslips aren’t edited by hand: change the salary or earnings (in USD) or the month’s USD rate, then recalculate.
+          </p>
+        )}
 
         <div className="p-2 bg-gray-50 payslip-container print:p-0 print:w-[210mm] print:h-[297mm]">
           <PayslipDocument record={record} companyInfo={companyInfo} id="payslip-content" />

@@ -50,7 +50,16 @@ export interface PayrollRegisterRow {
   heslb_deduction?: number | null;
   sdl_levy?: number | null;
   wcf_levy?: number | null;
+  /** paid in USD (FIG-906): the month's rate and the country's currency */
+  fx_rate?: number | string | null;
+  local_currency?: string | null;
 }
+
+/** " at 1 USD = 129 KES" for a USD group of the register (FIG-906); "" otherwise. */
+const usdRateNote = (currency: string, rows: PayrollRegisterRow[]) => {
+  const r = rows.find((x) => Number(x.fx_rate) > 0);
+  return currency === 'USD' && r ? ` at 1 USD = ${Number(r.fx_rate).toLocaleString()} ${String(r.local_currency ?? '')}`.trimEnd() : '';
+};
 
 export const REGISTER_COLUMNS = [
   'No.', 'Employee', 'Department', 'Basic', 'Allowances', 'Overtime', 'Leave deduction', 'Gross pay', 'PAYE', 'SHIF', 'NSSF', 'Housing levy', 'Other deductions', 'Net pay', 'NITA levy (employer)',
@@ -212,7 +221,7 @@ export function payrollRegisterPdf(rows: PayrollRegisterRow[], { periodLabel, co
       companyName,
       `${rows.length} ${rows.length === 1 ? 'employee' : 'employees'}`,
       `Generated ${new Date().toLocaleDateString('en-KE')}`,
-      currencies.length === 1 ? `Amounts in ${currencySymbol(currencies[0] ?? 'KES')}` : 'Amounts in each country’s currency',
+      currencies.length === 1 ? `Amounts in ${currencySymbol(currencies[0] ?? 'KES')}${groups.length === 1 ? usdRateNote(groups[0].currency, groups[0].rows) : ''}` : 'Amounts in each country’s currency',
     ]
       .filter(Boolean)
       .join('    '),
@@ -226,7 +235,7 @@ export function payrollRegisterPdf(rows: PayrollRegisterRow[], { periodLabel, co
     const { columns, lines, totals } = g;
     if (several) {
       doc.setFontSize(11);
-      doc.text(`${g.country} (${g.currency}): ${lines.length} ${lines.length === 1 ? 'employee' : 'employees'}`, 40, startY + 4);
+      doc.text(`${g.country} (${g.currency}${usdRateNote(g.currency, g.rows)}): ${lines.length} ${lines.length === 1 ? 'employee' : 'employees'}`, 40, startY + 4);
       startY += 14;
     }
     autoTable(doc, {

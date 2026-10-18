@@ -6,6 +6,7 @@ import type { EmployeeRecord } from './profileCompleteness';
 import { lastDayOf, p10Figures } from './payrollExports';
 import { nonTaxableEarningsOf } from './earnings';
 import { bandsOf, taxByBands, type Rates } from './statutoryCalc';
+import { localPayslip } from './payroll/usdPay';
 
 // The P9 (tax deduction card, FIG-773): an employee's pay and tax month by month for a year, from their payslips
 // in approved (or paid) payroll months. The figures are worked out the way payroll and the P10 work them out
@@ -152,7 +153,8 @@ export async function saveEmployerPin(pin: string): Promise<string> {
 async function approvedPayslips(employeeId: string, year: number): Promise<Payslip[]> {
   const { data, error } = await supabase.rpc('p9_payslips', { p_employee: employeeId, p_year: year });
   if (error) fail(error, 'Could not load the payslips.');
-  return (data ?? []) as Payslip[];
+  // the P9 is KRA's: a Kenya payslip paid in USD counts with its KES figures (FIG-906)
+  return ((data ?? []) as Payslip[]).map((p) => localPayslip(p));
 }
 
 /** The signed-in employee's P9 for a year (their payslips are visible to them once a month is approved). */

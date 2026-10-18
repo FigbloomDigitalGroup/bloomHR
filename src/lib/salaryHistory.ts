@@ -76,6 +76,10 @@ export interface SalaryHistoryRecord {
     /** the payslip's country and currency (FIG-905): its employee's branch's when worked out */
     country?: string;
     currency?: string;
+    /** paid in USD (FIG-906): the month's rate, the country's currency and the local statutory figures (lib/payroll/usdPay) */
+    fx_rate?: number | null;
+    local_currency?: string | null;
+    local_amounts?: Record<string, unknown> | null;
     payment_method?: string;
     bank_name?: string;
     account_number?: string;

@@ -25,9 +25,11 @@ interface Props {
   disabled?: boolean;
   /** fields set by the employee's job group, shown but not editable */
   locked?: string[];
+  /** the currency the employee is paid in (FIG-906: USD for a country paid in USD); labels the amounts when given */
+  currency?: string;
 }
 
-export default function EmployerPayFields({ values, onChange, disabled, locked = [] }: Props) {
+export default function EmployerPayFields({ values, onChange, disabled, locked = [], currency }: Props) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
       <SelectField
@@ -40,7 +42,7 @@ export default function EmployerPayFields({ values, onChange, disabled, locked =
         disabled={disabled}
       />
       {AMOUNTS.map(([field, label, hint]) => (
-        <AmountField key={field} label={label}
+        <AmountField key={field} label={currency ? `${label} (${currency})` : label}
           hint={locked.includes(field) ? 'Set by the job group' : hint ?? 'Per month; leave blank if none'} value={values[field]}
           onChange={(v) => onChange(field, v)} disabled={disabled || locked.includes(field)} />
       ))}

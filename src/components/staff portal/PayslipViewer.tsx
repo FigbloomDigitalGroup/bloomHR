@@ -32,8 +32,10 @@ import { loadMyP9 } from '../../lib/p9';
 import { loadCompanyIdentity, type CompanyIdentity } from '../../lib/companyProfile';
 import { useBackToClose } from '../../hooks/useBackToClose';
 import { currencyOf, currencySymbol } from '../../lib/payroll/currency';
+import { isUsdPayslip } from '../../lib/payroll/usdPay';
 import { CountryDeductionLines, CountryEmployerLines, hasCountryLines } from '../Payroll/CountryPayslipLines';
 import { PayslipSettlementBlock, WhtDeductionLine, WorkEarningLines, netPayLabel } from '../Payroll/PayslipSettlement';
+import LocalStatutorySection from '../Payroll/LocalStatutorySection';
 
 // HARDCODED STATUTORY SETTINGS - Updated to match payroll dashboard
 const statutorySettings = {
@@ -590,13 +592,15 @@ const PayslipModal = ({
                     {hasCountryLines(record) ? (
                       <CountryEmployerLines record={record} sym={calculated.sym} />
                     ) : (
-                      <div className="flex justify-between text-gray-600 mt-2 border-t border-gray-200 pt-1"><span>Tax relief:</span><span className="font-semibold">{calculated.sym} -2400</span></div>
+                      <div className="flex justify-between text-gray-600 mt-2 border-t border-gray-200 pt-1"><span>Tax relief:</span><span className="font-semibold">{calculated.sym} {isUsdPayslip(record) ? (-(Number(record.tax_relief) || 0)).toLocaleString() : '-2400'}</span></div>
                     )}
                   </div>
                 </div>
               </div>
 
               <PayslipSettlementBlock record={record} />
+              {/* paid in USD (FIG-906): the statutory figures in the local currency */}
+              <LocalStatutorySection record={record} />
 
               <div className="border border-gray-300 p-4 mb-8 bg-gray-50">
                 <div className="flex justify-between border-b border-gray-300 pb-2 mb-2 text-sm text-black">
