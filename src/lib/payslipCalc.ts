@@ -42,9 +42,54 @@ export interface PayslipContext {
   /** Uganda (FIG-905): Local Service Tax already paid this financial year, by employee number, and how it is collected */
   lstPaidThisYear?: Map<string, number>;
   lstCollection?: 'instalments' | 'lump_sum';
+  /** how many people the run pays in the employee's country (FIG-905: Tanzania's SDL applies from 10 employees) */
+  countryHeadcount?: number;
 }
 
-export function calculatePayslip(employee: Record<string, any>, ctx: PayslipContext): Record<string, any> {
+/** What a country's rules work out on the month's pay (FIG-905): its tax and social security, in place of Kenya's. */
+export interface StatutoryArgs {
+  employee: Record<string, any>;
+  rates: Rates;
+  overrideStatutoryChecks: boolean;
+  /** gross pay for the month (all earnings, less unpaid leave and absence) */
+  grossPay: number;
+  /** the basic salary earned this month (after unpaid leave and absence) */
+  basicEarned: number;
+  /** overtime paid this month */
+  overtimePay: number;
+  /** the month's earnings summary (taxable, not taxed, pensionable...) */
+  earnings: ReturnType<typeof summariseEarnings>;
+  contractor: boolean;
+  /** extra figures the run knows about the country (e.g. its headcount for a levy threshold) */
+  ctx: PayslipContext;
+}
+
+/** A country's statutory figures for one payslip. Everything in `deductions` is taken from pay and always in full. */
+export interface StatutoryOutcome {
+  paye: number;
+  nssf: number;
+  /** Kenya's SHIF; 0 elsewhere unless a country has a health levy in the same place */
+  health: number;
+  housingLevy: number;
+  wht: number;
+  whtRate: number;
+  taxRelief: number;
+  /** other statutory deductions taken from pay (Tanzania's HESLB repayment), by the payslip column that keeps each */
+  otherStatutory: Record<string, number>;
+  /** extra columns saved on the payslip (employer costs, taxable pay, flags) */
+  fields: Record<string, unknown>;
+  /** the per diem share of basic that is not taxed (Kenya's company practice), 0 elsewhere */
+  perDiem: number;
+  /** whether the Employment Act two-thirds cap applies to a settlement payslip */
+  cap: boolean;
+}
+
+/** A country's rules for the shared payslip calculation (earnings, leave, loans and settlement are the same everywhere). */
+export interface PayslipRules {
+  statutory(args: StatutoryArgs): StatutoryOutcome;
+}
+
+export function calculatePayslip(employee: Record<string, any>, ctx: PayslipContext, rules?: PayslipRules): Record<string, any> {
   const { rates, overrideStatutoryChecks, period: actualPeriod, leaveBasis } = ctx;
   const basicSalary = employee["Basic Salary"] || 0;
   const employeeId = employee["Employee Number"] || "";
@@ -109,36 +154,49 @@ export function calculatePayslip(employee: Record<string, any>, ctx: PayslipCont
     leaveDeduction +
     workPay;
 
-  // Taxable amount EXCLUDES the per diem portion and earnings that are not taxed
-  const taxableGross = grossPay - perDiem - earnings.nonTaxable;
+  // Kenya (the default rules): Kenya's statutory deductions exactly as before the country engines; another country's
+  // engine passes its own rules (FIG-905)
+  const outcome: StatutoryOutcome = rules
+    ? rules.statutory({ employee, rates: rates ?? {}, overrideStatutoryChecks, grossPay, basicEarned: Math.max(0, basicSalary - leaveDeduction), overtimePay, earnings, contractor, ctx })
+    : kenyaStatutory();
+  function kenyaStatutory(): StatutoryOutcome {
+    // Taxable amount EXCLUDES the per diem portion and earnings that are not taxed
+    const taxableGross = grossPay - perDiem - earnings.nonTaxable;
 
-  // SHIF, NSSF, AHL and PAYE with this month's rates (lib/statutoryCalc): pension, PRMF and mortgage
-  // interest come off taxable pay, insurance relief and the PWD exemption apply. A deduction is left out
-  // while its number or PIN is missing, unless statutory checks are overridden. A contractor pays none of them:
-  // withholding tax instead.
-  const statutory = statutoryFor(
-    {
-      ...statutoryPayWith(taxableGross - earnings.taxable, earnings.items),
-      ...employeeInputs(employee),
-      apply: contractor
-        ? { shif: false, nssf: false, ahl: false, paye: false }
-        : {
-            shif: overrideStatutoryChecks || Boolean(nhifNumber),
-            nssf: overrideStatutoryChecks || Boolean(nssfNumber),
-            ahl: overrideStatutoryChecks || Boolean(taxPin),
-            paye: overrideStatutoryChecks || Boolean(taxPin),
-          },
-    },
-    rates ?? {},
-  );
-  const nhifDeduction = statutory.shif;
-  const nssfDeduction = statutory.nssf;
-  const housingLevy = statutory.ahl;
-  const payeTax = statutory.paye;
-  // the monthly personal relief, as the P10 reports it
-  const taxRelief = contractor ? 0 : statutory.personalRelief;
-  const whtRate = contractor ? whtRateFor(employee, rates ?? {}) : 0;
-  const whtTax = contractor ? whtOn(grossPay, whtRate) : 0;
+    // SHIF, NSSF, AHL and PAYE with this month's rates (lib/statutoryCalc): pension, PRMF and mortgage
+    // interest come off taxable pay, insurance relief and the PWD exemption apply. A deduction is left out
+    // while its number or PIN is missing, unless statutory checks are overridden. A contractor pays none of them:
+    // withholding tax instead.
+    const statutory = statutoryFor(
+      {
+        ...statutoryPayWith(taxableGross - earnings.taxable, earnings.items),
+        ...employeeInputs(employee),
+        apply: contractor
+          ? { shif: false, nssf: false, ahl: false, paye: false }
+          : {
+              shif: overrideStatutoryChecks || Boolean(nhifNumber),
+              nssf: overrideStatutoryChecks || Boolean(nssfNumber),
+              ahl: overrideStatutoryChecks || Boolean(taxPin),
+              paye: overrideStatutoryChecks || Boolean(taxPin),
+            },
+      },
+      rates ?? {},
+    );
+    const nhifDeduction = statutory.shif;
+    const nssfDeduction = statutory.nssf;
+    const housingLevy = statutory.ahl;
+    const payeTax = statutory.paye;
+    // the monthly personal relief, as the P10 reports it
+    const taxRelief = contractor ? 0 : statutory.personalRelief;
+    const whtRate = contractor ? whtRateFor(employee, rates ?? {}) : 0;
+    const whtTax = contractor ? whtOn(grossPay, whtRate) : 0;
+    return {
+      paye: payeTax, nssf: nssfDeduction, health: nhifDeduction, housingLevy, wht: whtTax, whtRate, taxRelief,
+      otherStatutory: {}, fields: {}, perDiem, cap: true,
+    };
+  }
+  const { paye: payeTax, nssf: nssfDeduction, health: nhifDeduction, housingLevy, wht: whtTax, whtRate, taxRelief } = outcome;
+  const otherStatutory = Object.values(outcome.otherStatutory).reduce((s, n) => s + n, 0);
 
   // the employee's pension and post-retirement medical fund contributions come out of their pay
   const pensionItems = [
@@ -161,7 +219,7 @@ export function calculatePayslip(employee: Record<string, any>, ctx: PayslipCont
     employeeId,
     actualPeriod,
     grossPay - work.paidOut - work.arrearsBroughtForward -
-      (payeTax + nhifDeduction + nssfDeduction + housingLevy + whtTax + advanceDeduction + welfareDeduction + otherDeductions),
+      (payeTax + nhifDeduction + nssfDeduction + housingLevy + whtTax + otherStatutory + advanceDeduction + welfareDeduction + otherDeductions),
   );
   const loanDeduction = totalOf(loanItems);
   const deductionItems = [...voluntaryItems, ...loanItems];
@@ -173,6 +231,7 @@ export function calculatePayslip(employee: Record<string, any>, ctx: PayslipCont
     nssfDeduction +
     housingLevy +
     whtTax +
+    otherStatutory +
     loanDeduction +
     advanceDeduction +
     welfareDeduction +
@@ -184,11 +243,11 @@ export function calculatePayslip(employee: Record<string, any>, ctx: PayslipCont
     work,
     grossPay,
     totalDeductions,
-    statutory: payeTax + nhifDeduction + nssfDeduction + housingLevy + whtTax,
+    statutory: payeTax + nhifDeduction + nssfDeduction + housingLevy + whtTax + otherStatutory,
     netPay: grossPay - totalDeductions,
     whtRate,
     whtTax,
-    cap: ctx.deductionCap !== false,
+    cap: ctx.deductionCap !== false && outcome.cap,
   });
 
   return {
@@ -210,7 +269,7 @@ export function calculatePayslip(employee: Record<string, any>, ctx: PayslipCont
     overtime_rate: overtimeRate,
     commission: commission,
     bonus: bonus,
-    per_diem: perDiem,
+    per_diem: outcome.perDiem,
     gross_pay: grossPay,
     paye_tax: payeTax,
     nhif_deduction: nhifDeduction,
@@ -229,8 +288,10 @@ export function calculatePayslip(employee: Record<string, any>, ctx: PayslipCont
     overtime_items: overtime.items,
     total_deductions: totalDeductions,
     ...settlement,
-    // the employer's NITA training levy (FIG-898): an employer cost, not in deductions or net pay
-    nita_levy: nitaLevyFor(employee, rates),
+    // the employer's NITA training levy (FIG-898): an employer cost, not in deductions or net pay (Kenya's only)
+    nita_levy: rules ? 0 : nitaLevyFor(employee, rates),
+    ...outcome.otherStatutory,
+    ...outcome.fields,
     pay_period: actualPeriod,
     payment_method: paymentMethodLabel(employee.payment_method),
     bank_name: employee.Bank || "",

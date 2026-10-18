@@ -57,12 +57,24 @@ export interface SalaryHistoryRecord {
     arrears_brought_forward?: number;
     arrears_carried_forward?: number;
     arrears_note?: string | null;
+    /**
+     * Tanzania and Uganda (FIG-905): the employer's NSSF (never taken from pay), the pay PAYE was worked out on
+     * (Tanzania's taxable pay, Uganda's chargeable income: the same thing) and whether the employee was taxed as a
+     * resident. Kenya's payslips leave them empty.
+     */
+    employer_nssf?: number;
+    taxable_pay?: number | null;
+    tax_resident?: boolean | null;
+    /** Tanzania: the HESLB loan repayment taken from pay, and the employer's SDL and WCF */
+    heslb_deduction?: number;
+    sdl_levy?: number;
+    wcf_levy?: number;
+    /** Uganda: Local Service Tax */
+    lst_deduction?: number;
+    nssf_employer?: number;
+    chargeable_income?: number | null;
     worker_kind?: string | null;
     work_settlement?: boolean;
-    /** Uganda (FIG-905): Local Service Tax, the employer's NSSF and the chargeable income PAYE was worked out on */
-    lst_deduction?: number;
-    employer_nssf?: number;
-    chargeable_income?: number | null;
     /** the payslip's country and currency (FIG-905): its employee's branch's when worked out */
     country?: string;
     currency?: string;

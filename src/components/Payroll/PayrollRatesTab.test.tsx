@@ -92,3 +92,38 @@ describe('PayrollRatesTab', () => {
     expect(screen.queryByRole('button', { name: /Edit rates/ })).toBeNull();
   });
 });
+
+describe('Tanzania rates (FIG-905)', () => {
+  const TZ = [
+    row('paye_bands', null, { bands: [{ upto: 270000, rate: 0 }, { upto: 520000, rate: 0.08 }, { upto: null, rate: 0.3 }], effective_from: '2023-07-01', source: 'Income Tax Act' }),
+    row('nonresident_paye_rate', 0.15),
+    row('nssf_rate', 0.1),
+    row('nssf_employer_rate', 0.1),
+    row('sdl_rate', 0.035),
+    row('sdl_min_employees', 10),
+    row('wcf_rate', 0.005),
+    row('heslb_rate', 0.15),
+    row('wht_resident', 0.05),
+  ];
+
+  it('groups PAYE, NSSF, the employer levies, HESLB and contractors, in TSh', () => {
+    const sections = rateSections(TZ as never, 'Tanzania');
+    expect(sections.map((x) => x.title)).toEqual(['PAYE (income tax)', 'NSSF', 'Employer levies (not taken from pay)', 'HESLB', 'Contractors (withholding tax)']);
+    expect(sections[0].lines.map((l) => l.label)).toEqual([
+      'PAYE band: First TSh 270,000', 'PAYE band: TSh 270,001 to TSh 520,000', 'PAYE band: Above TSh 520,000', 'PAYE rate for a non-resident (flat, on gross)',
+    ]);
+    const levies = sections[2].lines.map((l) => [l.label, l.value]);
+    expect(levies).toEqual([
+      ['SDL rate (employer, on gross emoluments)', '3.5%'], ['SDL applies from this many employees', '10'], ['WCF rate (employer, on gross earnings)', '0.5%'],
+    ]);
+    expect(sections[4].lines[0].value).toBe('5%');
+  });
+
+  it('loads and titles the country it is for', async () => {
+    rates.rows = TZ;
+    render(<PayrollRatesTab country="Tanzania" payPeriod="2026-10" periodLabel="October 2026" canEdit onEdit={() => {}} version={0} />);
+    expect(await screen.findByText('Tanzania statutory rates for October 2026')).toBeTruthy();
+    expect(screen.getByText('HESLB loan repayment rate (on basic)')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Edit Tanzania rates/ })).toBeTruthy();
+  });
+});

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { X } from 'lucide-react';
 import { lastDayOf } from '../../lib/payrollExports';
-import { RATE_LABELS, type RateBand, type RateRow, ratesInForce, setCompanyBands, setCompanyRate } from '../../lib/statutoryRates';
+import { type RateBand, type RateRow, isPercentCode, rateLabel, ratesInForce, setCompanyBands, setCompanyRate } from '../../lib/statutoryRates';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import TableScroll from '../UI/TableScroll';
 
@@ -16,7 +16,13 @@ const formatValue = (r: RateRow) => {
       .join(' · ');
   }
   const v = Number(r.value);
-  return /rate$/.test(r.code) ? `${+(v * 100).toFixed(3)}%` : v.toLocaleString();
+  return isPercentCode(r.code) ? `${+(v * 100).toFixed(3)}%` : v.toLocaleString();
+};
+
+const DESCRIPTIONS: Record<string, string> = {
+  Kenya: 'What payroll uses for PAYE, SHIF, NSSF and the housing levy this month, and from when.',
+  Tanzania: 'What payroll uses for PAYE, NSSF, HESLB, SDL and WCF this month, and from when.',
+  Uganda: 'What payroll uses for PAYE, NSSF and the local service tax this month, and from when.',
 };
 
 /** A band being edited: "up to" and the rate (as a percentage) or annual amount, as typed. */
@@ -54,7 +60,7 @@ export default function StatutoryRatesModal({ payPeriod, onClose, onChanged, cou
     try {
       // percentages are typed as percentages and saved as fractions
       const typed = Number(editing.value);
-      const value = /rate$/.test(editing.code) ? typed / 100 : typed;
+      const value = isPercentCode(editing.code) ? typed / 100 : typed;
       await setCompanyRate(editing.code, value, editing.from, editing.source, country);
       toast.success('Rate saved. Recalculate draft months it affects.');
       setEditing(null);
@@ -95,7 +101,7 @@ export default function StatutoryRatesModal({ payPeriod, onClose, onChanged, cou
           <div>
             <h2 className="text-sm font-semibold text-ink">{country} statutory rates for {payPeriod}</h2>
             <p className="text-xs text-muted-foreground">
-              {country === 'Uganda' ? 'What payroll uses for PAYE, NSSF and the local service tax this month, and from when.' : 'What payroll uses for PAYE, SHIF, NSSF and the housing levy this month, and from when.'}
+              {DESCRIPTIONS[country] ?? DESCRIPTIONS.Kenya}
             </p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="p-1 text-muted-foreground hover:text-ink"><X className="h-4 w-4" /></button>
@@ -117,14 +123,14 @@ export default function StatutoryRatesModal({ payPeriod, onClose, onChanged, cou
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id} className="border-t border-border/60 align-top">
-                    <td className="py-1.5 pr-3 text-ink">{RATE_LABELS[r.code] ?? r.code}</td>
+                    <td className="py-1.5 pr-3 text-ink">{rateLabel(r.code, country)}</td>
                     <td className="py-1.5 pr-3 text-ink">{formatValue(r)}</td>
                     <td className="py-1.5 pr-3 text-muted-foreground">{r.effective_from}{r.effective_to ? ` to ${r.effective_to}` : ''}</td>
                     <td className="py-1.5 pr-3 text-muted-foreground">{r.tenant_id ? 'Your company' : r.source ?? 'Default'}</td>
                     <td className="py-1.5 text-right">
                       {!r.bands && (
                         <button type="button" className="text-brand font-semibold"
-                          onClick={() => { setEditingBands(null); setEditing({ code: r.code, value: String(/rate$/.test(r.code) ? +(Number(r.value) * 100).toFixed(4) : r.value), from: `${payPeriod}-01`, source: '' }); }}>
+                          onClick={() => { setEditingBands(null); setEditing({ code: r.code, value: String(isPercentCode(r.code) ? +(Number(r.value) * 100).toFixed(4) : r.value), from: `${payPeriod}-01`, source: '' }); }}>
                           Change
                         </button>
                       )}
@@ -147,10 +153,10 @@ export default function StatutoryRatesModal({ payPeriod, onClose, onChanged, cou
 
           {editing && (
             <div className="mt-4 rounded-lg border border-border p-3 space-y-2">
-              <p className="text-sm font-medium text-ink">{RATE_LABELS[editing.code] ?? editing.code} for your company</p>
+              <p className="text-sm font-medium text-ink">{rateLabel(editing.code, country)} for your company</p>
               <div className="flex flex-wrap gap-3">
                 <label className="text-xs text-ink">
-                  {/rate$/.test(editing.code) ? 'Rate (%)' : 'Amount'}
+                  {isPercentCode(editing.code) ? 'Rate (%)' : 'Amount'}
                   <input type="number" min={0} step="any" value={editing.value} onChange={(e) => setEditing({ ...editing, value: e.target.value })}
                     className="block mt-1 w-36 rounded-lg border border-border px-2 py-1 text-sm" />
                 </label>
@@ -175,7 +181,7 @@ export default function StatutoryRatesModal({ payPeriod, onClose, onChanged, cou
           )}
           {editingBands && (
             <div className="mt-4 rounded-lg border border-border p-3 space-y-2">
-              <p className="text-sm font-medium text-ink">{RATE_LABELS[editingBands.code] ?? editingBands.code} for your company</p>
+              <p className="text-sm font-medium text-ink">{rateLabel(editingBands.code, country)} for your company</p>
               <table className="text-xs">
                 <thead>
                   <tr className="text-left text-muted-foreground">

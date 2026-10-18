@@ -185,16 +185,17 @@ describe('approving the whole run the old way', () => {
 describe('statutory rates by country', () => {
   it("each country's rates are its own", async () => {
     await db.exec(`insert into statutory_rates (tenant_id, code, value, effective_from, source, country)
-                   values (null, 'sdl_rate', 0.035, '2024-07-01', 'Tanzania SDL (test)', 'tanzania')`);
+                   values (null, 'test_levy', 0.035, '2024-07-01', 'Tanzania levy (test)', 'tanzania')`);
     const r = await read<{ ke: Record<string, unknown>; tz: Record<string, unknown>; def: Record<string, unknown> }>(
       PAY,
       `select statutory_rates_on('2026-10-31', 'Kenya') ke, statutory_rates_on('2026-10-31', 'Tanzania') tz, statutory_rates_on('2026-10-31') def`
     );
-    expect(r[0].tz).toEqual({ sdl_rate: 0.035 });
+    // (Tanzania's own rates are seeded by 20261021000000_tanzania_payroll.sql)
+    expect(r[0].tz.test_levy).toBe(0.035);
     expect(r[0].ke.paye_bands).toBeTruthy();
-    expect(r[0].ke.sdl_rate).toBeUndefined();
+    expect(r[0].ke.test_levy).toBeUndefined();
     expect(r[0].def).toEqual(r[0].ke);
-    expect((await rows(`select country from statutory_rates where code = 'sdl_rate'`))[0]).toEqual({ country: 'Tanzania' });
+    expect((await rows(`select country from statutory_rates where code = 'test_levy'`))[0]).toEqual({ country: 'Tanzania' });
   });
 
   it("a company's rate for one country doesn't clash with another country's", async () => {
