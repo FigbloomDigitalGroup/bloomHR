@@ -41,14 +41,14 @@ const newBatchId = () =>
  * A chunk the database refuses is reported as rejected with the reason; the rest are still queued.
  */
 export async function queueInvitations(
-  people: { email: string; role?: string }[],
+  people: { email: string; role?: string; companyRoleId?: string | null }[],
   batchId: string = newBatchId(),
   chunkSize = ENQUEUE_BATCH_SIZE
 ): Promise<QueuedInvites> {
   const result: QueuedInvites = { batchId, queued: 0, skipped: 0, rejected: [] };
   for (const chunk of chunks(people, chunkSize)) {
     const { data, error } = await supabase.rpc('enqueue_invitations', {
-      p_people: chunk.map((p) => ({ email: p.email, role: p.role ?? 'STAFF' })),
+      p_people: chunk.map((p) => ({ email: p.email, role: p.role ?? 'STAFF', ...(p.companyRoleId ? { company_role_id: p.companyRoleId } : {}) })),
       p_batch: batchId,
     });
     if (error) {

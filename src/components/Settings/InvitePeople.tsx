@@ -2,12 +2,12 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Card, PageHeader, StatusPill, EmptyState, Button, TableScroll } from '../UI';
 import type { StatusTone } from '../UI';
-import { companyApi, inviteLink, Invitation, INVITABLE_ROLES } from '../../lib/companyApi';
+import { companyApi, inviteLink, Invitation } from '../../lib/companyApi';
+import { grantableRoles, roleDisplayName, roleSelection, useCompanyRoles } from '../../lib/roles';
 import { sendInvitations, summariseInvites } from '../../lib/employeeInvite';
 import EmployeeNumberingCard from './EmployeeNumbering';
 
 import { confirmDialog } from '../../lib/confirmDialog';
-const roleLabel = (role: string) => role.charAt(0) + role.slice(1).toLowerCase();
 
 const effectiveStatus = (inv: Invitation): { label: string; tone: StatusTone } => {
   if (inv.status === 'accepted') return { label: 'Joined', tone: 'success' };
@@ -17,13 +17,15 @@ const effectiveStatus = (inv: Invitation): { label: string; tone: StatusTone } =
 };
 
 interface InvitePeopleProps {
-  /** HR may only invite staff; administrators may invite any role. */
+  /** Administrators may invite with any role; others (HR) with roles based on Staff (the database checks the rest). */
   callerRole?: string;
 }
 
 /** Invite people to the company you are working in: they get a link that creates their account in it. */
 export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps) {
-  const roles = callerRole === 'ADMIN' ? INVITABLE_ROLES : (['STAFF'] as const);
+  // the company's roles (its own and the system ones, by the names it gave them), those this person may give
+  const { roles: companyRoles } = useCompanyRoles();
+  const roles = grantableRoles(companyRoles, callerRole);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<string>('STAFF');
   const [busy, setBusy] = useState(false);
@@ -55,8 +57,10 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
   };
 
   /** Creates the invitation and emails it. If the email cannot go out, the link is still there to send by hand. */
-  const invite = async (to: string, inviteRole: string) => {
-    const created = await companyApi.createInvitation(to, inviteRole);
+  const invite = async (to: string, inviteRole: string, companyRoleId?: string | null) => {
+    const created = companyRoleId
+      ? await companyApi.createInvitation(to, inviteRole, companyRoleId)
+      : await companyApi.createInvitation(to, inviteRole);
     const entry = { email: to.trim().toLowerCase(), link: inviteLink(created.token) };
     setLatest({ ...entry, mail: 'sending' });
     await load();
@@ -72,7 +76,10 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
     e.preventDefault();
     setBusy(true);
     try {
-      await invite(email, role);
+      // the picker holds the role's key: a system role's name, or a company role's CR_ key
+      const picked = roles.find((r) => r.role_key === role);
+      const selection = picked ? roleSelection(picked) : { role, companyRoleId: null };
+      await invite(email, selection.role, selection.companyRoleId);
       setEmail('');
     } catch (err) {
       toast.error((err as Error).message);
@@ -84,7 +91,7 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
   // a new invitation replaces the old link, so "resend" makes a fresh one and emails it
   const resend = async (inv: Invitation) => {
     try {
-      await invite(inv.email, inv.role);
+      await invite(inv.email, inv.role, inv.company_role_id);
     } catch (err) {
       toast.error((err as Error).message);
     }
@@ -99,7 +106,7 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
     if (!(await confirmDialog({ title: `Send ${due.length} ${due.length === 1 ? 'invitation' : 'invitations'} again?`, message: 'Each person gets a new link, and their old link stops working.', confirmLabel: 'Send again' }))) return;
     setResending({ done: 0, total: due.length });
     const outcomes = await sendInvitations(
-      due.map((inv) => ({ email: inv.email, role: inv.role })),
+      due.map((inv) => ({ email: inv.email, role: inv.role, companyRoleId: inv.company_role_id ?? null })),
       (done, total) => setResending({ done, total })
     );
     setResending(null);
@@ -147,8 +154,8 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
               className="px-3 py-2 rounded-tile border border-border text-[13px] text-ink bg-white focus:outline-none focus:ring-1 focus:ring-brand"
             >
               {roles.map((r) => (
-                <option key={r} value={r}>
-                  {roleLabel(r)}
+                <option key={r.role_key} value={r.role_key}>
+                  {r.name}
                 </option>
               ))}
             </select>
@@ -216,7 +223,7 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
                 return (
                   <tr key={inv.id} className="border-b border-border last:border-0">
                     <td className="px-4 py-2.5 text-ink">{inv.email}</td>
-                    <td className="px-4 py-2.5 text-muted-foreground">{roleLabel(inv.role)}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{roleDisplayName(companyRoles, inv.role, inv.company_role_id)}</td>
                     <td className="px-4 py-2.5">
                       <StatusPill label={status.label} tone={status.tone} />
                     </td>

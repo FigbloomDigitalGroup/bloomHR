@@ -106,16 +106,23 @@ describe('filters', () => {
 describe('who may edit (mirrors the database)', () => {
   const project: TaskProject = { id: 'p1', key: 'OPS', name: 'Ops', description: null, department_id: null, lead_number: 'LEAD', archived: false, created_by: 'u-hr' };
   const t = task({ assignee_number: 'E1', created_by: 'u-creator' });
-  it('assignee, creator, lead and people who run tasks', () => {
+  it('assignee, creator and lead; running tasks is not enough', () => {
     expect(canEditTask(t, { userId: 'u-x', employeeNumber: 'E1', manages: false }, project)).toBe(true);
     expect(canEditTask(t, { userId: 'u-creator', employeeNumber: null, manages: false }, project)).toBe(true);
     expect(canEditTask(t, { userId: 'u-x', employeeNumber: 'LEAD', manages: false }, project)).toBe(true);
-    expect(canEditTask(t, { userId: 'u-x', employeeNumber: 'E9', manages: true }, project)).toBe(true);
+    expect(canEditTask(t, { userId: 'u-x', employeeNumber: 'E9', manages: true }, project)).toBe(false);
     expect(canEditTask(t, { userId: 'u-x', employeeNumber: 'E9', manages: false }, project)).toBe(false);
+  });
+  it('HR and admin oversight is read-only: it adds no edit or delete', () => {
+    const hr = { userId: 'u-x', employeeNumber: 'E9', manages: true, oversees: true };
+    expect(canEditTask(t, hr, project)).toBe(false);
+    expect(canDeleteTask(t, hr, project)).toBe(false);
+    expect(canEditTask(t, { ...hr, employeeNumber: 'E1' }, project)).toBe(true); // unless they're the assignee
   });
   it('the assignee cannot delete', () => {
     expect(canDeleteTask(t, { userId: 'u-x', employeeNumber: 'E1', manages: false }, project)).toBe(false);
     expect(canDeleteTask(t, { userId: 'u-creator', employeeNumber: null, manages: false }, project)).toBe(true);
+    expect(canDeleteTask(t, { userId: 'u-x', employeeNumber: 'E9', manages: true }, project)).toBe(false);
   });
 });
 

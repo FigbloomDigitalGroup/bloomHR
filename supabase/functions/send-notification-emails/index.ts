@@ -10,6 +10,9 @@
 // claim_notification_emails() hands back, per employee, every notification not yet emailed (once the latest is a
 // couple of minutes old) and marks them emailed in the same statement, so two runs never send the same one. A send
 // that fails goes back with release_notification_emails() and is tried again on a later run, up to 5 times.
+// claim_payslip_emails() / release_payslip_emails() / finish_payslip_emails() send payslips with their PDF attached
+// (FIG-732, migration 20261019600000): the PDF is read from the private payslip-pdfs bucket, attached, and deleted
+// once sent (or kept for the company's payslip_pdf_keep_days).
 // claim_bulk_emails() / release_bulk_emails() / finish_bulk_emails() do the same for the company-wide email queue
 // (migration 20261014500000), whose rows go queued -> sending -> sent (or failed after 5 tries).
 //
@@ -23,10 +26,10 @@
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import {
-  chatDigestHtml, chatDigestSubject, chatLink, htmlFor, hrAlertHtml, hrAlertSubject, subjectFor,
-  type ChatDigestItem, type NotificationItem,
+  chatDigestHtml, chatDigestSubject, chatLink, htmlFor, hrAlertHtml, hrAlertSubject, payslipEmailHtml, payslipEmailSubject,
+  payslipFileName, subjectFor, type ChatDigestItem, type NotificationItem,
 } from './email.ts';
-import { createPacer, createResendSender, groupFailures, type Attachment, type OutgoingEmail } from './sending.ts';
+import { createPacer, createResendSender, groupFailures, toBase64, type Attachment, type OutgoingEmail } from './sending.ts';
 
 interface Claim {
   tenant_id: string;
@@ -60,6 +63,20 @@ interface ChatClaim {
   items: ChatDigestItem[];
 }
 
+interface PayslipClaim {
+  id: number;
+  tenant_id: string;
+  employee_number: string;
+  to_email: string | null;
+  first_name: string | null;
+  company_name: string | null;
+  pay_period: string;
+  pdf_path: string;
+  password_protected: boolean;
+  /** the company's payslip_pdf_keep_days: 0 = delete the PDF once sent */
+  keep_days: number;
+}
+
 interface BulkClaim {
   id: number;
   bulk_email_id: string;
@@ -81,6 +98,9 @@ interface BulkEmail {
 const RUN_MS = 45_000;
 /** Claimed at a time: one Resend batch. */
 const CLAIM_SIZE = 100;
+/** Payslips claimed at a time: each is downloaded and sent on its own (Resend's batch endpoint takes no attachments). */
+const PAYSLIP_CLAIM_SIZE = 10;
+const PAYSLIP_BUCKET = 'payslip-pdfs';
 
 const EMAIL_RE = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -163,6 +183,93 @@ Deno.serve(async (req) => {
       if (e) console.error('release_notification_emails:', e.message);
     }
     if (claims.length < CLAIM_SIZE) break;
+  }
+
+  // 1b. payslips with their PDF attached (FIG-732, migration 20261019600000) -------------------------------------
+  const deletePdfs = async (files: { id: number; pdf_path: string }[]) => {
+    if (!files.length) return;
+    const { error } = await db.storage.from(PAYSLIP_BUCKET).remove(files.map((f) => f.pdf_path));
+    if (error) {
+      console.error('payslip-pdfs remove:', error.message);
+      return;
+    }
+    const { error: e } = await db.rpc('mark_payslip_pdfs_deleted', { p_ids: files.map((f) => f.id) });
+    if (e) console.error('mark_payslip_pdfs_deleted:', e.message);
+  };
+
+  while (more()) {
+    const { data, error } = await db.rpc('claim_payslip_emails', { p_limit: PAYSLIP_CLAIM_SIZE });
+    if (error) {
+      console.error('claim_payslip_emails:', error.message);
+      break;
+    }
+    const claims = (data ?? []) as PayslipClaim[];
+    if (claims.length === 0) break;
+
+    const noEmail = claims.filter((c) => !EMAIL_RE.test((c.to_email ?? '').trim()));
+    if (noEmail.length) {
+      const { error: e } = await db.rpc('skip_payslip_emails', { p_ids: noEmail.map((c) => c.id), p_error: 'Not emailed: no valid email address' });
+      if (e) console.error('skip_payslip_emails:', e.message);
+    }
+
+    // each PDF from the private bucket; one that can't be read goes back to be tried again (counted as a try)
+    const ready: PayslipClaim[] = [];
+    const emails: OutgoingEmail[] = [];
+    for (const c of claims.filter((x) => EMAIL_RE.test((x.to_email ?? '').trim()))) {
+      const { data: file, error: e } = await db.storage.from(PAYSLIP_BUCKET).download(c.pdf_path);
+      if (e || !file) {
+        const { error: r } = await db.rpc('release_payslip_emails', {
+          p_ids: [c.id], p_error: `Could not read the PDF: ${e?.message ?? 'not found'}`, p_count_attempt: true,
+        });
+        if (r) console.error('release_payslip_emails:', r.message);
+        failed++;
+        continue;
+      }
+      const content = { firstName: c.first_name, companyName: c.company_name, period: c.pay_period, passwordProtected: c.password_protected, appUrl };
+      ready.push(c);
+      emails.push({
+        from,
+        to: (c.to_email ?? '').trim(),
+        subject: payslipEmailSubject(content),
+        html: payslipEmailHtml(content),
+        attachments: [{ filename: payslipFileName(c.pay_period, c.employee_number), content: toBase64(new Uint8Array(await file.arrayBuffer())) }],
+      });
+    }
+    const results = await sender.send(emails);
+
+    const done: { id: number; providerId: string | null }[] = [];
+    const log: Record<string, unknown>[] = [];
+    results.forEach((r, i) => {
+      if (!r.ok) return;
+      sent++;
+      done.push({ id: ready[i].id, providerId: r.id });
+      log.push({
+        tenant_id: ready[i].tenant_id, provider: 'resend', provider_id: r.id, purpose: 'payslip',
+        sent_by: null, from_address: from, to_addresses: [emails[i].to], subject: emails[i].subject,
+      });
+    });
+    if (done.length) {
+      const { error: e } = await db.rpc('finish_payslip_emails', { p_ids: done.map((d) => d.id), p_provider_ids: done.map((d) => d.providerId) });
+      if (e) console.error('finish_payslip_emails:', e.message);
+    }
+    await logSent(log);
+    for (const g of groupFailures(ready, results)) {
+      failed += g.items.length;
+      const { error: e } = await db.rpc('release_payslip_emails', {
+        p_ids: g.items.map((c) => c.id), p_error: g.error, p_count_attempt: g.countAttempt,
+      });
+      if (e) console.error('release_payslip_emails:', e.message);
+    }
+    // the company keeps no copy: deleted as soon as it is sent
+    const sentIds = new Set(done.map((d) => d.id));
+    await deletePdfs(ready.filter((c) => sentIds.has(c.id) && !(c.keep_days > 0)));
+    if (claims.length < PAYSLIP_CLAIM_SIZE) break;
+  }
+  // PDFs kept for a while, now past the company's keep_days (and those of emails that never went)
+  {
+    const { data, error } = await db.rpc('payslip_pdfs_to_delete', { p_limit: 100 });
+    if (error) console.error('payslip_pdfs_to_delete:', error.message);
+    else await deletePdfs((data ?? []) as { id: number; pdf_path: string }[]);
   }
 
   // 2. HR alerts and 3. unread chat digests: one delivery row (or several, for HR) per email ---------------------

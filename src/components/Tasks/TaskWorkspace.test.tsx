@@ -14,6 +14,7 @@ const api = vi.hoisted(() => ({
   loadComments: vi.fn(),
   loadActivity: vi.fn(),
   loadAttachments: vi.fn(),
+  taskConcernsMe: vi.fn(),
 }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../../lib/tasksApi', () => api);
@@ -85,5 +86,52 @@ describe('TaskWorkspace (staff)', () => {
     expect(await screen.findByText('Rita’s task')).toBeTruthy();
     expect(screen.queryByText('Mine to do')).toBeNull();
     expect(screen.queryByRole('button', { name: /New task/ })).toBeNull();
+  });
+});
+
+describe('TaskWorkspace (admin)', () => {
+  it('says who sees what, and a manager outside a project is told they only see the tasks they are involved in', async () => {
+    api.loadTaskViewer.mockResolvedValue({ userId: 'u-mgr', employeeNumber: 'E-MGR', manages: true, oversees: false });
+    render(<TaskWorkspace mode="admin" />);
+    expect(await screen.findByText(/You see tasks you're involved in/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /All tasks/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Everything I can see/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /^OPS Operations/ }));
+    expect(screen.getByText(/You are not in this project/)).toBeTruthy();
+    expect(screen.getByText(/Add yourself as a member/)).toBeTruthy();
+  });
+});
+
+describe('TaskWorkspace (HR and admins oversee)', () => {
+  beforeEach(() => {
+    api.loadTaskViewer.mockResolvedValue({ userId: 'u-adm', employeeNumber: 'E-ADM', manages: true, oversees: true });
+    api.taskConcernsMe.mockResolvedValue(false);
+  });
+
+  it('says they see every task, read-only unless involved, and offers All company tasks', async () => {
+    render(<TaskWorkspace mode="admin" />);
+    expect(await screen.findByText(/As HR\/admin you can see every task in the company \(read-only unless you're involved\)/)).toBeTruthy();
+    expect(screen.queryByText(/You see tasks you're involved in/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Everything I can see/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /All company tasks/ }));
+    expect(screen.getByRole('heading', { name: 'All company tasks' })).toBeTruthy();
+    expect(screen.getByText('Mine to do')).toBeTruthy();
+    expect(screen.getByText('Rita’s task')).toBeTruthy();
+    expect(screen.getByText('Sales task I was given')).toBeTruthy();
+    // no "you are not in this project" note: they see all of it
+    fireEvent.click(screen.getByRole('button', { name: /^OPS Operations/ }));
+    expect(screen.queryByText(/You are not in this project/)).toBeNull();
+  });
+
+  it('a task they are not involved in opens read-only', async () => {
+    render(<TaskWorkspace mode="admin" />);
+    await screen.findByText(/As HR\/admin/);
+    fireEvent.click(screen.getByRole('button', { name: /All company tasks/ }));
+    fireEvent.click(screen.getByText('Rita’s task'));
+    expect(await screen.findByText(/You can see this task as HR\/admin. It's read-only/)).toBeTruthy();
+    expect(api.taskConcernsMe).toHaveBeenCalledWith('b');
+    expect((screen.getByLabelText('Status') as HTMLSelectElement).disabled).toBe(true);
+    expect(screen.queryByLabelText('Comment')).toBeNull();
+    expect(screen.queryByText('Attach a file')).toBeNull();
   });
 });

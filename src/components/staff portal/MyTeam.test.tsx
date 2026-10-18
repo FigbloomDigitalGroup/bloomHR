@@ -26,7 +26,21 @@ vi.mock('../../lib/casualApi', async (orig) => ({ ...(await orig<typeof import('
 vi.mock('../../lib/approvals', async (orig) => ({ ...(await orig<typeof import('../../lib/approvals')>()), ...appr }));
 vi.mock('../../lib/pieceRateApi', async (orig) => ({ ...(await orig<typeof import('../../lib/pieceRateApi')>()), ...work }));
 
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import MyTeam from './MyTeam';
+
+// the tab is kept in the address (?view=...); the current address is shown so tests can check it
+function Address() {
+  const { search } = useLocation();
+  return <output data-testid="address">{search}</output>;
+}
+const renderTeam = (entry = '/staff?tab=my-team') =>
+  render(
+    <MemoryRouter initialEntries={[entry]}>
+      <MyTeam team={TEAM} />
+      <Address />
+    </MemoryRouter>,
+  );
 
 const member = (n: string, first: string, over: Partial<TeamMember> = {}): TeamMember => ({
   employee_number: n, first_name: first, last_name: 'Report', job_title: 'Sales Rep', department_id: 'd1', department: 'Sales',
@@ -66,7 +80,7 @@ const openTab = (name: string) => fireEvent.click(screen.getByRole('button', { n
 
 describe('My team', () => {
   it('lists the people who report to you, with their job and department', async () => {
-    render(<MyTeam team={TEAM} />);
+    renderTeam();
     expect(screen.getByText('2 people report to you')).toBeTruthy();
     expect(screen.getByText('Amina Report')).toBeTruthy();
     expect(screen.getByText('Sales Rep · Sales')).toBeTruthy();
@@ -77,7 +91,7 @@ describe('My team', () => {
 
   it('shows Casual days only when they supervise casual workers', async () => {
     cas.loadCasuals.mockResolvedValue([{ id: 'c', employee_number: 'C1', first_name: 'Cy', last_name: 'Cas', id_number: null, phone: null, daily_rate: 800, start_date: '2026-01-01', finished_on: null }]);
-    render(<MyTeam team={TEAM} />);
+    renderTeam();
     fireEvent.click(await screen.findByRole('button', { name: 'Casual days' }));
     expect(await screen.findByText('Cy Cas')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Approve .* waiting/ })).toBeNull();
@@ -85,7 +99,7 @@ describe('My team', () => {
 
   it('KPIs: shows only the team’s scorecards and lets the supervisor score them', async () => {
     kpi.loadAssignments.mockResolvedValue([row({}), row({ id: 'x', employee_number: 'SOMEONE-ELSE' })]);
-    render(<MyTeam team={TEAM} />);
+    renderTeam();
     openTab('KPIs');
     const open = await screen.findByRole('button', { name: 'Open scorecard for Amina Report' });
     expect(screen.queryByText('SOMEONE-ELSE')).toBeNull();
@@ -101,7 +115,7 @@ describe('My team', () => {
   });
 
   it('KPIs: assigns a library KPI to several reports at once', async () => {
-    render(<MyTeam team={TEAM} />);
+    renderTeam();
     openTab('KPIs');
     fireEvent.click(await screen.findByText('Assign and edit'));
     fireEvent.change(await screen.findByLabelText('KPI'), { target: { value: 'k1' } });
@@ -116,7 +130,7 @@ describe('My team', () => {
 
   it('KPIs: says so when HR has not set up a review period', async () => {
     kpi.loadPeriods.mockResolvedValue([]);
-    render(<MyTeam team={TEAM} />);
+    renderTeam();
     openTab('KPIs');
     expect(await screen.findByText('No review periods yet')).toBeTruthy();
   });
@@ -127,15 +141,24 @@ describe('My team', () => {
       { id: 'o1', employee_number: 'E1', work_date: '2026-10-14', hours: 2, day_type: 'normal', note: 'Stock take', status: 'submitted', source: 'self', rejection_reason: null, decided_at: null },
       { id: 'o2', employee_number: 'LEAD', work_date: '2026-10-14', hours: 3, day_type: 'normal', note: null, status: 'submitted', source: 'self', rejection_reason: null, decided_at: null },
     ]);
-    render(<MyTeam team={TEAM} />);
+    renderTeam();
     openTab('Overtime');
     fireEvent.click(await screen.findByText('Waiting for approval (1)'));
     expect(await screen.findByText('Stock take')).toBeTruthy();
     expect(screen.queryByText('LEAD')).toBeNull();
   });
 
+  it('keeps the tab in the address, so Back returns to the previous tab and a link opens one', async () => {
+    renderTeam();
+    openTab('Leave');
+    expect(screen.getByTestId('address').textContent).toBe('?tab=my-team&view=leave');
+    cleanup();
+    renderTeam('/staff?tab=my-team&view=leave');
+    expect(await screen.findByText('No leave is waiting for you to approve.')).toBeTruthy();
+  });
+
   it('Leave: says when nothing is waiting for approval', async () => {
-    render(<MyTeam team={TEAM} />);
+    renderTeam();
     openTab('Leave');
     expect(await screen.findByText('No leave is waiting for you to approve.')).toBeTruthy();
   });

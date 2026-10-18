@@ -28,6 +28,8 @@ interface TaskWorkspaceProps {
   mode: 'admin' | 'staff';
   /** a supervisor's view of their team: only tasks assigned to these people */
   teamNumbers?: string[];
+  /** a task to open straight away (from the calendar) */
+  initialOpenId?: string | null;
 }
 
 const typingIn = (el: EventTarget | null) => {
@@ -39,7 +41,7 @@ const typingIn = (el: EventTarget | null) => {
  * Tasks like Linear: projects down the side, a board (drag between columns) or a list grouped by status, filters,
  * "My tasks", and a task's full detail. The database decides what each person sees and may change.
  */
-export default function TaskWorkspace({ mode, teamNumbers }: TaskWorkspaceProps) {
+export default function TaskWorkspace({ mode, teamNumbers, initialOpenId = null }: TaskWorkspaceProps) {
   const { employees } = useEmployeeDirectory();
   const [viewer, setViewer] = useState<TaskViewer | null>(null);
   const [projects, setProjects] = useState<TaskProject[]>([]);
@@ -54,7 +56,7 @@ export default function TaskWorkspace({ mode, teamNumbers }: TaskWorkspaceProps)
   const [view, setView] = useState<'board' | 'list'>('board');
   const [filters, setFilters] = useState<TaskFilters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<TaskSort>('manual');
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(initialOpenId);
   const [creating, setCreating] = useState<{ status?: TaskStatus } | null>(null);
   const [editingProject, setEditingProject] = useState<TaskProject | 'new' | null>(null);
   const [showLabels, setShowLabels] = useState(false);
@@ -96,19 +98,22 @@ export default function TaskWorkspace({ mode, teamNumbers }: TaskWorkspaceProps)
   const projectById = useMemo(() => Object.fromEntries(projects.map((p) => [p.id, p])), [projects]);
   const labelById = useMemo(() => Object.fromEntries(labels.map((l) => [l.id, l])), [labels]);
 
+  // one of the project's people (sees all its tasks); running tasks alone is not membership
   const isMember = useCallback((p: TaskProject) => {
     if (!viewer) return false;
-    if (viewer.manages || p.created_by === viewer.userId) return true;
+    if (p.created_by === viewer.userId) return true;
     const me = viewer.employeeNumber;
     return !!me && (p.lead_number === me || (members[p.id] ?? []).includes(me) || (!!p.department_id && p.department_id === myDepartment));
   }, [viewer, members, myDepartment]);
+  // edits the project and its members: its lead, or the people who run tasks
   const leads = useCallback((p: TaskProject) => !!viewer && (viewer.manages || p.created_by === viewer.userId || (!!viewer.employeeNumber && p.lead_number === viewer.employeeNumber)), [viewer]);
 
   const sidebarProjects = useMemo(
     () => projects.filter((p) => (showArchived || !p.archived) && (mode === 'admin' || isMember(p) || tasks.some((t) => t.project_id === p.id))),
     [projects, showArchived, mode, isMember, tasks]
   );
-  const creatable = useMemo(() => projects.filter((p) => !p.archived && isMember(p)), [projects, isMember]);
+  // the people who run tasks may add a task to any project (they then see it, as its creator)
+  const creatable = useMemo(() => projects.filter((p) => !p.archived && (!!viewer?.manages || isMember(p))), [projects, isMember, viewer]);
 
   // what this scope shows, before the filters
   const scoped = useMemo(() => {
@@ -165,7 +170,9 @@ export default function TaskWorkspace({ mode, teamNumbers }: TaskWorkspaceProps)
 
   const open = openId ? tasks.find((t) => t.id === openId) ?? null : null;
   const currentProject = scope.startsWith('project:') ? projectById[scope.slice('project:'.length)] : null;
-  const title = team ? 'Team tasks' : scope === 'my' ? 'My tasks' : scope === 'all' ? (mode === 'admin' && viewer.manages ? 'All tasks' : 'Everything I can see') : scope === 'templates' ? 'Recurring tasks' : currentProject?.name ?? 'Tasks';
+  // HR and admins see every task in the company (read-only unless they're involved); everyone else what concerns them
+  const allLabel = viewer.oversees ? 'All company tasks' : 'Everything I can see';
+  const title = team ? 'Team tasks' : scope === 'my' ? 'My tasks' : scope === 'all' ? allLabel : scope === 'templates' ? 'Recurring tasks' : currentProject?.name ?? 'Tasks';
   const set = (patch: Partial<TaskFilters>) => setFilters((f) => ({ ...f, ...patch }));
 
   const navButton = (id: Scope, label: string, icon: ReactNode, count?: number) => (
@@ -202,11 +209,19 @@ export default function TaskWorkspace({ mode, teamNumbers }: TaskWorkspaceProps)
         }
       />
 
+      {!team && (
+        <p className="mb-3 text-[12px] text-muted-foreground">
+          {viewer.oversees
+            ? "As HR/admin you can see every task in the company (read-only unless you're involved)."
+            : "You see tasks you're involved in: yours, ones you created, your projects', and your team's."}
+        </p>
+      )}
+
       <div className="flex flex-col lg:flex-row gap-4">
         {!team && (
           <nav aria-label="Task views" className="lg:w-56 shrink-0 flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible">
             {navButton('my', 'My tasks', <User size={14} />, openCount((t) => !!viewer.employeeNumber && t.assignee_number === viewer.employeeNumber))}
-            {navButton('all', mode === 'admin' && viewer.manages ? 'All tasks' : 'Everything I can see', <Layers size={14} />)}
+            {navButton('all', allLabel, <Layers size={14} />)}
             {mode === 'admin' && viewer.manages && navButton('templates', 'Recurring', <Repeat size={14} />)}
             <p className="hidden lg:block mt-3 mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Projects</p>
             {sidebarProjects.map((p) => (
@@ -240,6 +255,12 @@ export default function TaskWorkspace({ mode, teamNumbers }: TaskWorkspaceProps)
                   <button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')} className={`px-2.5 py-1.5 text-xs inline-flex items-center gap-1 ${view === 'list' ? 'bg-secondary font-medium' : 'bg-white'}`}><List size={13} /> List</button>
                 </div>
               </div>
+
+              {currentProject && !viewer.oversees && !isMember(currentProject) && (
+                <p className="mb-3 text-[12px] text-muted-foreground">
+                  You are not in this project, so you only see its tasks you're involved in.{leads(currentProject) ? ' Add yourself as a member to see all of them.' : ''}
+                </p>
+              )}
 
               <div className="flex flex-wrap items-center gap-2 mb-3" aria-label="Filters">
                 <SearchInput aria-label="Search tasks" placeholder="Search tasks" value={filters.search} onChange={(e) => set({ search: e.target.value })} className="w-full sm:w-56" />

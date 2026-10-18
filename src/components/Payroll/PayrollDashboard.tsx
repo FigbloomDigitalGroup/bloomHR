@@ -82,6 +82,8 @@ import {
 import { ExportModal, P9FormGenerator } from "./PayrollToolModals";
 import { downloadPayrollRegisterPdf } from "../../lib/payrollPdf";
 import { PayslipModal } from "./PayrollPayslipModal";
+import EmailPayslipsPanel from "./EmailPayslipsPanel";
+import PayslipEmailSetting from "./PayslipEmailSetting";
 import { markEditedPayslips, statutoryContextFor } from "../../lib/payslipOverrides";
 import { withRunEdits } from "../../lib/payslipOverridesDb";
 import { usePayslipOverrides } from "../../hooks/usePayslipOverrides";
@@ -164,6 +166,8 @@ export default function PayrollDashboard() {
   const [runPeriod, setRunPeriod] = useState<string | null>(null);
   const [runVersion, setRunVersion] = useState(0);
   const [runBusy, setRunBusy] = useState(false);
+  // bumped when this person approves the month: payslips are emailed then if the company emails them automatically
+  const [payslipEmailAutoStart, setPayslipEmailAutoStart] = useState(0);
   // the open tab (?tab=...), and a counter bumped when the rates editor saves so the Rates tab reloads
   const [tab, setTab] = usePayrollTab();
   const [ratesVersion, setRatesVersion] = useState(0);
@@ -1392,6 +1396,7 @@ export default function PayrollDashboard() {
       await setRunStatus(monthRun.id, status);
       toast.success(done);
       setRunVersion((v) => v + 1);
+      if (status === "approved") setPayslipEmailAutoStart((n) => n + 1);
     } catch (err) {
       toast.error(runErrorMessage(err, "Could not update the payroll."));
     } finally {
@@ -1860,6 +1865,17 @@ export default function PayrollDashboard() {
           totalPages={totalPages}
           handlePageChange={handlePageChange}
           itemsPerPage={itemsPerPage}
+          payslipEmails={
+            <EmailPayslipsPanel
+              run={monthRun}
+              periodLabel={periodLabel}
+              records={payrollRecords}
+              companyInfo={companyInfo}
+              idNumberFor={(number) => employees.find((e: any) => e["Employee Number"] === number)?.["ID Number"]}
+              canEmail={canEditRates}
+              autoStart={payslipEmailAutoStart}
+            />
+          }
           demoPay={{
             shown: PAYMENTS_DEMO,
             enabled: demoPayEnabled,
@@ -1932,6 +1948,7 @@ export default function PayrollDashboard() {
             }
           />
           <OvertimeSettingsCard canEdit={canEditRates} onChanged={() => setDeductionsVersion((v) => v + 1)} />
+          <PayslipEmailSetting canEdit={canEditRates} />
         </div>
       )}
 

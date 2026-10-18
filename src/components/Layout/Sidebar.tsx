@@ -40,6 +40,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { supabase } from '../../lib/supabase';
 import { IN_LIST_SIZE, chunks, fetchAll } from '../../lib/fetchAll';
 import { SearchInput } from '../UI';
+import { onOverlayEntry } from '../../hooks/useBackToClose';
 
 // Grouping structure
 const menuGroups = [
@@ -134,7 +135,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
   const [searchQuery, setSearchQuery] = useState('');
 
   // Use permissions hook for dynamic access control
-  const { hasPermission, hasAnyPermission, userRole: permissionRole, loading: permissionsLoading } = usePermissions();
+  const { hasPermission, hasAnyPermission, userRole: permissionRole, roleName, loading: permissionsLoading } = usePermissions();
   const { data: myPreferences } = useMyPreferences(user?.email);
 
   // Badge on "Time Off" (FIG-575): count of pending leave applications that
@@ -256,7 +257,8 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [drawerOpen, onMobileClose]);
-  const userRole = user?.role || 'Admin';
+  // the role as the company names it (their own role, FIG-827), else the role
+  const userRole = roleName || user?.role || 'Admin';
   const avatarUrl = myPreferences?.avatarUrl ?? null;
   const userInitial = user?.email?.[0]?.toUpperCase() || 'A';
 
@@ -389,7 +391,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
                     return (
                       <motion.button
                         key={item.id}
-                        onClick={() => navigate(item.path)}
+                        onClick={() => navigate(item.path, { replace: onOverlayEntry() })}
                         className={`relative w-full flex items-center min-h-9 px-3 rounded-[9px] transition-all duration-300 group overflow-hidden ${!isExpanded && 'justify-center px-0'
                           } ${isActive
                             ? 'bg-shell-active text-shell-active-fg font-semibold shadow-sm'
@@ -470,8 +472,8 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
                     exit={{ opacity: 0, width: 0 }}
                     className="flex-1 overflow-hidden"
                   >
-                    <p className="text-xs font-bold text-shell-fg truncate font-lexend capitalize">
-                      {userRole.toLowerCase()}
+                    <p className={`text-xs font-bold text-shell-fg truncate font-lexend ${roleName ? '' : 'capitalize'}`}>
+                      {roleName ? userRole : userRole.toLowerCase()}
                     </p>
                     <p className="text-[10px] text-shell-fg/40 truncate">Admin Workspace</p>
                   </motion.div>
@@ -482,7 +484,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <button
                     type="button"
-                    onClick={() => navigate('/settings')}
+                    onClick={() => navigate('/settings', { replace: onOverlayEntry() })}
                     aria-label="Settings"
                     className="p-1.5 rounded-lg hover:bg-shell-fg/10 transition-colors"
                   >

@@ -61,6 +61,31 @@ export async function saveUpdatesLevel(level: EmailLevel): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+/** The daily company email (FIG-771): company events and colleagues' birthdays, each can be left out. */
+export interface DigestPreferences {
+  events: boolean;
+  birthdays: boolean;
+}
+
+/** Both on unless they turned one off; null when they aren't linked to an employee record. */
+export async function loadDigestPreferences(): Promise<DigestPreferences | null> {
+  const id = await myEmployeeId();
+  if (!id) return null;
+  const { data, error } = await supabase.from('notification_preferences').select('event_emails, birthday_emails').eq('employee_id', id).maybeSingle();
+  if (error) throw new Error(error.message);
+  const row = data as { event_emails?: boolean | null; birthday_emails?: boolean | null } | null;
+  return { events: row?.event_emails !== false, birthdays: row?.birthday_emails !== false };
+}
+
+export async function saveDigestPreferences(prefs: DigestPreferences): Promise<void> {
+  const id = await myEmployeeId();
+  if (!id) throw new Error('Your login is not linked to an employee record.');
+  const { error } = await supabase
+    .from('notification_preferences')
+    .upsert({ employee_id: id, event_emails: prefs.events, birthday_emails: prefs.birthdays, updated_at: new Date().toISOString() }, { onConflict: 'employee_id' });
+  if (error) throw new Error(error.message);
+}
+
 export interface EmailPreferences {
   hrAlerts: EmailLevel;
   chat: EmailLevel;

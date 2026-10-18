@@ -1,3 +1,4 @@
+import { payPeriodLabel } from '../../lib/payPeriod';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
@@ -29,6 +30,7 @@ import FigbloomLoader from '../UI/FigbloomLoader';
 import DownloadP9 from '../Payroll/DownloadP9';
 import { loadMyP9 } from '../../lib/p9';
 import { loadCompanyIdentity, type CompanyIdentity } from '../../lib/companyProfile';
+import { useBackToClose } from '../../hooks/useBackToClose';
 
 // HARDCODED STATUTORY SETTINGS - Updated to match payroll dashboard
 const statutorySettings = {
@@ -427,15 +429,6 @@ const GlowButton = ({
   );
 };
 
-// "2026-10" is October's run, which pays for September: the label shows the month worked
-const workedMonthLabel = (period: string | null | undefined) => {
-  if (!period) return 'N/A';
-  const [year, month] = String(period).split('-').map(Number);
-  let prevMonth = month - 1;
-  let prevYear = year;
-  if (prevMonth === 0) { prevMonth = 12; prevYear = year - 1; }
-  return new Date(prevYear, prevMonth - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-};
 
 // PayslipModal Component (Updated with advance deduction)
 const PayslipModal = ({
@@ -506,13 +499,7 @@ const PayslipModal = ({
               <div className="sm:text-right">
                 <h2 className="text-2xl sm:text-3xl font-bold uppercase text-gray-900 mb-1">PAYSLIP</h2>
                 <div className="text-gray-600 font-semibold text-sm">
-                  {payPeriod ? (() => {
-                    const [year, month] = String(payPeriod).split('-').map(Number);
-                    let prevMonth = month - 1;
-                    let prevYear = year;
-                    if (prevMonth === 0) { prevMonth = 12; prevYear = year - 1; }
-                    return new Date(prevYear, prevMonth - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-                  })() : 'N/A'}
+                  {payPeriodLabel(payPeriod)}
                 </div>
               </div>
             </div>
@@ -656,6 +643,8 @@ const PayslipViewer = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPayslip, setSelectedPayslip] = useState(null);
   const [currentPayslipIndex, setCurrentPayslipIndex] = useState(null);
+  // the phone's Back closes an open payslip first
+  useBackToClose(!!selectedPayslip, () => setSelectedPayslip(null));
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState<Date | null>(null);
   const [companyInfo, setCompanyInfo] = useState<CompanyIdentity | null>(null);
@@ -1019,7 +1008,7 @@ const PayslipViewer = () => {
               return (
                 <li key={payslip.id} className="p-4 text-xs">
                   <div className="flex items-center justify-between gap-3 mb-3">
-                    <span className="font-semibold text-sm text-gray-900 min-w-0 truncate">{workedMonthLabel(payPeriod)}</span>
+                    <span className="font-semibold text-sm text-gray-900 min-w-0 truncate">{payPeriodLabel(payPeriod)}</span>
                     <GlowButton variant="primary" icon={Eye} size="sm" onClick={() => handleViewPayslip(payslip, index)}>
                       View
                     </GlowButton>
@@ -1092,27 +1081,7 @@ const PayslipViewer = () => {
                             </button>
                             <div>
                               <div className="font-medium text-gray-900">
-                                {payslip["Pay Period"] || payslip.pay_period ?
-                                  (() => {
-                                    const period = payslip["Pay Period"] || payslip.pay_period;
-                                    const [year, month] = period.split('-').map(Number);
-
-                                    // Calculate previous month
-                                    let prevMonth = month - 1;
-                                    let prevYear = year;
-
-                                    if (prevMonth === 0) {
-                                      prevMonth = 12;
-                                      prevYear = year - 1;
-                                    }
-
-                                    const prevMonthDate = new Date(prevYear, prevMonth - 1, 1);
-
-                                    return `${prevMonthDate.toLocaleDateString('en-US', {
-                                      month: 'long',
-                                      year: 'numeric'
-                                    })} `;
-                                  })() : 'N/A'}
+                                {payPeriodLabel(payslip["Pay Period"] || payslip.pay_period)}
                               </div>
                             </div>
                           </div>

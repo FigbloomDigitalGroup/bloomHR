@@ -38,7 +38,8 @@ export interface HRNotification {
         | 'contract_sent' | 'contract_sent_back' | 'contract_accepted' | 'contract_cancelled' | 'contract_signed'
         | 'leave_exhausted' | 'casual_limit'
         | 'leave_document_overdue'
-        | 'contribution_requested';
+        | 'contribution_requested'
+        | 'company_digest';
     title: string;
     message: string;
     // Nullable for leave notifications - only contract/probation reminders
@@ -191,6 +192,8 @@ export async function fetchAdminHRNotifications(): Promise<HRNotification[]> {
         .from('hr_notifications')
         .select('*')
         .eq('is_read_admin', false)
+        // the daily company digest is each employee's own, not something for HR (FIG-771)
+        .neq('notification_type', 'company_digest')
         .order('created_at', { ascending: false })
         .limit(50);
     return (data || []) as HRNotification[];

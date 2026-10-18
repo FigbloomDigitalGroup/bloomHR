@@ -18,6 +18,7 @@ import TaskWorkspace from '../Tasks/TaskWorkspace';
 import TeamWork from '../PieceRate/TeamWork';
 import { loadWorkPeople } from '../../lib/pieceRateApi';
 import type { WorkPerson } from '../../lib/pieceRate';
+import { useUrlParam } from '../../hooks/useUrlParam';
 
 // My team (staff portal): for a staff member who supervises others (migration 20261018900000). The same screens HR
 // and managers use, limited to the supervisor's reports; the database decides what they may do (custom KPIs,
@@ -26,7 +27,9 @@ import type { WorkPerson } from '../../lib/pieceRate';
 type Tab = 'team' | 'tasks' | 'kpis' | 'overtime' | 'casual' | 'work' | 'leave';
 
 export default function MyTeam({ team }: { team: TeamMember[] }) {
-  const [tab, setTab] = useState<Tab>('team');
+  // the tab is in the address (?view=kpis), so the phone's Back returns to the previous tab
+  const [tabParam, setTab] = useUrlParam('view', 'team');
+  const tab = tabParam as Tab;
   const [casuals, setCasuals] = useState<CasualWorker[]>([]);
   const [workers, setWorkers] = useState<WorkPerson[]>([]);
 

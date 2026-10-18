@@ -29,11 +29,11 @@ export type InviteOutcome =
  * Creates an invitation to join the company with this role and emails the link (a new invitation replaces any
  * earlier one for the address, so this is also how an invitation is sent again). Never throws.
  */
-export async function sendInvitation(address: string | null | undefined, role: string): Promise<InviteOutcome> {
+export async function sendInvitation(address: string | null | undefined, role: string, companyRoleId?: string | null): Promise<InviteOutcome> {
   const email = normaliseWorkEmail(address);
   let token: string;
   try {
-    token = (await companyApi.createInvitation(email, role)).token;
+    token = (companyRoleId ? await companyApi.createInvitation(email, role, companyRoleId) : await companyApi.createInvitation(email, role)).token;
   } catch (err) {
     const reason = err instanceof Error ? err.message : 'Could not create the invitation.';
     if (/already in this company/i.test(reason)) return { status: 'member', email };
@@ -57,14 +57,14 @@ const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * second. `onProgress` is told after each one.
  */
 export async function sendInvitations(
-  people: { email: string; role: string }[],
+  people: { email: string; role: string; companyRoleId?: string | null }[],
   onProgress?: (done: number, total: number) => void,
   gapMs = 600
 ): Promise<InviteOutcome[]> {
   const outcomes: InviteOutcome[] = [];
   for (const [i, person] of people.entries()) {
     if (i > 0 && gapMs > 0) await pause(gapMs);
-    outcomes.push(await sendInvitation(person.email, person.role));
+    outcomes.push(await sendInvitation(person.email, person.role, person.companyRoleId));
     onProgress?.(i + 1, people.length);
   }
   return outcomes;

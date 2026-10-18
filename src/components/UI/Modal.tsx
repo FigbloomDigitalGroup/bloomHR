@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useId, useRef } from 'react';
+import { useBackToClose } from '../../hooks/useBackToClose';
 
 const maxWidths = {
   sm: 'max-w-sm',
@@ -31,7 +32,7 @@ interface ModalProps {
 
 // One modal shell that fits any screen: the overlay pads the panel off the edges and scrolls when the
 // panel is taller than the screen, and the panel never grows wider than the screen. Escape and a tap
-// on the backdrop close it.
+// on the backdrop close it, and so does the phone's Back (useBackToClose), before it goes to another page.
 export default function Modal({
   open,
   onClose,
@@ -49,6 +50,7 @@ export default function Modal({
   // re-renders the parent, re-runs the effect and pulls focus off the field onto the panel.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  useBackToClose(open, () => onCloseRef.current());
 
   useEffect(() => {
     if (!open) return;
