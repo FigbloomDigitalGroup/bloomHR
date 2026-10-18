@@ -1,0 +1,775 @@
+{
+  "routes": [
+    {
+      "path": "/",
+      "allowed": [
+        "ADMIN",
+        "MANAGER",
+        "HR",
+        "CHECKER"
+      ]
+    },
+    {
+      "path": "/dashboard",
+      "allowed": [
+        "ADMIN",
+        "MANAGER",
+        "HR",
+        "REGIONAL",
+        "OPERATIONS",
+        "CHECKER"
+      ]
+    },
+    {
+      "path": "/calendar",
+      "allowed": null
+    },
+    {
+      "path": "/employees",
+      "allowed": null
+    },
+    {
+      "path": "/add-employee",
+      "allowed": null
+    },
+    {
+      "path": "/onboarding",
+      "allowed": null
+    },
+    {
+      "path": "/offers",
+      "allowed": null
+    },
+    {
+      "path": "/view-employee/:id",
+      "allowed": null
+    },
+    {
+      "path": "/view-employee/:employeeId",
+      "allowed": null
+    },
+    {
+      "path": "/edit-employee/:id",
+      "allowed": null
+    },
+    {
+      "path": "/assign-managers",
+      "allowed": null
+    },
+    {
+      "path": "/organogram",
+      "allowed": null
+    },
+    {
+      "path": "/departments",
+      "allowed": null
+    },
+    {
+      "path": "/invite-people",
+      "allowed": [
+        "ADMIN",
+        "HR"
+      ]
+    },
+    {
+      "path": "/employee-added",
+      "allowed": null
+    },
+    {
+      "path": "/loanadmin",
+      "allowed": null
+    },
+    {
+      "path": "/asset",
+      "allowed": null
+    },
+    {
+      "path": "/asset/scan",
+      "allowed": null
+    },
+    {
+      "path": "/expenses",
+      "allowed": null
+    },
+    {
+      "path": "/tasks",
+      "allowed": null
+    },
+    {
+      "path": "/sms",
+      "allowed": null
+    },
+    {
+      "path": "/reports",
+      "allowed": null
+    },
+    {
+      "path": "reports/base",
+      "allowed": null
+    },
+    {
+      "path": "reports/staffloan",
+      "allowed": null
+    },
+    {
+      "path": "reports/statutory",
+      "allowed": null
+    },
+    {
+      "path": "/teams",
+      "allowed": null
+    },
+    {
+      "path": "/staffcheck",
+      "allowed": null
+    },
+    {
+      "path": "/payroll",
+      "allowed": [
+        "ADMIN",
+        "CHECKER"
+      ]
+    },
+    {
+      "path": "/settings",
+      "allowed": [
+        "ADMIN",
+        "CHECKER"
+      ]
+    },
+    {
+      "path": "/settings/company",
+      "allowed": null
+    },
+    {
+      "path": "/settings/audit-trail",
+      "allowed": null
+    },
+    {
+      "path": "/settings/job-groups",
+      "allowed": null
+    },
+    {
+      "path": "/settings/branches",
+      "allowed": null
+    },
+    {
+      "path": "/settings/job-titles",
+      "allowed": null
+    },
+    {
+      "path": "/salaryadmin",
+      "allowed": [
+        "ADMIN",
+        "CHECKER",
+        "MANAGER",
+        "REGIONAL"
+      ]
+    },
+    {
+      "path": "/casual-workers",
+      "allowed": null
+    },
+    {
+      "path": "/leave-discipline",
+      "allowed": null
+    },
+    {
+      "path": "/piece-rate",
+      "allowed": null
+    },
+    {
+      "path": "/overtime",
+      "allowed": null
+    },
+    {
+      "path": "/loans",
+      "allowed": null
+    },
+    {
+      "path": "/incident-reports",
+      "allowed": [
+        "ADMIN",
+        "CHECKER",
+        "MANAGER"
+      ]
+    },
+    {
+      "path": "/adminconfirm",
+      "allowed": [
+        "ADMIN",
+        "OPERATIONS",
+        "CHECKER",
+        "HR"
+      ]
+    },
+    {
+      "path": "/recruitment",
+      "allowed": [
+        "ADMIN",
+        "HR",
+        "OPERATIONS",
+        "CHECKER"
+      ]
+    },
+    {
+      "path": "/performance",
+      "allowed": null
+    },
+    {
+      "path": "/leaves",
+      "allowed": null
+    },
+    {
+      "path": "/training",
+      "allowed": null
+    },
+    {
+      "path": "/setup-assistant",
+      "allowed": null
+    },
+    {
+      "path": "/ai-assistant",
+      "allowed": null
+    },
+    {
+      "path": "/fogs",
+      "allowed": null
+    },
+    {
+      "path": "/mpesa-zap",
+      "allowed": null
+    },
+    {
+      "path": "/email-portal",
+      "allowed": [
+        "ADMIN",
+        "HR",
+        "CHECKER",
+        "MANAGER",
+        "OPERATIONS"
+      ]
+    },
+    {
+      "path": "/role-permissions",
+      "allowed": null
+    },
+    {
+      "path": "/appearance",
+      "allowed": null
+    },
+    {
+      "path": "/hr-lifecycle",
+      "allowed": [
+        "ADMIN",
+        "HR",
+        "CHECKER",
+        "MANAGER"
+      ]
+    },
+    {
+      "path": "*",
+      "allowed": null
+    }
+  ],
+  "roles": {
+    "ADMIN": {
+      "portal": "admin",
+      "sidebar": [
+        "Dashboard",
+        "Calendar",
+        "Task Manager",
+        "Teams",
+        "SMS Center",
+        "Email Portal",
+        "Employees",
+        "Organogram",
+        "Onboarding",
+        "Recruitment",
+        "Offers",
+        "Time Off",
+        "Leave discipline",
+        "Performance",
+        "Training",
+        "Assign Managers",
+        "Disciplinary",
+        "HR Lifecycle",
+        "Payroll",
+        "Casual workers",
+        "Piece rate & jobs",
+        "Overtime",
+        "Job groups",
+        "Salary Advance",
+        "Loans",
+        "Assets",
+        "Mpesa Zap",
+        "Reports",
+        "Email Admin",
+        "Incidents",
+        "Set up with AI",
+        "Departments",
+        "Branches",
+        "Job titles",
+        "Audit Trail",
+        "Role Permissions",
+        "Appearance"
+      ],
+      "routes": [
+        "/",
+        "/dashboard",
+        "/calendar",
+        "/employees",
+        "/add-employee",
+        "/onboarding",
+        "/offers",
+        "/view-employee/:id",
+        "/view-employee/:employeeId",
+        "/edit-employee/:id",
+        "/assign-managers",
+        "/organogram",
+        "/departments",
+        "/invite-people",
+        "/employee-added",
+        "/loanadmin",
+        "/asset",
+        "/asset/scan",
+        "/tasks",
+        "/sms",
+        "/reports",
+        "reports/base",
+        "reports/staffloan",
+        "reports/statutory",
+        "/teams",
+        "/staffcheck",
+        "/payroll",
+        "/settings",
+        "/settings/company",
+        "/settings/audit-trail",
+        "/settings/job-groups",
+        "/settings/branches",
+        "/settings/job-titles",
+        "/salaryadmin",
+        "/casual-workers",
+        "/leave-discipline",
+        "/piece-rate",
+        "/overtime",
+        "/loans",
+        "/incident-reports",
+        "/adminconfirm",
+        "/recruitment",
+        "/performance",
+        "/leaves",
+        "/training",
+        "/setup-assistant",
+        "/ai-assistant",
+        "/fogs",
+        "/mpesa-zap",
+        "/email-portal",
+        "/role-permissions",
+        "/appearance",
+        "/hr-lifecycle"
+      ]
+    },
+    "HR": {
+      "portal": "admin",
+      "sidebar": [
+        "Dashboard",
+        "Calendar",
+        "Task Manager",
+        "Teams",
+        "SMS Center",
+        "Email Portal",
+        "Employees",
+        "Organogram",
+        "Onboarding",
+        "Recruitment",
+        "Offers",
+        "Time Off",
+        "Leave discipline",
+        "Performance",
+        "Training",
+        "Assign Managers",
+        "Disciplinary",
+        "Casual workers",
+        "Overtime",
+        "Job groups",
+        "Loans",
+        "Reports",
+        "Email Admin",
+        "Departments",
+        "Branches",
+        "Job titles",
+        "Appearance"
+      ],
+      "routes": [
+        "/",
+        "/dashboard",
+        "/calendar",
+        "/employees",
+        "/add-employee",
+        "/onboarding",
+        "/offers",
+        "/view-employee/:id",
+        "/view-employee/:employeeId",
+        "/edit-employee/:id",
+        "/assign-managers",
+        "/organogram",
+        "/departments",
+        "/invite-people",
+        "/employee-added",
+        "/loanadmin",
+        "/asset",
+        "/asset/scan",
+        "/tasks",
+        "/sms",
+        "/reports",
+        "reports/base",
+        "reports/staffloan",
+        "reports/statutory",
+        "/teams",
+        "/staffcheck",
+        "/settings/company",
+        "/settings/audit-trail",
+        "/settings/job-groups",
+        "/settings/branches",
+        "/settings/job-titles",
+        "/casual-workers",
+        "/leave-discipline",
+        "/piece-rate",
+        "/overtime",
+        "/loans",
+        "/adminconfirm",
+        "/recruitment",
+        "/performance",
+        "/leaves",
+        "/training",
+        "/setup-assistant",
+        "/ai-assistant",
+        "/fogs",
+        "/mpesa-zap",
+        "/email-portal",
+        "/role-permissions",
+        "/appearance",
+        "/hr-lifecycle"
+      ]
+    },
+    "CHECKER": {
+      "portal": "admin",
+      "sidebar": [
+        "Dashboard",
+        "Calendar",
+        "Task Manager",
+        "Teams",
+        "Email Portal",
+        "Employees",
+        "Organogram",
+        "Onboarding",
+        "Recruitment",
+        "Offers",
+        "Leave discipline",
+        "Training",
+        "Disciplinary",
+        "Payroll",
+        "Casual workers",
+        "Piece rate & jobs",
+        "Overtime",
+        "Job groups",
+        "Salary Advance",
+        "Loans",
+        "Mpesa Zap",
+        "Reports",
+        "Email Admin",
+        "Incidents",
+        "Set up with AI",
+        "Departments",
+        "Branches",
+        "Job titles",
+        "Audit Trail",
+        "Appearance"
+      ],
+      "routes": [
+        "/",
+        "/dashboard",
+        "/calendar",
+        "/employees",
+        "/add-employee",
+        "/onboarding",
+        "/offers",
+        "/view-employee/:id",
+        "/view-employee/:employeeId",
+        "/edit-employee/:id",
+        "/assign-managers",
+        "/organogram",
+        "/departments",
+        "/employee-added",
+        "/loanadmin",
+        "/asset",
+        "/asset/scan",
+        "/tasks",
+        "/sms",
+        "/reports",
+        "reports/base",
+        "reports/staffloan",
+        "reports/statutory",
+        "/teams",
+        "/staffcheck",
+        "/payroll",
+        "/settings",
+        "/settings/company",
+        "/settings/audit-trail",
+        "/settings/job-groups",
+        "/settings/branches",
+        "/settings/job-titles",
+        "/salaryadmin",
+        "/casual-workers",
+        "/leave-discipline",
+        "/piece-rate",
+        "/overtime",
+        "/loans",
+        "/incident-reports",
+        "/adminconfirm",
+        "/recruitment",
+        "/performance",
+        "/leaves",
+        "/training",
+        "/setup-assistant",
+        "/ai-assistant",
+        "/fogs",
+        "/mpesa-zap",
+        "/email-portal",
+        "/role-permissions",
+        "/appearance",
+        "/hr-lifecycle"
+      ]
+    },
+    "MANAGER": {
+      "portal": "admin",
+      "sidebar": [
+        "Dashboard",
+        "Calendar",
+        "Task Manager",
+        "Teams",
+        "SMS Center",
+        "Email Portal",
+        "Employees",
+        "Organogram",
+        "Onboarding",
+        "Offers",
+        "Time Off",
+        "Leave discipline",
+        "Performance",
+        "Casual workers",
+        "Piece rate & jobs",
+        "Overtime",
+        "Job groups",
+        "Salary Advance",
+        "Reports",
+        "Incidents",
+        "Departments",
+        "Branches",
+        "Job titles",
+        "Appearance"
+      ],
+      "routes": [
+        "/",
+        "/dashboard",
+        "/calendar",
+        "/employees",
+        "/add-employee",
+        "/onboarding",
+        "/offers",
+        "/view-employee/:id",
+        "/view-employee/:employeeId",
+        "/edit-employee/:id",
+        "/assign-managers",
+        "/organogram",
+        "/departments",
+        "/employee-added",
+        "/loanadmin",
+        "/asset",
+        "/asset/scan",
+        "/tasks",
+        "/sms",
+        "/reports",
+        "reports/base",
+        "reports/staffloan",
+        "reports/statutory",
+        "/teams",
+        "/staffcheck",
+        "/settings/company",
+        "/settings/audit-trail",
+        "/settings/job-groups",
+        "/settings/branches",
+        "/settings/job-titles",
+        "/salaryadmin",
+        "/casual-workers",
+        "/leave-discipline",
+        "/piece-rate",
+        "/overtime",
+        "/loans",
+        "/incident-reports",
+        "/performance",
+        "/leaves",
+        "/training",
+        "/setup-assistant",
+        "/ai-assistant",
+        "/fogs",
+        "/mpesa-zap",
+        "/email-portal",
+        "/role-permissions",
+        "/appearance",
+        "/hr-lifecycle"
+      ]
+    },
+    "REGIONAL": {
+      "portal": "admin",
+      "sidebar": [
+        "Dashboard",
+        "Calendar",
+        "Task Manager",
+        "Teams",
+        "Employees",
+        "Organogram",
+        "Onboarding",
+        "Offers",
+        "Time Off",
+        "Leave discipline",
+        "Performance",
+        "Casual workers",
+        "Job groups",
+        "Salary Advance",
+        "Reports",
+        "Departments",
+        "Branches",
+        "Job titles",
+        "Appearance"
+      ],
+      "routes": [
+        "/dashboard",
+        "/calendar",
+        "/employees",
+        "/add-employee",
+        "/onboarding",
+        "/offers",
+        "/view-employee/:id",
+        "/view-employee/:employeeId",
+        "/edit-employee/:id",
+        "/assign-managers",
+        "/organogram",
+        "/departments",
+        "/employee-added",
+        "/loanadmin",
+        "/asset",
+        "/asset/scan",
+        "/tasks",
+        "/sms",
+        "/reports",
+        "reports/base",
+        "reports/staffloan",
+        "reports/statutory",
+        "/teams",
+        "/staffcheck",
+        "/settings/company",
+        "/settings/audit-trail",
+        "/settings/job-groups",
+        "/settings/branches",
+        "/settings/job-titles",
+        "/salaryadmin",
+        "/casual-workers",
+        "/leave-discipline",
+        "/piece-rate",
+        "/overtime",
+        "/loans",
+        "/performance",
+        "/leaves",
+        "/training",
+        "/setup-assistant",
+        "/ai-assistant",
+        "/fogs",
+        "/mpesa-zap",
+        "/role-permissions",
+        "/appearance"
+      ]
+    },
+    "OPERATIONS": {
+      "portal": "admin",
+      "sidebar": [
+        "Dashboard",
+        "Calendar",
+        "Task Manager",
+        "Teams",
+        "SMS Center",
+        "Email Portal",
+        "Employees",
+        "Organogram",
+        "Onboarding",
+        "Recruitment",
+        "Offers",
+        "Time Off",
+        "Leave discipline",
+        "Training",
+        "Disciplinary",
+        "Casual workers",
+        "Job groups",
+        "Reports",
+        "Departments",
+        "Branches",
+        "Job titles",
+        "Appearance"
+      ],
+      "routes": [
+        "/dashboard",
+        "/calendar",
+        "/employees",
+        "/add-employee",
+        "/onboarding",
+        "/offers",
+        "/view-employee/:id",
+        "/view-employee/:employeeId",
+        "/edit-employee/:id",
+        "/assign-managers",
+        "/organogram",
+        "/departments",
+        "/employee-added",
+        "/loanadmin",
+        "/asset",
+        "/asset/scan",
+        "/tasks",
+        "/sms",
+        "/reports",
+        "reports/base",
+        "reports/staffloan",
+        "reports/statutory",
+        "/teams",
+        "/staffcheck",
+        "/settings/company",
+        "/settings/audit-trail",
+        "/settings/job-groups",
+        "/settings/branches",
+        "/settings/job-titles",
+        "/casual-workers",
+        "/leave-discipline",
+        "/piece-rate",
+        "/overtime",
+        "/loans",
+        "/adminconfirm",
+        "/recruitment",
+        "/performance",
+        "/leaves",
+        "/training",
+        "/setup-assistant",
+        "/ai-assistant",
+        "/fogs",
+        "/mpesa-zap",
+        "/email-portal",
+        "/role-permissions",
+        "/appearance"
+      ]
+    },
+    "STAFF": {
+      "portal": "staff",
+      "sidebar": [],
+      "routes": []
+    }
+  }
+}

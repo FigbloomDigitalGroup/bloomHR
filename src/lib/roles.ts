@@ -25,7 +25,11 @@ export const SYSTEM_ROLE_LABELS: Record<SystemRole, string> = {
 /** Only a role based on ADMIN may hold these (admin_only_modules()). */
 export const ADMIN_ONLY_MODULES = ['settings', 'role-permissions'];
 /** A role based on STAFF may not hold these either (staff_restricted_modules()); task modules are allowed. */
-export const STAFF_RESTRICTED_MODULES = ['payroll', 'salaryadmin', 'mpesa-zap', 'adminconfirm', 'assign-managers', 'hr-lifecycle'];
+export const STAFF_RESTRICTED_MODULES = [
+  'payroll', 'salaryadmin', 'mpesa-zap', 'adminconfirm', 'assign-managers', 'hr-lifecycle',
+  // 20261021200000_roles_everywhere.sql
+  'loans', 'approve-exits', 'sign-in-security', 'hr-admin',
+];
 
 /** May a role with this base role hold the module? The same rule as module_allowed_for_base() in the database. */
 export const moduleAllowedForBase = (base: string, module: string) =>

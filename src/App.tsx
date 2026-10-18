@@ -25,6 +25,7 @@ import { useMobileNav } from './components/Layout/useMobileNav';
 import { isStaleChunkError, reloadOnceForStaleChunk } from './lib/staleChunk';
 import { welcomeMessage } from './lib/welcome';
 import { isHiddenModule } from './lib/hiddenModules';
+import { usesStaffPortal } from './lib/routeModules';
 
 // Route-level code splitting: each page is fetched when first visited.
 const AdminVideoUpload = lazy(() => import('./components/training/Training'));
@@ -105,6 +106,11 @@ interface Branch {
 const MFA_OPEN_PATHS = ['/login', '/mfa', '/update-password', '/join', '/create-company'];
 
 const Loader = () => <FigbloomLoader fullScreen />;
+
+/** A screen of the admin app, opened by the modules of the person's role (src/lib/routeModules.ts). */
+const gate = (path: string, element: React.ReactNode) => (
+  <Route key={path} path={path} element={<AuthRoute screen={path}>{element}</AuthRoute>} />
+);
 // while a page's code arrives: in the content area, where the page's own loader then carries on
 const PageLoader = () => (
   <div className="flex min-h-[60vh] items-center justify-center">
@@ -1000,7 +1006,7 @@ function App() {
                   </div>
                 ) : companyState.status === 'loading' ? (
                   <AppSkeleton />
-                ) : user.role === 'STAFF' ? (
+                ) : usesStaffPortal(user.role) ? (
                   <CompanyGate userId={session.user.id}>
                     <StaffPortalLanding />
                   </CompanyGate>
@@ -1037,259 +1043,81 @@ function App() {
                             <div key={location.pathname} className="page-enter w-full h-full">
                               <Suspense fallback={<PageLoader />}>
                               <Routes>
-                                <Route
-                                  path="/"
-                                  element={
-                                    user?.role === 'STAFF' ?
-                                      <StaffPortalLanding /> :
-                                      <AuthRoute allowedRoles={['ADMIN', 'MANAGER', 'HR', 'CHECKER']}>
-                                        <Dashboard selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />
-                                      </AuthRoute>
-                                  }
-                                />
-                                <Route
-                                  path="/dashboard"
-                                  element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'MANAGER', 'HR', 'REGIONAL', 'OPERATIONS', 'CHECKER']}>
-                                      <Dashboard selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />
-                                    </AuthRoute>
-                                  }
-                                />
-                                <Route path="/calendar" element={<CompanyCalendar />} />
-                                <Route path="/employees" element={<EmployeeList selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />} />
-                                <Route path="/add-employee" element={<AddEmployeePage />} />
-                                <Route path="/onboarding" element={<OnboardingReview />} />
-                                {/* Employees or Recruitment; the database decides what each may see */}
-                                <Route path="/offers" element={<OffersPage />} />
-                                <Route path="/view-employee/:id" element={<ViewEmployeePage />} />
-                                <Route path="/view-employee/:employeeId" element={<ViewEmployeePage />} />
-                                <Route path="/edit-employee/:id" element={<EditEmployeePage />} />
-                                <Route path="/assign-managers" element={<ManagerAssignment />} />
-                                <Route path="/organogram" element={<Organogram />} />
-                                <Route path="/departments" element={<Departments />} />
-                                <Route
-                                  path="/invite-people"
-                                  element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'HR']}>
-                                      <InvitePeople callerRole={user.role} />
-                                    </AuthRoute>
-                                  }
-                                />
-                                <Route path="/employee-added" element={<SuccessPage />} />
-                                <Route path="/loanadmin" element={<LoanRequestsAdmin />} />
-                                <Route path="/asset" element={<AssetManagement />} />
-                                <Route path="/asset/scan" element={<QRScanner />} />
-                                {!isHiddenModule('expenses') && <Route path="/expenses" element={<ExpenseModule selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />} />}
-                                <Route path="/tasks" element={<TaskManager />} />
-                                <Route path="/sms" element={<SMSCenter />} />
-                                <Route path="/reports" element={<ReportsList />} />
-                                <Route path="reports/base" element={<BaseReport
-                                  selectedTown={selectedTown}
-                                  selectedRegion={selectedRegion}
-                                  onTownChange={handleTownChange}
-                                  onRegionChange={handleRegionChange}
+                                {/* every screen opens by the modules of the person's role (routeModules.ts), never by its name */}
+                                {gate('/', <Dashboard selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />)}
+                                {gate('/dashboard', <Dashboard selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />)}
+                                {gate('/calendar', <CompanyCalendar />)}
+                                {gate('/employees', <EmployeeList selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />)}
+                                {gate('/add-employee', <AddEmployeePage />)}
+                                {gate('/onboarding', <OnboardingReview />)}
+                                {gate('/offers', <OffersPage />)}
+                                {gate('/view-employee/:id', <ViewEmployeePage />)}
+                                {gate('/view-employee/:employeeId', <ViewEmployeePage />)}
+                                {gate('/edit-employee/:id', <EditEmployeePage />)}
+                                {gate('/assign-managers', <ManagerAssignment />)}
+                                {gate('/organogram', <Organogram />)}
+                                {gate('/departments', <Departments />)}
+                                {gate('/invite-people', <InvitePeople callerRole={user.role} />)}
+                                {gate('/employee-added', <SuccessPage />)}
+                                {gate('/loanadmin', <LoanRequestsAdmin />)}
+                                {gate('/asset', <AssetManagement />)}
+                                {gate('/asset/scan', <QRScanner />)}
+                                {!isHiddenModule('expenses') && gate('/expenses', <ExpenseModule selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />)}
+                                {gate('/tasks', <TaskManager />)}
+                                {gate('/sms', <SMSCenter />)}
+                                {gate('/reports', <ReportsList />)}
+                                {gate('/reports/base', <BaseReport
+                                  selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange}
                                   reportTitle="Base Report"
                                   reportDescription="Base report view"
                                   onGenerateReport={async () => []}
                                   renderReportData={() => null}
-                                />} />
-                                <Route path="reports/staffloan" element={<StaffLoansReport
-                                  selectedTown={selectedTown}
-                                  selectedRegion={selectedRegion}
-                                  onTownChange={handleTownChange}
-                                  onRegionChange={handleRegionChange}
+                                />)}
+                                {gate('/reports/staffloan', <StaffLoansReport
+                                  selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange}
                                   reportTitle="Staff Loan Report"
                                   reportDescription="Staff loan details"
                                   onGenerateReport={async () => []}
                                   renderReportData={() => null}
-                                />} />
-                                <Route path="reports/statutory" element={<StatutoryDeductionsReport
-                                  selectedTown={selectedTown}
-                                  selectedRegion={selectedRegion}
-                                  onTownChange={handleTownChange}
-                                  onRegionChange={handleRegionChange}
+                                />)}
+                                {gate('/reports/statutory', <StatutoryDeductionsReport
+                                  selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange}
                                   reportTitle="Statutory Deductions"
                                   reportDescription="Statutory deductions details"
                                   onGenerateReport={async () => []}
                                   renderReportData={() => null}
-                                />} />
-                                <Route path="/teams" element={<ChatLayout />} />
-                                <Route path="/staffcheck" element={<WarningModule />} />
-                                <Route
-                                  path="/payroll"
-                                  element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'CHECKER']}>
-                                      <PayrollDashboard />
-                                    </AuthRoute>
-                                  }
-                                />
-                                <Route
-                                  path="/settings"
-                                  element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'CHECKER']}>
-                                      <UserRolesSettings />
-                                    </AuthRoute>
-                                  }
-                                />
-                                {/* everyone in the company reads it; ADMIN and Settings change it */}
-                                <Route
-                                  path="/settings/company"
-                                  element={
-                                    <AuthRoute>
-                                      <CompanyProfilePage />
-                                    </AuthRoute>
-                                  }
-                                />
-                                {/* ADMIN and Settings; the page tells anyone else they may not see it */}
-                                <Route
-                                  path="/settings/audit-trail"
-                                  element={
-                                    <AuthRoute>
-                                      <AuditTrailPage />
-                                    </AuthRoute>
-                                  }
-                                />
-                                {/* ADMIN, Payroll and Employees; the page tells anyone else they may not see it */}
-                                <Route
-                                  path="/settings/job-groups"
-                                  element={
-                                    <AuthRoute>
-                                      <JobGroupsPage />
-                                    </AuthRoute>
-                                  }
-                                />
-                                {/* everyone in the company reads branches; ADMIN, Employees and Settings change them (FIG-905) */}
-                                <Route
-                                  path="/settings/branches"
-                                  element={
-                                    <AuthRoute>
-                                      <BranchesPage />
-                                    </AuthRoute>
-                                  }
-                                />
-                                {/* HR, ADMIN, Employees and Performance; the page tells anyone else they may not see it */}
-                                <Route
-                                  path="/settings/job-titles"
-                                  element={
-                                    <AuthRoute>
-                                      <JobTitlesPage />
-                                    </AuthRoute>
-                                  }
-                                />
-                                <Route
-                                  path="/salaryadmin"
-                                  element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'CHECKER', 'MANAGER', 'REGIONAL']}>
-                                      <SalaryAdvanceAdmin
-                                        selectedTown={selectedTown}
-                                        selectedRegion={selectedRegion}
-                                        allTowns={branches}
-                                        regions={regions}
-                                        onTownChange={handleTownChange}
-                                        onRegionChange={handleRegionChange}
-                                      />
-                                    </AuthRoute>
-                                  }
-                                />
-                                {/* payroll, HR and supervisors; the database shows each only what they may see */}
-                                <Route
-                                  path="/casual-workers"
-                                  element={
-                                    <AuthRoute>
-                                      <CasualWorkers />
-                                    </AuthRoute>
-                                  }
-                                />
-                                {/* HR, and supervisors for their team; the database shows each only what they may see */}
-                                <Route
-                                  path="/leave-discipline"
-                                  element={
-                                    <AuthRoute>
-                                      <LeaveDisciplinePage />
-                                    </AuthRoute>
-                                  }
-                                />
-                                {/* piece rate and contract jobs: payroll, and supervisors for their team (the database decides) */}
-                                <Route
-                                  path="/piece-rate"
-                                  element={
-                                    <AuthRoute>
-                                      <PieceRatePage />
-                                    </AuthRoute>
-                                  }
-                                />
-                                {/* payroll and supervisors (their team); the database shows each only what they may see */}
-                                <Route
-                                  path="/overtime"
-                                  element={
-                                    <AuthRoute>
-                                      <OvertimePage />
-                                    </AuthRoute>
-                                  }
-                                />
-                                {/* HR, admins and payroll manage loans; the database shows anyone else nothing */}
-                                <Route
-                                  path="/loans"
-                                  element={
-                                    <AuthRoute>
-                                      <LoansAdmin />
-                                    </AuthRoute>
-                                  }
-                                />
-                                <Route
-                                  path="/incident-reports"
-                                  element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'CHECKER', 'MANAGER']}>
-                                      <IncidentReportsManagement />
-                                    </AuthRoute>
-                                  }
-                                />
-                                <Route
-                                  path="/adminconfirm"
-                                  element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'OPERATIONS', 'CHECKER', 'HR']}>
-                                      <StaffSignupRequests />
-                                    </AuthRoute>
-                                  }
-                                />
-                                <Route path="/recruitment"
-                                  element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'HR', 'OPERATIONS', 'CHECKER']}>
-                                      <RecruitmentDashboard />
-                                    </AuthRoute>} />
-                                <Route path="/performance" element={
-                                  <PerformanceDashboard
-                                    selectedTown={selectedTown}
-                                    selectedRegion={selectedRegion}
-                                    onTownChange={handleTownChange}
-                                    onRegionChange={handleRegionChange}
-                                  />
-                                } />
-                                <Route path="/leaves" element={<LeaveManagementSystem selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />} />
-                                <Route path="/training" element={<AdminVideoUpload />} />
-                                <Route path="/setup-assistant" element={<SetupAssistant />} />
-                                <Route path="/ai-assistant" element={<AIAssistantPage selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />} />
-
-                                <Route path="/fogs" element={<EmployeeDataTable selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />} />
-                                <Route path="/mpesa-zap" element={<MpesaZapPortal />} />
-
-                                <Route path="/email-portal" element={
-                                  <AuthRoute allowedRoles={['ADMIN', 'HR', 'CHECKER', 'MANAGER', 'OPERATIONS']}>
-                                    <EmailPortal />
-                                  </AuthRoute>
-                                } />
-
-                                <Route path="/role-permissions" element={<RolePermissions />} />
-                                <Route path="/appearance" element={<Appearance />} />
-
-                                <Route
-                                  path="/hr-lifecycle"
-                                  element={
-                                    <AuthRoute allowedRoles={['ADMIN', 'HR', 'CHECKER', 'MANAGER']}>
-                                      <HRLifecycleDashboard />
-                                    </AuthRoute>
-                                  }
-                                />
+                                />)}
+                                {gate('/teams', <ChatLayout />)}
+                                {gate('/staffcheck', <WarningModule />)}
+                                {gate('/payroll', <PayrollDashboard />)}
+                                {gate('/settings', <UserRolesSettings />)}
+                                {/* everyone in the company reads it; Settings changes it */}
+                                {gate('/settings/company', <CompanyProfilePage />)}
+                                {gate('/settings/audit-trail', <AuditTrailPage />)}
+                                {gate('/settings/job-groups', <JobGroupsPage />)}
+                                {gate('/settings/branches', <BranchesPage />)}
+                                {gate('/settings/job-titles', <JobTitlesPage />)}
+                                {gate('/salaryadmin', <SalaryAdvanceAdmin selectedTown={selectedTown} selectedRegion={selectedRegion} allTowns={branches} regions={regions} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />)}
+                                {/* the database shows each person only what they may see on these */}
+                                {gate('/casual-workers', <CasualWorkers />)}
+                                {gate('/leave-discipline', <LeaveDisciplinePage />)}
+                                {gate('/piece-rate', <PieceRatePage />)}
+                                {gate('/overtime', <OvertimePage />)}
+                                {gate('/loans', <LoansAdmin />)}
+                                {gate('/incident-reports', <IncidentReportsManagement />)}
+                                {gate('/adminconfirm', <StaffSignupRequests />)}
+                                {gate('/recruitment', <RecruitmentDashboard />)}
+                                {gate('/performance', <PerformanceDashboard selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />)}
+                                {gate('/leaves', <LeaveManagementSystem selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />)}
+                                {gate('/training', <AdminVideoUpload />)}
+                                {gate('/setup-assistant', <SetupAssistant />)}
+                                {gate('/ai-assistant', <AIAssistantPage selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />)}
+                                {gate('/fogs', <EmployeeDataTable selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />)}
+                                {gate('/mpesa-zap', <MpesaZapPortal />)}
+                                {gate('/email-portal', <EmailPortal />)}
+                                {gate('/role-permissions', <RolePermissions />)}
+                                {gate('/appearance', <Appearance />)}
+                                {gate('/hr-lifecycle', <HRLifecycleDashboard />)}
 
                                 <Route path="*" element={<NotFound />} />
                               </Routes>

@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { isHiddenModule } from '../../lib/hiddenModules';
 import {
   UsersRound,
   CalendarRange,
@@ -37,82 +36,84 @@ import { useMyPreferences } from '../../hooks/useMyPreferences';
 import { useLocation, useNavigate } from 'react-router-dom';
 import bloomMark from '../../../public/bloom-mark.png';
 import { usePermissions } from '../../hooks/usePermissions';
+import { inMenu } from '../../lib/routeModules';
 import { supabase } from '../../lib/supabase';
 import { IN_LIST_SIZE, chunks, fetchAll } from '../../lib/fetchAll';
 import { SearchInput } from '../UI';
 import { onOverlayEntry } from '../../hooks/useBackToClose';
 
-// Grouping structure
+// The menu, grouped. Who sees each entry is decided by its path in routeModules.ts (the modules of the person's role,
+// FIG-827), the same list the routes and the header search use.
 const menuGroups = [
   {
     title: "Overview",
     items: [
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid, path: '/dashboard', permission: 'dashboard' },
-      { id: 'calendar', label: 'Calendar', icon: CalendarDays, path: '/calendar', permission: 'dashboard' },
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid, path: '/dashboard' },
+      { id: 'calendar', label: 'Calendar', icon: CalendarDays, path: '/calendar' },
     ]
   },
   {
     title: "Workspace",
     items: [
-      { id: 'task-manager', label: 'Task Manager', icon: Kanban, path: '/tasks', permission: 'task-manager' },
-      { id: 'teams', label: 'Teams', icon: Network, path: '/teams', permission: 'teams' },
-      { id: 'messages', label: 'SMS Center', icon: MessagesSquare, path: '/sms', permission: 'sms' },
-      { id: 'email-portal', label: 'Email Portal', icon: Mails, path: '/email-portal', permission: 'email-portal' },
+      { id: 'task-manager', label: 'Task Manager', icon: Kanban, path: '/tasks' },
+      { id: 'teams', label: 'Teams', icon: Network, path: '/teams' },
+      { id: 'messages', label: 'SMS Center', icon: MessagesSquare, path: '/sms' },
+      { id: 'email-portal', label: 'Email Portal', icon: Mails, path: '/email-portal' },
     ]
   },
   {
     title: "Team",
     items: [
-      { id: 'employees', label: 'Employees', icon: UsersRound, path: '/employees', permission: 'employees' },
+      { id: 'employees', label: 'Employees', icon: UsersRound, path: '/employees' },
       { id: 'organogram', label: 'Organogram', icon: OrgChart, path: '/organogram' },
-      { id: 'onboarding', label: 'Onboarding', icon: ClipboardCheck, path: '/onboarding', permission: 'employees' },
-      { id: 'recruitment', label: 'Recruitment', icon: UserPlus2, path: '/recruitment', permission: 'recruitment' },
-      { id: 'offers', label: 'Offers', icon: FileSignature, path: '/offers', anyPermission: ['employees', 'recruitment'] },
-      { id: 'leaves', label: 'Time Off', icon: CalendarRange, path: '/leaves', permission: 'leaves' },
+      { id: 'onboarding', label: 'Onboarding', icon: ClipboardCheck, path: '/onboarding' },
+      { id: 'recruitment', label: 'Recruitment', icon: UserPlus2, path: '/recruitment' },
+      { id: 'offers', label: 'Offers', icon: FileSignature, path: '/offers' },
+      { id: 'leaves', label: 'Time Off', icon: CalendarRange, path: '/leaves' },
       // absences, failures to notify, missing leave documents and warnings for them: HR, and supervisors for their team
-      { id: 'leave-discipline', label: 'Leave discipline', icon: UserX, path: '/leave-discipline', anyPermission: ['leaves', 'employees'], orRoles: ['MANAGER'] },
-      { id: 'performance', label: 'Performance', icon: Target, path: '/performance', permission: 'performance' },
-      { id: 'training', label: 'Training', icon: Award, path: '/training', permission: 'training' },
-      { id: 'assign-managers', label: 'Assign Managers', icon: UserCheck, path: '/assign-managers', permission: 'assign-managers' },
-      { id: 'staffcheck', label: 'Disciplinary', icon: ShieldAlert, path: '/staffcheck', permission: 'staffcheck' },
-      { id: 'hr-lifecycle', label: 'HR Lifecycle', icon: HeartHandshake, path: '/hr-lifecycle', permission: 'hr-lifecycle' },
+      { id: 'leave-discipline', label: 'Leave discipline', icon: UserX, path: '/leave-discipline' },
+      { id: 'performance', label: 'Performance', icon: Target, path: '/performance' },
+      { id: 'training', label: 'Training', icon: Award, path: '/training' },
+      { id: 'assign-managers', label: 'Assign Managers', icon: UserCheck, path: '/assign-managers' },
+      { id: 'staffcheck', label: 'Disciplinary', icon: ShieldAlert, path: '/staffcheck' },
+      { id: 'hr-lifecycle', label: 'HR Lifecycle', icon: HeartHandshake, path: '/hr-lifecycle' },
     ]
   },
   {
     title: "Finance",
     items: [
-      { id: 'payroll', label: 'Payroll', icon: Landmark, path: '/payroll', permission: 'payroll' },
+      { id: 'payroll', label: 'Payroll', icon: Landmark, path: '/payroll' },
       // people paid by the day, outside the monthly payroll: payroll, HR, and managers who supervise casuals
-      { id: 'casual-workers', label: 'Casual workers', icon: HardHat, path: '/casual-workers', anyPermission: ['work-records', 'payroll', 'employees'], orRoles: ['HR', 'MANAGER'] },
+      { id: 'casual-workers', label: 'Casual workers', icon: HardHat, path: '/casual-workers' },
       // overtime hours per day, approved and paid with the month's salary: payroll, and managers for their team
       // piece rate and contract jobs: payroll, and managers who supervise people paid by work
-      { id: 'piece-rate', label: 'Piece rate & jobs', icon: Sprout, path: '/piece-rate', anyPermission: ['work-records', 'payroll'], orRoles: ['MANAGER'] },
-      { id: 'overtime', label: 'Overtime', icon: Timer, path: '/overtime', anyPermission: ['payroll', 'work-records'], orRoles: ['HR', 'MANAGER'] },
+      { id: 'piece-rate', label: 'Piece rate & jobs', icon: Sprout, path: '/piece-rate' },
+      { id: 'overtime', label: 'Overtime', icon: Timer, path: '/overtime' },
       // job groups and their pay: for Payroll and Employees, who can't open Settings
-      { id: 'job-groups', label: 'Job groups', icon: Layers, path: '/settings/job-groups', anyPermission: ['payroll', 'employees'] },
-      { id: 'expense', label: 'Expenses', icon: Receipt, path: '/expenses', permission: 'expenses' },
-      { id: 'advanced', label: 'Salary Advance', icon: Landmark, path: '/salaryadmin', permission: 'salaryadmin' },
+      { id: 'job-groups', label: 'Job groups', icon: Layers, path: '/settings/job-groups' },
+      { id: 'expense', label: 'Expenses', icon: Receipt, path: '/expenses' },
+      { id: 'advanced', label: 'Salary Advance', icon: Landmark, path: '/salaryadmin' },
       // HR and payroll (and admins): staff loans with interest
-      { id: 'loans', label: 'Loans', icon: HandCoins, path: '/loans', anyPermission: ['payroll'], orRoles: ['HR'] },
-      { id: 'asset', label: 'Assets', icon: Package, path: '/asset', permission: 'asset' },
-      { id: 'mpesa-zap', label: 'Mpesa Zap', icon: Smartphone, path: '/mpesa-zap', permission: 'mpesa-zap' },
+      { id: 'loans', label: 'Loans', icon: HandCoins, path: '/loans' },
+      { id: 'asset', label: 'Assets', icon: Package, path: '/asset' },
+      { id: 'mpesa-zap', label: 'Mpesa Zap', icon: Smartphone, path: '/mpesa-zap' },
     ]
   },
   {
     title: "System",
     items: [
-      { id: 'reports', label: 'Reports', icon: PieChart, path: '/reports', permission: 'reports' },
-      { id: 'email admin', label: 'Email Admin', icon: ShieldEllipsis, path: '/adminconfirm', permission: 'adminconfirm' },
-      { id: 'incident-reports', label: 'Incidents', icon: ShieldAlert, path: '/incident-reports', permission: 'incident-reports' },
-      { id: 'settings', label: 'Settings', icon: Settings, path: '/settings', permission: 'settings' },
-      { id: 'setup-assistant', label: 'Set up with AI', icon: Sparkles, path: '/setup-assistant', permission: 'settings' },
-      { id: 'departments', label: 'Departments', icon: Building2, path: '/departments', permission: 'employees' },
+      { id: 'reports', label: 'Reports', icon: PieChart, path: '/reports' },
+      { id: 'email admin', label: 'Email Admin', icon: ShieldEllipsis, path: '/adminconfirm' },
+      { id: 'incident-reports', label: 'Incidents', icon: ShieldAlert, path: '/incident-reports' },
+      { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
+      { id: 'setup-assistant', label: 'Set up with AI', icon: Sparkles, path: '/setup-assistant' },
+      { id: 'departments', label: 'Departments', icon: Building2, path: '/departments' },
       // offices, each in a country (FIG-905): holidays and the minimum wage follow an employee's branch
-      { id: 'branches', label: 'Branches', icon: MapPin, path: '/settings/branches', anyPermission: ['employees', 'settings'] },
+      { id: 'branches', label: 'Branches', icon: MapPin, path: '/settings/branches' },
       // the job titles list (KPI templates can be set per title): HR and the Employees module
-      { id: 'job-titles', label: 'Job titles', icon: BriefcaseBusiness, path: '/settings/job-titles', anyPermission: ['employees'], orRoles: ['HR'] },
-      { id: 'audit-trail', label: 'Audit Trail', icon: History, path: '/settings/audit-trail', permission: 'settings' },
-      { id: 'role-permissions', label: 'Role Permissions', icon: ShieldHalf, path: '/role-permissions', permission: 'role-permissions' },
+      { id: 'job-titles', label: 'Job titles', icon: BriefcaseBusiness, path: '/settings/job-titles' },
+      { id: 'audit-trail', label: 'Audit Trail', icon: History, path: '/settings/audit-trail' },
+      { id: 'role-permissions', label: 'Role Permissions', icon: ShieldHalf, path: '/role-permissions' },
       { id: 'appearance', label: 'Appearance', icon: Palette, path: '/appearance' },
     ]
   }
@@ -137,7 +138,9 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
   const [searchQuery, setSearchQuery] = useState('');
 
   // Use permissions hook for dynamic access control
-  const { hasPermission, hasAnyPermission, userRole: permissionRole, roleName, loading: permissionsLoading } = usePermissions();
+  const { hasPermission, roleName, loading: permissionsLoading } = usePermissions();
+  // the final approvers (HR administration; administrators) count every pending request, others only their team's
+  const seesAllLeave = !permissionsLoading && hasPermission('hr-admin');
   const { data: myPreferences } = useMyPreferences(user?.email);
 
   // Badge on "Time Off" (FIG-575): count of pending leave applications that
@@ -157,7 +160,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
 
     const fetchPendingLeaveCount = async () => {
       try {
-        if (user.role === 'ADMIN' || user.role === 'HR') {
+        if (seesAllLeave) {
           // `status` is stored with inconsistent casing across rows
           // ('Pending' from older/Staff-Portal-submitted rows, 'approved'
           // etc. from LeaveManagement's own writes) - match case-insensitively.
@@ -231,7 +234,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.email, user?.role]);
+  }, [user?.email, seesAllLeave]);
 
   const sidebarVariants: Variants = {
     expanded: {
@@ -377,18 +380,11 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
                 {/* Items */}
                 <div className="space-y-1">
                   {group.items.filter(item =>
-                    !isHiddenModule(item.permission) &&
+                    // while permissions load every entry shows (no blank sidebar flash), then only those the role gives
+                    (permissionsLoading ? inMenu(item.path, () => true) : inMenu(item.path, hasPermission)) &&
                     item.label.toLowerCase().includes(searchQuery.toLowerCase())
                   ).map((item) => {
                     const isActive = currentPath.startsWith(item.path);
-
-                    // While permissions are loading, show all items (avoid blank sidebar flash)
-                    // Once loaded, hide items the user doesn't have access to
-                    if (!permissionsLoading && item.permission && !hasPermission(item.permission)) return null;
-                    const anyOf = (item as { anyPermission?: string[] }).anyPermission;
-                    // or anyone with one of these roles, whatever their permissions
-                    const orRoles = (item as { orRoles?: string[] }).orRoles;
-                    if (!permissionsLoading && anyOf && !hasAnyPermission(anyOf) && !(orRoles && permissionRole && orRoles.includes(permissionRole))) return null;
 
                     return (
                       <motion.button
@@ -484,14 +480,14 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
 
               {isExpanded && (
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <button
+                  {!permissionsLoading && inMenu('/settings', hasPermission) && <button
                     type="button"
                     onClick={() => navigate('/settings', { replace: onOverlayEntry() })}
                     aria-label="Settings"
                     className="p-1.5 rounded-lg hover:bg-shell-fg/10 transition-colors"
                   >
                     <Settings className="w-3.5 h-3.5 text-shell-fg/40 hover:text-orange transition-colors" />
-                  </button>
+                  </button>}
                   {onLogout && (
                     <button
                       type="button"

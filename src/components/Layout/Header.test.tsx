@@ -26,6 +26,10 @@ vi.mock('../../hooks/useHRNotifications', () => ({
 }));
 const noCompanies = vi.hoisted(() => ({ data: [] as { is_current: boolean; name: string }[] }));
 vi.mock('../../hooks/useMyCompanies', () => ({ useMyCompanies: () => noCompanies }));
+const headerPerms = vi.hoisted(() => ({ granted: ['employees', 'payroll'] as string[] }));
+vi.mock('../../hooks/usePermissions', () => ({
+  usePermissions: () => ({ hasPermission: (m: string) => headerPerms.granted.includes(m), loading: false }),
+}));
 vi.mock('../chat/lib/presence', () => ({ useOnlinePeople: () => {} }));
 vi.mock('../Company/CompanySwitcher', () => ({ default: ({ name }: { name: string }) => <span>{name}</span> }));
 vi.mock('../Accessibility/AccessibilityModal', () => ({ AccessibilityButton: () => null }));
@@ -106,5 +110,23 @@ describe('Header phone Back button', () => {
     expect(back.className).toContain('md:hidden');
     fireEvent.click(back);
     expect(screen.getByTestId('where').textContent).toBe('/dashboard');
+  });
+});
+
+describe('Header search', () => {
+  it('finds only the screens the role gives, and opens one', () => {
+    headerPerms.granted = ['employees', 'payroll'];
+    render(
+      <MemoryRouter>
+        <Header />
+      </MemoryRouter>,
+    );
+    const box = screen.getByRole('textbox', { name: 'Search screens' });
+    fireEvent.change(box, { target: { value: 'pay' } });
+    expect(screen.getByRole('button', { name: 'Payroll' })).toBeTruthy();
+    fireEvent.change(box, { target: { value: 'role' } });
+    // Role Permissions is not theirs
+    expect(screen.queryByRole('button', { name: 'Role Permissions' })).toBeNull();
+    expect(screen.getByText('No screens match')).toBeTruthy();
   });
 });
