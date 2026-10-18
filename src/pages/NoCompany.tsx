@@ -97,7 +97,7 @@ export default function NoCompany({ email }: { email: string }) {
         <div className="space-y-3 mb-8">
           {invitations.map((inv) => (
             <AuthButton key={inv.id} onClick={() => joinInvited(inv)} disabled={joining !== null}>
-              {joining === inv.id ? 'Joining…' : `Join ${inv.company_name} as ${inv.role.charAt(0)}${inv.role.slice(1).toLowerCase()}`}
+              {joining === inv.id ? 'Joining…' : `Join ${inv.company_name} as ${inv.role_name || `${inv.role.charAt(0)}${inv.role.slice(1).toLowerCase()}`}`}
             </AuthButton>
           ))}
           <div className="border-t border-gray-100 pt-6" />

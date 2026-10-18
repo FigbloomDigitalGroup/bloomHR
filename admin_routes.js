@@ -17,7 +17,16 @@ const admin =
     ? createClient(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
     : null;
 
+// The seven system roles: user_profiles.role is always one of them. A company's own roles (company_roles, FIG-827) are
+// each based on one of these, and picking one sets both the company role and this base role.
 const ROLES = ["ADMIN", "HR", "CHECKER", "MANAGER", "REGIONAL", "OPERATIONS", "STAFF"];
+// modules only a role based on ADMIN may hold (admin_only_modules() in migration 20261019700000)
+const ADMIN_ONLY_MODULES = ["settings", "role-permissions"];
+// ...and those a role based on STAFF may not hold (staff_restricted_modules()); task modules are allowed
+const STAFF_RESTRICTED_MODULES = ["payroll", "salaryadmin", "mpesa-zap", "adminconfirm", "assign-managers", "hr-lifecycle"];
+const moduleAllowedForBase = (base, m) =>
+  base === "ADMIN" || (!ADMIN_ONLY_MODULES.includes(m) && (base !== "STAFF" || !STAFF_RESTRICTED_MODULES.includes(m)));
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATUSES = ["ACTIVE", "SUSPENDED", "DEACTIVATED"];
 const LOCATION_ROLES = ["REGIONAL", "MANAGER", "OPERATIONS", "STAFF"];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -47,15 +56,53 @@ async function authenticate(req) {
 
   const { data: profile, error: profileError } = await admin
     .from("user_profiles")
-    .select("role, account_status, tenant_id")
+    .select("role, account_status, tenant_id, company_role_id")
     .eq("user_id", data.user.id)
     .maybeSingle();
   if (profileError) throw new HttpError(500, "Could not verify caller role");
   if (!profile || !profile.tenant_id || (profile.account_status && profile.account_status !== "ACTIVE")) {
     throw new HttpError(403, "Forbidden");
   }
-  return { id: data.user.id, email: data.user.email, role: profile.role, tenantId: profile.tenant_id };
+  return {
+    id: data.user.id,
+    email: data.user.email,
+    role: profile.role,
+    tenantId: profile.tenant_id,
+    companyRoleId: profile.company_role_id || null,
+  };
 }
+
+// One of the caller's company's roles, or null. Only ever the caller's own company.
+async function loadCompanyRole(tenantId, companyRoleId) {
+  if (!companyRoleId || !UUID_RE.test(String(companyRoleId))) return null;
+  const { data, error } = await admin
+    .from("company_roles")
+    .select("id, tenant_id, role_key, name, base_role, is_system, active")
+    .eq("id", companyRoleId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+// The modules a role gives in a company (role_modules() in the database): a custom role's own, never more than its
+// base role may hold; otherwise the role's.
+async function roleModules(tenantId, role, companyRoleId) {
+  const custom = companyRoleId ? await loadCompanyRole(tenantId, companyRoleId) : null;
+  const useCustom = custom && !custom.is_system && custom.base_role === role;
+  const { data, error } = await admin
+    .from("role_permissions")
+    .select("permissions")
+    .eq("tenant_id", tenantId)
+    .eq("role_name", useCustom ? custom.role_key : role)
+    .maybeSingle();
+  if (error) throw new HttpError(500, "Could not verify permissions");
+  const granted = Array.isArray(data?.permissions) ? data.permissions : [];
+  return useCustom ? granted.filter((m) => moduleAllowedForBase(custom.base_role, m)) : granted;
+}
+
+// The caller's modules from their role (an administrator has every module: check caller.role === "ADMIN" first).
+const callerModules = (caller) => roleModules(caller.tenantId, caller.role, caller.companyRoleId);
 
 // Wraps a handler with auth, a role allow-list and uniform error handling.
 const guard = (allowedRoles, handler) => async (req, res) => {
@@ -89,6 +136,8 @@ const toUserView = (user, profile) => ({
   id: user.id,
   email: user.email,
   role: profile?.role || user.user_metadata?.role || "STAFF",
+  company_role_id: profile?.company_role_id || null,
+  role_name: profile?.role_name || null,
   account_status:
     profile?.account_status ||
     user.user_metadata?.account_status ||
@@ -103,10 +152,11 @@ const toUserView = (user, profile) => ({
 // Records the person's role and status in ONE company. memberships is the source of truth (a login can belong to
 // several companies); a database trigger mirrors it into user_profiles, the row the access rules read, when this
 // is the company the person is currently working in (or their first). Never writes another company's membership.
-async function syncProfile(userId, role, accountStatus, tenantId) {
-  const { error } = await admin
-    .from("memberships")
-    .upsert({ user_id: userId, tenant_id: tenantId, role, account_status: accountStatus }, { onConflict: "user_id,tenant_id" });
+// `companyRoleId` (undefined = leave it as it is) is the company role, whose base role `role` must be.
+async function syncProfile(userId, role, accountStatus, tenantId, companyRoleId) {
+  const row = { user_id: userId, tenant_id: tenantId, role, account_status: accountStatus };
+  if (companyRoleId !== undefined) row.company_role_id = companyRoleId;
+  const { error } = await admin.from("memberships").upsert(row, { onConflict: "user_id,tenant_id" });
   if (error) throw error;
 }
 
@@ -135,7 +185,7 @@ async function belongsToOtherCompany(userId, tenantId) {
 async function loadTenantProfile(userId, caller) {
   const { data, error } = await admin
     .from("memberships")
-    .select("role, account_status, tenant_id")
+    .select("role, account_status, tenant_id, company_role_id")
     .eq("user_id", userId)
     .eq("tenant_id", caller.tenantId)
     .maybeSingle();
@@ -148,10 +198,38 @@ async function loadTenantProfile(userId, caller) {
 async function tenantProfiles(caller) {
   const { data, error } = await admin
     .from("memberships")
-    .select("user_id, role, account_status")
+    .select("user_id, role, account_status, company_role_id")
     .eq("tenant_id", caller.tenantId);
   if (error) throw error;
+  // the company's own role names, looked up only when someone holds one
+  if (data.some((p) => p.company_role_id)) {
+    const { data: roles, error: rolesError } = await admin.from("company_roles").select("id, name").eq("tenant_id", caller.tenantId);
+    if (rolesError) throw rolesError;
+    const names = new Map((roles || []).map((r) => [r.id, r.name]));
+    for (const p of data) if (p.company_role_id) p.role_name = names.get(p.company_role_id) || null;
+  }
   return new Map(data.map((p) => [p.user_id, p]));
+}
+
+/**
+ * The role a request asks for: { role, companyRoleId, custom } where companyRoleId is null for a system role. A
+ * company role (company_role_id) must be one of the caller's company's, switched on; its base role is the role.
+ */
+async function resolveRequestedRole(caller, body) {
+  if (body?.company_role_id === undefined || body.company_role_id === null || body.company_role_id === "") {
+    return body?.role === undefined ? null : { role: body.role, companyRoleId: null, custom: null };
+  }
+  const custom = await loadCompanyRole(caller.tenantId, body.company_role_id);
+  if (!custom || !custom.active) throw new HttpError(400, "Unknown role");
+  return { role: custom.base_role, companyRoleId: custom.is_system ? null : custom.id, custom: custom.is_system ? null : custom };
+}
+
+// Giving someone a custom role, when not an administrator: only one based on STAFF (assertCanManageRole) whose
+// modules the caller holds themselves (user_may_grant() in the database).
+async function assertCanGiveCustomRole(caller, requested) {
+  if (caller.role === "ADMIN" || !requested?.custom) return;
+  const [theirs, mine] = await Promise.all([roleModules(caller.tenantId, requested.role, requested.custom.id), callerModules(caller)]);
+  if (!theirs.every((m) => mine.includes(m))) throw new HttpError(403, "You cannot give a role access you do not have yourself");
 }
 
 // HR may only manage STAFF accounts (the staff sign-up approval flow); ADMIN may manage any.
@@ -195,10 +273,13 @@ router.get(
 router.post(
   "/users",
   guard(["ADMIN", "HR"], async (req, res, caller) => {
-    const { password, role, account_status = "ACTIVE", location, branch } = req.body || {};
+    const { password, account_status = "ACTIVE", location, branch } = req.body || {};
+    const requested = await resolveRequestedRole(caller, req.body);
+    const role = requested?.role;
     const email = normalizeEmail(req.body?.email);
     validateFields({ email, role, account_status, password }, { requireAll: true });
     assertCanManageRole(caller, role);
+    await assertCanGiveCustomRole(caller, requested);
 
     const user_metadata = {
       role,
@@ -218,13 +299,15 @@ router.post(
       throw new HttpError(exists ? 409 : 400, error.message);
     }
     try {
-      await syncProfile(data.user.id, role, account_status, caller.tenantId);
+      await syncProfile(data.user.id, role, account_status, caller.tenantId, requested.companyRoleId);
     } catch (profileErr) {
       // Don't leave a login that can never pass the role check.
       await admin.auth.admin.deleteUser(data.user.id);
       throw profileErr;
     }
-    res.status(201).json({ user: toUserView(data.user, { role, account_status }) });
+    res.status(201).json({
+      user: toUserView(data.user, { role, account_status, company_role_id: requested.companyRoleId, role_name: requested.custom?.name }),
+    });
   })
 );
 
@@ -233,7 +316,9 @@ router.patch(
   "/users/:id",
   guard(["ADMIN", "HR"], async (req, res, caller) => {
     const { id } = req.params;
-    const { password, role, account_status, location, branch } = req.body || {};
+    const { password, account_status, location, branch } = req.body || {};
+    const requested = await resolveRequestedRole(caller, req.body);
+    const role = requested?.role;
     const email = req.body?.email === undefined ? undefined : normalizeEmail(req.body.email);
     validateFields({ email, role, account_status, password }, { requireAll: false });
 
@@ -246,8 +331,16 @@ router.patch(
     assertCanManageRole(caller, currentRole);
     const nextRole = role ?? currentRole;
     assertCanManageRole(caller, nextRole);
+    await assertCanGiveCustomRole(caller, requested);
+    // someone who is not an administrator cannot change the role of a person holding a custom role they could not give
+    if (requested && caller.role !== "ADMIN" && currentProfile?.company_role_id) {
+      const held = await loadCompanyRole(caller.tenantId, currentProfile.company_role_id);
+      await assertCanGiveCustomRole(caller, { role: currentRole, custom: held && !held.is_system ? held : null });
+    }
+    const roleChanges =
+      !!requested && (role !== currentRole || (requested.companyRoleId || null) !== (currentProfile?.company_role_id || null));
 
-    if (id === caller.id && ((role && role !== currentRole) || (account_status && account_status !== "ACTIVE"))) {
+    if (id === caller.id && (roleChanges || (account_status && account_status !== "ACTIVE"))) {
       throw new HttpError(400, "You cannot change your own role or deactivate your own account");
     }
 
@@ -282,8 +375,15 @@ router.patch(
 
     const { data, error } = await admin.auth.admin.updateUserById(id, update);
     if (error) throw new HttpError(error.status === 422 ? 409 : 400, error.message);
-    await syncProfile(id, nextRole, nextStatus, caller.tenantId);
-    res.json({ user: toUserView(data.user, { role: nextRole, account_status: nextStatus }) });
+    await syncProfile(id, nextRole, nextStatus, caller.tenantId, requested ? requested.companyRoleId : undefined);
+    res.json({
+      user: toUserView(data.user, {
+        role: nextRole,
+        account_status: nextStatus,
+        company_role_id: requested ? requested.companyRoleId : currentProfile?.company_role_id || null,
+        role_name: requested ? requested.custom?.name : null,
+      }),
+    });
   })
 );
 
@@ -322,6 +422,6 @@ router.post(
 );
 
 // Shared with sms_routes.js so every service-role route checks the caller the same way.
-export { authenticate, HttpError, admin };
+export { authenticate, HttpError, admin, callerModules, roleModules, loadCompanyRole };
 
 export default router;

@@ -9,6 +9,9 @@ export interface AdminUser {
   id: string;
   email: string;
   role: string;
+  /** the company's own role they hold (FIG-827), and its name */
+  company_role_id?: string | null;
+  role_name?: string | null;
   account_status: string;
   last_sign_in_at: string | null;
   created_at: string;
@@ -27,6 +30,8 @@ export interface CreateUserInput {
   email: string;
   password: string;
   role: string;
+  /** one of the company's own roles; its base role is then the role */
+  company_role_id?: string | null;
   account_status?: string;
   location?: string | null;
   branch?: string | null;
@@ -36,6 +41,7 @@ export interface UpdateUserInput {
   email?: string;
   password?: string;
   role?: string;
+  company_role_id?: string | null;
   account_status?: string;
   location?: string | null;
   branch?: string | null;

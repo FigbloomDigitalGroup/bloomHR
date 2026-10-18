@@ -14,6 +14,8 @@ export interface ClaimedInvite {
   expires_at: string;
   company_name: string | null;
   inviter_email: string | null;
+  /** the role as the company names it (a company's own role, FIG-827); older databases do not send it */
+  role_name?: string | null;
 }
 
 export interface OutgoingEmail {
@@ -61,7 +63,11 @@ export interface QueueRun {
 const escapeHtml = (value: unknown) =>
   String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 
-const roleLabel = (role: string) => String(role || '').charAt(0) + String(role || '').slice(1).toLowerCase();
+// a system role's key (STAFF) reads as "Staff"; a company's own role name is shown as the company wrote it
+const roleLabel = (role: string) => {
+  const r = String(role || '');
+  return /^[A-Z_]+$/.test(r) ? r.charAt(0) + r.slice(1).toLowerCase() : r;
+};
 
 /** The link that opens the join page for this invitation. */
 export const joinLink = (siteUrl: string, token: string) => `${siteUrl.replace(/\/+$/, '')}/join?token=${encodeURIComponent(token)}`;
@@ -103,7 +109,7 @@ export function invitationEmail({ company, role, inviter, link, expires }: { com
 export function emailFor(invite: ClaimedInvite, from: string, siteUrl: string): OutgoingEmail {
   const message = invitationEmail({
     company: invite.company_name || 'your company',
-    role: invite.role,
+    role: invite.role_name || invite.role,
     inviter: invite.inviter_email,
     link: joinLink(siteUrl, invite.token),
     expires: invite.expires_at,

@@ -9,7 +9,8 @@ import express from "express";
 import crypto from "node:crypto";
 import dotenv from "dotenv";
 import { Resend } from "resend";
-import { authenticate, HttpError, admin } from "./admin_routes.js";
+import { authenticate, HttpError, admin, loadCompanyRole } from "./admin_routes.js";
+import { callerHasModule } from "./authz.js";
 
 dotenv.config({ path: process.env.ENV_FILE || ".env" });
 
@@ -21,7 +22,11 @@ const hashToken = (token) => crypto.createHash("sha256").update(String(token ?? 
 const escapeHtml = (value) =>
   String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
-const roleLabel = (role) => String(role || "").charAt(0) + String(role || "").slice(1).toLowerCase();
+// a system role's key (STAFF) reads as "Staff"; a company's own role name is shown as the company wrote it
+const roleLabel = (role) => {
+  const r = String(role || "");
+  return /^[A-Z_]+$/.test(r) ? r.charAt(0) + r.slice(1).toLowerCase() : r;
+};
 
 // The address people are sent to. Configured, or Vercel's production address, or (last resort) the page that asked.
 function siteUrl(req) {
@@ -71,14 +76,15 @@ router.post("/send", async (req, res) => {
   try {
     if (!admin) throw new HttpError(500, "Admin API is not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
     const caller = await authenticate(req);
-    if (!["ADMIN", "HR"].includes(caller.role)) throw new HttpError(403, "Forbidden");
+    // whoever may invite: administrators and the "Invite people" module (HR keeps sending what it could create)
+    if (!["ADMIN", "HR"].includes(caller.role) && !(await callerHasModule(caller, ["invite-people"]))) throw new HttpError(403, "Forbidden");
 
     const token = req.body?.token;
     if (typeof token !== "string" || token.length < 20 || token.length > 200) throw new HttpError(400, "A valid invitation token is required");
 
     const { data: invitation, error } = await admin
       .from("invitations")
-      .select("id, email, role, status, expires_at")
+      .select("id, email, role, status, expires_at, company_role_id")
       .eq("token_hash", hashToken(token))
       .eq("tenant_id", caller.tenantId)
       .maybeSingle();
@@ -93,11 +99,13 @@ router.post("/send", async (req, res) => {
 
     const { data: tenant, error: tenantError } = await admin.from("tenants").select("name").eq("id", caller.tenantId).maybeSingle();
     if (tenantError) throw tenantError;
+    // a company's own role is named in the email as the company calls it
+    const companyRole = invitation.company_role_id ? await loadCompanyRole(caller.tenantId, invitation.company_role_id) : null;
 
     const link = `${siteUrl(req)}/join?token=${encodeURIComponent(token)}`;
     const message = invitationEmail({
       company: tenant?.name || "your company",
-      role: invitation.role,
+      role: companyRole?.name || invitation.role,
       inviter: caller.email,
       link,
       expires: invitation.expires_at,
@@ -146,7 +154,7 @@ router.post("/accept", async (req, res) => {
 
     const { data: invitation, error } = await admin
       .from("invitations")
-      .select("id, tenant_id, email, role, status, expires_at")
+      .select("id, tenant_id, email, role, status, expires_at, company_role_id")
       .eq("token_hash", hashToken(token))
       .maybeSingle();
     if (error) throw error;
@@ -183,9 +191,11 @@ router.post("/accept", async (req, res) => {
     }
     createdUserId = created.user.id;
 
-    const { error: memberError } = await admin
-      .from("memberships")
-      .insert({ user_id: createdUserId, tenant_id: invitation.tenant_id, role: invitation.role, account_status: "ACTIVE" });
+    // the company role the invitation gives, if it is still in use (else the base role alone)
+    const companyRole = invitation.company_role_id ? await loadCompanyRole(invitation.tenant_id, invitation.company_role_id) : null;
+    const membership = { user_id: createdUserId, tenant_id: invitation.tenant_id, role: invitation.role, account_status: "ACTIVE" };
+    if (companyRole?.active && companyRole.base_role === invitation.role) membership.company_role_id = companyRole.id;
+    const { error: memberError } = await admin.from("memberships").insert(membership);
     if (memberError) throw memberError;
 
     // best effort: keep the name on the profile too
