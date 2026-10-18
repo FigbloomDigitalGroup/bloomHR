@@ -5,6 +5,7 @@ const toasts = vi.hoisted(() => ({ error: [] as string[] }));
 vi.mock('react-hot-toast', () => ({ default: { error: (m: string) => toasts.error.push(m), success: () => {} } }));
 vi.mock('./PayrollRunBar', () => ({ default: () => null }));
 vi.mock('./ReturnsReadiness', () => ({ default: () => null }));
+vi.mock('./MinimumWageWarning', () => ({ default: ({ periodLabel }: { periodLabel: string }) => <div data-testid="minimum-wage-slot">{periodLabel}</div> }));
 
 import PayrollRunTab from './PayrollRunTab';
 import type { PayrollRun } from '../../lib/payrollRuns';
@@ -80,5 +81,16 @@ describe('PayrollRunTab', () => {
     render(<PayrollRunTab {...props({ shown: false })} />);
     expect(screen.queryByText('Pay all employees')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Pay' })).toBeNull();
+  });
+});
+
+describe('PayrollRunTab minimum wage warning', () => {
+  it('shows the warning slot before approval and hides it once the month is approved', () => {
+    render(<PayrollRunTab {...props()} payPeriod="2026-10" />);
+    expect(screen.getByTestId('minimum-wage-slot').textContent).toBe('October 2026');
+    cleanup();
+    const approved = { id: 'run1', pay_period: '2026-10', status: 'approved' } as unknown as PayrollRun;
+    render(<PayrollRunTab {...props({}, approved)} payPeriod="2026-10" />);
+    expect(screen.queryByTestId('minimum-wage-slot')).toBeNull();
   });
 });

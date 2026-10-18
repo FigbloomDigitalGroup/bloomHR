@@ -83,6 +83,7 @@ import { PayslipModal } from "./PayrollPayslipModal";
 import EmailPayslipsPanel from "./EmailPayslipsPanel";
 import PayslipEmailSetting from "./PayslipEmailSetting";
 import DeductionCapSetting from "./DeductionCapSetting";
+import MinimumWageCard from "./MinimumWageCard";
 import { markEditedPayslips, statutoryContextFor } from "../../lib/payslipOverrides";
 import { withRunEdits } from "../../lib/payslipOverridesDb";
 import { usePayslipOverrides } from "../../hooks/usePayslipOverrides";
@@ -1813,6 +1814,7 @@ export default function PayrollDashboard() {
           />
           <OvertimeSettingsCard canEdit={canEditRates} onChanged={() => setDeductionsVersion((v) => v + 1)} />
           <DeductionCapSetting canEdit={canEditRates} onChanged={() => setDeductionsVersion((v) => v + 1)} />
+          <MinimumWageCard canEdit={canEditRates} />
           <PayslipEmailSetting canEdit={canEditRates} />
         </div>
       )}

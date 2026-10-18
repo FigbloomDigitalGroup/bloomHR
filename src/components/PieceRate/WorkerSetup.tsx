@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import { Info, Users } from 'lucide-react';
@@ -8,11 +8,23 @@ import {
   BASIS_LABEL, FREQUENCY_LABEL, KIND_LABEL, WHT_LABEL, personName,
   type PayBasis, type PayFrequency, type WhtCategory, type WorkPerson, type WorkSettings,
 } from '../../lib/pieceRate';
+import { money, periodDay, workShortfalls, type WorkMonthDays } from '../../lib/minimumWage';
+import { loadWorkMonth } from '../../lib/minimumWageApi';
+import { useMinimumWages } from '../../hooks/useMinimumWages';
 
 // Each worker's pay setup: employee (PAYE, NSSF, SHIF, AHL through payroll) or contractor (withholding tax instead),
 // paid a salary or for the work they record, and how often work pay goes out. Casual workers, paid their own daily
 // rate in casual pay runs, are set up on the Casual workers page and don't show here. Also the company's setting for
-// whether what supervisors submit waits for payroll.
+// whether what supervisors submit waits for payroll. Anyone paid below the minimum wage last month (their work and jobs
+// against the per-day minimum x the days they recorded work, FIG-812 stage 6) has a warning badge.
+
+/** last month, 'YYYY-MM' */
+const lastMonth = () => {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
 
 interface Props {
   people: WorkPerson[];
@@ -41,6 +53,26 @@ export default function WorkerSetup({ people, settings, onChanged }: Props) {
       .filter((p) => !q || [personName(p), p.employee_number, p.department, p.job_title].some((v) => String(v ?? '').toLowerCase().includes(q)));
   }, [people, query, onlyWork]);
   const byWork = people.filter((p) => p.pay_basis === 'work').length;
+
+  const month = useMemo(lastMonth, []);
+  const wages = useMinimumWages(periodDay(month));
+  const [workMonth, setWorkMonth] = useState<WorkMonthDays[]>([]);
+  useEffect(() => {
+    let live = true;
+    loadWorkMonth(month)
+      .then((rows) => live && setWorkMonth(rows))
+      .catch(() => {
+        // no access or no migration yet: no badges
+      });
+    return () => {
+      live = false;
+    };
+  }, [month]);
+  const belowMinimum = useMemo(
+    () => workShortfalls(workMonth, people.map((p) => ({ employee_number: p.employee_number, worker_kind: p.worker_kind, name: personName(p) })),
+      wages.minimumFor, wages.settings),
+    [workMonth, people, wages.minimumFor, wages.settings],
+  );
 
   const save = async () => {
     if (!form) return;
@@ -190,7 +222,17 @@ export default function WorkerSetup({ people, settings, onChanged }: Props) {
                 {shown.map((p) => (
                   <tr key={p.employee_number} className="border-b border-border last:border-0">
                     <td className="px-3 py-2">
-                      <div className="font-semibold text-ink">{personName(p)}</div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-semibold text-ink">{personName(p)}</span>
+                        {belowMinimum.has(p.employee_number) && (() => {
+                          const s = belowMinimum.get(p.employee_number)!;
+                          return (
+                            <span title={`Last month: ${money(s.pay, s.currency)} for ${s.days} days of work; the minimum is ${money(s.minimum, s.currency)} (short by ${money(s.shortfall, s.currency)})`}>
+                              <StatusPill label="Below minimum wage last month" tone="warning" />
+                            </span>
+                          );
+                        })()}
+                      </div>
                       <div className="text-[10.5px] text-subtle">{[p.employee_number, p.department].filter(Boolean).join(' · ')}</div>
                     </td>
                     <td className="px-3 py-2">{KIND_LABEL[p.worker_kind]}</td>

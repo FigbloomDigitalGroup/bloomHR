@@ -4,9 +4,12 @@ import { Button, EmployeePicker, Modal } from '../UI';
 import DepartmentPicker from '../UI/DepartmentPicker';
 import { saveCasual, type CasualInput } from '../../lib/casualApi';
 import { today, type CasualWorker } from '../../lib/casualPay';
+import { casualRateShortfall, money, perDayMinimum } from '../../lib/minimumWage';
+import { useMinimumWages } from '../../hooks/useMinimumWages';
 
 // Register a casual worker, or change one: who they are, how they're paid (M-Pesa or bank), their daily rate, when
-// they started, where they work and who supervises them.
+// they started, where they work and who supervises them. A daily rate below the per-day minimum wage shows a warning
+// (FIG-812 stage 6), never a block.
 
 const field = 'w-full px-3 py-2 text-xs border border-border rounded-tile bg-white text-ink outline-none focus:border-brand';
 const labelClass = 'block text-[11.5px] font-semibold text-ink mb-1';
@@ -41,6 +44,9 @@ export default function CasualFormModal({ open, casual, onClose, onSaved }: Prop
   const [problem, setProblem] = useState<string | null>(null);
   const set = (patch: Partial<CasualInput>) => setForm((f) => ({ ...f, ...patch }));
   const bank = form.payment_method === 'Bank Transfer';
+  const wages = useMinimumWages(form.start_date || today(), { perEmployee: Boolean(casual) });
+  const minimum = wages.minimumFor(casual?.employee_number);
+  const short = casualRateShortfall(form.daily_rate, minimum, wages.settings);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,6 +87,13 @@ export default function CasualFormModal({ open, casual, onClose, onSaved }: Prop
           <div>
             <label className={labelClass} htmlFor="casual-rate">Daily rate (KSh)</label>
             <input id="casual-rate" className={field} inputMode="decimal" value={String(form.daily_rate)} onChange={(e) => set({ daily_rate: e.target.value })} />
+            {short !== null && minimum?.monthly && (
+              <p role="status" className="text-[11px] text-orange-text-alt mt-1" data-testid="casual-minimum-wage">
+                Below the minimum wage: {money(perDayMinimum(minimum.monthly, wages.settings.daysPerMonth), minimum.currency)} a day in{' '}
+                {minimum.country} ({money(minimum.monthly, minimum.currency)} a month / {wages.settings.daysPerMonth} days), short by{' '}
+                {money(short, minimum.currency)} a day. You can still save.
+              </p>
+            )}
           </div>
           <div>
             <label className={labelClass} htmlFor="casual-start">Start date</label>

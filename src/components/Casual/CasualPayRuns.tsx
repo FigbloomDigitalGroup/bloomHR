@@ -13,6 +13,8 @@ import {
 } from '../../lib/casualPay';
 import { toCsv, type ExportFile } from '../../lib/payrollExports';
 import { XLSX_TYPE, toXlsx } from '../../lib/xlsxExport';
+import { casualRateShortfall, money, perDayMinimum } from '../../lib/minimumWage';
+import { useMinimumWages } from '../../hooks/useMinimumWages';
 
 // Paying casuals: pick a period (a day, a week or any dates), see each person's days x daily rate, add one-off
 // additions or deductions with a note, approve (the lines are then fixed), download the M-Pesa or bank file, and
@@ -148,6 +150,8 @@ function RunDetail({ run, onBack, onChanged }: { run: CasualPayRun; onBack: () =
   const [paidOn, setPaidOn] = useState(today());
   const [busy, setBusy] = useState(false);
   const draft = run.status === 'draft';
+  // daily rates below the per-day minimum wage on the run's last day (FIG-812 stage 6): a warning, never a block
+  const wages = useMinimumWages(run.period_end);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -179,6 +183,9 @@ function RunDetail({ run, onBack, onChanged }: { run: CasualPayRun; onBack: () =
 
   const files = useMemo(() => ({ mpesa: casualMpesaFile(lines, run), bank: casualBankFile(lines, run) }), [lines, run]);
   const total = runTotal(lines);
+  const belowMinimum = lines
+    .map((l) => ({ line: l, minimum: wages.minimumFor(l.employee_number), short: casualRateShortfall(l.daily_rate, wages.minimumFor(l.employee_number), wages.settings) }))
+    .filter((x) => x.short !== null && x.minimum?.monthly);
   const slug = `casual-pay-${run.period_start}${run.period_start === run.period_end ? '' : `-to-${run.period_end}`}`;
 
   return (
@@ -218,6 +225,29 @@ function RunDetail({ run, onBack, onChanged }: { run: CasualPayRun; onBack: () =
           )}
         </div>
       </div>
+
+      {belowMinimum.length > 0 && (
+        <Card padding="sm" data-testid="casual-run-minimum-wage">
+          <div className="flex items-start gap-2 text-xs text-ink">
+            <AlertTriangle className="w-4 h-4 mt-0.5 text-orange-text-alt shrink-0" />
+            <div>
+              <p className="m-0 font-semibold">
+                {belowMinimum.length} {belowMinimum.length === 1 ? 'person has' : 'people have'} a daily rate below the minimum wage
+              </p>
+              <ul className="m-0 mt-1 space-y-0.5 text-muted-foreground">
+                {belowMinimum.map(({ line, minimum, short }) => (
+                  <li key={line.id}>
+                    <span className="font-semibold text-ink">{line.worker_name}</span>: {formatKsh(line.daily_rate ?? 0)} a day, the minimum in{' '}
+                    {minimum!.country} is {money(perDayMinimum(minimum!.monthly as number, wages.settings.daysPerMonth), minimum!.currency)} (short by{' '}
+                    {money(short as number, minimum!.currency)} a day)
+                  </li>
+                ))}
+              </ul>
+              <p className="m-0 mt-1 text-muted-foreground">A warning only: you can still approve and pay this run.</p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Card padding="none">
         <TableScroll>
