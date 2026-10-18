@@ -1,15 +1,18 @@
 import { Download, FileText, FolderDown } from 'lucide-react';
 import { Card, EmptyState } from '../UI';
-import type { PayrollRun } from '../../lib/payrollRuns';
+import type { PayrollRun, PayrollRunCountry } from '../../lib/payrollRuns';
 import { ApprovedRunPanels } from './RunPayActions';
 
-// The Files tab: the month's KRA P10, SHA and NSSF returns and the bank, M-Pesa and Equity bulk-payment files (the
-// exports panel, once the month is approved), plus the P9 tax card and the payroll table export.
+// The Files tab: grouped by country (FIG-905), each approved country's statutory returns (Kenya: KRA P10, SHA, NSSF,
+// housing levy, NITA) and its bulk-payment files in its currency (the exports panel), plus the P9 tax card and the
+// payroll table export.
 
 interface PayrollFilesTabProps {
   periodLabel: string;
   /** the month's run, null when it hasn't been started (or is still loading) */
   run: PayrollRun | null;
+  /** the run's countries: each approved one has its own files */
+  runCountries?: PayrollRunCountry[];
   onOpenP9: () => void;
   onOpenExport: () => void;
   onGoToRun: () => void;
@@ -18,17 +21,18 @@ interface PayrollFilesTabProps {
 const tool =
   'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-tile border border-border bg-white text-[11.5px] font-semibold text-ink hover:bg-secondary transition-colors';
 
-export default function PayrollFilesTab({ periodLabel, run, onOpenP9, onOpenExport, onGoToRun }: PayrollFilesTabProps) {
+export default function PayrollFilesTab({ periodLabel, run, runCountries, onOpenP9, onOpenExport, onGoToRun }: PayrollFilesTabProps) {
+  const filed = !!run && (runCountries && runCountries.length ? runCountries.some((c) => c.status !== 'draft') : run.status === 'approved' || run.status === 'paid');
   return (
     <div className="space-y-4">
-      {run && (run.status === 'approved' || run.status === 'paid') ? (
-        <ApprovedRunPanels run={run} />
+      {run && filed ? (
+        <ApprovedRunPanels run={run} runCountries={runCountries} />
       ) : (
         <Card>
           <EmptyState
             icon={<FolderDown className="w-5 h-5" />}
             title={`Approve payroll for ${periodLabel} first`}
-            description="The P10, SHA, NSSF, bank and Equity files are made from the approved payslips."
+            description="Each country’s returns and bank files are made from its approved payslips."
             action={
               <button type="button" onClick={onGoToRun} className={tool}>
                 Go to Run

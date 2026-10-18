@@ -9,6 +9,8 @@ vi.mock('./MinimumWageWarning', () => ({ default: ({ periodLabel }: { periodLabe
 
 import PayrollRunTab from './PayrollRunTab';
 import type { PayrollRun } from '../../lib/payrollRuns';
+import { countryReadiness, totalsByCurrency } from '../../lib/payroll/multiCountry';
+import { KENYA_RATES } from '../../lib/payroll/countries/kenyaFixtures';
 
 beforeEach(() => {
   toasts.error = [];
@@ -95,33 +97,56 @@ describe('PayrollRunTab minimum wage warning', () => {
   });
 });
 
-describe('PayrollRunTab: branches in other countries (FIG-905)', () => {
+describe('PayrollRunTab: one run for every country (FIG-905 stage 2)', () => {
   const branches = [
     { id: 'hq', name: 'Nairobi HQ', country: 'Kenya', currency: 'KES', city: null, address: null, active: true, is_default: true },
     { id: 'dar', name: 'Dar es Salaam', country: 'Tanzania', currency: 'TZS', city: null, address: null, active: true, is_default: false },
   ];
-  const tzRecord = { ...record, id: 'r2', employee_id: 'E2', employee_name: 'Baraka Mushi' };
+  const ke = { ...record, country: 'Kenya', currency: 'KES' };
+  const staff = [
+    { 'Employee Number': 'E1', 'First Name': 'Amina', 'Last Name': 'Wanjiru', branch_id: 'hq', 'Tax PIN': 'A012345678Z', 'NSSF Number': '1', 'SHIF Number': '2', payment_method: 'cash' },
+    { 'Employee Number': 'E2', 'First Name': 'Baraka', 'Last Name': 'Mushi', branch_id: 'dar' },
+  ];
+  const readinessFor = (runCountries: { country: string; status: 'draft' | 'approved' | 'paid' }[]) =>
+    countryReadiness({
+      employees: staff, branches, payslips: [ke], runCountries, runStarted: true,
+      ratesByCountry: new Map([['Kenya', KENYA_RATES]]),
+    });
+  const actions = () => ({ onApprove: vi.fn(), onReopen: vi.fn(), onMarkPaid: vi.fn(), onDiscard: vi.fn() });
+  const run = { id: 'run1', pay_period: '2026-10', status: 'draft' } as unknown as PayrollRun;
 
-  it('shows each employee’s branch and country, and flags staff outside Kenya with a notice', () => {
-    const p = { ...props(), finalFilteredRecords: [record, tzRecord], currentItems: [record, tzRecord] };
-    render(
-      <PayrollRunTab
-        {...p}
-        onPayroll={[{ 'Employee Number': 'E1', branch_id: null }, { 'Employee Number': 'E2', branch_id: 'dar' }]}
-        companyBranches={branches}
-      />
-    );
-    const notice = screen.getByRole('alert', { name: 'Staff outside Kenya' });
-    expect(notice.textContent).toContain('Payroll for Tanzania and Uganda staff comes next; their payslips are calculated with Kenya rules until then');
-    expect(notice.textContent).toContain('1 person is in a branch outside Kenya (1 in Tanzania)');
-    expect(screen.getAllByText(/Nairobi HQ \(Kenya\)/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Dar es Salaam \(Tanzania\)/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Tanzania: Kenya rules').length).toBeGreaterThan(0);
+  it('shows the readiness per country and the approval summary; staff without rules wait, never on Kenya rules', () => {
+    render(<PayrollRunTab {...props({}, run)} onPayroll={staff} companyBranches={branches} readiness={readinessFor([{ country: 'Kenya', status: 'draft' }])} countryActions={actions()} />);
+    expect(screen.getByTestId('approval-summary').textContent).toBe('Kenya 1 payslip KSh 62K ✓ · Tanzania 1 waiting for rules');
+    const tz = screen.getByTestId('country-Tanzania');
+    expect(tz.textContent).toContain('Waiting for rules');
+    expect(tz.textContent).toContain('Waiting for Tanzania payroll rules');
+    expect(tz.textContent).toContain('Baraka Mushi');
+    expect(screen.getByTestId('country-Kenya').textContent).toContain('Ready');
+    expect(screen.queryByText(/Kenya rules/)).toBeNull();
   });
 
-  it('says nothing when everyone is in Kenya', () => {
-    render(<PayrollRunTab {...props()} onPayroll={[{ 'Employee Number': 'E1' }]} companyBranches={branches} />);
-    expect(screen.queryByRole('alert', { name: 'Staff outside Kenya' })).toBeNull();
-    expect(screen.queryByText(/Kenya rules/)).toBeNull();
+  it('approves or reopens one country from its menu', () => {
+    const a = actions();
+    render(<PayrollRunTab {...props({}, run)} onPayroll={staff} companyBranches={branches} readiness={readinessFor([{ country: 'Kenya', status: 'draft' }])} countryActions={a} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Kenya actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Approve Kenya only' }));
+    expect(a.onApprove).toHaveBeenCalledWith('Kenya');
+    cleanup();
+    render(<PayrollRunTab {...props({}, run)} onPayroll={staff} companyBranches={branches} readiness={readinessFor([{ country: 'Kenya', status: 'approved' }])} countryActions={a} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Kenya actions' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Reopen Kenya' }));
+    expect(a.onReopen).toHaveBeenCalledWith('Kenya');
+  });
+
+  it('shows the totals per currency, never added together', () => {
+    const tz = { ...record, id: 'r2', employee_id: 'E2', employee_name: 'Baraka Mushi', country: 'Tanzania', currency: 'TZS', gross_pay: 1000000, total_deductions: 200000, net_pay: 800000 };
+    const rows = [ke, tz];
+    render(<PayrollRunTab {...props()} finalFilteredRecords={rows} currentItems={rows} payrollRecords={rows} currencyTotals={totalsByCurrency(rows)} />);
+    expect(screen.getByTestId('net-totals').textContent).toBe('KSh 62,440 · TSh 800,000');
+    expect(screen.getByTestId('total-KES').textContent).toContain('KSh 62,440');
+    expect(screen.getByTestId('total-TZS').textContent).toContain('TSh 800,000');
+    expect(screen.getAllByText('TSh 800,000').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/862,440/)).toBeNull();
   });
 });

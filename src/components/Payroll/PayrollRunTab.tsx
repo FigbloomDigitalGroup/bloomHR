@@ -34,8 +34,11 @@ import { Pagination } from "./PayrollPagination";
 import { PayslipSettlementBlock, WhtDeductionLine, WorkEarningLines } from "./PayslipSettlement";
 import WorkSettlementCard from "./WorkSettlementCard";
 import MinimumWageWarning from "./MinimumWageWarning";
-import BranchCountryNotice from "./BranchCountryNotice";
-import { type Branch, employeeBranch, paidWithKenyaRules } from "../../lib/branches";
+import CountryReadinessPanel, { type CountryActions, CurrencyTotalsText } from "./CountryReadinessPanel";
+import { type Branch, employeeBranch } from "../../lib/branches";
+import type { CountryReadiness, CurrencyTotals } from "../../lib/payroll/multiCountry";
+import { payslipCountry } from "../../lib/payroll/multiCountry";
+import { currencyOf, moneyRounded } from "../../lib/payroll/currency";
 
 // The Run tab: the month's payroll run (start, recalculate, approve, mark paid), the returns check, and the list of
 // employees on the payroll with their pay. The figures are worked out by PayrollDashboard; this only shows them.
@@ -89,9 +92,23 @@ interface PayrollRunTabProps {
   payrollRecords?: any[];
   /** the month, 'YYYY-MM' */
   payPeriod?: string;
-  /** the company's branches, each in a country (FIG-905): each employee's branch and country show, and staff outside
-   * Kenya are flagged (their payslips use Kenya's rules until their country's payroll comes) */
+  /** the company's branches, each in a country (FIG-905): each employee's branch and country show */
   companyBranches?: Branch[];
+  /** one run for every country (FIG-905 stage 2): each country's readiness, and its own approve / reopen / pay */
+  readiness?: CountryReadiness[];
+  countryActions?: CountryActions;
+  /** what the run bar shows and allows when countries are in different states */
+  runBarCountries?: { ready: number; draft: boolean; approved: boolean; summary?: string };
+  /** the filtered payslips' totals, one per currency (never added across currencies) */
+  currencyTotals?: CurrencyTotals[];
+  /** who Kenya's returns check covers (Kenya's staff); everyone on payroll when not given */
+  returnsEmployees?: EmployeeRecord[];
+  /** reports who is below their country's minimum wage, by country, for the readiness check */
+  onBelowMinimum?: (byCountry: Map<string, number>) => void;
+  /** the country filter: "all" or a country */
+  countryOptions?: string[];
+  selectedCountry?: string;
+  setSelectedCountry?: (v: string) => void;
   expandedRows: Set<unknown>;
   toggleRowExpand: (id: any, e: React.MouseEvent) => void;
   smsSendingStatus: Record<string, any>;
@@ -120,10 +137,12 @@ interface PayrollRunTabProps {
   };
 }
 
-const ksh = (n: number) => `KSh ${Math.round(n || 0).toLocaleString()}`;
+const ksh = (n: number, currency = "KES") => moneyRounded(n, currency);
 
-/** One employee's pay, line by line: shown when their row is opened. */
+/** One employee's pay, line by line, in the payslip's currency: shown when their row is opened. */
 function PayBreakdown({ record }: { record: any }) {
+  const cur = currencyOf(record);
+  const ksh = (n: number) => moneyRounded(n, cur);
   const line = (label: string, value: number, tone = "") => (
     <div className="flex justify-between gap-3">
       <span className="text-muted-foreground">{label}</span>
@@ -226,6 +245,15 @@ export default function PayrollRunTab({
   payrollRecords,
   payPeriod,
   companyBranches,
+  readiness,
+  returnsEmployees,
+  onBelowMinimum,
+  countryActions,
+  runBarCountries,
+  currencyTotals,
+  countryOptions,
+  selectedCountry = "all",
+  setSelectedCountry,
   expandedRows,
   toggleRowExpand,
   smsSendingStatus,
@@ -354,19 +382,18 @@ export default function PayrollRunTab({
       .join(" · ");
   };
 
+  // several countries on the run: each row says which (its pay is in that country's currency)
+  const severalCountries = new Set((payrollRecords ?? finalFilteredRecords).map((r) => payslipCountry(r))).size > 1;
   /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- a payroll row from PayrollDashboard */
-  const countryFlag = (record: any) => {
-    const b = branchOfRecord(record);
-    if (!b || !paidWithKenyaRules(b.country)) return null;
-    return (
-      <span
-        className="ml-1.5 inline-block align-middle rounded-full border border-orange-text-alt px-1.5 py-px text-[9.5px] font-semibold text-orange-text-alt"
-        title={`In ${b.name}, ${b.country}: worked out with Kenya rules until ${b.country}'s payroll comes. Check before paying.`}
-      >
-        {b.country}: Kenya rules
+  const countryFlag = (record: any) =>
+    severalCountries ? (
+      <span className="ml-1.5 inline-block align-middle rounded-full border border-border px-1.5 py-px text-[9.5px] font-semibold text-subtle">
+        {payslipCountry(record)} · {currencyOf(record)}
       </span>
-    );
-  };
+    ) : null;
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- a payroll row from PayrollDashboard */
+  const amount = (record: any, n: number) => ksh(n, currencyOf(record));
+  const totalsList = currencyTotals ?? [];
 
   return (
     <div className="space-y-4">
@@ -381,10 +408,13 @@ export default function PayrollRunTab({
         onReopen={onReopen}
         onMarkPaid={onMarkPaid}
         onDiscard={onDiscard}
+        countries={runBarCountries}
       />
 
-      {(!monthRun || monthRun.status === "draft") && <ReturnsReadiness employees={onPayroll} />}
-      {companyBranches?.length ? <BranchCountryNotice employees={onPayroll} branches={companyBranches} /> : null}
+      {(!monthRun || monthRun.status === "draft") && <ReturnsReadiness employees={returnsEmployees ?? onPayroll} />}
+      {readiness && countryActions && (
+        <CountryReadinessPanel readiness={readiness} runStarted={!!monthRun} busy={runBusy} actions={countryActions} />
+      )}
       {/* a warning before approval, never a block (FIG-812 stage 6) */}
       {!approved && payPeriod && (
         <MinimumWageWarning
@@ -392,13 +422,14 @@ export default function PayrollRunTab({
           employees={onPayroll}
           payPeriod={payPeriod}
           periodLabel={periodLabel}
+          onShortfalls={onBelowMinimum}
         />
       )}
       {approved && (
         <Card padding="sm" className="!rounded-xl">
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <FolderDown className="w-4 h-4 text-brand shrink-0" />
-            <span className="flex-1 min-w-0 basis-48 text-ink">The P10, SHA, NSSF, bank and Equity files for {periodLabel} are on the Files tab.</span>
+            <span className="flex-1 min-w-0 basis-48 text-ink">The returns and bank files for {periodLabel} are on the Files tab, per country.</span>
             <button type="button" onClick={onOpenFiles} className="font-semibold text-brand">
               Open Files
             </button>
@@ -431,9 +462,19 @@ export default function PayrollRunTab({
               Employees on payroll <span className="text-subtle font-semibold">({count})</span>
             </h2>
             <p className="text-[11px] text-muted-foreground mt-0.5">
-              Net pay <span className="font-bold text-brand-dark">{ksh(totalNetPay)}</span>
-              <span className="mx-1.5">·</span>Gross {ksh(totalGrossPay)}
-              <span className="mx-1.5">·</span>Deductions {ksh(totalDeductions)}
+              {currencyTotals ? (
+                <>
+                  Net pay <span className="font-bold text-brand-dark" data-testid="net-totals"><CurrencyTotalsText totals={totalsList} field="net" /></span>
+                  <span className="mx-1.5">·</span>Gross <CurrencyTotalsText totals={totalsList} field="gross" />
+                  <span className="mx-1.5">·</span>Deductions <CurrencyTotalsText totals={totalsList} field="deductions" />
+                </>
+              ) : (
+                <>
+                  Net pay <span className="font-bold text-brand-dark">{ksh(totalNetPay)}</span>
+                  <span className="mx-1.5">·</span>Gross {ksh(totalGrossPay)}
+                  <span className="mx-1.5">·</span>Deductions {ksh(totalDeductions)}
+                </>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
@@ -483,6 +524,17 @@ export default function PayrollRunTab({
               className="!bg-white !border-border"
             />
           </div>
+          {countryOptions && countryOptions.length > 1 && setSelectedCountry && (
+            <div className="min-w-0 sm:w-36">
+              <SearchableDropdown
+                options={[{ label: "All countries", value: "all" }, ...countryOptions.map((c) => ({ label: c, value: c }))]}
+                value={selectedCountry}
+                onChange={setSelectedCountry}
+                placeholder="Country"
+                icon={MapPin}
+              />
+            </div>
+          )}
           <div className="min-w-0 sm:w-36">
             <SearchableDropdown options={branches} value={selectedBranch} onChange={setSelectedBranch} placeholder="Branch" icon={MapPin} />
           </div>
@@ -528,7 +580,7 @@ export default function PayrollRunTab({
 
         {count === 0 ? (
           <div className="px-4 py-10 text-center text-xs text-muted-foreground">
-            {searchTerm || selectedBranch !== "all" || selectedDepartment !== "all" || selectedPaymentMethod !== "all"
+            {searchTerm || selectedCountry !== "all" || selectedBranch !== "all" || selectedDepartment !== "all" || selectedPaymentMethod !== "all"
               ? "No employees match the search or filters."
               : `No one is on the payroll for ${periodLabel} yet.`}
           </div>
@@ -545,8 +597,8 @@ export default function PayrollRunTab({
                       <div className="text-[10px] text-subtle truncate">{subline(record)}</div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="text-xs font-bold text-brand-dark whitespace-nowrap">{ksh(record.net_pay)}</div>
-                      <div className="text-[10px] text-subtle whitespace-nowrap">of {ksh(record.gross_pay)}</div>
+                      <div className="text-xs font-bold text-brand-dark whitespace-nowrap">{amount(record, record.net_pay)}</div>
+                      <div className="text-[10px] text-subtle whitespace-nowrap">of {amount(record, record.gross_pay)}</div>
                     </div>
                   </div>
                   <div className="mt-2 pl-6">{rowActions(record, index)}</div>
@@ -585,9 +637,9 @@ export default function PayrollRunTab({
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-right whitespace-nowrap">{ksh(record.gross_pay)}</td>
-                          <td className="px-4 py-3 text-right whitespace-nowrap text-muted-foreground">{ksh(record.total_deductions)}</td>
-                          <td className="px-4 py-3 text-right whitespace-nowrap font-bold text-brand-dark">{ksh(record.net_pay)}</td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap">{amount(record, record.gross_pay)}</td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap text-muted-foreground">{amount(record, record.total_deductions)}</td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap font-bold text-brand-dark">{amount(record, record.net_pay)}</td>
                           <td className="px-4 py-3 pl-6">{rowActions(record, index)}</td>
                         </tr>
                         {expandedRows.has(record.id) && (
@@ -601,13 +653,26 @@ export default function PayrollRunTab({
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-background text-ink font-bold">
-                      <td className="px-4 py-3">Total · {count} {count === 1 ? "employee" : "employees"}</td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap">{ksh(totalGrossPay)}</td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap">{ksh(totalDeductions)}</td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap text-brand-dark">{ksh(totalNetPay)}</td>
-                      <td />
-                    </tr>
+                    {currencyTotals && totalsList.length > 1 ? (
+                      // a total per currency, never one sum across currencies
+                      totalsList.map((t) => (
+                        <tr key={t.currency} className="bg-background text-ink font-bold" data-testid={`total-${t.currency}`}>
+                          <td className="px-4 py-3">Total {t.currency} · {t.count} {t.count === 1 ? "employee" : "employees"}</td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap">{ksh(t.gross, t.currency)}</td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap">{ksh(t.deductions, t.currency)}</td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap text-brand-dark">{ksh(t.net, t.currency)}</td>
+                          <td />
+                        </tr>
+                      ))
+                    ) : (
+                      <tr className="bg-background text-ink font-bold">
+                        <td className="px-4 py-3">Total · {count} {count === 1 ? "employee" : "employees"}</td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap">{ksh(currencyTotals ? totalsList[0]?.gross ?? 0 : totalGrossPay, totalsList[0]?.currency)}</td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap">{ksh(currencyTotals ? totalsList[0]?.deductions ?? 0 : totalDeductions, totalsList[0]?.currency)}</td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap text-brand-dark">{ksh(currencyTotals ? totalsList[0]?.net ?? 0 : totalNetPay, totalsList[0]?.currency)}</td>
+                        <td />
+                      </tr>
+                    )}
                   </tfoot>
                 </table>
               </TableScroll>

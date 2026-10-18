@@ -1,3 +1,5 @@
+import { payslipCountry } from "../../lib/payroll/multiCountry";
+import { currencyOf } from "../../lib/payroll/currency";
 import { useState, useEffect } from "react";
 import EmployeePicker from '../UI/EmployeePicker';
 import { FileText, Download, Calendar, FileSpreadsheet } from "lucide-react";
@@ -177,6 +179,9 @@ export const ExportModal = ({
         records.map((record: any) => ({
           "Employee ID": record.employee_id,
           "Employee Name": record.employee_name,
+          // each payslip's country and currency (FIG-905): amounts are in it, never converted
+          Country: payslipCountry(record),
+          Currency: currencyOf(record),
           Department: record.department,
           Position: record.position,
           "Basic Salary": record.basic_salary,
@@ -241,6 +246,9 @@ export const ExportModal = ({
         records.map((record: any) => ({
           "Employee ID": record.employee_id,
           "Employee Name": record.employee_name,
+          // each payslip's country and currency (FIG-905): amounts are in it, never converted
+          Country: payslipCountry(record),
+          Currency: currencyOf(record),
           Department: record.department,
           Position: record.position,
           "Basic Salary": record.basic_salary,

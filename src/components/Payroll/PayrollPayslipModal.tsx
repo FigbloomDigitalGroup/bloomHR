@@ -8,6 +8,11 @@ import { leaveLineLabel, leaveLineWorking, payslipLeaveLines } from "../../lib/l
 import { PayslipEditBar, type PayslipEditing } from "./PayslipEditModal";
 import { overtimeLineLabel, overtimeLineWorking, payslipOvertimeLines, payslipOvertimePay } from "../../lib/overtimePay";
 import { PayslipSettlementBlock, WhtDeductionLine, WorkEarningLines, netPayLabel } from "./PayslipSettlement";
+import { currencyOf, currencySymbol } from "../../lib/payroll/currency";
+
+/** The payslip's currency symbol (FIG-905): KSh, TSh, USh. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- a payroll row from PayrollDashboard
+const cur = (record: any) => currencySymbol(currencyOf(record));
 
 // One employee's payslip for the month (view, previous / next, PDF), moved from PayrollDashboard.
 
@@ -167,7 +172,7 @@ export const PayslipDocument = ({ record, companyInfo, id }: { record: any; comp
             <div className="p-3 space-y-2 text-black">
               <div className="flex justify-between">
                 <span>Basic</span>
-                <span className="font-semibold">KSh {(record.basic_salary || 0).toLocaleString()}</span>
+                <span className="font-semibold">{cur(record)} {(record.basic_salary || 0).toLocaleString()}</span>
               </div>
               {payslipLeaveLines(record).map((line, i) => (
                 <div key={`leave-${line.name}-${i}`} className="flex justify-between gap-3">
@@ -175,24 +180,24 @@ export const PayslipDocument = ({ record, companyInfo, id }: { record: any; comp
                     {leaveLineLabel(line)}
                     <span className="block text-gray-500 text-xs">{leaveLineWorking(line)}</span>
                   </span>
-                  <span className="font-semibold text-red-700 whitespace-nowrap">−KSh {line.amount.toLocaleString()}</span>
+                  <span className="font-semibold text-red-700 whitespace-nowrap">−{cur(record)} {line.amount.toLocaleString()}</span>
                 </div>
               ))}
               <div className="flex justify-between">
                 <span>House</span>
-                <span className="font-semibold">KSh {(record.house_allowance || 0).toLocaleString()}</span>
+                <span className="font-semibold">{cur(record)} {(record.house_allowance || 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span>Transport</span>
-                <span className="font-semibold">KSh {(record.transport_allowance || 0).toLocaleString()}</span>
+                <span className="font-semibold">{cur(record)} {(record.transport_allowance || 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span>Medical</span>
-                <span className="font-semibold">KSh {(record.medical_allowance || 0).toLocaleString()}</span>
+                <span className="font-semibold">{cur(record)} {(record.medical_allowance || 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span>Other</span>
-                <span className="font-semibold">KSh {(record.other_allowances || 0).toLocaleString()}</span>
+                <span className="font-semibold">{cur(record)} {(record.other_allowances || 0).toLocaleString()}</span>
               </div>
               {payslipOvertimeLines(record).length > 0 ? (
                 payslipOvertimeLines(record).map((line, i) => (
@@ -201,13 +206,13 @@ export const PayslipDocument = ({ record, companyInfo, id }: { record: any; comp
                       {overtimeLineLabel(line)}
                       <span className="block text-gray-500 text-xs">{overtimeLineWorking(line)}</span>
                     </span>
-                    <span className="font-semibold whitespace-nowrap">KSh {line.amount.toLocaleString()}</span>
+                    <span className="font-semibold whitespace-nowrap">{cur(record)} {line.amount.toLocaleString()}</span>
                   </div>
                 ))
               ) : (
                 <div className="flex justify-between">
                   <span>Overtime</span>
-                  <span className="font-semibold">KSh {payslipOvertimePay(record).toLocaleString()}</span>
+                  <span className="font-semibold">{cur(record)} {payslipOvertimePay(record).toLocaleString()}</span>
                 </div>
               )}
               {payslipEarningLines(record).map((line, i) => (
@@ -216,14 +221,14 @@ export const PayslipDocument = ({ record, companyInfo, id }: { record: any; comp
                     {line.name}
                     {!line.taxable && <span className="text-gray-500 text-xs"> (not taxed)</span>}
                   </span>
-                  <span className="font-semibold">KSh {line.amount.toLocaleString()}</span>
+                  <span className="font-semibold">{cur(record)} {line.amount.toLocaleString()}</span>
                 </div>
               ))}
               {/* the month's piece rate work and contract jobs (FIG-812) */}
               <WorkEarningLines record={record} />
               <div className="flex justify-between bg-gray-50 p-1 border border-gray-200 mt-2">
                 <span>Per diem</span>
-                <span className="font-bold">KSh {(record.per_diem || 0).toLocaleString()}</span>
+                <span className="font-bold">{cur(record)} {(record.per_diem || 0).toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -233,40 +238,40 @@ export const PayslipDocument = ({ record, companyInfo, id }: { record: any; comp
             <div className="p-3 space-y-2 text-black">
               <div className="flex justify-between">
                 <span>PAYE</span>
-                <span className="font-semibold">KSh {Math.round(record.paye_tax || 0).toLocaleString()}</span>
+                <span className="font-semibold">{cur(record)} {Math.round(record.paye_tax || 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span>SHIF / NHIF</span>
-                <span className="font-semibold">KSh {(record.nhif_deduction || 0).toLocaleString()}</span>
+                <span className="font-semibold">{cur(record)} {(record.nhif_deduction || 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span>NSSF</span>
-                <span className="font-semibold">KSh {(record.nssf_deduction || 0).toLocaleString()}</span>
+                <span className="font-semibold">{cur(record)} {(record.nssf_deduction || 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span>AHL</span>
-                <span className="font-semibold">KSh {(record.housing_levy || 0).toLocaleString()}</span>
+                <span className="font-semibold">{cur(record)} {(record.housing_levy || 0).toLocaleString()}</span>
               </div>
               <WhtDeductionLine record={record} />
               {Number(record.nita_levy) > 0 && (
                 <div className="flex justify-between text-gray-500">
                   <span>NITA levy (paid by employer)</span>
-                  <span>KSh {Number(record.nita_levy).toLocaleString()}</span>
+                  <span>{cur(record)} {Number(record.nita_levy).toLocaleString()}</span>
                 </div>
               )}
               <div className="flex justify-between">
                 <span>Advance</span>
-                <span className="font-semibold">KSh {(record.advance_deduction || 0).toLocaleString()}</span>
+                <span className="font-semibold">{cur(record)} {(record.advance_deduction || 0).toLocaleString()}</span>
               </div>
               {payslipDeductionLines(record).map((line, i) => (
                 <div key={`${line.name}-${i}`} className="flex justify-between">
                   <span>{line.name}</span>
-                  <span className="font-semibold">KSh {line.amount.toLocaleString()}</span>
+                  <span className="font-semibold">{cur(record)} {line.amount.toLocaleString()}</span>
                 </div>
               ))}
               <div className="flex justify-between text-gray-600 mt-2 border-t border-gray-200 pt-1">
                 <span>Tax relief:</span>
-                <span className="font-semibold">KSh -2400</span>
+                <span className="font-semibold">{cur(record)} -2400</span>
               </div>
             </div>
           </div>
@@ -277,15 +282,15 @@ export const PayslipDocument = ({ record, companyInfo, id }: { record: any; comp
         <div className="border border-gray-300 p-4 mb-8 bg-gray-50">
           <div className="flex justify-between border-b border-gray-300 pb-2 mb-2 text-sm text-black">
             <span className="font-bold">Gross pay</span>
-            <span className="font-bold">KSh {(record.gross_pay || 0).toLocaleString()}</span>
+            <span className="font-bold">{cur(record)} {(record.gross_pay || 0).toLocaleString()}</span>
           </div>
           <div className="flex justify-between border-b border-gray-300 pb-2 mb-3 text-sm text-black">
             <span className="font-bold">Total deductions</span>
-            <span className="font-bold">KSh {(record.total_deductions || 0).toLocaleString()}</span>
+            <span className="font-bold">{cur(record)} {(record.total_deductions || 0).toLocaleString()}</span>
           </div>
           <div className="flex justify-between items-center text-lg text-black mt-2">
             <span className="font-bold">{netPayLabel(record)}</span>
-            <span className="font-bold border-b-[3px] border-gray-400 border-double pb-0.5">KSh {Math.round(record.net_pay || 0).toLocaleString()}</span>
+            <span className="font-bold border-b-[3px] border-gray-400 border-double pb-0.5">{cur(record)} {Math.round(record.net_pay || 0).toLocaleString()}</span>
           </div>
         </div>
 

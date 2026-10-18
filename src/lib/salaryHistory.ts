@@ -59,6 +59,9 @@ export interface SalaryHistoryRecord {
     arrears_note?: string | null;
     worker_kind?: string | null;
     work_settlement?: boolean;
+    /** the payslip's country and currency (FIG-905): its employee's branch's when worked out */
+    country?: string;
+    currency?: string;
     payment_method?: string;
     bank_name?: string;
     account_number?: string;

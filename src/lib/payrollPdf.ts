@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 // the table plugin is called directly: since jspdf-autotable 5 importing it no longer adds doc.autoTable
 import { autoTable } from 'jspdf-autotable';
 import { payslipOvertimePay, round2 } from './overtimePay';
+import { currencyOf, currencySymbol } from './payroll/currency';
 
 // The month's payroll register as a PDF (A4 landscape): one row per payslip with the statutory columns, and the
 // totals at the foot. Built from the rows the payroll page already shows, so it matches the screen. The last column
@@ -40,6 +41,9 @@ export interface PayrollRegisterRow {
   arrears_brought_forward?: number | null;
   arrears_carried_forward?: number | null;
   work_settlement?: boolean | null;
+  /** the payslip's country and currency (FIG-905); Kenya / KES when not given */
+  country?: string | null;
+  currency?: string | null;
 }
 
 export const REGISTER_COLUMNS = [
@@ -99,17 +103,43 @@ export function registerFigures(rows: PayrollRegisterRow[]) {
   return { columns, lines, totals };
 }
 
-/** The register as a jsPDF document. */
+/**
+ * The register's rows by country (FIG-905), Kenya first: each country is its own table with its own subtotal in its
+ * own currency, never added to another country's.
+ */
+export function registerByCountry(rows: PayrollRegisterRow[]) {
+  const groups = new Map<string, { country: string; currency: string; rows: PayrollRegisterRow[] }>();
+  for (const r of rows) {
+    const country = String(r.country || '').trim() || 'Kenya';
+    const currency = currencyOf(r);
+    const key = `${country}|${currency}`;
+    const g = groups.get(key) ?? { country, currency, rows: [] };
+    g.rows.push(r);
+    groups.set(key, g);
+  }
+  return [...groups.values()]
+    .sort((a, b) => (a.country === 'Kenya' ? -1 : b.country === 'Kenya' ? 1 : a.country.localeCompare(b.country)))
+    .map((g) => ({ ...g, ...registerFigures(g.rows) }));
+}
+
+/** The register as a jsPDF document: one table per country, each with its subtotal in its currency. */
 export function payrollRegisterPdf(rows: PayrollRegisterRow[], { periodLabel, companyName }: { periodLabel: string; companyName?: string | null }) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-  const { columns, lines, totals } = registerFigures(rows);
+  const groups = registerByCountry(rows);
+  const several = groups.length > 1;
+  const currencies = [...new Set(groups.map((g) => g.currency))];
 
   doc.setFontSize(14);
   doc.text(`Payroll register: ${periodLabel}`, 40, 40);
   doc.setFontSize(9);
   doc.setTextColor(100);
   doc.text(
-    [companyName, `${lines.length} ${lines.length === 1 ? 'employee' : 'employees'}`, `Generated ${new Date().toLocaleDateString('en-KE')}`, 'Amounts in KSh']
+    [
+      companyName,
+      `${rows.length} ${rows.length === 1 ? 'employee' : 'employees'}`,
+      `Generated ${new Date().toLocaleDateString('en-KE')}`,
+      currencies.length === 1 ? `Amounts in ${currencySymbol(currencies[0] ?? 'KES')}` : 'Amounts in each country’s currency',
+    ]
       .filter(Boolean)
       .join('    '),
     40,
@@ -117,25 +147,35 @@ export function payrollRegisterPdf(rows: PayrollRegisterRow[], { periodLabel, co
   );
   doc.setTextColor(0);
 
-  autoTable(doc, {
-    startY: 70,
-    head: [[...columns]],
-    body: lines.map((l) => [l.number, l.name, l.department, ...l.amounts.map(money)]),
-    foot: [['', 'Total', '', ...totals.map(money)]],
-    showFoot: 'lastPage',
-    styles: { fontSize: columns.length > REGISTER_COLUMNS.length ? 6 : 7, cellPadding: columns.length > REGISTER_COLUMNS.length ? 2 : 3 },
-    headStyles: { fillColor: [31, 41, 55] },
-    footStyles: { fillColor: [243, 244, 246], textColor: [17, 24, 39], fontStyle: 'bold' },
-    columnStyles: Object.fromEntries(columns.slice(3).map((_, i) => [i + 3, { halign: 'right' }])),
-    margin: { left: 40, right: 40 },
-    didDrawPage: () => {
-      const page = doc.getNumberOfPages();
-      doc.setFontSize(7);
-      doc.setTextColor(120);
-      doc.text(`Page ${page}`, doc.internal.pageSize.getWidth() - 70, doc.internal.pageSize.getHeight() - 20);
-      doc.setTextColor(0);
-    },
-  });
+  let startY = 70;
+  for (const g of groups.length ? groups : [{ country: 'Kenya', currency: 'KES', rows: [], ...registerFigures([]) }]) {
+    const { columns, lines, totals } = g;
+    if (several) {
+      doc.setFontSize(11);
+      doc.text(`${g.country} (${g.currency}): ${lines.length} ${lines.length === 1 ? 'employee' : 'employees'}`, 40, startY + 4);
+      startY += 14;
+    }
+    autoTable(doc, {
+      startY,
+      head: [[...columns]],
+      body: lines.map((l) => [l.number, l.name, l.department, ...l.amounts.map(money)]),
+      foot: [['', several ? `${g.country} total (${currencySymbol(g.currency)})` : 'Total', '', ...totals.map(money)]],
+      showFoot: 'lastPage',
+      styles: { fontSize: columns.length > REGISTER_COLUMNS.length ? 6 : 7, cellPadding: columns.length > REGISTER_COLUMNS.length ? 2 : 3 },
+      headStyles: { fillColor: [31, 41, 55] },
+      footStyles: { fillColor: [243, 244, 246], textColor: [17, 24, 39], fontStyle: 'bold' },
+      columnStyles: Object.fromEntries(columns.slice(3).map((_, i) => [i + 3, { halign: 'right' }])),
+      margin: { left: 40, right: 40 },
+      didDrawPage: () => {
+        const page = doc.getNumberOfPages();
+        doc.setFontSize(7);
+        doc.setTextColor(120);
+        doc.text(`Page ${page}`, doc.internal.pageSize.getWidth() - 70, doc.internal.pageSize.getHeight() - 20);
+        doc.setTextColor(0);
+      },
+    });
+    startY = ((doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ?? startY) + 24;
+  }
   return doc;
 }
 

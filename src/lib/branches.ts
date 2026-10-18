@@ -2,8 +2,8 @@ import { supabase } from './supabase';
 
 /**
  * The company's branches (FIG-905, see 20261020500000_branches.sql): an office in a country. Every employee belongs to
- * one (employees.branch_id; none means the default branch). Holidays and the minimum wage follow the branch's country;
- * payroll per country comes later.
+ * one (employees.branch_id; none means the default branch). Holidays, the minimum wage and payroll follow the branch's
+ * country (payroll: lib/payroll, one engine per country).
  */
 export interface Branch {
   id: string;
@@ -18,9 +18,6 @@ export interface Branch {
 
 /** The countries offered when setting up a branch ("Other" lets HR type one). */
 export const BRANCH_COUNTRIES = ['Kenya', 'Tanzania', 'Uganda', 'Rwanda'] as const;
-
-/** Countries whose payroll is worked out with their own rules. Everyone else is paid with Kenya's rules for now. */
-export const PAYROLL_COUNTRIES = ['Kenya'];
 
 /** The usual currency of a country, as the database fills it in (country_currency). */
 export function currencyFor(country: string | null | undefined): string {
@@ -106,22 +103,6 @@ export function headcountByBranch(people: { branch: string }[], branches: Branch
   return n;
 }
 
-/** True when payslips for this country are worked out with another country's (Kenya's) rules for now. */
-export const paidWithKenyaRules = (country: string | null | undefined): boolean =>
-  !!country && !PAYROLL_COUNTRIES.some((c) => c.toLowerCase() === country.trim().toLowerCase());
-
 /** An employee record's branch (its branch_id, else its "Branch" name, else the default branch). */
 export const employeeBranch = (e: Record<string, unknown>, branches: Branch[]): Branch | undefined =>
   branchOf({ branchId: (e.branch_id as string | null) ?? null, branchName: (e.Branch as string | null) ?? null }, branches);
-
-/** The employees whose payslips are worked out with Kenya's rules for now (their branch is in another country), by country. */
-export function paidWithKenyaRulesByCountry(employees: Record<string, unknown>[], branches: Branch[]): Map<string, string[]> {
-  const out = new Map<string, string[]>();
-  for (const e of employees) {
-    const b = employeeBranch(e, branches);
-    if (!b || !paidWithKenyaRules(b.country)) continue;
-    const number = String(e['Employee Number'] ?? '').trim();
-    if (number) out.set(b.country, [...(out.get(b.country) || []), number]);
-  }
-  return out;
-}

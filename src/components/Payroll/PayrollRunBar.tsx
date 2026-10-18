@@ -25,6 +25,11 @@ interface PayrollRunBarProps {
   onReopen: () => void;
   onMarkPaid: () => void;
   onDiscard: () => void;
+  /**
+   * One run for every country (FIG-905): how many countries are ready to approve (Approve approves them all), and
+   * whether some countries are still drafts or already approved while others are not. Left out: one country, as before.
+   */
+  countries?: { ready: number; draft: boolean; approved: boolean; summary?: string };
 }
 
 const actionClass =
@@ -44,7 +49,12 @@ export default function PayrollRunBar({
   onReopen,
   onMarkPaid,
   onDiscard,
+  countries,
 }: PayrollRunBarProps) {
+  // with countries in different states the buttons follow the countries: drafts can be approved while others are
+  // approved and can be paid
+  const draftActions = countries ? !!run && countries.draft : run?.status === 'draft';
+  const approvedActions = countries ? !!run && countries.approved : run?.status === 'approved';
   let pill: { label: string; tone: StatusTone } = { label: 'Not started', tone: 'neutral' };
   let message = `Payroll for ${periodLabel} hasn't been started. The figures below are a preview from current employee details.`;
   if (loading) {
@@ -71,6 +81,7 @@ export default function PayrollRunBar({
           <span className="text-xs font-bold text-ink whitespace-nowrap">Payroll {periodLabel}</span>
           <StatusPill label={pill.label} tone={pill.tone} />
           <span className="text-[11.5px] text-muted-foreground w-full sm:w-auto">{message}</span>
+          {countries?.summary && <span className="text-[11.5px] text-ink w-full" data-testid="run-bar-summary">{countries.summary}</span>}
         </div>
 
         {!loading && (
@@ -82,7 +93,7 @@ export default function PayrollRunBar({
                 Start payroll run
               </button>
             )}
-            {run?.status === 'draft' && (
+            {draftActions && (
               <>
                 <button type="button" className={secondary} onClick={onDiscard} disabled={busy}>
                   <Trash2 className="w-3.5 h-3.5" />
@@ -92,13 +103,19 @@ export default function PayrollRunBar({
                   <RefreshCw className="w-3.5 h-3.5" />
                   Recalculate
                 </button>
-                <button type="button" className={primary} onClick={onApprove} disabled={busy}>
+                <button
+                  type="button"
+                  className={primary}
+                  onClick={onApprove}
+                  disabled={busy || (countries !== undefined && countries.ready === 0)}
+                  title={countries !== undefined && countries.ready === 0 ? 'No country is ready to approve: see By country' : undefined}
+                >
                   <CheckCircle className="w-3.5 h-3.5" />
                   Approve payroll
                 </button>
               </>
             )}
-            {run?.status === 'approved' && (
+            {approvedActions && (
               <>
                 <button type="button" className={secondary} onClick={onReopen} disabled={busy}>
                   <RotateCcw className="w-3.5 h-3.5" />

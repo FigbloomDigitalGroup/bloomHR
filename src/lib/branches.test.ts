@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { branchOf, currencyFor, headcountByBranch, paidWithKenyaRules, paidWithKenyaRulesByCountry, type Branch } from './branches';
+import { branchOf, currencyFor, employeeBranch, headcountByBranch, type Branch } from './branches';
 import { holidaysForCountry, withCountryTags } from './upcoming';
 
 const b = (id: string, name: string, country: string, is_default = false): Branch =>
@@ -24,19 +24,10 @@ describe('branches', () => {
     expect(Object.fromEntries(n)).toEqual({ kla: 2, hq: 1 });
   });
 
-  it('flags staff outside Kenya as paid with Kenya rules for now', () => {
-    expect(paidWithKenyaRules('Kenya')).toBe(false);
-    expect(paidWithKenyaRules('Tanzania')).toBe(true);
-    const byCountry = paidWithKenyaRulesByCountry(
-      [
-        { 'Employee Number': 'E1', branch_id: 'dar' },
-        { 'Employee Number': 'E2', Branch: 'Kampala' },
-        { 'Employee Number': 'E3' },
-        { 'Employee Number': 'E4', branch_id: 'dar' },
-      ],
-      branches
-    );
-    expect(Object.fromEntries(byCountry)).toEqual({ Tanzania: ['E1', 'E4'], Uganda: ['E2'] });
+  it("finds an employee's branch by id, then by name, else the default", () => {
+    expect(employeeBranch({ branch_id: 'dar' }, branches)?.country).toBe('Tanzania');
+    expect(employeeBranch({ Branch: 'Kampala' }, branches)?.country).toBe('Uganda');
+    expect(employeeBranch({}, branches)?.is_default).toBe(true);
   });
 });
 

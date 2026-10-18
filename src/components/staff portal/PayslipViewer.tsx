@@ -31,6 +31,7 @@ import DownloadP9 from '../Payroll/DownloadP9';
 import { loadMyP9 } from '../../lib/p9';
 import { loadCompanyIdentity, type CompanyIdentity } from '../../lib/companyProfile';
 import { useBackToClose } from '../../hooks/useBackToClose';
+import { currencyOf, currencySymbol } from '../../lib/payroll/currency';
 import { PayslipSettlementBlock, WhtDeductionLine, WorkEarningLines, netPayLabel } from '../Payroll/PayslipSettlement';
 
 // HARDCODED STATUTORY SETTINGS - Updated to match payroll dashboard
@@ -156,7 +157,7 @@ const savedPayslipValues = (saved: Record<string, any>) => {
 // Saved payslips (salary_history rows, which carry run_id) are shown as saved. Only older records from
 // payroll_records are still worked out here, with the same calculation the payroll page used.
 const calculatePayrollValues = (employee, overrideStatutoryChecks = true, salaryAdvances = [], payPeriod = null) => {
-  if (employee.run_id !== undefined) return savedPayslipValues(employee);
+  if (employee.run_id !== undefined) return { ...savedPayslipValues(employee), currency: currencyOf(employee), sym: currencySymbol(currencyOf(employee)) };
 
   const basicSalary = parseFloat(employee["Basic Salary"] || employee.basic_salary || 0);
   const houseAllowance = parseFloat(employee["House Allowance"] || employee.house_allowance || 0);
@@ -296,6 +297,9 @@ const calculatePayrollValues = (employee, overrideStatutoryChecks = true, salary
   const netPay = grossPay - totalDeductions;
 
   return {
+    // the payslip's own currency (FIG-905): KSh, TSh, USh
+    currency: currencyOf(employee),
+    sym: currencySymbol(currencyOf(employee)),
     basicSalary,
     houseAllowance,
     transportAllowance,
@@ -540,43 +544,43 @@ const PayslipModal = ({
                 <div className="border border-gray-300">
                   <div className="bg-gray-100 border-b border-gray-300 font-bold p-3 text-gray-900">Earnings</div>
                   <div className="p-3 space-y-2 text-black">
-                    <div className="flex justify-between"><span>Basic</span><span className="font-semibold">KSh {calculated.basicSalary.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>Basic</span><span className="font-semibold">{calculated.sym} {calculated.basicSalary.toLocaleString()}</span></div>
                     {calculated.leaveLines.map((line, i) => (
-                      <div key={`leave-${line.name}-${i}`} className="flex justify-between gap-3"><span>{leaveLineLabel(line)}<span className="block text-gray-500 text-xs">{leaveLineWorking(line)}</span></span><span className="font-semibold text-red-700 whitespace-nowrap">−KSh {line.amount.toLocaleString()}</span></div>
+                      <div key={`leave-${line.name}-${i}`} className="flex justify-between gap-3"><span>{leaveLineLabel(line)}<span className="block text-gray-500 text-xs">{leaveLineWorking(line)}</span></span><span className="font-semibold text-red-700 whitespace-nowrap">−{calculated.sym} {line.amount.toLocaleString()}</span></div>
                     ))}
-                    <div className="flex justify-between"><span>House</span><span className="font-semibold">KSh {calculated.houseAllowance.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Transport</span><span className="font-semibold">KSh {calculated.transportAllowance.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Medical</span><span className="font-semibold">KSh {calculated.medicalAllowance.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Other</span><span className="font-semibold">KSh {calculated.otherAllowances.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>House</span><span className="font-semibold">{calculated.sym} {calculated.houseAllowance.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>Transport</span><span className="font-semibold">{calculated.sym} {calculated.transportAllowance.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>Medical</span><span className="font-semibold">{calculated.sym} {calculated.medicalAllowance.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>Other</span><span className="font-semibold">{calculated.sym} {calculated.otherAllowances.toLocaleString()}</span></div>
                     {calculated.overtimeLines.length > 0 ? (
                       calculated.overtimeLines.map((line, i) => (
-                        <div key={`overtime-${line.day_type}-${i}`} className="flex justify-between gap-3"><span>{overtimeLineLabel(line)}<span className="block text-gray-500 text-xs">{overtimeLineWorking(line)}</span></span><span className="font-semibold whitespace-nowrap">KSh {line.amount.toLocaleString()}</span></div>
+                        <div key={`overtime-${line.day_type}-${i}`} className="flex justify-between gap-3"><span>{overtimeLineLabel(line)}<span className="block text-gray-500 text-xs">{overtimeLineWorking(line)}</span></span><span className="font-semibold whitespace-nowrap">{calculated.sym} {line.amount.toLocaleString()}</span></div>
                       ))
                     ) : (
-                      <div className="flex justify-between"><span>Overtime</span><span className="font-semibold">KSh {calculated.overtimePay.toLocaleString()}</span></div>
+                      <div className="flex justify-between"><span>Overtime</span><span className="font-semibold">{calculated.sym} {calculated.overtimePay.toLocaleString()}</span></div>
                     )}
                     {calculated.earningLines.map((line, i) => (
-                      <div key={`${line.name}-${i}`} className="flex justify-between"><span>{line.name}{line.taxable ? '' : ' (not taxed)'}</span><span className="font-semibold">KSh {line.amount.toLocaleString()}</span></div>
+                      <div key={`${line.name}-${i}`} className="flex justify-between"><span>{line.name}{line.taxable ? '' : ' (not taxed)'}</span><span className="font-semibold">{calculated.sym} {line.amount.toLocaleString()}</span></div>
                     ))}
                     {/* the month's piece rate work and contract jobs (FIG-812) */}
                     <WorkEarningLines record={record} />
-                    <div className="flex justify-between bg-gray-50 p-1 border border-gray-200 mt-2"><span>Per diem</span><span className="font-bold">KSh {calculated.perDiem.toLocaleString()}</span></div>
+                    <div className="flex justify-between bg-gray-50 p-1 border border-gray-200 mt-2"><span>Per diem</span><span className="font-bold">{calculated.sym} {calculated.perDiem.toLocaleString()}</span></div>
                   </div>
                 </div>
 
                 <div className="border border-gray-300">
                   <div className="bg-gray-100 border-b border-gray-300 font-bold p-3 text-gray-900">Deductions</div>
                   <div className="p-3 space-y-2 text-black">
-                    <div className="flex justify-between"><span>PAYE</span><span className="font-semibold">KSh {Math.round(calculated.payeTax).toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>SHIF</span><span className="font-semibold">KSh {calculated.nhifDeduction.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>NSSF</span><span className="font-semibold">KSh {calculated.nssfDeduction.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>AHL</span><span className="font-semibold">KSh {calculated.housingLevy.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>PAYE</span><span className="font-semibold">{calculated.sym} {Math.round(calculated.payeTax).toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>SHIF</span><span className="font-semibold">{calculated.sym} {calculated.nhifDeduction.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>NSSF</span><span className="font-semibold">{calculated.sym} {calculated.nssfDeduction.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>AHL</span><span className="font-semibold">{calculated.sym} {calculated.housingLevy.toLocaleString()}</span></div>
                     <WhtDeductionLine record={record} />
-                    <div className="flex justify-between"><span>Advance</span><span className="font-semibold">KSh {calculated.advanceDeduction.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>Advance</span><span className="font-semibold">{calculated.sym} {calculated.advanceDeduction.toLocaleString()}</span></div>
                     {calculated.deductionLines.map((line, i) => (
-                      <div key={`${line.name}-${i}`} className="flex justify-between"><span>{line.name}</span><span className="font-semibold">KSh {line.amount.toLocaleString()}</span></div>
+                      <div key={`${line.name}-${i}`} className="flex justify-between"><span>{line.name}</span><span className="font-semibold">{calculated.sym} {line.amount.toLocaleString()}</span></div>
                     ))}
-                    <div className="flex justify-between text-gray-600 mt-2 border-t border-gray-200 pt-1"><span>Tax relief:</span><span className="font-semibold">KSh -2400</span></div>
+                    <div className="flex justify-between text-gray-600 mt-2 border-t border-gray-200 pt-1"><span>Tax relief:</span><span className="font-semibold">{calculated.sym} -2400</span></div>
                   </div>
                 </div>
               </div>
@@ -586,15 +590,15 @@ const PayslipModal = ({
               <div className="border border-gray-300 p-4 mb-8 bg-gray-50">
                 <div className="flex justify-between border-b border-gray-300 pb-2 mb-2 text-sm text-black">
                   <span className="font-bold">Gross pay</span>
-                  <span className="font-bold">KSh {calculated.grossPay.toLocaleString()}</span>
+                  <span className="font-bold">{calculated.sym} {calculated.grossPay.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between border-b border-gray-300 pb-2 mb-3 text-sm text-black">
                   <span className="font-bold">Total deductions</span>
-                  <span className="font-bold">KSh {calculated.totalDeductions.toLocaleString()}</span>
+                  <span className="font-bold">{calculated.sym} {calculated.totalDeductions.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center text-lg text-black mt-2">
                   <span className="font-bold">{netPayLabel(record)}</span>
-                  <span className="font-bold border-b-[3px] border-gray-400 border-double pb-0.5">KSh {Math.round(calculated.netPay).toLocaleString()}</span>
+                  <span className="font-bold border-b-[3px] border-gray-400 border-double pb-0.5">{calculated.sym} {Math.round(calculated.netPay).toLocaleString()}</span>
                 </div>
               </div>
 
@@ -1022,15 +1026,15 @@ const PayslipViewer = () => {
                   <dl className="grid grid-cols-3 gap-2">
                     <div className="min-w-0">
                       <dt className="text-gray-500">Gross</dt>
-                      <dd className="font-bold text-status-success break-words">KSh {calculated.grossPay.toLocaleString()}</dd>
+                      <dd className="font-bold text-status-success break-words">{calculated.sym} {calculated.grossPay.toLocaleString()}</dd>
                     </div>
                     <div className="min-w-0">
                       <dt className="text-gray-500">Deductions</dt>
-                      <dd className="font-bold text-status-danger break-words">KSh {calculated.totalDeductions.toLocaleString()}</dd>
+                      <dd className="font-bold text-status-danger break-words">{calculated.sym} {calculated.totalDeductions.toLocaleString()}</dd>
                     </div>
                     <div className="min-w-0">
                       <dt className="text-gray-500">Net pay</dt>
-                      <dd className="font-bold text-status-success break-words">KSh {Math.round(calculated.netPay).toLocaleString()}</dd>
+                      <dd className="font-bold text-status-success break-words">{calculated.sym} {Math.round(calculated.netPay).toLocaleString()}</dd>
                     </div>
                   </dl>
                 </li>
@@ -1099,31 +1103,31 @@ const PayslipViewer = () => {
                           </div>
                         </td>
                         <td className="px-4 py-4 text-right font-bold text-status-success">
-                          KSh {calculated.grossPay.toLocaleString()}
+                          {calculated.sym} {calculated.grossPay.toLocaleString()}
                         </td>
                         <td className="px-4 py-4 text-right font-bold text-orange-text-alt">
-                          KSh {calculated.perDiem.toLocaleString()}
+                          {calculated.sym} {calculated.perDiem.toLocaleString()}
                         </td>
                         <td className="px-4 py-4 text-right text-status-danger">
-                          KSh {Math.round(calculated.payeTax).toLocaleString()}
+                          {calculated.sym} {Math.round(calculated.payeTax).toLocaleString()}
                         </td>
                         <td className="px-4 py-4 text-right text-status-purple">
-                          KSh {calculated.nhifDeduction.toLocaleString()}
+                          {calculated.sym} {calculated.nhifDeduction.toLocaleString()}
                         </td>
                         <td className="px-4 py-4 text-right text-status-info">
-                          KSh {calculated.nssfDeduction.toLocaleString()}
+                          {calculated.sym} {calculated.nssfDeduction.toLocaleString()}
                         </td>
                         <td className="px-4 py-4 text-right text-orange-text-alt">
-                          KSh {calculated.housingLevy.toLocaleString()}
+                          {calculated.sym} {calculated.housingLevy.toLocaleString()}
                         </td>
                         <td className="px-4 py-4 text-right text-orange">
-                          KSh {calculated.advanceDeduction.toLocaleString()}
+                          {calculated.sym} {calculated.advanceDeduction.toLocaleString()}
                         </td>
                         <td className="px-4 py-4 text-right font-bold text-status-danger">
-                          KSh {calculated.totalDeductions.toLocaleString()}
+                          {calculated.sym} {calculated.totalDeductions.toLocaleString()}
                         </td>
                         <td className="px-4 py-4 text-right font-bold text-status-success">
-                          KSh {Math.round(calculated.netPay).toLocaleString()}
+                          {calculated.sym} {Math.round(calculated.netPay).toLocaleString()}
                         </td>
                         <td className="sticky right-0 z-10 bg-white px-4 py-4 text-center">
                           <GlowButton
@@ -1145,38 +1149,38 @@ const PayslipViewer = () => {
                                 <h4 className="font-medium text-gray-900">Earnings</h4>
                                 <div className="flex justify-between">
                                   <span>Basic Salary:</span>
-                                  <span>KSh {calculated.basicSalary.toLocaleString()}</span>
+                                  <span>{calculated.sym} {calculated.basicSalary.toLocaleString()}</span>
                                 </div>
                                 {calculated.leaveLines.map((line, i) => (
                                   <div key={`leave-${line.name}-${i}`} className="flex justify-between">
                                     <span>{leaveLineLabel(line)}:</span>
-                                    <span className="text-status-danger">−KSh {line.amount.toLocaleString()}</span>
+                                    <span className="text-status-danger">−{calculated.sym} {line.amount.toLocaleString()}</span>
                                   </div>
                                 ))}
                                 <div className="flex justify-between">
                                   <span>House Allowance:</span>
-                                  <span>KSh {calculated.houseAllowance.toLocaleString()}</span>
+                                  <span>{calculated.sym} {calculated.houseAllowance.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span>Transport Allowance:</span>
-                                  <span>KSh {calculated.transportAllowance.toLocaleString()}</span>
+                                  <span>{calculated.sym} {calculated.transportAllowance.toLocaleString()}</span>
                                 </div>
                                 {calculated.overtimeLines.length > 0 ? (
                                   calculated.overtimeLines.map((line, i) => (
                                     <div key={`overtime-${line.day_type}-${i}`} className="flex justify-between">
                                       <span>{overtimeLineLabel(line)}:</span>
-                                      <span>KSh {line.amount.toLocaleString()}</span>
+                                      <span>{calculated.sym} {line.amount.toLocaleString()}</span>
                                     </div>
                                   ))
                                 ) : (
                                   <div className="flex justify-between">
                                     <span>Overtime Pay:</span>
-                                    <span>KSh {calculated.overtimePay.toLocaleString()}</span>
+                                    <span>{calculated.sym} {calculated.overtimePay.toLocaleString()}</span>
                                   </div>
                                 )}
                                 <div className="flex justify-between font-bold bg-orange-tint-alt p-1">
                                   <span>Per Diem:</span>
-                                  <span>KSh {calculated.perDiem.toLocaleString()}</span>
+                                  <span>{calculated.sym} {calculated.perDiem.toLocaleString()}</span>
                                 </div>
                               </div>
 
@@ -1184,19 +1188,19 @@ const PayslipViewer = () => {
                                 <h4 className="font-medium text-gray-900">Statutory Deductions</h4>
                                 <div className="flex justify-between">
                                   <span>PAYE:</span>
-                                  <span className="text-status-danger">KSh {Math.round(calculated.payeTax).toLocaleString()}</span>
+                                  <span className="text-status-danger">{calculated.sym} {Math.round(calculated.payeTax).toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span>SHIF:</span>
-                                  <span className="text-status-danger">KSh {calculated.nhifDeduction.toLocaleString()}</span>
+                                  <span className="text-status-danger">{calculated.sym} {calculated.nhifDeduction.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span>NSSF:</span>
-                                  <span className="text-status-danger">KSh {calculated.nssfDeduction.toLocaleString()}</span>
+                                  <span className="text-status-danger">{calculated.sym} {calculated.nssfDeduction.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span>Housing Levy:</span>
-                                  <span className="text-status-danger">KSh {calculated.housingLevy.toLocaleString()}</span>
+                                  <span className="text-status-danger">{calculated.sym} {calculated.housingLevy.toLocaleString()}</span>
                                 </div>
                                 {Number((payslip as Record<string, unknown>).nita_levy) > 0 && (
                                   <div className="flex justify-between text-gray-500">
@@ -1210,21 +1214,21 @@ const PayslipViewer = () => {
                                 <h4 className="font-medium text-gray-900">Other Deductions</h4>
                                 <div className="flex justify-between">
                                   <span>Advance Deduction:</span>
-                                  <span className="text-status-danger">KSh {calculated.advanceDeduction.toLocaleString()}</span>
+                                  <span className="text-status-danger">{calculated.sym} {calculated.advanceDeduction.toLocaleString()}</span>
                                 </div>
                                 {calculated.deductionLines.map((line, i) => (
                                   <div key={`${line.name}-${i}`} className="flex justify-between">
                                     <span>{line.name}:</span>
-                                    <span className="text-status-danger">KSh {line.amount.toLocaleString()}</span>
+                                    <span className="text-status-danger">{calculated.sym} {line.amount.toLocaleString()}</span>
                                   </div>
                                 ))}
                                 <div className="flex justify-between text-status-success">
                                   <span>Tax Relief:</span>
-                                  <span>KSh -{calculated.taxRelief.toLocaleString()}</span>
+                                  <span>{calculated.sym} -{calculated.taxRelief.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between font-medium">
                                   <span>Total Deductions:</span>
-                                  <span className="text-status-danger">KSh {calculated.totalDeductions.toLocaleString()}</span>
+                                  <span className="text-status-danger">{calculated.sym} {calculated.totalDeductions.toLocaleString()}</span>
                                 </div>
                               </div>
                             </div>
