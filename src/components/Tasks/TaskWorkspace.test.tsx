@@ -16,6 +16,16 @@ const api = vi.hoisted(() => ({
   loadAttachments: vi.fn(),
   taskConcernsMe: vi.fn(),
 }));
+// the signed-in person's modules (usePermissions); "Manage projects" is task-projects
+const perms = vi.hoisted(() => ({ modules: [] as string[] }));
+vi.mock('../../hooks/usePermissions', () => ({
+  usePermissions: () => ({
+    permissions: perms.modules,
+    hasPermission: (m: string) => perms.modules.includes(m),
+    loading: false,
+    userRole: 'STAFF',
+  }),
+}));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../../lib/tasksApi', () => api);
 vi.mock('../../hooks/useEmployeeDirectory', () => ({
@@ -44,7 +54,8 @@ const SALES: TaskProject = { id: 'p2', key: 'SAL', name: 'Sales', description: n
 
 beforeEach(() => {
   for (const f of Object.values(api)) f.mockReset();
-  api.loadTaskViewer.mockResolvedValue({ userId: 'u-mo', employeeNumber: 'E-MO', manages: false });
+  perms.modules = ['dashboard', 'task-manager'];
+  api.loadTaskViewer.mockResolvedValue({ userId: 'u-mo', employeeNumber: 'E-MO' });
   api.loadProjects.mockResolvedValue([OPS, SALES]);
   api.loadProjectMembers.mockResolvedValue({ p1: ['E-MO'] });
   api.loadTasks.mockResolvedValue([
@@ -89,9 +100,66 @@ describe('TaskWorkspace (staff)', () => {
   });
 });
 
+describe('TaskWorkspace (staff with "Manage projects")', () => {
+  it('staff without it see no project-management controls', async () => {
+    render(<TaskWorkspace mode="staff" />);
+    await screen.findByText('Mine to do');
+    expect(screen.queryByRole('button', { name: /New project/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Labels/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Recurring/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Edit Operations/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /New task/ })).toBeTruthy();
+  });
+
+  it('staff with it get New project, Labels, Recurring, project settings and every project', async () => {
+    perms.modules = ['dashboard', 'task-manager', 'task-projects'];
+    api.loadProjects.mockResolvedValue([OPS, SALES, { ...OPS, id: 'p3', key: 'FIN', name: 'Finance', department_id: null }]);
+    render(<TaskWorkspace mode="staff" />);
+    await screen.findByText('Mine to do');
+    expect(screen.getByRole('button', { name: /New project/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Labels/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Recurring/ })).toBeTruthy();
+    // every project, including one they are not in, with its settings
+    expect(screen.getByRole('button', { name: /^FIN Finance/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Edit Finance' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /New project/ }));
+    expect(await screen.findByRole('dialog')).toBeTruthy();
+  });
+
+  it('they may add a task to any project, for a department, a job title or several people', async () => {
+    perms.modules = ['task-projects'];
+    render(<TaskWorkspace mode="staff" />);
+    await screen.findByText('Mine to do');
+    fireEvent.keyDown(window, { key: 'c' });
+    const dialog = await screen.findByRole('dialog', { name: 'New task' });
+    const options = within(dialog).getByLabelText('Project').querySelectorAll('option');
+    expect([...options].map((o) => o.textContent)).toEqual(['Operations (OPS)', 'Sales (SAL)']);
+    expect(within(dialog).getByLabelText(/A department/)).toBeTruthy();
+    expect(within(dialog).getByLabelText(/A job title/)).toBeTruthy();
+    expect(within(dialog).getByLabelText(/Several people/)).toBeTruthy();
+  });
+
+  it('a supervisor’s team view stays without them', async () => {
+    perms.modules = ['task-projects'];
+    render(<TaskWorkspace mode="staff" teamNumbers={['E-RITA']} />);
+    await screen.findByText('Rita’s task');
+    expect(screen.queryByRole('button', { name: /New project/ })).toBeNull();
+  });
+});
+
 describe('TaskWorkspace (admin)', () => {
+  it('a role without "Manage projects" (unticked by the company) gets no project-management controls', async () => {
+    perms.modules = ['task-manager'];
+    api.loadTaskViewer.mockResolvedValue({ userId: 'u-mgr', employeeNumber: 'E-MGR', oversees: false });
+    render(<TaskWorkspace mode="admin" />);
+    await screen.findByText(/You see tasks you're involved in/);
+    expect(screen.queryByRole('button', { name: /New project/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Recurring/ })).toBeNull();
+  });
+
   it('says who sees what, and a manager outside a project is told they only see the tasks they are involved in', async () => {
-    api.loadTaskViewer.mockResolvedValue({ userId: 'u-mgr', employeeNumber: 'E-MGR', manages: true, oversees: false });
+    perms.modules = ['task-manager', 'task-projects'];
+    api.loadTaskViewer.mockResolvedValue({ userId: 'u-mgr', employeeNumber: 'E-MGR', oversees: false });
     render(<TaskWorkspace mode="admin" />);
     expect(await screen.findByText(/You see tasks you're involved in/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /All tasks/ })).toBeNull();
@@ -104,7 +172,8 @@ describe('TaskWorkspace (admin)', () => {
 
 describe('TaskWorkspace (HR and admins oversee)', () => {
   beforeEach(() => {
-    api.loadTaskViewer.mockResolvedValue({ userId: 'u-adm', employeeNumber: 'E-ADM', manages: true, oversees: true });
+    perms.modules = ['task-manager', 'task-projects'];
+    api.loadTaskViewer.mockResolvedValue({ userId: 'u-adm', employeeNumber: 'E-ADM', oversees: true });
     api.taskConcernsMe.mockResolvedValue(false);
   });
 
