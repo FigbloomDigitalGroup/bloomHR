@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { isPaidByMpesa, normalisePaymentMethod, paymentKind, paymentMethodLabel, paymentMethodOption } from './paymentMethods';
+import {
+  isKesPayslip, isPaidByMpesa, mpesaKenyaNote, normalisePaymentMethod, paymentKind, paymentMethodLabel, paymentMethodOption, splitForMpesaKenya,
+} from './paymentMethods';
 
 describe('normalisePaymentMethod', () => {
   it.each([
@@ -73,5 +75,32 @@ describe('isPaidByMpesa', () => {
       false,
       false,
     ]);
+  });
+});
+
+describe('M-Pesa Kenya pays KES payslips only', () => {
+  it('counts KES and payslips with no currency (saved before payslips had one) as KES', () => {
+    expect(isKesPayslip({ currency: 'KES' })).toBe(true);
+    expect(isKesPayslip({ currency: ' kes ' })).toBe(true);
+    expect(isKesPayslip({ currency: null })).toBe(true);
+    expect(isKesPayslip({})).toBe(true);
+    expect(isKesPayslip({ currency: 'TZS' })).toBe(false);
+    expect(isKesPayslip({ currency: 'UGX' })).toBe(false);
+    expect(isKesPayslip({ currency: 'USD' })).toBe(false);
+  });
+
+  it('splits payslips into the ones M-Pesa Kenya pays and the rest', () => {
+    const slips = [{ id: 1, currency: 'KES' }, { id: 2, currency: 'TZS' }, { id: 3 }, { id: 4, currency: 'USD' }];
+    const { kes, other } = splitForMpesaKenya(slips);
+    expect(kes.map((s) => s.id)).toEqual([1, 3]);
+    expect(other.map((s) => s.id)).toEqual([2, 4]);
+  });
+
+  it('says how many payslips are left out and in which currencies', () => {
+    expect(mpesaKenyaNote([{ currency: 'KES' }, {}])).toBeNull();
+    expect(mpesaKenyaNote([{ currency: 'USD' }, { currency: 'TZS' }, { currency: 'UGX' }, { currency: 'TZS' }])).toBe(
+      "4 payslips in TZS/UGX/USD aren't paid through M-Pesa Kenya. Use the bank or mobile money file for their currency."
+    );
+    expect(mpesaKenyaNote([{ currency: 'UGX' }])).toBe("1 payslip in UGX isn't paid through M-Pesa Kenya. Use the bank or mobile money file for its currency.");
   });
 });

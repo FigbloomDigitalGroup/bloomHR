@@ -2,6 +2,7 @@
 // the same when a batch is made) and the files finance uploads to the bank or M-Pesa. Nothing here moves money.
 import { addDays, weekStart } from './casualPay';
 import { equityFile, mpesaPhone, type ExportFile } from './payrollExports';
+import { isKesPayslip, mpesaKenyaNote } from './paymentMethods';
 import type { EmployeeRecord } from './profileCompleteness';
 
 export type PayoutKind = 'daily' | 'weekly' | 'job' | 'ad_hoc';
@@ -179,8 +180,16 @@ export function payoutBankFile(lines: PayoutLine[], batch: Pick<PayoutBatch, 'ki
 /** Safaricom's bulk (B2C) payment layout: phone as 2547XXXXXXXX, whole-shilling amount, name, reference. */
 export const PAYOUT_MPESA_HEADERS = ['Phone Number', 'Amount', 'Name', 'Reference'] as const;
 
-export function payoutMpesaFile(lines: PayoutLine[], batch: Pick<PayoutBatch, 'kind' | 'period_from' | 'period_to'>): ExportFile {
-  const ls = paying(lines, 'mobile');
+export function payoutMpesaFile(
+  lines: PayoutLine[],
+  batch: Pick<PayoutBatch, 'kind' | 'period_from' | 'period_to'> & Partial<Pick<PayoutBatch, 'currency'>>,
+): ExportFile {
+  const mobile = paying(lines, 'mobile');
+  // M-Pesa Kenya pays KES only: a TZS or UGX payout's mobile money goes by its own country's file
+  if (!isKesPayslip(batch)) {
+    return { headers: PAYOUT_MPESA_HEADERS, rows: [], problems: [], note: mpesaKenyaNote(mobile.map(() => batch)) ?? undefined };
+  }
+  const ls = mobile;
   const ref = payoutReference(batch);
   return {
     headers: PAYOUT_MPESA_HEADERS,

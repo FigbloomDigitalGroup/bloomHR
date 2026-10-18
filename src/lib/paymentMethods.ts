@@ -43,3 +43,33 @@ export const paymentKind = (value: unknown): PaymentKind => {
  * pays it by M-Pesa). Bank, cash and Airtel staff are paid another way; M-Pesa cannot pay an Airtel number.
  */
 export const isPaidByMpesa = (record: { payment_method?: unknown } | null | undefined) => paymentMethodLabel(record?.payment_method) === 'M-Pesa';
+
+/**
+ * Whether M-Pesa Kenya may pay this payslip: it pays Kenyan shillings only, so only KES payslips (no currency counts,
+ * as payslips saved before they had one are Kenya's). TZS, UGX and USD payslips go out by their own currency's bank or
+ * mobile money file. The server's M-Pesa route refuses any other currency too (mpesa.js).
+ */
+export const isKesPayslip = (record: { currency?: unknown } | null | undefined) => {
+  const c = text(record?.currency).toUpperCase();
+  return c === '' || c === 'KES';
+};
+
+/** The payslips M-Pesa Kenya may pay (KES) and the ones it must leave out (any other currency). */
+export function splitForMpesaKenya<T extends { currency?: unknown }>(records: readonly T[]): { kes: T[]; other: T[] } {
+  const kes: T[] = [];
+  const other: T[] = [];
+  for (const r of records) (isKesPayslip(r) ? kes : other).push(r);
+  return { kes, other };
+}
+
+/**
+ * "2 payslips in TZS/USD aren't paid through M-Pesa Kenya. Use the bank or mobile money file for their currency.",
+ * or null when every payslip is in KES.
+ */
+export function mpesaKenyaNote(records: readonly { currency?: unknown }[]): string | null {
+  const other = records.filter((r) => !isKesPayslip(r));
+  if (other.length === 0) return null;
+  const currencies = [...new Set(other.map((r) => text(r.currency).toUpperCase()))].sort();
+  const one = other.length === 1;
+  return `${other.length} ${one ? 'payslip' : 'payslips'} in ${currencies.join('/')} ${one ? "isn't" : "aren't"} paid through M-Pesa Kenya. Use the bank or mobile money file for ${one ? 'its' : 'their'} currency.`;
+}

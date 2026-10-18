@@ -134,6 +134,32 @@ describe('bulk payment files', () => {
     expect(bankFile([payslip('E1', { payment_method: 'Cash' })], [amina], '2026-10').rows).toEqual([]);
   });
 
+  it('M-Pesa Kenya: only KES payslips; TZS, UGX and USD ones are left out with a note', () => {
+    const others = [
+      { ...juma, 'Employee Number': 'T1' },
+      { ...juma, 'Employee Number': 'U1' },
+      { ...juma, 'Employee Number': 'D1' },
+    ];
+    const file = mpesaFile(
+      [payslip('E2', { net_pay: 30000 }), payslip('T1', { currency: 'TZS' }), payslip('U1', { currency: 'UGX' }), payslip('D1', { currency: 'USD' })],
+      [juma, ...others],
+      '2026-10'
+    );
+    expect(file.rows.map((r) => r[2])).toEqual(['30000.00']);
+    expect(file.note).toBe("3 payslips in TZS/UGX/USD aren't paid through M-Pesa Kenya. Use the bank or mobile money file for their currency.");
+    // KES and old payslips with no currency are paid as before, with no note
+    const kes = mpesaFile([payslip('E2', { currency: 'KES' }), payslip('E2', { currency: null })], [juma], '2026-10');
+    expect(kes.rows).toHaveLength(2);
+    expect(kes).not.toHaveProperty('note');
+  });
+
+  it('Equity Eazzy Biz: only KES payslips, with a note on the M-Pesa ones left out', () => {
+    const file = equityFile([payslip('E1'), payslip('E2', { currency: 'TZS' })], [amina, juma], '1234567890');
+    expect(file.rows).toHaveLength(1);
+    expect(file.rows[0][3]).toBe('Amina Wanjiru');
+    expect(file.note).toBe("1 payslip in TZS isn't paid through M-Pesa Kenya. Use the bank or mobile money file for its currency.");
+  });
+
   it('flags a missing M-Pesa number or bank account', () => {
     expect(mpesaFile([payslip('E2')], [{ ...juma, 'Mobile Number': '12' }], '2026-10').problems[0].missing).toEqual(['M-Pesa number']);
     expect(bankFile([payslip('E1')], [{ ...amina, 'Account Number': '' }], '2026-10').problems[0].missing).toEqual(['Account number']);

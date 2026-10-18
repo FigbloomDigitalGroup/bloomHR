@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { AlertTriangle, CheckCircle2, Loader, Wallet } from 'lucide-react';
 import { Modal } from '../UI';
 import { type DemoChannel, type DemoPayLine, totalNet } from '../../lib/demoPayments';
+import { isKesPayslip, mpesaKenyaNote } from '../../lib/paymentMethods';
 
 // Pretend paying for sales demos (PAYMENTS_DEMO in lib/inAppPayments): "Pay all employees" and the per-person "Pay"
 // on an approved month. Everything happens in the page's memory: nothing is saved, nothing is sent, no money moves.
@@ -61,7 +62,10 @@ export function DemoPayAllDialog({ open, onClose, periodLabel, lines, onPaid, on
   useEffect(() => () => clearTimeout(timer.current), []);
 
   const payable = useMemo(() => lines.filter((l) => l.problems.length === 0), [lines]);
-  const failing = useMemo(() => lines.filter((l) => l.problems.length > 0), [lines]);
+  // M-Pesa lines in TZS, UGX or USD: never paid through M-Pesa Kenya, so skipped with a note (fixing details won't help)
+  const otherCurrency = useMemo(() => lines.filter((l) => l.channel === 'M-Pesa' && !isKesPayslip(l)), [lines]);
+  const otherCurrencyNote = useMemo(() => mpesaKenyaNote(otherCurrency), [otherCurrency]);
+  const failing = useMemo(() => lines.filter((l) => l.problems.length > 0 && !otherCurrency.includes(l)), [lines, otherCurrency]);
   const byChannel = useMemo(
     () => CHANNELS.map((c) => ({ channel: c, lines: lines.filter((l) => l.channel === c) })).filter((c) => c.lines.length > 0),
     [lines],
@@ -107,6 +111,12 @@ export function DemoPayAllDialog({ open, onClose, periodLabel, lines, onPaid, on
                 ))}
               </ul>
             </div>
+
+            {otherCurrencyNote && (
+              <p role="note" className="rounded-xl bg-secondary p-3 text-xs text-ink">
+                {otherCurrencyNote}
+              </p>
+            )}
 
             {failing.length > 0 && (
               <div className="rounded-xl bg-orange-tint-alt p-3 space-y-2">

@@ -3,6 +3,7 @@ import { Smartphone, Users, CheckSquare, Square, Send, Search } from 'lucide-rea
 import { supabase } from '../../lib/supabase';
 import { IN_LIST_SIZE, chunks } from '../../lib/fetchAll';
 import toast from 'react-hot-toast';
+import { isKesPayslip, mpesaKenyaNote } from '../../lib/paymentMethods';
 
 // Format phone number for M-Pesa (254 format)
 const formatPhoneNumber = (phone) => {
@@ -336,6 +337,12 @@ const MpesaPaymentComponent = ({ payrollRecords }) => {
 
   // Process single M-PESA payment
   const processSingleMpesaPayment = async (employee) => {
+    // M-Pesa Kenya pays KES payslips only (the server refuses any other currency too)
+    if (!isKesPayslip(employee)) {
+      const note = mpesaKenyaNote([employee]) as string;
+      toast.error(note);
+      throw new Error(note);
+    }
     try {
       const phoneNumber = employeePhoneNumbers[employee.employee_id];
       if (!phoneNumber) {
@@ -355,7 +362,8 @@ const MpesaPaymentComponent = ({ payrollRecords }) => {
           phoneNumber: formattedPhone,
           amount: employee.net_pay,
           employeeNumber: employee.employee_id,
-          fullName: employee.employee_name
+          fullName: employee.employee_name,
+          currency: employee.currency || 'KES'
         }),
       });
 

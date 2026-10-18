@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Search, Smartphone, Send, Loader, CheckCircle, XCircle, X, Clock, Users, Eye, AlertTriangle, MessageSquare } from "lucide-react";
 import toast from "react-hot-toast";
 import { TableScroll } from "../UI";
-import { isPaidByMpesa, paymentMethodLabel } from "../../lib/paymentMethods";
+import { isKesPayslip, isPaidByMpesa, mpesaKenyaNote, paymentMethodLabel } from "../../lib/paymentMethods";
 
 // The in-app payment requests (maker-checker approval, M-Pesa single and bulk pay), moved from PayrollDashboard.
 // Only reachable while in-app paying is on (lib/inAppPayments).
@@ -565,8 +565,14 @@ export const MpesaSinglePaymentModal = ({
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [justification, setJustification] = useState("");
+  // a TZS, UGX or USD payslip is never paid through M-Pesa Kenya
+  const otherCurrencyNote = employee ? mpesaKenyaNote([employee]) : null;
 
   const handlePayment = async () => {
+    if (otherCurrencyNote) {
+      toast.error(otherCurrencyNote);
+      return;
+    }
     if (userRole === "maker" && !justification.trim()) {
       toast.error("Please provide a justification for this payment request");
       return;
@@ -611,6 +617,11 @@ export const MpesaSinglePaymentModal = ({
               Amount: KSh {employee.net_pay?.toLocaleString()}
             </p>
           </div>
+          {otherCurrencyNote && (
+            <p role="note" className="mt-2 text-xs text-red-600">
+              {otherCurrencyNote}
+            </p>
+          )}
         </div>
 
         {userRole === "maker" && (
@@ -654,7 +665,7 @@ export const MpesaSinglePaymentModal = ({
             onClick={handlePayment}
             className="px-4 py-2 text-xs font-medium text-white bg-primary rounded-md hover:bg-primary/90 flex items-center gap-2"
             disabled={
-              isProcessing || (userRole === "maker" && !justification.trim())
+              isProcessing || Boolean(otherCurrencyNote) || (userRole === "maker" && !justification.trim())
             }
           >
             {isProcessing ? (
@@ -677,7 +688,7 @@ export const MpesaSinglePaymentModal = ({
 
 // M-PESA Bulk Payment Modal
 /** The parts of a payroll record that decide whether M-Pesa may pay it. */
-export type PayRecipient = { employee_name?: string; payment_method?: unknown };
+export type PayRecipient = { employee_name?: string; payment_method?: unknown; currency?: unknown };
 
 export const MpesaBulkPaymentModal = ({
   isOpen,
@@ -697,8 +708,10 @@ export const MpesaBulkPaymentModal = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [justification, setJustification] = useState("");
 
-  // M-Pesa can only pay staff paid by M-Pesa: bank, cash and Airtel staff are left out of the list
-  const payable = useMemo(() => allEmployees.filter(isPaidByMpesa), [allEmployees]);
+  // M-Pesa can only pay staff paid by M-Pesa: bank, cash and Airtel staff are left out of the list, and so are
+  // payslips in TZS, UGX or USD (M-Pesa Kenya pays KES only)
+  const payable = useMemo(() => allEmployees.filter((emp) => isPaidByMpesa(emp) && isKesPayslip(emp)), [allEmployees]);
+  const otherCurrencyNote = useMemo(() => mpesaKenyaNote(allEmployees.filter(isPaidByMpesa)), [allEmployees]);
   const notPayable = useMemo(() => {
     const counts = new Map<string, number>();
     allEmployees
@@ -802,6 +815,12 @@ export const MpesaBulkPaymentModal = ({
             <p className="mt-2 text-xs text-gray-600">
               Not included (not paid by M-Pesa):{" "}
               {notPayable.map(([method, count]) => `${count} ${method}`).join(", ")}.
+            </p>
+          )}
+
+          {otherCurrencyNote && (
+            <p role="note" className="mt-2 text-xs text-gray-600">
+              {otherCurrencyNote}
             </p>
           )}
 

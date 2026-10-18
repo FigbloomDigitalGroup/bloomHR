@@ -141,3 +141,48 @@ describe('DemoPayButton', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('M-Pesa Kenya pays KES payslips only (demo)', () => {
+  // Juma (E2) is paid by M-Pesa: his KES payslip is paid, a TZS, UGX or USD one never is
+  const others = (currency: string) => demoPayLines([{ employee_id: 'E2', employee_name: 'Juma Wanjiru', net_pay: 30000, currency }], EMPLOYEES)[0];
+
+  it('leaves a TZS, UGX or USD M-Pesa payslip unpaid', () => {
+    for (const currency of ['TZS', 'UGX', 'USD']) {
+      expect(others(currency).problems).toEqual([`Payslip is in ${currency}: M-Pesa Kenya pays KES only`]);
+    }
+    expect(others('KES').problems).toEqual([]);
+    expect(lines()[1].problems).toEqual([]);
+  });
+
+  it('skips them in "Pay all employees" with a note, and pays the KES ones', () => {
+    const onPaid = vi.fn();
+    const mixed = demoPayLines(
+      [
+        { employee_id: 'E2', employee_name: 'Juma Wanjiru', net_pay: 30000 },
+        { employee_id: 'E2', employee_name: 'Juma TZ', net_pay: 30000, currency: 'TZS' },
+        { employee_id: 'E2', employee_name: 'Juma UG', net_pay: 30000, currency: 'UGX' },
+        { employee_id: 'E2', employee_name: 'Juma US', net_pay: 300, currency: 'USD' },
+      ],
+      EMPLOYEES,
+    );
+    render(<DemoPayAllDialog open onClose={() => {}} periodLabel="October 2026" lines={mixed} onPaid={onPaid} onFixDetails={() => {}} />);
+    expect(screen.getByRole('note').textContent).toBe(
+      "3 payslips in TZS/UGX/USD aren't paid through M-Pesa Kenya. Use the bank or mobile money file for their currency."
+    );
+    // not listed as details to fix: fixing details won't help
+    expect(screen.queryByText(/can't be paid until their details are fixed/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Pay 1 employee/ }));
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(onPaid).toHaveBeenCalledWith(['E2']);
+  });
+
+  it('the per-person Pay refuses a TZS M-Pesa payslip', () => {
+    const onPaid = vi.fn();
+    render(<DemoPayButton line={others('TZS')} paid={false} onPaid={onPaid} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Pay' }));
+    expect(screen.getByRole('alert').textContent).toBe("Juma Wanjiru can't be paid: Payslip is in TZS: M-Pesa Kenya pays KES only");
+    expect(onPaid).not.toHaveBeenCalled();
+  });
+});
