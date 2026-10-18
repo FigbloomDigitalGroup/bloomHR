@@ -58,6 +58,7 @@ const LoansAdmin = lazy(() => import('./components/Loans/LoansAdmin'));
 const CasualWorkers = lazy(() => import('./components/Casual/CasualWorkers'));
 const LeaveDisciplinePage = lazy(() => import('./components/LeaveDiscipline/LeaveDisciplinePage'));
 const OvertimePage = lazy(() => import('./components/Overtime/OvertimePage'));
+const PieceRatePage = lazy(() => import('./components/PieceRate/PieceRatePage'));
 const IncidentReportsManagement = lazy(() => import('./components/Settings/IncidentReportsManagement'));
 const WarningModule = lazy(() => import('./components/Warning/StaffCheck'));
 const BaseReport = lazy(() => import('./components/Reports/BaseReport'));
@@ -1195,6 +1196,15 @@ function App() {
                                   element={
                                     <AuthRoute>
                                       <LeaveDisciplinePage />
+                                    </AuthRoute>
+                                  }
+                                />
+                                {/* piece rate and contract jobs: payroll, and supervisors for their team (the database decides) */}
+                                <Route
+                                  path="/piece-rate"
+                                  element={
+                                    <AuthRoute>
+                                      <PieceRatePage />
                                     </AuthRoute>
                                   }
                                 />

@@ -17,12 +17,14 @@ const kpi = vi.hoisted(() => ({
 const ot = vi.hoisted(() => ({ loadOvertimePeople: vi.fn(), loadWaitingOvertime: vi.fn(), loadOvertime: vi.fn() }));
 const cas = vi.hoisted(() => ({ loadCasuals: vi.fn(), loadDays: vi.fn() }));
 const appr = vi.hoisted(() => ({ loadLeaveAwaitingMe: vi.fn(), loadApprovalChains: vi.fn() }));
+const work = vi.hoisted(() => ({ loadWorkPeople: vi.fn() }));
 
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../../lib/kpiApi', async (orig) => ({ ...(await orig<typeof import('../../lib/kpiApi')>()), ...kpi }));
 vi.mock('../../lib/overtimeApi', async (orig) => ({ ...(await orig<typeof import('../../lib/overtimeApi')>()), ...ot }));
 vi.mock('../../lib/casualApi', async (orig) => ({ ...(await orig<typeof import('../../lib/casualApi')>()), ...cas }));
 vi.mock('../../lib/approvals', async (orig) => ({ ...(await orig<typeof import('../../lib/approvals')>()), ...appr }));
+vi.mock('../../lib/pieceRateApi', async (orig) => ({ ...(await orig<typeof import('../../lib/pieceRateApi')>()), ...work }));
 
 import MyTeam from './MyTeam';
 
@@ -42,7 +44,7 @@ const row = (over: Partial<KpiAssignment>): KpiAssignment => ({
 });
 
 beforeEach(() => {
-  for (const f of [...Object.values(kpi), ...Object.values(ot), ...Object.values(cas), ...Object.values(appr)]) f.mockReset();
+  for (const f of [...Object.values(kpi), ...Object.values(ot), ...Object.values(cas), ...Object.values(appr), ...Object.values(work)]) f.mockReset();
   kpi.loadKpiAccess.mockResolvedValue({ manages: false, employeeNumber: 'LEAD', team: ['E1', 'E2'] });
   kpi.loadKpis.mockResolvedValue([CALLS]);
   kpi.loadPeriods.mockResolvedValue([Q4]);
@@ -56,6 +58,7 @@ beforeEach(() => {
   cas.loadDays.mockResolvedValue([]);
   appr.loadLeaveAwaitingMe.mockResolvedValue([]);
   appr.loadApprovalChains.mockResolvedValue({});
+  work.loadWorkPeople.mockResolvedValue([]);
 });
 afterEach(() => cleanup());
 
