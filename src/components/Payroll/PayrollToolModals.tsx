@@ -1,5 +1,6 @@
 import { payslipCountry } from "../../lib/payroll/multiCountry";
 import { currencyOf } from "../../lib/payroll/currency";
+import { fxExportColumns } from "../../lib/payroll/usdPay";
 import { useState, useEffect } from "react";
 import EmployeePicker from '../UI/EmployeePicker';
 import { FileText, Download, Calendar, FileSpreadsheet } from "lucide-react";
@@ -218,6 +219,8 @@ export const ExportModal = ({
           "Net Pay": Math.round(record.net_pay),
           // the employer's NITA training levy: an employer cost, not taken from pay (FIG-898)
           "NITA Levy (Employer)": Number(record.nita_levy) || 0,
+          // paid in USD (FIG-906): the month's rate and the local statutory figures (blank for local currency)
+          ...fxExportColumns(record),
           "Pay Period": record.pay_period,
         })),
       );
@@ -284,6 +287,8 @@ export const ExportModal = ({
           "Arrears Carried Forward": Number(record.arrears_carried_forward) || 0,
           "Net Pay": Math.round(record.net_pay),
           "NITA Levy (Employer)": Number(record.nita_levy) || 0,
+          // paid in USD (FIG-906): the month's rate and the local statutory figures (blank for local currency)
+          ...fxExportColumns(record),
           "Pay Period": record.pay_period,
         })),
       );

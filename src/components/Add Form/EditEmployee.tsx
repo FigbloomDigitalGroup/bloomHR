@@ -17,6 +17,8 @@ import SearchableDropdown from '../UI/SearchableDropdown';
 import DepartmentPicker from '../UI/DepartmentPicker';
 import BranchPicker from '../UI/BranchPicker';
 import { useBranches } from '../../hooks/useBranches';
+import { usePayCurrencies } from '../../hooks/usePayCurrencies';
+import { payCurrencyOf } from '../../lib/payroll/usdPay';
 import { employeeBranch } from '../../lib/branches';
 import { tidyCountry } from '../../lib/payroll/countries';
 import { fieldProblem, taxNumberLabel, taxNumberPlaceholder } from '../../lib/onboardingValidation';
@@ -126,6 +128,9 @@ const EditEmployeePage = () => {
   const { branches: companyBranches } = useBranches();
   const payrollCountry = tidyCountry(employeeBranch(employee as Record<string, unknown>, companyBranches)?.country) || 'Kenya';
   const inTanzania = payrollCountry === 'Tanzania';
+  // the currency the employee is paid in (FIG-906): their country's, or USD when the company pays it in USD
+  const { payCurrencies } = usePayCurrencies();
+  const payCurrency = payCurrencyOf(payrollCountry, payCurrencies);
   const numberLabel = (name: string) => (name === 'Tax PIN' ? `Tax PIN (${taxNumberLabel(payrollCountry)})` : name);
   const reportsToNumber = directory.find((e) => e.id && e.id === employee.reports_to_id)?.employeeNumber || '';
   const [loading, setLoading] = useState(true);
@@ -1318,7 +1323,7 @@ const EditEmployeePage = () => {
                     )}
                     {setsBasicSalary && (
                       <FormField
-                        label="Basic Salary"
+                        label={`Basic Salary (${payCurrency})`}
                         name="Basic Salary"
                         type="number"
                         value={employee['Basic Salary'] ? String(employee['Basic Salary']) : ''}
@@ -1347,6 +1352,7 @@ const EditEmployeePage = () => {
                     onChange={(field, value) => setEmployee(prev => ({ ...prev, [field]: value }))}
                     disabled={!isEditMode}
                     locked={lockedPayFields(jobGroups, employee as Record<string, unknown>)}
+                    currency={payCurrency}
                   />
                 </div>
               )}

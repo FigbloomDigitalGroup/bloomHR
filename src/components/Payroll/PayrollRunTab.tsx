@@ -40,6 +40,8 @@ import type { CountryReadiness, CurrencyTotals } from "../../lib/payroll/multiCo
 import { payslipCountry } from "../../lib/payroll/multiCountry";
 import { currencyOf, moneyRounded } from "../../lib/payroll/currency";
 import { countryPayslipLines } from "../../lib/payroll/countries";
+import { localPayslip } from "../../lib/payroll/usdPay";
+import LocalStatutorySection from "./LocalStatutorySection";
 
 // The Run tab: the month's payroll run (start, recalculate, approve, mark paid), the returns check, and the list of
 // employees on the payroll with their pay. The figures are worked out by PayrollDashboard; this only shows them.
@@ -123,6 +125,8 @@ interface PayrollRunTabProps {
   itemsPerPage: number;
   /** "Email payslips" for an approved month (EmailPayslipsPanel, FIG-732) */
   payslipEmails?: React.ReactNode;
+  /** "USD rate for Kenya this month", for countries paid in USD (UsdRatePanel, FIG-906) */
+  usdRates?: React.ReactNode;
   /** pretend paying for demos (lib/inAppPayments PAYMENTS_DEMO) */
   demoPay: {
     /** the Pay buttons show (demo mode is on) */
@@ -210,6 +214,10 @@ function PayBreakdown({ record }: { record: any }) {
       <div className="sm:col-span-3 empty:hidden">
         <PayslipSettlementBlock record={record} compact />
       </div>
+      {/* paid in USD (FIG-906): the statutory figures in the local currency, as filed */}
+      <div className="sm:col-span-3 empty:hidden">
+        <LocalStatutorySection record={record} compact />
+      </div>
     </div>
   );
 }
@@ -282,6 +290,7 @@ export default function PayrollRunTab({
   handlePageChange,
   itemsPerPage,
   payslipEmails,
+  usdRates,
   demoPay,
 }: PayrollRunTabProps) {
   const approved = monthRun?.status === "approved" || monthRun?.status === "paid";
@@ -428,13 +437,15 @@ export default function PayrollRunTab({
       />
 
       {(!monthRun || monthRun.status === "draft") && <ReturnsReadiness employees={returnsEmployees ?? onPayroll} />}
+      {(!monthRun || monthRun.status !== "paid") && usdRates}
       {readiness && countryActions && (
         <CountryReadinessPanel readiness={readiness} runStarted={!!monthRun} busy={runBusy} actions={countryActions} />
       )}
       {/* a warning before approval, never a block (FIG-812 stage 6) */}
       {!approved && payPeriod && (
         <MinimumWageWarning
-          payslips={payrollRecords ?? finalFilteredRecords}
+          // the minimum wage is the local currency's: a USD payslip is checked on its local figures (FIG-906)
+          payslips={(payrollRecords ?? finalFilteredRecords).map(localPayslip)}
           employees={onPayroll}
           payPeriod={payPeriod}
           periodLabel={periodLabel}

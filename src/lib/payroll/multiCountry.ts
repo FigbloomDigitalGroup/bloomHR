@@ -8,6 +8,7 @@ import { type CountryPayrollEngine, type EmployeeProblem, type PayslipRecord, en
 import { currencyOf, moneyShort } from './currency';
 import { tanzaniaMobileMoneyFile } from './countries/tanzania';
 import { ugandaMobileMoneyFile } from './countries/uganda';
+import { type PayCurrencies, USD, calculateInUsd, localPayslip, payCurrencyOf, rateText, usdBankFile } from './usdPay';
 
 // One payroll run for every country (FIG-905 stage 2): "run like they're one country but in the backend they're
 // different". The admin presses Run payroll and Approve once; behind that each employee is worked out by their
@@ -19,6 +20,10 @@ import { ugandaMobileMoneyFile } from './countries/uganda';
 // are in on the period's last day. A draft payslip saved before they moved is flagged ("moved branch: recalculate")
 // and holds its country back until it is recalculated. Once a country is approved its payslips are locked; a move
 // after that takes effect from the next month.
+//
+// FIG-906: a country can be paid in USD (company_pay_currencies) at the rate the company enters for the month
+// (payroll_fx_rates). Its engine still works in the local currency (lib/payroll/usdPay); its payslips are in USD with
+// the local statutory figures kept for the returns. A USD country without this month's rate is held back.
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- employee rows and payslips are the untyped rows the payroll page uses */
 type Employee = Record<string, any>;
@@ -41,6 +46,8 @@ const num = (v: unknown) => {
 };
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 const sameCountry = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+const nameOf = (e: Employee) =>
+  [e['First Name'], e['Middle Name'], e['Last Name']].map(text).filter(Boolean).join(' ') || text(e['Employee Number']);
 
 /** Kenya first (the company's home country so far), then the others by name. */
 export const countryOrder = (a: string, b: string) => (a === 'Kenya' ? -1 : b === 'Kenya' ? 1 : a.localeCompare(b));
@@ -57,25 +64,29 @@ export interface CountryGroup {
   engine: CountryPayrollEngine | null;
   /** the currency the country's branches pay in (the engine's when they agree) */
   currency: string;
+  /** the currency its payslips are in: the local one, or USD when the company pays the country in USD (FIG-906) */
+  payCurrency: string;
   employees: Employee[];
   /** branches in this country whose currency is not the one the country's payroll is worked out in */
   currencyMismatches: { branch: string; currency: string }[];
 }
 
 /** The employees on the payroll by country, each with its engine (null: not supported yet). */
-export function groupByCountry(employees: Employee[], branches: Branch[]): CountryGroup[] {
+export function groupByCountry(employees: Employee[], branches: Branch[], payCurrencies?: PayCurrencies | null): CountryGroup[] {
   const groups = new Map<string, CountryGroup>();
   for (const e of employees) {
     const { country, currency, branch } = payrollCountryOf(e, branches);
     let g = groups.get(country);
     if (!g) {
       const engine = engineFor(country);
-      g = { country, engine, currency: engine?.currency ?? currency, employees: [], currencyMismatches: [] };
+      const local = engine?.currency ?? currency;
+      g = { country, engine, currency: local, payCurrency: engine ? payCurrencyOf(country, payCurrencies, local) : local, employees: [], currencyMismatches: [] };
       groups.set(country, g);
     }
     g.employees.push(e);
-    // a branch paying in another currency than its country's payroll is worked out in: blocked, never converted
-    if (g.engine && currency !== g.engine.currency && !g.currencyMismatches.some((m) => m.branch === (branch?.name ?? ''))) {
+    // a branch paying in another currency than its country's payroll is worked out in: blocked, never converted (a
+    // branch set to USD in a country the company pays in USD is fine)
+    if (g.engine && currency !== g.engine.currency && currency !== g.payCurrency && !g.currencyMismatches.some((m) => m.branch === (branch?.name ?? ''))) {
       g.currencyMismatches.push({ branch: branch?.name ?? country, currency });
     }
   }
@@ -86,8 +97,11 @@ export function groupByCountry(employees: Employee[], branches: Branch[]): Count
 export const missingRatesFor = (engine: CountryPayrollEngine, rates: Rates | null | undefined) =>
   engine.requiredRates.filter((code) => !rates || rates[code] === null || rates[code] === undefined);
 
-/** Why a country's payslips can't be worked out at all (no engine, mismatched currency, no rates), or null. */
-export function cannotCalculate(group: CountryGroup, rates: Rates | null | undefined): string | null {
+/** "Enter this month's USD rate for Kenya" */
+export const usdRateMissing = (country: string) => `Enter this month's USD rate for ${country}`;
+
+/** Why a country's payslips can't be worked out at all (no engine, mismatched currency, no rates, no USD rate), or null. */
+export function cannotCalculate(group: CountryGroup, rates: Rates | null | undefined, fxRate?: number | null): string | null {
   if (!group.engine) return waitingLabel(group.country);
   if (group.currencyMismatches.length) {
     const m = group.currencyMismatches[0];
@@ -96,7 +110,24 @@ export function cannotCalculate(group: CountryGroup, rates: Rates | null | undef
   if (rates === undefined) return `Loading ${group.country} statutory rates`;
   const missing = missingRatesFor(group.engine, rates);
   if (missing.length) return `${group.country} has no statutory rates for this month: ${missing.join(', ')}. Add them on the Rates tab.`;
+  // paid in USD: nothing is worked out until the month's rate is confirmed (FIG-906)
+  if (group.payCurrency === USD && !(Number(fxRate) > 0)) return usdRateMissing(group.country);
   return null;
+}
+
+/** The pay currency per country and the month's confirmed USD rates (FIG-906); empty: everyone in local currency. */
+export interface UsdSetup {
+  payCurrencies?: PayCurrencies | null;
+  /** this month's rate per country, confirmed for the month (payroll_fx_rates): local currency per 1 USD */
+  fxRates?: Map<string, number> | null;
+}
+
+/** People in a USD-paid country who can't go on a USD payslip this month (piece rate work, contract jobs), and why. */
+export interface HeldBackPerson {
+  country: string;
+  employeeNumber: string;
+  name: string;
+  reason: string;
 }
 
 export interface RunCalculation {
@@ -104,6 +135,8 @@ export interface RunCalculation {
   records: PayslipRecord[];
   /** countries nobody worked out, with why and who */
   notCalculated: { country: string; reason: string; waiting: boolean; employees: Employee[] }[];
+  /** people in a USD-paid country left off the USD payslips (FIG-906): their country is held back */
+  heldBack: HeldBackPerson[];
 }
 
 /**
@@ -114,13 +147,16 @@ export interface RunCalculation {
 export function calculateRun(
   employees: Employee[],
   branches: Branch[],
-  ctxFor: (country: string) => PayslipContext | null
+  ctxFor: (country: string) => PayslipContext | null,
+  usd?: UsdSetup
 ): RunCalculation {
   const records: PayslipRecord[] = [];
   const notCalculated: RunCalculation['notCalculated'] = [];
-  for (const g of groupByCountry(employees, branches)) {
+  const heldBack: HeldBackPerson[] = [];
+  for (const g of groupByCountry(employees, branches, usd?.payCurrencies)) {
     const ctx = g.engine ? ctxFor(g.country) : null;
-    const reason = cannotCalculate(g, ctx ? ctx.rates : g.engine ? null : undefined);
+    const fxRate = usd?.fxRates?.get(g.country) ?? null;
+    const reason = cannotCalculate(g, ctx ? ctx.rates : g.engine ? null : undefined, fxRate);
     if (reason || !g.engine || !ctx) {
       notCalculated.push({ country: g.country, reason: reason ?? `${g.country} payroll can't be worked out yet`, waiting: !g.engine, employees: g.employees });
       continue;
@@ -128,11 +164,18 @@ export function calculateRun(
     // the country's headcount on the run (Tanzania's SDL applies from a number of employees)
     const countryCtx = { ...ctx, countryHeadcount: g.employees.length };
     for (const e of g.employees) {
+      if (g.payCurrency === USD && fxRate) {
+        // paid in USD: converted to local, worked out by the engine unchanged, back to USD (lib/payroll/usdPay)
+        const out = calculateInUsd(g.engine, e, countryCtx, fxRate);
+        if (out.record) records.push(out.record);
+        else heldBack.push({ country: g.country, employeeNumber: text(e['Employee Number']), name: nameOf(e), reason: out.heldBack });
+        continue;
+      }
       const r = g.engine.calculate({ employee: e, ctx: countryCtx });
       records.push({ ...r.record, country: g.engine.country, currency: g.engine.currency });
     }
   }
-  return { records, notCalculated };
+  return { records, notCalculated, heldBack };
 }
 
 /** A payslip's country (payslips saved before countries were recorded are Kenya's). */
@@ -201,14 +244,16 @@ export interface ReadinessInput {
   ratesByCountry: Map<string, Rates | null>;
   /** people paid below their country's minimum wage, by country (a warning, never a block) */
   belowMinimum?: Map<string, number>;
+  /** the pay currency per country and this month's confirmed USD rates (FIG-906) */
+  payCurrencies?: PayCurrencies | null;
+  fxRates?: Map<string, number> | null;
+  /** people a USD country couldn't put on its USD payslips (calculateRun's heldBack) */
+  heldBack?: HeldBackPerson[];
 }
-
-const nameOf = (e: Employee) =>
-  [e['First Name'], e['Middle Name'], e['Last Name']].map(text).filter(Boolean).join(' ') || text(e['Employee Number']);
 
 /** Before approval: per country, whether it is ready, waiting for its rules, or held back, and why. */
 export function countryReadiness(input: ReadinessInput): CountryReadiness[] {
-  const groups = groupByCountry(input.employees, input.branches);
+  const groups = groupByCountry(input.employees, input.branches, input.payCurrencies);
   const statusOf = new Map(input.runCountries.map((c) => [tidyCountry(c.country), c]));
   const slipsByCountry = new Map<string, PayslipRecord[]>();
   for (const p of input.payslips) {
@@ -224,7 +269,8 @@ export function countryReadiness(input: ReadinessInput): CountryReadiness[] {
     const engine = g?.engine ?? engineFor(country);
     const slips = slipsByCountry.get(country) ?? [];
     const run = statusOf.get(country);
-    const currency = engine?.currency ?? g?.currency ?? currencyFor(country);
+    const currency = g?.payCurrency ?? (engine ? payCurrencyOf(country, input.payCurrencies, engine.currency) : currencyFor(country));
+    const fxRate = input.fxRates?.get(country) ?? null;
     const totals = totalsByCurrency(slips).find((t) => t.currency === currency) ?? { currency, count: 0, gross: 0, deductions: 0, net: 0 };
     const blocking: string[] = [];
     const warnings: string[] = [];
@@ -243,8 +289,22 @@ export function countryReadiness(input: ReadinessInput): CountryReadiness[] {
     }
     if (!engine) return { ...base, state: 'waiting' as const, blocking: [waitingLabel(country)], warnings };
 
-    const reason = g ? cannotCalculate(g, input.ratesByCountry.has(country) ? input.ratesByCountry.get(country) : undefined) : null;
+    const reason = g ? cannotCalculate(g, input.ratesByCountry.has(country) ? input.ratesByCountry.get(country) : undefined, fxRate) : null;
     if (reason) blocking.push(reason);
+    // paid in USD (FIG-906): payslips worked out at another rate than this month's, and people who can't be paid in USD
+    if (currency === USD && fxRate) {
+      const stale = slips.filter((p) => currencyOf(p) === USD && Number(p.fx_rate) !== fxRate);
+      if (stale.length) {
+        blocking.push(`${stale.length} ${stale.length === 1 ? 'payslip was' : 'payslips were'} worked out at another USD rate than this month's ${rateText(fxRate, engine.currency)}: press Recalculate`);
+      }
+    }
+    const held = (input.heldBack ?? []).filter((h) => sameCountry(h.country, country));
+    if (held.length) {
+      const names = held.map((h) => h.name);
+      blocking.push(
+        `${names.slice(0, 5).join(', ')}${names.length > 5 ? ` and ${names.length - 5} more` : ''} ${held[0].reason}. Pay ${country} in ${engine.currency} this month, or settle that work outside the USD run.`
+      );
+    }
     if (input.runStarted && slips.length === 0 && (g?.employees.length ?? 0) > 0 && !reason) blocking.push('Not worked out yet: press Recalculate');
     // a draft payslip saved before its employee moved to another country's branch
     const moved = slips.filter((p) => {
@@ -308,9 +368,11 @@ export interface CountryFiles {
   currency: string;
   status: CountryRunStatus;
   payslips: PayslipRecord[];
-  /** the country's statutory returns (engine.returns()), only for its own staff */
+  /** the same payslips as the tax and social security bodies see them: in local currency (a USD payslip's local figures) */
+  statutoryPayslips: PayslipRecord[];
+  /** the country's statutory returns (engine.returns()), only for its own staff, always in local currency */
   returns: CountryFile[];
-  /** bank and mobile money files in the country's currency (the Equity file stays KES) */
+  /** bank and mobile money files in the currency the country is paid in (the Equity file stays KES; USD: by bank) */
   payments: CountryFile[];
 }
 
@@ -318,6 +380,10 @@ export interface CountryFiles {
 export function paymentFilesFor(currency: string, payslips: PayslipRecord[], employees: EmployeeRecord[], payPeriod: string, debitAccount: string): CountryFile[] {
   const own = payslips.filter((p) => currencyOf(p) === currency);
   const code = currency.toLowerCase();
+  if (currency === USD) {
+    // paid in USD (FIG-906): one bank file of USD net pay, apart from the local currency files
+    return [{ key: 'bank-usd', label: 'Bank bulk pay (USD)', name: 'bulk-pay-bank-usd', what: 'staff paid in USD, by bank', file: usdBankFile(own, employees, payPeriod) }];
+  }
   if (currency !== 'KES') {
     const bank = { key: `bank-${code}`, label: 'Bank bulk pay', name: `bulk-pay-bank-${code}`, what: `staff paid by bank, in ${currency}`, file: bankFile(own, employees, payPeriod) };
     // mobile money outside Kenya comes with each country's payroll: M-Pesa, Tigo Pesa and Airtel Money in Tanzania
@@ -355,19 +421,24 @@ export function filesByCountry(args: {
     const country = tidyCountry(rc.country);
     const engine = engineFor(country);
     const slips = args.payslips.filter((p) => sameCountry(payslipCountry(p), country));
-    const currency = engine?.currency ?? currencyOf(slips[0]);
+    // the currencies its payslips are in (one per month; USD for a country paid in USD), each with its payment files
+    const currencies = [...new Set(slips.map((p) => currencyOf(p)))];
+    const currency = currencies.length === 1 ? currencies[0] : engine?.currency ?? currencyOf(slips[0]);
     const rates = args.ratesByCountry.get(country) ?? {};
+    // returns are filed in local currency: a USD payslip's local statutory figures (FIG-906)
+    const statutory = slips.map((p) => localPayslip(p));
     out.push({
       country,
       currency,
       status: rc.status,
       payslips: slips,
+      statutoryPayslips: statutory,
       returns: (engine?.returns() ?? [])
-        .map((r) => ({ def: r, file: r.build(slips, args.employees, { payPeriod: args.payPeriod, rates }) }))
+        .map((r) => ({ def: r, file: r.build(statutory, args.employees, { payPeriod: args.payPeriod, rates }) }))
         // an optional return (the WHT return) only in a month it has rows
         .filter(({ def, file }) => !def.optional || file.rows.length > 0)
         .map(({ def, file }) => ({ key: def.key, label: def.label, name: def.name, what: def.what, authority: def.authority, file })),
-      payments: paymentFilesFor(currency, slips, args.employees, args.payPeriod, args.debitAccount),
+      payments: (currencies.length ? currencies : [currency]).flatMap((c) => paymentFilesFor(c, slips, args.employees, args.payPeriod, args.debitAccount)),
     });
   }
   return out;
@@ -376,11 +447,19 @@ export function filesByCountry(args: {
 // ---------------------------------------------------------------------------------------------
 // guards
 // ---------------------------------------------------------------------------------------------
-/** A payslip whose currency is not its country's payroll currency (blocked before saving, and by the database). */
-export function currencyMismatch(record: { country?: unknown; currency?: unknown; employee_name?: unknown; employee_id?: unknown }): string | null {
-  const engine = engineFor(payslipCountry(record));
-  if (!engine) return `${payslipCountry(record)} payroll isn't supported yet`;
-  return currencyOf(record) === engine.currency ? null : `${text(record.employee_name) || text(record.employee_id)}: ${payslipCountry(record)} payslips are in ${engine.currency}, not ${currencyOf(record)}`;
+/**
+ * A payslip whose currency is not the one its country is paid in (blocked before saving, and by the database): the
+ * country's own currency, or USD when the company pays the country in USD (FIG-906).
+ */
+export function currencyMismatch(
+  record: { country?: unknown; currency?: unknown; employee_name?: unknown; employee_id?: unknown },
+  payCurrencies?: PayCurrencies | null
+): string | null {
+  const country = payslipCountry(record);
+  const engine = engineFor(country);
+  if (!engine) return `${country} payroll isn't supported yet`;
+  const expected = payCurrencyOf(country, payCurrencies, engine.currency);
+  return currencyOf(record) === expected ? null : `${text(record.employee_name) || text(record.employee_id)}: ${country} payslips are in ${expected}, not ${currencyOf(record)}`;
 }
 
 /** Splits the month's payslips into what can still be saved (countries not yet approved) and what is locked. */
