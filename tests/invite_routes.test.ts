@@ -99,6 +99,8 @@ beforeEach(() => {
     { id: TENANT_A, name: 'Favor Farm' },
     { id: TENANT_B, name: 'Other Co' },
   ];
+  // HR holds "Invite people" by default (FIG-827); the server checks the module, not the role's name
+  state.role_permissions = [{ tenant_id: TENANT_A, role_name: 'HR', permissions: ['dashboard', 'invite-people'] }];
   state.invitations = [{ id: 'i1', tenant_id: TENANT_A, email: 'new.person@gmail.com', role: 'STAFF', status: 'pending', expires_at: future(), token_hash: sha(TOKEN) }];
 });
 
@@ -164,6 +166,12 @@ describe('POST /api/invites/send', () => {
     expect((await send('admin-a', {})).status).toBe(400);
     expect((await send('admin-a', { token: 'short' })).status).toBe(400);
     expect((await send('admin-a', { token: 'b'.repeat(64) })).status).toBe(404);
+  });
+
+  it('HR whose role had "Invite people" taken away cannot send any (the module decides, not the name)', async () => {
+    state.role_permissions = [{ tenant_id: TENANT_A, role_name: 'HR', permissions: ['dashboard'] }];
+    expect((await send('hr-a')).status).toBe(403);
+    expect(state.sends).toHaveLength(0);
   });
 
   it('lets HR send staff invitations but not others', async () => {
