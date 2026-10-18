@@ -4,6 +4,7 @@ import type { DeductionItem } from './voluntaryDeductions';
 import type { EarningItem } from './earnings';
 import type { LeaveItem } from './leavePay';
 import type { OvertimeItem } from './overtimePay';
+import type { WorkLine } from './workSettlement';
 
 export interface SalaryHistoryRecord {
     employee_id: string;
@@ -43,6 +44,21 @@ export interface SalaryHistoryRecord {
     /** overtime paid this month from approved entries (FIG-889), and its lines (one per kind of day) */
     overtime_pay?: number;
     overtime_items?: OvertimeItem[];
+    /** the month-end settlement of piece rate work and contract jobs (FIG-812, lib/workSettlement) */
+    work_pay?: number;
+    jobs_pay?: number;
+    work_items?: WorkLine[];
+    paid_out?: number;
+    ahl_withheld?: number;
+    reserve_released?: number;
+    wht_withheld?: number;
+    wht_rate?: number;
+    wht_tax?: number;
+    arrears_brought_forward?: number;
+    arrears_carried_forward?: number;
+    arrears_note?: string | null;
+    worker_kind?: string | null;
+    work_settlement?: boolean;
     payment_method?: string;
     bank_name?: string;
     account_number?: string;

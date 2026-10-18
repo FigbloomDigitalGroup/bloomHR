@@ -3,6 +3,7 @@ import { statutoryPayWith, summariseEarnings, type EarningItem } from './earning
 import { basicAfterLeave } from './leavePay';
 import type { DeductionItem } from './voluntaryDeductions';
 import { payslipOvertimePay } from './overtimePay';
+import { arrearsNote, isContractor, isContractorPayslip, isSettlementPayslip, settleMonth, whtOn, whtRateFor } from './workSettlement';
 
 /**
  * Edits to one payslip while its payroll run is a draft (FIG-883; table payslip_overrides). Pure: the database calls
@@ -53,6 +54,10 @@ export interface StatutoryContext {
   rates: Rates;
   inputs: Omit<StatutoryInput, 'cashPay' | 'apply'>;
   apply: NonNullable<StatutoryInput['apply']>;
+  /** a contractor: withholding tax at this rate instead of PAYE, NSSF, SHIF and AHL (FIG-812) */
+  wht?: { rate: number };
+  /** Employment Act s.19(3) two-thirds cap on a settlement payslip's deductions (default on) */
+  cap?: boolean;
 }
 
 /**
@@ -63,10 +68,22 @@ export const statutoryContextFor = (
   employee: Record<string, unknown> | undefined,
   rates: Rates | null | undefined,
   overrideStatutoryChecks: boolean,
+  cap = true,
 ): StatutoryContext => {
   const e = employee ?? {};
   const has = (...keys: string[]) => keys.some((k) => Boolean(e[k]));
+  // a contractor pays withholding tax instead (lib/workSettlement)
+  if (isContractor(e)) {
+    return {
+      rates: rates ?? {},
+      inputs: employeeInputs(e),
+      apply: { shif: false, nssf: false, ahl: false, paye: false },
+      wht: { rate: whtRateFor(e, rates ?? {}) },
+      cap,
+    };
+  }
   return {
+    cap,
     rates: rates ?? {},
     inputs: employeeInputs(e),
     apply: {
@@ -189,10 +206,23 @@ export function applyPayslipOverride<T extends Payslip>(record: T, override: Pay
 
   const oneOffDeductions = (o.one_off_deductions ?? []).map((d) => ({ name: d.label, amount: d.amount }));
   const otherDeductions = round2(num(record.other_deductions) + oneOffDeductions.reduce((s, d) => s + d.amount, 0));
+  // a contractor's withholding tax on the edited gross (FIG-812)
+  const whtTax = ctx.wht ? whtOn(grossPay, ctx.wht.rate) : 0;
   const totalDeductions = round2(
-    statutory.paye + statutory.shif + statutory.nssf + statutory.ahl +
+    statutory.paye + statutory.shif + statutory.nssf + statutory.ahl + whtTax +
       num(record.loan_deduction) + num(record.advance_deduction) + num(record.welfare_deduction) + otherDeductions,
   );
+  // a payslip settling a month of work: the balance after payouts and arrears, never below 0 (lib/workSettlement)
+  const settlement = isSettlementPayslip(record)
+    ? settleMonth({
+        grossPay,
+        totalDeductions,
+        statutory: statutory.paye + statutory.shif + statutory.nssf + statutory.ahl + whtTax,
+        paidOut: num(record.paid_out),
+        arrearsBroughtForward: num(record.arrears_brought_forward),
+        cap: ctx.cap !== false && !ctx.wht && !isContractorPayslip(record),
+      })
+    : null;
 
   Object.assign(next, {
     per_diem: perDiem,
@@ -205,9 +235,11 @@ export function applyPayslipOverride<T extends Payslip>(record: T, override: Pay
     deduction_items: [...deductionItemsOf(record), ...oneOffDeductions],
     other_deductions: otherDeductions,
     total_deductions: totalDeductions,
-    net_pay: round2(grossPay - totalDeductions),
+    net_pay: settlement ? settlement.netPay : round2(grossPay - totalDeductions),
     payslip_note: o.note ?? null,
   });
+  if (ctx.wht) Object.assign(next, { wht_rate: ctx.wht.rate, wht_tax: whtTax, tax_relief: 0 });
+  if (settlement) Object.assign(next, { arrears_carried_forward: settlement.carriedForward, arrears_note: arrearsNote(settlement) });
   return next as EditablePayslip<T>;
 }
 
@@ -236,14 +268,14 @@ export const EDITED_COLUMNS = [
   'basic_salary', 'house_allowance', 'transport_allowance', 'medical_allowance', 'other_allowances', 'overtime_hours',
   'overtime_rate', 'commission', 'bonus', 'per_diem', 'gross_pay', 'paye_tax', 'nhif_deduction', 'nssf_deduction',
   'housing_levy', 'tax_relief', 'other_deductions', 'total_deductions', 'net_pay', 'earning_items', 'deduction_items',
-  'payslip_note',
+  'payslip_note', 'wht_tax', 'arrears_carried_forward', 'arrears_note',
 ] as const;
 
 export const editedColumnsOf = (record: Payslip) =>
   Object.fromEntries(
     EDITED_COLUMNS.map((k) => [
       k,
-      k === 'earning_items' || k === 'deduction_items' ? (Array.isArray(record[k]) ? record[k] : []) : k === 'payslip_note' ? (record[k] || null) : num(record[k]),
+      k === 'earning_items' || k === 'deduction_items' ? (Array.isArray(record[k]) ? record[k] : []) : k === 'payslip_note' || k === 'arrears_note' ? (record[k] || null) : num(record[k]),
     ]),
   );
 

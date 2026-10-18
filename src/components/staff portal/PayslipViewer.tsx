@@ -31,6 +31,7 @@ import DownloadP9 from '../Payroll/DownloadP9';
 import { loadMyP9 } from '../../lib/p9';
 import { loadCompanyIdentity, type CompanyIdentity } from '../../lib/companyProfile';
 import { useBackToClose } from '../../hooks/useBackToClose';
+import { PayslipSettlementBlock, WhtDeductionLine, WorkEarningLines, netPayLabel } from '../Payroll/PayslipSettlement';
 
 // HARDCODED STATUTORY SETTINGS - Updated to match payroll dashboard
 const statutorySettings = {
@@ -557,6 +558,8 @@ const PayslipModal = ({
                     {calculated.earningLines.map((line, i) => (
                       <div key={`${line.name}-${i}`} className="flex justify-between"><span>{line.name}{line.taxable ? '' : ' (not taxed)'}</span><span className="font-semibold">KSh {line.amount.toLocaleString()}</span></div>
                     ))}
+                    {/* the month's piece rate work and contract jobs (FIG-812) */}
+                    <WorkEarningLines record={record} />
                     <div className="flex justify-between bg-gray-50 p-1 border border-gray-200 mt-2"><span>Per diem</span><span className="font-bold">KSh {calculated.perDiem.toLocaleString()}</span></div>
                   </div>
                 </div>
@@ -568,6 +571,7 @@ const PayslipModal = ({
                     <div className="flex justify-between"><span>SHIF</span><span className="font-semibold">KSh {calculated.nhifDeduction.toLocaleString()}</span></div>
                     <div className="flex justify-between"><span>NSSF</span><span className="font-semibold">KSh {calculated.nssfDeduction.toLocaleString()}</span></div>
                     <div className="flex justify-between"><span>AHL</span><span className="font-semibold">KSh {calculated.housingLevy.toLocaleString()}</span></div>
+                    <WhtDeductionLine record={record} />
                     <div className="flex justify-between"><span>Advance</span><span className="font-semibold">KSh {calculated.advanceDeduction.toLocaleString()}</span></div>
                     {calculated.deductionLines.map((line, i) => (
                       <div key={`${line.name}-${i}`} className="flex justify-between"><span>{line.name}</span><span className="font-semibold">KSh {line.amount.toLocaleString()}</span></div>
@@ -576,6 +580,8 @@ const PayslipModal = ({
                   </div>
                 </div>
               </div>
+
+              <PayslipSettlementBlock record={record} />
 
               <div className="border border-gray-300 p-4 mb-8 bg-gray-50">
                 <div className="flex justify-between border-b border-gray-300 pb-2 mb-2 text-sm text-black">
@@ -587,7 +593,7 @@ const PayslipModal = ({
                   <span className="font-bold">KSh {calculated.totalDeductions.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center text-lg text-black mt-2">
-                  <span className="font-bold">Net pay</span>
+                  <span className="font-bold">{netPayLabel(record)}</span>
                   <span className="font-bold border-b-[3px] border-gray-400 border-double pb-0.5">KSh {Math.round(calculated.netPay).toLocaleString()}</span>
                 </div>
               </div>

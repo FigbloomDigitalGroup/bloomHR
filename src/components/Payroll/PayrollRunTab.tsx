@@ -31,6 +31,8 @@ import { BulkPayButton } from "./RunPayActions";
 import { DemoPayButton } from "./DemoPayments";
 import type { DemoPayLine } from "../../lib/demoPayments";
 import { Pagination } from "./PayrollPagination";
+import { PayslipSettlementBlock, WhtDeductionLine, WorkEarningLines } from "./PayslipSettlement";
+import WorkSettlementCard from "./WorkSettlementCard";
 
 // The Run tab: the month's payroll run (start, recalculate, approve, mark paid), the returns check, and the list of
 // employees on the payroll with their pay. The figures are worked out by PayrollDashboard; this only shows them.
@@ -80,6 +82,10 @@ interface PayrollRunTabProps {
   };
   /** the month's NITA training levy, paid by the employer on top of pay (FIG-898) */
   nitaLevy?: { total: number; employees: number };
+  /** every payslip of the month, whatever the filters (the piece rate settlement summary and WHT report, FIG-812) */
+  payrollRecords?: any[];
+  /** the month, 'YYYY-MM' */
+  payPeriod?: string;
   expandedRows: Set<unknown>;
   toggleRowExpand: (id: any, e: React.MouseEvent) => void;
   smsSendingStatus: Record<string, any>;
@@ -136,6 +142,7 @@ function PayBreakdown({ record }: { record: any }) {
         {payslipEarningLines(record).map((l, i) => (
           <React.Fragment key={`${l.name}-${i}`}>{line(l.name, l.amount)}</React.Fragment>
         ))}
+        <WorkEarningLines record={record} amountClassName="" />
         {line("Per diem", record.per_diem || 0)}
       </div>
       <div className="space-y-1.5">
@@ -144,6 +151,7 @@ function PayBreakdown({ record }: { record: any }) {
         {line("SHIF", record.nhif_deduction, "text-status-danger")}
         {line("NSSF", record.nssf_deduction, "text-status-danger")}
         {line("Housing levy", record.housing_levy, "text-status-danger")}
+        <WhtDeductionLine record={record} amountClassName="text-status-danger" />
         {line("Tax relief", record.tax_relief || 0, "text-status-success")}
       </div>
       <div className="space-y-1.5">
@@ -156,6 +164,10 @@ function PayBreakdown({ record }: { record: any }) {
           <span>Total deductions</span>
           <span className="whitespace-nowrap text-status-danger">{ksh(record.total_deductions)}</span>
         </div>
+      </div>
+      {/* a month of piece rate work or contract jobs: from the month's net pay to what is paid now (FIG-812) */}
+      <div className="sm:col-span-3 empty:hidden">
+        <PayslipSettlementBlock record={record} compact />
       </div>
     </div>
   );
@@ -205,6 +217,8 @@ export default function PayrollRunTab({
   currentItems,
   totals: { totalGrossPay, totalDeductions, totalNetPay },
   nitaLevy,
+  payrollRecords,
+  payPeriod,
   expandedRows,
   toggleRowExpand,
   smsSendingStatus,
@@ -344,6 +358,10 @@ export default function PayrollRunTab({
         </Card>
       )}
       {approved && payslipEmails}
+
+      {payPeriod && (
+        <WorkSettlementCard payslips={payrollRecords ?? finalFilteredRecords} employees={onPayroll} payPeriod={payPeriod} periodLabel={periodLabel} />
+      )}
 
       {nitaLevy && nitaLevy.total > 0 && (
         <Card padding="sm" className="!rounded-xl">

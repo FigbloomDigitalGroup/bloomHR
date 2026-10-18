@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Info } from 'lucide-react';
+import { CheckCircle, Info } from 'lucide-react';
 import { Card, TableScroll } from '../../UI';
 import { formatKsh, longDate } from '../../../lib/casualPay';
 import { loadMyEarnings, loadMyPayouts } from '../../../lib/myWorkApi';
 import { myPayoutTotals, type MyPayouts } from '../../../lib/piecePayouts';
 import { formatQty } from '../../../lib/pieceRate';
 import { EARNINGS_NOTE, earningsTotals, monthChoices, type MyEarnings as Earnings } from '../../../lib/myWork';
+import { loadMyWorkSettlement, type MyWorkSettlement } from '../../../lib/workSettlementApi';
 
 // What I have earned in a month: gross from approved work and approved jobs, with what is still waiting for approval
 // kept apart, by kind of work and by week. Worked out by the database from my own rows (my_work_earnings). Before
 // deductions: payouts (with their holdback) and the month-end payslip show what I take home. Also what payouts
-// have paid me this month and what they held back (my_payouts, stage 4).
+// have paid me this month and what they held back (my_payouts, stage 4). Once the month's payroll is approved: that
+// it was settled on my payslip, and what was paid at month end (my_work_settlement, stage 5).
 
 export default function MyEarnings({ today }: { today: string }) {
   const months = useMemo(() => monthChoices(today, 12), [today]);
@@ -19,6 +21,7 @@ export default function MyEarnings({ today }: { today: string }) {
   const [data, setData] = useState<Earnings | null>(null);
   const [loading, setLoading] = useState(true);
   const [payouts, setPayouts] = useState<MyPayouts | null>(null);
+  const [settlement, setSettlement] = useState<MyWorkSettlement | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -32,6 +35,12 @@ export default function MyEarnings({ today }: { today: string }) {
     loadMyPayouts(month)
       .then((p) => live && setPayouts(p))
       .catch(() => live && setPayouts(null));
+    // settled on my payslip? (stage 5); nothing shows if this can't be read
+    setSettlement(null);
+    Promise.resolve()
+      .then(() => loadMyWorkSettlement(month))
+      .then((st) => live && setSettlement(st))
+      .catch(() => live && setSettlement(null));
     return () => {
       live = false;
     };
@@ -74,6 +83,18 @@ export default function MyEarnings({ today }: { today: string }) {
             : `${paidOut.count} ${paidOut.count === 1 ? 'payout' : 'payouts'} · ${formatKsh(paidOut.held)} held back, settled with your month-end pay`}
         </p>
       </Card>
+
+      {settlement?.settled && (
+        <div className="flex items-start gap-2 rounded-tile border border-brand/30 bg-green-tint p-3 text-[12px] text-ink" data-testid="work-settled">
+          <CheckCircle className="w-4 h-4 mt-0.5 shrink-0 text-brand" />
+          <span>
+            <span className="font-semibold">Settled on your {months.find((m) => m.value === month)?.label.split(' ')[0] ?? ''} payslip.</span>{' '}
+            {formatKsh(settlement.net_pay)} paid at month end
+            {Number(settlement.paid_out) > 0 ? `, after ${formatKsh(settlement.paid_out)} paid out during the month` : ''}.
+            {Number(settlement.arrears_carried_forward) > 0 && ` ${formatKsh(settlement.arrears_carried_forward)} is carried forward and taken from next month's pay.`}
+          </span>
+        </div>
+      )}
 
       <div className="flex items-start gap-2 rounded-tile border border-border bg-white p-3 text-[12px] text-ink">
         <Info className="w-4 h-4 mt-0.5 shrink-0 text-status-info" />
