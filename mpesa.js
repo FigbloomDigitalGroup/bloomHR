@@ -3,7 +3,7 @@ import express from "express";
 import axios from "axios";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
-import { applyB2CResult, applyB2CTimeout } from "./payroll_payments.js";
+import { applyB2CResult, applyB2CTimeout, isKesCurrency, nonKesRefusal } from "./payroll_payments.js";
 
 dotenv.config({ path: process.env.ENV_FILE || '.env' });
 
@@ -653,7 +653,13 @@ export async function requestB2C(payment) {
 // --- B2C Payment Endpoint ---
 router.post("/b2c", async (req, res) => {
   try {
-    const { phoneNumber, amount, employeeNumber, fullName } = req.body;
+    const { phoneNumber, amount, employeeNumber, fullName, currency } = req.body ?? {};
+
+    // M-Pesa Kenya pays shillings only: a payslip in TZS, UGX or USD is refused before anything is sent or saved.
+    // No currency means KES (salary advances and payslips saved before payslips had one).
+    if (!isKesCurrency(currency)) {
+      return res.status(400).json({ success: false, message: nonKesRefusal(currency) });
+    }
 
     if (!phoneNumber || !amount || !employeeNumber) {
       return res.status(400).json({ success: false, message: "Missing required parameters" });

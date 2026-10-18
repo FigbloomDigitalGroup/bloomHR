@@ -72,7 +72,7 @@ import { DemoPayAllDialog } from "./DemoPayments";
 import PayrollMoreMenu, { type MoreMenuItem } from "./PayrollMoreMenu";
 import { returnsReadiness } from "../../lib/payrollExports";
 import { employeesMissingDetails } from "../../lib/missingPayrollDetails";
-import { isPaidByMpesa, paymentMethodLabel } from "../../lib/paymentMethods";
+import { isKesPayslip, isPaidByMpesa, mpesaKenyaNote, paymentMethodLabel } from "../../lib/paymentMethods";
 import { fetchAll } from "../../lib/fetchAll";
 import { isPayrollReady } from "../../lib/onboardingValidation";
 import { isCasual } from "../../lib/casualPay";
@@ -883,6 +883,12 @@ export default function PayrollDashboard() {
 
   const processSingleMpesaPayment = async (employee: any) => {
     if (!IN_APP_PAYMENTS) throw new Error(IN_APP_PAYMENTS_OFF_MESSAGE);
+    // M-Pesa Kenya pays KES payslips only (the server refuses any other currency too)
+    if (!isKesPayslip(employee)) {
+      const note = mpesaKenyaNote([employee]) as string;
+      toast.error(note);
+      throw new Error(note);
+    }
     try {
       const phoneNumber = employee.employeeNu;
       if (!phoneNumber) {
@@ -905,6 +911,7 @@ export default function PayrollDashboard() {
             amount: employee.net_pay,
             employeeNumber: employee.employee_id,
             fullName: employee.employee_name,
+            currency: employee.currency || "KES",
           }),
         },
       );
@@ -932,7 +939,10 @@ export default function PayrollDashboard() {
   const processBulkMpesaPayment = async (requested: any) => {
     if (!IN_APP_PAYMENTS) throw new Error(IN_APP_PAYMENTS_OFF_MESSAGE);
     const results = [];
-    const selectedEmployees = (requested ?? []).filter(isPaidByMpesa);
+    // M-Pesa Kenya pays only staff paid by M-Pesa, and only their KES payslips
+    const selectedEmployees = (requested ?? []).filter((employee: PayRecipient) => isPaidByMpesa(employee) && isKesPayslip(employee));
+    const otherCurrency = mpesaKenyaNote((requested ?? []).filter(isPaidByMpesa));
+    if (otherCurrency) toast.error(otherCurrency, { duration: 10000 });
     const skipped = (requested ?? []).filter((employee: PayRecipient) => !isPaidByMpesa(employee));
     if (skipped.length) {
       toast.error(
@@ -971,6 +981,12 @@ export default function PayrollDashboard() {
   };
 
   const handleSingleMpesaPayment = (employee: any) => {
+    // a TZS, UGX or USD payslip is never paid through M-Pesa Kenya
+    const note = mpesaKenyaNote([employee]);
+    if (note) {
+      toast.error(note);
+      return;
+    }
     setSelectedEmployeeForMpesa(employee);
     setShowSingleMpesaModal(true);
   };

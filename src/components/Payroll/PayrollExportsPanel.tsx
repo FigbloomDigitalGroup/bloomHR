@@ -134,6 +134,11 @@ function FileRow({ f, disabled, onDownload, open, onToggle, children }: {
           ))}
         </div>
       </div>
+      {f.file.note && (
+        <p role="note" className="mt-1 text-xs text-muted-foreground">
+          {f.file.note}
+        </p>
+      )}
       {children}
       {open && (
         <ul className="mt-2 border-t border-border pt-2 space-y-0.5 text-xs text-ink">

@@ -1,5 +1,5 @@
 import type { EmployeeRecord } from './profileCompleteness';
-import { paymentKind } from './paymentMethods';
+import { isKesPayslip, mpesaKenyaNote, paymentKind } from './paymentMethods';
 import { employeeInputs, statutoryFor } from './statutoryCalc';
 import { nonTaxableEarningsOf, pensionableAdjustmentOf } from './earnings';
 import { isValidIdNumber, isValidKraPin, isValidNssfNumber, isValidOnboardingPhone, isValidShaNumber } from './onboardingValidation';
@@ -46,6 +46,8 @@ export interface ExportFile {
   rows: string[][];
   /** employees on the run whose record lacks something this file needs, with what */
   problems: { name: string; employeeNumber: string; missing: string[] }[];
+  /** payslips left out of the file and why (M-Pesa Kenya: those in another currency than KES) */
+  note?: string;
 }
 
 // Spelled exactly as in the P10 file finance uploads to iTax (FIGBLOOM SEPTEMBER 2026 PAYE), typos included.
@@ -272,9 +274,16 @@ export const mpesaPhone = (value: unknown) => {
 /** How a payslip is paid: the method saved on it, else the employee's. */
 const kindOf = (l: Line) => paymentKind(text(l.payslip.payment_method) || l.employee['payment_method']);
 
+/** The KES lines, and a note on the M-Pesa ones left out: M-Pesa Kenya pays KES payslips only, never TZS, UGX or USD. */
+const kesOnly = (ls: Line[]) => {
+  const note = mpesaKenyaNote(ls.filter((l) => kindOf(l) === 'mobile').map((l) => l.payslip));
+  return { kes: ls.filter((l) => isKesPayslip(l.payslip)), ...(note ? { note } : {}) };
+};
+
 export function mpesaFile(payslips: Payslip[], employees: EmployeeRecord[], payPeriod: string): ExportFile {
-  const ls = lines(payslips, employees).filter((l) => kindOf(l) === 'mobile' && num(l.payslip.net_pay) > 0);
+  const { kes: ls, note } = kesOnly(lines(payslips, employees).filter((l) => kindOf(l) === 'mobile' && num(l.payslip.net_pay) > 0));
   return {
+    ...(note ? { note } : {}),
     headers: MPESA_HEADERS,
     rows: ls.map(({ payslip, employee: e }) => [
       mpesaPhone(e['Mobile Number']), fullName(e) || text(payslip.employee_name), amount(num(payslip.net_pay)), `Salary ${payPeriod}`, text(e['Payroll Number']),
@@ -357,9 +366,11 @@ const localPhone = (value: unknown) => {
 const eazzyAmount = (value: number) => value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export function equityFile(payslips: Payslip[], employees: EmployeeRecord[], debitAccount: string): ExportFile {
-  const ls = lines(payslips, employees).filter((l) => kindOf(l) !== 'cash' && num(l.payslip.net_pay) > 0);
+  // the Eazzy Biz file pays in KES (its M-Pesa rows through M-Pesa Kenya): KES payslips only
+  const { kes: ls, note } = kesOnly(lines(payslips, employees).filter((l) => kindOf(l) !== 'cash' && num(l.payslip.net_pay) > 0));
   const debit = text(debitAccount);
   return {
+    ...(note ? { note } : {}),
     headers: EQUITY_HEADERS,
     rows: ls.map(({ payslip, employee: e }) => {
       const pay = num(payslip.net_pay);

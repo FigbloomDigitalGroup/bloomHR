@@ -95,6 +95,15 @@ describe('the M-Pesa bulk (B2C) file', () => {
     expect(f.problems).toEqual([{ name: 'Bad Phone', employeeNumber: 'W6', missing: ['M-Pesa number (07XXXXXXXX or 2547XXXXXXXX)'] }]);
   });
 
+  it('M-Pesa Kenya pays KES only: a TZS or UGX payout gets no rows, with a note', () => {
+    for (const currency of ['TZS', 'UGX']) {
+      const f = payoutMpesaFile(LINES, { ...WEEK, currency });
+      expect(f.rows).toEqual([]);
+      expect(f.note).toBe(`3 payslips in ${currency} aren't paid through M-Pesa Kenya. Use the bank or mobile money file for their currency.`);
+    }
+    expect(payoutMpesaFile(LINES, { ...WEEK, currency: 'KES' }).rows).toHaveLength(3);
+  });
+
   it('CSV: names quoted when needed, formulas kept as text', () => {
     const csv = toCsv(payoutMpesaFile(LINES, WEEK).headers, payoutMpesaFile(LINES, WEEK).rows);
     expect(csv.split('\r\n')[0]).toBe('Phone Number,Amount,Name,Reference');

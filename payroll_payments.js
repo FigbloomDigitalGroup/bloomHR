@@ -25,6 +25,15 @@ export const mpesaMaxAmount = () => Number(process.env.PAYROLL_MPESA_MAX_AMOUNT)
 /** Largest single bank payment, when the bank sets one (PAYROLL_BANK_MAX_AMOUNT); none by default. */
 export const bankMaxAmount = () => Number(process.env.PAYROLL_BANK_MAX_AMOUNT) || Infinity;
 
+/** M-Pesa Kenya pays Kenyan shillings only: a payslip in KES, or with no currency (saved before payslips had one). */
+export const isKesCurrency = (currency) => {
+  const c = String(currency ?? "").trim().toUpperCase();
+  return c === "" || c === "KES";
+};
+/** Why M-Pesa Kenya refuses a payslip in another currency. */
+export const nonKesRefusal = (currency) =>
+  `This payslip is in ${String(currency).trim().toUpperCase()}: M-Pesa Kenya pays KES payslips only. Use the bank or mobile money file for its currency.`;
+
 // ---------------------------------------------------------------------------------------------
 // who is paid how, and how much
 // ---------------------------------------------------------------------------------------------
@@ -174,7 +183,7 @@ export async function queueRunPayments(db, { tenantId, userId, runId }) {
   );
   // only approved countries' payslips, and only in KES (M-Pesa and the Kenyan banks pay shillings)
   const payslips = all.filter(
-    (p) => (!run.countries || run.countries.has(String(p.country || "Kenya").toLowerCase())) && String(p.currency || "KES").toUpperCase() === "KES"
+    (p) => (!run.countries || run.countries.has(String(p.country || "Kenya").toLowerCase())) && isKesCurrency(p.currency)
   );
   const numbers = [...new Set(payslips.map((p) => text(p.employee_id)).filter(Boolean))];
   const employees = new Map();
