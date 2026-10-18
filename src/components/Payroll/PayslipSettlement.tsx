@@ -5,6 +5,7 @@ import {
   payslipWorkLines,
   whtLabel,
 } from '../../lib/workSettlement';
+import { currencyOf, money } from '../../lib/payroll/currency';
 
 // The payslip's piece rate parts (FIG-812 stage 5, lib/workSettlement), shared by the admin payslip (PayslipDocument,
 // also the emailed PDF), the Run tab's breakdown and the staff portal's payslip: the work earnings ("Piece rate work",
@@ -12,7 +13,8 @@ import {
 // paid at month end. Each shows nothing on a salaried payslip.
 
 type Payslip = Record<string, unknown>;
-const ksh = (n: number) => `KSh ${n.toLocaleString()}`;
+/** an amount in the payslip's own currency (FIG-905): KSh, TSh, USh */
+const ksh = (n: number, record: Payslip) => money(n, currencyOf(record));
 
 /** "Piece rate work" (with its kinds of work) and "Contract jobs", as earnings lines. */
 export function WorkEarningLines({ record, amountClassName = 'font-semibold' }: { record: Payslip; amountClassName?: string }) {
@@ -24,7 +26,7 @@ export function WorkEarningLines({ record, amountClassName = 'font-semibold' }: 
             {line.name}
             {line.detail.length > 0 && <span className="block text-gray-500 text-xs">{line.detail.join('; ')}</span>}
           </span>
-          <span className={`${amountClassName} whitespace-nowrap`}>{ksh(line.amount)}</span>
+          <span className={`${amountClassName} whitespace-nowrap`}>{ksh(line.amount, record)}</span>
         </div>
       ))}
     </>
@@ -37,7 +39,7 @@ export function WhtDeductionLine({ record, amountClassName = 'font-semibold' }: 
   return (
     <div className="flex justify-between gap-3" data-testid="wht-line">
       <span>{whtLabel(record)}</span>
-      <span className={`${amountClassName} whitespace-nowrap`}>{ksh(Number(record.wht_tax) || 0)}</span>
+      <span className={`${amountClassName} whitespace-nowrap`}>{ksh(Number(record.wht_tax) || 0, record)}</span>
     </div>
   );
 }
@@ -59,7 +61,7 @@ export function PayslipSettlementBlock({ record, compact = false }: { record: Pa
               {l.note && <span className="block text-gray-500 text-[11px] font-normal">{l.note}</span>}
             </span>
             <span className="whitespace-nowrap">
-              {l.kind === 'minus' ? `−${ksh(l.amount)}` : l.kind === 'plus' ? `+${ksh(l.amount)}` : l.kind === 'info' ? `(${ksh(l.amount)})` : ksh(l.amount)}
+              {l.kind === 'minus' ? `−${ksh(l.amount, record)}` : l.kind === 'plus' ? `+${ksh(l.amount, record)}` : l.kind === 'info' ? `(${ksh(l.amount, record)})` : ksh(l.amount, record)}
             </span>
           </div>
         ))}

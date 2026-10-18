@@ -166,9 +166,9 @@ export default function PayrollRatesTab({ payPeriod, periodLabel, canEdit, onEdi
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-bold text-ink">Statutory rates for {periodLabel}</h2>
+          <h2 className="text-sm font-bold text-ink">Kenya statutory rates for {periodLabel}</h2>
           <p className="text-[11.5px] text-muted-foreground">
-            What payroll uses this month for PAYE, SHA, the housing levy and NSSF, from when, and where each comes from.
+            What Kenya payroll uses this month for PAYE, SHA, the housing levy and NSSF, from when, and where each comes from. Each country has its own rates; Tanzania and Uganda come with their payroll.
           </p>
         </div>
         {canEdit && (

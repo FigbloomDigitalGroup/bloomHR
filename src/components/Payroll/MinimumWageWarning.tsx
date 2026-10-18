@@ -17,11 +17,13 @@ interface Loaded {
   workDays: Map<string, number>;
 }
 
-export default function MinimumWageWarning({ payslips, employees, payPeriod, periodLabel }: {
+export default function MinimumWageWarning({ payslips, employees, payPeriod, periodLabel, onShortfalls }: {
   payslips: Row[];
   employees: Row[];
   payPeriod: string;
   periodLabel: string;
+  /** who is below, counted by country (the Run tab's readiness check per country, FIG-905) */
+  onShortfalls?: (byCountry: Map<string, number>) => void;
 }) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
 
@@ -43,6 +45,12 @@ export default function MinimumWageWarning({ payslips, employees, payPeriod, per
         : [],
     [loaded, payslips, employees],
   );
+  useEffect(() => {
+    if (!onShortfalls) return;
+    const byCountry = new Map<string, number>();
+    for (const s of below) byCountry.set(s.country, (byCountry.get(s.country) ?? 0) + 1);
+    onShortfalls(byCountry);
+  }, [below, onShortfalls]);
   if (below.length === 0) return null;
 
   return (

@@ -144,13 +144,23 @@ const chunks = (items, size) => {
   return out;
 };
 
-/** The run, checked to belong to the caller's company and to be approved (or already marked paid). */
+/** The run's countries that are approved (or paid) (FIG-905: each country is approved on its own); null for a run from before countries. */
+async function approvedCountries(db, runId) {
+  const { data, error } = await db.from("payroll_run_countries").select("country, status").eq("run_id", runId);
+  if (error || !data || data.length === 0) return null;
+  return new Set(data.filter((c) => ["approved", "paid"].includes(c.status)).map((c) => String(c.country).toLowerCase()));
+}
+
+/** The run, checked to belong to the caller's company and to be approved (or already marked paid), at least for one country. */
 async function approvedRun(db, tenantId, runId) {
   const { data: run, error } = await db.from("payroll_runs").select("id, tenant_id, pay_period, status").eq("id", runId).maybeSingle();
   if (error) throw error;
   if (!run || run.tenant_id !== tenantId) throw new HttpError(404, "That payroll run was not found");
-  if (!["approved", "paid"].includes(run.status)) throw new HttpError(409, `Payroll for ${run.pay_period} is a ${run.status}: approve it before paying`);
-  return run;
+  const countries = await approvedCountries(db, run.id);
+  if (!["approved", "paid"].includes(run.status) && !(countries && countries.size > 0)) {
+    throw new HttpError(409, `Payroll for ${run.pay_period} is a ${run.status}: approve it before paying`);
+  }
+  return { ...run, countries };
 }
 
 /**
@@ -159,8 +169,12 @@ async function approvedRun(db, tenantId, runId) {
  */
 export async function queueRunPayments(db, { tenantId, userId, runId }) {
   const run = await approvedRun(db, tenantId, runId);
-  const payslips = await fetchAll((from, to) =>
-    db.from("salary_history").select("employee_id, employee_name, net_pay, payment_method").eq("run_id", run.id).order("id").range(from, to)
+  const all = await fetchAll((from, to) =>
+    db.from("salary_history").select("employee_id, employee_name, net_pay, payment_method, country, currency").eq("run_id", run.id).order("id").range(from, to)
+  );
+  // only approved countries' payslips, and only in KES (M-Pesa and the Kenyan banks pay shillings)
+  const payslips = all.filter(
+    (p) => (!run.countries || run.countries.has(String(p.country || "Kenya").toLowerCase())) && String(p.currency || "KES").toUpperCase() === "KES"
   );
   const numbers = [...new Set(payslips.map((p) => text(p.employee_id)).filter(Boolean))];
   const employees = new Map();

@@ -38,6 +38,8 @@ export interface RateRow {
   effective_from: string;
   effective_to: string | null;
   source: string | null;
+  /** the country the rate is for (FIG-905): Kenya's rows so far */
+  country?: string;
 }
 
 const fail = (err: unknown, fallback: string): never => {
@@ -45,11 +47,12 @@ const fail = (err: unknown, fallback: string): never => {
   throw new Error(typeof message === 'string' && message ? message : fallback);
 };
 
-/** The rate of each code in force on a day: the company's own where it has one, else the default. */
-export async function ratesInForce(day: string): Promise<RateRow[]> {
+/** The rate of each code in force on a day for a country (Kenya by default): the company's own where it has one, else the default. */
+export async function ratesInForce(day: string, country = 'Kenya'): Promise<RateRow[]> {
   const { data, error } = await supabase
     .from('statutory_rates')
-    .select('id, tenant_id, code, value, bands, effective_from, effective_to, source')
+    .select('id, tenant_id, code, value, bands, effective_from, effective_to, source, country')
+    .eq('country', country)
     .lte('effective_from', day)
     .or(`effective_to.is.null,effective_to.gte.${day}`);
   if (error) fail(error, 'Could not load the statutory rates.');
@@ -67,8 +70,8 @@ const dayBefore = (iso: string) => {
   return d.toISOString().slice(0, 10);
 };
 
-/** Gives the company its own rate for a code from a date (a number; PAYE bands stay the default). */
-export async function setCompanyRate(code: string, value: number, from: string, source?: string): Promise<void> {
+/** Gives the company its own rate for a code from a date in a country (a number; PAYE bands stay the default). */
+export async function setCompanyRate(code: string, value: number, from: string, source?: string, country = 'Kenya'): Promise<void> {
   if (!Number.isFinite(value) || value < 0) throw new Error('Enter a number of 0 or more.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from)) throw new Error('Choose the date it starts.');
   const { tenantId } = await currentUserAndTenant();
@@ -76,10 +79,10 @@ export async function setCompanyRate(code: string, value: number, from: string, 
   const { error: endError } = await supabase
     .from('statutory_rates')
     .update({ effective_to: dayBefore(from) })
-    .eq('tenant_id', tenantId).eq('code', code).lt('effective_from', from).is('effective_to', null);
+    .eq('tenant_id', tenantId).eq('country', country).eq('code', code).lt('effective_from', from).is('effective_to', null);
   if (endError) fail(endError, 'The rate was not saved.');
   const { error } = await supabase.from('statutory_rates').insert({
-    tenant_id: tenantId, code, value, effective_from: from, source: source?.trim() || 'Set by the company',
+    tenant_id: tenantId, country, code, value, effective_from: from, source: source?.trim() || 'Set by the company',
   });
   if (error) fail(error, 'The rate was not saved.');
 }

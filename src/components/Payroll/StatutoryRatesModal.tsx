@@ -59,7 +59,7 @@ export default function StatutoryRatesModal({ payPeriod, onClose, onChanged }: {
       <div className="bg-white rounded-[10px] border border-border shadow-lg w-full max-w-3xl max-h-[90vh] flex flex-col">
         <div className="px-5 py-3 border-b border-border flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-ink">Statutory rates for {payPeriod}</h2>
+            <h2 className="text-sm font-semibold text-ink">Kenya statutory rates for {payPeriod}</h2>
             <p className="text-xs text-muted-foreground">What payroll uses for PAYE, SHIF, NSSF and the housing levy this month, and from when.</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="p-1 text-muted-foreground hover:text-ink"><X className="h-4 w-4" /></button>

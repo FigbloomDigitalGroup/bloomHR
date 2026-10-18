@@ -23,22 +23,39 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { PageHeader, TabBar } from "../UI";
 import MPesaSpreadsheetFullPage from "./MpesaSpreadSheet";
-import useStatutoryRates from "../../hooks/useStatutoryRates";
+import useCountryRates from "../../hooks/useCountryRates";
 import { usePermissions } from "../../hooks/usePermissions";
 import StatutoryRatesModal from "./StatutoryRatesModal";
-import { missingRates } from "../../lib/statutoryCalc";
-import { calculatePayslip } from "../../lib/payslipCalc";
+import { supportedCountries } from "../../lib/payroll/countries";
+import {
+  type CountryReadiness,
+  type RunCalculation,
+  approvalSummary,
+  calculateRun,
+  countriesToApprove,
+  countryOrder,
+  countryReadiness,
+  currencyMismatch,
+  payrollCountryOf,
+  payslipCountry,
+  savableRecords,
+  totalsByCurrency,
+} from "../../lib/payroll/multiCountry";
+import { moneyRounded } from "../../lib/payroll/currency";
 import { loadDeductionCap, loadWorkSettlement } from "../../lib/workSettlementApi";
 import type { SalaryHistoryRecord } from "../../lib/salaryHistory";
 import {
   type PayrollRun,
+  type PayrollRunCountry,
   type PayrollRunStatus,
+  discardDraftCountries,
   discardDraftRun,
   getPayrollRun,
+  getRunCountries,
   getRunPayslips,
   runErrorMessage,
   saveDraftRun,
-  setRunStatus,
+  setCountriesStatus,
 } from "../../lib/payrollRuns";
 import MissingPayrollDetailsModal from "./MissingPayrollDetailsModal";
 import { IN_APP_PAYMENTS, IN_APP_PAYMENTS_OFF_MESSAGE, PAYMENTS_DEMO } from "../../lib/inAppPayments";
@@ -126,6 +143,9 @@ const toSalaryHistory = (record: any): SalaryHistoryRecord => ({
   arrears_note: record.arrears_note ?? null,
   worker_kind: record.worker_kind ?? null,
   work_settlement: record.work_settlement === true,
+  // the payslip's country and currency (FIG-905): worked out by that country's engine
+  country: record.country || "Kenya",
+  currency: record.currency || "KES",
   payment_method: record.payment_method || "",
   bank_name: record.bank_name || "",
   account_number: record.account_number || "",
@@ -149,6 +169,8 @@ const fromSalaryHistory = (saved: any, live: any | undefined) => ({
   work_settlement: saved.work_settlement === true,
   // the employer's NITA levy the database saved on the payslip (FIG-898)
   nita_levy: Number(saved.nita_levy) || 0,
+  country: saved.country || "Kenya",
+  currency: saved.currency || "KES",
   payment_method: paymentMethodLabel(saved.payment_method),
   bank_name: saved.bank_name || "",
   account_number: saved.account_number || "",
@@ -165,7 +187,7 @@ export default function PayrollDashboard() {
   const [currentRecordIndex, setCurrentRecordIndex] = useState<number | null>(null);
   const [employees, setEmployees] = useState<any[]>([]);
   // the company's branches (FIG-905): the Run tab shows each employee's branch and flags staff outside Kenya
-  const { branches: companyBranches } = useBranches();
+  const { branches: companyBranches, loading: branchesLoading } = useBranches();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [departments, setDepartments] = useState(["all"]);
@@ -177,6 +199,13 @@ export default function PayrollDashboard() {
   // the month's payroll run and its saved payslips (runPeriod says which month they were loaded for)
   const [run, setRun] = useState<PayrollRun | null>(null);
   const [runPayslips, setRunPayslips] = useState<any[]>([]);
+  // each country's part of the run (FIG-905): approved, reopened and paid on its own
+  const [runCountries, setRunCountries] = useState<PayrollRunCountry[]>([]);
+  // staff nobody worked out this month: their country has no engine yet, no rates, or a currency mismatch
+  const [notCalculated, setNotCalculated] = useState<RunCalculation["notCalculated"]>([]);
+  const [selectedCountry, setSelectedCountry] = useState("all");
+  // people below their country's minimum wage, by country (the readiness check's warning)
+  const [belowMinimum, setBelowMinimum] = useState<Map<string, number>>(new Map());
   const [runPeriod, setRunPeriod] = useState<string | null>(null);
   const [runVersion, setRunVersion] = useState(0);
   const [runBusy, setRunBusy] = useState(false);
@@ -475,11 +504,14 @@ export default function PayrollDashboard() {
   };
 
   const actualPeriod = getPeriodString(selectedPeriod);
-  // the statutory rates in force this month (statutory_rates): one place for PAYE bands, reliefs, SHIF, NSSF and AHL
-  const { rates, isLoading: settingsLoading, error: ratesError, reload: reloadRates } = useStatutoryRates(actualPeriod);
+  // the statutory rates in force this month for each country with a payroll engine (statutory_rates by country);
+  // `rates` is Kenya's (the deductions and payslip editing screens use it)
+  const payrollCountries = useMemo(() => supportedCountries(), []);
+  const { ratesByCountry, errors: rateErrors, isLoading: settingsLoading, reload: reloadRates } = useCountryRates(actualPeriod, payrollCountries);
+  const rates = ratesByCountry?.get("Kenya") ?? null;
   useEffect(() => {
-    if (ratesError) toast.error(`Payroll can't be worked out: ${ratesError}`);
-  }, [ratesError]);
+    for (const [country, message] of rateErrors) toast.error(`${country} payroll can't be worked out: ${message}`);
+  }, [rateErrors]);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -1009,28 +1041,32 @@ export default function PayrollDashboard() {
             })),
           ]);
 
-          // Each employee's payslip (lib/payslipCalc). Only employees whose onboarding HR has approved are paid (the
-          // database refuses payslips for anyone else); "Not onboarded" lists the rest.
-          const payrollData = data.filter(isPayrollReady).map((employee) =>
-            calculatePayslip(employee, {
-              period: actualPeriod,
-              rates: rates ?? {}, // only worked out once the month's rates are loaded (see below)
-              overrideStatutoryChecks,
-              voluntaryByEmployee,
-              payrollLoans,
-              earningsByEmployee,
-              leaveByEmployee,
-              leaveBasis,
-              absenceByEmployee,
-              leavePayouts,
-              overtimeMonth,
-              advanceFor: calculateAdvanceDeduction,
-              workByEmployee,
-              deductionCap: capOn,
-            }),
-          );
+          // Each employee's payslip, worked out by their branch's country's engine with that country's rates, in its
+          // currency (lib/payroll, FIG-905). Staff in a country with no engine yet are worked out by nobody (never on
+          // another country's rules). Only employees whose onboarding HR has approved are paid (the database refuses
+          // payslips for anyone else); "Not onboarded" lists the rest.
+          const month = {
+            period: actualPeriod,
+            overrideStatutoryChecks,
+            voluntaryByEmployee,
+            payrollLoans,
+            earningsByEmployee,
+            leaveByEmployee,
+            leaveBasis,
+            absenceByEmployee,
+            leavePayouts,
+            overtimeMonth,
+            advanceFor: calculateAdvanceDeduction,
+            workByEmployee,
+            deductionCap: capOn,
+          };
+          const { records: payrollData, notCalculated: waiting } = calculateRun(data.filter(isPayrollReady), companyBranches, (country) => {
+            const countryRates = ratesByCountry?.get(country);
+            return countryRates ? { ...month, rates: countryRates } : null;
+          });
 
           setLiveRecords(payrollData);
+          setNotCalculated(waiting);
         }
       } catch (err) {
         console.error("Error:", err);
@@ -1040,19 +1076,12 @@ export default function PayrollDashboard() {
       }
     };
 
-    if (rates) {
-      // only with the month's rates, and never with one missing
-      const missing = missingRates(rates);
-      if (missing.length) {
-        toast.error(`Payroll for this month is missing statutory rates: ${missing.join(", ")}. Add them under Statutory rates.`);
-        setLiveRecords([]);
-        setIsLoading(false);
-        return;
-      }
+    // once every country's rates and the branches are loaded; a country missing a rate is held back (calculateRun)
+    if (ratesByCountry && !branchesLoading) {
       fetchEmployees();
     }
     // runVersion: worked out again after each start / recalculate / approve, so payouts or work approved meanwhile count
-  }, [actualPeriod, rates, overrideStatutoryChecks, salaryAdvances, deductionsVersion, detailsVersion, runVersion]);
+  }, [actualPeriod, ratesByCountry, companyBranches, branchesLoading, overrideStatutoryChecks, salaryAdvances, deductionsVersion, detailsVersion, runVersion]);
 
   // the month's payroll run, reloaded after each start/recalculate/approve/...
   useEffect(() => {
@@ -1060,10 +1089,11 @@ export default function PayrollDashboard() {
     (async () => {
       try {
         const found = await getPayrollRun(actualPeriod);
-        const payslips = found ? await getRunPayslips(found.id) : [];
+        const [payslips, countries] = found ? await Promise.all([getRunPayslips(found.id), getRunCountries(found.id)]) : [[], []];
         if (cancelled) return;
         setRun(found);
         setRunPayslips(payslips);
+        setRunCountries(countries);
         setRunPeriod(actualPeriod);
       } catch (err) {
         if (!cancelled) toast.error(runErrorMessage(err, "Could not load this month's payroll."));
@@ -1114,8 +1144,10 @@ export default function PayrollDashboard() {
         record.payment_method === selectedPaymentMethod;
       const matchesBranch =
         selectedBranch === "all" || record.branch === selectedBranch;
+      const matchesCountry = selectedCountry === "all" || payslipCountry(record) === selectedCountry;
 
       return (
+        matchesCountry &&
         matchesSearch &&
         matchesDepartment &&
         matchesPaymentMethod &&
@@ -1235,13 +1267,29 @@ export default function PayrollDashboard() {
     try {
       // with the payslips' hand edits applied again on top (FIG-883)
       const calculated = await withRunEdits(monthRun?.id, liveRecords.filter((r) => r.employee_id), (r) => payslipContext(r.employee_id));
-      const records = calculated.map((r) => toSalaryHistory({ ...r, pay_period: actualPeriod }));
-      await saveDraftRun(actualPeriod, records);
+      const all = calculated.map((r) => toSalaryHistory({ ...r, pay_period: actualPeriod }));
+      // a payslip never goes out in another currency than its country's (the database refuses it too)
+      const mismatch = all.map(currencyMismatch).find(Boolean);
+      if (mismatch) {
+        toast.error(mismatch);
+        return;
+      }
+      // countries already approved keep their payslips; the others are saved (started, or recalculated)
+      const { save: records, lockedCountries } = savableRecords(all, runCountries);
+      if (records.length === 0) {
+        toast.error(lockedCountries.length ? `${lockedCountries.join(", ")} ${lockedCountries.length === 1 ? "is" : "are"} already approved: reopen to recalculate.` : `No one can be paid for ${periodLabel} yet.`);
+        return;
+      }
+      await saveDraftRun(actualPeriod, records, lockedCountries);
       toast.success(
         monthRun
           ? `Recalculated ${records.length} payslips for ${periodLabel}.`
           : `Started payroll for ${periodLabel} with ${records.length} employees.`,
       );
+      const waiting = notCalculated.filter((n) => n.employees.length > 0);
+      if (waiting.length) {
+        toast(waiting.map((n) => `${n.country}: ${n.employees.length} not worked out (${n.reason})`).join("\n"), { icon: "ℹ️", duration: 8000 });
+      }
       if (unnumbered) {
         toast.error(`${unnumbered} employee(s) have no employee number, so they were left out. Add one and recalculate.`);
       }
@@ -1253,11 +1301,13 @@ export default function PayrollDashboard() {
     }
   };
 
-  const changeRunStatus = async (status: PayrollRunStatus, question: DialogOptions, done: string) => {
-    if (!monthRun || !(await confirmDialog(question))) return;
+  /** Approves, reopens or marks paid some of the run's countries in one go (FIG-905). */
+  const changeCountries = async (countries: string[], status: PayrollRunStatus, question: DialogOptions, done: string) => {
+    if (!monthRun || countries.length === 0 || !(await confirmDialog(question))) return;
     setRunBusy(true);
     try {
-      await setRunStatus(monthRun.id, status);
+      const changed = await setCountriesStatus(monthRun.id, countries, status);
+      if (changed.length === 0) throw new Error("Nothing changed: reload and try again.");
       toast.success(done);
       setRunVersion((v) => v + 1);
       if (status === "approved") setPayslipEmailAutoStart((n) => n + 1);
@@ -1270,12 +1320,12 @@ export default function PayrollDashboard() {
     }
   };
 
-  const runNetPay = payrollRecords.reduce((sum: number, r: any) => sum + (r.net_pay || 0), 0);
 
   const missingDetails = useMemo(() => employeesMissingDetails(employees), [employees]);
 
   // demo paying (PAYMENTS_DEMO): who would be paid how, and who was "paid" this month, in memory only (gone on reload)
-  const demoPayEnabled = PAYMENTS_DEMO && monthRun?.status === "approved";
+  // (any approved country can be paid; a paid one can't be paid again)
+  const demoPayEnabled = PAYMENTS_DEMO && runCountries.some((c) => c.status === "approved");
   // the Pay buttons always show in demo mode; before the month is approved they say why they can't pay yet
   const demoPayBlockedReason = demoPayEnabled
     ? null
@@ -1294,7 +1344,13 @@ export default function PayrollDashboard() {
       .catch((err) => console.error("Could not reload employees for paying:", err));
     return () => { stale = true; };
   }, [showDemoPayAll]);
-  const demoLines = useMemo(() => demoPayLines(payrollRecords, employees), [payrollRecords, employees]);
+  const approvedCountries = useMemo(() => new Set(runCountries.filter((c) => c.status !== "draft").map((c) => c.country)), [runCountries]);
+  // payslips of approved (or paid) countries: what can be paid, emailed and filed
+  const approvedRecords = useMemo(() => payrollRecords.filter((r: any) => monthRun && approvedCountries.has(payslipCountry(r))), [payrollRecords, approvedCountries, monthRun]);
+  const demoLines = useMemo(
+    () => demoPayLines(approvedRecords.filter((r: any) => runCountries.some((c) => c.country === payslipCountry(r) && c.status === "approved")), employees),
+    [approvedRecords, runCountries, employees],
+  );
   const demoLineByNumber = useMemo(() => new Map(demoLines.map((l) => [l.employeeNumber, l])), [demoLines]);
   const demoPaidNow = demoPaid.period === actualPeriod ? demoPaid.numbers : new Set<string>();
   const markDemoPaid = (numbers: string[]) =>
@@ -1317,10 +1373,12 @@ export default function PayrollDashboard() {
   ];
   const notOnboarded = useMemo(() => employees.filter((e) => !isPayrollReady(e)), [employees]);
   const onPayroll = useMemo(() => employees.filter(isPayrollReady), [employees]);
+  // Kenya's returns (P10, SHA, NSSF) are for Kenya's staff only
+  const kenyaOnPayroll = useMemo(() => onPayroll.filter((e) => payrollCountryOf(e, companyBranches).country === "Kenya"), [onPayroll, companyBranches]);
   const returnsGaps = useMemo(() => {
-    const r = returnsReadiness(onPayroll);
+    const r = returnsReadiness(kenyaOnPayroll);
     return new Set([...r.p10, ...r.sha, ...r.nssf].map((p) => p.employeeNumber)).size;
-  }, [onPayroll]);
+  }, [kenyaOnPayroll]);
 
   // the month's people with details missing: only those on this payroll, not everyone in the company
   const runMissingDetails = useMemo(() => {
@@ -1329,18 +1387,47 @@ export default function PayrollDashboard() {
   }, [payrollRecords, missingDetails]);
   const people = (n: number) => `${n} ${n === 1 ? "employee" : "employees"}`;
 
-  const handleApproveRun = () =>
-    changeRunStatus(
+  // each country's readiness for approval (FIG-905): one Approve approves every country that is ready
+  const readiness: CountryReadiness[] = useMemo(
+    () =>
+      countryReadiness({
+        employees: onPayroll,
+        branches: companyBranches,
+        payslips: payrollRecords,
+        runCountries,
+        runStarted: !!monthRun,
+        ratesByCountry: ratesByCountry ?? new Map(),
+        belowMinimum,
+      }),
+    [onPayroll, companyBranches, payrollRecords, runCountries, monthRun, ratesByCountry, belowMinimum],
+  );
+  const readyCountries = countriesToApprove(readiness);
+  const countriesIn = (status: PayrollRunStatus) =>
+    monthRun && runCountries.length === 0
+      ? monthRun.status === status ? ["Kenya"] : []
+      : runCountries.filter((c) => c.status === status).map((c) => c.country);
+  const listOf = (cs: string[]) => cs.join(", ");
+  const currencyTotals = useMemo(() => totalsByCurrency(finalFilteredRecords), [finalFilteredRecords]);
+
+  const approveCountries = (countries: string[]) => {
+    const ready = readiness.filter((r) => countries.includes(r.country));
+    return changeCountries(
+      countries,
       "approved",
       {
-        title: `Approve payroll for ${periodLabel}?`,
+        title: countries.length === readiness.filter((r) => r.payslips > 0 || r.employees > 0).length ? `Approve payroll for ${periodLabel}?` : `Approve ${listOf(countries)} for ${periodLabel}?`,
         message: [
-          `${people(payrollRecords.length)}, net pay KSh ${Math.round(runNetPay).toLocaleString()}.`,
+          approvalSummary(readiness),
+          ...ready.map((r) => `${r.country}: ${people(r.payslips)}, net pay ${moneyRounded(r.totals.net, r.currency)}.`),
+          ...ready.flatMap((r) => r.warnings.map((w) => `${r.country}: ${w}.`)),
           runMissingDetails
-            ? `${people(runMissingDetails)} ${runMissingDetails === 1 ? "is" : "are"} missing a KRA PIN, NSSF or SHA number, or payment details (see "Employees' pay").`
+            ? `${people(runMissingDetails)} ${runMissingDetails === 1 ? "is" : "are"} missing a tax PIN, statutory number, or payment details (see "Employees' pay").`
             : "",
           returnsGaps
             ? `${people(returnsGaps)} ${returnsGaps === 1 ? "is" : "are"} missing details the P10, SHA or NSSF returns need (see the returns check).`
+            : "",
+          readiness.some((r) => r.state === "blocked" || r.state === "waiting")
+            ? "Countries that aren't ready stay as they are and can be approved later."
             : "",
           "Payslips will be locked and staff will be able to see them.",
         ]
@@ -1348,30 +1435,43 @@ export default function PayrollDashboard() {
           .join("\n\n"),
         confirmLabel: "Approve payroll",
       },
-      `Payroll for ${periodLabel} approved. Staff can now see their payslips.`,
+      `Payroll for ${periodLabel} approved for ${listOf(countries)}. Staff there can now see their payslips.`,
     );
+  };
 
-  const handleReopenRun = () =>
-    changeRunStatus(
+  const handleApproveRun = () => {
+    if (readyCountries.length === 0) {
+      toast.error("No country is ready to approve yet: see By country.");
+      return;
+    }
+    return approveCountries(readyCountries);
+  };
+
+  const reopenCountries = (countries: string[]) =>
+    changeCountries(
+      countries,
       "draft",
       {
-        title: `Reopen payroll for ${periodLabel}?`,
+        title: `Reopen payroll for ${periodLabel}${countries.length === 1 && runCountries.length > 1 ? ` in ${countries[0]}` : ""}?`,
         message: "Staff won't see these payslips until it is approved again.",
         confirmLabel: "Reopen",
       },
-      `Payroll for ${periodLabel} reopened as a draft.`,
+      `Payroll for ${periodLabel} reopened as a draft (${listOf(countries)}).`,
     );
+  const handleReopenRun = () => reopenCountries(countriesIn("approved"));
 
-  const handleMarkRunPaid = () =>
-    changeRunStatus(
+  const markCountriesPaid = (countries: string[]) =>
+    changeCountries(
+      countries,
       "paid",
       {
-        title: `Mark payroll for ${periodLabel} as paid?`,
+        title: `Mark payroll for ${periodLabel}${countries.length === 1 && runCountries.length > 1 ? ` in ${countries[0]}` : ""} as paid?`,
         message: "This can't be undone: the payslips stay locked for good.",
         confirmLabel: "Mark as paid",
       },
-      `Payroll for ${periodLabel} marked as paid.`,
+      `Payroll for ${periodLabel} marked as paid (${listOf(countries)}).`,
     );
+  const handleMarkRunPaid = () => markCountriesPaid(countriesIn("approved"));
 
   const handleDiscardRun = async () => {
     if (
@@ -1386,8 +1486,25 @@ export default function PayrollDashboard() {
       return;
     setRunBusy(true);
     try {
-      await discardDraftRun(monthRun.id);
+      // only draft countries' payslips go; an approved country's stay (the run goes when nothing is left)
+      const locked = runCountries.some((c) => c.status !== "draft");
+      if (locked) await discardDraftCountries(monthRun.id, countriesIn("draft"));
+      else await discardDraftRun(monthRun.id);
       toast.success(`Draft payroll for ${periodLabel} discarded.`);
+      setRunVersion((v) => v + 1);
+    } catch (err) {
+      toast.error(runErrorMessage(err, "Could not discard the draft."));
+    } finally {
+      setRunBusy(false);
+    }
+  };
+
+  const discardCountry = async (country: string) => {
+    if (!monthRun || !(await confirmDialog({ title: `Discard ${country}'s draft payroll for ${periodLabel}?`, message: "Its saved payslips are deleted.", confirmLabel: "Discard", tone: "danger" }))) return;
+    setRunBusy(true);
+    try {
+      await discardDraftCountries(monthRun.id, [country]);
+      toast.success(`${country}'s draft for ${periodLabel} discarded.`);
       setRunVersion((v) => v + 1);
     } catch (err) {
       toast.error(runErrorMessage(err, "Could not discard the draft."));
@@ -1685,7 +1802,30 @@ export default function PayrollDashboard() {
           periodLabel={periodLabel}
           payPeriod={actualPeriod}
           companyBranches={companyBranches}
+          readiness={readiness}
+          countryActions={{
+            onApprove: (c) => void approveCountries([c]),
+            onReopen: (c) => void reopenCountries([c]),
+            onMarkPaid: (c) => void markCountriesPaid([c]),
+            onDiscard: (c) => void discardCountry(c),
+          }}
+          runBarCountries={
+            readiness.length > 1 || runCountries.length > 1 || notCalculated.length > 0
+              ? {
+                  ready: readyCountries.length,
+                  draft: !!monthRun && (monthRun.status === "draft" || readiness.some((r) => r.state === "ready" || r.state === "blocked")),
+                  approved: countriesIn("approved").length > 0,
+                  summary: approvalSummary(readiness),
+                }
+              : undefined
+          }
+          currencyTotals={currencyTotals}
+          countryOptions={[...new Set([...readiness.map((r) => r.country)])].sort(countryOrder)}
+          selectedCountry={selectedCountry}
+          setSelectedCountry={setSelectedCountry}
           payrollRecords={payrollRecords}
+          returnsEmployees={kenyaOnPayroll}
+          onBelowMinimum={setBelowMinimum}
           onDownloadPdf={() => {
             try {
               downloadPayrollRegisterPdf(finalFilteredRecords, { periodLabel, companyName: companyInfo?.company_name });
@@ -1736,9 +1876,10 @@ export default function PayrollDashboard() {
           itemsPerPage={itemsPerPage}
           payslipEmails={
             <EmailPayslipsPanel
-              run={monthRun}
+              // the payslips of approved countries are emailed (a draft country's wait for its approval)
+              run={monthRun && approvedCountries.size > 0 ? { ...monthRun, status: monthRun.status === "paid" ? "paid" : "approved" } : monthRun}
               periodLabel={periodLabel}
-              records={payrollRecords}
+              records={approvedRecords}
               companyInfo={companyInfo}
               idNumberFor={(number) => employees.find((e: any) => e["Employee Number"] === number)?.["ID Number"]}
               canEmail={canEditRates}
@@ -1827,6 +1968,7 @@ export default function PayrollDashboard() {
         <PayrollFilesTab
           periodLabel={periodLabel}
           run={monthRun}
+          runCountries={runCountries}
           onOpenP9={() => setShowP9Modal(true)}
           onOpenExport={() => setShowExportModal(true)}
           onGoToRun={() => setTab("run")}
@@ -1975,7 +2117,8 @@ export default function PayrollDashboard() {
       <P9FormGenerator
         isOpen={showP9Modal}
         onClose={() => setShowP9Modal(false)}
-        records={payrollRecords}
+        // the P9 is Kenya's tax card
+        records={payrollRecords.filter((r: any) => payslipCountry(r) === "Kenya")}
         companyInfo={companyInfo}
       />
 

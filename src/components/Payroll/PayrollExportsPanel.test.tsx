@@ -69,7 +69,7 @@ describe('PayrollExportsPanel', () => {
   it('offers each file with its row count, using the rates of the month’s last day', async () => {
     render(<PayrollExportsPanel run={run} />);
     expect(await screen.findByText('KRA PAYE (P10)')).toBeTruthy();
-    expect(screen.getAllByText(/2 rows/)).toHaveLength(4); // P10, SHA, NSSF, Equity (M-Pesa and bank together)
+    expect(screen.getAllByText(/2 rows/)).toHaveLength(5); // P10, SHA, NSSF, housing levy, Equity (M-Pesa and bank together)
     expect(screen.getAllByText(/1 row,/)).toHaveLength(3); // M-Pesa, bank, NITA levy (only E1 has a levy)
     expect(data.rateDays).toEqual(['2026-10-31']);
   });
@@ -81,7 +81,7 @@ describe('PayrollExportsPanel', () => {
     expect(totals.textContent).toContain('NITA levy');
     expect(totals.textContent).toContain('KSh 50.00');
     expect(totals.textContent).toContain('Employer only, 1 employee');
-    fireEvent.click(screen.getAllByRole('button', { name: /Download CSV/ })[6]);
+    fireEvent.click(screen.getAllByRole('button', { name: /Download CSV/ })[4]); // Kenya: P10, SHA, NSSF, housing levy, NITA, then payments
     expect(saved.files.map((f) => f.name)).toEqual(['nita-levy-2026-10.csv']);
     expect(await readBlob(saved.files[0].blob)).toBe(['PAYROLL NUMBER,EMPLOYEE NAME,ID NO,KRA PIN,NITA NO,LEVY', 'PR-00001,Amina Wanjiru,,A012345678Z,,50.00', ''].join(String.fromCharCode(13, 10)));
   });
@@ -89,7 +89,7 @@ describe('PayrollExportsPanel', () => {
   it('downloads a CSV named after the file and month', async () => {
     render(<PayrollExportsPanel run={run} />);
     await screen.findByText('KRA PAYE (P10)');
-    fireEvent.click(screen.getAllByRole('button', { name: /Download CSV/ })[3]); // M-Pesa
+    fireEvent.click(screen.getAllByRole('button', { name: /Download CSV/ })[5]); // M-Pesa
     expect(saved.files.map((f) => f.name)).toEqual(['bulk-pay-mpesa-2026-10.csv']);
     expect(await readBlob(saved.files[0].blob)).toBe('Phone Number,Name,Amount,Reference,Payroll Number\r\n254712345678,Amina Wanjiru,40000.00,Salary 2026-10,PR-00001\r\n');
   });
@@ -97,8 +97,8 @@ describe('PayrollExportsPanel', () => {
   it('offers each file as Excel too, with the same rows and every cell as text', async () => {
     render(<PayrollExportsPanel run={run} />);
     await screen.findByText('KRA PAYE (P10)');
-    expect(screen.getAllByRole('button', { name: /Download Excel/ })).toHaveLength(7);
-    fireEvent.click(screen.getAllByRole('button', { name: /Download Excel/ })[3]); // M-Pesa
+    expect(screen.getAllByRole('button', { name: /Download Excel/ })).toHaveLength(8);
+    fireEvent.click(screen.getAllByRole('button', { name: /Download Excel/ })[5]); // M-Pesa
     expect(saved.files.map((f) => f.name)).toEqual(['bulk-pay-mpesa-2026-10.xlsx']);
     const book = XLSX.read(await readBytes(saved.files[0].blob), { type: 'array' });
     expect(book.SheetNames).toEqual(['M-Pesa bulk pay']);
@@ -130,12 +130,12 @@ describe('PayrollExportsPanel', () => {
   it('asks for the company’s Equity account before the Eazzy Biz file can be downloaded', async () => {
     render(<PayrollExportsPanel run={run} />);
     await screen.findByText('Equity Bank (Eazzy Biz)');
-    const download = screen.getAllByRole('button', { name: /Download CSV/ })[5] as HTMLButtonElement;
+    const download = screen.getAllByRole('button', { name: /Download CSV/ })[7] as HTMLButtonElement;
     expect(download.disabled).toBe(true);
     fireEvent.change(screen.getByLabelText(/Equity account salaries are paid from/), { target: { value: '0123 456 789' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText('Paid from Equity account 0123456789')).toBeTruthy();
-    fireEvent.click(screen.getAllByRole('button', { name: /Download CSV/ })[5]);
+    fireEvent.click(screen.getAllByRole('button', { name: /Download CSV/ })[7]);
     expect(saved.files.map((f) => f.name)).toEqual(['equity-eazzy-biz-2026-10.csv']);
   });
 });

@@ -196,7 +196,7 @@ export default function Branches() {
         )}
       </Card>
       <p className="mt-2 mb-0 text-[11.5px] text-muted-foreground">
-        People with no branch are in the default branch. Payroll for Tanzania and Uganda comes next: until then their payslips are worked out with Kenya's rules.
+        People with no branch are in the default branch. Each person is paid on their branch's country's payroll rules, in its currency; until a country's rules are in (Tanzania and Uganda come next), its staff wait on the Run tab and are never paid on another country's rules.
       </p>
 
       {draft && (

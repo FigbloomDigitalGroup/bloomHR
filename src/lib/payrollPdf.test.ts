@@ -3,7 +3,7 @@
 // Builds real PDFs (no mocked jsPDF): the table plugin must actually draw, which is what broke when
 // jspdf-autotable 5 stopped adding doc.autoTable on import.
 import { describe, expect, it } from 'vitest';
-import { payrollRegisterPdf, registerFigures } from './payrollPdf';
+import { payrollRegisterPdf, registerByCountry, registerFigures } from './payrollPdf';
 
 const rows = [
   { employee_id: 'MCL-000001', employee_name: 'Amina Wanjiru', department: 'Finance', basic_salary: 80000, gross_pay: 95000,
@@ -48,5 +48,17 @@ describe('payroll register PDF', () => {
     expect(pdf).toContain('Payroll register: October 2026');
     expect(pdf).toContain('Amina Wanjiru');
     expect(pdf).toContain('125,000');
+  });
+
+  it('groups the register by country with a subtotal per currency, never one sum (FIG-905)', () => {
+    const tz = { employee_id: 'T1', employee_name: 'Baraka Mushi', department: 'Ops', basic_salary: 900000, gross_pay: 900000, total_deductions: 0, net_pay: 900000, country: 'Tanzania', currency: 'TZS' };
+    const groups = registerByCountry([tz, ...rows]);
+    expect(groups.map((g) => [g.country, g.currency, g.lines.length, g.totals[4]])).toEqual([['Kenya', 'KES', 2, 125000], ['Tanzania', 'TZS', 1, 900000]]);
+    // (the PDF escapes brackets in its text)
+    const pdf = payrollRegisterPdf([tz, ...rows], { periodLabel: 'October 2026' }).output().replace(/\\([()])/g, '$1');
+    expect(pdf).toContain('Kenya (KES): 2 employees');
+    expect(pdf).toContain('Tanzania (TZS): 1 employee');
+    expect(pdf).toContain('Kenya total (KSh)');
+    expect(pdf).not.toContain('1,025,000');
   });
 });
