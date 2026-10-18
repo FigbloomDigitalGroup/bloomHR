@@ -73,6 +73,9 @@ export interface ContractJob {
   status: JobStatus;
   completed_at: string | null;
   completion_notes: string | null;
+  /** a photo or document the worker added when marking it done (private 'work-files' bucket) */
+  completion_file?: string | null;
+  completion_file_name?: string | null;
   sent_back_reason: string | null;
   approved_at: string | null;
   paid_out_at: string | null;
@@ -119,9 +122,11 @@ export interface WorkImport {
 export interface WorkSettings {
   supervisor_work_needs_approval: boolean;
   payout_reserve_rate: number;
+  /** how many days back a worker may record their own work in the staff portal (never a future day) */
+  self_work_past_days: number;
 }
 
-export const DEFAULT_WORK_SETTINGS: WorkSettings = { supervisor_work_needs_approval: true, payout_reserve_rate: 0.1 };
+export const DEFAULT_WORK_SETTINGS: WorkSettings = { supervisor_work_needs_approval: true, payout_reserve_rate: 0.1, self_work_past_days: 7 };
 
 export const UNIT_SUGGESTIONS = ['kg', 'crate', 'piece', 'row', 'bag', 'tree', 'bunch', 'day', 'hour'];
 

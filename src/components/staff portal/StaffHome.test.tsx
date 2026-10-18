@@ -218,4 +218,16 @@ describe('StaffHome', () => {
     expect(nav.getByRole('button', { name: 'Payslips' })).toBeTruthy();
     await screen.findByText('Nothing assigned to you right now');
   });
+
+  it('shows a My work link only to someone paid by work or given jobs', async () => {
+    const { setActiveTab } = renderHome({ showMyWork: true });
+    const nav = within(screen.getByRole('navigation', { name: 'Quick links' }));
+    fireEvent.click(nav.getByRole('button', { name: 'My work' }));
+    expect(setActiveTab).toHaveBeenCalledWith('my-work');
+    await screen.findByText('Nothing assigned to you right now');
+    cleanup();
+    renderHome();
+    expect(within(screen.getByRole('navigation', { name: 'Quick links' })).queryByRole('button', { name: 'My work' })).toBeNull();
+    await screen.findByText('Nothing assigned to you right now');
+  });
 });

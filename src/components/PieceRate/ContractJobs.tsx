@@ -5,6 +5,7 @@ import { Button, Card, EmptyState, Modal, StatusPill, TabBar, TableScroll } from
 import { formatKsh, longDate } from '../../lib/casualPay';
 import { createJob, loadJobs, moveJob } from '../../lib/pieceRateApi';
 import { JOB_STATUS_LABEL, KIND_LABEL, personName, type ContractJob, type JobStatus, type WorkPerson } from '../../lib/pieceRate';
+import { openPrivateFile } from '../../lib/privateFiles';
 
 // Contract jobs: a set amount for a piece of work, paid only once it is completed and approved. Payroll or the
 // worker's supervisor gives the job; the worker (in the staff portal) or the supervisor marks it completed; payroll or
@@ -146,6 +147,12 @@ export default function ContractJobs({ people, canManage, onChanged }: Props) {
                         <div className="font-semibold text-ink">{j.title}</div>
                         {j.description && <div className="text-[11px] text-muted-foreground">{j.description}</div>}
                         {j.completion_notes && j.status !== 'open' && <div className="text-[11px] text-muted-foreground">Done: {j.completion_notes}</div>}
+                        {j.completion_file && j.status !== 'open' && (
+                          <button type="button" className="text-[11px] font-semibold text-brand"
+                            onClick={() => openPrivateFile('work-files', j.completion_file as string).catch((e) => toast.error((e as Error).message))}>
+                            View {j.completion_file_name || 'file'}
+                          </button>
+                        )}
                         {j.sent_back_reason && j.status === 'open' && <div className="text-[11px] text-status-danger">Sent back: {j.sent_back_reason}</div>}
                       </td>
                       <td className="px-3 py-2">

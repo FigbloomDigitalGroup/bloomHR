@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Cake, CalendarClock, CalendarDays, Check, CircleCheck, HandCoins, ListChecks, MessageCircle, PartyPopper, Plane,
-  ReceiptText, User, WalletCards,
+  ReceiptText, Sprout, User, WalletCards,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import StatusPill from '../UI/StatusPill';
@@ -16,7 +16,7 @@ import { comingUp, inDaysLabel, shortDay, type EventRow, type HolidayRow, type L
 import { upcomingBirthdays, type UpcomingItem } from '../../lib/celebrations';
 import { statusLabel, type Task } from '../../lib/tasks';
 import {
-  STATUS_TONES, WEEK_DAYS, countsLine, dueBucket, dueLabel, orderMyTasks, quickLinks, taskCounts, withinDays,
+  MY_WORK_LINK, STATUS_TONES, WEEK_DAYS, countsLine, dueBucket, dueLabel, orderMyTasks, quickLinks, taskCounts, withinDays,
   type QuickLinkIcon,
 } from '../../lib/staffHome';
 
@@ -29,13 +29,15 @@ interface StaffHomeProps {
   userName: string;
   /** opens Tasks with this task open (falls back to the Tasks list) */
   onOpenTask?: (taskId: string) => void;
+  /** paid by work or given contract jobs: a "My work" quick link (FIG-812) */
+  showMyWork?: boolean;
 }
 
 /**
  * The staff portal home: a greeting, "My tasks" (a quick look at what is assigned to me, overdue first), "This week"
  * (events, public holidays, birthdays and my own leave in the next 7 days) and quick links at the bottom.
  */
-export default function StaffHome({ setActiveTab, userName, onOpenTask }: StaffHomeProps) {
+export default function StaffHome({ setActiveTab, userName, onOpenTask, showMyWork }: StaffHomeProps) {
   const [employeeNumber, setEmployeeNumber] = useState<string | null | undefined>(undefined);
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [projects, setProjects] = useState<Record<string, string>>({});
@@ -124,7 +126,7 @@ export default function StaffHome({ setActiveTab, userName, onOpenTask }: StaffH
         />
       </div>
 
-      <QuickLinks onOpen={setActiveTab} />
+      <QuickLinks onOpen={setActiveTab} showMyWork={showMyWork} />
     </div>
   );
 }
@@ -372,10 +374,11 @@ const LINK_ICONS: Record<QuickLinkIcon, ReactNode> = {
   profile: <User className="w-5 h-5" strokeWidth={1.75} />,
   advance: <WalletCards className="w-5 h-5" strokeWidth={1.75} />,
   loans: <HandCoins className="w-5 h-5" strokeWidth={1.75} />,
+  work: <Sprout className="w-5 h-5" strokeWidth={1.75} />,
 };
 
-function QuickLinks({ onOpen }: { onOpen: (tab: string) => void }) {
-  const links = quickLinks();
+function QuickLinks({ onOpen, showMyWork }: { onOpen: (tab: string) => void; showMyWork?: boolean }) {
+  const links = showMyWork ? [MY_WORK_LINK, ...quickLinks()] : quickLinks();
   return (
     <nav aria-label="Quick links" className="space-y-2">
       <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Quick links</h3>
