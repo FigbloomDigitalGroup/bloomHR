@@ -63,8 +63,8 @@ describe("Kenya's public holidays", () => {
     ]);
   });
 
-  it('other countries: none yet', async () => {
-    expect(await list('Uganda', 2026)).toEqual([]);
+  it('countries without a list yet (Tanzania and Uganda have theirs since FIG-905): none', async () => {
+    expect(await list('Rwanda', 2026)).toEqual([]);
   });
 });
 
@@ -95,6 +95,6 @@ describe("each company's list", () => {
 
   it('the Holidays tab is told the country and whether its holidays are known', async () => {
     const c = (await asUser(db, HR, () => rows<{ c: { country: string; supported: boolean } }>(`select public_holidays_country() c`)))[0].c;
-    expect(c).toEqual({ country: 'Kenya', supported: true });
+    expect(c).toEqual({ country: 'Kenya', supported: true, countries: [{ country: 'Kenya', supported: true }] });
   });
 });

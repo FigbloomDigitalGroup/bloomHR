@@ -52,6 +52,7 @@ const UserRolesSettings = lazy(() => import('./components/Settings/UserRole'));
 const CompanyProfilePage = lazy(() => import('./components/Settings/CompanyProfile'));
 const JobGroupsPage = lazy(() => import('./components/Settings/JobGroups'));
 const JobTitlesPage = lazy(() => import('./components/Settings/JobTitles'));
+const BranchesPage = lazy(() => import('./components/Settings/Branches'));
 const AuditTrailPage = lazy(() => import('./components/Settings/AuditTrail'));
 const SalaryAdvanceAdmin = lazy(() => import('./components/Settings/SalaryAdmin'));
 const LoansAdmin = lazy(() => import('./components/Loans/LoansAdmin'));
@@ -1154,6 +1155,15 @@ function App() {
                                   element={
                                     <AuthRoute>
                                       <JobGroupsPage />
+                                    </AuthRoute>
+                                  }
+                                />
+                                {/* everyone in the company reads branches; ADMIN, Employees and Settings change them (FIG-905) */}
+                                <Route
+                                  path="/settings/branches"
+                                  element={
+                                    <AuthRoute>
+                                      <BranchesPage />
                                     </AuthRoute>
                                   }
                                 />

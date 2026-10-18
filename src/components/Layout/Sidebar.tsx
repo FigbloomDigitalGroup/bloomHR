@@ -30,7 +30,7 @@ import {
   HardHat,
   Timer,
   Sprout,
-  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature, History, Sparkles, BriefcaseBusiness
+  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature, History, Sparkles, BriefcaseBusiness, MapPin
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useMyPreferences } from '../../hooks/useMyPreferences';
@@ -107,6 +107,8 @@ const menuGroups = [
       { id: 'settings', label: 'Settings', icon: Settings, path: '/settings', permission: 'settings' },
       { id: 'setup-assistant', label: 'Set up with AI', icon: Sparkles, path: '/setup-assistant', permission: 'settings' },
       { id: 'departments', label: 'Departments', icon: Building2, path: '/departments', permission: 'employees' },
+      // offices, each in a country (FIG-905): holidays and the minimum wage follow an employee's branch
+      { id: 'branches', label: 'Branches', icon: MapPin, path: '/settings/branches', anyPermission: ['employees', 'settings'] },
       // the job titles list (KPI templates can be set per title): HR and the Employees module
       { id: 'job-titles', label: 'Job titles', icon: BriefcaseBusiness, path: '/settings/job-titles', anyPermission: ['employees'], orRoles: ['HR'] },
       { id: 'audit-trail', label: 'Audit Trail', icon: History, path: '/settings/audit-trail', permission: 'settings' },

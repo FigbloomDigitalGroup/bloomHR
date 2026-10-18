@@ -115,6 +115,20 @@ describe('country from the company', () => {
   });
 });
 
+describe('country from the branch (FIG-905)', () => {
+  it("an employee in a Tanzania branch gets Tanzania's amount; the rest keep the company's", async () => {
+    await db.exec(`insert into branches (tenant_id, name, country) values ('${A}', 'Dar es Salaam', 'Tanzania')`);
+    await db.exec(`update employees set branch_id = (select id from branches where tenant_id = '${A}' and name = 'Dar es Salaam')
+                   where "Employee Number" = 'W1'`);
+    const list = await read<{ employee_number: string; country: string; monthly_amount: string; currency: string }>(PAY,
+      `select * from employee_minimum_wages('2026-06-30') order by employee_number`);
+    expect(list.map((r) => [r.employee_number, r.country, r.monthly_amount, r.currency])).toEqual([
+      ['E1', 'Kenya', '16000.00', 'KES'], ['W1', 'Tanzania', '250000.00', 'TZS'],
+    ]);
+    await db.exec(`update employees set branch_id = null, "Branch" = null where "Employee Number" = 'W1'`);
+  });
+});
+
 describe("the month's work days", () => {
   it('counts distinct days with approved work, and the month of approved work and jobs', async () => {
     await as(PAY, `insert into work_types (name, unit, rate) values ('Crates', 'crate', 50)`);

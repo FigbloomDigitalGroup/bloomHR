@@ -18,6 +18,25 @@ export interface HolidayRow {
   name: string;
   date: string;
   recurring?: boolean | null;
+  /** only for staff in this country (FIG-905); null = every country */
+  country?: string | null;
+}
+
+/** The holidays for someone in this country: those with no country and the country's own. No country: all of them. */
+export function holidaysForCountry<T extends HolidayRow>(holidays: T[], country: string | null | undefined): T[] {
+  const c = (country || '').trim().toLowerCase();
+  if (!c) return holidays;
+  return holidays.filter((h) => !h.country || h.country.trim().toLowerCase() === c);
+}
+
+/**
+ * Every holiday, with its country after the name ("Karume Day (Tanzania)") when the list has holidays for more than one
+ * country; a one-country list is left as it is.
+ */
+export function withCountryTags<T extends HolidayRow>(holidays: T[]): T[] {
+  const countries = new Set(holidays.map((h) => (h.country || '').trim().toLowerCase()).filter(Boolean));
+  if (countries.size < 2) return holidays;
+  return holidays.map((h) => (h.country ? { ...h, name: `${h.name} (${h.country})` } : h));
 }
 
 export interface LeaveRow {

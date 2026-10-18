@@ -90,6 +90,7 @@ import { usePayslipOverrides } from "../../hooks/usePayslipOverrides";
 import { confirmDialog, type DialogOptions } from "../../lib/confirmDialog";
 import { PAYROLL_TABS, usePayrollTab } from "./payrollTabs";
 import PayrollRunTab from "./PayrollRunTab";
+import { useBranches } from "../../hooks/useBranches";
 import PayrollEmployeesTab from "./PayrollEmployeesTab";
 import PayrollDeductionsTab from "./PayrollDeductionsTab";
 import PayrollEarningsTab from "./PayrollEarningsTab";
@@ -163,6 +164,8 @@ export default function PayrollDashboard() {
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [currentRecordIndex, setCurrentRecordIndex] = useState<number | null>(null);
   const [employees, setEmployees] = useState<any[]>([]);
+  // the company's branches (FIG-905): the Run tab shows each employee's branch and flags staff outside Kenya
+  const { branches: companyBranches } = useBranches();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [departments, setDepartments] = useState(["all"]);
@@ -1681,6 +1684,7 @@ export default function PayrollDashboard() {
         <PayrollRunTab
           periodLabel={periodLabel}
           payPeriod={actualPeriod}
+          companyBranches={companyBranches}
           payrollRecords={payrollRecords}
           onDownloadPdf={() => {
             try {

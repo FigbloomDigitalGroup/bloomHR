@@ -119,7 +119,11 @@ type Holiday = {
   recurring: boolean;
   // 'auto': added from the country's public holidays (FIG-884); 'manual': added here
   source?: 'manual' | 'auto';
+  // only for staff in this country (FIG-905); null = every country
+  country?: string | null;
 };
+
+type HolidayCountries = { country: string; supported: boolean; countries?: { country: string; supported: boolean }[] };
 
 type LeaveApplication = {
   id: string;
@@ -1104,6 +1108,13 @@ const LeaveTypeFormModal = ({
   );
 };
 
+// "Kenya's" or "Kenya's, Tanzania's and Uganda's" (the countries whose lists we have)
+const holidayCountryNames = (c: HolidayCountries) => {
+  const names = (c.countries?.filter((x) => x.supported).map((x) => x.country) ?? []);
+  const list = (names.length ? names : [c.country]).map((n) => `${n}'s`);
+  return list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0];
+};
+
 // Holiday Form Modal
 const HolidayFormModal = ({
   isOpen,
@@ -1111,7 +1122,8 @@ const HolidayFormModal = ({
   newHoliday,
   setNewHoliday,
   handleSaveHoliday,
-  handleAddHoliday
+  handleAddHoliday,
+  countries = []
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -1119,6 +1131,8 @@ const HolidayFormModal = ({
   setNewHoliday: React.Dispatch<React.SetStateAction<any>>;
   handleSaveHoliday: (holiday: Holiday) => void;
   handleAddHoliday: () => void;
+  /** the countries the company has branches in (FIG-905): a holiday can be for one of them only */
+  countries?: string[];
 }) => {
   if (!isOpen) return null;
 
@@ -1174,6 +1188,25 @@ const HolidayFormModal = ({
             />
             <label className="ml-2 text-xs text-gray-700">Recurring holiday (every year)</label>
           </div>
+
+          {(countries.length > 1 || newHoliday.country) && (
+            <div>
+              <label htmlFor="holiday-country" className="block text-xs font-medium text-gray-700 mb-1">
+                For staff in
+              </label>
+              <select
+                id="holiday-country"
+                value={newHoliday.country || ''}
+                onChange={(e) => setNewHoliday((prev: any) => ({ ...prev, country: e.target.value || null }))}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-xs focus:ring-2 focus:ring-brand/20 focus:border-brand"
+              >
+                <option value="">Every country</option>
+                {[...new Set([...countries, ...(newHoliday.country ? [newHoliday.country] : [])])].map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 pt-6">
@@ -1580,7 +1613,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   // reloads the holidays after public holidays are added; the country they come from (FIG-884)
   const [holidaysReloadKey, setHolidaysReloadKey] = useState(0);
-  const [holidayCountry, setHolidayCountry] = useState<{ country: string; supported: boolean } | null>(null);
+  const [holidayCountry, setHolidayCountry] = useState<HolidayCountries | null>(null);
   const [holidayYear, setHolidayYear] = useState(new Date().getFullYear() + 1);
   const [addingHolidays, setAddingHolidays] = useState(false);
   const [leaveApplications, setLeaveApplications] = useState<LeaveApplication[]>([]);
@@ -2131,7 +2164,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
         console.error('Error fetching holidays:', err);
       }
       const { data: country } = await supabase.rpc('public_holidays_country');
-      if (country) setHolidayCountry(country as { country: string; supported: boolean });
+      if (country) setHolidayCountry(country as HolidayCountries);
     };
 
     if (activeTab === 'holidays') {
@@ -2547,7 +2580,8 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
           .insert([{
             name: holiday.name,
             date: holiday.date,
-            recurring: holiday.recurring
+            recurring: holiday.recurring,
+            country: holiday.country || null
           }])
           .select();
 
@@ -2563,7 +2597,8 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
           .update({
             name: holiday.name,
             date: holiday.date,
-            recurring: holiday.recurring
+            recurring: holiday.recurring,
+            country: holiday.country || null
           })
           .eq('id', holiday.id);
 
@@ -2911,7 +2946,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
                   disabled={addingHolidays}
                   className="inline-flex items-center gap-2 px-3 py-1.5 border border-primary text-primary hover:bg-primary/10 rounded-lg text-xs font-medium disabled:opacity-50"
                 >
-                  {addingHolidays ? 'Adding...' : `Add ${holidayCountry.country}'s public holidays`}
+                  {addingHolidays ? 'Adding...' : `Add ${holidayCountryNames(holidayCountry)} public holidays`}
                 </button>
               </>
             )}
@@ -2928,7 +2963,9 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
         <p className="mt-3 mb-0 text-[11px] text-gray-500">
           {holidayCountry && !holidayCountry.supported
             ? `We don't have ${holidayCountry.country}'s public holidays yet: add them here with Add Holiday.`
-            : `${holidayCountry?.country ?? 'Your country'}'s public holidays are added for this year and next, and every December for the year after. Eid al-Fitr and holidays gazetted at short notice can't be worked out ahead: add those here when they're announced.`}
+            : `${holidayCountry ? holidayCountryNames(holidayCountry) : "Your country's"} public holidays are added for this year and next, and every December for the year after. Eid al-Fitr, Eid al-Adha, Maulid and holidays gazetted at short notice can't be worked out ahead: add those here when they're announced (for the right country).`}
+          {(holidayCountry?.countries || []).some((c) => !c.supported) &&
+            ` We don't have ${(holidayCountry?.countries || []).filter((c) => !c.supported).map((c) => c.country).join(', ')}'s list yet: add those with Add Holiday.`}
         </p>
       </div>
 
@@ -2939,6 +2976,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
               <th className="text-left py-3 px-4 text-gray-700 font-base">Holiday Name</th>
               <th className="text-left py-3 px-4 text-gray-700 font-base">Date</th>
               <th className="text-left py-3 px-4 text-gray-700 font-base">Recurring</th>
+              <th className="text-left py-3 px-4 text-gray-700 font-base">For staff in</th>
               <th className="text-center py-3 px-4 text-gray-700 font-base">Actions</th>
             </tr>
           </thead>
@@ -2959,6 +2997,9 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
                     }`}>
                     {holiday.recurring ? 'Yes' : 'No'}
                   </span>
+                </td>
+                <td className="py-4 px-4">
+                  <p className="text-gray-700">{holiday.country || 'Every country'}</p>
                 </td>
                 <td className="py-4 px-4">
                   <div className="flex justify-center gap-1">
@@ -3339,6 +3380,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
           setNewHoliday={setNewHoliday}
           handleSaveHoliday={handleSaveHoliday}
           handleAddHoliday={handleAddHoliday}
+          countries={(holidayCountry?.countries || []).map((c) => c.country)}
         />
       )}
       {showAccrualSettings && (

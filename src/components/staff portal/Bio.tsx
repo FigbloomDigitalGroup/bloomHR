@@ -14,6 +14,7 @@ import StatusPill from '../UI/StatusPill';
 import { User, Briefcase, CreditCard, Phone, MapPin } from 'lucide-react';
 import { PAYMENT_METHODS, paymentMethodOption } from '../../lib/paymentMethods';
 import { loadEmployeeFieldValues } from '../../lib/employeeOptions';
+import { type Branch, employeeBranch, loadBranches } from '../../lib/branches';
 
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'SHIF Number'?: string | null;
@@ -131,6 +132,16 @@ const EmployeeBioPage = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [userRole, setUserRole] = useState<string>('employee'); // Track user role
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // the company's branches (FIG-905): the profile shows the employee's branch and its country
+  const [branches, setBranches] = useState<Branch[]>([]);
+  useEffect(() => {
+    let stale = false;
+    loadBranches()
+      .then((list) => { if (!stale) setBranches(list); })
+      .catch(() => { /* the branch name still shows; only its country is missing */ });
+    return () => { stale = true; };
+  }, []);
+  const myBranch = branches.length ? employeeBranch(employee as Record<string, unknown>, branches) : undefined;
 
   // Phone number change request state
 
@@ -1123,13 +1134,18 @@ const EmployeeBioPage = () => {
                     label="Branch"
                     name="Branch"
                     type={isEditMode ? "select" : "text"}
-                    value={employee.Branch || ''}
+                    value={employee.Branch || myBranch?.name || ''}
                     onChange={handleInputChange}
                     options={dropdownOptions.branches}
                     disabled={!isEditMode || !canEditField('Branch')}
                     readOnly={!canEditField('Branch')}
                     isReadOnly={!canEditField('Branch')}
                   />
+                  {myBranch && (
+                    <p className="m-0 -mt-2 text-[11px] text-muted-foreground" data-testid="my-branch">
+                      {myBranch.name}, {myBranch.country}{myBranch.city ? ` (${myBranch.city})` : ''}. Your public holidays follow your branch's country.
+                    </p>
+                  )}
                   <FormField
                     label="Office Location"
                     name="Town"

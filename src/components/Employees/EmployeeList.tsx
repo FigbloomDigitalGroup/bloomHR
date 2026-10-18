@@ -28,6 +28,8 @@ import { ONBOARDING_STATUSES } from '../../lib/onboardingValidation';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
+import { useBranches } from '../../hooks/useBranches';
+import { branchOf } from '../../lib/branches';
 
 type Employee = Database['public']['Tables']['employees']['Row'];
 
@@ -62,6 +64,11 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [selectedBranch, setSelectedBranch] = useState('all');
+  // the company's branches, each in a country (FIG-905); people with none are in the default branch
+  const { branches: companyBranches } = useBranches();
+  const branchFor = (e: Employee) =>
+    branchOf({ branchId: (e as Employee & { branch_id?: string | null }).branch_id, branchName: e.Branch }, companyBranches);
+  const branchName = (e: Employee) => branchFor(e)?.name ?? e.Branch ?? '';
   const [selectedEmploymentType, setSelectedEmploymentType] = useState('all');
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   // how complete each person's own information is (they fill most of it in themselves)
@@ -215,7 +222,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
     // Search Fields: Name, ID, Email, Phone (every word typed must match one of them)
     const matchesSearch = employeeMatchesSearch(employee, searchTerm);
     const matchesDepartment = selectedDepartment === 'all' || employee['Employee Type'] === selectedDepartment;
-    const matchesBranch = selectedBranch === 'all' || employee.Branch === selectedBranch;
+    const matchesBranch = selectedBranch === 'all' || branchName(employee) === selectedBranch;
     const matchesEmploymentType = selectedEmploymentType === 'all' || employee.Town === selectedEmploymentType;
     const matchesProfile =
       selectedProfile === 'all' || (selectedProfile === INCOMPLETE ? !scoreOf(employee).complete : scoreOf(employee).complete);
@@ -250,7 +257,11 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
 
   // Get unique departments and branches for filters
   const departments = ['all', ...new Set(employees.map(e => e['Employee Type']).filter(Boolean) as string[])];
-  const branches = ['all', ...new Set(employees.map(e => e.Branch).filter(Boolean) as string[])];
+  const branches = ['all', ...new Set(
+    companyBranches.length
+      ? companyBranches.filter((b) => b.active).map((b) => b.name)
+      : (employees.map(e => e.Branch).filter(Boolean) as string[])
+  )];
   const townOptions = ['all', ...new Set(employees.map(e => e.Town).filter(Boolean) as string[])];
   const employmentTypes = townOptions; // Previous code aliased Town as employmentTypes prop?
 
@@ -491,8 +502,10 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                   <div className="truncate" title={employee['Job Title'] || ''}>{employee['Job Title'] || 'N/A'}</div>
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[9.5px] font-bold uppercase text-subtle">Location</div>
-                  <div className="truncate">{[employee.Branch, employee.Town].filter(Boolean).join(' / ') || 'N/A'}</div>
+                  <div className="text-[9.5px] font-bold uppercase text-subtle">Branch</div>
+                  <div className="truncate" title={branchFor(employee)?.country || ''}>
+                    {[branchFor(employee) ? `${branchFor(employee)?.name} · ${branchFor(employee)?.country}` : employee.Branch, employee.Town].filter(Boolean).join(' / ') || 'N/A'}
+                  </div>
                 </div>
               </div>
 

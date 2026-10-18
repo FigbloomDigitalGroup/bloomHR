@@ -1,14 +1,25 @@
 import { supabase } from './supabase';
 import { fetchAllResult } from './fetchAll';
-import type { EventRow, HolidayRow, LeaveRow, TaskRow } from './upcoming';
+import { holidaysForCountry, type EventRow, type HolidayRow, type LeaveRow, type TaskRow } from './upcoming';
 
 // Reading what the calendar's "Coming up" list and the leave form's hints need. Everyone can read the company's
 // holidays and events; tasks and leave are limited by row-level security, and asked for by employee number here.
 
 export async function loadHolidays(): Promise<HolidayRow[]> {
-  const { data, error } = await supabase.from('holidays').select('name, date, recurring');
+  const { data, error } = await supabase.from('holidays').select('name, date, recurring, country');
   if (error) throw error;
-  return (data ?? []) as HolidayRow[];
+  return holidaysForCountry((data ?? []) as HolidayRow[], await myHolidayCountry());
+}
+
+/** The signed-in employee's country (their branch's, FIG-905), or null when they aren't an employee or it can't be told. */
+export async function myHolidayCountry(): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.rpc('my_holiday_country');
+    if (error) return null;
+    return (data as string | null) || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function loadCompanyEvents(): Promise<EventRow[]> {

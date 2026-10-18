@@ -34,6 +34,8 @@ import { Pagination } from "./PayrollPagination";
 import { PayslipSettlementBlock, WhtDeductionLine, WorkEarningLines } from "./PayslipSettlement";
 import WorkSettlementCard from "./WorkSettlementCard";
 import MinimumWageWarning from "./MinimumWageWarning";
+import BranchCountryNotice from "./BranchCountryNotice";
+import { type Branch, employeeBranch, paidWithKenyaRules } from "../../lib/branches";
 
 // The Run tab: the month's payroll run (start, recalculate, approve, mark paid), the returns check, and the list of
 // employees on the payroll with their pay. The figures are worked out by PayrollDashboard; this only shows them.
@@ -87,6 +89,9 @@ interface PayrollRunTabProps {
   payrollRecords?: any[];
   /** the month, 'YYYY-MM' */
   payPeriod?: string;
+  /** the company's branches, each in a country (FIG-905): each employee's branch and country show, and staff outside
+   * Kenya are flagged (their payslips use Kenya's rules until their country's payroll comes) */
+  companyBranches?: Branch[];
   expandedRows: Set<unknown>;
   toggleRowExpand: (id: any, e: React.MouseEvent) => void;
   smsSendingStatus: Record<string, any>;
@@ -220,6 +225,7 @@ export default function PayrollRunTab({
   nitaLevy,
   payrollRecords,
   payPeriod,
+  companyBranches,
   expandedRows,
   toggleRowExpand,
   smsSendingStatus,
@@ -325,11 +331,42 @@ export default function PayrollRunTab({
     );
   };
 
+  // each payslip's employee's branch (FIG-905), from the employee records
+  const branchByNumber = new Map<string, Branch>();
+  if (companyBranches?.length) {
+    for (const e of onPayroll) {
+      const b = employeeBranch(e, companyBranches);
+      if (b) branchByNumber.set(String(e["Employee Number"] ?? "").trim(), b);
+    }
+  }
   /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- a payroll row from PayrollDashboard */
-  const subline = (record: any) =>
-    [record.employeeNu || record.employee_id, record.position, record.department === "Branch Staff" ? record.branch : record.department]
+  const branchOfRecord = (record: any) => branchByNumber.get(String(record.employee_id ?? "").trim());
+
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- a payroll row from PayrollDashboard */
+  const subline = (record: any) => {
+    const b = branchOfRecord(record);
+    return [
+      record.employeeNu || record.employee_id,
+      record.position,
+      b ? `${b.name} (${b.country})` : record.department === "Branch Staff" ? record.branch : record.department,
+    ]
       .filter(Boolean)
       .join(" · ");
+  };
+
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- a payroll row from PayrollDashboard */
+  const countryFlag = (record: any) => {
+    const b = branchOfRecord(record);
+    if (!b || !paidWithKenyaRules(b.country)) return null;
+    return (
+      <span
+        className="ml-1.5 inline-block align-middle rounded-full border border-orange-text-alt px-1.5 py-px text-[9.5px] font-semibold text-orange-text-alt"
+        title={`In ${b.name}, ${b.country}: worked out with Kenya rules until ${b.country}'s payroll comes. Check before paying.`}
+      >
+        {b.country}: Kenya rules
+      </span>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -347,6 +384,7 @@ export default function PayrollRunTab({
       />
 
       {(!monthRun || monthRun.status === "draft") && <ReturnsReadiness employees={onPayroll} />}
+      {companyBranches?.length ? <BranchCountryNotice employees={onPayroll} branches={companyBranches} /> : null}
       {/* a warning before approval, never a block (FIG-812 stage 6) */}
       {!approved && payPeriod && (
         <MinimumWageWarning
@@ -503,7 +541,7 @@ export default function PayrollRunTab({
                   <div className="flex items-start gap-2">
                     {expandButton(record)}
                     <div className="min-w-0 flex-1">
-                      <div className="text-xs font-bold text-ink truncate">{record.employee_name}{editedBadge(record)}</div>
+                      <div className="text-xs font-bold text-ink truncate">{record.employee_name}{editedBadge(record)}{countryFlag(record)}</div>
                       <div className="text-[10px] text-subtle truncate">{subline(record)}</div>
                     </div>
                     <div className="text-right shrink-0">
@@ -542,7 +580,7 @@ export default function PayrollRunTab({
                             <div className="flex items-start gap-2">
                               {expandButton(record)}
                               <div className="min-w-0">
-                                <div className="font-bold">{record.employee_name}{editedBadge(record)}</div>
+                                <div className="font-bold">{record.employee_name}{editedBadge(record)}{countryFlag(record)}</div>
                                 <div className="text-[10px] text-subtle">{subline(record)}</div>
                               </div>
                             </div>
