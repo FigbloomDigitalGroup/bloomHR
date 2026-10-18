@@ -14,6 +14,9 @@ export interface PayoutBatch {
   period_from: string;
   period_to: string;
   pay_period: string;
+  /** the country and currency of everyone in it (FIG-905): a payout never mixes currencies */
+  country?: string | null;
+  currency?: string | null;
   status: PayoutStatus;
   notes: string | null;
   worker_count: number;

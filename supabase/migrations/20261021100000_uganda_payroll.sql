@@ -38,16 +38,27 @@
 --     an ordinary voluntary deduction.
 --   Rounding: whole shillings for every statutory figure (UGX is not used with cents).
 --
--- Employees:
---   "Tax PIN" holds the employee's tax number for their country: a URA TIN (10 digits) for staff in Uganda.
---   "NSSF Number" holds their NSSF Uganda member number (6 to 15 letters and digits; the format is not published).
+-- Employees, in every country (this migration defines the checks once for Kenya, Tanzania and Uganda; it runs after
+-- 20261021000000_tanzania_payroll.sql, which leaves them to it):
+--   "Tax PIN" holds the employee's tax number for their country: a KRA PIN in Kenya, a TRA TIN (9 digits, kept
+--     without dashes) in Tanzania, a URA TIN (10 digits) in Uganda. Unique in the company, as before.
+--   "NSSF Number" holds their member number of their country's NSSF: Kenya's format in Kenya; NSSF Tanzania and NSSF
+--     Uganda don't publish one, so 6 to 15 letters and digits (it only catches typos).
 --   kra_residency ('Resident' / 'Non-Resident') is the employee's tax residency in every country (empty = resident).
---   "ID Number" for a National ID in Uganda is the NIN (14 letters and digits).
+--   "ID Number" for a National ID is the NIN in Uganda (14 letters and digits) and the NIDA number in Tanzania (20
+--     digits, kept without dashes).
 --   The format checks and what onboarding asks for follow the employee's branch's country: a TIN instead of a KRA
---   PIN, and no SHA number, in Uganda.
+--   PIN, and no SHA number, in Tanzania and Uganda; a HESLB index number for a Tanzanian HESLB borrower.
+--   A country without payroll rules yet (Rwanda) keeps Kenya's formats.
+--
+-- Payslips: employer_nssf (the employer's NSSF, never taken from pay) and taxable_pay (the pay PAYE is worked out on;
+-- Uganda's chargeable income) are shared with Tanzania (20261021000000 adds them first); lst_deduction is Uganda's.
 --
 -- Piece rate payouts: each worker's holdbacks use their own country's rates. Kenya holds back the housing levy;
--- Uganda has no housing levy, so a payout holds back the reserve only (and 6% WHT for a contractor).
+-- Tanzania and Uganda have none, so a payout holds back the reserve only (and withholding tax for a contractor: 6% in
+-- Uganda; 5% resident or 15% non-resident in Tanzania). A payout is in one currency, never a sum across currencies:
+-- payroll picks the country when the company pays people in more than one, and a payout that would mix currencies is
+-- refused. Each batch keeps its country and currency, and notifications show amounts in it.
 --
 -- Written to run again safely.
 
@@ -86,11 +97,13 @@ where not exists (
 );
 
 -- ---------------------------------------------------------------------------------------------
--- 2. payslips: LST, the employer's NSSF and chargeable income
+-- 2. payslips: LST, and the columns shared with Tanzania (the employer's NSSF; taxable_pay holds Uganda's chargeable
+--    income; tax_resident)
 -- ---------------------------------------------------------------------------------------------
 alter table public.salary_history add column if not exists lst_deduction numeric(14, 2) not null default 0;
 alter table public.salary_history add column if not exists employer_nssf numeric(14, 2) not null default 0;
-alter table public.salary_history add column if not exists chargeable_income numeric(16, 2);
+alter table public.salary_history add column if not exists taxable_pay numeric(16, 2);
+alter table public.salary_history add column if not exists tax_resident boolean;
 
 -- ---------------------------------------------------------------------------------------------
 -- 3. employees and the company setting
@@ -183,36 +196,53 @@ language sql stable security definer set search_path = public as $$
 $$;
 revoke all on function public.employee_row_country(uuid, uuid, text) from public, anon, authenticated;
 
--- the employee's tax number in their country: a URA TIN (10 digits) in Uganda, a KRA PIN elsewhere (as before)
+-- the employee's tax number in their country: a TRA TIN (9 digits) in Tanzania, a URA TIN (10 digits) in Uganda, a KRA
+-- PIN elsewhere (as before)
 create or replace function public.tax_number_ok(p_country text, p text) returns boolean language sql immutable as $$
-  select case public.tidy_country(p_country) when 'Uganda' then p ~ '^\d{10}$' else public.kra_pin_ok(p) end
+  select case public.tidy_country(p_country)
+    when 'Tanzania' then p ~ '^\d{9}$'
+    when 'Uganda' then p ~ '^\d{10}$'
+    else public.kra_pin_ok(p) end
 $$;
 create or replace function public.tax_number_label(p_country text) returns text language sql immutable as $$
-  select case public.tidy_country(p_country) when 'Uganda' then 'TIN' else 'KRA PIN' end
+  select case when public.tidy_country(p_country) in ('Tanzania', 'Uganda') then 'TIN' else 'KRA PIN' end
 $$;
 create or replace function public.tax_number_hint(p_country text) returns text language sql immutable as $$
-  select case public.tidy_country(p_country) when 'Uganda' then 'should be 10 digits' else 'should look like A123456789B' end
+  select case public.tidy_country(p_country)
+    when 'Tanzania' then 'should be 9 digits, like 123-456-789'
+    when 'Uganda' then 'should be 10 digits'
+    else 'should look like A123456789B' end
 $$;
--- NSSF number: NSSF Uganda's member numbers (6 to 15 letters and digits) in Uganda, Kenya's format elsewhere
+-- a tax number as saved: no spaces, upper case; outside Kenya also without dashes (a TRA TIN is written 123-456-789)
+create or replace function public.tidy_tax_number(p_country text, p text) returns text language sql immutable as $$
+  select nullif(upper(regexp_replace(coalesce(p, ''),
+    case when coalesce(public.tidy_country(p_country), 'Kenya') = 'Kenya' then '\s' else '[\s-]' end, '', 'g')), '')
+$$;
+-- NSSF number: NSSF Tanzania's and NSSF Uganda's member numbers (6 to 15 letters and digits; neither publishes a
+-- format) in those countries, Kenya's format elsewhere
 create or replace function public.social_security_number_ok(p_country text, p text) returns boolean language sql immutable as $$
-  select case public.tidy_country(p_country) when 'Uganda' then p ~ '^[A-Z0-9]{6,15}$' else public.nssf_number_ok(p) end
+  select case when public.tidy_country(p_country) in ('Tanzania', 'Uganda') then upper(p) ~ '^[A-Z0-9]{6,15}$'
+              else public.nssf_number_ok(p) end
 $$;
 create or replace function public.social_security_number_hint(p_country text) returns text language sql immutable as $$
-  select case public.tidy_country(p_country) when 'Uganda' then 'should be 6 to 15 letters and digits' else 'should be 5 to 12 digits' end
+  select case when public.tidy_country(p_country) in ('Tanzania', 'Uganda') then 'should be 6 to 15 letters and digits'
+              else 'should be 5 to 12 digits' end
 $$;
--- a Ugandan National ID number is the NIN (14 letters and digits, e.g. CM12345678ABCD)
+-- a National ID number: the NIN in Uganda (14 letters and digits, e.g. CM12345678ABCD), the NIDA number in Tanzania
+-- (20 digits); Kenya's formats elsewhere
 create or replace function public.identity_number_ok_in(p_country text, p_type text, p_number text) returns boolean
 language sql immutable as $$
-  select case when public.tidy_country(p_country) = 'Uganda' and p_type = 'National ID' then p_number ~ '^[A-Z0-9]{14}$'
+  select case when p_type = 'National ID' and public.tidy_country(p_country) = 'Uganda' then p_number ~ '^[A-Z0-9]{14}$'
+              when p_type = 'National ID' and public.tidy_country(p_country) = 'Tanzania' then p_number ~ '^\d{20}$'
               else public.identity_number_ok(p_type, p_number) end
 $$;
--- an SHA number is asked for in Kenya only
+-- an SHA number is asked for in Kenya only (and in a country without payroll rules yet, which keeps Kenya's details)
 create or replace function public.needs_sha_number(p_country text) returns boolean language sql immutable as $$
-  select coalesce(public.tidy_country(p_country), 'Kenya') = 'Kenya'
+  select coalesce(public.tidy_country(p_country), 'Kenya') not in ('Tanzania', 'Uganda')
 $$;
 
 -- the employee record's checks (from 20261012100000_employee_onboarding.sql), with the tax number, NSSF number and
--- national ID formats of the employee's country
+-- national ID formats of the employee's country (Kenya, Tanzania, Uganda), and Tanzania's HESLB index number tidied
 create or replace function public.employees_onboarding_rules() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare
@@ -220,10 +250,10 @@ declare
   in_transition boolean := coalesce(current_setting('app.onboarding_transition', true), '') = 'on';
   is_staff boolean := auth.uid() is not null and not public.can_write_employees();
   changed text[];
-  v_country text := public.employee_row_country(new.tenant_id, new.branch_id, new."Branch");
+  v_country text := coalesce(public.employee_row_country(new.tenant_id, new.branch_id, new."Branch"), 'Kenya');
 begin
   -- tidy: identifiers without spaces, upper case; blanks are empty
-  new."Tax PIN" := nullif(upper(regexp_replace(coalesce(new."Tax PIN", ''), '\s', '', 'g')), '');
+  new."Tax PIN" := public.tidy_tax_number(v_country, new."Tax PIN");
   new."ID Number" := nullif(upper(regexp_replace(coalesce(new."ID Number", ''), '\s', '', 'g')), '');
   new."SHIF Number" := nullif(upper(regexp_replace(coalesce(new."SHIF Number", ''), '\s', '', 'g')), '');
   new."NSSF Number" := nullif(regexp_replace(coalesce(new."NSSF Number", ''), '[\s-]', '', 'g'), '');
@@ -234,6 +264,12 @@ begin
     new."Type of Identification" := 'National ID';
   end if;
   new."Disability Cert No" := nullif(btrim(new."Disability Cert No"), '');
+  -- a Tanzanian National ID (NIDA) is written with dashes: kept as its 20 digits
+  if v_country = 'Tanzania' and new."Type of Identification" = 'National ID' then
+    new."ID Number" := nullif(replace(coalesce(new."ID Number", ''), '-', ''), '');
+  end if;
+  -- Tanzania: the HESLB Form Four index number, upper case (20261021000000)
+  new.heslb_index_number := nullif(upper(btrim(coalesce(new.heslb_index_number, ''))), '');
 
   -- formats, checked when a value is new or changed
   if new."Tax PIN" is not null and (is_insert or new."Tax PIN" is distinct from old."Tax PIN")
@@ -329,7 +365,8 @@ create trigger employees_onboarding_rules before insert or update on public.empl
   for each row execute function public.employees_onboarding_rules();
 
 -- what is still missing on a record (from 20261012100000; onboarding_missing adds documents, referees and policies on
--- top): the tax number by its name in the employee's country, and an SHA number only in Kenya
+-- top): the tax number by its name in the employee's country, an SHA number only in Kenya, and a Tanzanian HESLB
+-- borrower's index number
 create or replace function public.onboarding_missing_details(e public.employees, p_part text default 'all') returns text[]
 language plpgsql stable security definer set search_path = public as $$
 declare
@@ -359,6 +396,9 @@ begin
     end if;
     if e."NSSF Number" is null then m := m || text 'NSSF number';
     elsif not public.social_security_number_ok(v_country, e."NSSF Number") then m := m || text 'NSSF number (not valid)'; end if;
+    if public.tidy_country(v_country) = 'Tanzania' and e.heslb_borrower and e.heslb_index_number is null then
+      m := m || text 'HESLB index number';
+    end if;
     if e."Mobile Number" is null then m := m || text 'Phone number';
     elsif not public.phone_ok(e."Mobile Number") then m := m || text 'Phone number (not valid)'; end if;
     if e.kra_residency is null then m := m || text 'Residency'; end if;
@@ -392,19 +432,48 @@ end $$;
 revoke all on function public.onboarding_missing_details(public.employees, text) from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------------------------------
--- 6. piece rate payouts on each worker's country's rates (from 20261020200000_piece_rate_payouts.sql)
+-- 6. piece rate payouts on each worker's country's rates, one currency per payout
+--    (from 20261020200000_piece_rate_payouts.sql; Kenya, Tanzania and Uganda)
 -- ---------------------------------------------------------------------------------------------
+-- An amount in a currency, for notifications: KES with cents as before (public.kes), whole shillings for TZS and UGX.
+create or replace function public.money_text(p_amount numeric, p_currency text) returns text language sql immutable as $$
+  select case coalesce(nullif(upper(btrim(p_currency)), ''), 'KES')
+    when 'KES' then public.kes(p_amount)
+    else upper(btrim(p_currency)) || ' ' || to_char(round(coalesce(p_amount, 0)), 'FM999,999,999,999,990') end
+$$;
+
+-- each batch's country and currency: everyone in it is paid in that currency (the batches so far are Kenya's)
+alter table public.work_payout_batches add column if not exists country text;
+alter table public.work_payout_batches add column if not exists currency text;
+update public.work_payout_batches set country = coalesce(country, 'Kenya'), currency = coalesce(currency, 'KES')
+where country is null or currency is null;
+alter table public.work_payout_batches drop constraint if exists work_payout_batches_currency_code;
+alter table public.work_payout_batches add constraint work_payout_batches_currency_code
+  check (currency is null or currency ~ '^[A-Z]{3}$');
+
+-- 20261021000000 (before it was merged with this one) held back Tanzania's payouts with a trigger; the batch does it now
+drop trigger if exists work_payout_line_tanzania on public.work_payout_lines;
+drop function if exists public.work_payout_line_tanzania();
+
+-- p_country: the country to pay (its workers only). Without it, everyone the payout picks must be paid in one
+-- currency: a payout that would mix currencies is refused, never added up across them.
+drop function if exists public.create_work_payout_batch(text, date, date, text[], text);
 create or replace function public.create_work_payout_batch(
-  p_kind text, p_from date, p_to date, p_workers text[] default null, p_notes text default null
+  p_kind text, p_from date, p_to date, p_workers text[] default null, p_notes text default null, p_country text default null
 ) returns uuid
 language plpgsql security definer set search_path = public as $$
 declare
   v_tenant uuid := public.current_tenant_id();
   v_today date := public.work_today();
+  v_only text := public.tidy_country(nullif(btrim(p_country), ''));
   v_id uuid;
   v_rates jsonb;
   v_ahl_rate numeric;
   v_country text;
+  v_currency text;
+  v_batch_country text;
+  v_batch_currency text;
+  v_resident boolean;
   v_wht_c numeric;
   v_wht_p numeric;
   v_reserve_rate numeric;
@@ -449,12 +518,13 @@ begin
   v_reserve_rate := coalesce((select s.payout_reserve_rate from public.company_payroll_settings s where s.tenant_id = v_tenant), 0.10);
   v_contractor_reserve := public.contractor_reserve(v_tenant);
 
-  insert into public.work_payout_batches (tenant_id, kind, period_from, period_to, pay_period, notes, created_by)
-  values (v_tenant, p_kind, p_from, p_to, to_char(p_from, 'YYYY-MM'), nullif(btrim(p_notes), ''), auth.uid())
+  insert into public.work_payout_batches (tenant_id, kind, period_from, period_to, pay_period, notes, created_by, country, currency)
+  values (v_tenant, p_kind, p_from, p_to, to_char(p_from, 'YYYY-MM'), nullif(btrim(p_notes), ''), auth.uid(),
+          v_only, case when v_only is not null then public.country_currency(v_only) end)
   returning id into v_id;
 
   for e in
-    select x."Employee Number" as num, x.worker_kind, x.wht_category, x.pay_frequency
+    select x."Employee Number" as num, x.worker_kind, x.wht_category, x.pay_frequency, x.kra_residency
     from public.employees x
     where x.tenant_id = v_tenant and x."Employee Number" is not null
       and coalesce(x.worker_kind, 'employee') <> 'casual'
@@ -466,6 +536,11 @@ begin
           end
     order by x."First Name", x."Last Name", x."Employee Number"
   loop
+    -- each worker's country and currency (their branch's, FIG-905); a payout for one country skips everyone else
+    v_country := coalesce(public.tidy_country(public.employee_country(v_tenant, e.num)), 'Kenya');
+    v_currency := coalesce(nullif(upper(btrim(public.employee_currency(v_tenant, e.num))), ''), public.country_currency(v_country));
+    continue when v_only is not null and v_country <> v_only;
+
     select coalesce(array_agg(w.id order by w.work_date), '{}'), coalesce(sum(w.amount), 0), min(w.work_date), max(w.work_date)
       into v_entries, v_work, v_first, v_last
     from public.work_entries w
@@ -487,13 +562,28 @@ begin
     v_gross := round(v_work + v_jobs_amt, 2);
     continue when v_gross <= 0;
 
-    -- each worker on their own country's rates (FIG-905): Kenya holds back the housing levy; a country without one
-    -- (Uganda) holds back the reserve only
-    v_country := coalesce(public.tidy_country(public.employee_country(v_tenant, e.num)), 'Kenya');
+    -- one currency per payout: the first worker paid sets it; anyone in another currency is refused, not added up
+    if v_batch_currency is null then
+      v_batch_country := v_country;
+      v_batch_currency := v_currency;
+    elsif v_currency <> v_batch_currency then
+      raise exception 'This payout would mix % (%) and % (%): make one payout for each country', v_batch_currency, v_batch_country, v_currency, v_country
+        using errcode = '22023';
+    end if;
+
+    -- each worker on their own country's rates (FIG-905): Kenya holds back the housing levy; Tanzania and Uganda have
+    -- none, so the reserve only. Contractors: Kenya and Uganda by the kind of service, Tanzania by residency.
     v_rates := public.statutory_rates_on(p_to, v_country);
     v_ahl_rate := coalesce((v_rates->>'ahl_rate')::numeric, case when v_country = 'Kenya' then 0.015 else 0 end);
-    v_wht_c := coalesce((v_rates->>'wht_contractual')::numeric, case when v_country = 'Kenya' then 0.03 else 0 end);
-    v_wht_p := coalesce((v_rates->>'wht_professional')::numeric, case when v_country = 'Kenya' then 0.05 else 0 end);
+    if v_country = 'Tanzania' then
+      v_resident := not (coalesce(e.kra_residency, '') ilike 'non%');
+      v_wht_c := case when v_resident then coalesce((v_rates->>'wht_resident')::numeric, 0.05)
+                      else coalesce((v_rates->>'wht_nonresident')::numeric, 0.15) end;
+      v_wht_p := v_wht_c;
+    else
+      v_wht_c := coalesce((v_rates->>'wht_contractual')::numeric, case when v_country = 'Kenya' then 0.03 else 0 end);
+      v_wht_p := coalesce((v_rates->>'wht_professional')::numeric, case when v_country = 'Kenya' then 0.05 else 0 end);
+    end if;
 
     v_contractor := e.worker_kind = 'contractor';
     if v_contractor then
@@ -522,6 +612,11 @@ begin
     perform public.work_payout_details(v_line);
   end loop;
 
+  -- the batch's country and currency: the one asked for, else its workers' (the company's for an empty batch)
+  update public.work_payout_batches
+     set country = coalesce(country, v_batch_country, public.company_country(v_tenant)),
+         currency = coalesce(currency, v_batch_currency, public.country_currency(public.company_country(v_tenant)))
+   where id = v_id;
   perform public.work_payout_recount(v_id);
   select * into b from public.work_payout_batches where id = v_id;
 
@@ -530,11 +625,111 @@ begin
       'Payout waiting for approval',
       coalesce(public.work_worker_name(v_tenant, public.current_employee_number()), 'Payroll') || ' made a payout for '
       || public.work_payout_days(p_from, p_to) || ' (' || b.worker_count || ' ' || case when b.worker_count = 1 then 'worker' else 'workers' end
-      || ', ' || public.kes(b.net_total) || ' to pay). Someone else must approve it: open Piece rate > Payouts.');
+      || ', ' || public.money_text(b.net_total, b.currency) || ' to pay). Someone else must approve it: open Piece rate > Payouts.');
   end if;
   return v_id;
 end $$;
-revoke all on function public.create_work_payout_batch(text, date, date, text[], text) from public, anon;
-grant execute on function public.create_work_payout_batch(text, date, date, text[], text) to authenticated;
+revoke all on function public.create_work_payout_batch(text, date, date, text[], text, text) from public, anon;
+grant execute on function public.create_work_payout_batch(text, date, date, text[], text, text) to authenticated;
+
+-- approving: as in 20261020200000, with each worker told the amount in the payout's currency
+create or replace function public.approve_work_payout_batch(p_batch uuid) returns public.work_payout_batches
+language plpgsql security definer set search_path = public as $$
+declare
+  b public.work_payout_batches;
+  v_l record;
+  v_changed integer;
+begin
+  b := public.work_payout_open(p_batch, array['draft']);
+  if public.payout_needs_second_approver(b.tenant_id) and b.created_by = auth.uid() then
+    raise exception 'Someone other than who made this payout must approve it' using errcode = '42501';
+  end if;
+  if public.pay_month_closed(b.tenant_id, b.period_from) then
+    raise exception 'Payroll for % is approved; that month is locked. Cancel this payout', to_char(b.period_from, 'Mon YYYY');
+  end if;
+  if not exists (select 1 from public.work_payout_lines where batch_id = p_batch) then
+    raise exception 'There is nobody to pay in this payout';
+  end if;
+  if exists (select 1 from public.work_payout_lines where batch_id = p_batch and problem is not null) then
+    raise exception 'Some workers have payment details missing: fix their records and refresh, or remove them from this payout';
+  end if;
+
+  -- everything in it must still be approved and unpaid (work can be reopened while a batch is a draft)
+  select count(*) into v_changed
+  from public.work_payout_lines l, unnest(l.entry_ids) as x(id)
+  where l.batch_id = p_batch and not exists (
+    select 1 from public.work_entries w where w.id = x.id and w.tenant_id = b.tenant_id and w.status = 'approved' and w.paid_out_at is null);
+  select v_changed + count(*) into v_changed
+  from public.work_payout_lines l, unnest(l.job_ids) as x(id)
+  where l.batch_id = p_batch and not exists (
+    select 1 from public.contract_jobs j where j.id = x.id and j.tenant_id = b.tenant_id and j.status = 'approved' and j.paid_out_at is null);
+  if v_changed > 0 then
+    raise exception 'Some work in this payout changed after it was made (reopened or paid another way). Cancel it and make a new one';
+  end if;
+
+  perform set_config('app.work_payout', 'on', true);
+  perform set_config('app.work_payout_at', now()::text, true);
+  update public.work_entries w set payout_line_id = l.id, paid_out_at = now()
+  from public.work_payout_lines l
+  where l.batch_id = p_batch and w.id = any (l.entry_ids);
+  update public.contract_jobs j set payout_line_id = l.id, paid_out_at = now()
+  from public.work_payout_lines l
+  where l.batch_id = p_batch and j.id = any (l.job_ids);
+  perform set_config('app.work_payout', 'off', true);
+  perform set_config('app.work_payout_at', '', true);
+
+  update public.work_payout_batches set status = 'approved', approved_by = auth.uid(), approved_at = now(), updated_at = now()
+  where id = p_batch returning * into b;
+
+  for v_l in select * from public.work_payout_lines where batch_id = p_batch loop
+    perform public.notify_employee_number(b.tenant_id, v_l.employee_number, 'employment_update', 'Payout on its way',
+      public.money_text(v_l.net, b.currency) || ' is being paid to you for '
+      || coalesce('work ' || public.work_payout_days(v_l.work_from, v_l.work_to), '')
+      || case when v_l.work_from is not null and cardinality(v_l.job_ids) > 0 then ' and ' else '' end
+      || case when cardinality(v_l.job_ids) = 1 then 'a contract job' when cardinality(v_l.job_ids) > 1 then cardinality(v_l.job_ids) || ' contract jobs' else '' end
+      || '.' || case when v_l.gross > v_l.net
+                     then ' ' || public.money_text(v_l.gross - v_l.net, b.currency) || ' is held back and settled with your month-end pay.' else '' end);
+  end loop;
+  return b;
+end $$;
+revoke all on function public.approve_work_payout_batch(uuid) from public, anon;
+grant execute on function public.approve_work_payout_batch(uuid) to authenticated;
+
+-- cancelling: as in 20261020200000, with the amount in the payout's currency
+create or replace function public.cancel_work_payout_batch(p_batch uuid, p_reason text default null) returns public.work_payout_batches
+language plpgsql security definer set search_path = public as $$
+declare
+  b public.work_payout_batches;
+  v_was text;
+  v_l record;
+begin
+  b := public.work_payout_open(p_batch, array['draft', 'approved']);
+  v_was := b.status;
+  if v_was = 'approved' then
+    if public.pay_month_closed(b.tenant_id, b.period_from) then
+      raise exception 'Payroll for % is approved, so this payout can''t be cancelled', to_char(b.period_from, 'Mon YYYY');
+    end if;
+    perform set_config('app.work_payout', 'on', true);
+    perform set_config('app.work_payout_at', '', true);
+    update public.work_entries set payout_line_id = null, paid_out_at = null
+    where payout_line_id in (select id from public.work_payout_lines where batch_id = p_batch);
+    update public.contract_jobs set payout_line_id = null, paid_out_at = null
+    where payout_line_id in (select id from public.work_payout_lines where batch_id = p_batch);
+    perform set_config('app.work_payout', 'off', true);
+  end if;
+  update public.work_payout_batches
+     set status = 'cancelled', cancelled_by = auth.uid(), cancelled_at = now(), cancel_reason = nullif(btrim(p_reason), ''),
+         updated_at = now()
+   where id = p_batch returning * into b;
+  if v_was = 'approved' then
+    for v_l in select * from public.work_payout_lines where batch_id = p_batch loop
+      perform public.notify_employee_number(b.tenant_id, v_l.employee_number, 'employment_update', 'Payout cancelled',
+        'The payout of ' || public.money_text(v_l.net, b.currency) || ' to you was cancelled before it was sent. The work in it will be paid in a later payout.');
+    end loop;
+  end if;
+  return b;
+end $$;
+revoke all on function public.cancel_work_payout_batch(uuid, text) from public, anon;
+grant execute on function public.cancel_work_payout_batch(uuid, text) to authenticated;
 
 notify pgrst, 'reload schema';

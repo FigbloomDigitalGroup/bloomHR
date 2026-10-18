@@ -100,7 +100,7 @@ describe('a worked payslip: gross 1,500,000 UGX', () => {
     const r = calculateUgandaPayslip(ug('U1'), ctx('2026-11'));
     expect(r).toMatchObject({
       country: 'Uganda', currency: 'UGX', gross_pay: 1500000, nssf_deduction: 75000, employer_nssf: 150000, lst_deduction: 0,
-      chargeable_income: 1500000, paye_tax: 338250, nhif_deduction: 0, housing_levy: 0, per_diem: 0, nita_levy: 0,
+      taxable_pay: 1500000, tax_resident: true, paye_tax: 338250, nhif_deduction: 0, housing_levy: 0, per_diem: 0, nita_levy: 0,
       total_deductions: 413250, net_pay: 1086750,
     });
   });
@@ -108,7 +108,7 @@ describe('a worked payslip: gross 1,500,000 UGX', () => {
   it('in October, the last LST instalment (25,000) comes off chargeable income: PAYE 330,750, net 1,069,250', () => {
     const r = calculateUgandaPayslip(ug('U1'), ctx('2026-10', { lstPaidThisYear: new Map([['U1', 75000]]) }));
     // chargeable 1,475,000: 33,750 + 30% x 990,000 = 330,750
-    expect(r).toMatchObject({ lst_deduction: 25000, chargeable_income: 1475000, paye_tax: 330750, nssf_deduction: 75000, net_pay: 1069250 });
+    expect(r).toMatchObject({ lst_deduction: 25000, taxable_pay: 1475000, paye_tax: 330750, nssf_deduction: 75000, net_pay: 1069250 });
   });
 
   it('labels the lines: PAYE, NSSF (5%), LST; employer NSSF (10%) as an employer cost', () => {
@@ -133,7 +133,7 @@ describe('a worked payslip: gross 1,500,000 UGX', () => {
       ug('U1'),
       ctx('2026-11', { earningsByEmployee: new Map([['U1', [{ name: 'Meal allowance', amount: 100000, taxable: false, pensionable: true }]]]) })
     );
-    expect(r).toMatchObject({ gross_pay: 1600000, nssf_deduction: 80000, chargeable_income: 1500000, paye_tax: 338250 });
+    expect(r).toMatchObject({ gross_pay: 1600000, nssf_deduction: 80000, taxable_pay: 1500000, paye_tax: 338250 });
   });
 });
 

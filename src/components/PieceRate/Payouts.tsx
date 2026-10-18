@@ -5,6 +5,9 @@ import { AlertTriangle, ArrowLeft, Ban, CheckCircle2, Download, Plus, RefreshCw,
 import { Button, Card, EmptyState, Modal, StatusPill, TableScroll } from '../UI';
 import { confirmDialog } from '../../lib/confirmDialog';
 import { formatKsh, periodLabel, today } from '../../lib/casualPay';
+import { moneyRounded } from '../../lib/payroll/currency';
+import { loadBranches } from '../../lib/branches';
+import { tidyCountry } from '../../lib/payroll/countries';
 import { toCsv, type ExportFile } from '../../lib/payrollExports';
 import { XLSX_TYPE, toXlsx } from '../../lib/xlsxExport';
 import { myUserId } from '../../lib/pieceRateApi';
@@ -24,6 +27,10 @@ import {
 // bank. Nothing is sent from here. The database works out and checks everything (20261020200000).
 
 const field = 'px-2 py-1.5 text-xs border border-border rounded-lg bg-white text-ink';
+
+/** An amount in a payout's currency (FIG-905): KSh as before, TSh or USh for a Tanzania or Uganda payout. */
+const payoutMoney = (n: number | string, currency?: string | null) =>
+  !currency || currency === 'KES' ? formatKsh(n) : moneyRounded(Number(n), currency);
 const KINDS: PayoutKind[] = ['daily', 'weekly', 'job', 'ad_hoc'];
 const KIND_HINT: Record<PayoutKind, string> = {
   daily: 'Workers paid daily: their approved work in these days, plus approved contract jobs not yet paid.',
@@ -40,6 +47,25 @@ function NewPayoutModal({ people, onClose, onCreated }: { people: WorkPerson[]; 
   const [picked, setPicked] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // a payout is in one currency (FIG-905): with branches in more than one country, payroll picks the country
+  const [countries, setCountries] = useState<string[]>([]);
+  const [country, setCountry] = useState('');
+  useEffect(() => {
+    let live = true;
+    loadBranches()
+      .then((bs) => {
+        const cs = [...new Set(bs.filter((b) => b.active !== false).map((b) => tidyCountry(b.country) || 'Kenya'))].sort((a, b) => (a === 'Kenya' ? -1 : b === 'Kenya' ? 1 : a.localeCompare(b)));
+        if (!live) return;
+        setCountries(cs.length > 1 ? cs : []);
+        setCountry(cs.length > 1 ? cs[0] : '');
+      })
+      .catch(() => {
+        // one country: the database still refuses a payout that would mix currencies
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
   const workers = people.filter((p) => p.pay_basis === 'work' || p.pay_frequency === 'per_job');
 
   const pickKind = (k: PayoutKind) => {
@@ -53,7 +79,8 @@ function NewPayoutModal({ people, onClose, onCreated }: { people: WorkPerson[]; 
     setBusy(true);
     setProblem(null);
     try {
-      onCreated(await createPayoutBatch(kind, from, to, kind === 'ad_hoc' ? picked : null));
+      const who = kind === 'ad_hoc' ? picked : null;
+      onCreated(await (country ? createPayoutBatch(kind, from, to, who, country) : createPayoutBatch(kind, from, to, who)));
     } catch (err) {
       setProblem((err as Error).message);
     } finally {
@@ -71,6 +98,15 @@ function NewPayoutModal({ people, onClose, onCreated }: { people: WorkPerson[]; 
           </select>
         </label>
         <p className="m-0 text-muted-foreground">{KIND_HINT[kind]}</p>
+        {countries.length > 1 && (
+          <label className="block">
+            <span className="font-semibold">Country</span>
+            <select aria-label="Country" className={`mt-1 w-full ${field}`} value={country} onChange={(e) => setCountry(e.target.value)}>
+              {countries.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <span className="mt-1 block text-muted-foreground">A payout is paid in one currency: make one for each country.</span>
+          </label>
+        )}
         <div className="flex flex-wrap gap-3">
           <label className="flex flex-col gap-1">
             {kind === 'job' ? 'Month from' : 'From'}
@@ -162,6 +198,9 @@ function PayoutDetail({ batch, settings, me, onBack, onChanged }: {
   }), [lines, batch, debit]);
   const cash = cashLines(lines);
   const slug = payoutFileSlug(batch);
+  // amounts in the payout's currency; the M-Pesa and Equity files are Kenya's, so another currency gets the bank file only
+  const currency = batch.currency || 'KES';
+  const fmt = (n: number | string) => payoutMoney(n, currency);
   const sum = (pick: (l: PayoutLine) => number | string) => lines.reduce((s, l) => s + Number(pick(l)), 0);
 
   return (
@@ -181,7 +220,7 @@ function PayoutDetail({ batch, settings, me, onBack, onChanged }: {
                 onClick={async () => {
                   if (await confirmDialog({
                     title: 'Approve this payout?',
-                    message: `${lines.length} ${lines.length === 1 ? 'worker' : 'workers'}, ${formatKsh(sum((l) => l.net))} to pay. The work in it is marked paid out and can't be paid again.`,
+                    message: `${lines.length} ${lines.length === 1 ? 'worker' : 'workers'}, ${fmt(sum((l) => l.net))} to pay. The work in it is marked paid out and can't be paid again.`,
                     confirmLabel: 'Approve',
                   })) await act(() => approvePayoutBatch(batch.id), 'Approved');
                 }}>
@@ -242,15 +281,15 @@ function PayoutDetail({ batch, settings, me, onBack, onChanged }: {
                     <div className="font-semibold text-ink">{l.worker_name}</div>
                     <div className="text-[10.5px] text-subtle">
                       {l.employee_number}{l.worker_kind === 'contractor' ? ' · contractor' : ''}
-                      {Number(l.jobs_amount) > 0 ? ` · jobs ${formatKsh(l.jobs_amount)}` : ''}
+                      {Number(l.jobs_amount) > 0 ? ` · jobs ${fmt(l.jobs_amount)}` : ''}
                     </div>
                     {l.problem && <div className="text-[10.5px] font-semibold text-status-danger">{l.problem}</div>}
                   </td>
-                  <td className="px-3 py-2 text-right">{formatKsh(l.gross)}</td>
-                  <td className="px-3 py-2 text-right">{Number(l.ahl) ? formatKsh(l.ahl) : '-'}</td>
-                  <td className="px-3 py-2 text-right">{Number(l.reserve) ? formatKsh(l.reserve) : '-'}</td>
-                  <td className="px-3 py-2 text-right">{Number(l.wht) ? formatKsh(l.wht) : '-'}</td>
-                  <td className="px-3 py-2 text-right font-semibold text-ink" aria-label={`${l.worker_name} to pay`}>{formatKsh(l.net)}</td>
+                  <td className="px-3 py-2 text-right">{fmt(l.gross)}</td>
+                  <td className="px-3 py-2 text-right">{Number(l.ahl) ? fmt(l.ahl) : '-'}</td>
+                  <td className="px-3 py-2 text-right">{Number(l.reserve) ? fmt(l.reserve) : '-'}</td>
+                  <td className="px-3 py-2 text-right">{Number(l.wht) ? fmt(l.wht) : '-'}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-ink" aria-label={`${l.worker_name} to pay`}>{fmt(l.net)}</td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     {l.payment_kind === 'bank' ? `Bank${l.bank ? ` (${l.bank})` : ''}` : l.payment_kind === 'cash' ? 'Cash' : l.payment_method || 'M-Pesa'}
                   </td>
@@ -272,13 +311,13 @@ function PayoutDetail({ batch, settings, me, onBack, onChanged }: {
               <tfoot>
                 <tr className="border-t border-border font-semibold text-ink">
                   <td className="px-3 py-2">{lines.length} {lines.length === 1 ? 'worker' : 'workers'}</td>
-                  <td className="px-3 py-2 text-right">{formatKsh(sum((l) => l.gross))}</td>
-                  <td className="px-3 py-2 text-right">{formatKsh(sum((l) => l.ahl))}</td>
-                  <td className="px-3 py-2 text-right">{formatKsh(sum((l) => l.reserve))}</td>
-                  <td className="px-3 py-2 text-right">{formatKsh(sum((l) => l.wht))}</td>
-                  <td className="px-3 py-2 text-right" aria-label="Total to pay">{formatKsh(sum((l) => l.net))}</td>
+                  <td className="px-3 py-2 text-right">{fmt(sum((l) => l.gross))}</td>
+                  <td className="px-3 py-2 text-right">{fmt(sum((l) => l.ahl))}</td>
+                  <td className="px-3 py-2 text-right">{fmt(sum((l) => l.reserve))}</td>
+                  <td className="px-3 py-2 text-right">{fmt(sum((l) => l.wht))}</td>
+                  <td className="px-3 py-2 text-right" aria-label="Total to pay">{fmt(sum((l) => l.net))}</td>
                   <td className="px-3 py-2 text-muted-foreground font-normal" colSpan={draft ? 2 : 1}>
-                    {formatKsh(sum((l) => lineHeld(l)))} held to the month end
+                    {fmt(sum((l) => lineHeld(l)))} held to the month end
                   </td>
                 </tr>
               </tfoot>
@@ -296,7 +335,7 @@ function PayoutDetail({ batch, settings, me, onBack, onChanged }: {
               ['bank', 'Bank bulk payment', 'bank', 'everyone paid by bank'],
               ['equity', 'Equity Bank (Eazzy Biz)', 'equity-eazzy-biz', 'everyone paid by bank or M-Pesa, from the company’s Equity account'],
               ['mpesa', 'M-Pesa bulk (B2C)', 'mpesa-b2c', 'everyone paid by M-Pesa'],
-            ] as const).map(([key, label, name, what]) => {
+            ] as const).filter(([key]) => currency === 'KES' || key === 'bank').map(([key, label, name, what]) => {
               const f = files[key];
               const blocked = key === 'equity' && !debit;
               return (
@@ -330,7 +369,7 @@ function PayoutDetail({ batch, settings, me, onBack, onChanged }: {
           </div>
           {cash.length > 0 && (
             <p className="m-0 mt-3 text-xs text-muted-foreground">
-              Paid in cash, so in no file: {cash.map((l) => `${l.worker_name} (${formatKsh(l.net)})`).join(', ')}.
+              Paid in cash, so in no file: {cash.map((l) => `${l.worker_name} (${fmt(l.net)})`).join(', ')}.
             </p>
           )}
         </Card>
@@ -407,8 +446,8 @@ export default function Payouts({ people, settings }: { people: WorkPerson[]; se
                       {b.status === 'draft' && b.flagged_count > 0 && <span className="ml-1 text-[10.5px] text-status-danger">{b.flagged_count} missing details</span>}
                     </td>
                     <td className="px-3 py-2 text-right">{b.worker_count}</td>
-                    <td className="px-3 py-2 text-right">{formatKsh(b.gross_total)}</td>
-                    <td className="px-3 py-2 text-right font-semibold">{formatKsh(b.net_total)}</td>
+                    <td className="px-3 py-2 text-right">{payoutMoney(b.gross_total, b.currency)}</td>
+                    <td className="px-3 py-2 text-right font-semibold">{payoutMoney(b.net_total, b.currency)}</td>
                     <td className="px-3 py-2 text-right">
                       <button type="button" className="text-brand font-semibold" onClick={() => setOpenId(b.id)}
                         aria-label={`Open ${PAYOUT_KIND_LABEL[b.kind]} payout ${periodLabel(b.period_from, b.period_to)}`}>

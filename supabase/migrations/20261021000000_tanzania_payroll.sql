@@ -51,19 +51,26 @@
 --     own templates need a login and were not seen.
 --
 -- Employees (Tanzania's details):
---   tz_tin                the TRA TIN (9 digits; kept without dashes, unique in the company). The existing "Tax PIN"
---                         can't hold it: it is checked as a KRA PIN (employees_onboarding_rules)
+--   "Tax PIN"             holds the tax number of the employee's country: the TRA TIN (9 digits, kept without dashes,
+--                         unique in the company) for staff in Tanzania
+--   "NSSF Number"         holds the employee's NSSF member number: NSSF Tanzania's for staff in Tanzania
 --   kra_residency         "Residency (for tax)", already there: Non-Resident means the flat 15%; empty means resident
---   tz_nssf_number        NSSF (Tanzania) membership number
 --   heslb_borrower        repays a HESLB loan (15% of basic each month); heslb_index_number is the Form Four index
 --   heslb_index_number    number HESLB identifies the borrower by
 --   secondary_employment  this is not the employee's main job: PAYE at the flat 30%
+--   The format checks of "Tax PIN", "NSSF Number" and "ID Number" (a NIDA number), what onboarding asks for (a TIN,
+--   no SHA number) and the tidying of heslb_index_number follow the employee's branch's country. They are defined once
+--   for every country in 20261021100000_uganda_payroll.sql (tax_number_ok, social_security_number_ok,
+--   identity_number_ok_in, needs_sha_number, employees_onboarding_rules, onboarding_missing_details).
 --
--- Payslips (salary_history): heslb_deduction (taken from pay, in total_deductions), the employer's costs nssf_employer,
--- sdl_levy and wcf_levy (never taken from pay), taxable_pay and tax_resident as worked out.
+-- Payslips (salary_history), shared with Uganda: employer_nssf (the employer's NSSF, never taken from pay),
+-- taxable_pay (the pay PAYE was worked out on: Tanzania's taxable pay, Uganda's chargeable income) and tax_resident
+-- (taxed as a resident). Tanzania's own: heslb_deduction (taken from pay, in total_deductions), and the employer's
+-- sdl_levy and wcf_levy (never taken from pay).
 --
 -- Piece rate payouts during the month: a Tanzania worker's payout holds back the company's reserve only (no Kenyan
 -- housing levy), and a Tanzania contractor's withholding tax is at Tanzania's rate (5% resident, 15% non-resident).
+-- create_work_payout_batch does this for every country in 20261021100000_uganda_payroll.sql.
 
 -- ---------------------------------------------------------------------------------------------
 -- 1. Tanzania's statutory rates
@@ -91,80 +98,24 @@ where not exists (
 );
 
 -- ---------------------------------------------------------------------------------------------
--- 2. employees: Tanzania's details
+-- 2. employees: Tanzania's details (the TIN and NSSF number are in "Tax PIN" and "NSSF Number")
 -- ---------------------------------------------------------------------------------------------
-alter table public.employees add column if not exists tz_tin text;
-alter table public.employees add column if not exists tz_nssf_number text;
 alter table public.employees add column if not exists heslb_borrower boolean not null default false;
 alter table public.employees add column if not exists heslb_index_number text;
 alter table public.employees add column if not exists secondary_employment boolean not null default false;
 
--- the TIN and NSSF number tidied (no spaces or dashes), the TIN checked and unique within the company
-create or replace function public.employees_tanzania_rules() returns trigger
-language plpgsql security definer set search_path = public as $$
-begin
-  new.tz_tin := nullif(regexp_replace(coalesce(new.tz_tin, ''), '[\s-]', '', 'g'), '');
-  new.tz_nssf_number := nullif(regexp_replace(coalesce(new.tz_nssf_number, ''), '[\s-]', '', 'g'), '');
-  new.heslb_index_number := nullif(upper(btrim(coalesce(new.heslb_index_number, ''))), '');
-  if new.tz_tin is not null and (tg_op = 'INSERT' or new.tz_tin is distinct from old.tz_tin) then
-    if new.tz_tin !~ '^\d{9}$' then
-      raise exception 'TIN "%" should be 9 digits, like 123-456-789', new.tz_tin using errcode = '23514';
-    end if;
-    if exists (select 1 from public.employees where tenant_id = new.tenant_id and tz_tin = new.tz_tin and id <> new.id) then
-      raise exception 'Another employee in this company already has TIN %', new.tz_tin using errcode = '23505';
-    end if;
-  end if;
-  return new;
-end $$;
-revoke all on function public.employees_tanzania_rules() from public, anon, authenticated;
-drop trigger if exists employees_tanzania_rules on public.employees;
-create trigger employees_tanzania_rules before insert or update on public.employees
-  for each row execute function public.employees_tanzania_rules();
-
 -- ---------------------------------------------------------------------------------------------
--- 3. payslips: Tanzania's figures
+-- 3. payslips: Tanzania's figures, and the columns Tanzania and Uganda share
 -- ---------------------------------------------------------------------------------------------
+-- shared with Uganda (20261021100000 adds them too, if not there): the employer's NSSF, the pay PAYE was worked out on
+-- (taxable pay; Uganda calls it chargeable income) and whether the employee was taxed as a resident
+alter table public.salary_history add column if not exists employer_nssf numeric(14, 2) not null default 0;
+alter table public.salary_history add column if not exists taxable_pay numeric(16, 2);
+alter table public.salary_history add column if not exists tax_resident boolean;
+-- Tanzania's own
 alter table public.salary_history add column if not exists heslb_deduction numeric(14, 2) not null default 0;
-alter table public.salary_history add column if not exists nssf_employer numeric(14, 2) not null default 0;
 alter table public.salary_history add column if not exists sdl_levy numeric(14, 2) not null default 0;
 alter table public.salary_history add column if not exists wcf_levy numeric(14, 2) not null default 0;
-alter table public.salary_history add column if not exists taxable_pay numeric(14, 2);
-alter table public.salary_history add column if not exists tax_resident boolean;
 alter table public.salary_history drop constraint if exists salary_history_tz_amounts;
 alter table public.salary_history add constraint salary_history_tz_amounts
-  check (heslb_deduction >= 0 and nssf_employer >= 0 and sdl_levy >= 0 and wcf_levy >= 0);
-
--- ---------------------------------------------------------------------------------------------
--- 4. piece rate payouts for Tanzania workers: the reserve only, and Tanzania's withholding tax for contractors
--- ---------------------------------------------------------------------------------------------
-create or replace function public.work_payout_line_tanzania() returns trigger
-language plpgsql security definer set search_path = public as $$
-declare
-  v_day date;
-  v_rates jsonb;
-  v_resident boolean;
-begin
-  if lower(coalesce(public.employee_country(new.tenant_id, new.employee_number), '')) <> 'tanzania' then
-    return new;
-  end if;
-  -- no Kenyan housing levy outside Kenya
-  new.ahl := 0;
-  new.ahl_rate := 0;
-  if new.worker_kind = 'contractor' then
-    select b.period_to into v_day from public.work_payout_batches b where b.id = new.batch_id;
-    v_rates := public.statutory_rates_on(coalesce(v_day, current_date), 'Tanzania');
-    select not (coalesce(e.kra_residency, '') ilike 'non%') into v_resident
-    from public.employees e where e.tenant_id = new.tenant_id and e."Employee Number" = new.employee_number;
-    new.wht_rate := case when coalesce(v_resident, true)
-                         then coalesce((v_rates->>'wht_resident')::numeric, 0.05)
-                         else coalesce((v_rates->>'wht_nonresident')::numeric, 0.15) end;
-    new.wht := round(new.gross * new.wht_rate, 2);
-  end if;
-  new.net := greatest(0, floor(new.gross - new.reserve - new.wht));
-  new.rounding := new.gross - new.reserve - new.wht - new.net;
-  return new;
-end $$;
-revoke all on function public.work_payout_line_tanzania() from public, anon, authenticated;
-drop trigger if exists work_payout_line_tanzania on public.work_payout_lines;
-create trigger work_payout_line_tanzania before insert on public.work_payout_lines
-  for each row execute function public.work_payout_line_tanzania();
+  check (heslb_deduction >= 0 and employer_nssf >= 0 and sdl_levy >= 0 and wcf_levy >= 0);

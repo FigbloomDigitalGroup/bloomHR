@@ -32,8 +32,9 @@ const tz = (number: string, extra: Record<string, any> = {}): Record<string, any
   'First Name': `Juma${number}`,
   'Last Name': 'Mwita',
   'Basic Salary': 1500000,
-  tz_tin: '123-456-789',
-  tz_nssf_number: '1002003004',
+  // "Tax PIN" and "NSSF Number" hold the numbers of the employee's country: a TRA TIN and an NSSF Tanzania number
+  'Tax PIN': '123-456-789',
+  'NSSF Number': '1002003004',
   payment_method: 'Bank Transfer',
   Bank: 'CRDB',
   'Account Number': '0150000000',
@@ -148,12 +149,15 @@ describe('the other rules', () => {
   });
 
   it('PAYE and NSSF are taken even with no TIN or NSSF number (listed as missing instead)', () => {
-    const e = tz('TZ-009', { tz_tin: '', tz_nssf_number: '', payment_method: 'bank', Bank: '' });
+    const e = tz('TZ-009', { 'Tax PIN': '', 'NSSF Number': '', payment_method: 'bank', Bank: '' });
     expect(calc(e).record.paye_tax).toBe(233000);
-    expect(tanzaniaEngine.validate(e).map((p) => p.problem)).toEqual(['TIN', 'NSSF (Tanzania) number', 'Bank']);
+    expect(tanzaniaEngine.validate(e).map((p) => p.problem)).toEqual(['TIN', 'NSSF number', 'Bank']);
     expect(tanzaniaEngine.validate(e).every((p) => !p.blocking)).toBe(true);
-    expect(tanzaniaEngine.validate(tz('TZ-010', { tz_tin: '12345' })).map((p) => p.problem)).toEqual(['TIN (9 digits)']);
+    expect(tanzaniaEngine.validate(tz('TZ-010', { 'Tax PIN': '12345' })).map((p) => p.problem)).toEqual(['TIN (9 digits)']);
+    // a KRA PIN is not a TRA TIN
+    expect(tanzaniaEngine.validate(tz('TZ-011', { 'Tax PIN': 'A012345678Z', 'NSSF Number': '12' })).map((p) => p.problem)).toEqual(['TIN (9 digits)', 'NSSF number (not valid)']);
     expect(isValidTin('123-456-789')).toBe(true);
+    expect(isValidTin('1000123456')).toBe(false);
   });
 
   it('loans, advances and voluntary deductions are the shared ones', () => {
@@ -238,7 +242,7 @@ describe('the returns', () => {
   });
 
   it('flags a missing TIN and NSSF number on the returns', () => {
-    const missing = [tz('TZ-001', { tz_tin: '', tz_nssf_number: '' })];
+    const missing = [tz('TZ-001', { 'Tax PIN': '', 'NSSF Number': '' })];
     const ps = missing.map((e) => calc(e).record);
     const r = (key: string) => tanzaniaEngine.returns().find((x) => x.key === key)!.build(ps, missing, { payPeriod: '2026-10', rates: TANZANIA_RATES });
     expect(r('tra-paye').problems[0].missing).toEqual(['TIN']);
@@ -281,7 +285,7 @@ describe('one run with a Kenya and a Tanzania employee', () => {
     const tra = files[1].returns.find((r) => r.key === 'tra-paye')!;
     expect(tra.file.rows.map((r) => r[1])).toEqual(['JumaTZ-001 Mwita']);
     expect(files[1].returns.map((r) => r.key)).not.toContain('p10');
-    expect(files[1].payments.map((p) => p.key)).toEqual(['bank-tzs']);
+    expect(files[1].payments.map((p) => p.key)).toEqual(['bank-tzs', 'mobile-tzs']);
   });
 });
 /* eslint-enable @typescript-eslint/no-explicit-any */

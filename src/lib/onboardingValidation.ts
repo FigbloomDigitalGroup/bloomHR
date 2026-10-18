@@ -51,32 +51,98 @@ export const isValidOnboardingPhone = (value: unknown) =>
 export const isValidNssfNumber = (value: unknown) => /^\d{4,11}[0-9X]$/.test(normaliseNssfNumber(value));
 export const isValidShaNumber = (value: unknown) => /^[A-Z0-9-]{4,20}$/.test(normaliseShaNumber(value));
 
-/** The employee's tax number by its name in their country (FIG-905): a URA TIN in Uganda, else a KRA PIN. */
-export const taxNumberLabel = (country?: string | null) => (text(country).toLowerCase() === 'uganda' ? 'TIN' : 'KRA PIN');
-const inUganda = (country?: string | null) => text(country).toLowerCase() === 'uganda';
+// ---------------------------------------------------------------------------------------------
+// the statutory numbers of the employee's country (FIG-905), as the database checks them (tax_number_ok,
+// social_security_number_ok, identity_number_ok_in, needs_sha_number in 20261021100000_uganda_payroll.sql)
+// ---------------------------------------------------------------------------------------------
+/** The payroll country as the database spells it ('Kenya' when not known). */
+const countryOf = (country?: string | null) => {
+  const c = text(country).toLowerCase();
+  return c === 'tanzania' ? 'Tanzania' : c === 'uganda' ? 'Uganda' : 'Kenya';
+};
+
+interface CountryNumbers {
+  /** what the "Tax PIN" field holds: KRA PIN, TRA TIN, URA TIN */
+  taxLabel: string;
+  taxOk: (normalised: string) => boolean;
+  taxHint: string;
+  taxPlaceholder: string;
+  /** "NSSF Number": the member number of that country's NSSF */
+  nssfOk: (normalised: string) => boolean;
+  nssfHint: string;
+  /** a National ID number in that country, when it isn't Kenya's */
+  nationalId?: { ok: (normalised: string) => boolean; hint: string };
+  /** an SHA number is asked for (Kenya only) */
+  sha: boolean;
+}
+
+// A country without payroll rules yet keeps Kenya's formats, as the database does.
+const NUMBERS: Record<'Kenya' | 'Tanzania' | 'Uganda', CountryNumbers> = {
+  Kenya: {
+    taxLabel: 'KRA PIN', taxOk: (v) => /^A\d{9}[A-Z]$/.test(v), taxHint: 'should look like A123456789B', taxPlaceholder: 'A123456789B',
+    nssfOk: (v) => /^\d{4,11}[0-9X]$/.test(v), nssfHint: 'should be 5 to 12 digits (the last may be X)', sha: true,
+  },
+  // TRA TIN: 9 digits (written 123-456-789). NSSF Tanzania and Uganda don't publish a member number format: 6 to 15
+  // letters and digits only catches typos. A NIDA number is 20 digits (written 19900101-12345-00001-12).
+  Tanzania: {
+    taxLabel: 'TIN', taxOk: (v) => /^\d{9}$/.test(v), taxHint: 'should be 9 digits, like 123-456-789', taxPlaceholder: '123-456-789',
+    nssfOk: (v) => /^[A-Z0-9]{6,15}$/.test(v), nssfHint: 'should be 6 to 15 letters and digits',
+    nationalId: { ok: (v) => /^\d{20}$/.test(v), hint: 'A NIDA number is 20 digits' }, sha: false,
+  },
+  // URA TIN: 10 digits. A Ugandan National ID is the NIN: 14 letters and digits.
+  Uganda: {
+    taxLabel: 'TIN', taxOk: (v) => /^\d{10}$/.test(v), taxHint: 'should be 10 digits', taxPlaceholder: '1000123456',
+    nssfOk: (v) => /^[A-Z0-9]{6,15}$/.test(v), nssfHint: 'should be 6 to 15 letters and digits',
+    nationalId: { ok: (v) => /^[A-Z0-9]{14}$/.test(v), hint: 'A NIN is 14 letters and digits' }, sha: false,
+  },
+};
+const numbersOf = (country?: string | null) => NUMBERS[countryOf(country)];
+
+/** A tax number as saved: no spaces, upper case; outside Kenya also without dashes (a TRA TIN is written 123-456-789). */
+export const normaliseTaxNumber = (value: unknown, country?: string | null) =>
+  countryOf(country) === 'Kenya' ? normaliseKraPin(value) : normaliseKraPin(value).replace(/-/g, '');
+/** An ID number as saved: a Tanzanian National ID (NIDA) also loses its dashes. */
+export const normaliseIdNumberIn = (value: unknown, country?: string | null, type: unknown = 'National ID') =>
+  countryOf(country) === 'Tanzania' && (text(type) || 'National ID') === 'National ID'
+    ? normaliseIdNumber(value).replace(/-/g, '')
+    : normaliseIdNumber(value);
+
+/** The employee's tax number by its name in their country: a KRA PIN in Kenya, a TIN in Tanzania and Uganda. */
+export const taxNumberLabel = (country?: string | null) => numbersOf(country).taxLabel;
+/** What a tax number looks like in the country, for a placeholder. */
+export const taxNumberPlaceholder = (country?: string | null) => numbersOf(country).taxPlaceholder;
+export const isValidTaxNumber = (value: unknown, country?: string | null) => numbersOf(country).taxOk(normaliseTaxNumber(value, country));
+export const isValidSocialSecurityNumber = (value: unknown, country?: string | null) => numbersOf(country).nssfOk(normaliseNssfNumber(value));
+/** An SHA number is asked for in Kenya only. */
+export const needsShaNumber = (country?: string | null) => numbersOf(country).sha;
+export const isValidIdNumberIn = (type: unknown, value: unknown, country?: string | null) => {
+  const own = numbersOf(country).nationalId;
+  if (own && type === 'National ID') return own.ok(normaliseIdNumberIn(value, country, type));
+  return isValidIdNumber(type, value);
+};
 
 /**
  * Why a value can't be saved, or null when it can (blank is fine here; `onboardingMissing` says what is required).
- * The employee's country (their branch's) picks the formats, as the database does: Uganda's TIN, NSSF and NIN.
+ * The employee's country (their branch's) picks the formats, as the database does: a TRA or URA TIN instead of a KRA
+ * PIN, each country's NSSF number and national ID.
  */
 export function fieldProblem(field: string, value: unknown, employee: EmployeeRecord = {}, country?: string | null): string | null {
   if (!text(value)) return null;
+  const n = numbersOf(country);
   switch (field) {
     case 'Tax PIN':
-      if (inUganda(country)) return /^\d{10}$/.test(normaliseKraPin(value)) ? null : 'TIN should be 10 digits';
-      return isValidKraPin(value) ? null : 'KRA PIN should look like A123456789B';
+      return isValidTaxNumber(value, country) ? null : `${n.taxLabel} ${n.taxHint}`;
     case 'ID Number': {
       // no type is taken as a national ID, as the database does
       const type = text(employee['Type of Identification']) || 'National ID';
       if (!isIdentityType(type)) return 'Choose the identity type first';
-      if (inUganda(country) && type === 'National ID') return /^[A-Z0-9]{14}$/.test(normaliseIdNumber(value)) ? null : 'A NIN is 14 letters and digits';
+      if (n.nationalId && type === 'National ID') return isValidIdNumberIn(type, value, country) ? null : n.nationalId.hint;
       return isValidIdNumber(type, value) ? null : `This is not a valid ${type} number`;
     }
     case 'Mobile Number':
       return isValidOnboardingPhone(value) ? null : 'Phone number should look like 0712345678, or start with + and the country code';
     case 'NSSF Number':
-      if (inUganda(country)) return /^[A-Z0-9]{6,15}$/.test(normaliseNssfNumber(value)) ? null : 'NSSF number should be 6 to 15 letters and digits';
-      return isValidNssfNumber(value) ? null : 'NSSF number should be 5 to 12 digits (the last may be X)';
+      return isValidSocialSecurityNumber(value, country) ? null : `NSSF number ${n.nssfHint}`;
     case 'SHIF Number':
       return isValidShaNumber(value) ? null : 'SHA number should be letters and digits only';
     default:
@@ -93,7 +159,7 @@ export interface OnboardingContacts {
 }
 
 /** What the employee still has to give before they can submit, in the words the form uses. */
-export function employeePartMissing(e: EmployeeRecord, contacts: OnboardingContacts): string[] {
+export function employeePartMissing(e: EmployeeRecord, contacts: OnboardingContacts, country?: string | null): string[] {
   const m: string[] = [];
   const need = (field: string, label: string) => {
     if (!text(e[field])) m.push(label);
@@ -111,10 +177,10 @@ export function employeePartMissing(e: EmployeeRecord, contacts: OnboardingConta
   need('residential_address', 'Residential address');
   need('Personal Email', 'Personal email');
   if (!isIdentityType(e['Type of Identification'])) m.push('Identity type');
-  needValid('ID Number', 'ID number', (v) => isValidIdNumber(e['Type of Identification'], v));
-  needValid('Tax PIN', 'KRA PIN', isValidKraPin);
-  needValid('SHIF Number', 'SHA number', isValidShaNumber);
-  needValid('NSSF Number', 'NSSF number', isValidNssfNumber);
+  needValid('ID Number', 'ID number', (v) => isValidIdNumberIn(e['Type of Identification'], v, country));
+  needValid('Tax PIN', taxNumberLabel(country), (v) => isValidTaxNumber(v, country));
+  if (needsShaNumber(country)) needValid('SHIF Number', 'SHA number', isValidShaNumber);
+  needValid('NSSF Number', 'NSSF number', (v) => isValidSocialSecurityNumber(v, country));
   needValid('Mobile Number', 'Phone number', isValidOnboardingPhone);
   need('kra_residency', 'Residency');
   if (e['is_pwd'] === null || e['is_pwd'] === undefined) m.push('Disability (PWD) status');
@@ -140,8 +206,8 @@ export function employerPartMissing(e: EmployeeRecord): string[] {
   return m;
 }
 
-export const onboardingMissing = (e: EmployeeRecord, contacts: OnboardingContacts) => [
-  ...employeePartMissing(e, contacts),
+export const onboardingMissing = (e: EmployeeRecord, contacts: OnboardingContacts, country?: string | null) => [
+  ...employeePartMissing(e, contacts, country),
   ...employerPartMissing(e),
 ];
 

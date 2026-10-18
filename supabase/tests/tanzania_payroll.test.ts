@@ -2,8 +2,11 @@
 //
 // Tanzania payroll (FIG-905 stage 3, migration 20261021000000_tanzania_payroll.sql): Tanzania's statutory rates seeded
 // as dated data (in force from 1 July 2023, not before; Kenya's untouched), a company's own Tanzania rate, the
-// employee fields, the payslip columns, piece rate payouts for a Tanzania worker holding back the reserve only (no
-// Kenyan housing levy) and a Tanzania contractor's withholding tax at Tanzania's rate, and running the migration again.
+// employee details (a TRA TIN in "Tax PIN" and an NSSF Tanzania number in "NSSF Number", checked by the shared
+// country-aware rules of 20261021100000; the HESLB and secondary employment fields), the payslip columns (employer_nssf
+// and taxable_pay shared with Uganda), piece rate payouts for a Tanzania worker holding back the reserve only (no
+// Kenyan housing levy), a Tanzania contractor's withholding tax at Tanzania's rate, one currency per payout, and
+// running the migration again.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -88,31 +91,51 @@ describe("Tanzania's statutory rates", () => {
 });
 
 describe("employees' Tanzania details and payslip columns", () => {
-  it('adds the TIN, NSSF (Tanzania) number, HESLB borrower and index number, and secondary employment (defaults off)', async () => {
-    const t1 = (await rows<Record<string, unknown>>(`select tz_tin, tz_nssf_number, heslb_borrower, heslb_index_number, secondary_employment from employees where "Employee Number" = 'T1'`))[0];
-    expect(t1).toEqual({ tz_tin: null, tz_nssf_number: null, heslb_borrower: false, heslb_index_number: null, secondary_employment: false });
-    await as(PAY, `update employees set tz_tin = '123-456-789', tz_nssf_number = '1002 003 004', heslb_borrower = true, heslb_index_number = 's0101/0001/2010' where "Employee Number" = 'T1'`);
-    const saved = (await rows<Record<string, unknown>>(`select tz_tin, tz_nssf_number, heslb_borrower, heslb_index_number from employees where "Employee Number" = 'T1'`))[0];
-    expect(saved).toEqual({ tz_tin: '123456789', tz_nssf_number: '1002003004', heslb_borrower: true, heslb_index_number: 'S0101/0001/2010' });
+  it('has no TIN or NSSF columns of its own: "Tax PIN" and "NSSF Number" hold the TRA TIN and NSSF Tanzania number', async () => {
+    const cols = await rows<{ c: string }>(`select column_name c from information_schema.columns where table_name = 'employees' and column_name in ('tz_tin', 'tz_nssf_number')`);
+    expect(cols).toEqual([]);
+    const t1 = (await rows<Record<string, unknown>>(`select heslb_borrower, heslb_index_number, secondary_employment from employees where "Employee Number" = 'T1'`))[0];
+    expect(t1).toEqual({ heslb_borrower: false, heslb_index_number: null, secondary_employment: false });
+    await as(PAY, `update employees set "Tax PIN" = '123-456-789', "NSSF Number" = '1002 003 004', heslb_borrower = true, heslb_index_number = 's0101/0001/2010',
+                   "Type of Identification" = 'National ID', "ID Number" = '19900101-12345-00001-12' where "Employee Number" = 'T1'`);
+    const saved = (await rows<Record<string, unknown>>(`select "Tax PIN", "NSSF Number", "ID Number", heslb_borrower, heslb_index_number from employees where "Employee Number" = 'T1'`))[0];
+    expect(saved).toEqual({ 'Tax PIN': '123456789', 'NSSF Number': '1002003004', 'ID Number': '19900101123450000112', heslb_borrower: true, heslb_index_number: 'S0101/0001/2010' });
   });
 
-  it('checks the TIN is 9 digits and unique in the company', async () => {
-    await expect(as(PAY, `update employees set tz_tin = '12345' where "Employee Number" = 'TC'`)).rejects.toThrow(/TIN "12345" should be 9 digits/);
-    await expect(as(PAY, `update employees set tz_tin = '123 456 789' where "Employee Number" = 'TC'`)).rejects.toThrow(/already has TIN 123456789/);
-    // a Kenyan's KRA PIN is still checked as before
-    await expect(as(PAY, `update employees set "Tax PIN" = '123456789' where "Employee Number" = 'K1'`)).rejects.toThrow(/KRA PIN/);
+  it("checks the TIN is 9 digits and unique in the company, the NSSF number and NIDA number by Tanzania's formats", async () => {
+    await expect(as(PAY, `update employees set "Tax PIN" = '12345' where "Employee Number" = 'TC'`)).rejects.toThrow(/TIN "12345" should be 9 digits/);
+    await expect(as(PAY, `update employees set "Tax PIN" = 'A012345678Z' where "Employee Number" = 'TC'`)).rejects.toThrow(/TIN "A012345678Z" should be 9 digits/);
+    await expect(as(PAY, `update employees set "Tax PIN" = '123 456 789' where "Employee Number" = 'TC'`)).rejects.toThrow(/already has TIN 123456789/);
+    await expect(as(PAY, `update employees set "NSSF Number" = 'N1' where "Employee Number" = 'TC'`)).rejects.toThrow(/NSSF number "N1" should be 6 to 15 letters and digits/);
+    await expect(as(PAY, `update employees set "Type of Identification" = 'National ID', "ID Number" = '12345678' where "Employee Number" = 'TC'`)).rejects.toThrow(/not a valid National ID/);
+    // a Kenyan's KRA PIN is still checked as before, and a TRA TIN is not one
+    await expect(as(PAY, `update employees set "Tax PIN" = '123456780' where "Employee Number" = 'K1'`)).rejects.toThrow(/KRA PIN "123456780" should look like A123456789B/);
+  });
+
+  it('asks a Tanzanian employee for a TIN and NSSF number, no KRA PIN or SHA number, and a borrower for the HESLB index number', async () => {
+    await as(PAY, `insert into employees ("Employee Number", "First Name", "Branch", heslb_borrower) values ('T9', 'Rehema', 'Dar es Salaam', true)`);
+    const m = (await rows<{ m: string[] }>(`select onboarding_missing_details(e, 'employee') m from employees e where "Employee Number" = 'T9'`))[0].m;
+    expect(m).toEqual(expect.arrayContaining(['TIN', 'NSSF number', 'HESLB index number']));
+    expect(m).not.toContain('KRA PIN');
+    expect(m).not.toContain('SHA number');
+    await as(PAY, `update employees set "NSSF Number" = '1002003005', heslb_index_number = 'S0101/0002/2010' where "Employee Number" = 'T9'`);
+    const after = (await rows<{ m: string[] }>(`select onboarding_missing_details(e, 'employee') m from employees e where "Employee Number" = 'T9'`))[0].m;
+    expect(after).toContain('TIN');
+    expect(after).not.toContain('NSSF number');
+    expect(after).not.toContain('HESLB index number');
+    await db.exec(`delete from employees where "Employee Number" = 'T9'`);
   });
 
   it("saves a Tanzania payslip's HESLB repayment, employer costs and taxable pay, in TZS", async () => {
     const m = (await rows<{ m: string }>(`select to_char(${day(1)}, 'YYYY-MM') m`))[0].m;
     await as(PAY, `insert into salary_history (employee_id, employee_name, pay_period, gross_pay, net_pay, total_deductions, paye_tax, nssf_deduction,
-                     heslb_deduction, nssf_employer, sdl_levy, wcf_levy, taxable_pay, tax_resident, tenant_id)
+                     heslb_deduction, employer_nssf, sdl_levy, wcf_levy, taxable_pay, tax_resident, tenant_id)
                    values ('T1', 'Tumaini T', '${m}', 1500000, 892000, 608000, 233000, 150000, 225000, 150000, 52500, 7500, 1350000, true, '${A}')`);
     const slip = (await rows<Record<string, unknown>>(
-      `select country, currency, heslb_deduction, nssf_employer, sdl_levy, wcf_levy, taxable_pay, tax_resident, nita_levy from salary_history where employee_id = 'T1'`
+      `select country, currency, heslb_deduction, employer_nssf, sdl_levy, wcf_levy, taxable_pay, tax_resident, nita_levy from salary_history where employee_id = 'T1'`
     ))[0];
     expect(slip).toEqual({
-      country: 'Tanzania', currency: 'TZS', heslb_deduction: '225000.00', nssf_employer: '150000.00', sdl_levy: '52500.00', wcf_levy: '7500.00',
+      country: 'Tanzania', currency: 'TZS', heslb_deduction: '225000.00', employer_nssf: '150000.00', sdl_levy: '52500.00', wcf_levy: '7500.00',
       taxable_pay: '1350000.00', tax_resident: true, nita_levy: '0.00',
     });
     await expect(as(PAY, `update salary_history set sdl_levy = -1 where employee_id = 'T1'`)).rejects.toThrow(/salary_history_tz_amounts/);
@@ -121,10 +144,18 @@ describe("employees' Tanzania details and payslip columns", () => {
 });
 
 describe('piece rate payouts for Tanzania workers', () => {
-  it("hold back the reserve only (no Kenyan housing levy), and a contractor's WHT at Tanzania's rate", async () => {
-    const id = (await read<{ id: string }>(PAY, `select create_work_payout_batch('daily', ${day(1)}, ${day(10)}) id`))[0].id;
+  it('never mix currencies: a payout for everyone with Kenyan and Tanzanian workers is refused', async () => {
+    await expect(read(PAY, `select create_work_payout_batch('daily', ${day(1)}, ${day(10)})`)).rejects.toThrow(/would mix KES \(Kenya\) and TZS \(Tanzania\)/);
+    expect(await rows(`select id from work_payout_batches`)).toEqual([]);
+  });
+
+  it("hold back the reserve only (no Kenyan housing levy), and a contractor's WHT at Tanzania's rate, in TZS", async () => {
+    const ke = (await read<{ id: string }>(PAY, `select create_work_payout_batch('daily', ${day(1)}, ${day(10)}, null, null, 'Kenya') id`))[0].id;
+    const tzb = (await read<{ id: string }>(PAY, `select create_work_payout_batch('daily', ${day(1)}, ${day(10)}, null, null, 'tanzania') id`))[0].id;
+    const batches = await rows<{ id: string; country: string; currency: string; worker_count: number }>(`select id, country, currency, worker_count from work_payout_batches order by currency`);
+    expect(batches.map((b) => [b.id, b.country, b.currency, b.worker_count])).toEqual([[ke, 'Kenya', 'KES', 1], [tzb, 'Tanzania', 'TZS', 3]]);
     const lines = await rows<{ employee_number: string; gross: string; ahl: string; reserve: string; wht: string; wht_rate: string; net: string; rounding: string }>(
-      `select employee_number, gross, ahl, reserve, wht, wht_rate, net, rounding from work_payout_lines where batch_id = '${id}' order by employee_number`
+      `select employee_number, gross, ahl, reserve, wht, wht_rate, net, rounding from work_payout_lines where batch_id in ('${ke}', '${tzb}') order by employee_number`
     );
     const by = Object.fromEntries(lines.map((l) => [l.employee_number, l]));
     // Kenya: AHL 1.5% of 10,000 and the 10% reserve, as before
@@ -138,15 +169,29 @@ describe('piece rate payouts for Tanzania workers', () => {
       expect(Number(l.net) + Number(l.ahl) + Number(l.reserve) + Number(l.wht) + Number(l.rounding)).toBe(Number(l.gross));
     }
   });
+
+  it('tells the worker the amount in their own currency', async () => {
+    expect(await rows<{ t: string }>(`select money_text(9000, 'TZS') t union all select money_text(8850, 'KES')`)).toEqual([{ t: 'TZS 9,000' }, { t: 'KES 8,850.00' }]);
+    await as(PAY, `select set_work_settings('{"payout_needs_second_approver": false}')`);
+    const tzb = (await rows<{ id: string }>(`select id from work_payout_batches where currency = 'TZS'`))[0].id;
+    await as(PAY, `select approve_work_payout_batch('${tzb}')`);
+    const note = await rows<{ message: string }>(`select message from hr_notifications where employee_number = 'T1' and title = 'Payout on its way'`);
+    expect(note[0].message).toMatch(/^TZS 9,000 is being paid to you for work .* TZS 1,000 is held back/);
+    expect(note[0].message).not.toMatch(/KES/);
+  });
 });
 
 describe('running the migration again', () => {
   it('changes nothing', async () => {
     const before = await rows(`select code, value, bands, effective_from from statutory_rates where country = 'Tanzania' order by code, effective_from`);
-    const people = await rows(`select "Employee Number", tz_tin, tz_nssf_number, heslb_borrower from employees order by 1`);
+    const people = await rows(`select "Employee Number", "Tax PIN", "NSSF Number", heslb_borrower, heslb_index_number from employees order by 1`);
+    const rules = await rows(`select pg_get_functiondef('public.tax_number_ok(text, text)'::regprocedure) d`);
     await db.exec(readFileSync(MIGRATION, 'utf8'));
     expect(await rows(`select code, value, bands, effective_from from statutory_rates where country = 'Tanzania' order by code, effective_from`)).toEqual(before);
-    expect(await rows(`select "Employee Number", tz_tin, tz_nssf_number, heslb_borrower from employees order by 1`)).toEqual(people);
+    expect(await rows(`select "Employee Number", "Tax PIN", "NSSF Number", heslb_borrower, heslb_index_number from employees order by 1`)).toEqual(people);
+    // the country-aware checks (20261021100000) are untouched by running this one again
+    expect(await rows(`select pg_get_functiondef('public.tax_number_ok(text, text)'::regprocedure) d`)).toEqual(rules);
+    await expect(as(PAY, `update employees set "Tax PIN" = '12345' where "Employee Number" = 'TC'`)).rejects.toThrow(/TIN "12345" should be 9 digits/);
     expect(before.length).toBe(12);
   });
 });

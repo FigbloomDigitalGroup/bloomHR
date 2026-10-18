@@ -163,10 +163,10 @@ describe('files per country', () => {
     expect(p10.file.rows[0][1]).toBe('Amina W');
     expect(kenya.payments.map((p) => p.key)).toEqual(['mpesa', 'bank', 'equity']);
     expect(kenya.payments.find((p) => p.key === 'equity')!.file.rows[0][6]).toBe('KES');
-    // Tanzania: its own returns (none of Kenya's), only optional ones with rows; a TZS bank file only
+    // Tanzania: its own returns (none of Kenya's), only optional ones with rows; TZS bank and mobile money files
     expect(files[1].returns.map((r) => r.key)).toEqual(['tra-paye', 'tz-nssf', 'wcf']);
     expect(files[1].returns[0].file.rows[0]).toContain('Baraka M');
-    expect(files[1].payments.map((p) => [p.key, p.name, p.file.rows.length])).toEqual([['bank-tzs', 'bulk-pay-bank-tzs', 1]]);
+    expect(files[1].payments.map((p) => [p.key, p.name, p.file.rows.length])).toEqual([['bank-tzs', 'bulk-pay-bank-tzs', 1], ['mobile-tzs', 'bulk-pay-mobile-tzs', 0]]);
     expect(files[1].payments[0].file.rows[0]).toContain('800000.00');
   });
 

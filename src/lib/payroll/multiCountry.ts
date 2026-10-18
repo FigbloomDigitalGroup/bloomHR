@@ -6,6 +6,7 @@ import { currencyFor, employeeBranch } from '../branches';
 import { type ExportFile, bankFile, equityFile, mpesaFile } from '../payrollExports';
 import { type CountryPayrollEngine, type EmployeeProblem, type PayslipRecord, engineFor, tidyCountry, waitingLabel } from './countries';
 import { currencyOf, moneyShort } from './currency';
+import { tanzaniaMobileMoneyFile } from './countries/tanzania';
 import { ugandaMobileMoneyFile } from './countries/uganda';
 
 // One payroll run for every country (FIG-905 stage 2): "run like they're one country but in the backend they're
@@ -313,13 +314,17 @@ export interface CountryFiles {
   payments: CountryFile[];
 }
 
-/** Bank and mobile money files for one currency's payslips: M-Pesa, bank and Equity for KES; the bank file for others. */
+/** Bank and mobile money files for one currency's payslips: M-Pesa, bank and Equity for KES; bank and mobile money for TZS and UGX; the bank file for others. */
 export function paymentFilesFor(currency: string, payslips: PayslipRecord[], employees: EmployeeRecord[], payPeriod: string, debitAccount: string): CountryFile[] {
   const own = payslips.filter((p) => currencyOf(p) === currency);
   const code = currency.toLowerCase();
   if (currency !== 'KES') {
     const bank = { key: `bank-${code}`, label: 'Bank bulk pay', name: `bulk-pay-bank-${code}`, what: `staff paid by bank, in ${currency}`, file: bankFile(own, employees, payPeriod) };
-    // mobile money outside Kenya comes with each country's payroll: MTN MoMo and Airtel Money in Uganda
+    // mobile money outside Kenya comes with each country's payroll: M-Pesa, Tigo Pesa and Airtel Money in Tanzania
+    // (numbers as 255...), MTN MoMo and Airtel Money in Uganda (256...)
+    if (currency === 'TZS') {
+      return [bank, { key: 'mobile-tzs', label: 'Mobile money bulk pay', name: 'bulk-pay-mobile-tzs', what: 'staff paid by M-Pesa, Tigo Pesa or Airtel Money, in TZS', file: tanzaniaMobileMoneyFile(own, employees, payPeriod) }];
+    }
     if (currency === 'UGX') {
       return [bank, { key: 'mobile-ugx', label: 'Mobile money bulk pay', name: 'bulk-pay-mobile-ugx', what: 'staff paid by MTN MoMo or Airtel Money, in UGX', file: ugandaMobileMoneyFile(own, employees, payPeriod) }];
     }

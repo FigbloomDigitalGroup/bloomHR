@@ -8,6 +8,7 @@ import { paymentKind } from '../../paymentMethods';
 import { isContractor } from '../../workSettlement';
 import { type ExportFile, isContractorSlip } from '../../payrollExports';
 import type { EmployeeRecord } from '../../profileCompleteness';
+import { isValidSocialSecurityNumber, isValidTaxNumber, normaliseNssfNumber, normaliseTaxNumber } from '../../onboardingValidation';
 import type { CountryPayrollEngine, EmployeeProblem, PayslipLine, PayslipRecord, PayslipResult, ReturnFile } from './types';
 
 // Tanzania (mainland) payroll (FIG-905 stage 3). Everyone in a Tanzania branch is worked out here, in TZS, with
@@ -18,7 +19,8 @@ import type { CountryPayrollEngine, EmployeeProblem, PayslipLine, PayslipRecord,
 //   NSSF            employee 10% and employer 10% of the month's pensionable pay, no ceiling (NSSF Act s.12; the split
 //                   may be 5/15 or 0/20: nssf_rate / nssf_employer_rate)
 //   taxable pay     a resident: taxable earnings less the employee's NSSF contribution (contributions to an approved
-//                   retirement fund come off pay before PAYE; nssf_deductible = 1)
+//                   retirement fund come off pay before PAYE; nssf_deductible = 1). Saved as taxable_pay, the column
+//                   every country keeps the pay PAYE is worked out on (Uganda's chargeable income too)
 //   PAYE            a resident: the monthly bands; a non-resident: a flat 15% of gross employment income (final,
 //                   nonresident_paye_rate); a secondary employment: a flat 30% (the top band, secondary_paye_rate)
 //   HESLB           a student loan repayment of 15% of the basic salary earned that month, for employees flagged as
@@ -28,6 +30,10 @@ import type { CountryPayrollEngine, EmployeeProblem, PayslipLine, PayslipRecord,
 //                   fixed allowances: not overtime or one-off earnings). Never taken from pay.
 //   contractors     withholding tax on the fee (resident 5% wht_resident, non-resident 15% wht_nonresident) instead
 //                   of PAYE, NSSF and HESLB; no SDL or WCF (they are not employees)
+//
+// The TRA TIN is in "Tax PIN" and the NSSF member number in "NSSF Number": those fields hold the numbers of the
+// employee's country, with the shared format checks (lib/onboardingValidation; tax_number_ok and
+// social_security_number_ok in the database).
 //
 // Unlike Kenya, PAYE and NSSF are taken even while the TIN or NSSF number is missing (the tax and contribution are
 // owed either way; the employee is listed as missing them so the returns can be filed). Health insurance (NHIF) has no
@@ -61,12 +67,15 @@ export const isTaxResident = (e: Employee | null | undefined) => !/^non/i.test(t
 export const isSecondaryEmployment = (e: Employee | null | undefined) => yes(e?.['secondary_employment']);
 /** Flagged as repaying a Higher Education Students' Loans Board loan. */
 export const isHeslbBorrower = (e: Employee | null | undefined) => yes(e?.['heslb_borrower']);
-/** The employee's NSSF (Tanzania) membership number. */
-export const tzNssfNumber = (e: Employee | null | undefined) => text(e?.['tz_nssf_number']);
-/** The employee's TRA TIN, digits only (employees.tz_tin: the "Tax PIN" field is checked as a KRA PIN). */
-export const tinOf = (e: Employee | null | undefined) => text(e?.['tz_tin']).replace(/[\s-]/g, '');
+/**
+ * The employee's NSSF (Tanzania) membership number: "NSSF Number", which holds the member number of the NSSF of the
+ * employee's country (checked by the shared rules in lib/onboardingValidation, as the database does).
+ */
+export const tzNssfNumber = (e: Employee | null | undefined) => normaliseNssfNumber(e?.['NSSF Number']);
+/** The employee's TRA TIN, digits only: "Tax PIN", which holds the tax number of the employee's country. */
+export const tinOf = (e: Employee | null | undefined) => normaliseTaxNumber(e?.['Tax PIN'], TANZANIA);
 /** A TRA TIN is 9 digits (often written 123-456-789). */
-export const isValidTin = (v: unknown) => /^\d{9}$/.test(text(v).replace(/[\s-]/g, ''));
+export const isValidTin = (v: unknown) => isValidTaxNumber(v, TANZANIA);
 
 export interface TanzaniaStatutoryInput {
   /** the month's earnings that are taxed (gross less earnings marked not taxed) */
@@ -131,7 +140,7 @@ export function tanzaniaStatutory(i: TanzaniaStatutoryInput, rates: Rates): Tanz
 
 /** The payslip columns Tanzania's figures are saved in (salary_history). */
 const tzFields = (s: TanzaniaStatutory, resident: boolean) => ({
-  nssf_employer: s.nssfEmployer,
+  employer_nssf: s.nssfEmployer,
   sdl_levy: s.sdl,
   wcf_levy: s.wcf,
   taxable_pay: s.taxablePay,
@@ -258,7 +267,7 @@ export const tanzaniaDeductionLines = (p: PayslipRecord): PayslipLine[] =>
 /** A Tanzania payslip's employer costs (paid on top of pay, never taken from it). */
 export const tanzaniaEmployerLines = (p: PayslipRecord): PayslipLine[] =>
   nonZero([
-    { label: 'NSSF (employer)', amount: num(p.nssf_employer) },
+    { label: 'NSSF (employer)', amount: num(p.employer_nssf) },
     { label: 'SDL (skills levy)', amount: num(p.sdl_levy) },
     { label: 'WCF (workers compensation)', amount: num(p.wcf_levy) },
   ]);
@@ -309,7 +318,7 @@ export function traPayeFile(payslips: PayslipRecord[], employees: EmployeeRecord
       amount(num(p.paye_tax)),
     ];
   });
-  return { headers: TRA_PAYE_HEADERS, rows, problems: problemsOf(ls, (e) => [['TIN', isValidTin(e['tz_tin'])]]) };
+  return { headers: TRA_PAYE_HEADERS, rows, problems: problemsOf(ls, (e) => [['TIN', isValidTin(e['Tax PIN'])]]) };
 }
 
 // NSSF Tanzania's monthly contribution schedule (the employer portal's member contributions upload).
@@ -319,11 +328,11 @@ export const TZ_NSSF_HEADERS = [
 ] as const;
 
 export function tzNssfFile(payslips: PayslipRecord[], employees: EmployeeRecord[]): ExportFile {
-  const ls = linesOf(employeesOnly(payslips).filter((p) => num(p.nssf_deduction) > 0 || num(p.nssf_employer) > 0), employees);
+  const ls = linesOf(employeesOnly(payslips).filter((p) => num(p.nssf_deduction) > 0 || num(p.employer_nssf) > 0), employees);
   const rows = ls.map((l, i) => {
     const p = l.payslip;
     const own = num(p.nssf_deduction);
-    const employer = num(p.nssf_employer);
+    const employer = num(p.employer_nssf);
     return [
       String(i + 1), tzNssfNumber(l.employee), text(l.employee['First Name']), text(l.employee['Middle Name']), text(l.employee['Last Name']),
       payrollNumber(l), amount(num(p.gross_pay)), amount(own), amount(employer), amount(own + employer),
@@ -332,7 +341,7 @@ export function tzNssfFile(payslips: PayslipRecord[], employees: EmployeeRecord[
   return {
     headers: TZ_NSSF_HEADERS,
     rows,
-    problems: problemsOf(ls, (e) => [['NSSF number', Boolean(tzNssfNumber(e))], ['Surname', Boolean(text(e['Last Name']))]]),
+    problems: problemsOf(ls, (e) => [['NSSF number', isValidSocialSecurityNumber(e['NSSF Number'], TANZANIA)], ['Surname', Boolean(text(e['Last Name']))]]),
   };
 }
 
@@ -380,7 +389,30 @@ export function tzWhtFile(payslips: PayslipRecord[], employees: EmployeeRecord[]
     String(i + 1), nameOf(l), tinOf(l.employee), payrollNumber(l), payPeriod, isTaxResident(l.employee) ? 'Y' : 'N',
     amount(num(l.payslip.gross_pay)), amount(num(l.payslip.wht_rate) * 100), amount(num(l.payslip.wht_tax)),
   ]);
-  return { headers: TZ_WHT_HEADERS, rows, problems: problemsOf(ls, (e) => [['TIN', isValidTin(e['tz_tin'])]]) };
+  return { headers: TZ_WHT_HEADERS, rows, problems: problemsOf(ls, (e) => [['TIN', isValidTin(e['Tax PIN'])]]) };
+}
+
+/** A Tanzanian mobile number as M-Pesa (Vodacom), Tigo Pesa (Mixx) and Airtel Money take it (255XXXXXXXXX), or ''. */
+export const tanzaniaPhone = (value: unknown) => {
+  const digits = text(value).replace(/\D/g, '');
+  const phone = /^0[67]\d{8}$/.test(digits) ? `255${digits.slice(1)}` : /^[67]\d{8}$/.test(digits) ? `255${digits}` : digits;
+  return /^255[67]\d{8}$/.test(phone) ? phone : '';
+};
+
+export const TZ_MOBILE_HEADERS = ['Phone Number', 'Name', 'Amount', 'Reference', 'Payroll Number'] as const;
+
+/** Bulk pay by mobile money in TZS (M-Pesa Tanzania, Tigo Pesa, Airtel Money): staff paid by mobile money. */
+export function tanzaniaMobileMoneyFile(payslips: PayslipRecord[], employees: EmployeeRecord[], payPeriod: string): ExportFile {
+  const byNumber = new Map(employees.map((e) => [text(e['Employee Number']), e]));
+  const ls = linesOf(
+    payslips.filter((p) => {
+      const e = byNumber.get(text(p.employee_id)) ?? {};
+      return paymentKind(text(p.payment_method) || e['payment_method']) === 'mobile' && num(p.net_pay) > 0;
+    }),
+    employees
+  );
+  const rows = ls.map((l) => [tanzaniaPhone(l.employee['Mobile Number']), nameOf(l), String(tzs(num(l.payslip.net_pay))), `Salary ${payPeriod}`, text(l.employee['Payroll Number'])]);
+  return { headers: TZ_MOBILE_HEADERS, rows, problems: problemsOf(ls, (e) => [['Mobile money number', Boolean(tanzaniaPhone(e['Mobile Number']))]]) };
 }
 
 /** What the month's Tanzania payroll owes each body, and when (PAYE and SDL to TRA by the 7th, HESLB by the 15th, NSSF and WCF by the month's end). */
@@ -388,7 +420,7 @@ export function tanzaniaRemittance(payslips: PayslipRecord[]) {
   const total = (f: (p: PayslipRecord) => number) => round2(payslips.reduce((t, p) => t + f(p), 0));
   return [
     { label: 'PAYE (TRA)', amount: total((p) => num(p.paye_tax) + (isContractorSlip(p) ? num(p.wht_tax) : 0)), note: 'From employees (and contractors’ WHT); by the 7th' },
-    { label: 'NSSF', amount: total((p) => num(p.nssf_deduction) + num(p.nssf_employer)), note: `${total((p) => num(p.nssf_deduction)).toLocaleString()} employees + ${total((p) => num(p.nssf_employer)).toLocaleString()} employer` },
+    { label: 'NSSF', amount: total((p) => num(p.nssf_deduction) + num(p.employer_nssf)), note: `${total((p) => num(p.nssf_deduction)).toLocaleString()} employees + ${total((p) => num(p.employer_nssf)).toLocaleString()} employer` },
     { label: 'SDL (TRA)', amount: total((p) => num(p.sdl_levy)), note: 'Employer only; by the 7th' },
     { label: 'WCF', amount: total((p) => num(p.wcf_levy)), note: 'Employer only; by the end of the month' },
     { label: 'HESLB', amount: total((p) => num(p.heslb_deduction)), note: 'From borrowers; by the 15th' },
@@ -408,13 +440,14 @@ const TANZANIA_RETURNS: ReturnFile[] = [
 export function tanzaniaProblems(employee: Employee): string[] {
   const missing: string[] = [];
   if (!tinOf(employee)) missing.push('TIN');
-  else if (!isValidTin(employee['tz_tin'])) missing.push('TIN (9 digits)');
+  else if (!isValidTin(employee['Tax PIN'])) missing.push('TIN (9 digits)');
   if (!isContractor(employee)) {
-    if (!tzNssfNumber(employee)) missing.push('NSSF (Tanzania) number');
+    if (!tzNssfNumber(employee)) missing.push('NSSF number');
+    else if (!isValidSocialSecurityNumber(employee['NSSF Number'], TANZANIA)) missing.push('NSSF number (not valid)');
     if (isHeslbBorrower(employee) && !text(employee['heslb_index_number'])) missing.push('HESLB index number');
   }
   const kind = paymentKind(employee['payment_method']);
-  if (kind === 'mobile' && !text(employee['Mobile Number'])) missing.push('Mobile money number');
+  if (kind === 'mobile' && !tanzaniaPhone(employee['Mobile Number'])) missing.push('Mobile money number');
   if (kind === 'bank') {
     if (!text(employee['Bank'])) missing.push('Bank');
     if (!text(employee['Account Number'])) missing.push('Account number');

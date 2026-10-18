@@ -130,10 +130,9 @@ const PAYSLIP_AMOUNTS = [
   // the month-end settlement of piece rate work and contract jobs (FIG-812, lib/workSettlement)
   "work_pay", "jobs_pay", "paid_out", "ahl_withheld", "reserve_released", "wht_withheld", "wht_rate", "wht_tax",
   "arrears_brought_forward", "arrears_carried_forward",
-  // Uganda (FIG-905): Local Service Tax and the employer's NSSF
-  "lst_deduction", "employer_nssf",
-  // Tanzania (FIG-905): the HESLB repayment, and the employer's NSSF, SDL and WCF (not taken from pay)
-  "heslb_deduction", "nssf_employer", "sdl_levy", "wcf_levy",
+  // Tanzania and Uganda (FIG-905): the employer's NSSF (both, never taken from pay); Tanzania's HESLB repayment and
+  // the employer's SDL and WCF; Uganda's Local Service Tax
+  "employer_nssf", "heslb_deduction", "sdl_levy", "wcf_levy", "lst_deduction",
 ] as const;
 
 /** A calculated payroll row as the salary_history row saved for it */
@@ -151,10 +150,10 @@ const toSalaryHistory = (record: any): SalaryHistoryRecord => ({
   arrears_note: record.arrears_note ?? null,
   worker_kind: record.worker_kind ?? null,
   work_settlement: record.work_settlement === true,
-  chargeable_income: record.chargeable_income ?? null,
   // the payslip's country and currency (FIG-905): worked out by that country's engine
   country: record.country || "Kenya",
   currency: record.currency || "KES",
+  // the pay PAYE was worked out on (Tanzania's taxable pay, Uganda's chargeable income) and the residency it was taxed on
   taxable_pay: record.taxable_pay ?? null,
   tax_resident: record.tax_resident ?? null,
   payment_method: record.payment_method || "",
@@ -178,7 +177,6 @@ const fromSalaryHistory = (saved: any, live: any | undefined) => ({
   arrears_note: saved.arrears_note ?? null,
   worker_kind: saved.worker_kind ?? live?.worker_kind ?? null,
   work_settlement: saved.work_settlement === true,
-  chargeable_income: saved.chargeable_income ?? null,
   // the employer's NITA levy the database saved on the payslip (FIG-898)
   nita_levy: Number(saved.nita_levy) || 0,
   country: saved.country || "Kenya",

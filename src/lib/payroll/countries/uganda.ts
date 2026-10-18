@@ -10,6 +10,7 @@ import { paymentKind, paymentMethodLabel } from '../../paymentMethods';
 import { employeeName } from '../../missingPayrollDetails';
 import { NO_WORK, isContractor, settlementFields, whtRateFor, workMonthOf, type WorkMonth } from '../../workSettlement';
 import type { ExportFile } from '../../payrollExports';
+import { isValidSocialSecurityNumber, isValidTaxNumber } from '../../onboardingValidation';
 import type { EmployeeRecord } from '../../profileCompleteness';
 import type { CountryPayrollEngine, EmployeeProblem, PayslipLine, PayslipRecord, PayslipResult, ReturnFile } from './types';
 
@@ -25,7 +26,8 @@ import type { CountryPayrollEngine, EmployeeProblem, PayslipLine, PayslipRecord,
 //                      instalments (the default) or all at once (company setting). Each instalment is what is still
 //                      owed this financial year spread over the instalments left, so it stops once the year's amount
 //                      is paid (here, with another employer or straight to the council: lst_years).
-//   chargeable income  gross pay − earnings that are not taxed − the LST taken this month (an allowable deduction)
+//   chargeable income  gross pay − earnings that are not taxed − the LST taken this month (an allowable deduction);
+//                      saved as the payslip's taxable_pay, the column every country keeps the pay PAYE is worked out on
 //   PAYE               resident: the monthly bands (nil up to 335,000 from July 2026); non-resident: the
 //                      non-resident bands (no nil band); both plus 10% of chargeable income above 10,000,000
 //   contractors        withholding tax on gross (6%), no NSSF, PAYE or LST
@@ -255,7 +257,9 @@ export function calculateUgandaPayslip(employee: Record<string, any>, ctx: Paysl
     tax_relief: 0,
     lst_deduction: lst.amount,
     employer_nssf: s.employerNssf,
-    chargeable_income: s.chargeableIncome,
+    // Uganda's chargeable income, in the column every country keeps the pay PAYE is worked out on
+    taxable_pay: s.chargeableIncome,
+    tax_resident: contractor ? null : isTaxResident(employee),
     loan_deduction: loanDeduction,
     advance_deduction: advanceDeduction,
     welfare_deduction: 0,
@@ -288,7 +292,7 @@ export function recalculateUgandaPayslip(record: PayslipRecord, rates: Rates, em
     { grossPay: num(record.gross_pay), nonTaxable, lst, resident: isTaxResident(employee), contractor, whtRate: num(record.wht_rate) },
     rates
   );
-  return { ...record, paye_tax: s.paye, nssf_deduction: s.nssf, employer_nssf: s.employerNssf, chargeable_income: s.chargeableIncome, wht_tax: contractor ? s.wht : 0 };
+  return { ...record, paye_tax: s.paye, nssf_deduction: s.nssf, employer_nssf: s.employerNssf, taxable_pay: s.chargeableIncome, wht_tax: contractor ? s.wht : 0 };
 }
 
 /** Uganda's payslip figures, labelled. */
@@ -322,7 +326,7 @@ export function ugandaPayslipResult(record: PayslipRecord): PayslipResult {
     ),
     employerCosts: nonZero([{ label: 'NSSF (employer, 10%)', amount: num(record.employer_nssf) }]),
     grossPay,
-    taxablePay: record.chargeable_income === undefined || record.chargeable_income === null ? grossPay : num(record.chargeable_income),
+    taxablePay: record.taxable_pay === undefined || record.taxable_pay === null ? grossPay : num(record.taxable_pay),
     tax: contractor ? num(record.wht_tax) : num(record.paye_tax),
     netPay: num(record.net_pay),
   };
@@ -365,7 +369,8 @@ export function uraPayeFile(payslips: PayslipRecord[], employees: EmployeeRecord
     const gross = num(p.gross_pay);
     const basic = Math.max(0, num(p.basic_salary) - num(p.leave_deduction));
     const lst = num(p.lst_deduction);
-    const chargeable = p.chargeable_income === undefined || p.chargeable_income === null ? Math.max(0, gross - lst) : num(p.chargeable_income);
+    // chargeable income: the payslip's taxable_pay
+    const chargeable = p.taxable_pay === undefined || p.taxable_pay === null ? Math.max(0, gross - lst) : num(p.taxable_pay);
     const untaxed = Math.max(0, gross - lst - chargeable);
     return [
       text(e['Tax PIN']), text(e['ID Number']), nameOf(e, p), text(e['Job Title']) || text(p.position), isTaxResident(e) ? 'Resident' : 'Non-Resident',
@@ -466,10 +471,10 @@ const UGANDA_RETURNS: ReturnFile[] = [
 // ---------------------------------------------------------------------------------------------
 // details
 // ---------------------------------------------------------------------------------------------
-/** A URA TIN: ten digits. */
-export const isValidUgandaTin = (value: unknown) => /^\d{10}$/.test(text(value).replace(/\s/g, ''));
+/** A URA TIN: ten digits (the shared check of each country's tax number, lib/onboardingValidation). */
+export const isValidUgandaTin = (value: unknown) => isValidTaxNumber(value, 'Uganda');
 /** An NSSF Uganda member number: 6 to 15 letters and digits (the format is not published; this only catches typos). */
-export const isValidUgandaNssfNumber = (value: unknown) => /^[A-Z0-9]{6,15}$/i.test(text(value).replace(/[\s-]/g, ''));
+export const isValidUgandaNssfNumber = (value: unknown) => isValidSocialSecurityNumber(value, 'Uganda');
 
 export function ugandaMissingDetails(employee: Record<string, unknown>): string[] {
   const m: string[] = [];

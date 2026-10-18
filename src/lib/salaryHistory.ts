@@ -71,8 +71,6 @@ export interface SalaryHistoryRecord {
     wcf_levy?: number;
     /** Uganda: Local Service Tax */
     lst_deduction?: number;
-    nssf_employer?: number;
-    chargeable_income?: number | null;
     worker_kind?: string | null;
     work_settlement?: boolean;
     /** the payslip's country and currency (FIG-905): its employee's branch's when worked out */

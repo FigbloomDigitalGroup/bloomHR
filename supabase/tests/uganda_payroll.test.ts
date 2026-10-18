@@ -3,7 +3,8 @@
 // Uganda payroll (FIG-905 stage 4, migration 20261021100000_uganda_payroll.sql): Uganda's dated statutory rates (the
 // 2026 PAYE bands from 1 July 2026, the bands before, NSSF, LST), the employee details by country (a URA TIN in
 // "Tax PIN", NSSF Uganda numbers, the NIN, no SHA number), LST paid per employee per financial year, the LST
-// collection setting, payouts holding back the reserve only for Ugandan workers, and running the migration again.
+// collection setting, payouts holding back the reserve only for Ugandan workers (one currency per payout), and running
+// the migration again.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -114,7 +115,7 @@ describe('employee details in Uganda', () => {
 
 describe('LST paid per employee per financial year', () => {
   const slip = (period: string, lst: number, emp = 'UG1') =>
-    `insert into salary_history (employee_id, employee_name, pay_period, gross_pay, net_pay, lst_deduction, employer_nssf, chargeable_income, tenant_id)
+    `insert into salary_history (employee_id, employee_name, pay_period, gross_pay, net_pay, lst_deduction, employer_nssf, taxable_pay, tenant_id)
      values ('${emp}', '${emp}', '${period}', 1500000, 1000000, ${lst}, 150000, 1475000, '${A}')`;
 
   it("adds up the year's other payslips and what was paid elsewhere, never the month being worked out", async () => {
@@ -173,7 +174,14 @@ describe('piece rate payouts in Uganda', () => {
                      values ('${emp}', ${day(2)}, (select id from work_types where name = 'Bags'), 100, 'submitted')`);
     }
     await db.exec(`update work_entries set status = 'approved' where status <> 'approved'`);
-    await as(PAY, `select create_work_payout_batch('daily', ${day(1)}, ${day(3)})`);
+    // one currency per payout: Kenyan and Ugandan workers together are refused, so payroll makes one per country
+    await expect(as(PAY, `select create_work_payout_batch('daily', ${day(1)}, ${day(3)})`)).rejects.toThrow(/would mix KES \(Kenya\) and UGX \(Uganda\)/);
+    await as(PAY, `select create_work_payout_batch('daily', ${day(1)}, ${day(3)}, null, null, 'Uganda')`);
+    await as(PAY, `select create_work_payout_batch('daily', ${day(1)}, ${day(3)}, null, null, 'Kenya')`);
+    expect(await rows(`select country, currency, worker_count from work_payout_batches order by currency`)).toEqual([
+      { country: 'Kenya', currency: 'KES', worker_count: 1 },
+      { country: 'Uganda', currency: 'UGX', worker_count: 1 },
+    ]);
     const lines = await rows<{ employee_number: string; gross: string; ahl: string; reserve: string; net: string }>(
       `select employee_number, gross, ahl, reserve, net from work_payout_lines order by employee_number`
     );
@@ -189,7 +197,9 @@ describe('running the migration again', () => {
     const rates = await rows(`select code, value, bands, effective_from, effective_to from statutory_rates where country = 'Uganda' order by code, effective_from`);
     const years = await rows(`select employee_number, fy_start, paid_elsewhere from lst_years order by 1`);
     const settings = await rows(`select lst_collection from company_payroll_settings`);
+    const batches = await rows(`select id, country, currency, net_total from work_payout_batches order by id`);
     await db.exec(readFileSync(MIGRATION, 'utf8'));
+    expect(await rows(`select id, country, currency, net_total from work_payout_batches order by id`)).toEqual(batches);
     expect(await rows(`select code, value, bands, effective_from, effective_to from statutory_rates where country = 'Uganda' order by code, effective_from`)).toEqual(rates);
     expect(rates.length).toBe(14);
     expect(await rows(`select employee_number, fy_start, paid_elsewhere from lst_years order by 1`)).toEqual(years);
