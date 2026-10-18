@@ -20,6 +20,7 @@ import {
   remittanceTotals,
   shaFile,
   toCsv,
+  whtFile,
 } from '../../lib/payrollExports';
 import { XLSX_TYPE, toXlsx } from '../../lib/xlsxExport';
 import FigbloomLoader from '../UI/FigbloomLoader';
@@ -35,6 +36,8 @@ interface Files {
   bank: ExportFile;
   equity: ExportFile;
   nita: ExportFile;
+  /** withholding tax on contractors, for the iTax WHT return (FIG-812) */
+  wht: ExportFile;
   /** the company's Equity account salaries are paid from ('' until payroll sets it) */
   debitAccount: string;
   /** what the month owes KRA, SHA, NSSF, the housing levy and NITA */
@@ -53,6 +56,7 @@ const FILES: { key: FileKey; label: string; name: string; what: string }[] = [
   { key: 'bank', label: 'Bank bulk pay', name: 'bulk-pay-bank', what: 'staff paid by bank' },
   { key: 'equity', label: 'Equity Bank (Eazzy Biz)', name: 'equity-eazzy-biz', what: 'everyone paid by bank or M-Pesa, from the company’s Equity account' },
   { key: 'nita', label: 'NITA training levy', name: 'nita-levy', what: 'employer levy per employee (not taken from pay)' },
+  { key: 'wht', label: 'KRA withholding tax (contractors)', name: 'kra-wht', what: 'iTax WHT return: each contractor’s gross, rate and tax' },
 ];
 
 /** The company's Equity account salaries are paid from (company_payroll_settings). */
@@ -91,6 +95,7 @@ export async function loadExportFiles(run: PayrollRun): Promise<Files> {
     bank: bankFile(ps, es, run.pay_period),
     equity: equityFile(ps, es, debitAccount),
     nita: nitaFile(ps, es),
+    wht: whtFile(ps, es, run.pay_period),
     debitAccount,
     totals: remittanceTotals(ps, rates),
   };
@@ -155,7 +160,8 @@ export default function PayrollExportsPanel({ run }: { run: PayrollRun }) {
 
       {files && (
         <div className="space-y-2">
-          {FILES.map(({ key, label, name, what }) => {
+          {/* the WHT return only when the month paid contractors (FIG-812) */}
+          {FILES.filter(({ key }) => key !== 'wht' || files.wht.rows.length > 0).map(({ key, label, name, what }) => {
             const f = files[key];
             return (
               <div key={key} className="rounded-tile border border-border px-3 py-2">

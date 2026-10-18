@@ -7,6 +7,7 @@ import { payslipEarningLines } from "../../lib/earnings";
 import { leaveLineLabel, leaveLineWorking, payslipLeaveLines } from "../../lib/leavePay";
 import { PayslipEditBar, type PayslipEditing } from "./PayslipEditModal";
 import { overtimeLineLabel, overtimeLineWorking, payslipOvertimeLines, payslipOvertimePay } from "../../lib/overtimePay";
+import { PayslipSettlementBlock, WhtDeductionLine, WorkEarningLines, netPayLabel } from "./PayslipSettlement";
 
 // One employee's payslip for the month (view, previous / next, PDF), moved from PayrollDashboard.
 
@@ -218,6 +219,8 @@ export const PayslipDocument = ({ record, companyInfo, id }: { record: any; comp
                   <span className="font-semibold">KSh {line.amount.toLocaleString()}</span>
                 </div>
               ))}
+              {/* the month's piece rate work and contract jobs (FIG-812) */}
+              <WorkEarningLines record={record} />
               <div className="flex justify-between bg-gray-50 p-1 border border-gray-200 mt-2">
                 <span>Per diem</span>
                 <span className="font-bold">KSh {(record.per_diem || 0).toLocaleString()}</span>
@@ -244,6 +247,7 @@ export const PayslipDocument = ({ record, companyInfo, id }: { record: any; comp
                 <span>AHL</span>
                 <span className="font-semibold">KSh {(record.housing_levy || 0).toLocaleString()}</span>
               </div>
+              <WhtDeductionLine record={record} />
               {Number(record.nita_levy) > 0 && (
                 <div className="flex justify-between text-gray-500">
                   <span>NITA levy (paid by employer)</span>
@@ -268,6 +272,8 @@ export const PayslipDocument = ({ record, companyInfo, id }: { record: any; comp
           </div>
         </div>
 
+        <PayslipSettlementBlock record={record} />
+
         <div className="border border-gray-300 p-4 mb-8 bg-gray-50">
           <div className="flex justify-between border-b border-gray-300 pb-2 mb-2 text-sm text-black">
             <span className="font-bold">Gross pay</span>
@@ -278,7 +284,7 @@ export const PayslipDocument = ({ record, companyInfo, id }: { record: any; comp
             <span className="font-bold">KSh {(record.total_deductions || 0).toLocaleString()}</span>
           </div>
           <div className="flex justify-between items-center text-lg text-black mt-2">
-            <span className="font-bold">Net pay</span>
+            <span className="font-bold">{netPayLabel(record)}</span>
             <span className="font-bold border-b-[3px] border-gray-400 border-double pb-0.5">KSh {Math.round(record.net_pay || 0).toLocaleString()}</span>
           </div>
         </div>

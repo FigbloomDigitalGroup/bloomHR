@@ -71,6 +71,10 @@ interface Line {
   employee: EmployeeRecord;
 }
 
+/** A contractor's payslip (FIG-812): withholding tax, not PAYE, NSSF or SHA, so not on those returns. */
+export const isContractorSlip = (p: Payslip) => text(p.worker_kind) === 'contractor';
+const employeesOnly = (payslips: Payslip[]) => payslips.filter((p) => !isContractorSlip(p));
+
 /** Each payslip with its employee's record (payslips whose employee no longer exists keep an empty record). */
 const lines = (payslips: Payslip[], employees: EmployeeRecord[]): Line[] => {
   const byNumber = new Map(employees.map((e) => [text(e['Employee Number']), e]));
@@ -128,7 +132,7 @@ export function p10Figures(payslip: Payslip, e: EmployeeRecord, rates: Rates) {
 }
 
 export function p10File(payslips: Payslip[], employees: EmployeeRecord[], rates: Rates): ExportFile {
-  const ls = lines(payslips, employees);
+  const ls = lines(employeesOnly(payslips), employees);
   return {
     headers: P10_HEADERS,
     rows: ls.map(({ payslip, employee: e }) => {
@@ -154,7 +158,7 @@ export function p10File(payslips: Payslip[], employees: EmployeeRecord[], rates:
 }
 
 export function shaFile(payslips: Payslip[], employees: EmployeeRecord[]): ExportFile {
-  const ls = lines(payslips, employees);
+  const ls = lines(employeesOnly(payslips), employees);
   return {
     headers: SHA_HEADERS,
     rows: ls.map(({ payslip, employee: e }) => [
@@ -175,7 +179,7 @@ export function shaFile(payslips: Payslip[], employees: EmployeeRecord[]): Expor
 }
 
 export function nssfFile(payslips: Payslip[], employees: EmployeeRecord[]): ExportFile {
-  const ls = lines(payslips, employees);
+  const ls = lines(employeesOnly(payslips), employees);
   return {
     headers: NSSF_HEADERS,
     rows: ls.map(({ payslip, employee: e }) => [
@@ -207,6 +211,31 @@ export function nitaFile(payslips: Payslip[], employees: EmployeeRecord[]): Expo
     ]),
     // the levy is paid per employer, so a missing NITA number on an employee is not a problem for the return
     problems: [],
+  };
+}
+
+// Withholding tax on contractors (FIG-812): one row per contractor per month for the KRA iTax withholding tax return,
+// from the month's payslips: their PIN, the month's gross, the rate and the tax (what payouts already withheld during
+// the month and what the month end withheld are both part of it, shown apart so finance can match the payments).
+export const WHT_HEADERS = [
+  'PIN of withholdee', 'Name of withholdee', 'Payroll number', 'Pay period', 'Nature of transaction', 'Gross amount',
+  'WHT rate (%)', 'WHT amount', 'Withheld at payouts', 'Withheld at month end',
+] as const;
+
+export function whtFile(payslips: Payslip[], employees: EmployeeRecord[], payPeriod: string): ExportFile {
+  const ls = lines(payslips.filter((p) => isContractorSlip(p) && num(p.wht_tax) > 0), employees);
+  return {
+    headers: WHT_HEADERS,
+    rows: ls.map(({ payslip, employee: e }) => {
+      const wht = num(payslip.wht_tax);
+      const atPayouts = Math.min(wht, num(payslip.wht_withheld));
+      return [
+        text(e['Tax PIN']), fullName(e) || text(payslip.employee_name), text(e['Payroll Number']) || text(payslip.employee_id), payPeriod,
+        text(e['wht_category']) === 'professional' ? 'Professional / management fees' : 'Contractual fees',
+        amount(num(payslip.gross_pay)), amount(num(payslip.wht_rate) * 100), amount(wht), amount(atPayouts), amount(wht - atPayouts),
+      ];
+    }),
+    problems: problemsOf(ls, (e) => need([['KRA PIN', isValidKraPin(e['Tax PIN'])]])),
   };
 }
 
@@ -286,7 +315,8 @@ export interface ReturnsReadiness {
 
 /** Before a month is approved: who on payroll is missing a detail each return needs (the same checks as the files). */
 export function returnsReadiness(employees: EmployeeRecord[]): ReturnsReadiness {
-  const slips = employees.map((e) => ({ employee_id: e['Employee Number'] }));
+  // contractors are not on these returns (withholding tax instead, FIG-812)
+  const slips = employees.map((e) => ({ employee_id: e['Employee Number'], worker_kind: e['worker_kind'] }));
   return { p10: p10File(slips, employees, {}).problems, sha: shaFile(slips, employees).problems, nssf: nssfFile(slips, employees).problems };
 }
 

@@ -5,7 +5,8 @@ import { payslipOvertimePay, round2 } from './overtimePay';
 
 // The month's payroll register as a PDF (A4 landscape): one row per payslip with the statutory columns, and the
 // totals at the foot. Built from the rows the payroll page already shows, so it matches the screen. The last column
-// is the employer's NITA training levy (FIG-898): an employer cost, after net pay, not part of the deductions.
+// is the employer's NITA training levy (FIG-898): an employer cost, after net pay, not part of the deductions. With
+// workers paid by work on it, the settlement columns too (FIG-812).
 
 /** The figures of one payslip row the register prints (the payroll page's records have these fields). */
 export interface PayrollRegisterRow {
@@ -31,17 +32,39 @@ export interface PayrollRegisterRow {
   net_pay?: number | null;
   /** the employer's NITA training levy for the payslip (not taken from pay) */
   nita_levy?: number | null;
+  /** the month-end settlement of piece rate work and contract jobs (FIG-812, lib/workSettlement) */
+  work_pay?: number | null;
+  jobs_pay?: number | null;
+  wht_tax?: number | null;
+  paid_out?: number | null;
+  arrears_brought_forward?: number | null;
+  arrears_carried_forward?: number | null;
+  work_settlement?: boolean | null;
 }
 
 export const REGISTER_COLUMNS = [
   'No.', 'Employee', 'Department', 'Basic', 'Allowances', 'Overtime', 'Leave deduction', 'Gross pay', 'PAYE', 'SHIF', 'NSSF', 'Housing levy', 'Other deductions', 'Net pay', 'NITA levy (employer)',
 ] as const;
 
+/**
+ * With anyone on the register paid for work or contract jobs (FIG-812), the register also shows their work, a
+ * contractor's withholding tax, what payouts already paid during the month and arrears brought and carried forward.
+ * A register with none keeps the columns above.
+ */
+export const WORK_REGISTER_COLUMNS = [
+  'No.', 'Employee', 'Department', 'Basic', 'Allowances', 'Overtime', 'Work & jobs', 'Leave deduction', 'Gross pay', 'PAYE', 'SHIF', 'NSSF',
+  'Housing levy', 'WHT', 'Other deductions', 'Paid during month', 'Arrears b/f', 'Carried forward', 'Net pay', 'NITA levy (employer)',
+] as const;
+
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : Number(v) || 0);
+const settlesWork = (r: PayrollRegisterRow) =>
+  r.work_settlement === true || num(r.work_pay) + num(r.jobs_pay) + num(r.wht_tax) + num(r.paid_out) + num(r.arrears_brought_forward) + num(r.arrears_carried_forward) > 0;
 const money = (v: number) => Math.round(v).toLocaleString('en-KE');
 
 /** The register's figures per row, in REGISTER_COLUMNS order (amounts as numbers), and the totals. */
 export function registerFigures(rows: PayrollRegisterRow[]) {
+  const withWork = rows.some(settlesWork);
+  const columns: readonly string[] = withWork ? WORK_REGISTER_COLUMNS : REGISTER_COLUMNS;
   const lines = rows.map((r) => {
     const basic = num(r.basic_salary);
     const gross = num(r.gross_pay);
@@ -52,22 +75,34 @@ export function registerFigures(rows: PayrollRegisterRow[]) {
     const nssf = num(r.nssf_deduction);
     const levy = num(r.housing_levy);
     const total = num(r.total_deductions);
-    return {
+    const who = {
       number: String(r.employeeNu || r.employee_id || ''),
       name: String(r.employee_name || ''),
       department: String((r.department === 'Branch Staff' ? r.branch : r.department) || ''),
+    };
+    if (!withWork) {
       // gross pay = basic + allowances and earnings + overtime − leave
-      amounts: [basic, Math.max(0, round2(gross + leave - basic - overtime)), overtime, leave ? -leave : 0, gross, paye, shif, nssf, levy, Math.max(0, total - paye - shif - nssf - levy), num(r.net_pay), num(r.nita_levy)],
+      return { ...who, amounts: [basic, Math.max(0, round2(gross + leave - basic - overtime)), overtime, leave ? -leave : 0, gross, paye, shif, nssf, levy, Math.max(0, total - paye - shif - nssf - levy), num(r.net_pay), num(r.nita_levy)] };
+    }
+    const work = round2(num(r.work_pay) + num(r.jobs_pay));
+    const wht = num(r.wht_tax);
+    return {
+      ...who,
+      amounts: [
+        basic, Math.max(0, round2(gross + leave - basic - overtime - work)), overtime, work, leave ? -leave : 0, gross, paye, shif, nssf, levy, wht,
+        Math.max(0, round2(total - paye - shif - nssf - levy - wht)), num(r.paid_out), num(r.arrears_brought_forward), num(r.arrears_carried_forward),
+        num(r.net_pay), num(r.nita_levy),
+      ],
     };
   });
-  const totals = lines.reduce((sum, l) => sum.map((s, i) => s + l.amounts[i]), Array(12).fill(0) as number[]);
-  return { lines, totals };
+  const totals = lines.reduce((sum, l) => sum.map((s, i) => s + l.amounts[i]), Array(columns.length - 3).fill(0) as number[]);
+  return { columns, lines, totals };
 }
 
 /** The register as a jsPDF document. */
 export function payrollRegisterPdf(rows: PayrollRegisterRow[], { periodLabel, companyName }: { periodLabel: string; companyName?: string | null }) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-  const { lines, totals } = registerFigures(rows);
+  const { columns, lines, totals } = registerFigures(rows);
 
   doc.setFontSize(14);
   doc.text(`Payroll register: ${periodLabel}`, 40, 40);
@@ -84,14 +119,14 @@ export function payrollRegisterPdf(rows: PayrollRegisterRow[], { periodLabel, co
 
   autoTable(doc, {
     startY: 70,
-    head: [REGISTER_COLUMNS as unknown as string[]],
+    head: [[...columns]],
     body: lines.map((l) => [l.number, l.name, l.department, ...l.amounts.map(money)]),
     foot: [['', 'Total', '', ...totals.map(money)]],
     showFoot: 'lastPage',
-    styles: { fontSize: 7, cellPadding: 3 },
+    styles: { fontSize: columns.length > REGISTER_COLUMNS.length ? 6 : 7, cellPadding: columns.length > REGISTER_COLUMNS.length ? 2 : 3 },
     headStyles: { fillColor: [31, 41, 55] },
     footStyles: { fillColor: [243, 244, 246], textColor: [17, 24, 39], fontStyle: 'bold' },
-    columnStyles: Object.fromEntries(REGISTER_COLUMNS.slice(3).map((_, i) => [i + 3, { halign: 'right' }])),
+    columnStyles: Object.fromEntries(columns.slice(3).map((_, i) => [i + 3, { halign: 'right' }])),
     margin: { left: 40, right: 40 },
     didDrawPage: () => {
       const page = doc.getNumberOfPages();

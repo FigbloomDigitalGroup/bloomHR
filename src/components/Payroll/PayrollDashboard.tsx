@@ -26,7 +26,9 @@ import MPesaSpreadsheetFullPage from "./MpesaSpreadSheet";
 import useStatutoryRates from "../../hooks/useStatutoryRates";
 import { usePermissions } from "../../hooks/usePermissions";
 import StatutoryRatesModal from "./StatutoryRatesModal";
-import { employeeInputs, missingRates, statutoryFor } from "../../lib/statutoryCalc";
+import { missingRates } from "../../lib/statutoryCalc";
+import { calculatePayslip } from "../../lib/payslipCalc";
+import { loadDeductionCap, loadWorkSettlement } from "../../lib/workSettlementApi";
 import type { SalaryHistoryRecord } from "../../lib/salaryHistory";
 import {
   type PayrollRun,
@@ -49,23 +51,19 @@ import { isPaidByMpesa, paymentMethodLabel } from "../../lib/paymentMethods";
 import { fetchAll } from "../../lib/fetchAll";
 import { isPayrollReady } from "../../lib/onboardingValidation";
 import { isCasual } from "../../lib/casualPay";
-import { nitaLevyFor, nitaTotal } from "../../lib/nitaLevy";
+import { nitaTotal } from "../../lib/nitaLevy";
 
 const withoutCasuals = <T extends Record<string, unknown>>(rows: T[] | null | undefined): T[] => (rows ?? []).filter((e) => !isCasual(e));
 import { advanceDeductionFor } from "../../lib/salaryAdvance";
 import { loadCompanyIdentity } from "../../lib/companyProfile";
 import { useNavigate } from "react-router-dom";
-import { deductionsForPeriod, loadDeductionSetup, totalOf } from "../../lib/voluntaryDeductions";
-import { loanDeductionsFor } from "../../lib/loans";
+import { deductionsForPeriod, loadDeductionSetup } from "../../lib/voluntaryDeductions";
 import { loadPayrollLoans } from "../../lib/loansApi";
-import { earningsForPeriod, statutoryPayWith, summariseEarnings } from "../../lib/earnings";
+import { earningsForPeriod } from "../../lib/earnings";
 import { loadEarningSetup } from "../../lib/earningsDb";
-import { basicAfterLeave, leavePayFor, leavePayoutItems } from "../../lib/leavePay";
 import { loadLeavePay, loadLeavePayouts, loadLeaveRateBasis } from "../../lib/leavePayDb";
-import { withAbsencePay } from "../../lib/absencePay";
 import { loadAbsencePay } from "../../lib/leaveDisciplineApi";
 import LeavePaySetting from "./LeavePaySetting";
-import { overtimeForPayslip } from "../../lib/overtimePay";
 import { loadOvertimeMonth } from "../../lib/overtimeApi";
 import OvertimeSettingsCard from "../Overtime/OvertimeSettingsCard";
 import { checkSMSBalance, formatPhoneNumber, sendSMSWithRetry, smsTemplates } from "../../lib/payrollSms";
@@ -84,6 +82,7 @@ import { downloadPayrollRegisterPdf } from "../../lib/payrollPdf";
 import { PayslipModal } from "./PayrollPayslipModal";
 import EmailPayslipsPanel from "./EmailPayslipsPanel";
 import PayslipEmailSetting from "./PayslipEmailSetting";
+import DeductionCapSetting from "./DeductionCapSetting";
 import { markEditedPayslips, statutoryContextFor } from "../../lib/payslipOverrides";
 import { withRunEdits } from "../../lib/payslipOverridesDb";
 import { usePayslipOverrides } from "../../hooks/usePayslipOverrides";
@@ -105,6 +104,9 @@ const PAYSLIP_AMOUNTS = [
   "housing_levy", "house_allowance", "transport_allowance", "medical_allowance", "other_allowances", "overtime_hours",
   "overtime_rate", "commission", "bonus", "per_diem", "tax_relief", "loan_deduction", "advance_deduction",
   "welfare_deduction", "other_deductions", "leave_deduction", "overtime_pay",
+  // the month-end settlement of piece rate work and contract jobs (FIG-812, lib/workSettlement)
+  "work_pay", "jobs_pay", "paid_out", "ahl_withheld", "reserve_released", "wht_withheld", "wht_rate", "wht_tax",
+  "arrears_brought_forward", "arrears_carried_forward",
 ] as const;
 
 /** A calculated payroll row as the salary_history row saved for it */
@@ -118,6 +120,10 @@ const toSalaryHistory = (record: any): SalaryHistoryRecord => ({
   leave_items: record.leave_items ?? [],
   payslip_note: record.payslip_note ?? null,
   overtime_items: record.overtime_items ?? [],
+  work_items: record.work_items ?? [],
+  arrears_note: record.arrears_note ?? null,
+  worker_kind: record.worker_kind ?? null,
+  work_settlement: record.work_settlement === true,
   payment_method: record.payment_method || "",
   bank_name: record.bank_name || "",
   account_number: record.account_number || "",
@@ -135,6 +141,10 @@ const fromSalaryHistory = (saved: any, live: any | undefined) => ({
   leave_items: saved.leave_items ?? [],
   payslip_note: saved.payslip_note ?? null,
   overtime_items: saved.overtime_items ?? [],
+  work_items: saved.work_items ?? [],
+  arrears_note: saved.arrears_note ?? null,
+  worker_kind: saved.worker_kind ?? live?.worker_kind ?? null,
+  work_settlement: saved.work_settlement === true,
   // the employer's NITA levy the database saved on the payslip (FIG-898)
   nita_levy: Number(saved.nita_levy) || 0,
   payment_method: paymentMethodLabel(saved.payment_method),
@@ -229,6 +239,8 @@ export default function PayrollDashboard() {
 
   // Statutory override state
   const [overrideStatutoryChecks, setOverrideStatutoryChecks] = useState(true);
+  // Employment Act s.19(3): deductions on a month-end settlement kept within two-thirds of wages (FIG-812)
+  const [deductionCap, setDeductionCap] = useState(true);
 
   const itemsPerPage = 5;
 
@@ -968,6 +980,10 @@ export default function PayrollDashboard() {
         const leavePayouts = await loadLeavePayouts(actualPeriod);
         // approved overtime this month, by kind of day, and the company's overtime settings (lib/overtimePay)
         const overtimeMonth = await loadOvertimeMonth(actualPeriod);
+        // the month's piece rate work and contract jobs, what payouts paid and held back, and arrears brought forward
+        // (FIG-812, lib/workSettlement), and whether deductions are kept within two-thirds of wages
+        const [workByEmployee, capOn] = await Promise.all([loadWorkSettlement(actualPeriod), loadDeductionCap()]);
+        setDeductionCap(capOn);
 
         if (data) {
           setEmployees(data);
@@ -989,181 +1005,24 @@ export default function PayrollDashboard() {
             })),
           ]);
 
-          // Process each employee with salary advance deduction. Only employees whose onboarding HR has approved are
-          // paid (the database refuses payslips for anyone else); "Not onboarded" lists the rest.
-          const payrollData = await Promise.all(
-            data.filter(isPayrollReady).map(async (employee) => {
-              const basicSalary = employee["Basic Salary"] || 0;
-              const employeeId = employee["Employee Number"] || "";
-              const jobGroup = employee["Job Group"] || "";
-              const employeeNat = employee["ID Number"] || "";
-              const employeeNu = employee["Mobile Number"] || "";
-              const firstName = employee["First Name"] || "";
-              const middleName = employee["Middle Name"] || "";
-              const branch = employee.Office || employee.branch || "";
-              const lastName = employee["Last Name"] || "";
-              const department =
-                employee.Department || employee["Job Level"] || "";
-              const position = employee["Job Title"] || "";
-
-              const houseAllowance = employee.house_allowance || 0;
-              const transportAllowance = employee.travel_allowance || 0;
-              // approved overtime entries (a line per kind of day); the old employees.overtime field only in a month
-              // when the company has no approved overtime at all (lib/overtimePay)
-              const overtime = overtimeForPayslip(overtimeMonth, employee, basicSalary);
-              const overtimeHours = overtime.hours;
-              const overtimeRate = overtime.rate;
-
-              const nhifNumber =
-                employee["NHIF Number"] || employee["SHIF Number"] || "";
-              const nssfNumber = employee["NSSF Number"] || "";
-              const taxPin = employee["Tax PIN"] || "";
-
-              const medicalAllowance = employee.medical_allowance || 0;
-              const otherAllowances = 0;
-              // this month's earnings: commissions in commission, every other earning in bonus (lib/earnings)
-              const earnings = summariseEarnings([
-                ...(earningsByEmployee.get(employeeId) ?? []),
-                ...leavePayoutItems(leavePayouts.get(employeeId), basicSalary, leaveBasis),
-              ]);
-              const commission = earnings.commission;
-              const bonus = earnings.bonus;
-
-              // unpaid leave days, and half a day for each half-pay leave day, come off the basic salary earned this
-              // month, so gross pay and everything worked out from it (PAYE, NSSF, SHIF, housing levy) is on what is left
-              const leave = withAbsencePay(leavePayFor(leaveByEmployee.get(employeeId), basicSalary, leaveBasis), absenceByEmployee.get(employeeId), basicSalary, leaveBasis);
-              const leaveDeduction = leave.total;
-
-              // Per diem is PART of basic salary (33%), not extra payment: 33% of the basic earned this month
-              const { perDiem } = basicAfterLeave(basicSalary, leaveDeduction);
-
-              const overtimePay = overtime.pay;
-
-              // Gross pay (basic salary already includes per diem)
-              const grossPay =
-                basicSalary +
-                houseAllowance +
-                transportAllowance +
-                medicalAllowance +
-                otherAllowances +
-                overtimePay +
-                commission +
-                bonus -
-                leaveDeduction;
-
-              // Taxable amount EXCLUDES the per diem portion and earnings that are not taxed
-              const taxableGross = grossPay - perDiem - earnings.nonTaxable;
-
-              // SHIF, NSSF, AHL and PAYE with this month's rates (lib/statutoryCalc): pension, PRMF and mortgage
-              // interest come off taxable pay, insurance relief and the PWD exemption apply. A deduction is left out
-              // while its number or PIN is missing, unless statutory checks are overridden.
-              const statutory = statutoryFor(
-                {
-                  ...statutoryPayWith(taxableGross - earnings.taxable, earnings.items),
-                  ...employeeInputs(employee),
-                  apply: {
-                    shif: overrideStatutoryChecks || Boolean(nhifNumber),
-                    nssf: overrideStatutoryChecks || Boolean(nssfNumber),
-                    ahl: overrideStatutoryChecks || Boolean(taxPin),
-                    paye: overrideStatutoryChecks || Boolean(taxPin),
-                  },
-                },
-                rates ?? {}, // only worked out once the month's rates are loaded (see below)
-              );
-              const nhifDeduction = statutory.shif;
-              const nssfDeduction = statutory.nssf;
-              const housingLevy = statutory.ahl;
-              const payeTax = statutory.paye;
-              // the monthly personal relief, as the P10 reports it
-              const taxRelief = statutory.personalRelief;
-
-              // the employee's pension and post-retirement medical fund contributions come out of their pay
-              const pensionItems = [
-                { name: "Pension contribution", amount: Number(employee.other_pension_contribution) || 0 },
-                { name: "Post-retirement medical fund", amount: Number(employee.post_retirement_medical_fund) || 0 },
-              ].filter((i) => i.amount > 0);
-
-              // Calculate salary advance deduction
-              // Calculate salary advance deduction
-              const advanceDeduction = calculateAdvanceDeduction(
-                employeeId,
-                actualPeriod,
-              );
-
-              // voluntary deductions are itemised (deduction_items); welfare is kept for older payslips
-              const voluntaryItems = [...pensionItems, ...(voluntaryByEmployee.get(employeeId) ?? [])];
-              const welfareDeduction = 0;
-              const otherDeductions = totalOf(voluntaryItems);
-              // loan instalments come last, out of what is left, so they never take net pay below 0; what doesn't fit
-              // is still owed next month. Each is a "Loan repayment: <type>" line (with its loan_id, which approving
-              // the month records as repaid) and their total is loan_deduction.
-              const loanItems = loanDeductionsFor(
-                payrollLoans,
-                employeeId,
-                actualPeriod,
-                grossPay - (payeTax + nhifDeduction + nssfDeduction + housingLevy + advanceDeduction + welfareDeduction + otherDeductions),
-              );
-              const loanDeduction = totalOf(loanItems);
-              const deductionItems = [...voluntaryItems, ...loanItems];
-
-              // Total deductions include statutory and advance deduction
-              const totalDeductions =
-                payeTax +
-                nhifDeduction +
-                nssfDeduction +
-                housingLevy +
-                loanDeduction +
-                advanceDeduction +
-                welfareDeduction +
-                otherDeductions;
-
-              const netPay = grossPay - totalDeductions;
-
-              return {
-                id: employee.id || "",
-                employee_id: employeeId,
-                employeeNat: employeeNat,
-                employeeNu: employeeNu,
-                jobGroup: jobGroup,
-                employee_name: `${firstName} ${middleName} ${lastName}`.trim(),
-                branch: branch,
-                department: department,
-                position: position,
-                basic_salary: basicSalary,
-                house_allowance: houseAllowance,
-                transport_allowance: transportAllowance,
-                medical_allowance: medicalAllowance,
-                other_allowances: otherAllowances,
-                overtime_hours: overtimeHours,
-                overtime_rate: overtimeRate,
-                commission: commission,
-                bonus: bonus,
-                per_diem: perDiem,
-                gross_pay: grossPay,
-                paye_tax: payeTax,
-                nhif_deduction: nhifDeduction,
-                nssf_deduction: nssfDeduction,
-                housing_levy: housingLevy,
-                tax_relief: taxRelief,
-                loan_deduction: loanDeduction,
-                advance_deduction: advanceDeduction,
-                welfare_deduction: welfareDeduction,
-                other_deductions: otherDeductions,
-                deduction_items: deductionItems,
-                earning_items: earnings.items,
-                leave_deduction: leaveDeduction,
-                leave_items: leave.items,
-                overtime_pay: overtimePay,
-                overtime_items: overtime.items,
-                total_deductions: totalDeductions,
-                net_pay: netPay,
-                // the employer's NITA training levy (FIG-898): an employer cost, not in deductions or net pay
-                nita_levy: nitaLevyFor(employee, rates),
-                pay_period: actualPeriod,
-                payment_method: paymentMethodLabel(employee.payment_method),
-                bank_name: employee.Bank || "",
-                account_number: employee["Account Number"] || "",
-              };
+          // Each employee's payslip (lib/payslipCalc). Only employees whose onboarding HR has approved are paid (the
+          // database refuses payslips for anyone else); "Not onboarded" lists the rest.
+          const payrollData = data.filter(isPayrollReady).map((employee) =>
+            calculatePayslip(employee, {
+              period: actualPeriod,
+              rates: rates ?? {}, // only worked out once the month's rates are loaded (see below)
+              overrideStatutoryChecks,
+              voluntaryByEmployee,
+              payrollLoans,
+              earningsByEmployee,
+              leaveByEmployee,
+              leaveBasis,
+              absenceByEmployee,
+              leavePayouts,
+              overtimeMonth,
+              advanceFor: calculateAdvanceDeduction,
+              workByEmployee,
+              deductionCap: capOn,
             }),
           );
 
@@ -1188,7 +1047,8 @@ export default function PayrollDashboard() {
       }
       fetchEmployees();
     }
-  }, [actualPeriod, rates, overrideStatutoryChecks, salaryAdvances, deductionsVersion, detailsVersion]);
+    // runVersion: worked out again after each start / recalculate / approve, so payouts or work approved meanwhile count
+  }, [actualPeriod, rates, overrideStatutoryChecks, salaryAdvances, deductionsVersion, detailsVersion, runVersion]);
 
   // the month's payroll run, reloaded after each start/recalculate/approve/...
   useEffect(() => {
@@ -1217,7 +1077,7 @@ export default function PayrollDashboard() {
   // calculation whenever the run is saved, and marked "Edited"
   const payslipEdits = usePayslipOverrides(monthRun?.id, runVersion);
   const payslipContext = (employeeNumber: string) =>
-    statutoryContextFor(employees.find((e) => e["Employee Number"] === employeeNumber), rates, overrideStatutoryChecks);
+    statutoryContextFor(employees.find((e) => e["Employee Number"] === employeeNumber), rates, overrideStatutoryChecks, deductionCap);
 
   // once the month's run is started, everything here (table, totals, exports, payslips, bulk pay) uses its saved figures
   const payrollRecords = useMemo(() => {
@@ -1399,6 +1259,8 @@ export default function PayrollDashboard() {
       if (status === "approved") setPayslipEmailAutoStart((n) => n + 1);
     } catch (err) {
       toast.error(runErrorMessage(err, "Could not update the payroll."));
+      // e.g. work or payouts changed since the payslips were worked out: work them out again for "Recalculate"
+      setRunVersion((v) => v + 1);
     } finally {
       setRunBusy(false);
     }
@@ -1817,6 +1679,8 @@ export default function PayrollDashboard() {
       {tab === "run" && (dataLoading ? loader : (
         <PayrollRunTab
           periodLabel={periodLabel}
+          payPeriod={actualPeriod}
+          payrollRecords={payrollRecords}
           onDownloadPdf={() => {
             try {
               downloadPayrollRegisterPdf(finalFilteredRecords, { periodLabel, companyName: companyInfo?.company_name });
@@ -1948,6 +1812,7 @@ export default function PayrollDashboard() {
             }
           />
           <OvertimeSettingsCard canEdit={canEditRates} onChanged={() => setDeductionsVersion((v) => v + 1)} />
+          <DeductionCapSetting canEdit={canEditRates} onChanged={() => setDeductionsVersion((v) => v + 1)} />
           <PayslipEmailSetting canEdit={canEditRates} />
         </div>
       )}

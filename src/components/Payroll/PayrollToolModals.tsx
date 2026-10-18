@@ -193,12 +193,23 @@ export const ExportModal = ({
           // unpaid and half-pay leave, taken off gross pay (FIG-880)
           "Leave Deduction": record.leave_deduction || 0,
           "Leave Days": leaveLinesText(record),
+          // the month's piece rate work and contract jobs, paid out during the month or not (FIG-812)
+          "Piece Rate Work": Number(record.work_pay) || 0,
+          "Contract Jobs": Number(record.jobs_pay) || 0,
           "Gross Pay": record.gross_pay,
           "PAYE Tax": Math.round(record.paye_tax),
           NHIF: record.nhif_deduction,
           NSSF: record.nssf_deduction,
           "Housing Levy": record.housing_levy,
           "Total Deductions": record.total_deductions,
+          // a contractor's withholding tax, then the month-end settlement (FIG-812, lib/workSettlement)
+          "Withholding Tax": Number(record.wht_tax) || 0,
+          "Paid During Month": Number(record.paid_out) || 0,
+          "AHL Already Withheld": Number(record.ahl_withheld) || 0,
+          "Reserve Released": Number(record.reserve_released) || 0,
+          "WHT Already Withheld": Number(record.wht_withheld) || 0,
+          "Arrears Brought Forward": Number(record.arrears_brought_forward) || 0,
+          "Arrears Carried Forward": Number(record.arrears_carried_forward) || 0,
           "Net Pay": Math.round(record.net_pay),
           // the employer's NITA training levy: an employer cost, not taken from pay (FIG-898)
           "NITA Levy (Employer)": Number(record.nita_levy) || 0,
@@ -246,12 +257,23 @@ export const ExportModal = ({
           // unpaid and half-pay leave, taken off gross pay (FIG-880)
           "Leave Deduction": record.leave_deduction || 0,
           "Leave Days": leaveLinesText(record),
+          // the month's piece rate work and contract jobs, paid out during the month or not (FIG-812)
+          "Piece Rate Work": Number(record.work_pay) || 0,
+          "Contract Jobs": Number(record.jobs_pay) || 0,
           "Gross Pay": record.gross_pay,
           "PAYE Tax": Math.round(record.paye_tax),
           NHIF: record.nhif_deduction,
           NSSF: record.nssf_deduction,
           "Housing Levy": record.housing_levy,
           "Total Deductions": record.total_deductions,
+          // a contractor's withholding tax, then the month-end settlement (FIG-812, lib/workSettlement)
+          "Withholding Tax": Number(record.wht_tax) || 0,
+          "Paid During Month": Number(record.paid_out) || 0,
+          "AHL Already Withheld": Number(record.ahl_withheld) || 0,
+          "Reserve Released": Number(record.reserve_released) || 0,
+          "WHT Already Withheld": Number(record.wht_withheld) || 0,
+          "Arrears Brought Forward": Number(record.arrears_brought_forward) || 0,
+          "Arrears Carried Forward": Number(record.arrears_carried_forward) || 0,
           "Net Pay": Math.round(record.net_pay),
           "NITA Levy (Employer)": Number(record.nita_levy) || 0,
           "Pay Period": record.pay_period,
