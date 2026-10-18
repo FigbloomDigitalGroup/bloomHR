@@ -1,25 +1,28 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
-  CHAT_LEVELS, UPDATE_LEVELS, loadEmailPreferences, loadUpdatesLevel, saveEmailPreferences, saveUpdatesLevel,
-  type EmailLevel, type EmailPreferences,
+  CHAT_LEVELS, UPDATE_LEVELS, loadDigestPreferences, loadEmailPreferences, loadUpdatesLevel, saveDigestPreferences,
+  saveEmailPreferences, saveUpdatesLevel, type DigestPreferences, type EmailLevel, type EmailPreferences,
 } from '../../lib/notificationPreferences';
 import LevelSelect from './LevelSelect';
 
 // What is emailed, in the notifications panel (FIG-771, FIG-890): their own updates and chat messages, each
-// everything / important only / off. Warnings, suspensions and payslips are emailed either way.
+// everything / important only / off. Warnings, suspensions and payslips are emailed either way. And the daily company
+// email: company events and colleagues' birthdays can each be left out.
 
 export default function EmailNotificationsToggle() {
   const [updates, setUpdates] = useState<EmailLevel | null>(null);
   const [prefs, setPrefs] = useState<EmailPreferences | null>(null);
+  const [digest, setDigest] = useState<DigestPreferences | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadUpdatesLevel().then(setUpdates, () => setUpdates(null));
     loadEmailPreferences().then(setPrefs, () => setPrefs(null));
+    loadDigestPreferences().then(setDigest, () => setDigest(null));
   }, []);
 
-  if (updates === null && prefs === null) return null;
+  if (updates === null && prefs === null && digest === null) return null;
 
   const save = async (fn: () => Promise<void>, done: () => void) => {
     setSaving(true);
@@ -54,6 +57,35 @@ export default function EmailNotificationsToggle() {
           disabled={saving}
           onChange={(chat) => void save(() => saveEmailPreferences({ ...prefs, chat }), () => setPrefs({ ...prefs, chat }))}
         />
+      )}
+      {digest !== null && (
+        <div className="space-y-1" role="group" aria-label="Daily company email">
+          <span className="block text-gray-600">Daily company email</span>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={digest.events}
+              disabled={saving}
+              onChange={(e) => {
+                const next = { ...digest, events: e.target.checked };
+                void save(() => saveDigestPreferences(next), () => setDigest(next));
+              }}
+            />
+            Company events
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={digest.birthdays}
+              disabled={saving}
+              onChange={(e) => {
+                const next = { ...digest, birthdays: e.target.checked };
+                void save(() => saveDigestPreferences(next), () => setDigest(next));
+              }}
+            />
+            Colleagues&apos; birthdays
+          </label>
+        </div>
       )}
       <span className="block text-[11px] text-gray-500">
         Warnings, suspensions and payslips are always emailed. Mute a chat with the bell at its top.

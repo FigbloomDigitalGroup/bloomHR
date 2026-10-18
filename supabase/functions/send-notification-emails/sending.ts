@@ -128,3 +128,11 @@ export function groupFailures<T>(items: T[], results: SendResult[]): { error: st
   });
   return [...groups.values()];
 }
+
+/** Bytes as base64 (Resend's attachments), a chunk at a time so a large file doesn't overflow the call stack. */
+export function toBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  return btoa(binary);
+}

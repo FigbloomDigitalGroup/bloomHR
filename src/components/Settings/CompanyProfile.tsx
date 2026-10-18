@@ -8,6 +8,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { COMPANY_PROFILE_SAVED } from '../Dashboard/GetStarted';
 import { saveEmployerPin } from '../../lib/p9';
 import WorkWeekCard from './WorkWeek';
+import CompanyEmailSettingsCard from './CompanyEmailSettings';
 import {
   BUSINESS_TYPES,
   COUNTRIES,
@@ -451,6 +452,7 @@ export default function CompanyProfilePage() {
         </Section>
 
         <WorkWeekCard />
+        <CompanyEmailSettingsCard />
       </div>
     </div>
   );

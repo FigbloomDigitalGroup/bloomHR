@@ -91,6 +91,8 @@ interface PayrollRunTabProps {
   totalPages: number;
   handlePageChange: (page: number) => void;
   itemsPerPage: number;
+  /** "Email payslips" for an approved month (EmailPayslipsPanel, FIG-732) */
+  payslipEmails?: React.ReactNode;
   /** pretend paying for demos (lib/inAppPayments PAYMENTS_DEMO) */
   demoPay: {
     /** the Pay buttons show (demo mode is on) */
@@ -214,6 +216,7 @@ export default function PayrollRunTab({
   totalPages,
   handlePageChange,
   itemsPerPage,
+  payslipEmails,
   demoPay,
 }: PayrollRunTabProps) {
   const approved = monthRun?.status === "approved" || monthRun?.status === "paid";
@@ -340,6 +343,7 @@ export default function PayrollRunTab({
           </div>
         </Card>
       )}
+      {approved && payslipEmails}
 
       {nitaLevy && nitaLevy.total > 0 && (
         <Card padding="sm" className="!rounded-xl">
