@@ -1,5 +1,5 @@
 // The notification emails (FIG-771, FIG-890): one email per person with every notification not yet emailed to them,
-// the same for HR's alerts, and the unread chat digest. Plain TypeScript with no Deno or Node APIs, so the Edge
+// the same for HR's alerts, the unread chat digest, and a payslip with its PDF attached (FIG-732). Plain TypeScript with no Deno or Node APIs, so the Edge
 // Function uses it and vitest tests it.
 
 export interface NotificationItem {
@@ -100,7 +100,7 @@ function layout({ companyName, firstName, intro, rows, link, button, footer }: L
       <tr><td style="padding:12px 16px;border-top:1px solid #E5E7EB">
         <div style="font-weight:600;color:#16201A;font-size:14px">${escape(n.title)}</div>${
           n.message ? `
-        <div style="color:#4B5563;font-size:13px;line-height:1.5;margin-top:4px">${escape(n.message)}</div>` : ''
+        <div style="color:#4B5563;font-size:13px;line-height:1.5;margin-top:4px">${escape(n.message).replace(/\r?\n/g, '<br>')}</div>` : ''
         }
       </td></tr>`
     )
@@ -195,5 +195,57 @@ export function chatDigestHtml({ firstName, companyName, items, link }: ChatDige
     footer:
       'You get this when messages are still unread 10 minutes after they were sent, at most every 30 minutes. Mute a ' +
       'chat with its bell, or choose everything, direct messages and mentions only, or none in your email settings.',
+  });
+}
+
+// ---- a payslip, with its PDF attached (FIG-732) ----------------------------------------------------------------
+
+export interface PayslipEmail {
+  firstName: string | null;
+  companyName: string | null;
+  /** the payroll month, 'YYYY-MM' */
+  period: string;
+  /** the PDF is protected with the employee's ID number (the email says so; it never contains the number) */
+  passwordProtected: boolean;
+  /** the staff portal, for the button */
+  appUrl: string;
+}
+
+/** "2026-10" -> "October 2026" (as the "Payslip ready" notification names the month); anything else as it is. */
+export function periodLabel(period: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(period ?? '');
+  if (!m || Number(m[2]) < 1 || Number(m[2]) > 12) return oneLine(period ?? '');
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  return `${months[Number(m[2]) - 1]} ${m[1]}`;
+}
+
+/** The attachment's name: payslip-2026-10-MCL-000001.pdf (safe characters only). */
+export function payslipFileName(period: string, employeeNumber: string): string {
+  const safe = (s: string) => (s ?? '').trim().replace(/[^0-9A-Za-z._-]+/g, '_');
+  return `payslip-${safe(period)}-${safe(employeeNumber)}.pdf`;
+}
+
+export function payslipEmailSubject({ period, companyName }: Pick<PayslipEmail, 'period' | 'companyName'>): string {
+  return `Your payslip for ${periodLabel(period)}${from(companyName)}`.slice(0, 200);
+}
+
+/** What the email says about opening the PDF: which password, never the password itself. */
+export function payslipPasswordNote(passwordProtected: boolean): string {
+  return passwordProtected
+    ? 'The PDF is protected with a password: your ID number (national ID or passport number, as on your employee record), with no spaces.'
+    : 'The PDF is not password protected. Keep it somewhere safe.';
+}
+
+export function payslipEmailHtml({ firstName, companyName, period, passwordProtected, appUrl }: PayslipEmail): string {
+  return layout({
+    companyName,
+    firstName,
+    intro: `Your payslip for ${periodLabel(period)} is attached to this email as a PDF.`,
+    rows: [{ title: 'Opening the PDF', message: payslipPasswordNote(passwordProtected) }],
+    link: appUrl,
+    button: 'See your payslips in the staff portal',
+    footer:
+      'This email and its attachment are confidential and meant only for you. Payslips are always emailed; if you ' +
+      'think this is not yours, delete it and tell HR.',
   });
 }
