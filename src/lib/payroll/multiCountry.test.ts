@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Branch } from '../branches';
 import { KENYA_RATES, baseContext } from './countries/kenyaFixtures';
+import { TANZANIA_RATES } from './countries/tanzaniaFixtures';
+import { UGANDA_RATES } from './countries/ugandaFixtures';
 import {
   approvalSummary,
   calculateRun,
@@ -18,14 +20,14 @@ import { currencyOf, money, moneyRounded, moneyShort } from './currency';
 
 const branch = (id: string, country: string, currency: string, is_default = false): Branch =>
   ({ id, name: id, country, currency, city: null, address: null, active: true, is_default });
-const branches = [branch('Nairobi', 'Kenya', 'KES', true), branch('Dar', 'Tanzania', 'TZS'), branch('Kampala', 'Uganda', 'UGX')];
+const branches = [branch('Nairobi', 'Kenya', 'KES', true), branch('Dar', 'Tanzania', 'TZS'), branch('Kampala', 'Uganda', 'UGX'), branch('Kigali', 'Rwanda', 'RWF')];
 
 const emp = (n: string, branch_id: string | null, extra: Record<string, unknown> = {}) => ({
   'Employee Number': n, 'First Name': `F${n}`, 'Last Name': `L${n}`, branch_id, 'Basic Salary': 60000,
   'Tax PIN': 'A012345678Z', 'NSSF Number': '1', 'SHIF Number': '2', payment_method: 'cash', ...extra,
 });
-const staff = [emp('K1', 'Nairobi'), emp('K2', null), emp('T1', 'Dar'), emp('T2', 'Dar'), emp('U1', 'Kampala')];
-const rates = new Map([['Kenya', KENYA_RATES]]);
+const staff = [emp('K1', 'Nairobi'), emp('K2', null), emp('T1', 'Dar'), emp('T2', 'Dar'), emp('U1', 'Kampala'), emp('R1', 'Kigali')];
+const rates = new Map([['Kenya', KENYA_RATES], ['Tanzania', TANZANIA_RATES], ['Uganda', UGANDA_RATES]]);
 const ctxFor = (country: string) => (rates.get(country) ? { ...baseContext({ workByEmployee: undefined }), rates: rates.get(country)! } : null);
 
 describe('countries from branches', () => {
@@ -35,19 +37,20 @@ describe('countries from branches', () => {
     expect(payrollCountryOf(emp('X', null), [])).toMatchObject({ country: 'Kenya', currency: 'KES' });
   });
 
-  it('groups staff by country, Kenya first, with each engine (none for Tanzania and Uganda yet)', () => {
+  it('groups staff by country, Kenya first, with each engine (none for Rwanda yet)', () => {
     const g = groupByCountry(staff, branches);
-    expect(g.map((x) => [x.country, x.employees.length, !!x.engine])).toEqual([['Kenya', 2, true], ['Tanzania', 2, false], ['Uganda', 1, false]]);
+    expect(g.map((x) => [x.country, x.employees.length, !!x.engine])).toEqual([['Kenya', 2, true], ['Rwanda', 1, false], ['Tanzania', 2, true], ['Uganda', 1, true]]);
   });
 });
 
 describe('one run for every country', () => {
   it('works everyone out with their own engine; staff without one are worked out by nobody', () => {
     const { records, notCalculated } = calculateRun(staff, branches, ctxFor);
-    expect(records.map((r) => [r.employee_id, r.country, r.currency])).toEqual([['K1', 'Kenya', 'KES'], ['K2', 'Kenya', 'KES']]);
+    expect(records.map((r) => [r.employee_id, r.country, r.currency])).toEqual([
+      ['K1', 'Kenya', 'KES'], ['K2', 'Kenya', 'KES'], ['T1', 'Tanzania', 'TZS'], ['T2', 'Tanzania', 'TZS'], ['U1', 'Uganda', 'UGX'],
+    ]);
     expect(notCalculated.map((n) => [n.country, n.waiting, n.reason, n.employees.length])).toEqual([
-      ['Tanzania', true, 'Waiting for Tanzania payroll rules', 2],
-      ['Uganda', true, 'Waiting for Uganda payroll rules', 1],
+      ['Rwanda', true, 'Waiting for Rwanda payroll rules', 1],
     ]);
   });
 
@@ -87,12 +90,12 @@ describe('totals per currency', () => {
 describe('readiness and approval per country', () => {
   const { records } = calculateRun(staff, branches, ctxFor);
 
-  it('before approval: Kenya ready, Tanzania and Uganda waiting; one Approve approves the ready ones', () => {
+  it('before approval: Kenya, Tanzania and Uganda ready, Rwanda waiting; one Approve approves the ready ones', () => {
     const r = countryReadiness({ employees: staff, branches, payslips: records, runCountries: [{ country: 'Kenya', status: 'draft' }], runStarted: true, ratesByCountry: rates });
-    expect(r.map((x) => [x.country, x.state])).toEqual([['Kenya', 'ready'], ['Tanzania', 'waiting'], ['Uganda', 'waiting']]);
-    expect(countriesToApprove(r)).toEqual(['Kenya']);
-    expect(approvalSummary(r)).toMatch(/^Kenya 2 payslips KSh \d+K ✓ · Tanzania 2 waiting for rules · Uganda 1 waiting for rules$/);
-    expect(r[1].waitingNames).toEqual(['FT1 LT1', 'FT2 LT2']);
+    expect(r.map((x) => [x.country, x.state])).toEqual([['Kenya', 'ready'], ['Rwanda', 'waiting'], ['Tanzania', 'ready'], ['Uganda', 'ready']]);
+    expect(countriesToApprove(r)).toEqual(['Kenya', 'Tanzania', 'Uganda']);
+    expect(approvalSummary(r)).toMatch(/^Kenya 2 payslips KSh \d+K ✓ · Rwanda 1 waiting for rules · Tanzania 2 payslips TSh [\d,.]+K? ✓ · Uganda 1 payslip USh [\d,.]+K? ✓$/);
+    expect(r[1].waitingNames).toEqual(['FR1 LR1']);
   });
 
   it('warns (without blocking) about missing details and pay below the minimum wage', () => {
@@ -132,7 +135,8 @@ describe('readiness and approval per country', () => {
     expect(r[0].state).toBe('approved');
     expect(r[0].approvedAt).toBe('2026-10-31');
     expect(r[0].warnings[0]).toMatch(/^1 person is not on the approved payslips/);
-    expect(countriesToApprove(r)).toEqual([]);
+    // Kenya is approved; Tanzania and Uganda (their own drafts) can still be approved
+    expect(countriesToApprove(r)).toEqual(['Tanzania', 'Uganda']);
   });
 });
 
@@ -159,9 +163,10 @@ describe('files per country', () => {
     expect(p10.file.rows[0][1]).toBe('Amina W');
     expect(kenya.payments.map((p) => p.key)).toEqual(['mpesa', 'bank', 'equity']);
     expect(kenya.payments.find((p) => p.key === 'equity')!.file.rows[0][6]).toBe('KES');
-    // Tanzania: no returns until its engine; a TZS bank file only
-    expect(files[1].returns).toEqual([]);
-    expect(files[1].payments.map((p) => [p.key, p.name, p.file.rows.length])).toEqual([['bank-tzs', 'bulk-pay-bank-tzs', 1]]);
+    // Tanzania: its own returns (none of Kenya's), only optional ones with rows; TZS bank and mobile money files
+    expect(files[1].returns.map((r) => r.key)).toEqual(['tra-paye', 'tz-nssf', 'wcf']);
+    expect(files[1].returns[0].file.rows[0]).toContain('Baraka M');
+    expect(files[1].payments.map((p) => [p.key, p.name, p.file.rows.length])).toEqual([['bank-tzs', 'bulk-pay-bank-tzs', 1], ['mobile-tzs', 'bulk-pay-mobile-tzs', 0]]);
     expect(files[1].payments[0].file.rows[0]).toContain('800000.00');
   });
 
@@ -179,7 +184,10 @@ describe('guards', () => {
   it('blocks a payslip in another currency than its country', () => {
     expect(currencyMismatch({ country: 'Kenya', currency: 'KES' })).toBeNull();
     expect(currencyMismatch({ country: 'Kenya', currency: 'TZS', employee_name: 'Amina' })).toBe('Amina: Kenya payslips are in KES, not TZS');
-    expect(currencyMismatch({ country: 'Tanzania', currency: 'TZS' })).toBe("Tanzania payroll isn't supported yet");
+    expect(currencyMismatch({ country: 'Tanzania', currency: 'TZS' })).toBeNull();
+    expect(currencyMismatch({ country: 'Tanzania', currency: 'KES', employee_name: 'Baraka' })).toBe('Baraka: Tanzania payslips are in TZS, not KES');
+    expect(currencyMismatch({ country: 'Uganda', currency: 'UGX' })).toBeNull();
+    expect(currencyMismatch({ country: 'Rwanda', currency: 'RWF' })).toBe("Rwanda payroll isn't supported yet");
   });
 
   it('never saves over an approved country', () => {

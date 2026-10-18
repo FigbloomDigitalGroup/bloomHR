@@ -244,7 +244,7 @@ describe('worker setup and rates', () => {
 
   it('withholding tax rates are dated defaults', async () => {
     const r = await rows<{ code: string; value: string }>(
-      `select code, value from statutory_rates where tenant_id is null and code like 'wht_%' order by code`
+      `select code, value from statutory_rates where tenant_id is null and code like 'wht_%' and country = 'Kenya' order by code`
     );
     expect(r).toEqual([{ code: 'wht_contractual', value: '0.03' }, { code: 'wht_professional', value: '0.05' }]);
   });

@@ -39,6 +39,7 @@ import { type Branch, employeeBranch } from "../../lib/branches";
 import type { CountryReadiness, CurrencyTotals } from "../../lib/payroll/multiCountry";
 import { payslipCountry } from "../../lib/payroll/multiCountry";
 import { currencyOf, moneyRounded } from "../../lib/payroll/currency";
+import { countryPayslipLines } from "../../lib/payroll/countries";
 
 // The Run tab: the month's payroll run (start, recalculate, approve, mark paid), the returns check, and the list of
 // employees on the payroll with their pay. The figures are worked out by PayrollDashboard; this only shows them.
@@ -142,6 +143,7 @@ const ksh = (n: number, currency = "KES") => moneyRounded(n, currency);
 /** One employee's pay, line by line, in the payslip's currency: shown when their row is opened. */
 function PayBreakdown({ record }: { record: any }) {
   const cur = currencyOf(record);
+  const country = countryPayslipLines(record);
   const ksh = (n: number) => moneyRounded(n, cur);
   const line = (label: string, value: number, tone = "") => (
     <div className="flex justify-between gap-3">
@@ -168,16 +170,30 @@ function PayBreakdown({ record }: { record: any }) {
           <React.Fragment key={`${l.name}-${i}`}>{line(l.name, l.amount)}</React.Fragment>
         ))}
         <WorkEarningLines record={record} amountClassName="" />
-        {line("Per diem", record.per_diem || 0)}
+        {!country && line("Per diem", record.per_diem || 0)}
       </div>
       <div className="space-y-1.5">
         <h4 className="text-[10px] font-bold uppercase text-subtle">Statutory deductions</h4>
-        {line("PAYE", record.paye_tax, "text-status-danger")}
-        {line("SHIF", record.nhif_deduction, "text-status-danger")}
-        {line("NSSF", record.nssf_deduction, "text-status-danger")}
-        {line("Housing levy", record.housing_levy, "text-status-danger")}
-        <WhtDeductionLine record={record} amountClassName="text-status-danger" />
-        {line("Tax relief", record.tax_relief || 0, "text-status-success")}
+        {country ? (
+          <>
+            {/* another country's lines (FIG-905): Tanzania's or Uganda's tax and contributions, then the employer's costs */}
+            {country.deductions.map((l) => (
+              <React.Fragment key={l.label}>{line(l.label, l.amount, "text-status-danger")}</React.Fragment>
+            ))}
+            {country.employerCosts.map((l) => (
+              <React.Fragment key={l.label}>{line(`${l.label}, paid by the employer`, l.amount)}</React.Fragment>
+            ))}
+          </>
+        ) : (
+          <>
+            {line("PAYE", record.paye_tax, "text-status-danger")}
+            {line("SHIF", record.nhif_deduction, "text-status-danger")}
+            {line("NSSF", record.nssf_deduction, "text-status-danger")}
+            {line("Housing levy", record.housing_levy, "text-status-danger")}
+            <WhtDeductionLine record={record} amountClassName="text-status-danger" />
+            {line("Tax relief", record.tax_relief || 0, "text-status-success")}
+          </>
+        )}
       </div>
       <div className="space-y-1.5">
         <h4 className="text-[10px] font-bold uppercase text-subtle">Other deductions</h4>

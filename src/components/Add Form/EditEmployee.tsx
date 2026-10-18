@@ -16,6 +16,10 @@ import { User, Briefcase, CreditCard, Phone, MapPin } from 'lucide-react';
 import SearchableDropdown from '../UI/SearchableDropdown';
 import DepartmentPicker from '../UI/DepartmentPicker';
 import BranchPicker from '../UI/BranchPicker';
+import { useBranches } from '../../hooks/useBranches';
+import { employeeBranch } from '../../lib/branches';
+import { tidyCountry } from '../../lib/payroll/countries';
+import { fieldProblem, taxNumberLabel, taxNumberPlaceholder } from '../../lib/onboardingValidation';
 import EmployeePicker from '../UI/EmployeePicker';
 import { useEmployeeDirectory } from '../../hooks/useEmployeeDirectory';
 import { employeeTypeOptions } from '../../lib/employmentTypes';
@@ -40,6 +44,10 @@ type Employee = Database['public']['Tables']['employees']['Row'] & {
   reports_to_id?: string | null;
   // the branch (20261020500000): an office in a country; null = the default branch
   branch_id?: string | null;
+  // Tanzania payroll (20261021000000, FIG-905); the TRA TIN and NSSF number are in "Tax PIN" and "NSSF Number"
+  heslb_borrower?: boolean | null;
+  heslb_index_number?: string | null;
+  secondary_employment?: boolean | null;
 };
 
 type DropdownOptions = {
@@ -96,6 +104,12 @@ const EditEmployeePage = () => {
   const [employee, setEmployee] = useState<Partial<Employee>>({});
   // the "Reports to" picker works by employee number; reports_to_id is what is saved
   const { employees: directory } = useEmployeeDirectory();
+  // the employee's branch's country (FIG-905): "Tax PIN" and "NSSF Number" hold that country's numbers (a KRA PIN, a
+  // TRA TIN or a URA TIN), checked as the database checks them; someone in Tanzania has Tanzania's payroll details too
+  const { branches: companyBranches } = useBranches();
+  const payrollCountry = tidyCountry(employeeBranch(employee as Record<string, unknown>, companyBranches)?.country) || 'Kenya';
+  const inTanzania = payrollCountry === 'Tanzania';
+  const numberLabel = (name: string) => (name === 'Tax PIN' ? `Tax PIN (${taxNumberLabel(payrollCountry)})` : name);
   const reportsToNumber = directory.find((e) => e.id && e.id === employee.reports_to_id)?.employeeNumber || '';
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -404,17 +418,19 @@ const EditEmployeePage = () => {
             }
             break;
           case 'NSSF Number':
-            if (!nssfRegex.test(deduction.number)) {
-              newErrors[`deduction${deduction.name}`] = 'Invalid NSSF number (9 digits)';
+          case 'Tax PIN': {
+            // the format of the employee's country (FIG-905), as the database checks it
+            const problem = payrollCountry === 'Kenya'
+              ? (deduction.name === 'Tax PIN' ? !kraPinRegex.test(deduction.number) : !nssfRegex.test(deduction.number))
+                ? deduction.name === 'Tax PIN' ? 'Invalid KRA PIN format (e.g., A123456789Z)' : 'Invalid NSSF number (9 digits)'
+                : null
+              : fieldProblem(deduction.name, deduction.number, {}, payrollCountry);
+            if (problem) {
+              newErrors[`deduction${deduction.name}`] = problem;
               isValid = true;
             }
             break;
-          case 'Tax PIN':
-            if (!kraPinRegex.test(deduction.number)) {
-              newErrors[`deduction${deduction.name}`] = 'Invalid KRA PIN format (e.g., A123456789Z)';
-              isValid = true;
-            }
-            break;
+          }
           case 'NITA':
             if (!nitaRegex.test(deduction.number)) {
               newErrors[`deduction${deduction.name}`] = 'Invalid NITA number format';
@@ -1332,7 +1348,7 @@ const EditEmployeePage = () => {
                             {deduction.isActive && <Check className="w-4 h-4 text-brand" />}
                           </div>
                         )}
-                        <span className="ml-2 font-medium min-w-[100px]">{deduction.name}</span>
+                        <span className="ml-2 font-medium min-w-[100px]">{numberLabel(deduction.name)}</span>
                       </div>
                       {deduction.isActive && (
                         <div className="flex-1">
@@ -1342,7 +1358,7 @@ const EditEmployeePage = () => {
                               value={deduction.number}
                               onChange={(e) => handleStatutoryDeductionChange(index, 'number', e.target.value)}
                               className={`w-full h-11 bg-gray-50 border-gray-300 border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm`}
-                              placeholder={`Enter ${deduction.name}`}
+                              placeholder={deduction.name === 'Tax PIN' ? taxNumberPlaceholder(payrollCountry) : `Enter ${deduction.name}`}
                               disabled={!isEditMode}
                               onBlur={() => validateField(`deduction${deduction.name}`, deduction.number)}
                             />
@@ -1360,6 +1376,52 @@ const EditEmployeePage = () => {
                   ))}
                 </div>
               </div>
+
+              {inTanzania && (
+                <div data-testid="tanzania-payroll">
+                  <SectionHeader title="Tanzania payroll" icon={CreditCard} />
+                  <div className="grid grid-cols-1 gap-4 mt-4">
+                    <p className="text-xs text-muted-foreground">The TRA TIN and NSSF Tanzania number go in Tax PIN and NSSF Number above.</p>
+                    <label className="flex items-center gap-2 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        checked={employee.heslb_borrower === true}
+                        disabled={!isEditMode}
+                        onChange={(e) => setEmployee((prev) => ({ ...prev, heslb_borrower: e.target.checked }))}
+                      />
+                      Repays a HESLB student loan (15% of basic salary each month, after tax)
+                    </label>
+                    {employee.heslb_borrower === true && (
+                      <FormField
+                        label="HESLB Form Four index number"
+                        name="heslb_index_number"
+                        value={employee.heslb_index_number || ''}
+                        onChange={handleInputChange}
+                        disabled={!isEditMode}
+                      />
+                    )}
+                    <label className="flex items-center gap-2 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        checked={employee.secondary_employment === true}
+                        disabled={!isEditMode}
+                        onChange={(e) => setEmployee((prev) => ({ ...prev, secondary_employment: e.target.checked }))}
+                      />
+                      This is not their main job (secondary employment: PAYE at a flat 30%)
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        checked={/^non/i.test(String(employee.kra_residency ?? ''))}
+                        disabled={!isEditMode}
+                        onChange={(e) => setEmployee((prev) => ({ ...prev, kra_residency: e.target.checked ? 'Non-Resident' : 'Resident' }))}
+                      />
+                      Not resident in Tanzania for tax (PAYE at a flat 15% of gross)
+                    </label>
+                    <p className="text-xs text-muted-foreground">NHIF, where the employee has it, is added as a voluntary deduction.</p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -53,7 +53,9 @@ describe('payroll register PDF', () => {
   it('groups the register by country with a subtotal per currency, never one sum (FIG-905)', () => {
     const tz = { employee_id: 'T1', employee_name: 'Baraka Mushi', department: 'Ops', basic_salary: 900000, gross_pay: 900000, total_deductions: 0, net_pay: 900000, country: 'Tanzania', currency: 'TZS' };
     const groups = registerByCountry([tz, ...rows]);
-    expect(groups.map((g) => [g.country, g.currency, g.lines.length, g.totals[4]])).toEqual([['Kenya', 'KES', 2, 125000], ['Tanzania', 'TZS', 1, 900000]]);
+    // each country has its own columns (Tanzania's: PAYE, NSSF, HESLB and the employer's costs)
+    expect(groups.map((g) => [g.country, g.currency, g.lines.length, g.totals[g.columns.indexOf('Gross pay') - 3]])).toEqual([['Kenya', 'KES', 2, 125000], ['Tanzania', 'TZS', 1, 900000]]);
+    expect(groups[1].columns).toContain('HESLB');
     // (the PDF escapes brackets in its text)
     const pdf = payrollRegisterPdf([tz, ...rows], { periodLabel: 'October 2026' }).output().replace(/\\([()])/g, '$1');
     expect(pdf).toContain('Kenya (KES): 2 employees');

@@ -20,6 +20,7 @@ const api = vi.hoisted(() => ({
   myUserId: vi.fn(),
   confirm: vi.fn(),
   saveAs: vi.fn(),
+  loadBranches: vi.fn(),
 }));
 
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
@@ -27,6 +28,7 @@ vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() 
 vi.mock('file-saver', () => ({ saveAs: api.saveAs }));
 vi.mock('../../lib/confirmDialog', () => ({ confirmDialog: api.confirm }));
 vi.mock('../../lib/pieceRateApi', () => ({ myUserId: api.myUserId }));
+vi.mock('../../lib/branches', async (importOriginal) => ({ ...(await importOriginal<object>()), loadBranches: api.loadBranches }));
 vi.mock('../../lib/piecePayoutsApi', () => ({
   loadPayoutBatches: api.loadPayoutBatches,
   loadPayoutLines: api.loadPayoutLines,
@@ -83,6 +85,7 @@ beforeEach(() => {
   api.loadEquityDebitAccount.mockResolvedValue('1234567890');
   api.myUserId.mockResolvedValue('me');
   api.confirm.mockResolvedValue(true);
+  api.loadBranches.mockResolvedValue([]);
 });
 afterEach(() => cleanup());
 
@@ -203,5 +206,44 @@ describe('an approved payout', () => {
     expect(screen.getByText(/Set the company's Equity account/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel payout' }));
     await waitFor(() => expect(api.cancelPayoutBatch).toHaveBeenCalledWith('b1', null));
+  });
+});
+
+describe('a company paying people in more than one country (FIG-905)', () => {
+  const br = (name: string, country: string) => ({ id: name, name, country, currency: null, city: null, address: null, active: true, is_default: country === 'Kenya' });
+
+  it('picks the country of the payout, so a payout is in one currency', async () => {
+    api.loadBranches.mockResolvedValue([br('Nairobi', 'Kenya'), br('Dar', 'Tanzania')]);
+    api.batches = [];
+    render(<Payouts people={PEOPLE} settings={SETTINGS} />);
+    await settle();
+    fireEvent.click(screen.getByRole('button', { name: 'New payout' }));
+    await settle();
+    fireEvent.change(screen.getByLabelText('Country'), { target: { value: 'Tanzania' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Make payout' }));
+    await waitFor(() => expect(api.createPayoutBatch).toHaveBeenCalledWith('daily', DAY, DAY, null, 'Tanzania'));
+  });
+
+  it('asks nothing when every branch is in one country', async () => {
+    api.loadBranches.mockResolvedValue([br('Nairobi', 'Kenya'), br('Mombasa', 'Kenya')]);
+    render(<Payouts people={PEOPLE} settings={SETTINGS} />);
+    await settle();
+    fireEvent.click(screen.getByRole('button', { name: 'New payout' }));
+    await settle();
+    expect(screen.queryByLabelText('Country')).toBeNull();
+  });
+
+  it("shows a Tanzania payout in TSh, with the bank file only (M-Pesa and Equity files are Kenya's)", async () => {
+    api.batches = [batch({ status: 'approved', country: 'Tanzania', currency: 'TZS', gross_total: 20000, net_total: 18000 })];
+    api.lines = [line({ gross: 10000, ahl: 0, ahl_rate: 0, reserve: 1000, net: 9000 })];
+    render(<Payouts people={PEOPLE} settings={SETTINGS} />);
+    await settle();
+    expect(screen.getByText('TSh 18,000')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /^Open Daily payout/ }));
+    await settle();
+    expect(screen.getByLabelText('Wanjiru One to pay').textContent).toBe('TSh 9,000');
+    expect(screen.getByRole('button', { name: 'Bank bulk payment CSV' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'M-Pesa bulk (B2C) CSV' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Equity Bank (Eazzy Biz) CSV' })).toBeNull();
   });
 });

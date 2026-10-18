@@ -44,6 +44,12 @@ export interface PayrollRegisterRow {
   /** the payslip's country and currency (FIG-905); Kenya / KES when not given */
   country?: string | null;
   currency?: string | null;
+  /** Tanzania and Uganda (FIG-905): the employer's NSSF; Uganda's LST; Tanzania's HESLB, SDL and WCF */
+  lst_deduction?: number | null;
+  employer_nssf?: number | null;
+  heslb_deduction?: number | null;
+  sdl_levy?: number | null;
+  wcf_levy?: number | null;
 }
 
 export const REGISTER_COLUMNS = [
@@ -65,8 +71,76 @@ const settlesWork = (r: PayrollRegisterRow) =>
   r.work_settlement === true || num(r.work_pay) + num(r.jobs_pay) + num(r.wht_tax) + num(r.paid_out) + num(r.arrears_brought_forward) + num(r.arrears_carried_forward) > 0;
 const money = (v: number) => Math.round(v).toLocaleString('en-KE');
 
+/** Uganda's register (FIG-905): PAYE, NSSF and LST, with the employer's NSSF as the employer cost. */
+export const UGANDA_REGISTER_COLUMNS = [
+  'No.', 'Employee', 'Department', 'Basic', 'Allowances', 'Overtime', 'Work & jobs', 'Leave deduction', 'Gross pay', 'PAYE', 'NSSF (5%)', 'LST',
+  'WHT', 'Other deductions', 'Paid during month', 'Arrears b/f', 'Carried forward', 'Net pay', 'NSSF (employer, 10%)',
+] as const;
+
+function ugandaRegister(rows: PayrollRegisterRow[]) {
+  const lines = rows.map((r) => {
+    const basic = num(r.basic_salary);
+    const gross = num(r.gross_pay);
+    const leave = num(r.leave_deduction);
+    const overtime = payslipOvertimePay(r);
+    const work = round2(num(r.work_pay) + num(r.jobs_pay));
+    const paye = num(r.paye_tax);
+    const nssf = num(r.nssf_deduction);
+    const lst = num(r.lst_deduction);
+    const wht = num(r.wht_tax);
+    return {
+      number: String(r.employeeNu || r.employee_id || ''),
+      name: String(r.employee_name || ''),
+      department: String((r.department === 'Branch Staff' ? r.branch : r.department) || ''),
+      amounts: [
+        basic, Math.max(0, round2(gross + leave - basic - overtime - work)), overtime, work, leave ? -leave : 0, gross, paye, nssf, lst, wht,
+        Math.max(0, round2(num(r.total_deductions) - paye - nssf - lst - wht)), num(r.paid_out), num(r.arrears_brought_forward),
+        num(r.arrears_carried_forward), num(r.net_pay), num(r.employer_nssf),
+      ],
+    };
+  });
+  const columns: readonly string[] = UGANDA_REGISTER_COLUMNS;
+  const totals = lines.reduce((sum, l) => sum.map((s, i) => s + l.amounts[i]), Array(columns.length - 3).fill(0) as number[]);
+  return { columns, lines, totals };
+}
+
+/** Tanzania's register (FIG-905): PAYE, NSSF and HESLB, with the employer's NSSF, SDL and WCF as employer costs. */
+export const TANZANIA_REGISTER_COLUMNS = [
+  'No.', 'Employee', 'Department', 'Basic', 'Allowances', 'Overtime', 'Work & jobs', 'Leave deduction', 'Gross pay', 'PAYE', 'NSSF', 'HESLB',
+  'WHT', 'Other deductions', 'Paid during month', 'Arrears b/f', 'Carried forward', 'Net pay', 'NSSF (employer)', 'SDL (employer)', 'WCF (employer)',
+] as const;
+
+function tanzaniaRegister(rows: PayrollRegisterRow[]) {
+  const lines = rows.map((r) => {
+    const basic = num(r.basic_salary);
+    const gross = num(r.gross_pay);
+    const leave = num(r.leave_deduction);
+    const overtime = payslipOvertimePay(r);
+    const work = round2(num(r.work_pay) + num(r.jobs_pay));
+    const paye = num(r.paye_tax);
+    const nssf = num(r.nssf_deduction);
+    const heslb = num(r.heslb_deduction);
+    const wht = num(r.wht_tax);
+    return {
+      number: String(r.employeeNu || r.employee_id || ''),
+      name: String(r.employee_name || ''),
+      department: String((r.department === 'Branch Staff' ? r.branch : r.department) || ''),
+      amounts: [
+        basic, Math.max(0, round2(gross + leave - basic - overtime - work)), overtime, work, leave ? -leave : 0, gross, paye, nssf, heslb, wht,
+        Math.max(0, round2(num(r.total_deductions) - paye - nssf - heslb - wht)), num(r.paid_out), num(r.arrears_brought_forward),
+        num(r.arrears_carried_forward), num(r.net_pay), num(r.employer_nssf), num(r.sdl_levy), num(r.wcf_levy),
+      ],
+    };
+  });
+  const columns: readonly string[] = TANZANIA_REGISTER_COLUMNS;
+  const totals = lines.reduce((sum, l) => sum.map((s, i) => s + l.amounts[i]), Array(columns.length - 3).fill(0) as number[]);
+  return { columns, lines, totals };
+}
+
 /** The register's figures per row, in REGISTER_COLUMNS order (amounts as numbers), and the totals. */
-export function registerFigures(rows: PayrollRegisterRow[]) {
+export function registerFigures(rows: PayrollRegisterRow[], country = 'Kenya') {
+  if (country === 'Tanzania') return tanzaniaRegister(rows);
+  if (country === 'Uganda') return ugandaRegister(rows);
   const withWork = rows.some(settlesWork);
   const columns: readonly string[] = withWork ? WORK_REGISTER_COLUMNS : REGISTER_COLUMNS;
   const lines = rows.map((r) => {
@@ -119,7 +193,7 @@ export function registerByCountry(rows: PayrollRegisterRow[]) {
   }
   return [...groups.values()]
     .sort((a, b) => (a.country === 'Kenya' ? -1 : b.country === 'Kenya' ? 1 : a.country.localeCompare(b.country)))
-    .map((g) => ({ ...g, ...registerFigures(g.rows) }));
+    .map((g) => ({ ...g, ...registerFigures(g.rows, g.country) }));
 }
 
 /** The register as a jsPDF document: one table per country, each with its subtotal in its currency. */

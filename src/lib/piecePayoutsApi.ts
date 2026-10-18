@@ -9,7 +9,7 @@ const fail = (error: { message?: string } | null) => {
 };
 
 const BATCH_COLUMNS =
-  'id, kind, period_from, period_to, pay_period, status, notes, worker_count, flagged_count, gross_total, ahl_total, reserve_total, wht_total, net_total, created_by, created_at, approved_by, approved_at, exported_at, cancelled_at, cancel_reason';
+  'id, kind, period_from, period_to, pay_period, country, currency, status, notes, worker_count, flagged_count, gross_total, ahl_total, reserve_total, wht_total, net_total, created_by, created_at, approved_by, approved_at, exported_at, cancelled_at, cancel_reason';
 
 export async function loadPayoutBatches(): Promise<PayoutBatch[]> {
   const { data, error } = await supabase.from('work_payout_batches').select(BATCH_COLUMNS).order('created_at', { ascending: false }).limit(200);
@@ -29,8 +29,12 @@ export async function loadPayoutLines(batchId: string): Promise<PayoutLine[]> {
   return (data ?? []) as PayoutLine[];
 }
 
-export async function createPayoutBatch(kind: PayoutKind, from: string, to: string, workers: string[] | null = null): Promise<string> {
-  const { data, error } = await supabase.rpc('create_work_payout_batch', { p_kind: kind, p_from: from, p_to: to, p_workers: workers, p_notes: null });
+/**
+ * Makes a payout. A payout is in one currency (FIG-905): give the country when the company pays people in more than
+ * one; without it the database refuses a payout that would mix currencies.
+ */
+export async function createPayoutBatch(kind: PayoutKind, from: string, to: string, workers: string[] | null = null, country: string | null = null): Promise<string> {
+  const { data, error } = await supabase.rpc('create_work_payout_batch', { p_kind: kind, p_from: from, p_to: to, p_workers: workers, p_notes: null, p_country: country });
   fail(error);
   return data as string;
 }

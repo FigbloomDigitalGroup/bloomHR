@@ -10,6 +10,7 @@ import type { EmployeeRecord } from '../../lib/profileCompleteness';
 import { type ExportFile, type Rates, lastDayOf, remittanceTotals, toCsv } from '../../lib/payrollExports';
 import { type CountryFile, type CountryFiles, type RunCountry, filesByCountry } from '../../lib/payroll/multiCountry';
 import { XLSX_TYPE, toXlsx } from '../../lib/xlsxExport';
+import { tanzaniaRemittance } from '../../lib/payroll/countries/tanzania';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
 // The Files tab's downloads, per country (FIG-905 stage 2): each approved (or paid) country's statutory returns, built
@@ -199,6 +200,7 @@ export default function PayrollExportsPanel({ run, runCountries }: { run: Payrol
             </h4>
           )}
           {c.country === 'Kenya' && files.totals.get(c.country) && <RemittanceTotals totals={files.totals.get(c.country)!} />}
+          {c.country === 'Tanzania' && <TanzaniaRemittance payslips={c.payslips} />}
           {c.returns.length === 0 && (
             <p className="text-xs text-muted-foreground mb-2">{c.country}’s returns come with its payroll rules.</p>
           )}
@@ -242,6 +244,22 @@ export default function PayrollExportsPanel({ run, runCountries }: { run: Payrol
 }
 
 const ksh = (n: number) => `KSh ${n.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const tsh = (n: number) => `TSh ${Math.round(n).toLocaleString('en-KE')}`;
+
+/** Tanzania's amounts to pay over for the month (FIG-905): PAYE, NSSF (both shares), SDL, WCF and HESLB. */
+function TanzaniaRemittance({ payslips }: { payslips: CountryFiles['payslips'] }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-3" aria-label="Tanzania amounts to pay">
+      {tanzaniaRemittance(payslips).map((i) => (
+        <div key={i.label} className="rounded-tile border border-border px-3 py-2">
+          <p className="text-[10px] font-bold uppercase text-subtle">{i.label}</p>
+          <p className="text-sm font-semibold text-ink">{tsh(i.amount)}</p>
+          <p className="text-[10.5px] text-muted-foreground">{i.note}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /** Kenya's amounts to pay over for the month: PAYE, SHIF, NSSF and housing levy (both shares), and the employer's NITA levy. */
 function RemittanceTotals({ totals }: { totals: ReturnType<typeof remittanceTotals> }) {

@@ -6,6 +6,8 @@ import { currencyFor, employeeBranch } from '../branches';
 import { type ExportFile, bankFile, equityFile, mpesaFile } from '../payrollExports';
 import { type CountryPayrollEngine, type EmployeeProblem, type PayslipRecord, engineFor, tidyCountry, waitingLabel } from './countries';
 import { currencyOf, moneyShort } from './currency';
+import { tanzaniaMobileMoneyFile } from './countries/tanzania';
+import { ugandaMobileMoneyFile } from './countries/uganda';
 
 // One payroll run for every country (FIG-905 stage 2): "run like they're one country but in the backend they're
 // different". The admin presses Run payroll and Approve once; behind that each employee is worked out by their
@@ -123,8 +125,10 @@ export function calculateRun(
       notCalculated.push({ country: g.country, reason: reason ?? `${g.country} payroll can't be worked out yet`, waiting: !g.engine, employees: g.employees });
       continue;
     }
+    // the country's headcount on the run (Tanzania's SDL applies from a number of employees)
+    const countryCtx = { ...ctx, countryHeadcount: g.employees.length };
     for (const e of g.employees) {
-      const r = g.engine.calculate({ employee: e, ctx });
+      const r = g.engine.calculate({ employee: e, ctx: countryCtx });
       records.push({ ...r.record, country: g.engine.country, currency: g.engine.currency });
     }
   }
@@ -310,13 +314,21 @@ export interface CountryFiles {
   payments: CountryFile[];
 }
 
-/** Bank and mobile money files for one currency's payslips: M-Pesa, bank and Equity for KES; the bank file for others. */
+/** Bank and mobile money files for one currency's payslips: M-Pesa, bank and Equity for KES; bank and mobile money for TZS and UGX; the bank file for others. */
 export function paymentFilesFor(currency: string, payslips: PayslipRecord[], employees: EmployeeRecord[], payPeriod: string, debitAccount: string): CountryFile[] {
   const own = payslips.filter((p) => currencyOf(p) === currency);
   const code = currency.toLowerCase();
   if (currency !== 'KES') {
-    // (mobile money outside Kenya comes with each country's payroll)
-    return [{ key: `bank-${code}`, label: 'Bank bulk pay', name: `bulk-pay-bank-${code}`, what: `staff paid by bank, in ${currency}`, file: bankFile(own, employees, payPeriod) }];
+    const bank = { key: `bank-${code}`, label: 'Bank bulk pay', name: `bulk-pay-bank-${code}`, what: `staff paid by bank, in ${currency}`, file: bankFile(own, employees, payPeriod) };
+    // mobile money outside Kenya comes with each country's payroll: M-Pesa, Tigo Pesa and Airtel Money in Tanzania
+    // (numbers as 255...), MTN MoMo and Airtel Money in Uganda (256...)
+    if (currency === 'TZS') {
+      return [bank, { key: 'mobile-tzs', label: 'Mobile money bulk pay', name: 'bulk-pay-mobile-tzs', what: 'staff paid by M-Pesa, Tigo Pesa or Airtel Money, in TZS', file: tanzaniaMobileMoneyFile(own, employees, payPeriod) }];
+    }
+    if (currency === 'UGX') {
+      return [bank, { key: 'mobile-ugx', label: 'Mobile money bulk pay', name: 'bulk-pay-mobile-ugx', what: 'staff paid by MTN MoMo or Airtel Money, in UGX', file: ugandaMobileMoneyFile(own, employees, payPeriod) }];
+    }
+    return [bank];
   }
   return [
     { key: 'mpesa', label: 'M-Pesa bulk pay', name: 'bulk-pay-mpesa', what: 'staff paid by M-Pesa', file: mpesaFile(own, employees, payPeriod) },

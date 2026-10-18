@@ -101,11 +101,13 @@ describe('PayrollRunTab: one run for every country (FIG-905 stage 2)', () => {
   const branches = [
     { id: 'hq', name: 'Nairobi HQ', country: 'Kenya', currency: 'KES', city: null, address: null, active: true, is_default: true },
     { id: 'dar', name: 'Dar es Salaam', country: 'Tanzania', currency: 'TZS', city: null, address: null, active: true, is_default: false },
+    // a country without payroll rules yet (Tanzania and Uganda have them since FIG-905 stages 3 and 4)
+    { id: 'kgl', name: 'Kigali', country: 'Rwanda', currency: 'RWF', city: null, address: null, active: true, is_default: false },
   ];
   const ke = { ...record, country: 'Kenya', currency: 'KES' };
   const staff = [
     { 'Employee Number': 'E1', 'First Name': 'Amina', 'Last Name': 'Wanjiru', branch_id: 'hq', 'Tax PIN': 'A012345678Z', 'NSSF Number': '1', 'SHIF Number': '2', payment_method: 'cash' },
-    { 'Employee Number': 'E2', 'First Name': 'Baraka', 'Last Name': 'Mushi', branch_id: 'dar' },
+    { 'Employee Number': 'E2', 'First Name': 'Baraka', 'Last Name': 'Mushi', branch_id: 'kgl' },
   ];
   const readinessFor = (runCountries: { country: string; status: 'draft' | 'approved' | 'paid' }[]) =>
     countryReadiness({
@@ -117,11 +119,11 @@ describe('PayrollRunTab: one run for every country (FIG-905 stage 2)', () => {
 
   it('shows the readiness per country and the approval summary; staff without rules wait, never on Kenya rules', () => {
     render(<PayrollRunTab {...props({}, run)} onPayroll={staff} companyBranches={branches} readiness={readinessFor([{ country: 'Kenya', status: 'draft' }])} countryActions={actions()} />);
-    expect(screen.getByTestId('approval-summary').textContent).toBe('Kenya 1 payslip KSh 62K ✓ · Tanzania 1 waiting for rules');
-    const tz = screen.getByTestId('country-Tanzania');
-    expect(tz.textContent).toContain('Waiting for rules');
-    expect(tz.textContent).toContain('Waiting for Tanzania payroll rules');
-    expect(tz.textContent).toContain('Baraka Mushi');
+    expect(screen.getByTestId('approval-summary').textContent).toBe('Kenya 1 payslip KSh 62K ✓ · Rwanda 1 waiting for rules');
+    const rw = screen.getByTestId('country-Rwanda');
+    expect(rw.textContent).toContain('Waiting for rules');
+    expect(rw.textContent).toContain('Waiting for Rwanda payroll rules');
+    expect(rw.textContent).toContain('Baraka Mushi');
     expect(screen.getByTestId('country-Kenya').textContent).toContain('Ready');
     expect(screen.queryByText(/Kenya rules/)).toBeNull();
   });

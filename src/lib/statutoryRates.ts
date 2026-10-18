@@ -27,14 +27,50 @@ export const RATE_LABELS: Record<string, string> = {
   nssf_lower_limit: 'NSSF lower earnings limit',
   nssf_upper_limit: 'NSSF upper earnings limit',
   nita_levy: 'NITA training levy (employer, per employee monthly)',
+  // Uganda (FIG-905)
+  paye_bands_non_resident: 'PAYE bands (non-resident)',
+  paye_surcharge_threshold: 'Extra PAYE above (monthly)',
+  paye_surcharge_rate: 'Extra PAYE rate',
+  nssf_deductible: 'NSSF deducted before PAYE (1 = yes)',
+  lst_bands: 'Local service tax bands (annual amount)',
+  lst_deductible: 'LST deducted before PAYE (1 = yes)',
+  lst_first_month: 'LST first month of collection (7 = July)',
+  lst_months: 'LST months of collection',
+  wht_contractual: 'Withholding tax on contractors (services)',
+  wht_professional: 'Withholding tax on professional fees',
 };
+
+/** A band: up to an amount (null: everything above), at a rate (PAYE) or an annual amount (LST). */
+export type RateBand = { upto: number | null; rate?: number; amount?: number };
+/** Tanzania's rates (FIG-905, migration 20261021000000_tanzania_payroll.sql), labelled for people. */
+export const TANZANIA_RATE_LABELS: Record<string, string> = {
+  paye_bands: 'PAYE bands (resident)',
+  nonresident_paye_rate: 'PAYE rate for a non-resident (flat, on gross)',
+  secondary_paye_rate: 'PAYE rate for a secondary employment (flat)',
+  nssf_rate: 'NSSF rate (employee)',
+  nssf_employer_rate: 'NSSF rate (employer)',
+  nssf_deductible: 'NSSF deducted before PAYE (1 = yes)',
+  sdl_rate: 'SDL rate (employer, on gross emoluments)',
+  sdl_min_employees: 'SDL applies from this many employees',
+  wcf_rate: 'WCF rate (employer, on gross earnings)',
+  heslb_rate: 'HESLB loan repayment rate (on basic)',
+  wht_resident: 'Withholding tax on a resident contractor’s fees rate',
+  wht_nonresident: 'Withholding tax on a non-resident contractor’s fees rate',
+};
+
+/** A rate's label in a country: Tanzania's own labels where it has them, else the shared ones (Kenya and Uganda). */
+export const rateLabel = (code: string, country = 'Kenya') =>
+  (country === 'Tanzania' ? TANZANIA_RATE_LABELS[code] : undefined) ?? RATE_LABELS[code] ?? code;
+
+/** A value that is typed and shown as a percentage (rates, and every withholding tax rate), not an amount or a count. */
+export const isPercentCode = (code: string) => /rate$/.test(code) || /^wht_/.test(code);
 
 export interface RateRow {
   id: string;
   tenant_id: string | null;
   code: string;
   value: number | null;
-  bands: { upto: number | null; rate: number }[] | null;
+  bands: RateBand[] | null;
   effective_from: string;
   effective_to: string | null;
   source: string | null;
@@ -61,7 +97,8 @@ export async function ratesInForce(day: string, country = 'Kenya'): Promise<Rate
     const seen = byCode.get(r.code);
     if (!seen || (seen.tenant_id === null && r.tenant_id !== null)) byCode.set(r.code, r);
   }
-  return [...byCode.values()].sort((a, b) => Object.keys(RATE_LABELS).indexOf(a.code) - Object.keys(RATE_LABELS).indexOf(b.code));
+  const order = Object.keys(country === 'Tanzania' ? TANZANIA_RATE_LABELS : RATE_LABELS);
+  return [...byCode.values()].sort((a, b) => order.indexOf(a.code) - order.indexOf(b.code));
 }
 
 const dayBefore = (iso: string) => {
@@ -85,4 +122,32 @@ export async function setCompanyRate(code: string, value: number, from: string, 
     tenant_id: tenantId, country, code, value, effective_from: from, source: source?.trim() || 'Set by the company',
   });
   if (error) fail(error, 'The rate was not saved.');
+}
+
+/**
+ * Gives the company its own bands for a code from a date in a country (PAYE bands, Uganda's LST bands): each band up to
+ * an amount, the last for everything above. The bands must go up, with only the last open-ended.
+ */
+export async function setCompanyBands(code: string, bands: RateBand[], from: string, source?: string, country = 'Kenya'): Promise<void> {
+  if (!bands.length) throw new Error('Add at least one band.');
+  bands.forEach((b, i) => {
+    const last = i === bands.length - 1;
+    if (last ? b.upto !== null : !(Number.isFinite(b.upto) && (b.upto as number) > 0)) {
+      throw new Error(last ? 'The last band is for everything above: leave its "up to" empty.' : 'Each band but the last needs an "up to" amount.');
+    }
+    if (i > 0 && !last && (b.upto as number) <= (bands[i - 1].upto as number)) throw new Error('Each band must go up from the one before.');
+    const v = b.amount ?? b.rate;
+    if (v === undefined || !Number.isFinite(v) || v < 0) throw new Error('Enter a rate or amount of 0 or more for each band.');
+  });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from)) throw new Error('Choose the date it starts.');
+  const { tenantId } = await currentUserAndTenant();
+  const { error: endError } = await supabase
+    .from('statutory_rates')
+    .update({ effective_to: dayBefore(from) })
+    .eq('tenant_id', tenantId).eq('country', country).eq('code', code).lt('effective_from', from).is('effective_to', null);
+  if (endError) fail(endError, 'The bands were not saved.');
+  const { error } = await supabase.from('statutory_rates').insert({
+    tenant_id: tenantId, country, code, bands, effective_from: from, source: source?.trim() || 'Set by the company',
+  });
+  if (error) fail(error, 'The bands were not saved.');
 }
