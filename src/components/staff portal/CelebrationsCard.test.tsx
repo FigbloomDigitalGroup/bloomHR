@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 
 const state = vi.hoisted(() => ({
   people: [] as Record<string, string | null>[],
+  tables: {} as Record<string, unknown[]>,
   myEmail: 'me@farm.co.ke',
   startDirectMessage: vi.fn(),
   sendMessage: vi.fn(),
@@ -12,7 +13,7 @@ vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: (table: string) => ({
       select: () => {
-        const data = table === 'employee_directory' ? state.people : [];
+        const data = table === 'employee_directory' ? state.people : state.tables[table] || [];
         // awaited as is, or read a page at a time
         return Object.assign(Promise.resolve({ data }), {
           order: () => ({ range: (from: number, to: number) => Promise.resolve({ data: data.slice(from, to + 1), error: null }) }),
@@ -61,5 +62,28 @@ describe('CelebrationsCard', () => {
     render(<CelebrationsCard />);
     expect(await screen.findByText(/Happy birthday, Me!/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Send wishes' })).toBeNull();
+  });
+
+  it('looks 60 days ahead and links to the calendar', async () => {
+    const inDays = (n: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() + n);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    state.people = [];
+    state.tables = {
+      company_events: [
+        { title: 'Year-end party', date: inDays(45), description: 'At the farm' },
+        { title: 'Too far', date: inDays(75), description: null },
+      ],
+    };
+    const onViewCalendar = vi.fn();
+    render(<CelebrationsCard onViewCalendar={onViewCalendar} />);
+    expect(await screen.findByText('Year-end party')).toBeTruthy();
+    expect(screen.queryByText('Too far')).toBeNull();
+    expect(screen.getByText('The next 60 days at your company')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'View calendar →' }));
+    expect(onViewCalendar).toHaveBeenCalled();
+    state.tables = {};
   });
 });

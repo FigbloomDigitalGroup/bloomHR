@@ -28,6 +28,8 @@ interface TaskWorkspaceProps {
   mode: 'admin' | 'staff';
   /** a supervisor's view of their team: only tasks assigned to these people */
   teamNumbers?: string[];
+  /** a task to open straight away (from the calendar) */
+  initialOpenId?: string | null;
 }
 
 const typingIn = (el: EventTarget | null) => {
@@ -39,7 +41,7 @@ const typingIn = (el: EventTarget | null) => {
  * Tasks like Linear: projects down the side, a board (drag between columns) or a list grouped by status, filters,
  * "My tasks", and a task's full detail. The database decides what each person sees and may change.
  */
-export default function TaskWorkspace({ mode, teamNumbers }: TaskWorkspaceProps) {
+export default function TaskWorkspace({ mode, teamNumbers, initialOpenId = null }: TaskWorkspaceProps) {
   const { employees } = useEmployeeDirectory();
   const [viewer, setViewer] = useState<TaskViewer | null>(null);
   const [projects, setProjects] = useState<TaskProject[]>([]);
@@ -54,7 +56,7 @@ export default function TaskWorkspace({ mode, teamNumbers }: TaskWorkspaceProps)
   const [view, setView] = useState<'board' | 'list'>('board');
   const [filters, setFilters] = useState<TaskFilters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<TaskSort>('manual');
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(initialOpenId);
   const [creating, setCreating] = useState<{ status?: TaskStatus } | null>(null);
   const [editingProject, setEditingProject] = useState<TaskProject | 'new' | null>(null);
   const [showLabels, setShowLabels] = useState(false);
