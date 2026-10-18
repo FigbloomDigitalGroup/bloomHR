@@ -4,6 +4,7 @@ import { Archive, FolderKanban, Kanban, List, Plus, Repeat, Settings2, Tag, User
 import { Button, EmptyState, PageHeader, SearchInput } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import { useEmployeeDirectory } from '../../hooks/useEmployeeDirectory';
+import { usePermissions } from '../../hooks/usePermissions';
 import {
   EMPTY_FILTERS, PRIORITIES, activeFilterCount, canEditTask, filterTasks,
   type DueFilter, type Task, type TaskFilters, type TaskLabel, type TaskPriority, type TaskProject, type TaskSort,
@@ -22,6 +23,9 @@ import TemplatesPanel from './TemplatesPanel';
 import type { MentionPerson } from './MentionInput';
 
 type Scope = 'my' | 'all' | 'templates' | `project:${string}`;
+
+/** The "Manage projects" module (migration 20261020000000_manage_projects). */
+export const MANAGE_PROJECTS_MODULE = 'task-projects';
 
 interface TaskWorkspaceProps {
   /** admin: the Task Manager page; staff: the staff portal's Tasks */
@@ -43,7 +47,12 @@ const typingIn = (el: EventTarget | null) => {
  */
 export default function TaskWorkspace({ mode, teamNumbers, initialOpenId = null }: TaskWorkspaceProps) {
   const { employees } = useEmployeeDirectory();
-  const [viewer, setViewer] = useState<TaskViewer | null>(null);
+  // "Manage projects" (task-projects, FIG-901): any role may hold it, staff-based ones included; the database's
+  // manages_tasks() is the same module, so these buttons only show where the database would allow them
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
+  const managesProjects = !permissionsLoading && hasPermission(MANAGE_PROJECTS_MODULE);
+  const [loadedViewer, setViewer] = useState<Omit<TaskViewer, 'manages'> | null>(null);
+  const viewer = useMemo<TaskViewer | null>(() => (loadedViewer ? { ...loadedViewer, manages: managesProjects } : null), [loadedViewer, managesProjects]);
   const [projects, setProjects] = useState<TaskProject[]>([]);
   const [members, setMembers] = useState<Record<string, string[]>>({});
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -109,8 +118,8 @@ export default function TaskWorkspace({ mode, teamNumbers, initialOpenId = null 
   const leads = useCallback((p: TaskProject) => !!viewer && (viewer.manages || p.created_by === viewer.userId || (!!viewer.employeeNumber && p.lead_number === viewer.employeeNumber)), [viewer]);
 
   const sidebarProjects = useMemo(
-    () => projects.filter((p) => (showArchived || !p.archived) && (mode === 'admin' || isMember(p) || tasks.some((t) => t.project_id === p.id))),
-    [projects, showArchived, mode, isMember, tasks]
+    () => projects.filter((p) => (showArchived || !p.archived) && (mode === 'admin' || managesProjects || isMember(p) || tasks.some((t) => t.project_id === p.id))),
+    [projects, showArchived, mode, managesProjects, isMember, tasks]
   );
   // the people who run tasks may add a task to any project (they then see it, as its creator)
   const creatable = useMemo(() => projects.filter((p) => !p.archived && (!!viewer?.manages || isMember(p))), [projects, isMember, viewer]);
@@ -198,13 +207,13 @@ export default function TaskWorkspace({ mode, teamNumbers, initialOpenId = null 
         subtitle={team ? 'Tasks given to the people who report to you' : 'Projects, boards and your own work. Press C to create a task.'}
         actions={
           <div className="flex flex-wrap gap-2">
-            {mode === 'admin' && viewer.manages && (
+            {viewer.manages && !team && (
               <>
                 <Button variant="secondary" icon={<Tag size={14} />} onClick={() => setShowLabels(true)}>Labels</Button>
                 <Button variant="secondary" icon={<FolderKanban size={14} />} onClick={() => setEditingProject('new')}>New project</Button>
               </>
             )}
-            {!team && <Button icon={<Plus size={14} />} onClick={() => (creatable.length ? setCreating({}) : toast.error(mode === 'admin' ? 'Create a project first' : 'You are not in any project yet: ask HR to add you'))}>New task</Button>}
+            {!team && <Button icon={<Plus size={14} />} onClick={() => (creatable.length ? setCreating({}) : toast.error(viewer.manages ? 'Create a project first' : 'You are not in any project yet: ask whoever manages projects to add you'))}>New task</Button>}
           </div>
         }
       />
@@ -222,7 +231,7 @@ export default function TaskWorkspace({ mode, teamNumbers, initialOpenId = null 
           <nav aria-label="Task views" className="lg:w-56 shrink-0 flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible">
             {navButton('my', 'My tasks', <User size={14} />, openCount((t) => !!viewer.employeeNumber && t.assignee_number === viewer.employeeNumber))}
             {navButton('all', allLabel, <Layers size={14} />)}
-            {mode === 'admin' && viewer.manages && navButton('templates', 'Recurring', <Repeat size={14} />)}
+            {viewer.manages && navButton('templates', 'Recurring', <Repeat size={14} />)}
             <p className="hidden lg:block mt-3 mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Projects</p>
             {sidebarProjects.map((p) => (
               <div key={p.id} className="group flex items-center min-w-[9rem] lg:min-w-0">
@@ -235,7 +244,7 @@ export default function TaskWorkspace({ mode, teamNumbers, initialOpenId = null 
               </div>
             ))}
             {sidebarProjects.length === 0 && <p className="px-2.5 text-[11px] text-muted-foreground">No projects yet.</p>}
-            {mode === 'admin' && projects.some((p) => p.archived) && (
+            {(mode === 'admin' || viewer.manages) && projects.some((p) => p.archived) && (
               <button type="button" onClick={() => setShowArchived((s) => !s)} className="flex items-center gap-1 px-2.5 py-1 text-[11px] text-muted-foreground hover:underline">
                 <Archive size={11} /> {showArchived ? 'Hide archived' : 'Show archived'}
               </button>

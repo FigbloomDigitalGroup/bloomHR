@@ -87,8 +87,9 @@ beforeAll(async () => {
   await db.exec(`
     delete from role_permissions where tenant_id = '${A}';
     insert into role_permissions (role_name, permissions, tenant_id) values
-      ('HR', array['employees', 'task-manager'], '${A}'),
-      ('MANAGER', array['dashboard', 'task-manager'], '${A}'),
+      -- "Manage projects" (task-projects, 20261020000000) is what lets HR and the manager run projects
+      ('HR', array['employees', 'task-manager', 'task-projects'], '${A}'),
+      ('MANAGER', array['dashboard', 'task-manager', 'task-projects'], '${A}'),
       -- every default STAFF role has the Task Manager module: it must not mean "sees every task"
       ('STAFF', array['dashboard', 'task-manager'], '${A}');
   `);
@@ -148,7 +149,7 @@ describe('the old todos', () => {
     const { readFileSync } = await import('node:fs');
     const { join } = await import('node:path');
     for (const f of ['20261019200000_tasks.sql', '20261019500000_task_visibility.sql', '20261019500000_task_visibility.sql',
-      '20261019650000_task_oversight.sql']) {
+      '20261019650000_task_oversight.sql', '20261020000000_manage_projects.sql']) {
       await db.exec(readFileSync(join(__dirname, '..', 'migrations', f), 'utf8'));
       await db.exec('reset search_path');
     }

@@ -13,7 +13,7 @@ interface ProjectModalProps {
   members: string[];
   takenKeys: string[];
   nameOf: (n: string | null) => string;
-  /** the people who run tasks may change the department and archive; a lead edits the rest */
+  /** whoever holds "Manage projects" may change the department and archive; a lead edits the rest */
   manages: boolean;
   onClose: () => void;
   onSaved: (project: TaskProject) => void;

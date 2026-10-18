@@ -8,6 +8,10 @@ vi.mock('../../lib/supabase', () => {
   const permissions = [
     { id: 'p1', module_name: 'Dashboard', module_id: 'dashboard', description: 'Main dashboard', category: 'overview' },
     { id: 'p2', module_name: 'Task Manager', module_id: 'task-manager', description: 'Tasks', category: 'workspace' },
+    {
+      id: 'p5', module_name: 'Manage projects', module_id: 'task-projects', category: 'workspace',
+      description: 'Create projects, add members, assign tasks to a department or team, set up recurring tasks and labels.',
+    },
     { id: 'p3', module_name: 'Payroll', module_id: 'payroll', description: 'Pay', category: 'finance' },
     { id: 'p4', module_name: 'Settings', module_id: 'settings', description: 'Set up', category: 'system' },
   ];
@@ -88,6 +92,16 @@ describe('RolePermissions with the company’s own roles', () => {
     fireEvent.click(screen.getByRole('button', { name: /Save Changes/ }));
     await waitFor(() => expect(db.rpc).toHaveBeenCalledWith('set_company_role_modules', { p_role: 'r-op', p_modules: ['dashboard', 'task-manager'] }));
     expect(db.upserts).toEqual([]);
+  });
+
+  it('lists "Manage projects", which a role based on Staff may hold (FIG-901)', async () => {
+    await open();
+    fireEvent.click(screen.getByRole('button', { name: /Operators/ }));
+    expect(screen.getByText('Create projects, add members, assign tasks to a department or team, set up recurring tasks and labels.')).toBeTruthy();
+    expect(sw('Manage projects').getAttribute('aria-disabled')).not.toBe('true');
+    fireEvent.click(sw('Manage projects'));
+    fireEvent.click(screen.getByRole('button', { name: /Save Changes/ }));
+    await waitFor(() => expect(db.rpc).toHaveBeenCalledWith('set_company_role_modules', { p_role: 'r-op', p_modules: ['dashboard', 'task-projects'] }));
   });
 
   it('a role people hold cannot be switched off or deleted until they are moved', async () => {

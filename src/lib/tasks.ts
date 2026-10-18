@@ -132,10 +132,11 @@ export interface TaskTemplate {
   last_period: string | null;
 }
 
-/** Who is looking: their login, their employee number (if any), whether they run tasks and whether they oversee them. */
+/** Who is looking: their login, their employee number (if any), whether they manage projects and whether they oversee them. */
 export interface TaskViewer {
   userId: string;
   employeeNumber: string | null;
+  /** holds "Manage projects" (task-projects): projects, members, labels, recurring tasks, tasks for a department */
   manages: boolean;
   /** ADMIN or HR: reads every task in the company for oversight; changing one still needs canEditTask */
   oversees?: boolean;

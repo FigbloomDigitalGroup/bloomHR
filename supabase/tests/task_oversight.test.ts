@@ -61,7 +61,8 @@ beforeAll(async () => {
     grant usage on schema storage to anon, authenticated;
     grant all on storage.objects to anon, authenticated;
   `);
-  for (const f of ['20261019200000_tasks.sql', '20261019500000_task_visibility.sql', '20261019650000_task_oversight.sql']) {
+  for (const f of ['20261019200000_tasks.sql', '20261019500000_task_visibility.sql', '20261019650000_task_oversight.sql',
+    '20261020000000_manage_projects.sql']) {
     await db.exec(migration(f));
     await db.exec('reset search_path');
   }
@@ -88,8 +89,8 @@ beforeAll(async () => {
       ('B-1', 'Bo', 'Other', 'out@b.co', 'Admin', 'Active', '${B}');
     delete from role_permissions where tenant_id = '${A}';
     insert into role_permissions (role_name, permissions, tenant_id) values
-      ('ADMIN', array['task-manager'], '${A}'), ('HR', array['task-manager'], '${A}'),
-      ('MANAGER', array['task-manager'], '${A}'), ('OPERATIONS', array['task-manager'], '${A}'),
+      ('ADMIN', array['task-manager', 'task-projects'], '${A}'), ('HR', array['task-manager', 'task-projects'], '${A}'),
+      ('MANAGER', array['task-manager', 'task-projects'], '${A}'), ('OPERATIONS', array['task-manager', 'task-projects'], '${A}'),
       ('STAFF', array['task-manager'], '${A}');
   `);
   // a project nobody above created (made by the database), led by Lena, with Mo in it

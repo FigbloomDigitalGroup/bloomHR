@@ -14,17 +14,17 @@ const fail = (error: unknown, fallback: string): never => {
   throw new Error((error as { message?: string })?.message || fallback);
 };
 
-/** The signed-in login, their employee number, whether they run tasks and whether they oversee every task (ADMIN/HR). */
-export async function loadTaskViewer(): Promise<TaskViewer> {
+/**
+ * The signed-in login, their employee number and whether they oversee every task (ADMIN/HR). Whether they manage
+ * projects is the "Manage projects" module (task-projects), read with usePermissions like every other module.
+ */
+export async function loadTaskViewer(): Promise<Omit<TaskViewer, 'manages'>> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('You are not signed in');
-  const [num, manages, oversees] = await Promise.all([
-    supabase.rpc('current_employee_number'), supabase.rpc('manages_tasks'), supabase.rpc('oversees_tasks'),
-  ]);
+  const [num, oversees] = await Promise.all([supabase.rpc('current_employee_number'), supabase.rpc('oversees_tasks')]);
   return {
     userId: user.id,
     employeeNumber: (num.data as string | null) || null,
-    manages: manages.data === true,
     oversees: oversees.data === true,
   };
 }
