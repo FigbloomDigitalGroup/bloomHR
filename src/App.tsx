@@ -67,6 +67,7 @@ const BaseReport = lazy(() => import('./components/Reports/BaseReport'));
 const ReportsList = lazy(() => import('./components/Reports/ReportLists'));
 const StaffLoansReport = lazy(() => import('./components/Reports/staffloans'));
 const StatutoryDeductionsReport = lazy(() => import('./components/Reports/statutory'));
+const GroupReport = lazy(() => import('./components/Reports/GroupReport'));
 const AssetManagement = lazy(() => import('./components/Asset/Asset'));
 const QRScanner = lazy(() => import('./components/Asset/scan'));
 const MpesaZapPortal = lazy(() => import('./components/Settings/MpesaZapPortal'));
@@ -1066,6 +1067,7 @@ function App() {
                                 {gate('/tasks', <TaskManager />)}
                                 {gate('/sms', <SMSCenter />)}
                                 {gate('/reports', <ReportsList />)}
+                                {gate('/reports/group', <GroupReport />)}
                                 {gate('/reports/base', <BaseReport
                                   selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange}
                                   reportTitle="Base Report"
