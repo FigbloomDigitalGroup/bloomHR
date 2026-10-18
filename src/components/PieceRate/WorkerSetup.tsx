@@ -68,6 +68,24 @@ export default function WorkerSetup({ people, settings, onChanged }: Props) {
     }
   };
 
+  const toggle = async (patch: Partial<WorkSettings>, done: string) => {
+    try {
+      await saveWorkSettings(patch);
+      toast.success(done);
+      onChanged();
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
+
+  const saveReserve = async (value: string) => {
+    const pct = Number(value);
+    if (!Number.isFinite(pct) || pct < 0 || pct > 50) return;
+    const rate = Math.round(pct * 100) / 10000;
+    if (rate === settings.payout_reserve_rate) return;
+    await toggle({ payout_reserve_rate: rate }, `Payouts now hold back a ${pct}% reserve`);
+  };
+
   const savePastDays = async (value: string) => {
     const days = Number(value);
     if (!Number.isInteger(days) || days < 0 || days > 62 || days === settings.self_work_past_days) return;
@@ -116,6 +134,32 @@ export default function WorkerSetup({ people, settings, onChanged }: Props) {
             className="w-16 rounded-lg border border-border px-2 py-1 text-right"
             onBlur={(e) => void savePastDays(e.target.value)} />
           <span>days back in the staff portal (never a future day). Supervisors and payroll can record older work.</span>
+        </label>
+      </Card>
+
+      <Card padding="sm">
+        <h3 className="m-0 mb-2 text-xs font-bold text-ink">Payouts during the month</h3>
+        <label className="flex flex-wrap items-center gap-2 text-xs text-ink">
+          <span><strong>Hold back a reserve of</strong></span>
+          <input key={settings.payout_reserve_rate} type="number" min={0} max={50} step={0.5} inputMode="decimal"
+            aria-label="Reserve held back from payouts (%)" defaultValue={Math.round(settings.payout_reserve_rate * 10000) / 100}
+            className="w-16 rounded-lg border border-border px-2 py-1 text-right"
+            onBlur={(e) => void saveReserve(e.target.value)} />
+          <span>% of each payout (with AHL), towards the month&apos;s PAYE, NSSF and SHIF. The month-end payroll settles the rest.</span>
+        </label>
+        <label className="mt-2 flex items-start gap-2 text-xs text-ink">
+          <input type="checkbox" className="mt-0.5" checked={settings.payout_needs_second_approver}
+            aria-label="A second person approves payouts"
+            onChange={(e) => void toggle({ payout_needs_second_approver: e.target.checked },
+              e.target.checked ? 'Payouts now need a second person to approve them' : 'Whoever makes a payout can now approve it')} />
+          <span><strong>Someone other than who made a payout approves it</strong> (recommended). Untick if only one person runs payroll.</span>
+        </label>
+        <label className="mt-2 flex items-start gap-2 text-xs text-ink">
+          <input type="checkbox" className="mt-0.5" checked={settings.contractor_reserve}
+            aria-label="Hold back the reserve from contractors"
+            onChange={(e) => void toggle({ contractor_reserve: e.target.checked },
+              e.target.checked ? 'Contractors now have the reserve held back too' : 'Contractors now have only withholding tax taken')} />
+          <span><strong>Hold back the reserve from contractors too.</strong> Off: contractors only have withholding tax taken from each payout.</span>
         </label>
       </Card>
 

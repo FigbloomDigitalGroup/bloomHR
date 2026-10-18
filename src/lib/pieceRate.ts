@@ -124,9 +124,15 @@ export interface WorkSettings {
   payout_reserve_rate: number;
   /** how many days back a worker may record their own work in the staff portal (never a future day) */
   self_work_past_days: number;
+  /** someone other than who made a payout batch approves it (stage 4) */
+  payout_needs_second_approver: boolean;
+  /** contractors have the reserve held back from payouts too */
+  contractor_reserve: boolean;
 }
 
-export const DEFAULT_WORK_SETTINGS: WorkSettings = { supervisor_work_needs_approval: true, payout_reserve_rate: 0.1, self_work_past_days: 7 };
+export const DEFAULT_WORK_SETTINGS: WorkSettings = {
+  supervisor_work_needs_approval: true, payout_reserve_rate: 0.1, self_work_past_days: 7, payout_needs_second_approver: true, contractor_reserve: false,
+};
 
 export const UNIT_SUGGESTIONS = ['kg', 'crate', 'piece', 'row', 'bag', 'tree', 'bunch', 'day', 'hour'];
 

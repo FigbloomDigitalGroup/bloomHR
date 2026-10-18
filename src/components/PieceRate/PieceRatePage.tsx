@@ -11,13 +11,15 @@ import ContractJobs from './ContractJobs';
 import WorkTotals from './WorkTotals';
 import WorkTypes from './WorkTypes';
 import WorkerSetup from './WorkerSetup';
+import Payouts from './Payouts';
 
 // Piece rate and contract jobs (FIG-812 stage 2). Payroll ('work-records' or 'payroll') sets up kinds of work, rates
 // and each worker's pay, records and uploads work, approves it, and runs contract jobs. A supervisor records their
 // team's work for the day, approves their workers' own submissions and gives and approves their jobs. The database
-// decides who may do what (20261014100000, 20261019800000).
+// decides who may do what (20261014100000, 20261019800000). Payroll also pays workers during the month in payout
+// batches, with bank and M-Pesa files (stage 4, 20261020200000).
 
-type Tab = 'entry' | 'approvals' | 'upload' | 'jobs' | 'totals' | 'types' | 'workers';
+type Tab = 'entry' | 'approvals' | 'upload' | 'jobs' | 'totals' | 'payouts' | 'types' | 'workers';
 
 export default function PieceRatePage() {
   const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
@@ -61,6 +63,7 @@ export default function PieceRatePage() {
     ...(canManage ? [{ id: 'upload', label: 'Upload' }] : []),
     { id: 'jobs', label: 'Contract jobs' },
     { id: 'totals', label: 'Totals' },
+    ...(canManage ? [{ id: 'payouts', label: 'Payouts' }] : []),
     ...(canManage ? [{ id: 'types', label: 'Work types' }, { id: 'workers', label: 'Workers' }] : []),
   ];
 
@@ -84,6 +87,7 @@ export default function PieceRatePage() {
       {tab === 'upload' && canManage && <WorkUpload people={people} types={types} />}
       {tab === 'jobs' && <ContractJobs people={people} canManage={canManage} />}
       {tab === 'totals' && <WorkTotals />}
+      {tab === 'payouts' && canManage && <Payouts people={people} settings={settings} />}
       {tab === 'types' && canManage && <WorkTypes types={types} rates={rates} onChanged={() => void reload()} />}
       {tab === 'workers' && canManage && <WorkerSetup people={people} settings={settings} onChanged={() => void reload()} />}
     </div>

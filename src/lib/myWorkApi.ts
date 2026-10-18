@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { currentUserAndTenant, randomFileName } from './privateFiles';
 import type { MyEarnings, MyEntry, MyJob, MyWorkProfile } from './myWork';
+import type { MyPayouts } from './piecePayouts';
 
 // The staff portal's "My work": the signed-in worker's own entries, jobs and earnings (migration 20261020100000). The
 // database only ever returns their own rows here; recording and submitting reuse pieceRateApi (saveDayCells,
@@ -50,6 +51,13 @@ export async function loadMyEarnings(month: string): Promise<MyEarnings> {
   const { data, error } = await supabase.rpc('my_work_earnings', { p_month: month });
   fail(error);
   return data as MyEarnings;
+}
+
+/** What my payouts in a month paid and held back (my_payouts, stage 4): only ever my own. */
+export async function loadMyPayouts(month: string): Promise<MyPayouts> {
+  const { data, error } = await supabase.rpc('my_payouts', { p_month: month });
+  fail(error);
+  return data as MyPayouts;
 }
 
 /** Marks my own open job done, with an optional note and photo or document; the approver is told. */
