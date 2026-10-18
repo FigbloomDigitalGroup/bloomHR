@@ -53,7 +53,7 @@ beforeAll(async () => {
       ('${RECR}', 'recruit@a.co', 'Rita Recruit', 'RECRUITER', '${A}'), ('${STAFF}', 'me@a.co', 'Amina Wanjiru', 'STAFF', '${A}'),
       ('${OTHER}', 'them@a.co', 'Otieno Ouma', 'STAFF', '${A}');
     insert into role_permissions (role_name, permissions, tenant_id) values
-      ('HR', array['leaves', 'employees'], '${A}'), ('RECRUITER', array['recruitment'], '${A}'), ('STAFF', array['dashboard'], '${A}');
+      ('HR', array['leaves', 'employees', 'loans'], '${A}'), ('RECRUITER', array['recruitment'], '${A}'), ('STAFF', array['dashboard'], '${A}');
     insert into employees ("Employee Number", "First Name", "Last Name", "Work Email", tenant_id) values
       ('E-ME', 'Amina', 'Wanjiru', 'me@a.co', '${A}'), ('E-THEM', 'Otieno', 'Ouma', 'them@a.co', '${A}'),
       ('E-HR', 'Hellen', 'Rono', 'hr@a.co', '${A}');

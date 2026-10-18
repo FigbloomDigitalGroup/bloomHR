@@ -13,7 +13,7 @@ const TYPE_B = '00000000-0000-0000-0000-0000000000b1';
 
 const ROLE_MODULES: Record<string, string[]> = {
   STAFF: ['dashboard'],
-  HR: ['employees', 'reports', 'hr-lifecycle', 'leaves'],
+  HR: ['employees', 'reports', 'hr-lifecycle', 'leaves', 'invite-people'],
   MANAGER: ['leaves', 'performance', 'recruitment', 'training', 'asset'],
   SETTINGS: ['settings'],
   PAYROLL: ['payroll'],

@@ -45,7 +45,7 @@ beforeAll(async () => {
   }
   await db.exec(`
     insert into role_permissions (role_name, permissions, tenant_id) values
-      ('HR', array['employees', 'performance'], '${A}'), ('STAFF', array['dashboard'], '${A}'), ('STAFF', array['dashboard'], '${B}');
+      ('HR', array['employees', 'performance', 'kpi-admin'], '${A}'), ('STAFF', array['dashboard'], '${A}'), ('STAFF', array['dashboard'], '${B}');
     insert into employees ("Employee Number", "First Name", "Last Name", "Work Email", "Job Title", "Status", manager_email,
                            "Profile Image", "ID Number", "Basic Salary", "Account Number", tenant_id) values
       ('A-LEAD', 'Lena', 'Lead', 'lead@a.co', 'Team Lead', 'Active', 'lead@a.co', null, '20000001', 90000, 'ACC-L', '${A}'),
