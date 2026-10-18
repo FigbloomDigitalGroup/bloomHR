@@ -3,19 +3,22 @@ import toast from 'react-hot-toast';
 import { Info } from 'lucide-react';
 import { Card, TableScroll } from '../../UI';
 import { formatKsh, longDate } from '../../../lib/casualPay';
-import { loadMyEarnings } from '../../../lib/myWorkApi';
+import { loadMyEarnings, loadMyPayouts } from '../../../lib/myWorkApi';
+import { myPayoutTotals, type MyPayouts } from '../../../lib/piecePayouts';
 import { formatQty } from '../../../lib/pieceRate';
 import { EARNINGS_NOTE, earningsTotals, monthChoices, type MyEarnings as Earnings } from '../../../lib/myWork';
 
 // What I have earned in a month: gross from approved work and approved jobs, with what is still waiting for approval
 // kept apart, by kind of work and by week. Worked out by the database from my own rows (my_work_earnings). Before
-// deductions: payouts (with their holdback) and the month-end payslip show what I take home.
+// deductions: payouts (with their holdback) and the month-end payslip show what I take home. Also what payouts
+// have paid me this month and what they held back (my_payouts, stage 4).
 
 export default function MyEarnings({ today }: { today: string }) {
   const months = useMemo(() => monthChoices(today, 12), [today]);
   const [month, setMonth] = useState(months[0].value);
   const [data, setData] = useState<Earnings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [payouts, setPayouts] = useState<MyPayouts | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -24,12 +27,18 @@ export default function MyEarnings({ today }: { today: string }) {
       .then((d) => live && setData(d))
       .catch((err) => live && toast.error((err as Error).message))
       .finally(() => live && setLoading(false));
+    setPayouts(null);
+    // payouts during the month (stage 4); the earnings still show if this can't be read
+    loadMyPayouts(month)
+      .then((p) => live && setPayouts(p))
+      .catch(() => live && setPayouts(null));
     return () => {
       live = false;
     };
   }, [month]);
 
   const totals = earningsTotals(data);
+  const paidOut = myPayoutTotals(payouts);
   const isThisMonth = month === months[0].value;
 
   return (
@@ -55,6 +64,16 @@ export default function MyEarnings({ today }: { today: string }) {
           <p className="m-0 text-[11.5px] text-muted-foreground">Not counted until your supervisor approves it</p>
         </Card>
       </div>
+
+      <Card padding="sm">
+        <p className="m-0 text-[11.5px] font-semibold uppercase tracking-wide text-muted-foreground">Paid out</p>
+        <p className="m-0 mt-1 text-[22px] font-bold text-ink" aria-label="Paid out">{formatKsh(paidOut.paid)}</p>
+        <p className="m-0 text-[11.5px] text-muted-foreground" aria-label="Held back">
+          {paidOut.count === 0
+            ? 'Nothing paid out yet this month'
+            : `${paidOut.count} ${paidOut.count === 1 ? 'payout' : 'payouts'} · ${formatKsh(paidOut.held)} held back, settled with your month-end pay`}
+        </p>
+      </Card>
 
       <div className="flex items-start gap-2 rounded-tile border border-border bg-white p-3 text-[12px] text-ink">
         <Info className="w-4 h-4 mt-0.5 shrink-0 text-status-info" />

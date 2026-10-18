@@ -84,6 +84,8 @@ export async function loadWorkSettings(): Promise<WorkSettings> {
     supervisor_work_needs_approval: s.supervisor_work_needs_approval ?? DEFAULT_WORK_SETTINGS.supervisor_work_needs_approval,
     payout_reserve_rate: Number(s.payout_reserve_rate ?? DEFAULT_WORK_SETTINGS.payout_reserve_rate),
     self_work_past_days: Number(s.self_work_past_days ?? DEFAULT_WORK_SETTINGS.self_work_past_days),
+    payout_needs_second_approver: s.payout_needs_second_approver ?? DEFAULT_WORK_SETTINGS.payout_needs_second_approver,
+    contractor_reserve: s.contractor_reserve ?? DEFAULT_WORK_SETTINGS.contractor_reserve,
   };
 }
 

@@ -10,6 +10,7 @@ const api = vi.hoisted(() => ({
   loadMyEntries: vi.fn(),
   loadMyJobs: vi.fn(),
   loadMyEarnings: vi.fn(),
+  loadMyPayouts: vi.fn(),
   completeMyJob: vi.fn(),
   saveDayCells: vi.fn(),
   submitEntries: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock('../../../lib/myWorkApi', () => ({
   loadMyEntries: api.loadMyEntries,
   loadMyJobs: api.loadMyJobs,
   loadMyEarnings: api.loadMyEarnings,
+  loadMyPayouts: api.loadMyPayouts,
   completeMyJob: api.completeMyJob,
 }));
 
@@ -74,13 +76,14 @@ const EARNINGS: MyEarnings = {
 const recordProps = { employeeNumber: 'W1', types: TYPES, rates: RATES, today: TODAY, pastDays: 7, closedMonths: [] as string[] };
 
 beforeEach(() => {
-  for (const f of [api.loadMyEntries, api.loadMyJobs, api.loadMyEarnings, api.completeMyJob, api.saveDayCells, api.submitEntries, api.loadWorkTypes, api.loadWorkRates]) f.mockReset();
+  for (const f of [api.loadMyEntries, api.loadMyJobs, api.loadMyEarnings, api.completeMyJob, api.saveDayCells, api.submitEntries, api.loadWorkTypes, api.loadWorkRates, api.loadMyPayouts]) f.mockReset();
   api.entries = [];
   api.jobs = [];
   api.earnings = EARNINGS;
   api.loadMyEntries.mockImplementation(() => Promise.resolve(api.entries));
   api.loadMyJobs.mockImplementation(() => Promise.resolve(api.jobs));
   api.loadMyEarnings.mockImplementation(() => Promise.resolve(api.earnings));
+  api.loadMyPayouts.mockResolvedValue({ pay_period: '2026-10', gross: 0, paid: 0, ahl: 0, reserve: 0, wht: 0, held: 0, payouts: [] });
   api.completeMyJob.mockResolvedValue(undefined);
   api.saveDayCells.mockResolvedValue([]);
   api.submitEntries.mockResolvedValue({ submitted: 1, approved: 0, problem: null });
@@ -222,5 +225,31 @@ describe('earnings', () => {
     fireEvent.change(screen.getByLabelText('Month'), { target: { value: '2026-09-01' } });
     await settle();
     expect(api.loadMyEarnings).toHaveBeenLastCalledWith('2026-09-01');
+  });
+});
+
+describe('paid out', () => {
+  it("what this month's payouts paid me and held back to the month end", async () => {
+    api.loadMyPayouts.mockResolvedValue({
+      pay_period: '2026-10', gross: 2000, paid: 1770, ahl: 30, reserve: 200, wht: 0, held: 230,
+      payouts: [
+        { kind: 'daily', from: '2026-10-12', to: '2026-10-12', approved_at: '2026-10-13T08:00:00Z', gross: 1000, net: 885, held: 115 },
+        { kind: 'daily', from: '2026-10-13', to: '2026-10-13', approved_at: '2026-10-14T08:00:00Z', gross: 1000, net: 885, held: 115 },
+      ],
+    });
+    render(<MyEarningsView today={TODAY} />);
+    await settle();
+    expect(api.loadMyPayouts).toHaveBeenCalledWith('2026-10-01');
+    expect(screen.getByLabelText('Paid out').textContent).toBe('KSh 1,770');
+    expect(screen.getByLabelText('Held back').textContent).toBe('2 payouts · KSh 230 held back, settled with your month-end pay');
+  });
+
+  it('nothing paid out yet, and the earnings still show if payouts cannot be read', async () => {
+    api.loadMyPayouts.mockRejectedValue(new Error('offline'));
+    render(<MyEarningsView today={TODAY} />);
+    await settle();
+    expect(screen.getByLabelText('Paid out').textContent).toBe('KSh 0');
+    expect(screen.getByLabelText('Held back').textContent).toBe('Nothing paid out yet this month');
+    expect(screen.getByLabelText('Approved gross').textContent).toBe('KSh 16,200');
   });
 });
