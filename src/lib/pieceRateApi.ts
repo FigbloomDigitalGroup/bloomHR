@@ -83,6 +83,7 @@ export async function loadWorkSettings(): Promise<WorkSettings> {
   return {
     supervisor_work_needs_approval: s.supervisor_work_needs_approval ?? DEFAULT_WORK_SETTINGS.supervisor_work_needs_approval,
     payout_reserve_rate: Number(s.payout_reserve_rate ?? DEFAULT_WORK_SETTINGS.payout_reserve_rate),
+    self_work_past_days: Number(s.self_work_past_days ?? DEFAULT_WORK_SETTINGS.self_work_past_days),
   };
 }
 
@@ -212,7 +213,7 @@ export async function loadImports(): Promise<WorkImport[]> {
 export async function loadJobs(): Promise<ContractJob[]> {
   const { data, error } = await supabase
     .from('contract_jobs')
-    .select('id, employee_number, title, description, amount, start_date, due_date, status, completed_at, completion_notes, sent_back_reason, approved_at, paid_out_at, created_at')
+    .select('id, employee_number, title, description, amount, start_date, due_date, status, completed_at, completion_notes, completion_file, completion_file_name, sent_back_reason, approved_at, paid_out_at, created_at')
     .order('created_at', { ascending: false })
     .limit(2000);
   fail(error);

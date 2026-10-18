@@ -68,6 +68,18 @@ export default function WorkerSetup({ people, settings, onChanged }: Props) {
     }
   };
 
+  const savePastDays = async (value: string) => {
+    const days = Number(value);
+    if (!Number.isInteger(days) || days < 0 || days > 62 || days === settings.self_work_past_days) return;
+    try {
+      await saveWorkSettings({ self_work_past_days: days });
+      toast.success(days === 0 ? 'Workers can record their own work for today only' : `Workers can record their own work up to ${days} days back`);
+      onChanged();
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
+
   return (
     <div className="space-y-3">
       <Card padding="sm">
@@ -96,6 +108,14 @@ export default function WorkerSetup({ people, settings, onChanged }: Props) {
             <strong>Work a supervisor submits waits for payroll&apos;s approval</strong> (recommended, as for casual days). Untick to
             count it as soon as the supervisor submits it. Workers&apos; own submissions always wait for their supervisor.
           </span>
+        </label>
+        <label className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink">
+          <span><strong>Workers can record their own work up to</strong></span>
+          <input key={settings.self_work_past_days} type="number" min={0} max={62} inputMode="numeric"
+            aria-label="Days back workers can record their own work" defaultValue={settings.self_work_past_days}
+            className="w-16 rounded-lg border border-border px-2 py-1 text-right"
+            onBlur={(e) => void savePastDays(e.target.value)} />
+          <span>days back in the staff portal (never a future day). Supervisors and payroll can record older work.</span>
         </label>
       </Card>
 

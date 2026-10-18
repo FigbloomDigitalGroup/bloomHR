@@ -24,7 +24,8 @@ import {
   Target as PhTarget,
   UsersThree as PhUsersThree,
   Buildings as PhBuildings,
-  Kanban as PhKanban
+  Kanban as PhKanban,
+  Plant as PhPlant
 } from '@phosphor-icons/react';
 
 // Keep Lucide icons for UI elements only
@@ -89,6 +90,8 @@ import AdvanceRequest from '../SalaryAdvance/AdvanceRequest';
 import LoanRequest from '../Loans/LoanRequest';
 import { useBackToClose } from '../../hooks/useBackToClose';
 import { useStaffPortalTab } from './useStaffPortalTab';
+import MyWork from '../PieceRate/staff/MyWork';
+import { useMyWorkProfile } from '../PieceRate/staff/useMyWorkProfile';
 
 interface CompanyProfile {
   image_url: string | null;
@@ -1049,6 +1052,8 @@ const staffMenuGroups: MenuGroup[] = [
 
 // Shown only to someone who supervises at least one person (migration 20261018900000)
 const myTeamGroup: MenuGroup = { title: 'My team', items: [{ id: 'my-team', label: 'My team', icon: PhUsersThree }] };
+// Shown only to someone paid by work or given contract jobs (FIG-812, migration 20261020100000)
+const myWorkGroup: MenuGroup = { title: 'My work', items: [{ id: 'my-work', label: 'My work', icon: PhPlant }] };
 
 // Main StaffPortal Component with Time Tracking
 const StaffPortal = () => {
@@ -1118,7 +1123,10 @@ const StaffPortal = () => {
   useEffect(() => {
     loadMyTeam().then(setTeam).catch((e) => console.error('Could not load your team:', e));
   }, []);
-  const menuGroups = team.length > 0 ? [staffMenuGroups[0], myTeamGroup, ...staffMenuGroups.slice(1)] : staffMenuGroups;
+  const myWork = useMyWorkProfile();
+  const showMyWork = !!myWork?.qualifies;
+  const extraGroups = [...(showMyWork ? [myWorkGroup] : []), ...(team.length > 0 ? [myTeamGroup] : [])];
+  const menuGroups = [staffMenuGroups[0], ...extraGroups, ...staffMenuGroups.slice(1)];
 
   const fetchCompanyProfile = async () => {
     try {
@@ -1757,7 +1765,8 @@ const StaffPortal = () => {
                 </div>
               )}
               {/* Render Active Tab */}
-              {activeTab === 'home' && <StaffHome setActiveTab={setActiveTab} userName={userName} onOpenTask={openTask} />}
+              {activeTab === 'home' && <StaffHome setActiveTab={setActiveTab} userName={userName} onOpenTask={openTask} showMyWork={showMyWork} />}
+              {activeTab === 'my-work' && myWork?.qualifies && <MyWork profile={myWork} />}
               {activeTab === 'salary-advance' && <AdvanceRequest />}
               {activeTab === 'onboarding' && <OnboardingForm />}
               {activeTab === 'first-weeks' && <MyFirstWeeks onOpenTraining={() => setActiveTab('training')} />}

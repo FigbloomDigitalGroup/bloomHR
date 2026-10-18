@@ -87,7 +87,7 @@ export const STATUS_TONES: Record<TaskStatus, StatusTone> = {
 /** The last day of "this week" (today plus 6). */
 export const weekEnd = (today: Date = new Date()) => addDays(startOfDay(today), WEEK_DAYS);
 
-export type QuickLinkIcon = 'leave' | 'payslips' | 'tasks' | 'calendar' | 'chat' | 'profile' | 'advance' | 'loans';
+export type QuickLinkIcon = 'leave' | 'payslips' | 'tasks' | 'calendar' | 'chat' | 'profile' | 'advance' | 'loans' | 'work';
 
 export interface QuickLink {
   /** the staff portal section it opens (setActiveTab) */
@@ -112,6 +112,9 @@ export const QUICK_LINKS: QuickLink[] = [
   { tab: 'salary-advance', label: 'Salary advance', icon: 'advance', module: 'salaryadmin' },
   { tab: 'loan', label: 'Loans', icon: 'loans', module: 'loans' },
 ];
+
+/** Shown first for someone paid by work or given contract jobs (FIG-812). */
+export const MY_WORK_LINK: QuickLink = { tab: 'my-work', label: 'My work', icon: 'work' };
 
 export function quickLinks(hidden: (moduleId?: string | null) => boolean = isHiddenModule): QuickLink[] {
   return QUICK_LINKS.filter((l) => !l.module || !hidden(l.module));
