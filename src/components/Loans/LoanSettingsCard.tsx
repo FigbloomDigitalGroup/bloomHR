@@ -73,8 +73,8 @@ const productError = (p: ProductForm): string | null => {
 
 /** `canEdit` defaults to who the database lets change them: HR, admins and payroll users. */
 export default function LoanSettingsCard({ canEdit: canEditProp, className = '' }: { canEdit?: boolean; className?: string }) {
-  const { userRole, hasPermission, loading: permissionsLoading } = usePermissions();
-  const canEdit = canEditProp ?? (!permissionsLoading && (userRole === 'ADMIN' || userRole === 'HR' || hasPermission('payroll')));
+  const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
+  const canEdit = canEditProp ?? (!permissionsLoading && hasAnyPermission(['loans', 'payroll']));
   const [saved, setSaved] = useState<LoanSettings | null>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [products, setProducts] = useState<LoanProduct[]>([]);

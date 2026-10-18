@@ -17,6 +17,8 @@ import {
 } from '../../lib/inviteQueue';
 import toast from 'react-hot-toast';
 import FigbloomLoader from '../UI/FigbloomLoader';
+import CompanyRolePicker, { RolePick, STAFF_PICK } from '../UI/CompanyRolePicker';
+import ModuleGate from '../ProtectedRoutes/ModuleGate';
 
 type Employee = {
   "Account Number": string | null
@@ -242,6 +244,8 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
     regional_manager: ''
   });
   const [isUploading, setIsUploading] = useState(false);
+  // the role new people are invited with (one of the company's roles; staff unless picked)
+  const [inviteAs, setInviteAs] = useState<RolePick>(STAFF_PICK);
   const [bulkUploadPreview, setBulkUploadPreview] = useState<BulkUploadPreview | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({
@@ -531,7 +535,7 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
           regional_manager: ''
         });
         // the invitation also starts their onboarding (they fill in their own details)
-        const invite = await inviteToOnboard(String(data[0].id), data[0]["Work Email"]);
+        const invite = await inviteToOnboard(String(data[0].id), data[0]["Work Email"], inviteAs);
         if (invite.status === 'sent') toast.success(`Employee added. Invitation to join sent to ${invite.email}.`);
         else if (invite.status === 'member') toast.success(`Employee added. ${invite.email} already has access to this company.`);
         else toast.error(`Employee added, but the invitation was not sent: ${invite.reason} Send it again from Invite people.`, { duration: 8000 });
@@ -778,7 +782,7 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
       // everyone who was added gets a link to join the company (sent in the background), and is now onboarding
       if (createdEmails.length) {
         setInviteProgress(null);
-        const queued = await queueInvitations(createdEmails.map((email) => ({ email, role: 'STAFF' })));
+        const queued = await queueInvitations(createdEmails.map((email) => ({ email, role: inviteAs.role, companyRoleId: inviteAs.companyRoleId })));
         rememberInviteBatch(queued.batchId);
         setInviteBatch({ id: queued.batchId, rejected: queued.rejected });
         const rejected = new Set(queued.rejected.map((r) => r.email));
@@ -1095,6 +1099,9 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
               className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
               <Download className="w-4 h-4" /> Download template
             </button>
+            <ModuleGate anyOf={['invite-people']}>
+              <CompanyRolePicker id="bulk-invite-role-guide" label="Invite new people as" value={inviteAs} onChange={setInviteAs} disabled={isUploading} className="min-w-[180px]" />
+            </ModuleGate>
             <label className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 cursor-pointer">
               <Upload className="w-4 h-4" /> Upload spreadsheet
               <input type="file" accept=".xlsx, .xls, .csv" onChange={handleBulkUpload} className="hidden" disabled={isUploading} />
@@ -1179,6 +1186,9 @@ const EmployeeDataTable: React.FC<TownProps> = ({ selectedTown }) => {
             </button>
 
             {/* Upload/Download Buttons */}
+            <ModuleGate anyOf={['invite-people']}>
+              <CompanyRolePicker id="bulk-invite-role" label="Invite new people as" value={inviteAs} onChange={setInviteAs} disabled={isUploading} className="min-w-[180px]" />
+            </ModuleGate>
             <label className="flex items-center gap-2 px-3 py-2 text-xs bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors cursor-pointer">
               <Upload className="w-3 h-3" />
               Bulk Upload

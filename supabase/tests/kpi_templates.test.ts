@@ -95,7 +95,7 @@ beforeAll(async () => {
   }
   await db.exec(`
     insert into role_permissions (role_name, permissions, tenant_id) values
-      ('HR', array['employees'], '${A}'), ('MANAGER', array['performance'], '${A}'), ('STAFF', array['dashboard'], '${A}'),
+      ('HR', array['employees', 'kpi-admin'], '${A}'), ('MANAGER', array['performance'], '${A}'), ('STAFF', array['dashboard'], '${A}'),
       ('CLERK', array['employees'], '${A}');
   `);
   salesDept = (await one<{ id: string }>(`insert into departments (tenant_id, name) values ('${A}', 'Sales') returning id`)).id;

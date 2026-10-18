@@ -47,8 +47,12 @@ export async function sendInvitation(address: string | null | undefined, role: s
   }
 }
 
-/** Invites a new employee to join as staff and emails them the link. Never throws: the outcome says what happened. */
-export const inviteEmployee = (workEmail: string | null | undefined) => sendInvitation(workEmail, 'STAFF');
+/**
+ * Invites a new employee to join, as staff unless another role is picked (one of the company's roles), and emails them
+ * the link. Never throws: the outcome says what happened.
+ */
+export const inviteEmployee = (workEmail: string | null | undefined, role = 'STAFF', companyRoleId: string | null = null) =>
+  sendInvitation(workEmail, role, companyRoleId);
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 

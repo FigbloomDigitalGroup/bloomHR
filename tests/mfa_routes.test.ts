@@ -17,6 +17,9 @@ const state = vi.hoisted(() => ({
   authUsers: [] as { id: string; email: string }[],
   profiles: [] as Record<string, unknown>[],
   mfaNumbers: [] as Record<string, unknown>[],
+  // modules per role (role_permissions) and the company's own roles: "privileged" goes by modules
+  rolePermissions: [] as Record<string, unknown>[],
+  companyRoles: [] as Record<string, unknown>[],
   tenants: [{ id: 'tenant-a', name: 'Acme Ltd' }] as Record<string, unknown>[],
   policy: { mode: 'privileged', method: 'email' },
   // people's own setting (personal_two_step), by user id
@@ -71,6 +74,8 @@ vi.mock('@supabase/supabase-js', () => {
       if (name === 'mfa_numbers') return table(() => state.mfaNumbers);
       if (name === 'mfa_codes') return table(() => state.codes);
       if (name === 'tenants') return table(() => state.tenants);
+      if (name === 'role_permissions') return table(() => state.rolePermissions);
+      if (name === 'company_roles') return table(() => state.companyRoles);
       throw new Error(`unexpected table ${name}`);
     },
     rpc: async (fn: string, a: Record<string, any>) => {
@@ -181,6 +186,11 @@ beforeEach(() => {
     { user_id: STAFF, role: 'STAFF', account_status: 'ACTIVE', tenant_id: TENANT },
   ];
   state.mfaNumbers = [];
+  state.rolePermissions = [
+    { tenant_id: TENANT, role_name: 'HR', permissions: ['dashboard', 'invite-people'] },
+    { tenant_id: TENANT, role_name: 'STAFF', permissions: ['dashboard', 'task-manager', 'teams'] },
+  ];
+  state.companyRoles = [];
   state.policy = { mode: 'privileged', method: 'email' };
   state.personal = {};
   state.codes = [];
@@ -251,6 +261,22 @@ describe('POST /send', () => {
     expect((await post('/send', jwt(ADMIN, 's1'))).status).toBe(409);
     state.policy = { mode: 'everyone', method: 'email' };
     expect((await post('/send', jwt(STAFF, 's1'))).status).toBe(200);
+  });
+
+  it('"privileged" goes by modules, not role names', async () => {
+    // a MANAGER-based company role with payroll is asked
+    const cr = '55555555-5555-4555-8555-555555555555';
+    const lead = `lead-${n}`;
+    state.authUsers.push({ id: lead, email: `lead${n}@acme.co` });
+    state.profiles.push({ user_id: lead, role: 'MANAGER', company_role_id: cr, account_status: 'ACTIVE', tenant_id: TENANT });
+    state.companyRoles.push({ id: cr, tenant_id: TENANT, role_key: `CR_${cr.replace(/-/g, '')}`, name: 'Payroll lead', base_role: 'MANAGER', is_system: false, active: true });
+    state.rolePermissions.push({ tenant_id: TENANT, role_name: `CR_${cr.replace(/-/g, '')}`, permissions: ['dashboard', 'payroll'] });
+    expect((await post('/send', jwt(lead, 's1'))).status).toBe(200);
+    // HR whose role lost "Invite people" (and holds no other privileged module) is not
+    state.rolePermissions[0].permissions = ['dashboard'];
+    const res = await post('/send', jwt(OTHER, 's1'));
+    expect(res.status).toBe(409);
+    expect((await res.json()).reason).toBe('not_required');
   });
 
   it('sends a code to someone who turned it on for themselves, by the way they chose', async () => {

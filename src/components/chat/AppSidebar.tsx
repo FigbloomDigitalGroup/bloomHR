@@ -32,7 +32,7 @@ interface AppSidebarProps {
   onDMCreate: (userId: string) => void;
   currentUser: User | null;
   users: User[];
-  /** Only administrators, HR and managers create channels; for everyone else the "+" is not shown. */
+  /** Only people whose role has Create chat channels start channels; for everyone else the "+" is not shown. */
   canCreateChannels?: boolean;
 }
 

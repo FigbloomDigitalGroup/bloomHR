@@ -35,7 +35,8 @@ beforeAll(async () => {
     insert into user_profiles (user_id, email, role, tenant_id) values
       ('${ADMIN}', 'admin@a.co', 'ADMIN', '${A}'), ('${HR}', 'hr@a.co', 'HR', '${A}'), ('${MANAGER}', 'mgr@a.co', 'MANAGER', '${A}'),
       ('${STAFF}', 'staff@a.co', 'STAFF', '${A}'), ('${CHECKER}', 'chk@a.co', 'CHECKER', '${A}');
-    insert into role_permissions (role_name, permissions, tenant_id) values ('STAFF', array['dashboard'], '${A}');
+    insert into role_permissions (role_name, permissions, tenant_id) values ('STAFF', array['dashboard'], '${A}'),
+      ('HR', array['chat-channels'], '${A}'), ('MANAGER', array['chat-channels'], '${A}');
   `);
 }, 120000);
 

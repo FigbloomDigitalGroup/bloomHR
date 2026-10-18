@@ -1,17 +1,14 @@
 // authz.js - permission and rate-limit helpers shared by the backend routes that need the signed-in caller
 // (sms_routes.js, email_routes.js). admin_routes.js verifies who is calling; this decides what they may do.
-import { admin, callerModules } from "./admin_routes.js";
+import { admin } from "./admin_routes.js";
 
 /**
- * Does the caller's role include one of these modules (the same permissions the app uses to show or hide screens,
- * edited under Role & Permissions)? ADMIN always does. A company's own role (FIG-827) gives its own modules.
- * Scoped to the caller's own tenant.
+ * callerHasModule(caller, modules): does the caller's role include one of these modules (the same permissions the app
+ * uses to show or hide screens, edited under Role & Permissions)? The administrator (base role ADMIN) always does; a
+ * company's own role (FIG-827) gives its own modules. Defined next to authenticate() in admin_routes.js, whose own
+ * routes use it too (importing it from here would be a circular import), and shared from here.
  */
-export async function callerHasModule(caller, modules) {
-  if (caller.role === "ADMIN") return true;
-  const granted = await callerModules(caller);
-  return modules.some((m) => granted.includes(m));
-}
+export { callerHasModule } from "./admin_routes.js";
 
 /**
  * A budget over a sliding window counted in the database (take_rate_limit(), migration 20261014500100), so every

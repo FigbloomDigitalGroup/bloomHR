@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useUser } from '../ProtectedRoutes/UserContext';
+import { usePermissions } from '../../hooks/usePermissions';
+import CompanyRolePicker, { RolePick, STAFF_PICK } from '../UI/CompanyRolePicker';
 import { X, Plus, ArrowLeft, User, Briefcase, Phone, CreditCard, MapPin, AlertCircle, Users, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
@@ -82,9 +83,13 @@ const nssfRegex = /^[0-9]{9}$/;
 
 const AddEmployeePage = () => {
   const navigate = useNavigate();
-  const { user } = useUser();
-  const isAdmin = user?.role === 'ADMIN';
-  const isHR = user?.role === 'HR';
+  // by the modules of the person's role (FIG-827): HR administration shows the salary section, and the basic salary
+  // needs Payroll as well (as before: administrators only, by default)
+  const { hasPermission } = usePermissions();
+  const seesSalarySection = hasPermission('hr-admin');
+  const setsBasicSalary = hasPermission('hr-admin') && hasPermission('payroll');
+  // the role their invitation gives (staff unless picked); only someone who may invite people picks it
+  const [inviteAs, setInviteAs] = useState<RolePick>(STAFF_PICK);
   // the company's own numbers are typed in; otherwise the system gives the next one when saved
   const { numbering, ownNumbers } = useEmployeeNumbering();
   // the company's job groups (null when this person may not see them: the free-text "Job Group" stays)
@@ -522,7 +527,7 @@ const AddEmployeePage = () => {
 
       // email them a link to join the company and fill in their onboarding; the employee is saved either way, and the
       // next page says how it went
-      const invite = await inviteToOnboard(String(employeeData[0].id), newEmployee['Work Email']);
+      const invite = await inviteToOnboard(String(employeeData[0].id), newEmployee['Work Email'], inviteAs);
 
       navigate('/employee-added', {
         state: {
@@ -951,6 +956,14 @@ const AddEmployeePage = () => {
                     required
                   />
                 </div>
+                {hasPermission('invite-people') && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                    <div>
+                      <CompanyRolePicker id="new-employee-role" label="Invite them to the app as" value={inviteAs} onChange={setInviteAs} />
+                      <p className="mt-1 text-[11px] text-muted-foreground">The invitation to join goes to their work email. Only the roles you may give are listed.</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                   <div>
@@ -1176,7 +1189,7 @@ const AddEmployeePage = () => {
                   </div>
                 </div>
 
-                {(isAdmin || isHR) && (
+                {seesSalarySection && (
                   <div>
                     <SectionHeader
                       title="Salary Information"
@@ -1200,7 +1213,7 @@ const AddEmployeePage = () => {
                           options={dropdownOptions.jobGroup}
                         />
                       )}
-                      {isAdmin && (
+                      {setsBasicSalary && (
                         <FormField
                           label="Basic Salary"
                           name="Basic Salary"

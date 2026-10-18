@@ -17,7 +17,7 @@ import { loadMutedChats, setChatMuted } from "../../lib/notificationPreferences"
 
 /** `onMessagesRead` tells the staff portal a conversation was read (opened, or a message arrived in it while open). */
 export function ChatLayout({ onMessagesRead }: { onMessagesRead?: (channelId: string) => void } = {}) {
-  const { userRole } = usePermissions();
+  const { hasPermission } = usePermissions();
   const onlinePeople = useOnlinePeople();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -337,7 +337,7 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: (channelId: st
       console.error('❌ Error creating channel:', error);
       toast.error(
         /row-level security/i.test(error?.message || '')
-          ? 'Only administrators, HR and managers can create channels.'
+          ? 'Your role cannot create channels.'
           : error?.message || 'Failed to create channel'
       );
       throw error;
@@ -576,7 +576,8 @@ const handleDMCreate = async (userId: string) => {
     employees: liveEmployees,
     currentEmail: currentUser.email,
     onMessage: handleDMCreate,
-    canViewRecords: !!userRole && String(userRole).toUpperCase() !== 'STAFF',
+    // opening someone's employee record is the Employees module (every role but Staff by default)
+    canViewRecords: hasPermission('employees'),
   };
 
   return (
@@ -589,7 +590,7 @@ const handleDMCreate = async (userId: string) => {
           activeChannel={liveActiveChannel}
           onChannelSelect={handleChannelSelect}
           onChannelCreate={handleChannelCreate}
-          canCreateChannels={canCreateChannels(userRole)}
+          canCreateChannels={canCreateChannels(hasPermission)}
           onDMCreate={handleDMCreate}
           currentUser={getSafeUserData()}
           users={getUsersForSidebar()}

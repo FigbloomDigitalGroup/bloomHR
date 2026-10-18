@@ -88,7 +88,7 @@ beforeAll(async () => {
     delete from role_permissions where tenant_id = '${A}';
     insert into role_permissions (role_name, permissions, tenant_id) values
       -- "Manage projects" (task-projects, 20261020000000) is what lets HR and the manager run projects
-      ('HR', array['employees', 'task-manager', 'task-projects'], '${A}'),
+      ('HR', array['employees', 'task-manager', 'task-projects', 'task-oversight'], '${A}'),
       ('MANAGER', array['dashboard', 'task-manager', 'task-projects'], '${A}'),
       -- every default STAFF role has the Task Manager module: it must not mean "sees every task"
       ('STAFF', array['dashboard', 'task-manager'], '${A}');

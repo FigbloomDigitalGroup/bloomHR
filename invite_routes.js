@@ -9,7 +9,7 @@ import express from "express";
 import crypto from "node:crypto";
 import dotenv from "dotenv";
 import { Resend } from "resend";
-import { authenticate, HttpError, admin, loadCompanyRole } from "./admin_routes.js";
+import { authenticate, HttpError, admin, loadCompanyRole, callerModules, roleModules } from "./admin_routes.js";
 import { callerHasModule } from "./authz.js";
 
 dotenv.config({ path: process.env.ENV_FILE || ".env" });
@@ -71,13 +71,13 @@ export function invitationEmail({ company, role, inviter, link, expires }) {
   return { subject, html, text };
 }
 
-// POST /api/invites/send  { token }  -> emails the invitation that token belongs to (ADMIN, HR)
+// POST /api/invites/send  { token }  -> emails the invitation that token belongs to ("Invite people")
 router.post("/send", async (req, res) => {
   try {
     if (!admin) throw new HttpError(500, "Admin API is not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
     const caller = await authenticate(req);
-    // whoever may invite: administrators and the "Invite people" module (HR keeps sending what it could create)
-    if (!["ADMIN", "HR"].includes(caller.role) && !(await callerHasModule(caller, ["invite-people"]))) throw new HttpError(403, "Forbidden");
+    // whoever may invite: the administrator and roles with the "Invite people" module (can_invite_people())
+    if (!(await callerHasModule(caller, ["invite-people"]))) throw new HttpError(403, "Forbidden");
 
     const token = req.body?.token;
     if (typeof token !== "string" || token.length < 20 || token.length > 200) throw new HttpError(400, "A valid invitation token is required");
@@ -92,8 +92,16 @@ router.post("/send", async (req, res) => {
     if (!invitation || invitation.status !== "pending" || new Date(invitation.expires_at) < new Date()) {
       throw new HttpError(404, "This invitation is not valid any more");
     }
-    // the database already limits HR to inviting staff; keep that true here too
-    if (caller.role !== "ADMIN" && invitation.role !== "STAFF") throw new HttpError(403, "Only an administrator can send this invitation");
+    // the database already checked the role when the invitation was made (user_may_grant()); keep that true here too:
+    // the administrator sends any, others only roles based on STAFF whose modules they hold themselves
+    if (caller.role !== "ADMIN") {
+      if (invitation.role !== "STAFF") throw new HttpError(403, "Only an administrator can send this invitation");
+      const custom = invitation.company_role_id ? await loadCompanyRole(caller.tenantId, invitation.company_role_id) : null;
+      if (custom && !custom.is_system) {
+        const [theirs, mine] = await Promise.all([roleModules(caller.tenantId, invitation.role, custom.id), callerModules(caller)]);
+        if (!theirs.every((m) => mine.includes(m))) throw new HttpError(403, "You cannot give a role access you do not have yourself");
+      }
+    }
 
     if (!process.env.RESEND_API_KEY) throw new HttpError(503, "Email is not set up yet (RESEND_API_KEY)");
 

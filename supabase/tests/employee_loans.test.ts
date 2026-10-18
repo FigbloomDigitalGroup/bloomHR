@@ -45,8 +45,8 @@ beforeAll(async () => {
       ('${HR}', 'hr@a.co', 'HR', '${A}'), ('${PAY}', 'pay@a.co', 'FINANCE', '${A}'), ('${S1}', 's1@a.co', 'STAFF', '${A}'),
       ('${S2}', 's2@a.co', 'STAFF', '${A}'), ('${MGR}', 'mgr@a.co', 'MANAGER', '${A}'), ('${HRB}', 'hr@b.co', 'HR', '${B}');
     insert into role_permissions (role_name, permissions, tenant_id) values
-      ('HR', array['employees'], '${A}'), ('FINANCE', array['payroll'], '${A}'), ('STAFF', array['dashboard'], '${A}'),
-      ('MANAGER', array['salaryadmin', 'employees'], '${A}'), ('HR', array['employees'], '${B}');
+      ('HR', array['employees', 'loans'], '${A}'), ('FINANCE', array['payroll'], '${A}'), ('STAFF', array['dashboard'], '${A}'),
+      ('MANAGER', array['salaryadmin', 'employees'], '${A}'), ('HR', array['employees', 'loans'], '${B}');
     insert into employees ("Employee Number", "First Name", "Last Name", "Work Email", "Basic Salary", onboarding_status, tenant_id) values
       ('H1', 'Hana', 'Hr', 'hr@a.co', 100000, 'approved', '${A}'),
       ('E1', 'Esther', 'One', 's1@a.co', 60000, 'approved', '${A}'),

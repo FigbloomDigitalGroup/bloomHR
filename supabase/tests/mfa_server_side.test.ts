@@ -40,7 +40,10 @@ const check = (user: string, session: string, hash: string) =>
 
 beforeAll(async () => {
   db = await bootLiveDb();
-  await db.exec(`insert into tenants (id, name, slug) values ('${B}', 'Other Co', 'other-co');`);
+  // "admins, HR and payroll" follows the modules: HR invites people, a checker runs payroll (as the default roles)
+  await db.exec(`insert into tenants (id, name, slug) values ('${B}', 'Other Co', 'other-co');
+    insert into role_permissions (role_name, permissions, tenant_id) values
+      ('HR', array['invite-people'], '${A}'), ('CHECKER', array['payroll'], '${A}'), ('STAFF', array['dashboard'], '${A}');`);
   for (const [id, role, t] of [[ADMIN, 'ADMIN', A], [HR, 'HR', A], [CHECKER, 'CHECKER', A], [STAFF, 'STAFF', A], [ADMIN_B, 'ADMIN', B]]) {
     await db.exec(`
       insert into auth.users (id, email) values ('${id}', '${role.toLowerCase()}-${id.slice(-4)}@x.co');

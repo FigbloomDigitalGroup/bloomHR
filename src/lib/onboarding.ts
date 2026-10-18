@@ -223,8 +223,12 @@ export async function startOnboarding(employeeId: string) {
  * Emails the invitation to the employee's work email and marks the record invited. Never throws: the outcome says
  * what happened (an invitation that was made but not emailed still counts, the link can be sent by hand).
  */
-export async function inviteToOnboard(employeeId: string, workEmail: string | null | undefined): Promise<InviteOutcome> {
-  const outcome = await inviteEmployee(workEmail);
+export async function inviteToOnboard(
+  employeeId: string,
+  workEmail: string | null | undefined,
+  as: { role: string; companyRoleId: string | null } = { role: 'STAFF', companyRoleId: null }
+): Promise<InviteOutcome> {
+  const outcome = await inviteEmployee(workEmail, as.role, as.companyRoleId);
   if (outcome.status === 'failed') return outcome;
   try {
     await startOnboarding(employeeId);

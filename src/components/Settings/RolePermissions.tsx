@@ -14,7 +14,10 @@ import {
     ChevronDown,
     Info,
     Plus,
-    Lock
+    Lock,
+    CalendarRange,
+    Target,
+    Eye
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
@@ -34,6 +37,8 @@ import {
 } from '../../lib/roles';
 
 import { confirmDialog } from '../../lib/confirmDialog';
+import { MODULE_AREAS, moduleInfo } from '../../lib/modules';
+import { screensFor, usesStaffPortal } from '../../lib/routeModules';
 interface Permission {
     id: string;
     module_name: string;
@@ -45,19 +50,27 @@ interface Permission {
 const CATEGORY_ICONS: Record<string, any> = {
     'overview': LayoutDashboard,
     'workspace': Building2,
-    'people-hr': Users,
-    'finance': Wallet,
+    'people': Users,
+    'time': CalendarRange,
+    'performance': Target,
+    'pay': Wallet,
     'system': Settings,
     'default': Briefcase
 };
 
-const PERMISSION_CATEGORIES = [
-    { id: 'overview', name: 'Overview' },
-    { id: 'workspace', name: 'Workspace' },
-    { id: 'people-hr', name: 'People & HR' },
-    { id: 'finance', name: 'Finance & Assets' },
-    { id: 'system', name: 'System' },
+// the modules grouped by area (src/lib/modules.ts); a module the app does not know yet goes under "Other"
+const PERMISSION_CATEGORIES: { id: string; name: string; explain?: string }[] = [
+    ...MODULE_AREAS,
+    { id: 'other', name: 'Other' },
 ];
+const areaOf = (moduleId: string) => moduleInfo(moduleId)?.area ?? 'other';
+const explainOf = (p: { module_id: string; description: string }) => moduleInfo(p.module_id)?.explain ?? p.description;
+
+/** Where people with this base role work: Staff use the staff portal, every other role the admin app. */
+export const workspaceOf = (base: string) =>
+    usesStaffPortal(base)
+        ? { label: 'Staff portal', explain: 'People with this role use the staff portal, never the admin app. Ticked modules that work in the portal (Manage projects, See every task, Teams) show up there.' }
+        : { label: 'Admin app', explain: 'People with this role use the admin app; the menu shows the screens their ticked modules open.' };
 
 const inputClass =
     'w-full rounded-tile border border-border bg-white px-3 py-2 text-xs text-ink outline-none focus:border-brand';
@@ -335,8 +348,8 @@ export default function RolePermissions() {
 
     const filteredPermissions = permissions.filter(p => {
         const matchesSearch = p.module_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            p.description.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
+            explainOf(p).toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory = selectedCategory === 'all' || areaOf(p.module_id) === selectedCategory;
         return matchesSearch && matchesCategory;
     });
 
@@ -344,7 +357,7 @@ export default function RolePermissions() {
     const people = holders[selectedRole] ?? 0;
 
     const getPermissionsByCategory = (category: string) => {
-        return filteredPermissions.filter(p => p.category === category);
+        return filteredPermissions.filter(p => areaOf(p.module_id) === category);
     };
 
     const selectClass =
@@ -564,6 +577,8 @@ export default function RolePermissions() {
                         </label>
                     </div>
 
+                    {current && <RoleSummary role={current} modules={currentRolePermissions} />}
+
                     {current?.base_role === 'ADMIN' && (
                         <div className="flex items-start gap-2 p-3 mb-3.5 bg-status-info-tint rounded-xl text-xs text-status-info">
                             <Info className="w-4 h-4 shrink-0 mt-px" />
@@ -594,6 +609,7 @@ export default function RolePermissions() {
                                             <div className="flex items-center gap-2">
                                                 <Icon className="w-[15px] h-[15px] text-muted-foreground" strokeWidth={1.8} />
                                                 <h3 className="m-0 text-[13px] font-bold text-ink">{category.name}</h3>
+                                                {category.explain && <span className="hidden sm:inline text-[11px] text-muted-foreground">{category.explain}</span>}
                                             </div>
                                             <span className="text-[11px] text-muted-foreground">
                                                 {categoryPerms.filter(p => currentRolePermissions.includes(p.module_id)).length} / {categoryPerms.length} Active
@@ -627,7 +643,12 @@ export default function RolePermissions() {
                                                         </span>
                                                         <span>
                                                             <span className="block text-xs font-bold text-ink">{permission.module_name}</span>
-                                                            <span className="block text-[10.5px] text-subtle">{locked ?? permission.description}</span>
+                                                            <span className="block text-[10.5px] text-subtle">{explainOf(permission)}</span>
+                                                            {locked && (
+                                                                <span className="mt-0.5 flex items-center gap-1 text-[10.5px] font-semibold text-orange-text-alt">
+                                                                    <Lock className="w-[10px] h-[10px]" aria-hidden="true" /> {locked}
+                                                                </span>
+                                                            )}
                                                         </span>
                                                     </button>
                                                 );
@@ -642,5 +663,69 @@ export default function RolePermissions() {
                 )}
             </div>
         </div>
+    );
+}
+
+/** Why a module is locked for a role, in full: shown above the modules of a role that has locked ones. */
+const LOCK_RULES: Record<string, string> = {
+    admin: 'Settings and Role Permissions can only be given to roles based on Administrator: whoever holds them could give themselves everything else.',
+    staff: 'Roles based on Staff never get Payroll, pay and loans, approving sign-ups, assigning managers, HR Lifecycle, exits, HR administration or sign-in security: the powers over money and other people\'s records.',
+};
+
+/**
+ * "What can this role do": where its people work (staff portal or admin app), the screens its ticked modules open,
+ * and the modules it cannot hold, with why.
+ */
+export function RoleSummary({ role, modules }: { role: CompanyRole; modules: string[] }) {
+    const isAdmin = role.base_role === 'ADMIN';
+    const held = (m: string) => isAdmin || (modules.includes(m) && !lockedReason(role.base_role, m));
+    const where = workspaceOf(role.base_role);
+    const screens = usesStaffPortal(role.base_role) ? [] : screensFor(held);
+    const portalExtras = [
+        held('task-projects') && 'Manage projects (create projects, assign tasks to teams)',
+        held('task-oversight') && 'See every task, read-only',
+        held('teams') && 'Teams chat',
+        held('task-manager') && 'Their tasks',
+    ].filter(Boolean) as string[];
+    const locks = [
+        role.base_role !== 'ADMIN' && LOCK_RULES.admin,
+        role.base_role === 'STAFF' && LOCK_RULES.staff,
+    ].filter(Boolean) as string[];
+    return (
+        <Card className="mb-3.5" aria-label="What this role can do">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+                <Eye className="w-[15px] h-[15px] text-muted-foreground" strokeWidth={1.8} />
+                <h3 className="m-0 text-[13px] font-bold text-ink">What {role.name} can do</h3>
+                <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-bold ${usesStaffPortal(role.base_role) ? 'bg-orange-tint-alt text-orange-text-alt' : 'bg-green-tint text-brand-dark'}`}>
+                    {where.label}
+                </span>
+            </div>
+            <p className="m-0 mb-2 text-[11.5px] text-muted-foreground">{where.explain}</p>
+            {usesStaffPortal(role.base_role) ? (
+                <ul className="m-0 pl-4 text-xs text-ink list-disc" aria-label="In the staff portal">
+                    <li>Their own profile, leave, payslips and requests</li>
+                    {portalExtras.map((x) => <li key={x}>{x}</li>)}
+                </ul>
+            ) : isAdmin ? (
+                <p className="m-0 text-xs text-ink">Every screen and every action, whatever is ticked.</p>
+            ) : screens.length === 0 ? (
+                <p className="m-0 text-xs text-ink">No screens yet: tick modules below.</p>
+            ) : (
+                <ul className="m-0 flex flex-wrap gap-1.5 p-0 list-none" aria-label="Screens it opens">
+                    {screens.map((s) => (
+                        <li key={s.path} className="rounded-md border border-border bg-background px-2 py-0.5 text-[11px] text-ink">{s.label}</li>
+                    ))}
+                </ul>
+            )}
+            {locks.length > 0 && (
+                <div className="mt-2.5 space-y-1">
+                    {locks.map((l) => (
+                        <p key={l} className="m-0 flex items-start gap-1.5 text-[11px] text-muted-foreground">
+                            <Lock className="w-3 h-3 mt-0.5 shrink-0" aria-hidden="true" /> {l}
+                        </p>
+                    ))}
+                </div>
+            )}
+        </Card>
     );
 }

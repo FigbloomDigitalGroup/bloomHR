@@ -27,7 +27,7 @@ import { STATUS_LABELS, statusLabel, statusTone } from '../../lib/onboarding';
 import { ONBOARDING_STATUSES } from '../../lib/onboardingValidation';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
+import ModuleGate from '../ProtectedRoutes/ModuleGate';
 import { useBranches } from '../../hooks/useBranches';
 import { branchOf } from '../../lib/branches';
 
@@ -356,11 +356,11 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
             <Button variant="secondary" onClick={() => navigate('/organogram')} icon={<Network className="w-3.5 h-3.5" strokeWidth={2} />}>
               Organogram
             </Button>
-            <RoleButtonWrapper allowedRoles={['ADMIN', 'HR', 'MANAGER', 'REGIONAL']}>
+            <ModuleGate anyOf={['employee-edit']}>
               <Button onClick={() => navigate('/add-employee')} icon={<Plus className="w-3.5 h-3.5" strokeWidth={2.2} />}>
                 Add Employee
               </Button>
-            </RoleButtonWrapper>
+            </ModuleGate>
           </>
         }
       />
@@ -386,7 +386,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
         {renderPillSelect(['all', ...ONBOARDING_STATUSES.map((s) => STATUS_LABELS[s])], selectedOnboarding, setSelectedOnboarding, 'Onboarding: all', 'Filter by onboarding')}
 
         {selectionAction ? (
-          <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+          <ModuleGate anyOf={['hr-admin', 'approve-exits']}>
             <Button
               variant="secondary"
               onClick={() => {
@@ -410,30 +410,30 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
             >
               Update ({selectedIds.length})
             </Button>
-          </RoleButtonWrapper>
+          </ModuleGate>
         ) : (
           <>
-            <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+            <ModuleGate anyOf={['hr-admin']}>
               <Button variant="secondary" onClick={() => setShowDuplicateModal(true)} icon={<Copy className="w-3.5 h-3.5" />}>
                 Duplicates
               </Button>
-            </RoleButtonWrapper>
-            <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+            </ModuleGate>
+            <ModuleGate anyOf={['hr-admin']}>
               <Button variant="secondary" onClick={() => navigate('/fogs?add=1')} icon={<UsersRound className="w-3.5 h-3.5" />}>
                 Bulk add
               </Button>
-            </RoleButtonWrapper>
-            <RoleButtonWrapper allowedRoles={['ADMIN']}>
+            </ModuleGate>
+            <ModuleGate allOf={['hr-admin', 'payroll']}>
               <Button variant="secondary" onClick={() => navigate('/fogs')} icon={<Edit3Icon className="w-3.5 h-3.5" />}>
                 Bulk Edit
               </Button>
-            </RoleButtonWrapper>
-            <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+            </ModuleGate>
+            <ModuleGate anyOf={['hr-admin']}>
               <Button variant="secondary" onClick={() => setSelectionAction('relocate')} icon={<Building2 className="w-3.5 h-3.5" />}>
                 Relocate
               </Button>
-            </RoleButtonWrapper>
-            <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+            </ModuleGate>
+            <ModuleGate anyOf={['approve-exits']}>
               <Button
                 variant="secondary"
                 className="!text-status-danger"
@@ -442,7 +442,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
               >
                 Bulk Terminate
               </Button>
-            </RoleButtonWrapper>
+            </ModuleGate>
           </>
         )}
       </div>
@@ -534,7 +534,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
               })()}
 
               <div className={`flex gap-2 ${selectionAction ? 'opacity-40 pointer-events-none' : ''}`}>
-                <RoleButtonWrapper allowedRoles={['ADMIN', 'HR', 'MANAGER', 'REGIONAL']}>
+                <ModuleGate anyOf={['employee-edit']}>
                   <button
                     type="button"
                     className="flex-1 text-center py-[7px] rounded-lg border border-border bg-white text-[11px] font-semibold text-ink hover:bg-secondary transition-colors"
@@ -545,8 +545,8 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                   >
                     Manage
                   </button>
-                </RoleButtonWrapper>
-                <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+                </ModuleGate>
+                <ModuleGate anyOf={['approve-exits']}>
                   <button
                     type="button"
                     disabled={isInactive}
@@ -558,7 +558,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                   >
                     Terminate
                   </button>
-                </RoleButtonWrapper>
+                </ModuleGate>
               </div>
             </Card>
           );

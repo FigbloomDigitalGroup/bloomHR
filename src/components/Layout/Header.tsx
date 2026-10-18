@@ -6,7 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { useHRNotifications, fetchAdminHRNotifications, markAdminNotificationRead, type HRNotification } from '../../hooks/useHRNotifications';
-import { SearchInput } from '../UI';
+import ScreenSearch from './ScreenSearch';
 import CompanySwitcher from '../Company/CompanySwitcher';
 import { useOnlinePeople } from '../chat/lib/presence';
 import { useMyCompanies } from '../../hooks/useMyCompanies';
@@ -425,7 +425,7 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
         {/* Search: takes the room left between the two sides, up to 460px; hidden on phones */}
         <div className="flex-1 min-w-0 hidden sm:flex justify-center">
           <div className="w-full max-w-[460px]">
-            <SearchInput placeholder="Search Figbloom HR" />
+            <ScreenSearch />
           </div>
         </div>
 

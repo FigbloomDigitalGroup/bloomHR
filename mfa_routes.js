@@ -18,7 +18,7 @@ import crypto from "node:crypto";
 import dotenv from "dotenv";
 import { Resend } from "resend";
 import { authenticate, HttpError, admin } from "./admin_routes.js";
-import { createSharedBudget } from "./authz.js";
+import { callerHasModule, createSharedBudget } from "./authz.js";
 import { formatPhone, sendServerSms } from "./sms_routes.js";
 
 dotenv.config({ path: process.env.ENV_FILE || ".env" });
@@ -37,9 +37,11 @@ const cooldown = createSharedBudget("mfa-send-cooldown", { default: { limit: 1, 
 const sendBudget = createSharedBudget("mfa-send", { default: { limit: 5, windowMs: 15 * MINUTE } });
 const verifyBudget = createSharedBudget("mfa-verify", { default: { limit: 20, windowMs: 15 * MINUTE } });
 
-const PRIVILEGED = ["ADMIN", "HR", "CHECKER"];
-/** Does the company's setting ask this role for a code? (the same rule as two_step_applies() in the database) */
-export const twoStepApplies = (mode, role) => mode === "everyone" || (mode === "privileged" && PRIVILEGED.includes(role));
+// "Privileged" people are those whose role holds one of these modules (two_step_privileged_modules() in the
+// database): money, company settings, who may do what, and bringing people in. The administrator holds them all.
+export const PRIVILEGED_MODULES = ["payroll", "settings", "role-permissions", "invite-people"];
+/** Does the company's setting ask this person for a code? `privileged`: their role holds a PRIVILEGED_MODULES module. */
+export const twoStepApplies = (mode, privileged) => mode === "everyone" || (mode === "privileged" && privileged === true);
 
 /**
  * The session id in a login token. Read only after authenticate() has had the token verified by Supabase Auth, so
@@ -130,7 +132,8 @@ async function policyFor(caller) {
   const { data, error } = await admin.rpc("two_step_policy", { p_tenant: caller.tenantId });
   if (error) throw new HttpError(500, "Could not read the two-step sign-in setting");
   const row = (Array.isArray(data) ? data[0] : data) || {};
-  if (twoStepApplies(row.mode, caller.role)) return { method: row.method === "sms" ? "sms" : "email" };
+  const privileged = row.mode === "privileged" && (await callerHasModule(caller, PRIVILEGED_MODULES));
+  if (twoStepApplies(row.mode, privileged)) return { method: row.method === "sms" ? "sms" : "email" };
   // not asked of their role: did they turn it on for themselves? (20261018500000, FIG-891)
   const { data: own, error: ownError } = await admin.rpc("personal_two_step", { p_tenant: caller.tenantId, p_user: caller.id });
   if (ownError) throw new HttpError(500, "Could not read the two-step sign-in setting");

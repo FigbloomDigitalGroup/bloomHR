@@ -21,11 +21,12 @@ import {
 const inputClass = 'w-full rounded-tile border border-border bg-white px-3 py-2 text-[12.5px] text-ink outline-none focus:border-brand';
 const labelClass = 'block text-[11.5px] font-semibold text-muted-foreground mb-1';
 
-/** Who may manage job titles (the database decides; this only hides the page from others). */
-export function canManageJobTitles(role: string | null, has: (m: string) => boolean): boolean {
-  if (role === 'ADMIN' || role === 'HR') return true;
-  if (has('employees')) return true;
-  return has('performance') && role !== 'MANAGER' && role !== 'REGIONAL';
+/**
+ * Who may manage job titles: the Employees module or Manage KPIs (as the database's manages_job_titles decides; this
+ * only hides the page from others). Administrators hold every module.
+ */
+export function canManageJobTitles(has: (m: string) => boolean): boolean {
+  return has('employees') || has('kpi-admin');
 }
 
 interface Draft {
@@ -41,8 +42,8 @@ interface Draft {
  * KPI templates can be set per job title.
  */
 export default function JobTitles() {
-  const { hasPermission, userRole, loading: permissionsLoading } = usePermissions();
-  const allowed = !permissionsLoading && canManageJobTitles(userRole, hasPermission);
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
+  const allowed = !permissionsLoading && canManageJobTitles(hasPermission);
   const [titles, setTitles] = useState<JobTitleOverview[] | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [groups, setGroups] = useState<JobGroupChoice[]>([]);

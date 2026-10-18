@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Database } from '../../types/supabase';
 import GlowButton from '../UI/GlowButton';
-import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
+import ModuleGate from '../ProtectedRoutes/ModuleGate';
 
 import { confirmDialog } from '../../lib/confirmDialog';
 type Asset = Database['public']['Tables']['assets']['Row'];
@@ -351,7 +351,7 @@ const QRScanner: React.FC = () => {
             New Scan
           </GlowButton>
           
-          <RoleButtonWrapper allowedRoles={['ADMIN', 'IT']}>
+          <ModuleGate anyOf={['asset']}>
             <GlowButton 
               variant="secondary"
               icon={Download}
@@ -361,7 +361,7 @@ const QRScanner: React.FC = () => {
             >
               Export History
             </GlowButton>
-          </RoleButtonWrapper>
+          </ModuleGate>
         </div>
       </div>
 
@@ -642,7 +642,7 @@ const QRScanner: React.FC = () => {
                       >
                         Edit Asset
                       </GlowButton>
-                      <RoleButtonWrapper allowedRoles={['ADMIN', 'IT']}>
+                      <ModuleGate anyOf={['asset']}>
                         <GlowButton 
                           variant="danger" 
                           size="xs"
@@ -650,7 +650,7 @@ const QRScanner: React.FC = () => {
                         >
                           Delete
                         </GlowButton>
-                      </RoleButtonWrapper>
+                      </ModuleGate>
                     </div>
                   </div>
                 ) : scanStatus === 'error' ? (
@@ -839,7 +839,7 @@ const QRScanner: React.FC = () => {
                 Add New Asset
               </GlowButton>
               
-              <RoleButtonWrapper allowedRoles={['ADMIN', 'IT']}>
+              <ModuleGate anyOf={['asset']}>
                 <GlowButton 
                   variant="secondary"
                   size="xs"
@@ -848,7 +848,7 @@ const QRScanner: React.FC = () => {
                 >
                   Print QR Labels
                 </GlowButton>
-              </RoleButtonWrapper>
+              </ModuleGate>
               
               <GlowButton 
                 variant="secondary"

@@ -22,8 +22,20 @@ const admin =
 const ROLES = ["ADMIN", "HR", "CHECKER", "MANAGER", "REGIONAL", "OPERATIONS", "STAFF"];
 // modules only a role based on ADMIN may hold (admin_only_modules() in migration 20261019700000)
 const ADMIN_ONLY_MODULES = ["settings", "role-permissions"];
-// ...and those a role based on STAFF may not hold (staff_restricted_modules()); task modules are allowed
-const STAFF_RESTRICTED_MODULES = ["payroll", "salaryadmin", "mpesa-zap", "adminconfirm", "assign-managers", "hr-lifecycle"];
+// ...and those a role based on STAFF may not hold (staff_restricted_modules(), as widened by the roles-by-modules
+// migration); task modules are allowed
+const STAFF_RESTRICTED_MODULES = [
+  "payroll",
+  "salaryadmin",
+  "mpesa-zap",
+  "adminconfirm",
+  "assign-managers",
+  "hr-lifecycle",
+  "loans",
+  "approve-exits",
+  "sign-in-security",
+  "hr-admin",
+];
 const moduleAllowedForBase = (base, m) =>
   base === "ADMIN" || (!ADMIN_ONLY_MODULES.includes(m) && (base !== "STAFF" || !STAFF_RESTRICTED_MODULES.includes(m)));
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -104,12 +116,24 @@ async function roleModules(tenantId, role, companyRoleId) {
 // The caller's modules from their role (an administrator has every module: check caller.role === "ADMIN" first).
 const callerModules = (caller) => roleModules(caller.tenantId, caller.role, caller.companyRoleId);
 
-// Wraps a handler with auth, a role allow-list and uniform error handling.
-const guard = (allowedRoles, handler) => async (req, res) => {
+/**
+ * Does the caller's role include one of these modules (the same permissions the app uses to show or hide screens,
+ * edited under Role & Permissions)? The administrator (base role ADMIN) always does. A company's own role (FIG-827)
+ * gives its own modules. Scoped to the caller's own tenant. Shared through authz.js.
+ */
+async function callerHasModule(caller, modules) {
+  if (caller.role === "ADMIN") return true;
+  const granted = await callerModules(caller);
+  return modules.some((m) => granted.includes(m));
+}
+
+// Wraps a handler with auth, a module check (the caller's role must include one of `modules`) and uniform error
+// handling. Access follows the company's Role & Permissions settings, never the role's name.
+const guard = (modules, handler) => async (req, res) => {
   try {
     if (!admin) throw new HttpError(500, "Admin API is not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
     const caller = await authenticate(req);
-    if (!allowedRoles.includes(caller.role)) throw new HttpError(403, "Forbidden");
+    if (!(await callerHasModule(caller, modules))) throw new HttpError(403, "Forbidden");
     await handler(req, res, caller);
   } catch (err) {
     const status = err instanceof HttpError ? err.status : err.status && err.status < 500 ? err.status : 500;
@@ -224,17 +248,28 @@ async function resolveRequestedRole(caller, body) {
   return { role: custom.base_role, companyRoleId: custom.is_system ? null : custom.id, custom: custom.is_system ? null : custom };
 }
 
-// Giving someone a custom role, when not an administrator: only one based on STAFF (assertCanManageRole) whose
-// modules the caller holds themselves (user_may_grant() in the database).
-async function assertCanGiveCustomRole(caller, requested) {
-  if (caller.role === "ADMIN" || !requested?.custom) return;
-  const [theirs, mine] = await Promise.all([roleModules(caller.tenantId, requested.role, requested.custom.id), callerModules(caller)]);
-  if (!theirs.every((m) => mine.includes(m))) throw new HttpError(403, "You cannot give a role access you do not have yourself");
+/**
+ * May the caller give (or manage someone holding) this role? Exactly user_may_grant() in the database: the
+ * administrator (base role ADMIN) may give any role; anyone else needs "Invite people", may give only roles based on
+ * STAFF, and a company's own role only when they hold every one of its modules themselves.
+ * `role` is the base role; `custom` the company's own role (a company_roles row, not a system one) or null.
+ */
+async function assertMayGrant(caller, { role, custom }) {
+  if (caller.role === "ADMIN") return;
+  const mine = await callerModules(caller);
+  if (!mine.includes("invite-people")) throw new HttpError(403, "Forbidden");
+  if (role !== "STAFF") throw new HttpError(403, "Only an administrator can give this role");
+  if (custom) {
+    const theirs = await roleModules(caller.tenantId, role, custom.id);
+    if (!theirs.every((m) => mine.includes(m))) throw new HttpError(403, "You cannot give a role access you do not have yourself");
+  }
 }
 
-// HR may only manage STAFF accounts (the staff sign-up approval flow); ADMIN may manage any.
-function assertCanManageRole(caller, role) {
-  if (caller.role !== "ADMIN" && role !== "STAFF") throw new HttpError(403, "Only an ADMIN can manage non-STAFF accounts");
+// The company's own role a person holds (null for a system role or none).
+async function heldCustomRole(caller, profile) {
+  if (!profile?.company_role_id) return null;
+  const held = await loadCompanyRole(caller.tenantId, profile.company_role_id);
+  return held && !held.is_system ? held : null;
 }
 
 function validateFields({ email, role, account_status, password }, { requireAll }) {
@@ -249,19 +284,19 @@ function validateFields({ email, role, account_status, password }, { requireAll 
   if (requireAll && (!email || !password || !role)) throw new HttpError(400, "email, password and role are required");
 }
 
-// GET /api/admin/users - every auth user with role/status (ADMIN)
+// GET /api/admin/users - every auth user with role/status ("Role permissions", which only roles based on ADMIN hold)
 router.get(
   "/users",
-  guard(["ADMIN"], async (_req, res, caller) => {
+  guard(["role-permissions"], async (_req, res, caller) => {
     const [users, byId] = await Promise.all([listAllAuthUsers(), tenantProfiles(caller)]);
     res.json({ users: users.filter((u) => byId.has(u.id)).map((u) => toUserView(u, byId.get(u.id))) });
   })
 );
 
-// GET /api/admin/auth-users - slim id/email/metadata list for sign-up matching (ADMIN, HR)
+// GET /api/admin/auth-users - slim id/email/metadata list for sign-up matching ("Invite people")
 router.get(
   "/auth-users",
-  guard(["ADMIN", "HR"], async (_req, res, caller) => {
+  guard(["invite-people"], async (_req, res, caller) => {
     const [users, byId] = await Promise.all([listAllAuthUsers(), tenantProfiles(caller)]);
     res.json({
       users: users.filter((u) => byId.has(u.id)).map((u) => ({ id: u.id, email: u.email, user_metadata: u.user_metadata })),
@@ -269,17 +304,16 @@ router.get(
   })
 );
 
-// POST /api/admin/users - create a login (ADMIN any role, HR STAFF only)
+// POST /api/admin/users - create a login ("Invite people"; the role given follows assertMayGrant)
 router.post(
   "/users",
-  guard(["ADMIN", "HR"], async (req, res, caller) => {
+  guard(["invite-people"], async (req, res, caller) => {
     const { password, account_status = "ACTIVE", location, branch } = req.body || {};
     const requested = await resolveRequestedRole(caller, req.body);
     const role = requested?.role;
     const email = normalizeEmail(req.body?.email);
     validateFields({ email, role, account_status, password }, { requireAll: true });
-    assertCanManageRole(caller, role);
-    await assertCanGiveCustomRole(caller, requested);
+    await assertMayGrant(caller, requested);
 
     const user_metadata = {
       role,
@@ -311,10 +345,11 @@ router.post(
   })
 );
 
-// PATCH /api/admin/users/:id - change email/role/status/location/branch/password (ADMIN, HR for STAFF)
+// PATCH /api/admin/users/:id - change email/role/status/location/branch/password ("Invite people", for people
+// holding a role the caller could give, and only to such a role)
 router.patch(
   "/users/:id",
-  guard(["ADMIN", "HR"], async (req, res, caller) => {
+  guard(["invite-people"], async (req, res, caller) => {
     const { id } = req.params;
     const { password, account_status, location, branch } = req.body || {};
     const requested = await resolveRequestedRole(caller, req.body);
@@ -328,15 +363,11 @@ router.patch(
     const current = existing.user;
 
     const currentRole = currentProfile?.role || current.user_metadata?.role || "STAFF";
-    assertCanManageRole(caller, currentRole);
+    // the role they hold now and the one they are given must both be roles the caller may give (as
+    // assign_company_role() in the database): nobody manages someone with access they could not hand out themselves
+    if (caller.role !== "ADMIN") await assertMayGrant(caller, { role: currentRole, custom: await heldCustomRole(caller, currentProfile) });
     const nextRole = role ?? currentRole;
-    assertCanManageRole(caller, nextRole);
-    await assertCanGiveCustomRole(caller, requested);
-    // someone who is not an administrator cannot change the role of a person holding a custom role they could not give
-    if (requested && caller.role !== "ADMIN" && currentProfile?.company_role_id) {
-      const held = await loadCompanyRole(caller.tenantId, currentProfile.company_role_id);
-      await assertCanGiveCustomRole(caller, { role: currentRole, custom: held && !held.is_system ? held : null });
-    }
+    if (requested) await assertMayGrant(caller, requested);
     const roleChanges =
       !!requested && (role !== currentRole || (requested.companyRoleId || null) !== (currentProfile?.company_role_id || null));
 
@@ -387,10 +418,10 @@ router.patch(
   })
 );
 
-// DELETE /api/admin/users/:id (ADMIN)
+// DELETE /api/admin/users/:id ("Role permissions")
 router.delete(
   "/users/:id",
-  guard(["ADMIN"], async (req, res, caller) => {
+  guard(["role-permissions"], async (req, res, caller) => {
     if (req.params.id === caller.id) throw new HttpError(400, "You cannot delete your own account");
     await loadTenantProfile(req.params.id, caller);
     // Leave this company; the login itself goes only when it belongs to no other company.
@@ -407,10 +438,10 @@ router.delete(
   })
 );
 
-// POST /api/admin/users/:id/reset-email - send the user a password reset email (ADMIN)
+// POST /api/admin/users/:id/reset-email - send the user a password reset email ("Role permissions")
 router.post(
   "/users/:id/reset-email",
-  guard(["ADMIN"], async (req, res, caller) => {
+  guard(["role-permissions"], async (req, res, caller) => {
     await loadTenantProfile(req.params.id, caller);
     const { data, error } = await admin.auth.admin.getUserById(req.params.id);
     if (error || !data?.user?.email) throw new HttpError(404, "User not found");
@@ -422,6 +453,6 @@ router.post(
 );
 
 // Shared with sms_routes.js so every service-role route checks the caller the same way.
-export { authenticate, HttpError, admin, callerModules, roleModules, loadCompanyRole };
+export { authenticate, HttpError, admin, callerModules, callerHasModule, roleModules, loadCompanyRole };
 
 export default router;

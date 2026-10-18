@@ -44,8 +44,8 @@ beforeAll(async () => {
       ('${S1}', 's1@a.co', 'STAFF', '${A}'), ('${S2}', 's2@a.co', 'STAFF', '${A}'), ('${S3}', 's3@a.co', 'STAFF', '${A}'),
       ('${HRB}', 'hr@b.co', 'HR', '${B}');
     insert into role_permissions (role_name, permissions, tenant_id) values
-      ('HR', array['employees', 'hr-lifecycle'], '${A}'), ('MANAGER', array['hr-lifecycle'], '${A}'),
-      ('STAFF', array['dashboard'], '${A}'), ('HR', array['employees', 'hr-lifecycle'], '${B}');
+      ('HR', array['employees', 'hr-lifecycle', 'approve-exits'], '${A}'), ('MANAGER', array['hr-lifecycle'], '${A}'),
+      ('STAFF', array['dashboard'], '${A}'), ('HR', array['employees', 'hr-lifecycle', 'approve-exits'], '${B}');
     insert into employees ("Employee Number", "First Name", "Last Name", "Work Email", "Basic Salary", notice_days, onboarding_status, tenant_id) values
       ('H1', 'Hana', 'Hr', 'hr1@a.co', 100000, null, 'approved', '${A}'),
       ('E1', 'Esther', 'One', 's1@a.co', 60000, 30, 'approved', '${A}'),

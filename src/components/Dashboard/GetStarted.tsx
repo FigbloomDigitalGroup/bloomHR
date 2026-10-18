@@ -26,7 +26,10 @@ const dismissKey = (tenantId: string) => `getstarted_dismissed_${tenantId}`;
 
 /** A short checklist for a new company's administrator: profile, team, employees, look. Dismissible. */
 export default function GetStarted() {
-  const { userRole } = usePermissions();
+  const { hasAllPermissions, loading: permissionsLoading } = usePermissions();
+  // the checklist's steps are the company profile (Settings) and inviting the team (Invite people): whoever holds
+  // both, which by default is only the administrator
+  const setsUpCompany = !permissionsLoading && hasAllPermissions(['settings', 'invite-people']);
   const { data: companies } = useMyCompanies();
   const current = companies?.find((c) => c.is_current);
   const [dismissed, setDismissed] = useState(true); // hidden until we know
@@ -44,7 +47,7 @@ export default function GetStarted() {
   }, [current?.tenant_id]);
 
   useEffect(() => {
-    if (!current || dismissed || userRole !== 'ADMIN') return;
+    if (!current || dismissed || !setsUpCompany) return;
     let cancelled = false;
     (async () => {
       const [profile, invitations, employees] = await Promise.allSettled([
@@ -63,7 +66,7 @@ export default function GetStarted() {
     return () => {
       cancelled = true;
     };
-  }, [current?.tenant_id, dismissed, userRole, checkCount]);
+  }, [current?.tenant_id, dismissed, setsUpCompany, checkCount]);
 
   // look again after the profile is saved, and when the person comes back to this tab (e.g. after inviting someone)
   useEffect(() => {
@@ -81,7 +84,7 @@ export default function GetStarted() {
     };
   }, []);
 
-  if (!current || dismissed || !loaded || userRole !== 'ADMIN') return null;
+  if (!current || dismissed || !loaded || !setsUpCompany) return null;
 
   const steps: Step[] = [
     {

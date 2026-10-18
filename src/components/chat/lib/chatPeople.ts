@@ -7,7 +7,7 @@ export interface ChatPeople {
   currentEmail?: string;
   /** opens (or starts) a direct message with this employee */
   onMessage?: (employeeId: string) => void;
-  /** HR, managers and admins can open someone's employee record */
+  /** whoever holds the Employees module can open someone's employee record */
   canViewRecords: boolean;
 }
 

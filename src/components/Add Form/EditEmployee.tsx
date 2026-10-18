@@ -24,8 +24,10 @@ import EmployeePicker from '../UI/EmployeePicker';
 import { useEmployeeDirectory } from '../../hooks/useEmployeeDirectory';
 import { employeeTypeOptions } from '../../lib/employmentTypes';
 import { STARTER_DEPARTMENTS, ensureBranchListed, loadEmployeeFieldValues, optionsWithStarters } from '../../lib/employeeOptions';
-import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
-import { useUser } from '../ProtectedRoutes/UserContext';
+import ModuleGate from '../ProtectedRoutes/ModuleGate';
+import { usePermissions } from '../../hooks/usePermissions';
+import CompanyRolePicker, { RolePick, STAFF_PICK } from '../UI/CompanyRolePicker';
+import { sendInvitation } from '../../lib/employeeInvite';
 import { PAYMENT_METHODS, paymentMethodOption } from '../../lib/paymentMethods';
 import { useJobGroups } from '../../hooks/useJobGroups';
 import JobGroupPicker from './JobGroupPicker';
@@ -93,9 +95,24 @@ const helbRegex = /^[A-Za-z0-9]{6,12}$/;
 const EditEmployeePage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useUser();
-  const isAdmin = user?.role === 'ADMIN';
-  const isHR = user?.role === 'HR';
+  // by the modules of the person's role (FIG-827), as AddEmployeePage: HR administration shows the salary section and
+  // Delete, Payroll as well sets the basic salary; removing someone's login is user-account administration
+  const { hasPermission } = usePermissions();
+  const seesSalarySection = hasPermission('hr-admin');
+  const setsBasicSalary = hasPermission('hr-admin') && hasPermission('payroll');
+  const mayRemoveLogin = hasPermission('role-permissions');
+  // invite them to the app with one of the company's roles (for someone added without a login)
+  const [inviteAs, setInviteAs] = useState<RolePick>(STAFF_PICK);
+  const [inviting, setInviting] = useState(false);
+  const invite = async () => {
+    setInviting(true);
+    const outcome = await sendInvitation(employee['Work Email'], inviteAs.role, inviteAs.companyRoleId);
+    setInviting(false);
+    if (outcome.status === 'sent') toast.success(`Invitation sent to ${outcome.email}`);
+    else if (outcome.status === 'member') toast.success(`${outcome.email} already has access to this company`);
+    else if (outcome.status === 'not-emailed') toast.error(`The invitation was made but not emailed: ${outcome.reason}`);
+    else toast.error(outcome.reason);
+  };
   // the company's job groups (null when this person may not see them: the free-text "Job Group" stays)
   const jobGroups = useJobGroups();
   const jobTitles = useJobTitles();
@@ -672,7 +689,7 @@ const EditEmployeePage = () => {
             </>
           ) : (
             <>
-              <RoleButtonWrapper allowedRoles={['ADMIN', 'HR']}>
+              <ModuleGate anyOf={['hr-admin']}>
                 <GlowButton
                   onClick={() => setDeleting(true)}
                   icon={Trash2}
@@ -680,8 +697,8 @@ const EditEmployeePage = () => {
                 >
                   Delete
                 </GlowButton>
-              </RoleButtonWrapper>
-              <RoleButtonWrapper allowedRoles={['ADMIN', 'HR', 'MANAGER', 'REGIONAL']}>
+              </ModuleGate>
+              <ModuleGate anyOf={['employee-edit']}>
                 <GlowButton
                   onClick={handleEditToggle}
                   icon={PencilLine}
@@ -689,11 +706,11 @@ const EditEmployeePage = () => {
                 >
                   Edit Employee
                 </GlowButton>
-              </RoleButtonWrapper>
+              </ModuleGate>
             </>
           )}
           {deleting && employee.id && (
-            <DeleteEmployeeModal employeeId={String(employee.id)} isAdmin={isAdmin} onClose={() => setDeleting(false)} />
+            <DeleteEmployeeModal employeeId={String(employee.id)} isAdmin={mayRemoveLogin} onClose={() => setDeleting(false)} />
           )}
         </div>
       </div>
@@ -1063,6 +1080,14 @@ const EditEmployeePage = () => {
                       disabled={!isEditMode}
                     />
                   </div>
+                  {hasPermission('invite-people') && !isEditMode && !!employee['Work Email'] && (
+                    <div className="mt-6 flex flex-wrap items-end gap-3" aria-label="Invite to the app">
+                      <CompanyRolePicker id="employee-invite-role" label="Invite them to the app as" value={inviteAs} onChange={setInviteAs} className="min-w-[220px]" />
+                      <GlowButton onClick={invite} loading={inviting} variant="secondary">
+                        Send invitation
+                      </GlowButton>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -1276,7 +1301,7 @@ const EditEmployeePage = () => {
                 </div>
               </div>
 
-              {(isAdmin || isHR) && (
+              {seesSalarySection && (
                 <div>
                   <SectionHeader
                     title="Salary Information"
@@ -1291,7 +1316,7 @@ const EditEmployeePage = () => {
                         disabled={!isEditMode}
                       />
                     )}
-                    {isAdmin && (
+                    {setsBasicSalary && (
                       <FormField
                         label="Basic Salary"
                         name="Basic Salary"

@@ -8,6 +8,7 @@ import GlowButton from '../UI/GlowButton';
 import SearchableDropdown from '../UI/SearchableDropdown';
 import { format } from 'date-fns';
 import { useUser } from '../ProtectedRoutes/UserContext';
+import { usePermissions } from '../../hooks/usePermissions';
 import { useEmployeeDirectory } from '../../hooks/useEmployeeDirectory';
 import { useDepartments } from '../../hooks/useDepartments';
 import { departmentPath } from '../../lib/orgStructure';
@@ -20,7 +21,13 @@ const ViewEmployeePage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user: currentUser } = useUser();
-  const isAdmin = currentUser?.role === 'ADMIN';
+  const { hasPermission, hasAnyPermission, hasAllPermissions, loading: permissionsLoading } = usePermissions();
+  // pay on the record: HR administration and Payroll together (by default only administrators)
+  const seesPay = !permissionsLoading && hasAllPermissions(['hr-admin', 'payroll']);
+  // approving exits (and terminating without approval, reversing a termination): Approve exits
+  const approvesExits = !permissionsLoading && hasPermission('approve-exits');
+  // the pending exit requests for this person: line managers (My team's work) and administrators see them
+  const seesPendingExits = !permissionsLoading && hasPermission('team-work');
   const [employee, setEmployee] = useState<Employee | null>(null);
   // their department (with the departments above it) and who they report to
   const { employees: directory } = useEmployeeDirectory();
@@ -136,10 +143,10 @@ const ViewEmployeePage = () => {
 
   // Fetch pending termination requests
   useEffect(() => {
-    if (userRole === 'admin' || userRole === 'manager') {
+    if (seesPendingExits) {
       fetchTerminationRequests();
     }
-  }, [userRole, id]);
+  }, [seesPendingExits, id]);
 
   const fetchTerminationRequests = async () => {
     try {
@@ -176,8 +183,8 @@ const ViewEmployeePage = () => {
   const requiresApproval = () => {
     if (!employee) return false;
 
-    // If user is admin or HR, no approval needed
-    if (userRole?.toUpperCase() === 'ADMIN' || userRole?.toUpperCase() === 'HR') return false;
+    // whoever approves exits needs no approval
+    if (approvesExits) return false;
 
     // Managers require admin approval for managers/directors
     const isManager = employee['Employee Type']?.toLowerCase().includes('manager') ||
@@ -189,16 +196,11 @@ const ViewEmployeePage = () => {
   };
 
   // Check if user can approve terminations
-  const canApproveTerminations = () => {
-    const role = userRole?.toUpperCase();
-    return role === 'ADMIN' || role === 'HR';
-  };
+  const canApproveTerminations = () => approvesExits;
 
   // Check if user can terminate employees
-  const canTerminateEmployees = () => {
-    const role = userRole?.toUpperCase();
-    return role === 'ADMIN' || role === 'HR' || role === 'MANAGER';
-  };
+  // Approve exits, or a line manager's My team's work (by default administrators, HR and managers)
+  const canTerminateEmployees = () => !permissionsLoading && hasAnyPermission(['approve-exits', 'team-work']);
 
   // Submit termination request for approval
   const submitTerminationRequest = async () => {
@@ -952,21 +954,21 @@ Company Name
                 <DetailRow label="Job Title" value={employee['Job Title'] || 'N/A'} />
                 <DetailRow
                   label="Job Group"
-                  value={`${employee['Job Group'] || 'N/A'}${isAdmin && employee.job_group_id && employee.pay_overridden ? ' (pay set by hand)' : ''}`}
+                  value={`${employee['Job Group'] || 'N/A'}${seesPay && employee.job_group_id && employee.pay_overridden ? ' (pay set by hand)' : ''}`}
                 />
                 <DetailRow label="Department" value={departmentName || 'N/A'} />
                 <DetailRow label="Reports to" value={manager ? `${manager.fullName}${manager.jobTitle ? ` (${manager.jobTitle})` : ''}` : employee['Manager'] || 'N/A'} />
                 <DetailRow label="Start Date" value={employee['Start Date'] ? format(new Date(employee['Start Date']), 'MMMM d, yyyy') : 'N/A'} />
                 <DetailRow label="Email" value={employee['Email Address'] || 'N/A'} />
                 <DetailRow label="Phone" value={employee['Phone Number'] || 'N/A'} />
-                {isAdmin && (
+                {seesPay && (
                   <DetailRow label="Basic Salary" value={employee['Basic Salary'] ? `KSh ${Number(employee['Basic Salary']).toLocaleString()}` : 'N/A'} />
                 )}
               </div>
             </div>
 
             {/* Pending Approval Requests (for managers/admins) */}
-            {(userRole === 'admin' || userRole === 'manager') && pendingTerminationRequests.length > 0 && (
+            {seesPendingExits && pendingTerminationRequests.length > 0 && (
               <div className="lg:col-span-2 bg-yellow-50 rounded-lg p-5 border border-yellow-200">
                 <h3 className="font-semibold text-gray-800 flex items-center mb-4">
                   <UserCheck className="mr-3 text-yellow-600" size={18} />
@@ -992,7 +994,7 @@ Company Name
                         </div>
 
                         <div>
-                          {userRole === 'admin' ? (
+                          {approvesExits ? (
                             <div className="flex space-x-2">
                               <GlowButton
                                 onClick={() => approveTerminationRequest(request.id)}

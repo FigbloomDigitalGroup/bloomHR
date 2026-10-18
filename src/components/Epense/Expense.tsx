@@ -20,7 +20,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { currentUserAndTenant, openPrivateFile, randomFileName } from '../../lib/privateFiles';
 import EmployeePicker from '../UI/EmployeePicker';
-import RoleButtonWrapper from '../ProtectedRoutes/RoleButton';
+import ModuleGate from '../ProtectedRoutes/ModuleGate';
 import { PageHeader, Card, Button, StatusPill, EmptyState, SearchInput } from '../UI';
 import type { StatusTone } from '../UI';
 import { TownProps } from '../../types/supabase';
@@ -1110,7 +1110,7 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                     <div className="text-sm font-bold text-ink">{formatCurrency(expense.amount)}</div>
                     {canTakeAction(expense) && (
                       <div className="flex items-center gap-1.5">
-                        <RoleButtonWrapper allowedRoles={['ADMIN', 'OPERATIONS']}>
+                        <ModuleGate anyOf={['expenses']}>
                           <button
                             type="button"
                             aria-label={`Approve ${expense.title}`}
@@ -1124,8 +1124,8 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                           >
                             <Check className="w-[13px] h-[13px]" strokeWidth={2} />
                           </button>
-                        </RoleButtonWrapper>
-                        <RoleButtonWrapper allowedRoles={['ADMIN', 'OPERATIONS']}>
+                        </ModuleGate>
+                        <ModuleGate anyOf={['expenses']}>
                           <button
                             type="button"
                             aria-label={`Recommend ${expense.title}`}
@@ -1139,8 +1139,8 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                           >
                             <ThumbsUp className="w-[13px] h-[13px]" strokeWidth={2} />
                           </button>
-                        </RoleButtonWrapper>
-                        <RoleButtonWrapper allowedRoles={['ADMIN', 'OPERATIONS']}>
+                        </ModuleGate>
+                        <ModuleGate anyOf={['expenses']}>
                           <button
                             type="button"
                             aria-label={`Reject ${expense.title}`}
@@ -1154,7 +1154,7 @@ const ExpenseModule: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                           >
                             <Ban className="w-[13px] h-[13px]" strokeWidth={2} />
                           </button>
-                        </RoleButtonWrapper>
+                        </ModuleGate>
                       </div>
                     )}
                   </div>
