@@ -3,7 +3,8 @@
 // Tasks like Linear (20261019200000): projects with keys, who sees and changes a task, sub-tasks, a task for a whole
 // department (one per person under a group task), recurring role tasks once per period, the activity log,
 // notifications (assigned, @mentioned, commented, done) and the old todos copied into a "General" project.
-// Only the people concerned see a task (20261019500000): no role, ADMIN and HR included, sees every task.
+// Only the people concerned see a task (20261019500000), except that ADMIN and HR see every task read-only, for
+// oversight (20261019650000; task_oversight.test.ts covers it). Other roles see only what concerns them.
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { PGlite } from '@electric-sql/pglite';
 import { asAnon, asUser, bootDb } from './db';
@@ -136,20 +137,22 @@ describe('the old todos', () => {
     expect(pat.map((t) => t.title)).toEqual(['Old by login']); // the one Pat created
     expect((await as<{ title: string }>(PAT, `select title from todos order by title`)).map((t) => t.title)).toEqual(['Old by login']);
     expect(await as(RITA, `select 1 from tasks where legacy_todo_id is not null`)).toHaveLength(0);
-    // HR sees the one it created, not every old task
-    expect((await as<{ title: string }>(HR, `select title from tasks where legacy_todo_id is not null`)).map((t) => t.title)).toEqual(['Old follow-up']);
-    expect(await as(ADM, `select 1 from tasks where legacy_todo_id is not null`)).toHaveLength(0);
+    // HR and admins see every old task of their company (oversight); a manager only what concerns them
+    expect(await as(HR, `select 1 from tasks where legacy_todo_id is not null`)).toHaveLength(4);
+    expect(await as(ADM, `select 1 from tasks where legacy_todo_id is not null`)).toHaveLength(4);
+    expect(await as(MGR, `select 1 from tasks where legacy_todo_id is not null`)).toHaveLength(0);
     expect((await as<{ title: string }>(HR, `select title from todos order by title`)).map((t) => t.title)).toEqual(['Old follow-up']);
   });
 
   it('running the migrations again copies nothing twice and keeps tasks to the people concerned', async () => {
     const { readFileSync } = await import('node:fs');
     const { join } = await import('node:path');
-    for (const f of ['20261019200000_tasks.sql', '20261019500000_task_visibility.sql', '20261019500000_task_visibility.sql']) {
+    for (const f of ['20261019200000_tasks.sql', '20261019500000_task_visibility.sql', '20261019500000_task_visibility.sql',
+      '20261019650000_task_oversight.sql']) {
       await db.exec(readFileSync(join(__dirname, '..', 'migrations', f), 'utf8'));
       await db.exec('reset search_path');
     }
-    expect(await as(ADM, `select 1 from tasks where legacy_todo_id is not null`)).toHaveLength(0);
+    expect(await as(MGR, `select 1 from tasks where legacy_todo_id is not null`)).toHaveLength(0);
     expect((await rows<{ n: number }>(`select count(*)::int n from tasks where legacy_todo_id is not null`))[0].n).toBe(5);
     expect((await rows<{ n: number }>(`select count(*)::int n from task_projects where key = 'GEN'`))[0].n).toBe(2);
   });
@@ -211,39 +214,42 @@ describe('who sees a task', () => {
   });
 });
 
-describe('nobody sees every task because of their role', () => {
-  it('an unrelated ADMIN, HR officer or MANAGER sees the project but none of its tasks', async () => {
-    for (const who of [ADM, HR2, MGR]) {
-      expect(await titlesFor(who)).toEqual([]);
-      // they still see the project, to manage it
-      expect(await as(who, `select 1 from task_projects where id = $1`, [project])).toHaveLength(1);
-      // and none of what hangs off its tasks
-      expect(await as(who, `select 1 from task_comments c join tasks t on t.id = c.task_id where t.project_id = $1`, [project])).toHaveLength(0);
-      expect(await as(who, `select 1 from task_activity a where a.task_id in (select id from tasks where project_id = $1)`, [project])).toHaveLength(0);
-    }
-    // nor change or delete them
+describe('only ADMIN and HR see every task, and only to read it', () => {
+  it('an unrelated MANAGER sees the project but none of its tasks', async () => {
+    expect(await titlesFor(MGR)).toEqual([]);
+    // they still see the project, to manage it
+    expect(await as(MGR, `select 1 from task_projects where id = $1`, [project])).toHaveLength(1);
+    // and none of what hangs off its tasks
+    expect(await as(MGR, `select 1 from task_comments c join tasks t on t.id = c.task_id where t.project_id = $1`, [project])).toHaveLength(0);
+    expect(await as(MGR, `select 1 from task_activity a where a.task_id in (select id from tasks where project_id = $1)`, [project])).toHaveLength(0);
+  });
+
+  it('an unrelated ADMIN or HR officer sees every task, but cannot change, delete or comment on them', async () => {
+    for (const who of [ADM, HR2]) expect(await titlesFor(who)).toEqual(await titlesFor(LEAD));
     const [forMo] = await rows<{ id: string }>(`select id from tasks where title = 'For Mo'`);
-    expect(await as(ADM, `update tasks set priority = 'low' where id = $1 returning 1`, [forMo.id])).toHaveLength(0);
-    expect(await as(ADM, `delete from tasks where id = $1 returning 1`, [forMo.id])).toHaveLength(0);
-    expect(await as(ADM, `select can_edit_task($1) ok`, [forMo.id])).toEqual([{ ok: false }]);
-    expect(await fails(as(ADM, `insert into task_comments (task_id, body) values ($1, 'x')`, [forMo.id]))).toMatch(/row-level security/);
+    for (const who of [ADM, HR2]) {
+      expect(await as(who, `update tasks set priority = 'low' where id = $1 returning 1`, [forMo.id])).toHaveLength(0);
+      expect(await as(who, `delete from tasks where id = $1 returning 1`, [forMo.id])).toHaveLength(0);
+      expect(await as(who, `select can_edit_task($1) ok`, [forMo.id])).toEqual([{ ok: false }]);
+      expect(await fails(as(who, `insert into task_comments (task_id, body) values ($1, 'x')`, [forMo.id]))).toMatch(/row-level security/);
+    }
   });
 
   it('they see a task once added to the project, @mentioned on it, or as the assignee’s supervisor', async () => {
     // added to the project: every task in it, and gone again when removed
-    await as(ADM, `insert into task_project_members (project_id, employee_number) values ($1, 'A-ADM')`, [project]);
-    expect(await titlesFor(ADM)).toContain('For Rita');
-    await as(ADM, `delete from task_project_members where project_id = $1 and employee_number = 'A-ADM'`, [project]);
-    expect(await titlesFor(ADM)).toEqual([]);
+    await as(MGR, `insert into task_project_members (project_id, employee_number) values ($1, 'A-MGR')`, [project]);
+    expect(await titlesFor(MGR)).toContain('For Rita');
+    await as(MGR, `delete from task_project_members where project_id = $1 and employee_number = 'A-MGR'`, [project]);
+    expect(await titlesFor(MGR)).toEqual([]);
 
     // @mentioned: that task only
     const [forMo] = await rows<{ id: string }>(`select id from tasks where title = 'For Mo'`);
-    await as(MO, `insert into task_comments (task_id, body, mentions) values ($1, 'FYI @Hal', array['A-HR2'])`, [forMo.id]);
-    expect(await titlesFor(HR2)).toEqual(['For Mo']);
-    expect(await as(HR2, `select 1 from task_comments where task_id = $1`, [forMo.id])).toHaveLength(1);
+    await as(MO, `insert into task_comments (task_id, body, mentions) values ($1, 'FYI @Rita', array['A-RITA'])`, [forMo.id]);
+    expect(await titlesFor(RITA)).toEqual(['For Mo', 'For Rita']);
+    expect(await as(RITA, `select 1 from task_comments where task_id = $1`, [forMo.id])).toHaveLength(1);
     // and may comment, but not change it
-    expect(await fails(as(HR2, `insert into task_comments (task_id, body) values ($1, 'Seen')`, [forMo.id]))).toBe('');
-    expect(await as(HR2, `update tasks set priority = 'low' where id = $1 returning 1`, [forMo.id])).toHaveLength(0);
+    expect(await fails(as(RITA, `insert into task_comments (task_id, body) values ($1, 'Seen')`, [forMo.id]))).toBe('');
+    expect(await as(RITA, `update tasks set priority = 'low' where id = $1 returning 1`, [forMo.id])).toHaveLength(0);
 
     // the supervisor: the tasks of the people who report to them
     const mgr = (await rows<{ id: string }>(`select id from employees where "Employee Number" = 'A-MGR'`))[0].id;
@@ -259,7 +265,8 @@ describe('nobody sees every task because of their role', () => {
     const [t] = await as<{ id: string }>(ADM, `insert into tasks (project_id, title, assignee_number, created_by) values ($1, 'Renew licence', 'A-PAT', $2) returning id`, [p.id, ADM]);
     expect(await as(ADM, `select 1 from tasks where id = $1`, [t.id])).toHaveLength(1);
     expect(await as(PAT, `select 1 from tasks where id = $1`, [t.id])).toHaveLength(1); // the assignee
-    expect(await as(HR2, `select 1 from tasks where id = $1`, [t.id])).toHaveLength(0); // another admin-type who is not concerned
+    expect(await as(MGR, `select 1 from tasks where id = $1`, [t.id])).toHaveLength(0); // a manager who is not concerned
+    expect(await as(HR2, `select 1 from tasks where id = $1`, [t.id])).toHaveLength(1); // HR, for oversight
     expect(await as(HR2, `select 1 from task_projects where id = $1`, [p.id])).toHaveLength(1);
     // archiving stays with the people who run tasks
     expect(await as(HR2, `update task_projects set archived = true where id = $1 returning 1`, [p.id])).toHaveLength(1);
@@ -347,16 +354,16 @@ describe('a task for a department', () => {
     // Rita is not in the project: she sees the group task and everyone's sub-tasks in it, nothing else of the project's
     const rita = (await as<{ id: string }>(RITA, `select id from tasks where id = $1 or parent_id = $1`, [group])).map((r) => r.id);
     expect(rita).toHaveLength(3);
-    // an unrelated admin sees none of it
-    expect(await as(ADM, `select 1 from tasks where id = $1 or parent_id = $1`, [group])).toHaveLength(0);
+    // an unrelated manager sees none of it
+    expect(await as(MGR, `select 1 from tasks where id = $1 or parent_id = $1`, [group])).toHaveLength(0);
   });
 
-  it('an admin who is not in the project may still give a department a task, and then sees it (as its creator)', async () => {
-    const [{ create_group_task: group }] = await as<{ create_group_task: string }>(ADM,
+  it('a manager who is not in the project may still give a department a task, and then sees it (as its creator)', async () => {
+    const [{ create_group_task: group }] = await as<{ create_group_task: string }>(MGR,
       `select create_group_task($1, 'Sign the code of conduct', null, 'none', null, 'department', $2)`, [project, sales]);
-    expect(await as(ADM, `select 1 from tasks where id = $1 or parent_id = $1`, [group])).toHaveLength(3);
-    expect(await titlesFor(ADM)).toEqual(['Sign the code of conduct', 'Sign the code of conduct', 'Sign the code of conduct']);
-    expect(await as(HR2, `select 1 from tasks where id = $1 or parent_id = $1`, [group])).toHaveLength(0);
+    expect(await as(MGR, `select 1 from tasks where id = $1 or parent_id = $1`, [group])).toHaveLength(3);
+    expect(await titlesFor(MGR)).toEqual(['Sign the code of conduct', 'Sign the code of conduct', 'Sign the code of conduct']);
+    expect(await as(PAT, `select 1 from tasks where id = $1 or parent_id = $1`, [group])).toHaveLength(0);
     await rows(`delete from tasks where id = $1`, [group]);
   });
 
@@ -393,9 +400,9 @@ describe('recurring role tasks', () => {
       `select assignee_number, due_date::text, template_period, priority from tasks where title = 'Weekly cash count' order by template_period, assignee_number`);
     expect(made[0]).toEqual({ assignee_number: 'A-MO', due_date: '2026-10-21', template_period: '2026-W43', priority: 'medium' });
     expect(made.map((m) => m.assignee_number)).toEqual(['A-MO', 'A-PAT', 'A-MO', 'A-PAT']);
-    // the tasks are the template creator's (HR, who is also in the project); an unrelated admin does not see them
+    // the tasks are the template creator's (HR, who is also in the project); an unrelated manager does not see them
     expect(await as(HR, `select 1 from tasks where title = 'Weekly cash count'`)).toHaveLength(4);
-    expect(await as(ADM, `select 1 from tasks where title = 'Weekly cash count'`)).toHaveLength(0);
+    expect(await as(MGR, `select 1 from tasks where title = 'Weekly cash count'`)).toHaveLength(0);
     // only people who run tasks may run them by hand, and a STAFF member cannot see templates
     expect(await fails(as(MO, `select run_task_templates()`))).toMatch(/Only people who run tasks/);
     expect(await as(MO, `select 1 from task_templates`)).toHaveLength(0);
@@ -406,16 +413,16 @@ describe('recurring role tasks', () => {
   });
 
   it('a template’s creator sees the tasks it makes, even outside the project', async () => {
-    await as(ADM, `insert into task_templates (project_id, title, schedule, target_kind, people)
+    await as(MGR, `insert into task_templates (project_id, title, schedule, target_kind, people)
                    values ($1, 'Daily till check', 'daily', 'people', array['A-PAT'])`, [project]);
     // Monday 2 Nov: the weekly cash count for both loan officers, and the daily one for Pat
-    expect((await as<{ n: number }>(ADM, `select run_task_templates('2026-11-02'::date) n`))[0].n).toBe(3);
-    const mine = await as<{ title: string; creator_number: string; created_by: string }>(ADM,
+    expect((await as<{ n: number }>(MGR, `select run_task_templates('2026-11-02'::date) n`))[0].n).toBe(3);
+    const mine = await as<{ title: string; creator_number: string; created_by: string }>(MGR,
       `select title, creator_number, created_by from tasks where template_id is not null and template_period >= '2026-11'
        or template_period = '2026-W45' order by title`);
-    expect(mine).toEqual([{ title: 'Daily till check', creator_number: 'A-ADM', created_by: ADM }]);
+    expect(mine).toEqual([{ title: 'Daily till check', creator_number: 'A-MGR', created_by: MGR }]);
     expect(await as(PAT, `select 1 from tasks where title = 'Daily till check'`)).toHaveLength(1);
-    expect(await as(HR2, `select 1 from tasks where title = 'Daily till check'`)).toHaveLength(0);
+    expect(await as(RITA, `select 1 from tasks where title = 'Daily till check'`)).toHaveLength(0);
   });
 });
 

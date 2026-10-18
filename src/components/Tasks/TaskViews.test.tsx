@@ -14,6 +14,7 @@ const api = vi.hoisted(() => ({
   uploadAttachment: vi.fn(),
   removeAttachment: vi.fn(),
   attachmentUrl: vi.fn(),
+  taskConcernsMe: vi.fn(),
 }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../../lib/tasksApi', () => api);
@@ -208,6 +209,30 @@ describe('TaskDetail', () => {
     fireEvent.change(screen.getByLabelText('New sub-task'), { target: { value: 'Collect forms' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => expect(props.onCreateSubtask).toHaveBeenCalledWith(expect.objectContaining({ id: 'c' }), 'Collect forms'));
+  });
+
+  it('HR or an admin overseeing a task they are not involved in only reads it', async () => {
+    api.taskConcernsMe.mockResolvedValue(false);
+    detail(TASKS[5], { viewer: { userId: 'u-adm', employeeNumber: 'E-ADM', manages: true, oversees: true } });
+    expect(await screen.findByText(/You can see this task as HR\/admin/)).toBeTruthy();
+    expect(api.taskConcernsMe).toHaveBeenCalledWith('d');
+    expect(screen.getByText('Started counting')).toBeTruthy(); // comments and files still readable
+    expect(screen.getByText('count.pdf')).toBeTruthy();
+    expect((screen.getByLabelText('Status') as HTMLSelectElement).disabled).toBe(true);
+    expect(screen.queryByLabelText('Delete task')).toBeNull();
+    expect(screen.queryByLabelText('Comment')).toBeNull();
+    expect(screen.queryByLabelText('New sub-task')).toBeNull();
+    expect(screen.queryByText('Attach a file')).toBeNull();
+    expect(screen.queryByLabelText('Remove count.pdf')).toBeNull();
+  });
+
+  it('an overseer who is involved (say @mentioned) can still comment', async () => {
+    api.taskConcernsMe.mockResolvedValue(true);
+    detail(TASKS[5], { viewer: { userId: 'u-adm', employeeNumber: 'E-ADM', manages: true, oversees: true } });
+    await screen.findByText('Started counting');
+    await waitFor(() => expect(api.taskConcernsMe).toHaveBeenCalled());
+    expect(screen.getByLabelText('Comment')).toBeTruthy();
+    expect(screen.queryByText(/You can see this task as HR\/admin/)).toBeNull();
   });
 
   it('the creator deletes a task', async () => {

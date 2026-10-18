@@ -170,7 +170,9 @@ export default function TaskWorkspace({ mode, teamNumbers, initialOpenId = null 
 
   const open = openId ? tasks.find((t) => t.id === openId) ?? null : null;
   const currentProject = scope.startsWith('project:') ? projectById[scope.slice('project:'.length)] : null;
-  const title = team ? 'Team tasks' : scope === 'my' ? 'My tasks' : scope === 'all' ? 'Everything I can see' : scope === 'templates' ? 'Recurring tasks' : currentProject?.name ?? 'Tasks';
+  // HR and admins see every task in the company (read-only unless they're involved); everyone else what concerns them
+  const allLabel = viewer.oversees ? 'All company tasks' : 'Everything I can see';
+  const title = team ? 'Team tasks' : scope === 'my' ? 'My tasks' : scope === 'all' ? allLabel : scope === 'templates' ? 'Recurring tasks' : currentProject?.name ?? 'Tasks';
   const set = (patch: Partial<TaskFilters>) => setFilters((f) => ({ ...f, ...patch }));
 
   const navButton = (id: Scope, label: string, icon: ReactNode, count?: number) => (
@@ -208,14 +210,18 @@ export default function TaskWorkspace({ mode, teamNumbers, initialOpenId = null 
       />
 
       {!team && (
-        <p className="mb-3 text-[12px] text-muted-foreground">You see tasks you're involved in: yours, ones you created, your projects', and your team's.</p>
+        <p className="mb-3 text-[12px] text-muted-foreground">
+          {viewer.oversees
+            ? "As HR/admin you can see every task in the company (read-only unless you're involved)."
+            : "You see tasks you're involved in: yours, ones you created, your projects', and your team's."}
+        </p>
       )}
 
       <div className="flex flex-col lg:flex-row gap-4">
         {!team && (
           <nav aria-label="Task views" className="lg:w-56 shrink-0 flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible">
             {navButton('my', 'My tasks', <User size={14} />, openCount((t) => !!viewer.employeeNumber && t.assignee_number === viewer.employeeNumber))}
-            {navButton('all', 'Everything I can see', <Layers size={14} />)}
+            {navButton('all', allLabel, <Layers size={14} />)}
             {mode === 'admin' && viewer.manages && navButton('templates', 'Recurring', <Repeat size={14} />)}
             <p className="hidden lg:block mt-3 mb-1 px-2.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Projects</p>
             {sidebarProjects.map((p) => (
@@ -250,7 +256,7 @@ export default function TaskWorkspace({ mode, teamNumbers, initialOpenId = null 
                 </div>
               </div>
 
-              {currentProject && !isMember(currentProject) && (
+              {currentProject && !viewer.oversees && !isMember(currentProject) && (
                 <p className="mb-3 text-[12px] text-muted-foreground">
                   You are not in this project, so you only see its tasks you're involved in.{leads(currentProject) ? ' Add yourself as a member to see all of them.' : ''}
                 </p>

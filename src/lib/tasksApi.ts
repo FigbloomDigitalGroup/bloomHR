@@ -14,16 +14,26 @@ const fail = (error: unknown, fallback: string): never => {
   throw new Error((error as { message?: string })?.message || fallback);
 };
 
-/** The signed-in login, their employee number and whether they run tasks. */
+/** The signed-in login, their employee number, whether they run tasks and whether they oversee every task (ADMIN/HR). */
 export async function loadTaskViewer(): Promise<TaskViewer> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('You are not signed in');
-  const [num, manages] = await Promise.all([supabase.rpc('current_employee_number'), supabase.rpc('manages_tasks')]);
+  const [num, manages, oversees] = await Promise.all([
+    supabase.rpc('current_employee_number'), supabase.rpc('manages_tasks'), supabase.rpc('oversees_tasks'),
+  ]);
   return {
     userId: user.id,
     employeeNumber: (num.data as string | null) || null,
     manages: manages.data === true,
+    oversees: oversees.data === true,
   };
+}
+
+/** Whether the signed-in user is concerned with a task (may comment and attach), not only overseeing it. */
+export async function taskConcernsMe(taskId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('task_concerns_me', { p_task: taskId });
+  if (error) return true; // let the database decide when they try
+  return data === true;
 }
 
 const PROJECT_COLUMNS = 'id, key, name, description, department_id, lead_number, archived, created_by';

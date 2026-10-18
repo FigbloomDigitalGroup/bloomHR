@@ -132,11 +132,13 @@ export interface TaskTemplate {
   last_period: string | null;
 }
 
-/** Who is looking: their login, their employee number (if any) and whether they run tasks. */
+/** Who is looking: their login, their employee number (if any), whether they run tasks and whether they oversee them. */
 export interface TaskViewer {
   userId: string;
   employeeNumber: string | null;
   manages: boolean;
+  /** ADMIN or HR: reads every task in the company for oversight; changing one still needs canEditTask */
+  oversees?: boolean;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -301,7 +303,8 @@ export const activeFilterCount = (f: TaskFilters) =>
 // who may do what (the database decides; this only hides buttons that would fail)
 // ---------------------------------------------------------------------------------------------
 
-// no role-wide power: running tasks (viewer.manages) is about projects, labels and templates, not other people's tasks
+// no role-wide power: running tasks (viewer.manages) is about projects, labels and templates, not other people's tasks,
+// and oversight (viewer.oversees) is read-only
 export function canEditTask(t: Task, viewer: TaskViewer, project?: TaskProject | null): boolean {
   if (t.created_by && t.created_by === viewer.userId) return true;
   if (viewer.employeeNumber && t.assignee_number === viewer.employeeNumber) return true;
