@@ -1,3 +1,4 @@
+import { payPeriodLabel } from '../../lib/payPeriod';
 import React from "react";
 import { Download, ArrowLeft, ArrowRight, X } from "lucide-react";
 import html2pdf from "html2pdf.js";
@@ -88,12 +89,7 @@ export const PayslipDocument = ({ record, companyInfo, id }: { record: any; comp
             {(() => {
               const now = new Date();
               const fallbackPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-              const periodToUse = record.pay_period || record["Pay Period"] || fallbackPeriod;
-              const [year, month] = String(periodToUse).split('-').map(Number);
-              let prevMonth = month - 1;
-              let prevYear = year;
-              if (prevMonth === 0) { prevMonth = 12; prevYear = year - 1; }
-              return new Date(prevYear, prevMonth - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+              return payPeriodLabel(record.pay_period || record["Pay Period"] || fallbackPeriod);
             })()}
           </div>
         </div>
