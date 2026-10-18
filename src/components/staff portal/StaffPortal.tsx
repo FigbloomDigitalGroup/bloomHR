@@ -100,6 +100,8 @@ import bloomMark from '../../../public/bloom-mark.png';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import AdvanceRequest from '../SalaryAdvance/AdvanceRequest';
 import LoanRequest from '../Loans/LoanRequest';
+import { useBackToClose } from '../../hooks/useBackToClose';
+import { useStaffPortalTab } from './useStaffPortalTab';
 
 interface CompanyProfile {
   image_url: string | null;
@@ -305,6 +307,8 @@ function NotificationSidebar({
   onClearAll: () => void;
   onRemove: (id: string) => void;
 }) {
+  // the phone's Back closes the panel
+  useBackToClose(isOpen, onClose);
   return (
     <AnimatePresence>
       {isOpen && (
@@ -1295,7 +1299,8 @@ const myTeamGroup: MenuGroup = { title: 'My team', items: [{ id: 'my-team', labe
 const StaffPortal = () => {
   // shows this person as online in Teams on every page of the portal
   useOnlinePeople();
-  const [activeTab, setActiveTab] = useState('home');
+  // the open section is in the address (?tab=payslips), so Back, refresh and links work (useStaffPortalTab)
+  const [activeTab, setActiveTab] = useStaffPortalTab();
   // a task to open when Tasks next shows (picked on the calendar)
   const [taskToOpen, setTaskToOpen] = useState<string | null>(null);
   const openTask = (taskId: string) => {
@@ -1308,6 +1313,8 @@ const StaffPortal = () => {
   }, [activeTab]);
   const [showResetModal, setShowResetModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false); // For mobile
+  // the phone's Back closes the menu first
+  useBackToClose(sidebarOpen, () => setSidebarOpen(false));
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   // New Sidebar States
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -1909,6 +1916,7 @@ const StaffPortal = () => {
           onOpenMenu={() => setSidebarOpen(true)}
           onPasswordReset={() => setShowResetModal(true)}
           setActiveTab={setActiveTab}
+          atHome={activeTab === 'home'}
         />
 
         {/* Floating Header */}

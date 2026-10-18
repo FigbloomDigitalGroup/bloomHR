@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 vi.mock('../../lib/supabase', () => {
   // any query resolves to an empty result; realtime channels do nothing
@@ -79,5 +79,32 @@ describe('Header menu button', () => {
     const panel = heading.closest('.fixed') as HTMLElement;
     expect(panel.className).toContain('w-[calc(100vw-2rem)]');
     expect(panel.className).toContain('sm:w-96');
+  });
+});
+
+describe('Header phone Back button', () => {
+  function Where() {
+    return <output data-testid="where">{useLocation().pathname}</output>;
+  }
+  const at = (entries: string[]) =>
+    render(
+      <MemoryRouter initialEntries={entries} initialIndex={entries.length - 1}>
+        <Routes>
+          <Route path="*" element={<><Header /><Where /></>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+  it('is not shown on the dashboard', () => {
+    at(['/dashboard']);
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+  });
+
+  it('goes to the previous page, on phones only', () => {
+    at(['/dashboard', '/employees']);
+    const back = screen.getByRole('button', { name: 'Back' });
+    expect(back.className).toContain('md:hidden');
+    fireEvent.click(back);
+    expect(screen.getByTestId('where').textContent).toBe('/dashboard');
   });
 });

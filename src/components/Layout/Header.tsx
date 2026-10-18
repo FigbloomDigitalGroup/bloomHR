@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { AccessibilityButton } from '../Accessibility/AccessibilityModal';
 import { Bell, X, Trash2, CheckCircle, UserPlus, Calendar, MapPin, ChevronDown, AlertTriangle, Clock, HelpCircle, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { useHRNotifications, fetchAdminHRNotifications, markAdminNotificationRead, type HRNotification } from '../../hooks/useHRNotifications';
@@ -12,6 +12,8 @@ import { useOnlinePeople } from '../chat/lib/presence';
 import { useMyCompanies } from '../../hooks/useMyCompanies';
 import { OPEN_COMPANY_PROFILE, COMPANY_PROFILE_SAVED } from '../Dashboard/GetStarted';
 import { loadCompanyIdentity, type CompanyIdentity } from '../../lib/companyProfile';
+import { onOverlayEntry, useBackToClose, useExitGuard } from '../../hooks/useBackToClose';
+import PhoneBackButton from './PhoneBackButton';
 
 interface HeaderProps {
   user?: { email: string; role: string };
@@ -147,6 +149,13 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
   }, [locationOpen]);
   const [companyProfile, setCompanyProfile] = useState<CompanyIdentity | null>(null);
   const navigate = useNavigate();
+  // phones: Back closes the notifications panel first; "‹ Back" in the header away from the dashboard; and in the
+  // installed app, Back on the dashboard asks before leaving
+  const { pathname } = useLocation();
+  const atHome = pathname === '/' || pathname === '/dashboard';
+  const goHome = () => navigate('/dashboard', { replace: true });
+  useBackToClose(sidebarOpen, () => setSidebarOpen(false));
+  useExitGuard(atHome, goHome);
 
   // Create notification item helper
   const createNotificationItem = (type: 'staff' | 'leave', data: any): NotificationItem => {
@@ -334,16 +343,17 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
       )
     }));
 
-    // Navigate based on type
+    // Navigate based on type (in place of the panel's history entry, so Back does not land on the closed panel)
+    const replace = onOverlayEntry();
     if (notification.type === 'staff') {
-      navigate('/adminconfirm');
+      navigate('/adminconfirm', { replace });
       setNotifications(prev => ({ ...prev, staff: Math.max(0, prev.staff - 1) }));
     } else if (notification.type === 'leave') {
-      navigate('/leaves');
+      navigate('/leaves', { replace });
       setNotifications(prev => ({ ...prev, leave: Math.max(0, prev.leave - 1) }));
     } else if (notification.type === 'hr') {
       if (notification.hrId) markAdminNotificationRead(notification.hrId);
-      navigate('/hr-lifecycle');
+      navigate('/hr-lifecycle', { replace });
       setNotifications(prev => ({ ...prev, hr: Math.max(0, prev.hr - 1) }));
     }
 
@@ -401,6 +411,7 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
             <Menu className="w-5 h-5 stroke-[1.8px]" />
           </button>
         )}
+        <PhoneBackButton atHome={atHome} onHome={goHome} compact className="md:hidden -ml-2" />
 
         {/* Company menu: switch company, company profile, new company */}
         <div className="flex items-center min-w-0 flex-shrink max-w-[38%] sm:max-w-[240px]">

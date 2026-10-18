@@ -15,6 +15,7 @@ import OvertimeWaiting from '../Overtime/OvertimeWaiting';
 import CasualDaysGrid from '../Casual/CasualDaysGrid';
 import LeaveAwaitingMe from '../Approvals/LeaveAwaitingMe';
 import TaskWorkspace from '../Tasks/TaskWorkspace';
+import { useUrlParam } from '../../hooks/useUrlParam';
 
 // My team (staff portal): for a staff member who supervises others (migration 20261018900000). The same screens HR
 // and managers use, limited to the supervisor's reports; the database decides what they may do (custom KPIs,
@@ -23,7 +24,9 @@ import TaskWorkspace from '../Tasks/TaskWorkspace';
 type Tab = 'team' | 'tasks' | 'kpis' | 'overtime' | 'casual' | 'leave';
 
 export default function MyTeam({ team }: { team: TeamMember[] }) {
-  const [tab, setTab] = useState<Tab>('team');
+  // the tab is in the address (?view=kpis), so the phone's Back returns to the previous tab
+  const [tabParam, setTab] = useUrlParam('view', 'team');
+  const tab = tabParam as Tab;
   const [casuals, setCasuals] = useState<CasualWorker[]>([]);
 
   useEffect(() => {
