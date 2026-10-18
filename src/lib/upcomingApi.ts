@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { fetchAllResult } from './fetchAll';
 import type { EventRow, HolidayRow, LeaveRow, TaskRow } from './upcoming';
 
 // Reading what the calendar's "Coming up" list and the leave form's hints need. Everyone can read the company's
@@ -45,5 +46,18 @@ export async function loadMyLeave(employeeNumber: string): Promise<LeaveRow[]> {
     start: l['Start Date'],
     end: l['End Date'],
     status: l.status,
+  }));
+}
+
+/** Everyone's name, birthday and work email, for birthdays (only the day is ever shown, never the year). */
+export async function loadBirthdayPeople(): Promise<{ name: string; dateOfBirth: string | null; email: string | null }[]> {
+  // every employee, a page at a time (one request is capped at 1000 rows)
+  const { data } = await fetchAllResult((from, to) =>
+    supabase.from('employee_directory').select('"First Name", "Last Name", "Date of Birth", "Work Email"').order('"Employee Number"').range(from, to)
+  );
+  return ((data || []) as Record<string, string | null>[]).map((p) => ({
+    name: `${p['First Name'] || ''} ${p['Last Name'] || ''}`,
+    dateOfBirth: p['Date of Birth'],
+    email: p['Work Email'],
   }));
 }

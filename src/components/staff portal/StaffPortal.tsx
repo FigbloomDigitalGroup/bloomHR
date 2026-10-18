@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // Phosphor Icons - Premium icon set
 import {
-  ChatCircleDots as PhChatCircleDots,
   FileText as PhFileText,
   SquaresFour as PhSquaresFour,
   GraduationCap as PhGraduationCap,
@@ -37,17 +36,6 @@ import {
   Bell,
   Menu,
   Search,
-  WalletCards,
-  HandCoins,
-  ReceiptText,
-  MessageSquarePlus,
-  CalendarClock,
-  History,
-  FileSignature,
-  Fingerprint,
-  FolderClosed,
-  ShieldAlert,
-  BriefcaseBusiness,
   AlertTriangle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -67,7 +55,7 @@ import { ChatLayout } from '../chat/ChatLayout';
 import { useOnlinePeople } from '../chat/lib/presence';
 import { realChannelId } from '../chat/lib/names';
 import { addIncoming, toUnreadCounts, totalUnread, type IncomingMessage, type UnreadCounts } from '../chat/lib/unread';
-import CelebrationsCard from './CelebrationsCard';
+import StaffHome from './StaffHome';
 import VideoConferenceComponent from './VideoConf';
 import UserProfileDropdown from './UserProfile';
 import StaffMobileHeader from './StaffMobileHeader';
@@ -89,7 +77,6 @@ import { NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
 import { describeFree, useLeaveCheck } from '../../lib/leaveRules';
 import { LEAVE_DOCUMENTS_BUCKET, LeaveDocumentRule, loadLeaveDocumentRules, uploadLeaveDocument } from '../../lib/leaveDocuments';
 import LeaveDocuments from '../Leave/LeaveDocuments';
-import CompleteProfileCard from './CompleteProfileCard';
 import OnboardingForm from '../Onboarding/OnboardingForm';
 import MyFirstWeeks from '../AfterHiring/MyFirstWeeks';
 import PayslipViewer from './PayslipViewer';
@@ -160,85 +147,6 @@ const parseApplicationDate = (app: any): Date => {
 
   return parsedDate;
 };
-
-// Elevated PortalCard Component — matches Employee card design
-function PortalCard({ icon, title, description, onClick, color = 'green' }: {
-  icon: React.ReactNode,
-  title: string,
-  description: string,
-  onClick: () => void,
-  color?: 'green' | 'blue' | 'purple' | 'amber' | 'rose' | 'indigo' | 'cyan',
-  active?: boolean
-}) {
-  const themes = {
-    green: { avatarBg: 'bg-gradient-to-br from-brand to-brand-dark', headerBg: 'bg-gradient-to-r from-brand/80 to-brand-dark/80', iconText: 'text-brand', rowHover: 'group-hover:border-green-tint group-hover:bg-green-tint/10', dot: 'bg-status-success' },
-    blue: { avatarBg: 'bg-gradient-to-br from-blue-600 to-blue-700', headerBg: 'bg-gradient-to-r from-blue-600/80 to-blue-500/80', iconText: 'text-blue-600', rowHover: 'group-hover:border-blue-100 group-hover:bg-blue-50/10', dot: 'bg-blue-500' },
-    purple: { avatarBg: 'bg-gradient-to-br from-purple-600 to-purple-700', headerBg: 'bg-gradient-to-r from-purple-600/80 to-purple-500/80', iconText: 'text-purple-600', rowHover: 'group-hover:border-purple-100 group-hover:bg-purple-50/10', dot: 'bg-purple-500' },
-    amber: { avatarBg: 'bg-gradient-to-br from-amber-500 to-amber-700', headerBg: 'bg-gradient-to-r from-amber-600/80 to-amber-500/80', iconText: 'text-amber-600', rowHover: 'group-hover:border-amber-100 group-hover:bg-amber-50/10', dot: 'bg-amber-500' },
-    rose: { avatarBg: 'bg-gradient-to-br from-rose-500 to-rose-700', headerBg: 'bg-gradient-to-r from-rose-600/80 to-rose-500/80', iconText: 'text-rose-600', rowHover: 'group-hover:border-rose-100 group-hover:bg-rose-50/10', dot: 'bg-rose-500' },
-    indigo: { avatarBg: 'bg-gradient-to-br from-indigo-600 to-indigo-700', headerBg: 'bg-gradient-to-r from-indigo-600/80 to-indigo-500/80', iconText: 'text-indigo-600', rowHover: 'group-hover:border-indigo-100 group-hover:bg-indigo-50/10', dot: 'bg-indigo-500' },
-    cyan: { avatarBg: 'bg-gradient-to-br from-cyan-500 to-cyan-700', headerBg: 'bg-gradient-to-r from-cyan-600/80 to-cyan-500/80', iconText: 'text-cyan-600', rowHover: 'group-hover:border-cyan-100 group-hover:bg-cyan-50/10', dot: 'bg-cyan-500' },
-  };
-
-  const theme = themes[color];
-
-  return (
-    <motion.div
-      whileHover={{ y: -4 }}
-      whileTap={{ scale: 0.98 }}
-      className="group flex flex-col bg-white rounded-2xl border border-gray-200/60 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] hover:border-brand/20 transition-all duration-300 overflow-hidden cursor-pointer"
-      onClick={onClick}
-    >
-      {/* Header */}
-      <div className="relative h-14 px-4 flex items-center bg-gradient-to-r from-brand/10 to-white">
-        <div className="flex items-center space-x-3 w-full">
-          {/* Avatar-style icon circle */}
-          <div className="relative">
-            <div className="w-8 h-8 bg-transparent rounded-full flex items-center justify-center text-black border border-black/20">
-              <div className="[&_svg]:w-[18px] [&_svg]:h-[18px]">{icon}</div>
-            </div>
-            <div className={`absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${theme.dot}`} />
-          </div>
-          {/* Title & label */}
-          <div className="space-y-0.5 min-w-0">
-            <h3 className="text-gray-900 font-normal text-[13px] leading-tight group-hover:text-brand transition-colors truncate">
-              {title}
-            </h3>
-            <span className="px-1.5 py-0.5 rounded-md bg-gray-50 text-gray-500 text-[9px] font-medium tracking-wide border border-gray-200">
-              Staff Portal
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Slick Separator */}
-      <div className="h-px w-full bg-gray-200" />
-
-      {/* Body */}
-      <div className="px-4 py-4 flex-grow bg-white">
-        <div className={`flex items-center p-2 rounded-lg bg-gray-50/50 border border-gray-100 ${theme.rowHover} transition-colors`}>
-          <div className="ml-1 min-w-0">
-            <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">Description</p>
-            <p className="text-xs font-medium text-gray-700 truncate">{description}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Separator */}
-      <div className="h-px w-full bg-gray-200" />
-
-      {/* Footer */}
-      <div className="h-11 px-4 flex items-center bg-white">
-        <div className="flex items-center justify-between w-full">
-          <span className="text-[10px] font-bold text-gray-500 group-hover:text-brand transition-colors">Open</span>
-          <div className={`w-6 h-6 rounded-full bg-gray-100 group-hover:bg-green-tint flex items-center justify-center ${theme.iconText} transition-colors`}>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
 
 // Header Status Component
 function HeaderStatus({
@@ -1022,159 +930,6 @@ const LeaveApplicationsList = () => {
         </div>
       </div>
     </div>
-  );
-};
-
-// Enhanced DashboardHome with Payslip button
-const DashboardHome = ({ setActiveTab, userName }: { setActiveTab: (tab: string) => void, userName: string }) => {
-  const currentHour = new Date().getHours();
-  const greeting = currentHour < 12 ? "Good Morning" : currentHour < 17 ? "Good Afternoon" : "Good Evening";
-
-  return (
-    <div className="px-3 py-2 md:p-6 space-y-5 md:space-y-8">
-      {/* Clean Welcome Banner */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-3 pt-2 pb-1"
-      >
-        <div className="flex-1 space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="px-1.5 py-0.5 bg-green-tint border border-green-tint rounded text-[9px] font-bold tracking-[0.2em] text-status-success uppercase">
-              System Active
-            </span>
-            <div className="h-px w-6 bg-gray-300" />
-            <span className="text-[9px] font-medium text-gray-500 lowercase tracking-wider">
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-            </span>
-          </div>
-
-          <div className="flex flex-col gap-0 shadow-sm leading-tight text-shadow-sm">
-            <h2 className="text-xl md:text-2xl font-light tracking-tight text-gray-900 leading-none pb-1">
-              {greeting}, <span className="font-bold text-gray-900 tracking-normal">{userName.split(' ')[0]}</span><span className="text-brand">.</span>
-            </h2>
-            <p className="text-gray-500 text-[11px] md:text-xs font-medium max-w-md pt-0.5">
-              Your workspace is optimized and ready for deployment.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 pt-2 md:pt-0 w-full md:w-auto">
-          <motion.button
-            whileHover={{ scale: 1.02, y: -1 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setActiveTab('details')}
-            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-medium hover:bg-gray-800 transition-all shadow-sm"
-          >
-            <PhUserCircle size={14} weight="bold" />
-            Profile
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.02, y: -1 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setActiveTab('VideoConf')}
-            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 transition-all shadow-sm"
-          >
-            <PhChatCircleDots size={14} weight="bold" />
-            Hub
-          </motion.button>
-        </div>
-      </motion.div>
-
-      <CompleteProfileCard onOpen={() => setActiveTab('onboarding')} />
-
-      <CelebrationsCard onViewCalendar={() => setActiveTab('company-calendar')} />
-
-      {/* Services Grid */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between px-2">
-          <div>
-            <h3 className="text-base md:text-lg font-bold text-gray-900">Quick Services</h3>
-            <p className="text-[10px] md:text-xs text-gray-500 font-medium tracking-tight">Access your employee tools and resources</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-          <PortalCard
-            icon={<WalletCards className="w-5 h-5" strokeWidth={1.5} />}
-            title="Salary Advance"
-            description="Emergency financial support"
-            onClick={() => setActiveTab('salary-advance')}
-            color="green"
-          />
-          <PortalCard
-            icon={<HandCoins className="w-5 h-5" strokeWidth={1.5} />}
-            title="Loans"
-            description="Apply for a staff loan and see your repayments"
-            onClick={() => setActiveTab('loan')}
-            color="green"
-          />
-          <PortalCard
-            icon={<ReceiptText className="w-5 h-5" strokeWidth={1.5} />}
-            title="Payslips"
-            description="Download salary breakdowns"
-            onClick={() => setActiveTab('payslips')}
-            color="green"
-          />
-          <PortalCard
-            icon={<MessageSquarePlus className="w-5 h-5" strokeWidth={1.5} />}
-            title="Comm Hub"
-            description="Collaborate with your team"
-            onClick={() => setActiveTab('VideoConf')}
-            color="green"
-          />
-          <PortalCard
-            icon={<CalendarClock className="w-5 h-5" strokeWidth={1.5} />}
-            title="Leave Request"
-            description="Plan your time off"
-            onClick={() => setActiveTab('leave')}
-            color="green"
-          />
-          <PortalCard
-            icon={<History className="w-5 h-5" strokeWidth={1.5} />}
-            title="Leave History"
-            description="Review previous applications"
-            onClick={() => setActiveTab('leave-history')}
-            color="green"
-          />
-          <PortalCard
-            icon={<FileSignature className="w-5 h-5" strokeWidth={1.5} />}
-            title="Contracts"
-            description="Review employment documents"
-            onClick={() => setActiveTab('contract')}
-            color="green"
-          />
-          <PortalCard
-            icon={<Fingerprint className="w-5 h-5" strokeWidth={1.5} />}
-            title="My Profile"
-            description="Manage your personal info"
-            onClick={() => setActiveTab('details')}
-            color="green"
-          />
-          <PortalCard
-            icon={<FolderClosed className="w-5 h-5" strokeWidth={1.5} />}
-            title="Documents"
-            description="Secure file storage"
-            onClick={() => setActiveTab('documents')}
-            color="green"
-          />
-          <PortalCard
-            icon={<ShieldAlert className="w-5 h-5" strokeWidth={1.5} />}
-            title="Report Incident"
-            description="Whistleblower protection"
-            onClick={() => setActiveTab('incident-report')}
-            color="green"
-          />
-          <PortalCard
-            icon={<BriefcaseBusiness className="w-5 h-5" strokeWidth={1.5} />}
-            title="Opportunities"
-            description="Career growth paths"
-            onClick={() => setActiveTab('job-applications')}
-            color="green"
-          />
-        </div>
-      </div>
-    </div >
   );
 };
 
@@ -1994,7 +1749,7 @@ const StaffPortal = () => {
                 </div>
               )}
               {/* Render Active Tab */}
-              {activeTab === 'home' && <DashboardHome setActiveTab={setActiveTab} userName={userName} />}
+              {activeTab === 'home' && <StaffHome setActiveTab={setActiveTab} userName={userName} onOpenTask={openTask} />}
               {activeTab === 'salary-advance' && <AdvanceRequest />}
               {activeTab === 'onboarding' && <OnboardingForm />}
               {activeTab === 'first-weeks' && <MyFirstWeeks onOpenTraining={() => setActiveTab('training')} />}
