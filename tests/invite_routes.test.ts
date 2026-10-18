@@ -18,12 +18,14 @@ const state = vi.hoisted(() => ({
   user_profiles: [] as Row[],
   invitations: [] as Row[],
   tenants: [] as Row[],
+  // the "Invite people" module (FIG-827): staff have none of it here
+  role_permissions: [] as Row[],
   sends: [] as Record<string, unknown>[],
   sendResult: { error: null } as { error: unknown },
 }));
 
 vi.mock('@supabase/supabase-js', () => {
-  const table = (name: 'user_profiles' | 'invitations' | 'tenants') => {
+  const table = (name: 'user_profiles' | 'invitations' | 'tenants' | 'role_permissions') => {
     const filters: [string, unknown][] = [];
     const b: Record<string, unknown> = {
       select: () => b,

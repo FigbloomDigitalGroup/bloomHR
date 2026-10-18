@@ -88,6 +88,10 @@ export const AUDIT_TABLE_LABELS: Record<string, string> = {
   assets: 'Asset',
   todos: 'Task',
   tenants: 'Company',
+  // roles (FIG-827): a company's roles, their modules, and who holds which (by the role's name)
+  company_roles: 'Role',
+  role_permissions: 'Role permissions',
+  role_assignments: 'Role given',
 };
 
 export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {

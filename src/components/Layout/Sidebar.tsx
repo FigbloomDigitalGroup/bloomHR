@@ -132,7 +132,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
   const [searchQuery, setSearchQuery] = useState('');
 
   // Use permissions hook for dynamic access control
-  const { hasPermission, hasAnyPermission, userRole: permissionRole, loading: permissionsLoading } = usePermissions();
+  const { hasPermission, hasAnyPermission, userRole: permissionRole, roleName, loading: permissionsLoading } = usePermissions();
   const { data: myPreferences } = useMyPreferences(user?.email);
 
   // Badge on "Time Off" (FIG-575): count of pending leave applications that
@@ -254,7 +254,8 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [drawerOpen, onMobileClose]);
-  const userRole = user?.role || 'Admin';
+  // the role as the company names it (their own role, FIG-827), else the role
+  const userRole = roleName || user?.role || 'Admin';
   const avatarUrl = myPreferences?.avatarUrl ?? null;
   const userInitial = user?.email?.[0]?.toUpperCase() || 'A';
 
@@ -468,8 +469,8 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
                     exit={{ opacity: 0, width: 0 }}
                     className="flex-1 overflow-hidden"
                   >
-                    <p className="text-xs font-bold text-shell-fg truncate font-lexend capitalize">
-                      {userRole.toLowerCase()}
+                    <p className={`text-xs font-bold text-shell-fg truncate font-lexend ${roleName ? '' : 'capitalize'}`}>
+                      {roleName ? userRole : userRole.toLowerCase()}
                     </p>
                     <p className="text-[10px] text-shell-fg/40 truncate">Admin Workspace</p>
                   </motion.div>

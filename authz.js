@@ -1,21 +1,15 @@
 // authz.js - permission and rate-limit helpers shared by the backend routes that need the signed-in caller
 // (sms_routes.js, email_routes.js). admin_routes.js verifies who is calling; this decides what they may do.
-import { admin, HttpError } from "./admin_routes.js";
+import { admin, callerModules } from "./admin_routes.js";
 
 /**
  * Does the caller's role include one of these modules (the same permissions the app uses to show or hide screens,
- * edited under Role & Permissions)? ADMIN always does. Scoped to the caller's own tenant.
+ * edited under Role & Permissions)? ADMIN always does. A company's own role (FIG-827) gives its own modules.
+ * Scoped to the caller's own tenant.
  */
 export async function callerHasModule(caller, modules) {
   if (caller.role === "ADMIN") return true;
-  const { data, error } = await admin
-    .from("role_permissions")
-    .select("permissions")
-    .eq("tenant_id", caller.tenantId)
-    .eq("role_name", caller.role)
-    .maybeSingle();
-  if (error) throw new HttpError(500, "Could not verify permissions");
-  const granted = Array.isArray(data?.permissions) ? data.permissions : [];
+  const granted = await callerModules(caller);
   return modules.some((m) => granted.includes(m));
 }
 

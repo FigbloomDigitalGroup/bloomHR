@@ -16,6 +16,8 @@ export interface InvitePreview {
   company_name: string;
   email: string;
   role: string;
+  /** the role as the company names it (its own role, or a renamed system role) */
+  role_name?: string | null;
 }
 
 /** An open invitation sent to the signed-in person's own address. */
@@ -24,12 +26,15 @@ export interface PendingInvitation {
   company_name: string;
   role: string;
   expires_at: string;
+  role_name?: string | null;
 }
 
 export interface Invitation {
   id: string;
   email: string;
   role: string;
+  /** the company's own role the invitation gives (FIG-827), else null: the system role */
+  company_role_id?: string | null;
   status: 'pending' | 'accepted' | 'revoked';
   created_at: string;
   expires_at: string;
@@ -42,6 +47,7 @@ export interface CreatedInvitation {
   expires_at: string;
 }
 
+/** The system roles (lib/roles has the company's own roles too; the setup assistant offers these). */
 export const INVITABLE_ROLES = ['STAFF', 'MANAGER', 'REGIONAL', 'OPERATIONS', 'CHECKER', 'HR', 'ADMIN'] as const;
 
 /** Supabase errors are plain objects, not Error instances: turn them into a message a person can read. */
@@ -76,8 +82,11 @@ export const companyApi = {
     await call<null>('switch_company', { p_tenant_id: tenantId });
   },
 
-  createInvitation: async (email: string, role: string): Promise<CreatedInvitation> => {
-    const rows = await call<CreatedInvitation[]>('create_invitation', { p_email: email, p_role: role });
+  /** `companyRoleId`: one of the company's own roles (its base role is then the role). */
+  createInvitation: async (email: string, role: string, companyRoleId?: string | null): Promise<CreatedInvitation> => {
+    const args: Record<string, unknown> = { p_email: email, p_role: role };
+    if (companyRoleId) args.p_company_role_id = companyRoleId;
+    const rows = await call<CreatedInvitation[]>('create_invitation', args);
     const created = Array.isArray(rows) ? rows[0] : rows;
     if (!created?.token) throw new Error('Could not create the invitation. Please try again.');
     return created;
@@ -113,7 +122,7 @@ export const companyApi = {
   listInvitations: async (): Promise<Invitation[]> => {
     const { data, error } = await supabase
       .from('invitations')
-      .select('id, email, role, status, created_at, expires_at, accepted_at')
+      .select('id, email, role, company_role_id, status, created_at, expires_at, accepted_at')
       .order('created_at', { ascending: false })
       .limit(100);
     if (error) throw new Error(describeCompanyError(error));

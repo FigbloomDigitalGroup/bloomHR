@@ -38,7 +38,9 @@ import CareersSettingsCard from './CareersSettings';
 import LoanSettingsCard from '../Loans/LoanSettingsCard';
 
 import { confirmDialog } from '../../lib/confirmDialog';
-// Role definitions
+import { CompanyRole, rolesApi, roleDisplayName, roleKeyFor, roleSelection, useCompanyRoles } from '../../lib/roles';
+// The system roles' look (icon, colour, whether they work at one location). The company's roles, its own and these by
+// the names it gave them, come from useCompanyRoles(); a company's own role looks like its base role.
 const ROLES = {
   ADMIN: {
     label: 'Admin',
@@ -107,18 +109,21 @@ const StatusBadge = ({ status }: { status: string }) => (
   />
 );
 
-const RoleBadge = ({ role }: { role: keyof typeof ROLES }) => {
-  const roleInfo = ROLES[role] || ROLES.STAFF;
-  return <StatusPill label={roleInfo.label} tone={ROLE_TONE[role] || 'neutral'} />;
-};
+const RoleBadge = ({ role, label }: { role: string; label: string }) => (
+  <StatusPill label={label || (ROLES[role as keyof typeof ROLES] || ROLES.STAFF).label} tone={ROLE_TONE[role] || 'neutral'} />
+);
+
+const requiresLocation = (role: string) => !!ROLES[role as keyof typeof ROLES]?.requiresLocation;
 
 const UserCard = ({
   user,
+  roles,
   onEdit,
   onDelete,
   onResetPassword
 }: {
   user: any;
+  roles: CompanyRole[];
   onEdit: (user: any) => void;
   onDelete: (user: any) => void;
   onResetPassword: (user: any) => void;
@@ -194,7 +199,7 @@ const UserCard = ({
 
       <div className="flex flex-wrap gap-2 mt-3">
         <StatusBadge status={user.account_status} />
-        <RoleBadge role={user.role || 'STAFF'} />
+        <RoleBadge role={user.role || 'STAFF'} label={roleDisplayName(roles, user.role || 'STAFF', user.company_role_id)} />
       </div>
     </Card>
   );
@@ -282,6 +287,8 @@ const Pagination = ({
 interface UserData {
   email: string;
   role: string;
+  /** the company's own role they hold (FIG-827), else null */
+  company_role_id?: string | null;
   password?: string;
   confirmPassword?: string;
   location: string | null;
@@ -290,10 +297,12 @@ interface UserData {
 
 const UserEditModal = ({
   user,
+  roles,
   onClose,
   onSave
 }: {
   user: UserData | null;
+  roles: CompanyRole[];
   onClose: () => void;
   onSave: (user: UserData) => void
 }) => {
@@ -318,9 +327,12 @@ const UserEditModal = ({
     }
   }, [user]);
 
-  const handleRoleChange = (role: keyof typeof ROLES) => {
-    setEditedUser({ ...editedUser, role });
+  // picking a role sets both the base role and the company role (null for a system role)
+  const handleRoleChange = (picked: CompanyRole) => {
+    const { role, companyRoleId } = roleSelection(picked);
+    setEditedUser({ ...editedUser, role, company_role_id: companyRoleId });
   };
+  const selectedKey = roleKeyFor(roles, editedUser.role, editedUser.company_role_id);
 
   const validatePassword = () => {
     if (!user && !editedUser.password) {
@@ -427,26 +439,28 @@ const UserEditModal = ({
 
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
-            <div className="grid grid-cols-2 gap-2">
-              {(Object.keys(ROLES) as Array<keyof typeof ROLES>).map((role) => {
-                const roleInfo = ROLES[role];
-
+            <div className="grid grid-cols-2 gap-2" role="group" aria-label="Role">
+              {roles.filter((r) => r.active || r.role_key === selectedKey).map((r) => {
+                const selected = selectedKey === r.role_key;
                 return (
                   <button
-                    key={role}
-                    onClick={() => handleRoleChange(role)}
-                    className={`p-2 border rounded-lg text-xs font-medium ${editedUser.role === role ?
-                      (role === 'ADMIN' ? 'border-purple-500 bg-purple-50 text-purple-700' :
-                        role === 'REGIONAL' ? 'border-violet-500 bg-violet-50 text-violet-700' :
-                          role === 'MANAGER' ? 'border-blue-500 bg-blue-50 text-blue-700' :
-                            role === 'CHECKER' ? 'border-orange-500 bg-orange-50 text-orange-700' :
-                              role === 'OPERATIONS' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' :
-                                role === 'STAFF' ? 'border-green-500 bg-green-50 text-green-700' :
+                    type="button"
+                    key={r.role_key}
+                    aria-pressed={selected}
+                    title={r.is_system ? r.description ?? undefined : `Based on ${roleDisplayName(roles, r.base_role)}`}
+                    onClick={() => handleRoleChange(r)}
+                    className={`p-2 border rounded-lg text-xs font-medium ${selected ?
+                      (r.base_role === 'ADMIN' ? 'border-purple-500 bg-purple-50 text-purple-700' :
+                        r.base_role === 'REGIONAL' ? 'border-violet-500 bg-violet-50 text-violet-700' :
+                          r.base_role === 'MANAGER' ? 'border-blue-500 bg-blue-50 text-blue-700' :
+                            r.base_role === 'CHECKER' ? 'border-orange-500 bg-orange-50 text-orange-700' :
+                              r.base_role === 'OPERATIONS' ? 'border-indigo-500 bg-indigo-50 text-indigo-700' :
+                                r.base_role === 'STAFF' ? 'border-green-500 bg-green-50 text-green-700' :
                                   'border-gray-500 bg-gray-50 text-gray-700') :
                       'border-gray-200 hover:bg-gray-50'
                       }`}
                   >
-                    {roleInfo.label}
+                    {r.name}
                   </button>
                 );
               })}
@@ -682,6 +696,7 @@ export default function UserRolesSettings() {
   const [resettingPasswordUser, setResettingPasswordUser] = useState<any | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [usersPerPage] = useState(12);
+  const { roles } = useCompanyRoles();
 
   // Fetch users from Supabase - FIXED to get all users
   useEffect(() => {
@@ -705,7 +720,7 @@ export default function UserRolesSettings() {
   // Filter users based on search and filters
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = selectedRole === 'ALL' || user.role === selectedRole;
+    const matchesRole = selectedRole === 'ALL' || roleKeyFor(roles, user.role, user.company_role_id) === selectedRole;
     const matchesStatus = selectedStatus === 'ALL' || user.account_status === selectedStatus;
 
     return matchesSearch && matchesRole && matchesStatus;
@@ -766,18 +781,25 @@ export default function UserRolesSettings() {
       const finalUserData = userData;
 
       if (editingUser) {
-        // Update existing user
+        // A new role goes through the database (assign_company_role): it checks who may give which role and records
+        // the change in the audit trail. The rest (status, location) through the admin API, as before.
+        const roleChanged =
+          finalUserData.role !== editingUser.role || (finalUserData.company_role_id || null) !== (editingUser.company_role_id || null);
+        const picked = roles.find((r) => r.role_key === roleKeyFor(roles, finalUserData.role, finalUserData.company_role_id));
+        const assignInDb = roleChanged && !!picked?.id;
+        if (assignInDb) await rolesApi.assign(editingUser.id, picked!.id!);
         await adminApi.updateUser(editingUser.id, {
           email: finalUserData.email,
-          role: finalUserData.role,
+          ...(roleChanged && !assignInDb ? { role: finalUserData.role } : {}),
           account_status: finalUserData.account_status,
-          location: ROLES[finalUserData.role as keyof typeof ROLES]?.requiresLocation ? finalUserData.location || null : null
+          location: requiresLocation(finalUserData.role) ? finalUserData.location || null : null
         });
 
         setUsers(users.map(u => u.id === editingUser.id ? {
           ...u,
           email: finalUserData.email,
           role: finalUserData.role,
+          company_role_id: finalUserData.company_role_id || null,
           account_status: finalUserData.account_status,
           location: finalUserData.location || null
         } : u));
@@ -792,14 +814,16 @@ export default function UserRolesSettings() {
           email: finalUserData.email,
           password: finalUserData.password,
           role: finalUserData.role,
+          ...(finalUserData.company_role_id ? { company_role_id: finalUserData.company_role_id } : {}),
           account_status: finalUserData.account_status,
-          location: ROLES[finalUserData.role as keyof typeof ROLES]?.requiresLocation ? finalUserData.location || null : null
+          location: requiresLocation(finalUserData.role) ? finalUserData.location || null : null
         });
 
         setUsers([...users, {
           id: created.id,
           email: finalUserData.email,
           role: finalUserData.role,
+          company_role_id: finalUserData.company_role_id || null,
           account_status: finalUserData.account_status || 'ACTIVE',
           last_sign_in_at: null,
           created_at: new Date().toISOString(),
@@ -954,8 +978,8 @@ export default function UserRolesSettings() {
               className="w-full appearance-none rounded-tile border border-border bg-white pl-3 pr-8 py-2 text-xs text-ink outline-none focus:border-brand"
             >
               <option value="ALL">All Roles</option>
-              {(Object.keys(ROLES) as Array<keyof typeof ROLES>).map((role) => (
-                <option key={role} value={role}>{ROLES[role].label}</option>
+              {roles.map((r) => (
+                <option key={r.role_key} value={r.role_key}>{r.name}</option>
               ))}
             </select>
             <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-subtle" strokeWidth={2} />
@@ -988,6 +1012,7 @@ export default function UserRolesSettings() {
                   <UserCard
                     key={user.id}
                     user={user}
+                    roles={roles}
                     onEdit={setEditingUser}
                     onDelete={handleDeleteUser}
                     onResetPassword={setResettingPasswordUser}
@@ -1022,6 +1047,7 @@ export default function UserRolesSettings() {
       {showAddUserModal && (
         <UserEditModal
           user={null}
+          roles={roles}
           onClose={() => setShowAddUserModal(false)}
           onSave={handleSaveUser}
         />
@@ -1030,6 +1056,7 @@ export default function UserRolesSettings() {
       {editingUser && (
         <UserEditModal
           user={editingUser}
+          roles={roles}
           onClose={() => setEditingUser(null)}
           onSave={handleSaveUser}
         />
