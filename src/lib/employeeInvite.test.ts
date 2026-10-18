@@ -29,6 +29,11 @@ describe('inviteEmployee', () => {
     expect(emailInvitation).toHaveBeenCalledWith('tok');
   });
 
+  it('invites with the role picked: one of the company roles (its base role and id)', async () => {
+    await expect(inviteEmployee('lead@figbloom.org', 'STAFF', 'r-lead')).resolves.toEqual({ status: 'sent', email: 'lead@figbloom.org' });
+    expect(createInvitation).toHaveBeenCalledWith('lead@figbloom.org', 'STAFF', 'r-lead');
+  });
+
   it('keeps the link to send by hand when the email does not go out', async () => {
     emailInvitation.mockRejectedValue(new Error('Email is not set up'));
     await expect(inviteEmployee('a@b.co')).resolves.toEqual({
