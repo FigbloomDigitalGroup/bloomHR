@@ -25,6 +25,22 @@ export function toDay(value: string | null | undefined): Date | null {
   return isNaN(d.getTime()) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+/**
+ * A birthday's month (0-11) and day. Colleagues only ever get 'MM-DD' (employee_directory.birthday, never the year);
+ * a full date of birth is read too. Null if missing or unreadable.
+ */
+export function birthdayMonthDay(value: string | null | undefined): { month: number; day: number } | null {
+  if (!value) return null;
+  const md = /^(\d{1,2})-(\d{1,2})$/.exec(value.trim());
+  if (md) {
+    const month = Number(md[1]) - 1;
+    const day = Number(md[2]);
+    return month >= 0 && month <= 11 && day >= 1 && day <= 31 ? { month, day } : null;
+  }
+  const d = toDay(value);
+  return d ? { month: d.getMonth(), day: d.getDate() } : null;
+}
+
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const daysBetween = (from: Date, to: Date) => Math.round((startOfDay(to).getTime() - startOfDay(from).getTime()) / DAY);
 
@@ -39,15 +55,15 @@ export function nextAnniversary(month: number, day: number, today: Date): Date {
 }
 
 export function upcomingBirthdays(
-  people: { name: string; dateOfBirth: string | null | undefined; email?: string | null }[],
+  people: { name: string; birthday: string | null | undefined; email?: string | null }[],
   today: Date,
   withinDays: number
 ): UpcomingItem[] {
   const items: UpcomingItem[] = [];
   for (const p of people) {
-    const born = toDay(p.dateOfBirth);
+    const born = birthdayMonthDay(p.birthday);
     if (!born || !p.name.trim()) continue;
-    const date = nextAnniversary(born.getMonth(), born.getDate(), today);
+    const date = nextAnniversary(born.month, born.day, today);
     const daysAway = daysBetween(today, date);
     if (daysAway <= withinDays) items.push({ kind: 'birthday', title: p.name.trim(), date, daysAway, email: p.email });
   }

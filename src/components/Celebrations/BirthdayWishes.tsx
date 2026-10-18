@@ -119,7 +119,7 @@ export function TodaysBirthdayWishes({ className = '' }: { className?: string })
     Promise.all([
       // every employee, a page at a time (one request is capped at 1000 rows)
       fetchAllResult((from, to) =>
-        supabase.from('employee_directory').select('"First Name", "Last Name", "Date of Birth", "Work Email"').order('"Employee Number"').range(from, to)
+        supabase.from('employee_directory').select('"First Name", "Last Name", birthday, "Work Email"').order('"Employee Number"').range(from, to)
       ),
       supabase.auth.getSession(),
     ])
@@ -131,7 +131,7 @@ export function TodaysBirthdayWishes({ className = '' }: { className?: string })
           upcomingBirthdays(
             ((people.data || []) as Record<string, string | null>[]).map((p) => ({
               name: `${p['First Name'] || ''} ${p['Last Name'] || ''}`,
-              dateOfBirth: p['Date of Birth'],
+              birthday: p.birthday,
               email: p['Work Email'],
             })),
             new Date(),

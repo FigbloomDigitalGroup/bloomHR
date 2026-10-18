@@ -60,15 +60,15 @@ export async function loadMyLeave(employeeNumber: string): Promise<LeaveRow[]> {
   }));
 }
 
-/** Everyone's name, birthday and work email, for birthdays (only the day is ever shown, never the year). */
-export async function loadBirthdayPeople(): Promise<{ name: string; dateOfBirth: string | null; email: string | null }[]> {
+/** Everyone's name, birthday ('MM-DD': the directory never gives colleagues the year) and work email. */
+export async function loadBirthdayPeople(): Promise<{ name: string; birthday: string | null; email: string | null }[]> {
   // every employee, a page at a time (one request is capped at 1000 rows)
   const { data } = await fetchAllResult((from, to) =>
-    supabase.from('employee_directory').select('"First Name", "Last Name", "Date of Birth", "Work Email"').order('"Employee Number"').range(from, to)
+    supabase.from('employee_directory').select('"First Name", "Last Name", birthday, "Work Email"').order('"Employee Number"').range(from, to)
   );
   return ((data || []) as Record<string, string | null>[]).map((p) => ({
     name: `${p['First Name'] || ''} ${p['Last Name'] || ''}`,
-    dateOfBirth: p['Date of Birth'],
+    birthday: p.birthday,
     email: p['Work Email'],
   }));
 }

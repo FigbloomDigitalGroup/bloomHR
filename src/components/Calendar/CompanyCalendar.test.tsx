@@ -36,6 +36,7 @@ vi.mock('../../lib/supabase', () => ({
 }));
 
 import CompanyCalendar from './CompanyCalendar';
+import { fetchAllResult } from '../../lib/fetchAll';
 
 beforeEach(() => {
   state.tables = { company_events: [{ id: 'e1', title: 'Town hall', date: fx.isoDate, description: null }] };
@@ -167,5 +168,25 @@ describe('Coming up', () => {
     const panel = screen.getByTestId('coming-up');
     fireEvent.click(await within(panel).findByRole('button', { name: 'Open task Stock count' }));
     expect(screen.getByTestId('where').textContent).toBe('/tasks?task=t-soon');
+  });
+});
+
+describe('birthdays on the calendar', () => {
+  it("shows a colleague's birthday from its day and month alone (the directory never gives the year)", async () => {
+    const mm = String(eventDay.getMonth() + 1).padStart(2, '0');
+    vi.mocked(fetchAllResult).mockResolvedValueOnce({
+      data: [
+        { 'First Name': 'Amina', 'Last Name': 'Hassan', birthday: `${mm}-15`, Town: null },
+        // the old full date is no longer read from the directory
+        { 'First Name': 'Old', 'Last Name': 'Column', 'Date of Birth': `1990-${mm}-15`, birthday: null, Town: null },
+      ],
+      error: null,
+    } as never);
+    show();
+    const list = screen.getByTestId('calendar-phone-list');
+    await within(list).findByText('Town hall');
+    fireEvent.click(screen.getByRole('button', { name: format(eventDay, 'd MMMM yyyy') }));
+    expect(await within(list).findByText('Amina Hassan')).toBeTruthy();
+    expect(within(list).queryByText('Old Column')).toBeNull();
   });
 });

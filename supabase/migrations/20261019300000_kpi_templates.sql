@@ -792,6 +792,13 @@ grant execute on function public.merge_job_titles(uuid, uuid) to authenticated;
 -- ---------------------------------------------------------------------------------------------
 -- 6. the directory every role reads: plus the job title and job group ids (template matches, pickers)
 -- ---------------------------------------------------------------------------------------------
+-- Skipped once 20261020700000_birthday_privacy has redefined the view (it adds a birthday column and hides the year),
+-- so running this file again neither fails on the extra column nor brings the year back.
+do $do$
+begin
+  if not exists (select 1 from information_schema.columns where table_schema = 'public'
+                 and table_name = 'employee_directory' and column_name = 'birthday') then
+    execute $v$
 create or replace view public.employee_directory with (security_barrier = true) as
   select "tenant_id",
     "Employee Number",
@@ -827,6 +834,9 @@ create or replace view public.employee_directory with (security_barrier = true) 
     "job_title_id",
     "job_group_id"
   from public.employees e
-  where tenant_id = (select public.current_tenant_id());
+  where tenant_id = (select public.current_tenant_id())
+    $v$;
+  end if;
+end $do$;
 
 notify pgrst, 'reload schema';
