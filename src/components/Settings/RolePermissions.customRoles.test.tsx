@@ -97,7 +97,7 @@ describe('RolePermissions with the company’s own roles', () => {
   it('lists "Manage projects", which a role based on Staff may hold (FIG-901)', async () => {
     await open();
     fireEvent.click(screen.getByRole('button', { name: /Operators/ }));
-    expect(screen.getByText('Create projects, add members, assign tasks to a department or team, set up recurring tasks and labels.')).toBeTruthy();
+    expect(screen.getByText('Create projects, add members, assign tasks to teams, recurring tasks and labels')).toBeTruthy();
     expect(sw('Manage projects').getAttribute('aria-disabled')).not.toBe('true');
     fireEvent.click(sw('Manage projects'));
     fireEvent.click(screen.getByRole('button', { name: /Save Changes/ }));
