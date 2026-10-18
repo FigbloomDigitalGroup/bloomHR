@@ -10,7 +10,7 @@ import {
 } from '../../lib/tasks';
 import {
   addComment, attachmentUrl, deleteComment, deleteTask, loadActivity, loadAttachments, loadComments, removeAttachment,
-  setTaskLabels, updateTask, uploadAttachment, type TaskChange,
+  setTaskLabels, taskConcernsMe, updateTask, uploadAttachment, type TaskChange,
 } from '../../lib/tasksApi';
 import { confirmDialog } from '../../lib/confirmDialog';
 import MentionInput, { type MentionPerson } from './MentionInput';
@@ -40,6 +40,18 @@ export default function TaskDetail(props: TaskDetailProps) {
   const project = props.projects.find((p) => p.id === task.project_id) ?? null;
   const editable = canEditTask(task, viewer, project);
   const deletable = canDeleteTask(task, viewer, project);
+  // HR and admins read every task; on one they're not involved in, they only read (no comments, files or sub-tasks)
+  const [readOnly, setReadOnly] = useState(false);
+  useEffect(() => {
+    let live = true;
+    setReadOnly(false);
+    if (viewer.oversees && !editable) {
+      void taskConcernsMe(task.id).then((concerned) => live && setReadOnly(!concerned));
+    }
+    return () => {
+      live = false;
+    };
+  }, [task.id, viewer.oversees, editable]);
 
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
@@ -139,6 +151,12 @@ export default function TaskDetail(props: TaskDetailProps) {
         </span>
       </div>
 
+      {readOnly && (
+        <p className="px-5 py-2 border-b border-border bg-secondary/40 text-[12px] text-muted-foreground" role="note">
+          You can see this task as HR/admin. It's read-only: only the people involved can change it or comment.
+        </p>
+      )}
+
       <div className="flex flex-col md:flex-row">
         <div className="flex-1 min-w-0 p-5 flex flex-col gap-4">
           <input
@@ -181,22 +199,24 @@ export default function TaskDetail(props: TaskDetailProps) {
                 </li>
               ))}
             </ul>
-            <form
-              className="flex gap-2 mt-2"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (!subtask.trim()) return;
-                try {
-                  await props.onCreateSubtask(task, subtask.trim());
-                  setSubtask('');
-                } catch (err) {
-                  toast.error((err as Error).message);
-                }
-              }}
-            >
-              <input aria-label="New sub-task" value={subtask} onChange={(e) => setSubtask(e.target.value)} placeholder="Add a sub-task..." className={fieldClass} />
-              <Button type="submit" variant="secondary" icon={<Plus size={14} />} disabled={!subtask.trim()}>Add</Button>
-            </form>
+            {!readOnly && (
+              <form
+                className="flex gap-2 mt-2"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!subtask.trim()) return;
+                  try {
+                    await props.onCreateSubtask(task, subtask.trim());
+                    setSubtask('');
+                  } catch (err) {
+                    toast.error((err as Error).message);
+                  }
+                }}
+              >
+                <input aria-label="New sub-task" value={subtask} onChange={(e) => setSubtask(e.target.value)} placeholder="Add a sub-task..." className={fieldClass} />
+                <Button type="submit" variant="secondary" icon={<Plus size={14} />} disabled={!subtask.trim()}>Add</Button>
+              </form>
+            )}
           </section>
 
           <section>
@@ -236,17 +256,21 @@ export default function TaskDetail(props: TaskDetailProps) {
                     </div>
                   </div>
                 ))}
-                <MentionInput
-                  value={draft}
-                  onChange={setDraft}
-                  onMention={(p) => setPicked((cur) => (cur.some((x) => x.number === p.number) ? cur : [...cur, p]))}
-                  people={props.people}
-                  placeholder="Write a comment... type @ to mention someone"
-                  onSubmit={post}
-                />
-                <div className="flex justify-end">
-                  <Button onClick={post} disabled={posting || !draft.trim()}>{posting ? 'Posting...' : 'Comment'}</Button>
-                </div>
+                {!readOnly && (
+                  <>
+                    <MentionInput
+                      value={draft}
+                      onChange={setDraft}
+                      onMention={(p) => setPicked((cur) => (cur.some((x) => x.number === p.number) ? cur : [...cur, p]))}
+                      people={props.people}
+                      placeholder="Write a comment... type @ to mention someone"
+                      onSubmit={post}
+                    />
+                    <div className="flex justify-end">
+                      <Button onClick={post} disabled={posting || !draft.trim()}>{posting ? 'Posting...' : 'Comment'}</Button>
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <ul className="flex flex-col gap-1.5" data-testid="task-activity">
@@ -361,28 +385,30 @@ export default function TaskDetail(props: TaskDetailProps) {
                 </li>
               ))}
             </ul>
-            <label className="inline-flex items-center gap-1 text-[11px] text-brand cursor-pointer hover:underline">
-              <Paperclip size={11} /> {uploading ? 'Uploading...' : 'Attach a file'}
-              <input
-                type="file"
-                className="sr-only"
-                disabled={uploading}
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = '';
-                  if (!file) return;
-                  setUploading(true);
-                  try {
-                    await uploadAttachment(task.id, file);
-                    await refresh();
-                  } catch (err) {
-                    toast.error((err as Error).message);
-                  } finally {
-                    setUploading(false);
-                  }
-                }}
-              />
-            </label>
+            {!readOnly && (
+              <label className="inline-flex items-center gap-1 text-[11px] text-brand cursor-pointer hover:underline">
+                <Paperclip size={11} /> {uploading ? 'Uploading...' : 'Attach a file'}
+                <input
+                  type="file"
+                  className="sr-only"
+                  disabled={uploading}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!file) return;
+                    setUploading(true);
+                    try {
+                      await uploadAttachment(task.id, file);
+                      await refresh();
+                    } catch (err) {
+                      toast.error((err as Error).message);
+                    } finally {
+                      setUploading(false);
+                    }
+                  }}
+                />
+              </label>
+            )}
           </div>
           <p className="text-[10px] text-muted-foreground mt-auto">
             Created {when(task.created_at)}{task.creator_number ? ` by ${props.nameOf(task.creator_number)}` : ''}
