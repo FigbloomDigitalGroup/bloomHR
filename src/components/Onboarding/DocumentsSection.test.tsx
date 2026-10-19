@@ -44,12 +44,13 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('DocumentsSection (employee)', () => {
-  it('lists the documents by section, required or optional, and hides claim documents nobody claims', async () => {
+  it('lists what is required by section, and hides claim documents nobody claims', async () => {
     render(<DocumentsSection employeeId="e1" />);
     expect(await screen.findByText('Core attachments')).toBeTruthy();
-    expect(screen.getByText('Driving licence')).toBeTruthy();
-    expect(screen.getAllByText('(optional)')).toHaveLength(1);
+    expect(screen.getByText('Proof of identity')).toBeTruthy();
+    expect(screen.queryByText('Driving licence')).toBeNull(); // optional: offered under "Add a document"
     expect(screen.queryByText('KRA PWD exemption certificate')).toBeNull();
+    expect(screen.getByText('Other documents')).toBeTruthy();
   });
 
   it('shows why HR rejected a file, and lets the employee upload it again', async () => {
@@ -64,6 +65,76 @@ describe('DocumentsSection (employee)', () => {
     render(<DocumentsSection employeeId="e1" />);
     await screen.findByText('d2.pdf');
     expect(screen.getAllByRole('button', { name: /Remove/ })).toHaveLength(1); // only the rejected CV
+  });
+});
+
+describe('DocumentsSection: other documents', () => {
+  const openForm = async () => {
+    render(<DocumentsSection employeeId="e1" />);
+    fireEvent.click(await screen.findByRole('button', { name: /Add a document/ }));
+    return screen.getByLabelText('Document type') as HTMLSelectElement;
+  };
+  const choose = (...names: string[]) =>
+    fireEvent.change(screen.getByLabelText('Choose files'), { target: { files: names.map((n) => new File(['x'], n)) } });
+  const uploadButton = () => screen.getByRole('button', { name: /^Upload$/ }) as HTMLButtonElement;
+
+  it('offers the types the employee is not asked for, and "Other"; never a required or claim type', async () => {
+    const select = await openForm();
+    const options = Array.from(select.options).map((o) => o.textContent);
+    expect(options).toContain('Driving licence');
+    expect(options).toContain('Other (give it a title)');
+    expect(options).not.toContain('Updated CV');
+    expect(options).not.toContain('KRA PWD exemption certificate');
+  });
+
+  it('picks a type and uploads several files', async () => {
+    const select = await openForm();
+    fireEvent.change(select, { target: { value: 'driving_licence' } });
+    choose('front.jpg', 'back.jpg');
+    fireEvent.click(uploadButton());
+    await waitFor(() => expect(api.uploadMyDocument).toHaveBeenCalledTimes(2));
+    expect(api.uploadMyDocument).toHaveBeenCalledWith('e1', 'driving_licence', expect.any(File), { description: '' });
+  });
+
+  it('"Other" needs a title before it uploads', async () => {
+    const select = await openForm();
+    fireEvent.change(select, { target: { value: 'other' } });
+    choose('first-aid.pdf');
+    expect(uploadButton().disabled).toBe(true);
+    expect(screen.getByText('Give the document a title.')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'First Aid certificate' } });
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Red Cross' } });
+    expect(uploadButton().disabled).toBe(false);
+    fireEvent.click(uploadButton());
+    await waitFor(() => expect(api.uploadMyDocument).toHaveBeenCalledWith('e1', 'other', expect.any(File), { title: 'First Aid certificate', description: 'Red Cross' }));
+  });
+
+  it('lists what was added, by its title', async () => {
+    api.loadDocuments.mockResolvedValue([
+      { ...doc('d3', 'other', 'pending'), title: 'First Aid certificate', description: 'Red Cross' },
+      { ...doc('d4', 'driving_licence', 'accepted'), type_label: 'Driving licence' },
+    ]);
+    render(<DocumentsSection employeeId="e1" />);
+    expect(await screen.findByText('First Aid certificate')).toBeTruthy();
+    expect(screen.getByText('Driving licence')).toBeTruthy();
+    expect(screen.getByText('Red Cross')).toBeTruthy();
+  });
+});
+
+describe('DocumentsSection: the checklist follows the employee’s country', () => {
+  it('a Tanzania employee is asked for the TRA TIN and NSSF Tanzania, not a KRA PIN certificate', async () => {
+    api.loadChecklist.mockResolvedValue([
+      item('id_document', 'Proof of identity', 'core', true, true),
+      item('tra_tin_certificate', 'TRA TIN certificate', 'core', true),
+      item('tz_nssf_document', 'NSSF Tanzania card or statement', 'core', true),
+      item('heslb_document', 'HESLB letter (loan beneficiaries)', 'core', false),
+    ]);
+    api.loadDocuments.mockResolvedValue([]);
+    render(<DocumentsSection employeeId="e1" />);
+    expect(await screen.findByText('TRA TIN certificate')).toBeTruthy();
+    expect(screen.getByText('NSSF Tanzania card or statement')).toBeTruthy();
+    expect(screen.queryByText(/KRA PIN/)).toBeNull();
+    expect(screen.queryByText('HESLB letter (loan beneficiaries)')).toBeNull(); // not a loan holder
   });
 });
 
@@ -86,6 +157,19 @@ describe('DocumentsReview (HR)', () => {
     fireEvent.change(screen.getByLabelText('Reason for rejecting d2.pdf'), { target: { value: 'Expired ID' } });
     fireEvent.click(confirm);
     await waitFor(() => expect(api.rejectDocument).toHaveBeenCalledWith('d2', 'Expired ID'));
+  });
+
+  it('shows what the employee added under "Other documents", to accept or reject', async () => {
+    api.loadDocuments.mockResolvedValue([
+      doc('d1', 'cv', 'accepted'),
+      { ...doc('d3', 'other', 'pending'), title: 'First Aid certificate', description: 'Red Cross' },
+    ]);
+    render(<DocumentsReview employeeId="e1" onChanged={vi.fn()} />);
+    expect(await screen.findByText('Other documents')).toBeTruthy();
+    expect(screen.getByText('First Aid certificate')).toBeTruthy();
+    expect(screen.getByText('Red Cross')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Accept/ }));
+    await waitFor(() => expect(api.acceptDocument).toHaveBeenCalledWith('d3'));
   });
 
   it('asks this employee for a role-specific document, and shows their referees', async () => {

@@ -5,14 +5,18 @@ import { currentUserAndTenant, openPrivateFile } from './privateFiles';
 // private "documents" bucket and lists their referees; HR sees them, accepts or rejects each file (a rejection says
 // why), and decides which documents the company and each employee must provide.
 
-export type DocumentSection = 'core' | 'qualifications' | 'role' | 'claims';
+export type DocumentSection = 'core' | 'qualifications' | 'role' | 'claims' | 'other';
 
 export const SECTION_TITLES: Record<DocumentSection, string> = {
   core: 'Core attachments',
   qualifications: 'Qualifications',
   role: 'Role-specific documents',
   claims: 'Tax exemption and relief documents',
+  other: 'Other documents',
 };
+
+/** The generic type for a document the employee names themselves (20261021900000): it needs a title. */
+export const OTHER_DOCUMENT = 'other';
 
 export interface ChecklistItem {
   code: string;
@@ -34,6 +38,11 @@ export interface EmployeeDocument {
   file_name: string;
   content_type: string | null;
   size_bytes: number | null;
+  /** the employee's own title (always set for "other") and description */
+  title?: string | null;
+  description?: string | null;
+  /** its type's label (also for a type not on this employee's list) */
+  type_label?: string | null;
   status: DocumentStatus;
   review_note: string | null;
   reviewed_at: string | null;
@@ -75,7 +84,10 @@ const fail = (err: unknown, fallback: string): never => {
 // ---------------------------------------------------------------------------------------------
 // reading
 // ---------------------------------------------------------------------------------------------
-/** Every document type, with whether this employee must provide it (no id: the signed-in employee's own). */
+/**
+ * The document types for this employee's country, with whether they must provide it (no id: the signed-in employee's
+ * own). Never includes "other".
+ */
 export async function loadChecklist(employeeId?: string): Promise<ChecklistItem[]> {
   const { data, error } = await supabase.rpc('document_checklist', employeeId ? { p_employee: employeeId } : {});
   if (error) fail(error, 'Could not load the list of documents.');
@@ -83,18 +95,40 @@ export async function loadChecklist(employeeId?: string): Promise<ChecklistItem[
 }
 
 export async function loadDocuments(employeeId: string): Promise<EmployeeDocument[]> {
-  const { data, error } = await supabase.from('employee_documents').select('*').eq('employee_id', employeeId).order('uploaded_at', { ascending: false });
+  const { data, error } = await supabase.from('employee_documents').select('*, type:document_types(label)').eq('employee_id', employeeId)
+    .order('uploaded_at', { ascending: false });
   if (error) fail(error, 'Could not load the documents.');
-  return (data ?? []) as EmployeeDocument[];
+  return (data ?? []).map(({ type, ...doc }: Record<string, unknown>) => ({
+    ...doc, type_label: (type as { label?: string } | null)?.label ?? null,
+  })) as EmployeeDocument[];
 }
+
+/** What a file is called on screen: its own title, else its type's label. */
+export const documentName = (doc: Pick<EmployeeDocument, 'code' | 'title' | 'type_label'>, checklist: Pick<ChecklistItem, 'code' | 'label'>[]): string =>
+  doc.title?.trim() || checklist.find((c) => c.code === doc.code)?.label || doc.type_label
+  || (doc.code === OTHER_DOCUMENT ? 'Other document' : doc.code.replace(/_/g, ' '));
+
+/** Whether a file belongs under "Other documents": its type is not one this employee is asked for. */
+export const isExtraDocument = (doc: Pick<EmployeeDocument, 'code'>, checklist: Pick<ChecklistItem, 'code' | 'required'>[]): boolean =>
+  !checklist.some((c) => c.code === doc.code && c.required);
+
+/** The types an employee may add as an extra document: those on their list they are not asked for (not tax claims). */
+export const extraDocumentTypes = (checklist: ChecklistItem[]): ChecklistItem[] =>
+  checklist.filter((c) => !c.required && c.section !== 'claims' && c.code !== OTHER_DOCUMENT);
 
 export const openDocument = (doc: Pick<EmployeeDocument, 'file_path'>) => openPrivateFile('documents', doc.file_path);
 
 // ---------------------------------------------------------------------------------------------
 // the employee
 // ---------------------------------------------------------------------------------------------
-/** Uploads a file to the employee's own folder and records it (waiting for HR). Undoes the upload if recording fails. */
-export async function uploadMyDocument(employeeId: string, code: string, file: File): Promise<void> {
+/**
+ * Uploads a file to the employee's own folder and records it (waiting for HR). Undoes the upload if recording fails.
+ * An "other" document needs a title; any document may have one and a description.
+ */
+export async function uploadMyDocument(employeeId: string, code: string, file: File, extra?: { title?: string; description?: string }): Promise<void> {
+  const title = extra?.title?.trim() || null;
+  const description = extra?.description?.trim() || null;
+  if (code === OTHER_DOCUMENT && !title) throw new Error('Give the document a title');
   const problem = fileProblem(file);
   if (problem) throw new Error(problem);
   const { userId, tenantId } = await currentUserAndTenant();
@@ -104,6 +138,7 @@ export async function uploadMyDocument(employeeId: string, code: string, file: F
   if (stored.error) fail(stored.error, 'The file was not uploaded.');
   const { error } = await supabase.from('employee_documents').insert({
     employee_id: employeeId, code, file_path: path, file_name: file.name, content_type: file.type || null, size_bytes: file.size,
+    ...(title ? { title } : {}), ...(description ? { description } : {}),
   });
   if (error) {
     await supabase.storage.from('documents').remove([path]);
@@ -186,6 +221,8 @@ export interface DocumentTypeSetting {
   label: string;
   section: DocumentSection;
   required_by_default: boolean;
+  /** the countries it applies to (null: every country) */
+  countries: string[] | null;
   /** the company's own choice, or null to use the default */
   required: boolean | null;
 }
@@ -193,14 +230,15 @@ export interface DocumentTypeSetting {
 /** Every document type that a company can require (not the claim documents, which follow the employee's claims). */
 export async function loadCompanyDocumentSettings(): Promise<DocumentTypeSetting[]> {
   const [types, settings] = await Promise.all([
-    supabase.from('document_types').select('code, label, section, required_by_default, sort').is('required_when', null).order('sort'),
+    supabase.from('document_types').select('code, label, section, required_by_default, countries, sort').is('required_when', null).neq('section', 'other').order('sort'),
     supabase.from('company_document_settings').select('code, required'),
   ]);
   if (types.error) fail(types.error, 'Could not load the document types.');
   if (settings.error) fail(settings.error, 'Could not load the company’s settings.');
   const chosen = new Map((settings.data ?? []).map((s: { code: string; required: boolean }) => [s.code, s.required]));
-  return (types.data ?? []).map((t: { code: string; label: string; section: DocumentSection; required_by_default: boolean }) => ({
-    code: t.code, label: t.label, section: t.section, required_by_default: t.required_by_default, required: chosen.get(t.code) ?? null,
+  return (types.data ?? []).map((t: { code: string; label: string; section: DocumentSection; required_by_default: boolean; countries?: string[] | null }) => ({
+    code: t.code, label: t.label, section: t.section, required_by_default: t.required_by_default, countries: t.countries ?? null,
+    required: chosen.get(t.code) ?? null,
   }));
 }
 

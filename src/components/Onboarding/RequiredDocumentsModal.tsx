@@ -50,6 +50,7 @@ export default function RequiredDocumentsModal({ onClose }: { onClose: () => voi
                     <label className="flex items-center gap-2 py-1 text-sm text-ink">
                       <input type="checkbox" checked={t.required ?? t.required_by_default} onChange={(e) => void toggle(t, e.target.checked)} />
                       {t.label}
+                      {t.countries?.length ? <span className="text-xs text-muted-foreground">({t.countries.join(', ')} only)</span> : null}
                     </label>
                   </li>
                 ))}
@@ -58,7 +59,8 @@ export default function RequiredDocumentsModal({ onClose }: { onClose: () => voi
           ))}
           <p className="text-xs text-muted-foreground">
             The KRA PWD exemption certificate, mortgage interest statement and insurance policy are asked for automatically when
-            an employee claims them.
+            an employee claims them, and the HESLB letter for Tanzania HESLB loan holders. Each employee is only asked for the
+            documents of their branch's country, and can add other documents themselves.
           </p>
         </div>
       </div>

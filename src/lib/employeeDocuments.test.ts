@@ -70,6 +70,13 @@ describe('uploadMyDocument', () => {
     expect(db.inserts[0]).toMatchObject({ employee_id: 'e1', code: 'cv', file_path: db.uploads[0], file_name: 'My CV.pdf', size_bytes: 1000 });
   });
 
+  it('an "other" document needs a title, which is saved with its description', async () => {
+    await expect(uploadMyDocument('e1', 'other', file('aid.pdf'))).rejects.toThrow(/title/);
+    expect(db.uploads).toHaveLength(0);
+    await uploadMyDocument('e1', 'other', file('aid.pdf'), { title: ' First Aid certificate ', description: 'Red Cross' });
+    expect(db.inserts[0]).toMatchObject({ code: 'other', title: 'First Aid certificate', description: 'Red Cross' });
+  });
+
   it('removes the uploaded file again if it could not be recorded', async () => {
     db.insertError = { message: 'A document must be uploaded to your own folder' };
     await expect(uploadMyDocument('e1', 'cv', file('cv.pdf'))).rejects.toThrow(/your own folder/);

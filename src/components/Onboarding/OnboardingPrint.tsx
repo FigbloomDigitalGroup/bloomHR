@@ -6,7 +6,7 @@ import { type OnboardingRecord, errorMessage, loadOnboardingForReview, statusLab
 import { supabase } from '../../lib/supabase';
 import { loadCompanyIdentity } from '../../lib/companyProfile';
 import { type PolicyItem, loadPolicyChecklist } from '../../lib/companyPolicies';
-import { type ChecklistItem, DOCUMENT_STATUS_LABELS, type EmployeeDocument, type Referee, loadChecklist, loadDocuments, loadReferees } from '../../lib/employeeDocuments';
+import { type ChecklistItem, DOCUMENT_STATUS_LABELS, type EmployeeDocument, type Referee, documentName, isExtraDocument, loadChecklist, loadDocuments, loadReferees } from '../../lib/employeeDocuments';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
 // The onboarding form as a printable page: the company, the employee's name and position, the date they submitted,
@@ -99,16 +99,29 @@ export default function OnboardingPrint() {
             </ul>
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-5 mb-2">Documents</h3>
             <ul className="text-sm text-ink space-y-0.5">
-              {docs.checklist.filter((c) => c.required || docs.files.some((f) => f.code === c.code)).map((c) => {
+              {docs.checklist.filter((c) => c.required).map((c) => {
                 const mine = docs.files.filter((f) => f.code === c.code);
                 return (
                   <li key={c.code} className="flex justify-between gap-3 border-b border-border/60 py-1">
-                    <span>{c.label}{c.required ? '' : ' (optional)'}</span>
+                    <span>{c.label}</span>
                     <span className="text-right">{mine.length ? mine.map((f) => DOCUMENT_STATUS_LABELS[f.status]).join(', ') : 'Not uploaded'}</span>
                   </li>
                 );
               })}
             </ul>
+            {docs.files.some((f) => isExtraDocument(f, docs.checklist)) && (
+              <>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-5 mb-2">Other documents</h3>
+                <ul className="text-sm text-ink space-y-0.5">
+                  {docs.files.filter((f) => isExtraDocument(f, docs.checklist)).map((f) => (
+                    <li key={f.id} className="flex justify-between gap-3 border-b border-border/60 py-1">
+                      <span>{documentName(f, docs.checklist)}{f.description ? ` (${f.description})` : ''}</span>
+                      <span className="text-right">{DOCUMENT_STATUS_LABELS[f.status]}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </section>
         )}
 
