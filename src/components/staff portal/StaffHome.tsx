@@ -22,6 +22,7 @@ import {
   type QuickLinkIcon,
 } from '../../lib/staffHome';
 import { LoaderBlock } from '../UI/FigbloomLoader';
+import LeaveAwaitingMe from '../Approvals/LeaveAwaitingMe';
 
 const SHOW_TASKS = 6;
 const SHOW_WEEK = 8;
@@ -110,6 +111,9 @@ export default function StaffHome({ setActiveTab, userName, onOpenTask, showMyWo
       <CompleteProfileCard onOpen={() => setActiveTab('onboarding')} />
 
       {openResignation && <ResignationHomeLine exit={openResignation} onView={() => setActiveTab('resignation')} />}
+
+      {/* leave waiting on my decision (nothing when there is none) */}
+      <LeaveAwaitingMe />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 items-start">
         <MyTasks
