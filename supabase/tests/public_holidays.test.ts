@@ -69,23 +69,33 @@ describe("Kenya's public holidays", () => {
 });
 
 describe("each company's list", () => {
-  it('every company has this year and next; a new company gets them when it is created', async () => {
+  it('every company has this year and next: the fixed-date ones once, every year (FIG-918); Easter each year', async () => {
     const y = new Date().getFullYear();
-    const count = async (tenant: string, year: number) =>
-      Number((await rows<{ n: string }>(`select count(*) n from holidays where tenant_id = '${tenant}' and source = 'auto' and extract(year from date) = ${year}`))[0].n);
-    expect(await count(A, y)).toBeGreaterThanOrEqual(10);
-    expect(await count(A, y + 1)).toBeGreaterThanOrEqual(10);
+    const fixed = ["New Year's Day", 'Labour Day', 'Madaraka Day', 'Mazingira Day', 'Mashujaa Day', 'Jamhuri Day', 'Christmas Day', 'Boxing Day'];
+    const recurring = async (tenant: string) =>
+      (await rows<{ name: string }>(`select name from holidays where tenant_id = '${tenant}' and source = 'auto' and recurring order by date`)).map((r) => r.name);
+    const oneOff = async (tenant: string, year: number) =>
+      (await rows<{ name: string }>(`select name from holidays where tenant_id = '${tenant}' and source = 'auto' and not recurring and extract(year from date) = ${year} order by date`)).map((r) => r.name);
+    expect(await recurring(A)).toEqual(fixed);
+    expect((await oneOff(A, y)).slice(0, 2)).toEqual(['Good Friday', 'Easter Monday']);
+    expect((await oneOff(A, y + 1)).slice(0, 2)).toEqual(['Good Friday', 'Easter Monday']);
+    expect((await oneOff(A, y + 1)).every((n) => ['Good Friday', 'Easter Monday'].includes(n) || n.endsWith('(observed)'))).toBe(true);
     await db.exec(`insert into tenants (id, name, slug) values ('${NEW}', 'New Co', 'new-co')`);
-    expect(await count(NEW, y)).toBeGreaterThanOrEqual(10);
+    expect(await recurring(NEW)).toEqual(fixed);
   });
 
   it('HR adds another year; again adds nothing; a day already on the list is left alone; staff cannot', async () => {
     await db.exec(`insert into holidays (tenant_id, name, date, recurring) values ('${A}', 'Our own New Year', '2030-01-01', false)`);
     const added = (await asUser(db, HR, () => rows<{ n: number }>(`select add_public_holidays(2030) n`)))[0].n;
-    expect(added).toBe(10); // the 10, plus Mashujaa Day (observed) on Mon 21 Oct, less New Year's Day
+    expect(added).toBe(3); // Good Friday, Easter Monday and Mashujaa Day (observed) on Mon 21 Oct: the rest are every year
     expect((await asUser(db, HR, () => rows<{ n: number }>(`select add_public_holidays(2030) n`)))[0].n).toBe(0);
     expect((await rows<{ name: string }>(`select name from holidays where tenant_id = '${A}' and date = '2030-01-01'`)).map((r) => r.name)).toEqual(['Our own New Year']);
     expect(await asUser(db, STAFF, () => run(`select add_public_holidays(2031)`))).toMatch(/Only people who run leave/);
+  });
+
+  it('leave counting skips a fixed-date holiday in any year from its one every-year row', async () => {
+    // Mon 9 to Fri 13 December 2030: 5 working days, less Jamhuri Day (Thu 12th)
+    expect(Number((await rows<{ n: string }>(`select leave_days_for('${A}', 'ME', '2030-12-09', '2030-12-13', false) n`))[0].n)).toBe(4);
   });
 
   it('leave counting skips Good Friday and Easter Monday', async () => {
