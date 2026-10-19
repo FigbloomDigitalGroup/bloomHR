@@ -1,3 +1,4 @@
+import { money } from '../../lib/payroll/currency';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
 
@@ -61,10 +62,10 @@ describe('a Kenya payslip', () => {
   it('groups deductions before tax, tax and after tax, from the engine', () => {
     render(<PayslipDocument record={record} companyInfo={{}} extras={extrasFor('Kenya')} />);
     const before = section('deductions-before-tax');
-    expect(before.getByText('NSSF').nextSibling?.textContent).toBe(`KSh ${record.nssf_deduction.toLocaleString()}`);
-    expect(before.getByText('SHIF').nextSibling?.textContent).toBe(`KSh ${record.nhif_deduction.toLocaleString()}`);
+    expect(before.getByText('NSSF').nextSibling?.textContent).toBe(money(record.nssf_deduction, 'KES'));
+    expect(before.getByText('SHIF').nextSibling?.textContent).toBe(money(record.nhif_deduction, 'KES'));
     expect(before.getByText('Housing levy')).toBeTruthy();
-    expect(section('deductions-tax').getByText('PAYE').nextSibling?.textContent).toBe(`KSh ${record.paye_tax.toLocaleString()}`);
+    expect(section('deductions-tax').getByText('PAYE').nextSibling?.textContent).toBe(money(record.paye_tax, "KES"));
   });
 
   it('shows taxable pay and the reliefs with their real amounts (personal relief from the rate)', () => {
