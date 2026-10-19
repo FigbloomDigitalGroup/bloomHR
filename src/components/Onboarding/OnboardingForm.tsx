@@ -315,7 +315,8 @@ export default function OnboardingForm() {
         <section className="border-t border-border pt-5">
           <h3 className="text-sm font-semibold text-ink">Documents</h3>
           <p className="text-xs text-muted-foreground mt-0.5 mb-3">Upload clear copies. Files are saved as soon as you upload them.</p>
-          <DocumentsSection employeeId={String(record.employee['id'])} onChanged={() => void refresh()} />
+          <DocumentsSection employeeId={String(record.employee['id'])} onChanged={() => void refresh()}
+            identityType={values['Type of Identification'] ? String(values['Type of Identification']) : null} />
         </section>
 
         <section className="border-t border-border pt-5">

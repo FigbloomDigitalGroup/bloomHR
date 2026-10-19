@@ -10,7 +10,12 @@ import {
   type Referee,
   SECTION_TITLES,
   acceptDocument,
+  acceptDocumentAsComplete,
   documentName,
+  fileCaption,
+  filesSetting,
+  pageOf,
+  slotsView,
   isExtraDocument,
   loadChecklist,
   loadDocuments,
@@ -30,7 +35,7 @@ const STATUS_TONE = { pending: 'warning', accepted: 'success', rejected: 'danger
 const SECTIONS: DocumentSection[] = ['core', 'qualifications', 'role', 'claims'];
 const errorText = (err: unknown, fallback: string) => (err instanceof Error && err.message ? err.message : fallback);
 
-function FileLine({ doc, onChanged, name }: { doc: EmployeeDocument; onChanged: () => void; name?: string }) {
+function FileLine({ doc, onChanged, name, canComplete }: { doc: EmployeeDocument; onChanged: () => void; name?: string; canComplete?: boolean }) {
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -65,13 +70,19 @@ function FileLine({ doc, onChanged, name }: { doc: EmployeeDocument; onChanged: 
             <Check className="h-3.5 w-3.5" /> Accept
           </button>
         )}
+        {canComplete && (
+          <button type="button" disabled={busy} onClick={() => void act(() => acceptDocumentAsComplete(doc.id))}
+            className="inline-flex items-center gap-1 text-status-success font-semibold" title="This one file is the whole document (e.g. both sides on one scan)">
+            <Check className="h-3.5 w-3.5" /> Accept as complete
+          </button>
+        )}
         {doc.status !== 'rejected' && !rejecting && (
           <button type="button" disabled={busy} onClick={() => setRejecting(true)} className="inline-flex items-center gap-1 text-status-danger font-semibold">
             <X className="h-3.5 w-3.5" /> Reject
           </button>
         )}
       </div>
-      {name && doc.description && <p className="ml-5 mt-0.5 text-muted-foreground">{doc.description}</p>}
+      {doc.description && <p className="ml-5 mt-0.5 text-muted-foreground">{doc.description}</p>}
       {doc.status === 'rejected' && doc.review_note && <p className="ml-5 mt-0.5 text-status-danger">Rejected: “{doc.review_note}”</p>}
       {rejecting && (
         <div className="ml-5 mt-1 flex flex-wrap gap-2">
@@ -141,16 +152,38 @@ export default function DocumentsReview({ employeeId, onChanged }: { employeeId:
             <ul className="space-y-2">
               {items.map((item) => {
                 const mine = files.filter((f) => f.code === item.code);
+                const { mode, slots } = filesSetting(item);
+                const view = mode === 'slots' ? slotsView(mine, slots) : null;
+                const pages = mine.some((f) => pageOf(f) > 1) ? 2 : 1;
+                const sorted = mode === 'single' ? [...mine].sort((a, b) => pageOf(a) - pageOf(b)) : mine;
                 return (
-                  <li key={item.code} className="border-b border-border/60 pb-2">
+                  <li key={item.code} className="border-b border-border/60 pb-2" data-testid={`review-${item.code}`}>
                     <p className="text-sm text-ink">
                       {item.label}
                       {item.required && <span className="text-xs text-muted-foreground"> · required</span>}
                     </p>
                     {mine.length === 0 ? (
                       <p className="text-xs text-status-danger">Not uploaded yet</p>
+                    ) : view ? (
+                      <ul className="mt-1 space-y-1">
+                        {view.bySlot.map(({ slot, files: inSlot, live }) => (
+                          <li key={slot}>
+                            {inSlot.length > 0 && (
+                              <ul className="space-y-1">
+                                {inSlot.map((d) => (
+                                  <FileLine key={d.id} doc={d} onChanged={changed} name={slot}
+                                    canComplete={view.missing.length > 0 && d.status !== 'rejected' && !d.complete} />
+                                ))}
+                              </ul>
+                            )}
+                            {!live && !view.whole && <p className="text-xs text-status-danger">{slot} missing</p>}
+                          </li>
+                        ))}
+                      </ul>
                     ) : (
-                      <ul className="mt-1 space-y-1">{mine.map((d) => <FileLine key={d.id} doc={d} onChanged={changed} />)}</ul>
+                      <ul className="mt-1 space-y-1">
+                        {sorted.map((d) => <FileLine key={d.id} doc={d} onChanged={changed} name={fileCaption(d, mode, slots, pages) || undefined} />)}
+                      </ul>
                     )}
                   </li>
                 );

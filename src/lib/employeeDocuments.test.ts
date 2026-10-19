@@ -41,7 +41,10 @@ vi.mock('./privateFiles', () => ({
   openPrivateFile: vi.fn(),
 }));
 
-import { deleteMyDocument, fileProblem, refereeProblem, rejectDocument, emptyReferee, uploadMyDocument, type EmployeeDocument } from './employeeDocuments';
+import {
+  deleteMyDocument, fileCaption, fileProblem, filesSetting, refereeProblem, rejectDocument, emptyReferee, resolveSlots, slotsView, uploadMyDocument,
+  type EmployeeDocument,
+} from './employeeDocuments';
 
 const file = (name: string, size = 1000) => new File([new Uint8Array(size)], name, { type: 'application/pdf' });
 
@@ -116,5 +119,37 @@ describe('reviewing and referees', () => {
     expect(refereeProblem(emptyReferee())).toMatch(/full name/);
     expect(refereeProblem({ ...emptyReferee(), full_name: 'Mary' })).toMatch(/phone number or email/);
     expect(refereeProblem({ ...emptyReferee(), full_name: 'Mary', email: 'm@co.com' })).toBeNull();
+  });
+});
+
+describe('files settings', () => {
+  const ID = { 'National ID': ['Front', 'Back'], 'Passport Number': ['Bio page'], '*': ['Front', 'Back'] };
+  const f = (part: string | null, status: EmployeeDocument['status'] = 'pending', complete = false) =>
+    ({ id: Math.random().toString(), part, status, complete } as unknown as EmployeeDocument);
+
+  it('slots follow the identity type', () => {
+    expect(resolveSlots(ID, 'Passport Number')).toEqual(['Bio page']);
+    expect(resolveSlots(ID, 'Alien ID')).toEqual(['Front', 'Back']);
+    expect(resolveSlots(['Front', 'Back'], 'Passport Number')).toEqual(['Front', 'Back']);
+    expect(filesSetting({ allows_many: true, file_mode: 'slots', slots: ['Front', 'Back'], slots_def: ID }, 'Passport Number')).toEqual({ mode: 'slots', slots: ['Bio page'] });
+    expect(filesSetting({ allows_many: true })).toEqual({ mode: 'many', slots: [] });
+  });
+
+  it('a slot is missing until it has a file that was not rejected; an old file is the first slot', () => {
+    expect(slotsView([f(null)], ['Front', 'Back']).missing).toEqual(['Back']);
+    expect(slotsView([f('Front'), f('Back', 'rejected')], ['Front', 'Back']).missing).toEqual(['Back']);
+    expect(slotsView([f(null, 'accepted', true)], ['Front', 'Back']).missing).toEqual([]);
+  });
+
+  it('captions: the slot, the page, the label', () => {
+    expect(fileCaption({ part: null, label: null }, 'slots', ['Front', 'Back'])).toBe('Front');
+    expect(fileCaption({ part: 'Page 2', label: null }, 'single', [], 2)).toBe('Page 2');
+    expect(fileCaption({ part: null, label: 'BSc Commerce' }, 'many', [])).toBe('BSc Commerce');
+  });
+
+  it('uploads a part and a label with the file', async () => {
+    await uploadMyDocument('e1', 'id_document', file('front.jpg'), { part: 'Front', label: '  ' });
+    expect(db.inserts[0]).toMatchObject({ code: 'id_document', part: 'Front' });
+    expect(db.inserts[0]).not.toHaveProperty('label');
   });
 });
