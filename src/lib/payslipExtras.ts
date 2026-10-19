@@ -109,7 +109,7 @@ const companyContext = () => {
 async function loadEmployee(employeeNumber: string): Promise<(Payslip & { branch_id?: string | null }) | null> {
   const { data, error } = await supabase
     .from('employees')
-    .select('"Employee Number", "Tax PIN", "NSSF Number", "SHIF Number", "NHIF Number", "ID Number", branch_id, "Branch", "Department", "Job Title", "Job Group"')
+    .select('"Employee Number", "Tax PIN", "NSSF Number", "SHIF Number", "NHIF Number", "ID Number", branch_id, "Branch", "Job Title", "Job Group"')
     .eq('"Employee Number"', employeeNumber)
     .maybeSingle();
   return error ? null : (data as Payslip | null);
@@ -159,7 +159,7 @@ export function employeeDetailsOf(record: Payslip, employee: Payslip | null, bra
     shaNumber: orNull(e['SHIF Number']) ?? orNull(e['NHIF Number']),
     idNumber: orNull(e['ID Number']) ?? orNull(record.employeeNat),
     branch: branchName ?? orNull(record.branch) ?? orNull(e['Branch']),
-    department: orNull(record.department) ?? orNull(e['Department']),
+    department: orNull(record.department),
     position: orNull(record.position) ?? orNull(e['Job Title']),
     jobGroup: orNull(record.jobGroup) ?? orNull(e['Job Group']),
   };
