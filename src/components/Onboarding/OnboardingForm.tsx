@@ -8,6 +8,7 @@ import RefereesSection from './RefereesSection';
 import HealthSection from './HealthSection';
 import AgreementsSection from './AgreementsSection';
 import BankBranchFields from './BankBranchFields';
+import StillToProvide from './StillToProvide';
 import {
   type Contact,
   type OnboardingRecord,
@@ -26,7 +27,8 @@ import { supabase } from '../../lib/supabase';
 import FigbloomLoader from '../UI/FigbloomLoader';
 
 // The employee's part of onboarding (staff portal): personal, identity and statutory, tax claims, bank, emergency
-// contact and next of kin. They save as they go and submit to HR when it is complete.
+// contact and next of kin. They save as they go and submit to HR once the company's essentials are in; the rest
+// (documents, referees, policies...) can follow after approval without sending the record back (20261021700000).
 
 const SEXES = ['Female', 'Male', 'Intersex'] as const;
 const MARITAL = ['Single', 'Married', 'Divorced', 'Widowed', 'Separated'] as const;
@@ -41,7 +43,7 @@ function StatusBanner({ record }: { record: OnboardingRecord }) {
     invited: 'Fill in your details below and submit them to HR.',
     submitted: 'HR is reviewing your details. You can still correct them while you wait.',
     changes_requested: 'HR sent your details back. Make the changes below and submit again.',
-    approved: 'HR has approved your details. Changing your ID, KRA, SHA or NSSF numbers, phone, residency, disability or bank details sends them back to HR for review, and you are not paid until HR approves again.',
+    approved: 'HR has approved your details. Adding anything still to provide is fine, but changing your ID, tax, SHA or NSSF numbers, phone, residency, disability or bank details once given sends them back to HR for review, and you are not paid until HR approves again.',
   };
   return (
     <Card className="mb-4">
@@ -213,23 +215,28 @@ export default function OnboardingForm() {
     <div className="p-4 sm:p-6 max-w-4xl">
       <h2 className="text-lg font-semibold text-ink mb-1">Onboarding</h2>
       <p className="text-sm text-muted-foreground mb-4">
-        Your details for payroll and the KRA, SHA and NSSF returns. Fields marked * are required.
+        Your details for payroll and the tax and social security returns. Fields marked * are needed; the lists below say
+        what HR needs now, before you can submit, and what can come later, after you are approved and paid.
       </p>
 
       <StatusBanner record={record} />
 
-      {record.missing.employee.length > 0 && (
+      {status !== 'approved' && record.missing.essentialsEmployee.length > 0 && (
         <Card className="mb-4">
-          <p className="text-sm font-medium text-ink">Still needed before you can submit</p>
-          <p className="text-sm text-muted-foreground mt-1">{record.missing.employee.join(', ')}</p>
+          <p className="text-sm font-medium text-ink">Needed now, before you can submit</p>
+          <p className="text-sm text-muted-foreground mt-1">{record.missing.essentialsEmployee.join(', ')}</p>
         </Card>
       )}
 
-      {record.missing.documentsOutstanding.length > 0 && (
+      {record.missing.followUps.length > 0 && (
         <Card className="mb-4">
-          <p className="text-sm font-medium text-ink">Documents still to upload</p>
-          <p className="text-sm text-muted-foreground mt-1">{record.missing.documentsOutstanding.join(', ')}</p>
-          <p className="text-xs text-muted-foreground mt-1">You can submit without them and upload them later, below or in the Documents tab.</p>
+          <p className="text-sm font-medium text-ink">{status === 'approved' ? 'Still to provide' : 'Can follow later'}</p>
+          <p className="text-xs text-muted-foreground mt-0.5 mb-2">
+            {status === 'approved'
+              ? 'You are approved and on payroll. Add these when you can, below (documents, referees, policies) or in the Documents tab; it does not send your details back to HR.'
+              : 'You can submit without these and add them after HR approves you.'}
+          </p>
+          <StillToProvide followUps={record.missing.followUps} />
         </Card>
       )}
 

@@ -15,13 +15,13 @@ vi.mock('../../lib/onboarding', async (importOriginal) => {
 });
 
 import OnboardingForm from './OnboardingForm';
-import { emptyContact, type OnboardingRecord } from '../../lib/onboarding';
+import { emptyContact, type FollowUp, type OnboardingRecord } from '../../lib/onboarding';
 
 const record = (employee: Record<string, unknown>, missing: string[] = []): OnboardingRecord => ({
   employee: { id: 'id-1', 'Employee Number': 'E1', 'First Name': 'Amina', onboarding_status: 'invited', ...employee },
   emergency: emptyContact(),
   nextOfKin: emptyContact(),
-  missing: { employee: missing, employer: [], documentsOutstanding: [] as string[] },
+  missing: { employee: missing, employer: [], documentsOutstanding: [] as string[], essentialsEmployee: missing, essentialsEmployer: [], followUps: [] },
   history: [],
 });
 
@@ -95,11 +95,30 @@ describe('OnboardingForm', () => {
     expect(await screen.findByText(/not linked to an employee record/)).toBeTruthy();
   });
 
-  it('lists documents still to upload, and says they can be submitted later', async () => {
-    api.loadMyOnboarding.mockResolvedValue({ ...record({}), missing: { employee: [], employer: [], documentsOutstanding: ['Updated CV', 'HELB clearance certificate'] } });
+  const followUp = (item: string, extra: Partial<FollowUp> = {}): FollowUp => ({ item_key: 'documents', item, note: null, due_date: null, overdue: false, ...extra });
+
+  it('says what is needed now and what can follow later', async () => {
+    api.loadMyOnboarding.mockResolvedValue({ ...record({}), missing: { employee: ['NSSF number', 'Referee'], employer: [], documentsOutstanding: ['Updated CV'],
+      essentialsEmployee: ['NSSF number'], essentialsEmployer: [], followUps: [followUp('Referee', { item_key: 'referee' }), followUp('Document: Updated CV')] } });
     render(<OnboardingForm />);
-    expect(await screen.findByText('Updated CV, HELB clearance certificate')).toBeTruthy();
-    expect(screen.getByText(/You can submit without them/)).toBeTruthy();
+    expect((await screen.findByText('Needed now, before you can submit')).nextElementSibling?.textContent).toBe('NSSF number');
+    expect(screen.getByText('Can follow later')).toBeTruthy();
+    expect(screen.getByText('Document: Updated CV')).toBeTruthy();
+    expect(screen.getByText(/You can submit without these/)).toBeTruthy();
     expect((screen.getByRole('button', { name: /Submit to HR/ }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('once approved, shows what is still to provide with HR’s due dates', async () => {
+    api.loadMyOnboarding.mockResolvedValue({ ...record({ onboarding_status: 'approved' }), missing: { employee: ['Referee'], employer: [], documentsOutstanding: ['Updated CV'],
+      essentialsEmployee: [], essentialsEmployer: [], followUps: [
+        followUp('Referee', { item_key: 'referee' }),
+        followUp('Document: Updated CV', { note: 'rejected, upload again', due_date: '2026-10-30', overdue: true }),
+      ] } });
+    render(<OnboardingForm />);
+    expect(await screen.findByText('Still to provide')).toBeTruthy();
+    expect(screen.getByText(/does not send your details back to HR/)).toBeTruthy();
+    expect(screen.getByText('Document: Updated CV (rejected, upload again, due 30 Oct 2026, overdue)')).toBeTruthy();
+    expect(screen.queryByText('Needed now, before you can submit')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Submit to HR/ })).toBeNull();
   });
 });

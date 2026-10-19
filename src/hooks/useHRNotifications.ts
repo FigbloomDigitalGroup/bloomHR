@@ -39,7 +39,8 @@ export interface HRNotification {
         | 'leave_exhausted' | 'casual_limit'
         | 'leave_document_overdue'
         | 'contribution_requested'
-        | 'company_digest';
+        | 'company_digest'
+        | 'onboarding_followups_overdue';
     title: string;
     message: string;
     // Nullable for leave notifications - only contract/probation reminders

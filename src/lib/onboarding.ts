@@ -68,11 +68,32 @@ const toContact = (row: Record<string, unknown> | null | undefined): Contact => 
 
 const contactFilled = (c: Contact) => Boolean(c.full_name && c.phone_number);
 
+/** Something the employee can give after approval (20261021700000): a detail, a referee, a policy or a document. */
+export interface FollowUp {
+  /** the item's key, as Settings names it (documents, referee, policies, sex...) */
+  item_key: string;
+  /** the item as the missing-lists name it, e.g. "Referee" or "Document: Updated CV" */
+  item: string;
+  /** where a document is: "waiting for HR" or "rejected, upload again" */
+  note: string | null;
+  /** HR's due date (YYYY-MM-DD) */
+  due_date: string | null;
+  overdue: boolean;
+}
+
 export interface MissingParts {
+  /** everything the employee has not given yet (for display) */
   employee: string[];
+  /** everything HR has not entered yet */
   employer: string[];
-  /** required documents not yet uploaded and accepted: they don't hold up submitting or approving */
+  /** required documents not yet uploaded and accepted */
   documentsOutstanding: string[];
+  /** what blocks submitting: the company's essentials the employee has not given */
+  essentialsEmployee: string[];
+  /** what else blocks approving: HR's part (and documents to review, when the company makes documents essential) */
+  essentialsEmployer: string[];
+  /** what can follow later (on an approved record: everything still outstanding) */
+  followUps: FollowUp[];
 }
 
 export interface ReviewEvent {
@@ -114,13 +135,27 @@ async function loadParts(employee: EmployeeRecord, employeeId: string | null): P
   ]);
   for (const r of [emergency, nextOfKin, missing, history]) if (r.error) fail(r.error, 'Could not load the onboarding details.');
   const parts = (Array.isArray(missing.data) ? missing.data[0] : missing.data) as
-    | { employee_part?: string[]; employer_part?: string[]; documents_outstanding?: string[] }
+    | {
+        employee_part?: string[];
+        employer_part?: string[];
+        documents_outstanding?: string[];
+        essentials_employee?: string[];
+        essentials_employer?: string[];
+        followups?: FollowUp[];
+      }
     | null;
   return {
     employee,
     emergency: toContact(emergency.data),
     nextOfKin: toContact(nextOfKin.data),
-    missing: { employee: parts?.employee_part ?? [], employer: parts?.employer_part ?? [], documentsOutstanding: parts?.documents_outstanding ?? [] },
+    missing: {
+      employee: parts?.employee_part ?? [],
+      employer: parts?.employer_part ?? [],
+      documentsOutstanding: parts?.documents_outstanding ?? [],
+      essentialsEmployee: parts?.essentials_employee ?? [],
+      essentialsEmployer: parts?.essentials_employer ?? [],
+      followUps: parts?.followups ?? [],
+    },
     history: (history.data ?? []) as ReviewEvent[],
   };
 }
@@ -197,6 +232,12 @@ export interface OverviewRow {
   employee_part: string[];
   employer_part: string[];
   documents_outstanding: string[];
+  /** what still blocks approving (the employee's essentials and HR's part) */
+  essentials_missing: string[];
+  /** still to provide: what can follow later */
+  followups: string[];
+  /** how many of them are past HR's due date */
+  followups_overdue: number;
 }
 
 export async function loadOnboardingOverview(): Promise<OverviewRow[]> {
@@ -271,4 +312,52 @@ export async function removeEmployeePhoto(employeeNumber: string) {
   const { data, error } = await supabase.from('employees').update({ 'Profile Image': null }).eq('Employee Number', employeeNumber).select('"Employee Number"');
   if (error) fail(error, 'The photo was not removed.');
   requireUpdatedRows(data, 'The photo was not removed: you may not change this employee.');
+}
+
+/** HR sets (or, with null, clears) the due date of an item still to provide. */
+export async function setFollowUpDueDate(employeeId: string, item: string, dueDate: string | null) {
+  const { error } = await supabase.rpc('set_onboarding_followup_due', { p_employee: employeeId, p_item: item, p_due: dueDate || null });
+  if (error) fail(error, 'The due date was not saved.');
+}
+
+/** "Updated CV (due 30 Oct 2026, overdue)": one follow-up as a line of text. */
+export function followUpText(f: FollowUp): string {
+  const extras = [
+    f.note,
+    f.due_date ? `due ${new Date(`${f.due_date}T00:00:00`).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}` : null,
+    f.overdue ? 'overdue' : null,
+  ].filter(Boolean);
+  return extras.length ? `${f.item} (${extras.join(', ')})` : f.item;
+}
+
+// ---------------------------------------------------------------------------------------------
+// the company's essentials (Settings)
+// ---------------------------------------------------------------------------------------------
+export interface EssentialItem {
+  item_key: string;
+  label: string;
+  section: string;
+  essential: boolean;
+  default_essential: boolean;
+  /** why payroll needs it, when it does: Settings warns before it is made optional */
+  payroll_note: string | null;
+}
+
+export interface OnboardingSettings {
+  reminder_every_days: number;
+  customised: boolean;
+  items: EssentialItem[];
+}
+
+export async function loadOnboardingSettings(): Promise<OnboardingSettings> {
+  const { data, error } = await supabase.rpc('onboarding_settings');
+  if (error) fail(error, 'Could not load the onboarding settings.');
+  return data as OnboardingSettings;
+}
+
+/** Saves which items are essential (the rest can follow later) and how often employees are reminded. */
+export async function saveOnboardingSettings(essentialKeys: string[], reminderEveryDays: number): Promise<OnboardingSettings> {
+  const { data, error } = await supabase.rpc('save_onboarding_settings', { p_essential_items: essentialKeys, p_reminder_every_days: reminderEveryDays });
+  if (error) fail(error, 'The onboarding settings were not saved.');
+  return data as OnboardingSettings;
 }

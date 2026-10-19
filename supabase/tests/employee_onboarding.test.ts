@@ -71,6 +71,10 @@ beforeAll(async () => {
       ('E-FAR', 'Far', 'far@b.co', 'Clerk', 30000, 'MPESA', '${B}');
     -- these tests are about the details; documents and referees are tested in onboarding_documents.test.ts
     insert into company_document_settings (tenant_id, code, required) select '${A}', code, false from document_types;
+    -- this company ticks every item as essential: onboarding is all or nothing, as it was before 20261021700000
+    -- (onboarding_essentials.test.ts covers the default, where much can follow later)
+    insert into company_onboarding_settings (tenant_id, essential_items)
+      select '${A}', array_agg(item_key) from onboarding_item_catalogue();
   `);
 }, 120000);
 
