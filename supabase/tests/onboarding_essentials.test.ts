@@ -199,6 +199,7 @@ describe('the company decides what is essential', () => {
   });
 });
 
+  // (the KRA PIN certificate: one file. Proof of identity takes the front and the back since 20261022000000_document_parts)
 describe('follow-ups after approval', () => {
   it('providing them never sends the record back', async () => {
     await asUser(db, U.STAFF, () => run(`update employees set "Gender" = 'Female', nationality = 'Kenyan', residential_address = 'Kilimani',
@@ -207,24 +208,24 @@ describe('follow-ups after approval', () => {
     expect(await asUser(db, U.STAFF, () => run(`insert into emergency_contact ("Employee Number", full_name, relationship, phone_number) values ('E-ME', 'Halima', 'Sister', '0722000000')`))).toBe('');
     const [{ version_id }] = await asUser(db, U.STAFF, () => rows<{ version_id: string }>(`select version_id from policy_checklist()`));
     expect(await asUser(db, U.STAFF, () => run(`select accept_policy('${version_id}')`))).toBe('');
-    expect(await asUser(db, U.STAFF, () => run(upload('id_document', U.STAFF, 'E-ME')))).toBe('');
+    expect(await asUser(db, U.STAFF, () => run(upload('kra_pin_certificate', U.STAFF, 'E-ME')))).toBe('');
     expect(await status('E-ME')).toBe('approved');
     expect(await rows(`select 1 from employee_onboarding_reviews where employee_id = '${ids['E-ME']}' and action = 'resubmitted'`)).toEqual([]);
     const left = await followups('E-ME');
     expect(left.map((f) => f.item)).not.toContain('Sex');
     expect(left.map((f) => f.item)).not.toContain('Referee');
     expect(left.map((f) => f.item)).not.toContain('Agreement: Code of conduct');
-    expect(left.find((f) => f.item === 'Document: Proof of identity')?.note).toBe('waiting for HR');
+    expect(left.find((f) => f.item === 'Document: KRA PIN certificate')?.note).toBe('waiting for HR');
   });
 
   it('HR reviews the document itself, as before, and the record stays approved', async () => {
-    const [{ id }] = await rows<{ id: string }>(`select id from employee_documents where employee_id = '${ids['E-ME']}' and code = 'id_document'`);
+    const [{ id }] = await rows<{ id: string }>(`select id from employee_documents where employee_id = '${ids['E-ME']}' and code = 'kra_pin_certificate'`);
     expect(await asUser(db, U.HR, () => run(`select review_employee_document('${id}', 'reject', 'Blurry')`))).toBe('');
-    expect((await followups('E-ME')).find((f) => f.item === 'Document: Proof of identity')?.note).toBe('rejected, upload again');
-    await asUser(db, U.STAFF, () => run(upload('id_document', U.STAFF, 'E-ME')));
-    const [{ id: again }] = await rows<{ id: string }>(`select id from employee_documents where employee_id = '${ids['E-ME']}' and code = 'id_document' and status = 'pending'`);
+    expect((await followups('E-ME')).find((f) => f.item === 'Document: KRA PIN certificate')?.note).toBe('rejected, upload again');
+    await asUser(db, U.STAFF, () => run(upload('kra_pin_certificate', U.STAFF, 'E-ME')));
+    const [{ id: again }] = await rows<{ id: string }>(`select id from employee_documents where employee_id = '${ids['E-ME']}' and code = 'kra_pin_certificate' and status = 'pending'`);
     expect(await asUser(db, U.HR, () => run(`select review_employee_document('${again}', 'accept')`))).toBe('');
-    expect(await items('E-ME')).not.toContain('Document: Proof of identity');
+    expect(await items('E-ME')).not.toContain('Document: KRA PIN certificate');
     expect(await status('E-ME')).toBe('approved');
   });
 
