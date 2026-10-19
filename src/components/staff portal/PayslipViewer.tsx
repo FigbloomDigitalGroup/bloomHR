@@ -33,84 +33,22 @@ import { loadCompanyIdentity, type CompanyIdentity } from '../../lib/companyProf
 import { useBackToClose } from '../../hooks/useBackToClose';
 import { currencyOf, currencySymbol } from '../../lib/payroll/currency';
 import { PayslipDocument } from '../Payroll/PayslipDocument';
+import { perDiemRateOf, statutoryFor, type Rates } from '../../lib/statutoryCalc';
+import { lastDayOf } from '../../lib/payrollExports';
 import { usePayslipExtras } from '../Payroll/usePayslipExtras';
 
-// HARDCODED STATUTORY SETTINGS - Updated to match payroll dashboard
-const statutorySettings = {
-  payeBrackets: [
-    { threshold: 24000, rate: 0.10 },
-    { threshold: 32333, rate: 0.25 },
-    { threshold: 500000, rate: 0.30 },
-    { threshold: 800000, rate: 0.325 },
-    { threshold: 999999999, rate: 0.35 }
-  ],
-  personalRelief: 2400,
-  nssfLowerLimit: 9000,
-  nssfUpperLimit: 108000,
-  nssfRate: 0.06,
-  nssfMaximum: 6480,
-  nhifRate: 0.0275, // Flat rate system - 2.75%
-  housingLevyRate: 0.015,
-  currency: 'KSh',
-  welfareDeduction: 300
-};
+// Older payslips (payroll_records, before saved payslips) show the figures they were paid with. A record without
+// them is worked out with the statutory rates in force for its month (statutory_rates_on, lib/statutoryCalc), never
+// with a copy of the rates kept here (FIG-813).
+const LEGACY_RATES = '__rates';
 
-// UPDATED calculation functions to match payroll dashboard
-const statutoryCalculations = {
-  calculatePAYE: (taxableIncome) => {
-    if (!taxableIncome || taxableIncome <= 0) return 0;
-
-    let tax = 0;
-    let remainingIncome = taxableIncome;
-
-    for (let i = 0; i < statutorySettings.payeBrackets.length; i++) {
-      const bracket = statutorySettings.payeBrackets[i];
-      const prevBracket = i > 0 ? statutorySettings.payeBrackets[i - 1] : { threshold: 0 };
-
-      if (remainingIncome > 0) {
-        const bracketAmount = i === 0
-          ? Math.min(remainingIncome, bracket.threshold)
-          : Math.min(remainingIncome, bracket.threshold - prevBracket.threshold);
-
-        tax += bracketAmount * bracket.rate;
-        remainingIncome -= bracketAmount;
-      }
-    }
-
-    return Number(tax.toFixed(2));
-  },
-
-  calculateNSSF: (grossSalary) => {
-    if (!grossSalary || grossSalary <= 0) return 0;
-
-    const tier1 = Math.min(grossSalary, statutorySettings.nssfLowerLimit) * statutorySettings.nssfRate;
-    let tier2 = 0;
-
-    if (grossSalary > statutorySettings.nssfLowerLimit) {
-      const tier2Salary = Math.min(
-        grossSalary - statutorySettings.nssfLowerLimit,
-        statutorySettings.nssfUpperLimit - statutorySettings.nssfLowerLimit
-      );
-      tier2 = tier2Salary * statutorySettings.nssfRate;
-    }
-
-    const total = Math.min(tier1 + tier2, statutorySettings.nssfMaximum);
-    return Number(total.toFixed(2));
-  },
-
-  calculateNHIF: (grossPay) => {
-    if (!grossPay || grossPay <= 0) return 0;
-
-    // UPDATED: Use taxable gross instead of gross pay (minus per diem)
-    const nhif = grossPay * statutorySettings.nhifRate;
-    return Number(nhif.toFixed(2));
-  },
-
-  calculateHousingLevy: (grossSalary) => {
-    if (!grossSalary || grossSalary <= 0) return 0;
-    const levy = grossSalary * statutorySettings.housingLevyRate;
-    return Number(levy.toFixed(2));
-  }
+/** "2026-01", "2026-01-15" or "January 2026" -> "2026-01" (null when it can't be read). */
+const periodKey = (payPeriod: unknown): string | null => {
+  const text = String(payPeriod ?? '').trim();
+  const iso = /^(\d{4})-(\d{2})/.exec(text);
+  if (iso) return `${iso[1]}-${iso[2]}`;
+  const d = new Date(text);
+  return Number.isNaN(d.getTime()) ? null : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
 /** A saved payslip (salary_history, from an approved payroll run) exactly as payroll approved it. */
@@ -170,14 +108,15 @@ const calculatePayrollValues = (employee, overrideStatutoryChecks = true, salary
   const commission = parseFloat(employee["Commission"] || employee.commission || 0);
   const bonus = parseFloat(employee["Bonus"] || employee.bonus || 0);
 
-  // EXACT SAME: Per diem is 33% of basic salary
-  const perDiem = basicSalary * 0.33;
+  // the month's statutory rates (loaded with the record), never a copy kept here
+  const rates: Rates = employee[LEGACY_RATES] ?? {};
+  // the per diem share of basic (per_diem_rate, 33% by default) is not taxed
+  const perDiem = basicSalary * perDiemRateOf(rates);
 
-  // EXACT SAME: Overtime pay
   const overtimePay = overtimeHours * overtimeRate;
 
-  // EXACT SAME: Gross pay (basic salary already includes per diem)
-  const grossPay = basicSalary + houseAllowance + transportAllowance +
+  // Gross pay (basic salary already includes per diem)
+  const workedGross = basicSalary + houseAllowance + transportAllowance +
     medicalAllowance + otherAllowances + overtimePay +
     commission + bonus;
 
@@ -187,37 +126,34 @@ const calculatePayrollValues = (employee, overrideStatutoryChecks = true, salary
   const taxPin = employee["Tax PIN"] || employee.tax_pin || '';
   const employeeId = employee["Employee ID"] || employee.employee_id || employee["Employee Number"] || '';
 
-  // EXACT SAME: Taxable amount EXCLUDES the per diem portion
-  const taxableGross = grossPay - perDiem;
+  // Taxable amount EXCLUDES the per diem portion
+  const taxableGross = workedGross - perDiem;
 
-  // EXACT SAME: Statutory deductions with override
-  let nhifDeduction = 0;
-  let nssfDeduction = 0;
-  let housingLevy = 0;
-
-  if (overrideStatutoryChecks || nhifNumber) {
-    nhifDeduction = statutoryCalculations.calculateNHIF(taxableGross);
-  }
-
-  if (overrideStatutoryChecks || nssfNumber) {
-    nssfDeduction = statutoryCalculations.calculateNSSF(taxableGross);
-  }
-
-  if (overrideStatutoryChecks || taxPin) {
-    housingLevy = statutoryCalculations.calculateHousingLevy(taxableGross);
-  }
-
-  // EXACT SAME: Calculate taxable income for PAYE AFTER deducting NSSF and Housing Levy
-  const taxableIncomeForPAYE = taxableGross - nssfDeduction - housingLevy;
-
-  let payeTax = 0;
-  let taxRelief = 0;
-
-  if (overrideStatutoryChecks || taxPin) {
-    payeTax = statutoryCalculations.calculatePAYE(taxableIncomeForPAYE);
-    taxRelief = Math.min(payeTax, statutorySettings.personalRelief);
-    payeTax = Math.max(0, payeTax - taxRelief);
-  }
+  // SHIF, NSSF, the housing levy and PAYE with the month's rates (lib/statutoryCalc), as payroll works them out
+  const statutory = statutoryFor(
+    {
+      cashPay: taxableGross,
+      apply: {
+        shif: overrideStatutoryChecks || Boolean(nhifNumber),
+        nssf: overrideStatutoryChecks || Boolean(nssfNumber),
+        ahl: overrideStatutoryChecks || Boolean(taxPin),
+        paye: overrideStatutoryChecks || Boolean(taxPin),
+      },
+    },
+    rates,
+  );
+  // what an older record was paid with wins over the working
+  const stored = (column: string): number | null => {
+    const v = employee[column];
+    return v === undefined || v === null || String(v).trim() === '' ? null : parseFloat(v) || 0;
+  };
+  const grossPay = stored('Gross Pay') ?? workedGross;
+  const nhifDeduction = stored('NHIF') ?? statutory.shif;
+  const nssfDeduction = stored('NSSF') ?? statutory.nssf;
+  const housingLevy = stored('Housing Levy') ?? statutory.ahl;
+  const payeTax = stored('PAYE Tax') ?? statutory.paye;
+  const taxRelief = overrideStatutoryChecks || taxPin ? Math.min(statutory.taxBeforeReliefs, statutory.personalRelief) : 0;
+  const taxableIncomeForPAYE = statutory.taxablePay;
 
   // UPDATED: Calculate salary advance deduction for CURRENT PAY PERIOD ONLY
   const calculateAdvanceDeduction = (employeeNumber) => {
@@ -280,22 +216,22 @@ const calculatePayrollValues = (employee, overrideStatutoryChecks = true, salary
 
   const advanceDeduction = calculateAdvanceDeduction(employeeId);
 
-  // EXACT SAME: Voluntary deductions set to 0 except welfare
+  // Voluntary deductions set to 0 except welfare
   const loanDeduction = 0;
   const welfareDeduction = 300; // Fixed welfare deduction
   const otherDeductions = 0;
 
-  // EXACT SAME: Total deductions
-  const totalDeductions = payeTax +
+  // Total deductions (as the record kept them, when it did)
+  const totalDeductions = stored('Total Deductions') ?? (payeTax +
     nhifDeduction +
     nssfDeduction +
     housingLevy +
     loanDeduction +
     advanceDeduction +
     welfareDeduction +
-    otherDeductions;
+    otherDeductions);
 
-  const netPay = grossPay - totalDeductions;
+  const netPay = stored('Net Pay') ?? grossPay - totalDeductions;
 
   return {
     // the payslip's own currency (FIG-905): KSh, TSh, USh
@@ -438,7 +374,7 @@ const GlowButton = ({
 
 /** An older payroll record (before saved payslips) in the shape the shared payslip reads, with its worked-out figures. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- payroll_records rows are untyped
-const legacyPayslipRecord = (record: any, c: ReturnType<typeof calculatePayrollValues>, payPeriod: string | null) => ({
+const legacyPayslipRecord = ({ [LEGACY_RATES]: _rates, ...record }: any, c: ReturnType<typeof calculatePayrollValues>, payPeriod: string | null) => ({
   ...record,
   employee_id: record["Employee ID"] || record.employee_id,
   employee_name: record["Employee Name"] || record.employee_name,
@@ -667,6 +603,19 @@ const PayslipViewer = () => {
         }
       }
 
+      // older records are worked out with their month's statutory rates
+      if (data.length && data[0].run_id === undefined) {
+        const periods = [...new Set(data.map((r) => periodKey(r["Pay Period"] ?? r.pay_period)).filter((p): p is string => !!p))];
+        const loaded = await Promise.all(
+          periods.map(async (period) => {
+            const { data: rates } = await supabase.rpc('statutory_rates_on', { p_day: lastDayOf(period), p_country: 'Kenya' });
+            return [period, (rates ?? {}) as Rates] as const;
+          })
+        );
+        const byPeriod = new Map(loaded);
+        data = data.map((r) => ({ ...r, [LEGACY_RATES]: byPeriod.get(periodKey(r["Pay Period"] ?? r.pay_period) ?? '') ?? {} }));
+      }
+
       setPayslips(data || []);
     } catch (error) {
       console.error('Error fetching payslips:', error);
@@ -801,20 +750,6 @@ const PayslipViewer = () => {
         </div>
       </div>
 
-      {/* System Info */}
-      {/* <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-xs">
-        <div className="flex items-center gap-2 mb-2">
-          <Calculator className="w-4 h-4 text-green-600" />
-          <span className="font-semibold text-green-800">Current System: HARDCODED FLAT RATE</span>
-        </div>
-        <div className="grid grid-cols-2 gap-2 text-green-700">
-          <div><strong>NHIF Rate:</strong> 2.75%</div>
-          <div><strong>SHIF Calculation:</strong> Taxable Gross × 2.75%</div>
-          <div><strong>Statutory Override:</strong> {overrideStatutoryChecks ? 'Enabled' : 'Disabled'}</div>
-          <div><strong>Welfare Deduction:</strong> KSh 300</div>
-        </div>
-      </div> */}
-
       {/* Summary Cards - Updated with advance deductions */}
       {showSummary && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -851,9 +786,9 @@ const PayslipViewer = () => {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Statutory Deductions Summary</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatutoryCard label="Total PAYE Tax" value={summaryTotals.totalPAYE} icon={FileText} color="red" rate="Progressive rates" />
-            <StatutoryCard label="Total NSSF" value={summaryTotals.totalNSSF} icon={Calculator} color="blue" rate="6% (Tiered)" />
-            <StatutoryCard label="Total SHIF" value={summaryTotals.totalNHIF} icon={TrendingUp} color="purple" rate="2.75%" />
-            <StatutoryCard label="Housing Levy" value={summaryTotals.totalHousingLevy} icon={DollarSign} color="yellow" rate="1.5%" />
+            <StatutoryCard label="Total NSSF" value={summaryTotals.totalNSSF} icon={Calculator} color="blue" rate="Month's rates" />
+            <StatutoryCard label="Total SHIF" value={summaryTotals.totalNHIF} icon={TrendingUp} color="purple" rate="Month's rates" />
+            <StatutoryCard label="Housing Levy" value={summaryTotals.totalHousingLevy} icon={DollarSign} color="yellow" rate="Month's rates" />
           </div>
         </div>
       )}

@@ -16,7 +16,8 @@ const ADMIN_B = '00000000-0000-0000-0000-00000000b0ad';
 // Keep in sync with the "exempt" arrays in the migrations.
 // statutory_rates holds platform defaults (no company) next to companies' own rates; tested in employee_onboarding.test.ts.
 // document_types, banks and bank_branches are reference lists every company shares (read-only).
-const NOT_TENANT_OWNED = ['tenants', 'permissions', 'user_profiles', 'memberships', 'user_preferences', 'Employee_Records_Duplicate', 'kenya_branches_duplicate', 'statutory_rates', 'document_types', 'banks', 'bank_branches'];
+// platform_admins and platform_rate_changes are Figbloom's own, above every company (finance_bill_readiness.test.ts).
+const NOT_TENANT_OWNED = ['tenants', 'permissions', 'user_profiles', 'memberships', 'user_preferences', 'Employee_Records_Duplicate', 'kenya_branches_duplicate', 'statutory_rates', 'document_types', 'banks', 'bank_branches', 'platform_admins', 'platform_rate_changes'];
 
 let db: PGlite;
 

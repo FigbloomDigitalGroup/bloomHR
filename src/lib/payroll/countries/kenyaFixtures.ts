@@ -40,6 +40,8 @@ export const KENYA_RATES: Rates = {
   nita_levy: 50,
   wht_contractual: 0.03,
   wht_professional: 0.05,
+  // the per diem share of basic (a dated rate since FIG-813; 33%, as before)
+  per_diem_rate: 0.33,
 };
 
 const PERIOD = '2026-10';

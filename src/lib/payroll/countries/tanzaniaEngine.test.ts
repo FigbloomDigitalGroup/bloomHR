@@ -76,7 +76,7 @@ describe('a worked payslip: gross TZS 1,500,000, resident', () => {
       { label: 'SDL (skills levy)', amount: 52500 },
       { label: 'WCF (workers compensation)', amount: 7500 },
     ]);
-    expect(r.statutoryDeductions).toEqual([{ label: 'PAYE', amount: 233000 }, { label: 'NSSF (10%)', amount: 150000 }]);
+    expect(r.statutoryDeductions).toEqual([{ label: 'PAYE', amount: 233000 }, { label: 'NSSF', amount: 150000 }]);
   });
   it('is in TZS with none of Kenya’s lines', () => {
     expect([r.country, r.currency, r.record.country, r.record.currency]).toEqual(['Tanzania', 'TZS', 'Tanzania', 'TZS']);

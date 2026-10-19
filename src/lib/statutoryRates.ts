@@ -27,6 +27,8 @@ export const RATE_LABELS: Record<string, string> = {
   nssf_lower_limit: 'NSSF lower earnings limit',
   nssf_upper_limit: 'NSSF upper earnings limit',
   nita_levy: 'NITA training levy (employer, per employee monthly)',
+  // company practice (FIG-813): 33% by default; a company sets its own, or 0 for none
+  per_diem_rate: 'Per diem share of basic salary (not taxed)',
   // Uganda (FIG-905)
   paye_bands_non_resident: 'PAYE bands (non-resident)',
   paye_surcharge_threshold: 'Extra PAYE above (monthly)',

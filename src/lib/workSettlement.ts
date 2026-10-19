@@ -102,9 +102,9 @@ const hasWork = (w: WorkMonth) =>
 export const settlementApplies = (employee: Record<string, unknown> | null | undefined, work: WorkMonth) =>
   isContractor(employee) || String(employee?.['pay_basis'] ?? '') === 'work' || hasWork(work);
 
-/** A contractor's withholding tax rate from the month's rates: professional 5%, contractual 3% (Third Schedule). */
+/** A contractor's withholding tax rate from the month's rates (wht_professional or wht_contractual, Third Schedule). */
 export const whtRateFor = (employee: Record<string, unknown> | null | undefined, rates: Rates) =>
-  String(employee?.['wht_category'] ?? '') === 'professional' ? rateOf(rates, 'wht_professional', 0.05) : rateOf(rates, 'wht_contractual', 0.03);
+  String(employee?.['wht_category'] ?? '') === 'professional' ? rateOf(rates, 'wht_professional') : rateOf(rates, 'wht_contractual');
 
 /** Withholding tax on a month's gross. */
 export const whtOn = (gross: number, rate: number) => round2(Math.max(0, gross) * Math.max(0, rate));

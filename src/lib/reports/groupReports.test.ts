@@ -90,10 +90,10 @@ describe('the payroll summary', () => {
       { label: 'NSSF (employer)', amount: 7320 }, { label: 'Housing levy (employer)', amount: 2250 }, { label: 'NITA levy', amount: 100 },
     ]);
     expect([ke.loans, ke.otherDeductions, ke.totalDeductions, ke.net, ke.totalCost]).toEqual([1000, 0, 40695, 109305, 159670]);
-    expect(tz.statutory.map((l) => l.label)).toEqual(['PAYE', 'NSSF (10%)', 'HESLB loan repayment']);
+    expect(tz.statutory.map((l) => l.label)).toEqual(['PAYE', 'NSSF', 'HESLB loan repayment']);
     expect(tz.employerCosts.map((l) => [l.label, l.amount])).toEqual([['NSSF (employer)', 200000], ['SDL (skills levy)', 70000], ['WCF (workers compensation)', 10000]]);
-    expect(ug.statutory.map((l) => [l.label, l.amount])).toEqual([['PAYE', 330750], ['NSSF (5%)', 75000], ['Local service tax', 25000]]);
-    expect(ug.employerCosts).toEqual([{ label: 'NSSF (employer, 10%)', amount: 150000 }]);
+    expect(ug.statutory.map((l) => [l.label, l.amount])).toEqual([['PAYE', 330750], ['NSSF', 75000], ['Local service tax', 25000]]);
+    expect(ug.employerCosts).toEqual([{ label: 'NSSF (employer)', amount: 150000 }]);
   });
 
   it('adds up per currency, never across', () => {

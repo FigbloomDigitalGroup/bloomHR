@@ -105,12 +105,12 @@ describe('tax on the reduced gross', () => {
     const basic = 60000;
     const leave = leavePayFor(row([{ unpaid_days: 2 }, { leave_type: 'Sick Leave', half_pay_days: 3 }]), basic, 'basic_30');
     expect(leave.total).toBe(7000);
-    const { earnedBasic, perDiem } = basicAfterLeave(basic, leave.total);
+    const { earnedBasic, perDiem } = basicAfterLeave(basic, leave.total, 0.33);
     expect(earnedBasic).toBe(53000);
     expect(perDiem).toBeCloseTo(17490, 2); // 33% of what was earned
     const gross = earnedBasic; // no allowances
     const reduced = statutoryFor({ cashPay: gross - perDiem }, rates);
-    const full = statutoryFor({ cashPay: basic - basicAfterLeave(basic, 0).perDiem }, rates);
+    const full = statutoryFor({ cashPay: basic - basicAfterLeave(basic, 0, 0.33).perDiem }, rates);
     // cash pay 35,510 rather than 40,200
     expect(reduced.ahl).toBe(532.65);
     expect(reduced.nssf).toBe(2130.6);
@@ -120,7 +120,14 @@ describe('tax on the reduced gross', () => {
   });
 
   it('a whole month unpaid leaves no basic and no per diem', () => {
-    expect(basicAfterLeave(30000, 30000)).toEqual({ earnedBasic: 0, perDiem: 0 });
+    expect(basicAfterLeave(30000, 30000, 0.33)).toEqual({ earnedBasic: 0, perDiem: 0 });
+  });
+
+  it("takes the per diem share from the month's rate (per_diem_rate): 33% by default, the company's own when set", () => {
+    expect(basicAfterLeave(60000, 0, 0.33).perDiem).toBeCloseTo(19800, 2);
+    expect(basicAfterLeave(60000, 0, 0.2).perDiem).toBe(12000);
+    expect(basicAfterLeave(60000, 0, 0).perDiem).toBe(0);
+    expect(basicAfterLeave(60000, 0, -1).perDiem).toBe(0);
   });
 });
 

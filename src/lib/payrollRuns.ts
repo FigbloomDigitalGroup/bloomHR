@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { IN_LIST_SIZE, chunks, fetchAll } from './fetchAll';
 import { saveSalaryHistoryBatch, type SalaryHistoryRecord } from './salaryHistory';
+import type { Rates } from './statutoryCalc';
 
 /**
  * One payroll run per company per month (table payroll_runs). Its payslips are the salary_history rows for that
@@ -92,7 +93,13 @@ export const getRunPayslips = async (runId: string) =>
  * employees no longer in `records` are removed, so the draft always matches the latest calculation. Countries already
  * approved or paid (`lockedCountries`) are left as they are: their payslips are neither saved nor removed.
  */
-export const saveDraftRun = async (payPeriod: string, records: SalaryHistoryRecord[], lockedCountries: string[] = []) => {
+export const saveDraftRun = async (
+  payPeriod: string,
+  records: SalaryHistoryRecord[],
+  lockedCountries: string[] = [],
+  /** the rates each country was worked out with (FIG-813): recorded so a later rate change flags the draft */
+  ratesUsed?: Map<string, Rates | null> | null,
+) => {
   if (records.length === 0) throw new Error('There are no employees to pay for this month.');
   await saveSalaryHistoryBatch(records.map((r) => ({ ...r, pay_period: payPeriod })));
 
@@ -111,6 +118,40 @@ export const saveDraftRun = async (payPeriod: string, records: SalaryHistoryReco
     const { error } = await supabase.from('salary_history').delete().in('id', ids);
     if (error) throw error;
   }
+
+  if (ratesUsed) {
+    const run = await getPayrollRun(payPeriod);
+    const saved = new Set(records.map((r) => String((r as { country?: unknown }).country || 'Kenya').trim().toLowerCase()));
+    const used = Object.fromEntries([...ratesUsed].filter(([country, rates]) => rates && saved.has(country.trim().toLowerCase()) && !locked.has(country.trim().toLowerCase())));
+    if (run && Object.keys(used).length) await recordRunRates(run.id, used as Record<string, Rates>);
+  }
+};
+
+/** A database without migration 20261021800000 yet: the stale-rates check is skipped, never an error. */
+const missingFunction = (error: unknown) => ['42883', 'PGRST202'].includes((error as { code?: string } | null)?.code ?? '');
+
+/** Records the rates each draft country of the run was worked out with (approved countries are left as they are). */
+export const recordRunRates = async (runId: string, rates: Record<string, Rates>): Promise<string[]> => {
+  const { data, error } = await supabase.rpc('record_payroll_rates', { p_run: runId, p_rates: rates });
+  if (error) {
+    if (missingFunction(error)) return [];
+    throw error;
+  }
+  return (data ?? []) as string[];
+};
+
+/**
+ * The run's draft countries whose statutory rates for the month changed since they were worked out (a new platform
+ * rate, a company's own rate): they must be recalculated before they can be approved. Approved and paid countries are
+ * never listed: they never change.
+ */
+export const getStaleCountries = async (runId: string): Promise<string[]> => {
+  const { data, error } = await supabase.rpc('payroll_stale_countries', { p_run: runId });
+  if (error) {
+    if (missingFunction(error)) return [];
+    throw error;
+  }
+  return ((data ?? []) as unknown[]).map((c) => (typeof c === 'string' ? c : String((c as Record<string, unknown>)?.payroll_stale_countries ?? '')));
 };
 
 export const setRunStatus = async (runId: string, status: PayrollRunStatus) => {

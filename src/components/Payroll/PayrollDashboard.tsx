@@ -60,6 +60,7 @@ import {
   discardDraftRun,
   getPayrollRun,
   getRunCountries,
+  getStaleCountries,
   getRunPayslips,
   runErrorMessage,
   saveDraftRun,
@@ -120,6 +121,8 @@ import PayrollEmployeesTab from "./PayrollEmployeesTab";
 import PayrollDeductionsTab from "./PayrollDeductionsTab";
 import PayrollEarningsTab from "./PayrollEarningsTab";
 import PayrollRatesTab from "./PayrollRatesTab";
+import { PlatformRatesLink, RatesChangedNotice } from "./RatesChangedNotice";
+import PlatformRatesBanner from "./PlatformRatesBanner";
 import UgandaLstSettings from "./UgandaLstSettings";
 import PayrollFilesTab from "./PayrollFilesTab";
 import PayrollHistoryTab from "./PayrollHistoryTab";
@@ -233,6 +236,8 @@ export default function PayrollDashboard() {
   const [runPayslips, setRunPayslips] = useState<any[]>([]);
   // each country's part of the run (FIG-905): approved, reopened and paid on its own
   const [runCountries, setRunCountries] = useState<PayrollRunCountry[]>([]);
+  // draft countries worked out with other statutory rates than those in force now (FIG-813): recalculate before approving
+  const [staleCountries, setStaleCountries] = useState<string[]>([]);
   // staff nobody worked out this month: their country has no engine yet, no rates, or a currency mismatch
   const [notCalculated, setNotCalculated] = useState<RunCalculation["notCalculated"]>([]);
   const [selectedCountry, setSelectedCountry] = useState("all");
@@ -1171,11 +1176,14 @@ export default function PayrollDashboard() {
     (async () => {
       try {
         const found = await getPayrollRun(actualPeriod);
-        const [payslips, countries] = found ? await Promise.all([getRunPayslips(found.id), getRunCountries(found.id)]) : [[], []];
+        const [payslips, countries, stale] = found
+          ? await Promise.all([getRunPayslips(found.id), getRunCountries(found.id), getStaleCountries(found.id).catch(() => [] as string[])])
+          : [[], [], [] as string[]];
         if (cancelled) return;
         setRun(found);
         setRunPayslips(payslips);
         setRunCountries(countries);
+        setStaleCountries(stale);
         setRunPeriod(actualPeriod);
       } catch (err) {
         if (!cancelled) toast.error(runErrorMessage(err, "Could not load this month's payroll."));
@@ -1379,7 +1387,7 @@ export default function PayrollDashboard() {
         toast.error(lockedCountries.length ? `${lockedCountries.join(", ")} ${lockedCountries.length === 1 ? "is" : "are"} already approved: reopen to recalculate.` : `No one can be paid for ${periodLabel} yet.`);
         return;
       }
-      await saveDraftRun(actualPeriod, records, lockedCountries);
+      await saveDraftRun(actualPeriod, records, lockedCountries, ratesByCountry);
       toast.success(
         monthRun
           ? `Recalculated ${records.length} payslips for ${periodLabel}.`
@@ -1500,8 +1508,9 @@ export default function PayrollDashboard() {
         payCurrencies,
         fxRates,
         heldBack,
+        ratesChanged: staleCountries,
       }),
-    [onPayroll, companyBranches, payrollRecords, runCountries, monthRun, ratesByCountry, belowMinimum, payCurrencies, fxRates, heldBack],
+    [onPayroll, companyBranches, payrollRecords, runCountries, monthRun, ratesByCountry, belowMinimum, payCurrencies, fxRates, heldBack, staleCountries],
   );
   // the countries on this month's payroll paid in USD: each needs the month's rate (FIG-906)
   const usdCountries = useMemo(
@@ -1699,6 +1708,9 @@ export default function PayrollDashboard() {
       />
 
       <TabBar items={[...PAYROLL_TABS]} activeId={tab} onChange={setTab} className="border-b border-border" />
+
+      {/* new platform statutory rates (FIG-813): "New Kenya rates from 1 July 2026", for the countries this company pays in */}
+      <PlatformRatesBanner countries={[...new Set(["Kenya", ...companyBranches.map((b) => b.country)])]} onOpenRates={() => setTab("rates")} />
 
       {/* WALLET UI REMOVED - Commented out as requested */}
 
@@ -1904,6 +1916,14 @@ export default function PayrollDashboard() {
 
 
 
+      {tab === "run" && !dataLoading && monthRun && (
+        <RatesChangedNotice
+          countries={staleCountries.filter((c) => runCountries.some((rc) => rc.country === c && rc.status === "draft"))}
+          periodLabel={periodLabel}
+          busy={runBusy}
+          onRecalculate={() => void handleSaveRun()}
+        />
+      )}
       {tab === "run" && (dataLoading ? loader : (
         <PayrollRunTab
           periodLabel={periodLabel}
@@ -2076,6 +2096,7 @@ export default function PayrollDashboard() {
               ))}
             </div>
           )}
+          <PlatformRatesLink onOpen={() => navigate("/platform/rates")} />
           <PayrollRatesTab
             payPeriod={actualPeriod}
             periodLabel={periodLabel}

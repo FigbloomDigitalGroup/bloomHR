@@ -83,7 +83,7 @@ export function tanzaniaTaxDetails(
   return {
     not_taxed: nonZero([line('not_taxed', 'Earnings not taxed', Math.max(0, num(i.grossPay) - num(i.taxablePay)))]),
     taxable_benefits: [],
-    before_tax: nonZero([line('nssf', 'NSSF', i.resident && rateOf(rates, 'nssf_deductible', 1) ? s.nssf : 0)]),
+    before_tax: nonZero([line('nssf', 'NSSF', i.resident && rateOf(rates, 'nssf_deductible') ? s.nssf : 0)]),
     tax_before_reliefs: s.paye,
     reliefs: [],
   };
@@ -100,8 +100,8 @@ export function ugandaTaxDetails(
     not_taxed: nonZero([line('not_taxed', 'Earnings not taxed', num(i.nonTaxable))]),
     taxable_benefits: [],
     before_tax: nonZero([
-      line('lst', 'Local service tax', rateOf(rates, 'lst_deductible', 1) ? num(i.lst) : 0),
-      line('nssf', 'NSSF', rateOf(rates, 'nssf_deductible', 0) ? s.nssf : 0),
+      line('lst', 'Local service tax', rateOf(rates, 'lst_deductible') ? num(i.lst) : 0),
+      line('nssf', 'NSSF', rateOf(rates, 'nssf_deductible') ? s.nssf : 0),
     ]),
     tax_before_reliefs: s.paye,
     reliefs: [],

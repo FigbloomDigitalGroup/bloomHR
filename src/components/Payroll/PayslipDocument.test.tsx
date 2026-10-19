@@ -136,7 +136,7 @@ describe('a Tanzania payslip', () => {
     expect(screen.queryByTestId('employee-sha-number')).toBeNull();
     expect(section('payslip-employee').getByText('NIDA number:')).toBeTruthy();
     expect(section('payslip-employer').getByText('TIN: 123456789')).toBeTruthy();
-    expect(section('deductions-before-tax').getByText('NSSF (10%)').nextSibling?.textContent).toBe('TSh 150,000');
+    expect(section('deductions-before-tax').getByText('NSSF').nextSibling?.textContent).toBe('TSh 150,000');
     expect(amountOf('taxable-pay')).toContain('TSh 1,350,000');
     expect(amountOf('no-reliefs')).toMatch(/Tanzania has no personal relief/);
     expect(screen.queryByText(/Personal relief/)).toBeNull();
@@ -164,10 +164,10 @@ describe('a Uganda payslip', () => {
     const lst = Number(record.lst_deduction);
     expect(lst).toBeGreaterThan(0);
     expect(section('deductions-before-tax').getByText('Local service tax').nextSibling?.textContent).toBe(`USh ${lst.toLocaleString()}`);
-    expect(section('deductions-after-tax').getByText('NSSF (5%)').nextSibling?.textContent).toBe('USh 100,000');
+    expect(section('deductions-after-tax').getByText('NSSF').nextSibling?.textContent).toBe('USh 100,000');
     expect(amountOf('taxable-pay')).toContain(`USh ${(2000000 - lst).toLocaleString()}`);
     expect(amountOf('no-reliefs')).toMatch(/Uganda has no personal relief/);
-    expect(section('employer-contributions').getByText('NSSF (employer, 10%)').nextSibling?.textContent).toBe('USh 200,000');
+    expect(section('employer-contributions').getByText('NSSF (employer)').nextSibling?.textContent).toBe('USh 200,000');
   });
 });
 

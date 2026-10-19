@@ -111,15 +111,15 @@ describe('a worked payslip: gross 1,500,000 UGX', () => {
     expect(r).toMatchObject({ lst_deduction: 25000, taxable_pay: 1475000, paye_tax: 330750, nssf_deduction: 75000, net_pay: 1069250 });
   });
 
-  it('labels the lines: PAYE, NSSF (5%), LST; employer NSSF (10%) as an employer cost', () => {
+  it('labels the lines: PAYE, NSSF, LST; employer NSSF as an employer cost', () => {
     const r = ugandaEngine.calculate({ employee: ug('U1'), ctx: ctx('2026-07') });
     expect(r.currency).toBe('UGX');
     expect(r.statutoryDeductions).toEqual([
       { label: 'PAYE', amount: 330750 },
-      { label: 'NSSF (5%)', amount: 75000 },
+      { label: 'NSSF', amount: 75000 },
       { label: 'Local service tax', amount: 25000 },
     ]);
-    expect(r.employerCosts).toEqual([{ label: 'NSSF (employer, 10%)', amount: 150000 }]);
+    expect(r.employerCosts).toEqual([{ label: 'NSSF (employer)', amount: 150000 }]);
     expect(r.taxablePay).toBe(1475000);
   });
 

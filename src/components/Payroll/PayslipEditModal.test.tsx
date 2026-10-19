@@ -21,7 +21,7 @@ import { PayslipEditBar, PayslipEditModal, editBlockedReason } from './PayslipEd
 const rates = {
   paye_bands: [{ upto: 24000, rate: 0.1 }, { upto: 32333, rate: 0.25 }, { upto: 500000, rate: 0.3 }, { upto: null, rate: 0.35 }],
   personal_relief: 2400, shif_deductible: 1, ahl_deductible: 1, shif_rate: 0.0275, shif_minimum: 300, ahl_rate: 0.015,
-  nssf_rate: 0.06, nssf_upper_limit: 108000,
+  nssf_rate: 0.06, nssf_upper_limit: 108000, per_diem_rate: 0.33,
 };
 const context: StatutoryContext = { rates, inputs: {}, apply: { shif: true, nssf: true, ahl: true, paye: true } };
 const base = {

@@ -89,8 +89,16 @@ export function taxByBands(taxable: number, bands: Band[]): number {
   return round2(tax);
 }
 
+/**
+ * The share of basic salary paid as a non-taxed per diem (Kenya payroll's company practice): the month's per_diem_rate,
+ * 0.33 by default (statutory_rates, migration 20261021800000), the company's own when it sets one (0 for none).
+ */
+export const perDiemRateOf = (rates: Rates) => Math.max(0, rateOf(rates, 'per_diem_rate'));
+
 /** The rates a payroll needs; names any missing so payroll stops rather than paying with a gap. */
-export const REQUIRED_RATES = ['paye_bands', 'personal_relief', 'shif_rate', 'nssf_rate', 'nssf_upper_limit', 'ahl_rate'] as const;
+export const REQUIRED_RATES = [
+  'paye_bands', 'personal_relief', 'shif_rate', 'nssf_rate', 'nssf_upper_limit', 'ahl_rate', 'per_diem_rate', 'wht_contractual', 'wht_professional',
+] as const;
 export const missingRates = (rates: Rates) => REQUIRED_RATES.filter((code) => rates[code] === null || rates[code] === undefined);
 
 export function statutoryFor(input: StatutoryInput, rates: Rates): StatutoryResult {
