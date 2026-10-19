@@ -53,9 +53,12 @@ describe('CompanyRolePicker', () => {
   it('an administrator is offered every role that is switched on', async () => {
     perms.role = 'ADMIN';
     render(<CompanyRolePicker value={STAFF_PICK} onChange={() => {}} />);
-    await waitFor(() => expect(options()).toHaveLength(7));
+    // wait for the final list (the roles and their labels can arrive a moment apart on a busy machine)
+    await waitFor(() => {
+      expect(options()).toHaveLength(7);
+      expect(options()).toContain('Payroll clerk (based on Manager)');
+    });
     expect(options()).not.toContain('Retired (based on Staff)');
-    expect(options()).toContain('Payroll clerk (based on Manager)');
   });
 
   it('picking a company role gives its base role and its id', async () => {
