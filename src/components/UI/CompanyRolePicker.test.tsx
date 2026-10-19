@@ -53,9 +53,14 @@ describe('CompanyRolePicker', () => {
   it('an administrator is offered every role that is switched on', async () => {
     perms.role = 'ADMIN';
     render(<CompanyRolePicker value={STAFF_PICK} onChange={() => {}} />);
-    await waitFor(() => expect(options()).toHaveLength(7));
+    // the picker starts with the 7 standard roles, then shows the company's list: the 7 standard roles (the ones the
+    // company hasn't renamed come from the defaults) plus its 3 switched-on roles. Waiting for 7 used to catch the
+    // first list, so the check below raced the load.
+    await waitFor(() => {
+      expect(options()).toHaveLength(10);
+      expect(options()).toContain('Payroll clerk (based on Manager)');
+    });
     expect(options()).not.toContain('Retired (based on Staff)');
-    expect(options()).toContain('Payroll clerk (based on Manager)');
   });
 
   it('picking a company role gives its base role and its id', async () => {
