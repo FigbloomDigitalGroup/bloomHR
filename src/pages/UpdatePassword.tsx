@@ -294,7 +294,7 @@ const UpdatePasswordPage = ({ waitMs = LINK_WAIT_MS }: { waitMs?: number }) => {
               </AuthButton>
             </form>
           )}
-          <AuthButton variant="secondary" onClick={() => navigate('/login')}>
+          <AuthButton variant="secondary" onClick={() => { sessionStorage.removeItem('isPasswordRecovery'); navigate('/login'); }}>
             <ArrowLeft size={16} /> Back to sign in
           </AuthButton>
         </div>
