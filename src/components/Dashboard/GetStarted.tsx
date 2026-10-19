@@ -11,6 +11,12 @@ import { Card } from '../UI';
 export const OPEN_COMPANY_PROFILE = 'open-company-profile';
 /** Fired after the company profile is saved, so the checklist can tick it off straight away. */
 export const COMPANY_PROFILE_SAVED = 'company-profile-saved';
+/** Fired by the dashboard's "Setup guide" link: brings the full checklist back, even if hidden or long finished. */
+export const SHOW_SETUP_GUIDE = 'show-setup-guide';
+
+/** How long the "is set up" line stays after every step was first seen done. */
+export const SET_UP_LINE_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 interface Step {
   id: string;
@@ -23,8 +29,23 @@ interface Step {
 }
 
 const dismissKey = (tenantId: string) => `getstarted_dismissed_${tenantId}`;
+/** When every step was first seen done (ms since 1970), per company. */
+const completeKey = (tenantId: string) => `getstarted_complete_${tenantId}`;
 
-/** A short checklist for a new company's administrator: profile, team, employees, look. Dismissible. */
+function readCompleteSince(tenantId: string): number | null {
+  try {
+    const n = Number(localStorage.getItem(completeKey(tenantId)));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A short checklist for a new company's administrator: profile, team, employees, look. Dismissible. Once every step is
+ * done it shrinks to one "is set up" line for 7 days, then goes; a step undone brings the checklist back, and so does
+ * the dashboard's "Setup guide" link (SHOW_SETUP_GUIDE).
+ */
 export default function GetStarted() {
   const { hasAllPermissions, loading: permissionsLoading } = usePermissions();
   // the checklist's steps are the company profile (Settings) and inviting the team (Invite people): whoever holds
@@ -36,6 +57,8 @@ export default function GetStarted() {
   const [done, setDone] = useState({ profile: false, invited: false, employees: false });
   const [loaded, setLoaded] = useState(false);
   const [checkCount, setCheckCount] = useState(0); // bumped to look at the data again
+  const [expanded, setExpanded] = useState(false); // the full checklist opened from the "is set up" line
+  const [forced, setForced] = useState(false); // asked for with the "Setup guide" link
 
   useEffect(() => {
     if (!current) return;
@@ -84,6 +107,41 @@ export default function GetStarted() {
     };
   }, []);
 
+  // the "Setup guide" link: show the full checklist again, even if it was hidden
+  useEffect(() => {
+    const show = () => {
+      setForced(true);
+      setDismissed(false);
+    };
+    window.addEventListener(SHOW_SETUP_GUIDE, show);
+    return () => window.removeEventListener(SHOW_SETUP_GUIDE, show);
+  }, []);
+  useEffect(() => {
+    if (!forced || !current) return;
+    try {
+      localStorage.removeItem(dismissKey(current.tenant_id));
+    } catch {
+      /* shown for this visit only */
+    }
+  }, [forced, current?.tenant_id]);
+
+  const lookDone = loadStoredTheme() !== null;
+  const allDone = loaded && done.profile && done.invited && done.employees && lookDone;
+
+  // remember when every step was first seen done; forget it when one goes back to undone
+  useEffect(() => {
+    if (!current || !loaded) return;
+    try {
+      if (allDone) {
+        if (readCompleteSince(current.tenant_id) === null) localStorage.setItem(completeKey(current.tenant_id), String(Date.now()));
+      } else {
+        localStorage.removeItem(completeKey(current.tenant_id));
+      }
+    } catch {
+      /* not remembered: the line shows again next visit */
+    }
+  }, [current?.tenant_id, loaded, allDone]);
+
   if (!current || dismissed || !loaded || !setsUpCompany) return null;
 
   const steps: Step[] = [
@@ -115,7 +173,7 @@ export default function GetStarted() {
       id: 'look',
       title: 'Choose your look',
       hint: 'Pick a theme and colours for your own view.',
-      done: loadStoredTheme() !== null,
+      done: lookDone,
       action: 'Appearance',
       to: '/appearance',
     },
@@ -129,7 +187,31 @@ export default function GetStarted() {
       /* hidden for this visit only */
     }
     setDismissed(true);
+    setForced(false);
+    setExpanded(false);
   };
+
+  if (allDone && !forced) {
+    const since = readCompleteSince(current.tenant_id) ?? Date.now();
+    if (Date.now() - since > SET_UP_LINE_DAYS * DAY_MS) return null;
+    if (!expanded) {
+      return (
+        <Card>
+          <div className="flex items-center justify-between gap-3">
+            <p className="m-0 text-[13px] font-semibold text-ink">
+              <span className="text-brand" aria-hidden>
+                ✓{' '}
+              </span>
+              {current.name} is set up
+            </p>
+            <button type="button" onClick={() => setExpanded(true)} className="text-[12px] font-semibold text-brand hover:underline">
+              Show setup guide
+            </button>
+          </div>
+        </Card>
+      );
+    }
+  }
 
   return (
     <Card>
@@ -140,9 +222,16 @@ export default function GetStarted() {
             {completed} of {steps.length} done
           </p>
         </div>
-        <button type="button" onClick={dismiss} className="text-[12px] font-semibold text-muted-foreground hover:text-ink">
-          Hide
-        </button>
+        <div className="flex items-center gap-3">
+          {allDone && expanded && !forced && (
+            <button type="button" onClick={() => setExpanded(false)} className="text-[12px] font-semibold text-muted-foreground hover:text-ink">
+              Show less
+            </button>
+          )}
+          <button type="button" onClick={dismiss} className="text-[12px] font-semibold text-muted-foreground hover:text-ink">
+            Hide
+          </button>
+        </div>
       </div>
       <div className="mt-2 h-1.5 rounded-pill bg-secondary overflow-hidden" aria-hidden>
         <div className="h-full bg-brand transition-all" style={{ width: `${(completed / steps.length) * 100}%` }} />
