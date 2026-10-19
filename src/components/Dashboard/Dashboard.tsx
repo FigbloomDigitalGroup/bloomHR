@@ -1,16 +1,22 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Users, CalendarDays, Calendar, Wallet, NotepadText, Phone, AlertCircle, MapPin, RefreshCw, Cake, Video, BookOpen, FileText, TrendingUp, ChevronRight } from "lucide-react";
+import { Users, CalendarDays, Calendar, Wallet, NotepadText, Phone, AlertCircle, MapPin, RefreshCw, Cake, ChevronRight, PartyPopper, Plane, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase"
 import { fetchAllResult } from "../../lib/fetchAll";
 import { TownProps } from '../../types/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PageHeader, StatCard, Card, TabBar, EmptyState, Button } from '../UI';
-import GetStarted from './GetStarted';
+import GetStarted, { SHOW_SETUP_GUIDE } from './GetStarted';
 import GroupOverview from './GroupOverview';
 import { money } from '../../lib/payroll/currency';
 import { TodaysBirthdayWishes } from '../Celebrations/BirthdayWishes';
-import { findBirthdays } from '../../lib/birthdays';
+import { usePermissions } from '../../hooks/usePermissions';
+import { canOpenScreen } from '../../lib/routeModules';
+import { addDays, dayKey, inDaysLabel, shortDay, startOfDay, type EventRow, type HolidayRow } from '../../lib/upcoming';
+import { loadBirthdayPeople, loadCompanyEvents } from '../../lib/upcomingApi';
+import { upcomingBirthdays, type UpcomingItem } from '../../lib/celebrations';
+import { WEEK_DAYS, withinDays } from '../../lib/staffHome';
+import { adminWeekItems, holidaysForCompany, type AdminWeekItem } from '../../lib/adminWeek';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import FigbloomLoader from "../UI/FigbloomLoader";
 
@@ -24,15 +30,38 @@ interface AreaTownMapping {
   [area: string]: string[];
 }
 
-interface NewsItem {
-  id: number;
-  type: 'birthday' | 'conference' | 'training' | 'payslip' | 'report';
-  title: string;
-  description?: string;
-  date: string;
-  time?: string;
-  participants?: string;
-  people?: { name: string; date?: string }[];
+/** The company's active branches (the `branches` table, FIG-905) and their countries; null when it can't be read. */
+async function loadActiveBranches(): Promise<{ count: number; countries: string[] } | null> {
+  try {
+    const { data, error } = await supabase.from('branches').select('id, country, active');
+    if (error || !data) return null;
+    const active = (data as { country: string | null; active: boolean | null }[]).filter((b) => b.active !== false);
+    return { count: active.length, countries: active.map((b) => b.country || '').filter(Boolean) };
+  } catch {
+    return null;
+  }
+}
+
+/** How many people have approved leave starting from today to 6 days ahead; 0 when it can't be read. */
+async function countLeaveStartingThisWeek(today: Date): Promise<number> {
+  const from = startOfDay(today);
+  const to = addDays(from, WEEK_DAYS);
+  try {
+    const { data, error } = await supabase
+      .from('leave_application')
+      .select('"Employee Number", "Start Date", status')
+      .gte('"Start Date"', dayKey(from))
+      .lte('"Start Date"', dayKey(to));
+    if (error || !data) return 0;
+    const people = new Set<string>();
+    (data as Record<string, string | null>[]).forEach((l, i) => {
+      if ((l.status || '').trim().toLowerCase() !== 'approved') return;
+      people.add(l['Employee Number'] || `row-${i}`);
+    });
+    return people.size;
+  } catch {
+    return 0;
+  }
 }
 
 interface ActivityItem {
@@ -62,7 +91,8 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
   const [areaTownMapping, setAreaTownMapping] = useState<AreaTownMapping>({});
   const [isArea, setIsArea] = useState<boolean>(false);
   const [townsInArea, setTownsInArea] = useState<string[]>([]);
-  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
+  const [weekItems, setWeekItems] = useState<AdminWeekItem[]>([]);
+  const [leaveStartingThisWeek, setLeaveStartingThisWeek] = useState(0);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [isNewsLoading, setIsNewsLoading] = useState(true);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
@@ -70,45 +100,34 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
   const [employeesByTown, setEmployeesByTown] = useState<{ town: string; count: number }[]>([]);
 
   const navigate = useNavigate();
+  const { hasPermission, hasAllPermissions, loading: permissionsLoading } = usePermissions();
+  const canManageBranches = !permissionsLoading && canOpenScreen('/settings/branches', hasPermission);
+  // the "Get <company> set up" checklist is for whoever holds Settings and Invite people (GetStarted.tsx)
+  const setsUpCompany = !permissionsLoading && hasAllPermissions(['settings', 'invite-people']);
 
-  // Fetch birthday news from employees table
-  const fetchBirthdayNews = async () => {
+  // The company's next 7 days (today plus 6), as the staff home's "This week": public holidays (every country's, tagged
+  // when the company is in more than one), company events, birthdays (name only) and how many start leave
+  const fetchWeekNews = async () => {
     setIsNewsLoading(true);
     try {
       const today = new Date();
-
-      // every employee, a page at a time (one request is capped at 1000 rows)
-      const { data: employees, error } = await fetchAllResult((from, to) =>
-        supabase
-          .from('employees')
-          .select('"First Name", "Last Name", "Mobile Number", "Date of Birth", Town, Branch')
-          .order('"Employee Number"')
-          .order('id')
-          .range(from, to)
-      );
-
-      if (error) {
-        console.error('Error fetching employees for birthdays:', error);
-        return;
-      }
-
-      const { today: todaysBirthdays, upcoming: upcomingBirthdays } = findBirthdays(employees ?? [], today);
-      const names = (people: { name: string }[]) =>
-        `${people.slice(0, 3).map((p) => p.name).join(', ')}${people.length > 3 ? ` and ${people.length - 3} others` : ''}`;
-
-      // only groups with people in them: a new company with no employees yet has nothing to announce
-      const items: NewsItem[] = [];
-      if (todaysBirthdays.length > 0) {
-        items.push({ id: 1, type: 'birthday', title: "Today's Birthdays", description: names(todaysBirthdays), date: 'Today', time: 'All day', people: todaysBirthdays });
-      }
-      if (upcomingBirthdays.length > 0) {
-        items.push({ id: 2, type: 'birthday', title: 'Upcoming Birthdays', description: names(upcomingBirthdays), date: 'Next 7 days', people: upcomingBirthdays });
-      }
-
-      setNewsItems(items);
-
+      const [ev, hol, people, branches, leaveCount] = await Promise.allSettled([
+        loadCompanyEvents(),
+        supabase.from('holidays').select('name, date, recurring, country'),
+        loadBirthdayPeople(),
+        loadActiveBranches(),
+        countLeaveStartingThisWeek(today),
+      ]);
+      const events: EventRow[] = ev.status === 'fulfilled' ? ev.value : [];
+      const allHolidays: HolidayRow[] =
+        hol.status === 'fulfilled' && !hol.value.error ? ((hol.value.data ?? []) as HolidayRow[]) : [];
+      const countries = branches.status === 'fulfilled' && branches.value ? branches.value.countries : [];
+      const birthdays: UpcomingItem[] =
+        people.status === 'fulfilled' ? withinDays(upcomingBirthdays(people.value, today, WEEK_DAYS), WEEK_DAYS) : [];
+      setWeekItems(adminWeekItems({ events, holidays: holidaysForCompany(allHolidays, countries), birthdays }, today));
+      setLeaveStartingThisWeek(leaveCount.status === 'fulfilled' ? leaveCount.value : 0);
     } catch (error) {
-      console.error('Error in fetchBirthdayNews:', error);
+      console.error('Error loading this week for the dashboard:', error);
     } finally {
       setIsNewsLoading(false);
     }
@@ -227,7 +246,7 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
 
   // Load news when component mounts
   useEffect(() => {
-    fetchBirthdayNews();
+    fetchWeekNews();
   }, []);
 
   // Lazily fetch analytics data the first time the Analytics tab is opened
@@ -302,12 +321,18 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
       const [
         { count: employeesCount },
         { count: leaveRequestsCount },
-        { count: branchesCount }
+        activeBranches
       ] = await Promise.all([
         supabase.from('employees').select('*', { count: 'exact', head: true }),
         supabase.from('leave_application').select('*', { count: 'exact', head: true }),
-        supabase.from('kenya_branches').select('*', { count: 'exact', head: true })
+        loadActiveBranches()
       ]);
+      // the company's own branches; the old towns list only when they can't be read
+      let branchesCount = activeBranches?.count ?? null;
+      if (branchesCount === null) {
+        const { count } = await supabase.from('kenya_branches').select('*', { count: 'exact', head: true });
+        branchesCount = count || 0;
+      }
 
       if (fetchId !== fetchIdRef.current) return;
 
@@ -483,7 +508,7 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
   const handleRefresh = () => {
     const currentFetchId = ++fetchIdRef.current;
     fetchDashboardData(currentFetchId);
-    fetchBirthdayNews();
+    fetchWeekNews();
   };
 
   // Get town/area display name
@@ -497,19 +522,6 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
 
     return currentTown;
   };
-
-  // Get icon for news type
-  const getNewsIcon = (type: NewsItem['type']) => {
-    switch (type) {
-      case 'birthday': return <Cake className="w-4 h-4" />;
-      case 'conference': return <Video className="w-4 h-4" />;
-      case 'training': return <BookOpen className="w-4 h-4" />;
-      case 'payslip': return <FileText className="w-4 h-4" />;
-      case 'report': return <TrendingUp className="w-4 h-4" />;
-      default: return <FileText className="w-4 h-4" />;
-    }
-  };
-
 
   return (
     <div className="min-h-screen p-6 md:p-8 font-sans bg-transparent">
@@ -553,9 +565,16 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
           }
           className="!mb-0"
           actions={
-            <Button variant="secondary" onClick={handleRefresh} disabled={isLoading} icon={<RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />}>
-              Refresh Data
-            </Button>
+            <>
+              {setsUpCompany && (
+                <Button variant="ghost" onClick={() => window.dispatchEvent(new Event(SHOW_SETUP_GUIDE))} icon={<Sparkles className="w-3.5 h-3.5" />}>
+                  Setup guide
+                </Button>
+              )}
+              <Button variant="secondary" onClick={handleRefresh} disabled={isLoading} icon={<RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />}>
+                Refresh Data
+              </Button>
+            </>
           }
         />
 
@@ -586,7 +605,18 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <StatCard label="Total Employees" value={stats.employees} icon={<Users className="w-[18px] h-[18px]" strokeWidth={1.8} />} tint="green" />
               <StatCard label="Leave Requests" value={stats.leaveRequests} icon={<CalendarDays className="w-[18px] h-[18px]" strokeWidth={1.8} />} tint="orange" />
-              <StatCard label="Active Branches" value={stats.activeBranches} icon={<MapPin className="w-[18px] h-[18px]" strokeWidth={1.8} />} tint="green" />
+              {canManageBranches ? (
+                <button
+                  type="button"
+                  onClick={() => navigate('/settings/branches')}
+                  aria-label={`Active Branches: ${stats.activeBranches}. Open Settings, Branches`}
+                  className="block w-full text-left rounded-card transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                >
+                  <StatCard label="Active Branches" value={stats.activeBranches} icon={<MapPin className="w-[18px] h-[18px]" strokeWidth={1.8} />} tint="green" />
+                </button>
+              ) : (
+                <StatCard label="Active Branches" value={stats.activeBranches} icon={<MapPin className="w-[18px] h-[18px]" strokeWidth={1.8} />} tint="green" />
+              )}
             </div>
 
             {/* the group view: headcount by country and payroll money per currency (FIG-905) */}
@@ -704,57 +734,54 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
                 </div>
               </Card>
 
-              {/* Company Updates */}
+              {/* Company Updates: the next 7 days, as the staff home's "This week" */}
               <Card className="flex flex-col h-full">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-[13px] font-bold text-ink">Company Updates</h3>
+                  <div>
+                    <h3 className="text-[13px] font-bold text-ink">Company Updates</h3>
+                    <p className="text-[11.5px] text-muted-foreground mt-0.5">The next 7 days</p>
+                  </div>
                   <button
                     type="button"
                     onClick={() => navigate('/calendar')}
-                    aria-label="View company calendar"
-                    className="text-subtle hover:text-brand transition-colors"
+                    className="text-[12px] font-semibold text-brand hover:underline whitespace-nowrap"
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    View calendar →
                   </button>
                 </div>
 
                 <div className="space-y-2.5 flex-1">
                   {isNewsLoading ? (
                     <div className="flex justify-center py-8"><FigbloomLoader label="Loading" compact /></div>
-                  ) : newsItems.length === 0 ? (
+                  ) : weekItems.length === 0 && leaveStartingThisWeek === 0 ? (
                     <EmptyState
                       icon={<Calendar className="w-4 h-4" />}
-                      title="No company updates yet"
-                      description="Birthdays appear here once your employees' dates of birth are entered. Events come from the company calendar."
+                      title="Nothing on the calendar this week"
+                      description="Public holidays, company events and birthdays in the next 7 days appear here."
                     />
                   ) : (
-                    newsItems.slice(0, 4).map((news) => (
-                      <div key={news.id} className="flex gap-2.5 items-start">
-                        <div className="w-[34px] h-[34px] rounded-tile bg-orange-tint text-orange flex items-center justify-center flex-shrink-0">
-                          {getNewsIcon(news.type)}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[12.5px] font-bold text-ink truncate">{news.title}</div>
-                          {news.people && news.people.length > 0 ? (
-                            <div className="flex flex-wrap gap-1.5 mt-1">
-                              {news.people.map((person, idx) => (
-                                <button
-                                  key={idx}
-                                  type="button"
-                                  onClick={() => navigate(`/employees?q=${encodeURIComponent(person.name)}`)}
-                                  className="inline-flex items-center gap-1 text-[11px] font-medium text-brand bg-green-tint hover:bg-green-tint/70 px-2 py-0.5 rounded-full transition-colors"
-                                  title={`View ${person.name} in Employees`}
-                                >
-                                  {person.name}{person.date ? ` · ${person.date}` : ''}
-                                </button>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-[11.5px] text-muted-foreground line-clamp-2">{news.description}</div>
-                          )}
-                        </div>
-                      </div>
-                    ))
+                    <>
+                      {leaveStartingThisWeek > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => navigate('/leaves')}
+                          className="w-full flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                        >
+                          <Plane className="w-4 h-4 text-brand flex-shrink-0" />
+                          {leaveStartingThisWeek === 1 ? '1 person starts leave this week' : `${leaveStartingThisWeek} people start leave this week`}
+                        </button>
+                      )}
+                      <ul className="divide-y divide-gray-100">
+                        {weekItems.slice(0, SHOW_WEEK).map((item) => <WeekRow key={item.key} item={item} />)}
+                        {weekItems.length > SHOW_WEEK && (
+                          <li className="pt-2">
+                            <button type="button" onClick={() => navigate('/calendar')} className="text-xs text-gray-500 hover:text-brand">
+                              and {weekItems.length - SHOW_WEEK} more
+                            </button>
+                          </li>
+                        )}
+                      </ul>
+                    </>
                   )}
                 </div>
               </Card>
@@ -765,5 +792,34 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
         )}
       </div>
     </div >
+  );
+}
+
+const SHOW_WEEK = 6;
+
+/** One day's holiday, event or birthday: what, and when ("Tue 20 Oct", "Tomorrow"). */
+function WeekRow({ item }: { item: AdminWeekItem }) {
+  const isToday = item.daysAway <= 0;
+  const icon =
+    item.kind === 'birthday' ? <Cake className="w-4 h-4" />
+      : item.kind === 'holiday' ? <CalendarDays className="w-4 h-4" />
+        : <PartyPopper className="w-4 h-4" />;
+  const what = item.kind === 'holiday' ? 'Public holiday' : item.kind === 'birthday' ? 'Birthday' : item.detail || 'Company event';
+  return (
+    <li className="flex items-start gap-3 py-2">
+      <span className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isToday ? 'bg-brand text-white' : 'bg-green-tint text-brand'}`}>
+        {icon}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[12.5px] font-bold text-ink truncate">{item.title}</p>
+        <p className="text-[11.5px] text-muted-foreground truncate">{what}</p>
+      </div>
+      <div className="text-right flex-shrink-0">
+        <p className="text-xs font-semibold text-gray-700 whitespace-nowrap">{shortDay(item.date)}</p>
+        {item.daysAway <= 1 && (
+          <p className={`text-[11px] font-semibold ${isToday ? 'text-brand' : 'text-gray-500'}`}>{inDaysLabel(item.daysAway)}</p>
+        )}
+      </div>
+    </li>
   );
 }
