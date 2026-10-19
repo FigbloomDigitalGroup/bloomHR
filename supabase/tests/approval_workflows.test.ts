@@ -237,6 +237,22 @@ describe('only the current approver decides, in order', () => {
     expect(await decide(U.HR, id, 'approved')).toMatch(/not the approver/);
     expect(await decide(U.MGR, id, 'approved')).toBe('');
   });
+
+  it('the line manager is the Reports to person when no manager email is typed in (FIG-916)', async () => {
+    await db.exec(`update employees set reports_to_id = (select id from employees where "Employee Number" = 'E-MGR' and tenant_id = '${A}')
+                   where "Employee Number" = 'E-SOLO' and tenant_id = '${A}'`);
+    expect(await setWorkflow(U.ADMIN, [{ approver_type: 'reports_to' }])).toBe('');
+    const told = (await notes('E-MGR', 'approval_needed')).length;
+    const id = await apply(U.SOLO, 'E-SOLO');
+    expect(await request(id)).toMatchObject({ status: 'pending', current_step: 1 });
+    expect(await notes('E-MGR', 'approval_needed')).toHaveLength(told + 1);
+    expect(await asUser(db, U.MGR, () => rows(`select record_id from my_leave_approvals()`))).toEqual([{ record_id: id }]);
+    expect((await chain(U.MGR, id)).steps.map((s) => [s.status, s.waiting_on ?? null])).toEqual([['current', 'Max Manager']]);
+    expect(await decide(U.OTHER, id, 'approved')).toMatch(/not the approver/);
+    expect(await decide(U.MGR, id, 'approved')).toBe('');
+    expect((await leave(id)).status).toBe('approved');
+    await db.exec(`update employees set reports_to_id = null where "Employee Number" = 'E-SOLO'`);
+  });
 });
 
 describe('setting up workflows', () => {
