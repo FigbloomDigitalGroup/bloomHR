@@ -208,7 +208,8 @@ function NotificationSidebar({
   notifications,
   onMarkRead,
   onClearAll,
-  onRemove
+  onRemove,
+  onOpenApprovals
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -216,6 +217,7 @@ function NotificationSidebar({
   onMarkRead: (n: NotificationItem) => void;
   onClearAll: () => void;
   onRemove: (id: string) => void;
+  onOpenApprovals: () => void;
 }) {
   // the phone's Back closes the panel
   useBackToClose(isOpen, onClose);
@@ -275,7 +277,15 @@ function NotificationSidebar({
                     <p className="text-[10px] text-gray-600 mb-3 leading-relaxed">{n.message}</p>
                     <div className="flex items-center justify-between">
                       <span className="text-[9px] text-gray-400">{new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      {!n.isRead && (
+                      {n.type === 'approval' && (
+                        <button
+                          onClick={() => { onMarkRead(n); onOpenApprovals(); }}
+                          className="text-[10px] font-bold text-brand hover:text-brand-dark"
+                        >
+                          Approve or reject
+                        </button>
+                      )}
+                      {!n.isRead && n.type !== 'approval' && (
                         <button
                           onClick={() => onMarkRead(n)}
                           className="text-[10px] font-bold text-brand hover:text-brand-dark"
@@ -507,6 +517,7 @@ const LeaveApplicationForm = ({ onSeeCalendar }: { onSeeCalendar?: () => void })
 
   return (
     <div className="p-6">
+      <LeaveAwaitingMe />
       <div className="mb-6">
         <h2 className="text-2xl font-semibold text-gray-800">Leave Application</h2>
         <div className="flex items-center mt-2">
@@ -1038,7 +1049,9 @@ const staffMenuGroups: MenuGroup[] = [
         hasSubmenu: true,
         submenu: [
           { id: 'leave', label: 'Apply for Leave' },
-          { id: 'leave-history', label: 'Leave History' }
+          { id: 'leave-history', label: 'Leave History' },
+          // anyone may be a Leave Approver, line manager or department head, whatever their role
+          { id: 'leave-approvals', label: 'Approve leave' }
         ]
       },
       { id: 'contract', label: 'Contracts', icon: PhFile },
@@ -1162,7 +1175,7 @@ const StaffPortal = () => {
         .filter(n => !HR_ONLY_NOTIFICATIONS.includes(n.notification_type))
         .map(n => ({
           id: `hr-${n.id}`,
-          type: n.notification_type.startsWith('leave_') ? 'leave' : n.notification_type === 'warning_issued' ? 'warning' : 'update',
+          type: n.notification_type === 'approval_needed' ? 'approval' : n.notification_type.startsWith('leave_') ? 'leave' : n.notification_type === 'warning_issued' ? 'warning' : 'update',
           title: n.title,
           message: n.message,
           timestamp: new Date(n.created_at),
@@ -1783,6 +1796,7 @@ const StaffPortal = () => {
               {activeTab === 'my-team' && team.length > 0 && <MyTeam team={team} />}
               {activeTab === 'leave' && <LeaveApplicationForm onSeeCalendar={() => setActiveTab('company-calendar')} />}
               {activeTab === 'leave-history' && <><LeaveApplicationsList /><MyAbsences /></>}
+              {activeTab === 'leave-approvals' && <div className="p-6"><LeaveAwaitingMe showEmpty /></div>}
               {isCompanySection(activeTab) && (
                 <StaffCompany section={activeTab} onSectionChange={setActiveTab} employeeNumber={employeeNumber} onOpenTask={openTask} />
               )}
@@ -1808,6 +1822,7 @@ const StaffPortal = () => {
           onMarkRead={handleNotificationClick}
           onClearAll={handleClearAll}
           onRemove={handleRemoveNotification}
+          onOpenApprovals={() => { setNotificationSidebarOpen(false); setActiveTab('leave-approvals'); }}
         />
       </div>
     </div>
