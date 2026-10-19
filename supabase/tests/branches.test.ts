@@ -194,11 +194,12 @@ describe('public holidays per country', () => {
     const n = async (country: string, year: number) =>
       Number(await val(`select count(*) from holidays where tenant_id = '${A}' and source = 'auto' and country = '${country}' and extract(year from date) = ${year}`));
     expect(await n('Tanzania', y)).toBe(13);
-    expect(await n('Tanzania', y + 1)).toBe(13);
+    // the fixed-date ones are every year (FIG-918): next year only adds Good Friday and Easter Monday
+    expect(await n('Tanzania', y + 1)).toBe(2);
     // the rows added before branches were Kenya's
     expect(Number(await val(`select count(*) from holidays where source = 'auto' and country is null`))).toBe(0);
     const added = (await read<{ n: number }>(HR, `select add_public_holidays(2030) n`))[0].n;
-    expect(added).toBe(11 + 13); // Kenya (10 + Mashujaa Day observed) and Tanzania
+    expect(added).toBe(3 + 2); // Kenya (Easter's two and Mashujaa Day observed) and Tanzania (Easter's two)
     expect((await read<{ n: number }>(HR, `select add_public_holidays(2030) n`))[0].n).toBe(0);
     const c = (await read<{ c: { countries: unknown[] } }>(HR, `select public_holidays_country() c`))[0].c;
     expect(c.countries).toEqual([{ country: 'Kenya', supported: true }, { country: 'Tanzania', supported: true }]);

@@ -3013,7 +3013,12 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
                   </p>
                 </td>
                 <td className="py-4 px-4">
-                  <p className="text-gray-700">{formatDate(holiday.date)}</p>
+                  <p className="text-gray-700">
+                    {holiday.recurring && /^\d{4}-\d{2}-\d{2}/.test(holiday.date)
+                      // every year: the day and month, not the year it was first added
+                      ? `${Number(holiday.date.slice(8, 10))} ${new Date(2000, Number(holiday.date.slice(5, 7)) - 1, 1).toLocaleString('en', { month: 'short' })} · every year`
+                      : formatDate(holiday.date)}
+                  </p>
                 </td>
                 <td className="py-4 px-4">
                   <span className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-0.5 rounded-full ${holiday.recurring ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
