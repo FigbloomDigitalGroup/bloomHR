@@ -684,9 +684,11 @@ function App() {
         // FIRST: Check if this is a password recovery - do this BEFORE any session checks
         const urlHasRecoveryToken = window.location.href.includes('type=recovery') ||
           window.location.hash.includes('type=recovery');
-        const isRecoveryFlag = sessionStorage.getItem('isPasswordRecovery') === 'true';
+        // the recovery flag only holds while on the reset page: anywhere else (a typed address, a restored tab) it is a
+        // leftover from a link that failed, and must not trap the tab on /update-password
+        if (currentPath !== '/update-password' && !urlHasRecoveryToken) sessionStorage.removeItem('isPasswordRecovery');
 
-        if (currentPath === '/update-password' || urlHasRecoveryToken || isRecoveryFlag) {
+        if (currentPath === '/update-password' || urlHasRecoveryToken) {
           console.log('🔐 Password recovery detected - allowing UpdatePassword page to handle auth');
           if (urlHasRecoveryToken) {
             sessionStorage.setItem('isPasswordRecovery', 'true');
@@ -750,9 +752,7 @@ function App() {
 
           const urlHasRecoveryToken = window.location.href.includes('type=recovery') ||
             window.location.hash.includes('type=recovery');
-          const isRecoveryFlag = sessionStorage.getItem('isPasswordRecovery') === 'true';
-
-          if (currentPath === '/update-password' || urlHasRecoveryToken || isRecoveryFlag) {
+          if (currentPath === '/update-password' || urlHasRecoveryToken) {
             console.log('🔐 Recovery flow active - staying on update-password');
             // Don't redirect, let UpdatePassword page handle it
           } else if (!publicPaths.includes(currentPath) && currentPath !== '/') {
@@ -776,16 +776,11 @@ function App() {
       const currentPath = location.pathname;
       const urlHasRecoveryToken = window.location.href.includes('type=recovery') ||
         window.location.hash.includes('type=recovery');
-      const isRecoveryFlag = sessionStorage.getItem('isPasswordRecovery') === 'true';
-
-      if (currentPath === '/update-password' || urlHasRecoveryToken || isRecoveryFlag) {
+      if (currentPath === '/update-password' || urlHasRecoveryToken) {
         console.log('🔐 Auth state change ignored - in password recovery mode');
         if (urlHasRecoveryToken) {
           sessionStorage.setItem('isPasswordRecovery', 'true');
-        }
-
-        if ((urlHasRecoveryToken || isRecoveryFlag) && currentPath !== '/update-password') {
-          navigate(recoveryTarget(), { replace: true });
+          if (currentPath !== '/update-password') navigate(recoveryTarget(), { replace: true });
         }
         return; // Exit early, let UpdatePassword handle everything
       }
