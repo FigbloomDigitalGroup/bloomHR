@@ -1458,6 +1458,31 @@ const EmployeeBioPage = () => {
                 </div>
               )}
 
+              {/* everyone sees their own pay, read-only (it is in their contract and on every payslip); HR and
+                  payroll edit it above */}
+              {!seesPay && !permissionsLoading && (
+                <div>
+                  <SectionHeader
+                    title="My Pay"
+                    icon={CreditCard}
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+                    <FormField
+                      label="Basic Salary"
+                      name="Basic Salary"
+                      value={employee['Basic Salary'] != null
+                        ? `${employee['Currency'] || 'KES'} ${Number(employee['Basic Salary']).toLocaleString('en-KE', { maximumFractionDigits: 2 })}`
+                        : 'Not set yet - ask HR'}
+                      onChange={() => {}}
+                      disabled
+                      readOnly
+                      isReadOnly
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">Your basic pay before deductions. Each month's payslip shows the full breakdown.</p>
+                </div>
+              )}
+
               <div>
                 <SectionHeader
                   title="Statutory Deductions"
