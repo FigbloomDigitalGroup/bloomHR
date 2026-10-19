@@ -14,6 +14,7 @@ import GlowButton from '../UI/GlowButton';
 import ModuleGate from '../ProtectedRoutes/ModuleGate';
 
 import { confirmDialog } from '../../lib/confirmDialog';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 type Asset = Database['public']['Tables']['assets']['Row'];
 
 const QRScanner: React.FC = () => {
@@ -548,12 +549,7 @@ const QRScanner: React.FC = () => {
 
                 {/* Asset Information */}
                 {loading ? (
-                  <div className="text-center py-8">
-                    <div className="animate-pulse">
-                      <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto mb-3"></div>
-                      <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
-                    </div>
-                  </div>
+                  <LoaderBlock label="Looking up the asset" compact />
                 ) : asset ? (
                   <div className="bg-white border border-gray-200 rounded-lg p-4">
                     <div className="flex items-start justify-between mb-3">

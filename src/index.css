@@ -349,6 +349,8 @@ html[data-page="dark"] .fb-loader { --fb-green: rgb(255 255 255); }
 .fb-loader svg circle, .fb-loader svg path { stroke: var(--fb-green); }
 .fb-loader .fb-leaf { stroke: none; fill: var(--fb-green); }
 .fb-loader__text { font-size: 15px; font-weight: 300; color: rgb(var(--text-600)); letter-spacing: .02em; }
+.fb-loader--compact { gap: 10px; }
+.fb-loader--compact .fb-loader__text { font-size: 13px; }
 .fb-loader__dot { animation: fb-dots 1.4s ease-in-out infinite; }
 .fb-loader__dot:nth-child(2) { animation-delay: .2s; }
 .fb-loader__dot:nth-child(3) { animation-delay: .4s; }

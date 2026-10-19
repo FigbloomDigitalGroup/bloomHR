@@ -20,6 +20,7 @@ import {
   type AdvanceRow,
 } from '../../lib/salaryAdvance';
 import { loadAdvanceWindow, loadMyAdvances, loadMyEmployee, requestAdvance, watchMyAdvances, type MyEmployee } from '../../lib/salaryAdvanceApi';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // Staff portal: ask for a salary advance and follow it from request to repaid.
 
@@ -127,7 +128,7 @@ export default function AdvanceRequest() {
           <h2 className="text-[15px] font-bold text-ink mb-3">Ask for an advance</h2>
 
           {loading ? (
-            <p className="text-[12.5px] text-muted-foreground">Loading...</p>
+            <LoaderBlock label="Loading" compact />
           ) : (
             <form onSubmit={submit} noValidate className="space-y-4">
               {blocked && (

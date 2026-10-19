@@ -26,6 +26,7 @@ import {
   updateEarningType,
 } from '../../lib/earningsDb';
 import { confirmDialog } from '../../lib/confirmDialog';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // The Earnings tab: the company's kinds of earnings on top of salary (Bonus, Commission, incentives...) and what each
 // employee is paid for the month on screen, once or every month. Payroll adds them to gross pay (lib/earnings).
@@ -590,8 +591,8 @@ export default function PayrollEarningsTab({ payPeriod, periodLabel, onChanged, 
               <tbody>
                 {loading && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
-                      Loading…
+                    <td colSpan={6}>
+                      <LoaderBlock label="Loading" compact />
                     </td>
                   </tr>
                 )}

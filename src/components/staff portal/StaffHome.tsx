@@ -21,6 +21,7 @@ import {
   MY_WORK_LINK, STATUS_TONES, WEEK_DAYS, countsLine, dueBucket, dueLabel, orderMyTasks, quickLinks, taskCounts, withinDays,
   type QuickLinkIcon,
 } from '../../lib/staffHome';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 const SHOW_TASKS = 6;
 const SHOW_WEEK = 8;
@@ -180,12 +181,6 @@ function Section({ title, subtitle, action, children }: { title: string; subtitl
   );
 }
 
-const Skeleton = () => (
-  <div className="space-y-2 py-2">
-    {[0, 1, 2].map((i) => <div key={i} className="h-10 rounded-lg bg-gray-100 animate-pulse" />)}
-  </div>
-);
-
 const linkButton = 'text-xs font-semibold text-brand hover:underline whitespace-nowrap mt-1';
 
 function MyTasks({ tasks, employeeNumber, projects, onOpen, onMarkDone, onSeeAll }: {
@@ -210,7 +205,7 @@ function MyTasks({ tasks, employeeNumber, projects, onOpen, onMarkDone, onSeeAll
       }
     >
       {loading ? (
-        <Skeleton />
+        <LoaderBlock label="Loading" compact />
       ) : ordered.length === 0 ? (
         <EmptyState icon={<CircleCheck className="w-5 h-5" />} title="Nothing assigned to you right now" description="New tasks for you will show here." />
       ) : (
@@ -321,7 +316,7 @@ function ThisWeek({ loading, events, holidays, leave, birthdays, me, tasksDueThi
         </button>
       )}
       {loading ? (
-        <Skeleton />
+        <LoaderBlock label="Loading" compact />
       ) : items.length === 0 ? (
         <EmptyState icon={<CalendarDays className="w-5 h-5" />} title="Nothing on the calendar this week" />
       ) : (

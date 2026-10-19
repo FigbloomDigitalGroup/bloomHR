@@ -13,6 +13,7 @@ import {
 } from '../../lib/offers';
 
 import { confirmDialog } from '../../lib/confirmDialog';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 // The company's offer letter templates: a title and a body with placeholders. The default one starts every new offer.
 
 type Draft = Pick<OfferTemplate, 'title' | 'body' | 'is_default' | 'active'> & { id: string | null };
@@ -90,7 +91,7 @@ export default function OfferTemplatesModal({ onClose }: { onClose: () => void }
         </div>
       ) : (
         <div className="space-y-2 mt-3">
-          {templates === null && <p className="text-sm text-muted-foreground">Loading…</p>}
+          {templates === null && <LoaderBlock label="Loading templates" compact />}
           {templates?.map((t) => (
             <div key={t.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2">
               <p className="flex-1 min-w-[160px] text-sm font-medium text-ink">{t.title}</p>

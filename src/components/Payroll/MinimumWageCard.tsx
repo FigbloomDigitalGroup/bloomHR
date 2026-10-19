@@ -7,6 +7,7 @@ import {
   COUNTRIES, DEFAULT_SETTINGS, currencyFor, historyByCountry, money, perDayMinimum, type MinimumWage, type MinimumWageSettings,
 } from '../../lib/minimumWage';
 import { addMinimumWage, deleteMinimumWage, loadCompanyMinimum, loadMinimumWages, saveMinimumWageSettings } from '../../lib/minimumWageApi';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // Payroll > Rates: the minimum wage (FIG-812 stage 6). One monthly amount per country, entered by the company with the
 // date it takes effect; a new amount is added with a later date, so the history stays. Figbloom fills in no amounts.
@@ -131,9 +132,11 @@ export default function MinimumWageCard({ canEdit }: { canEdit: boolean }) {
             </span>
           </label>
 
-          {groups.length === 0 ? (
+          {rows === null ? (
+            <LoaderBlock label="Loading" compact />
+          ) : groups.length === 0 ? (
             <p className="m-0 rounded-tile bg-background px-3 py-2 text-muted-foreground" data-testid="minimum-wage-empty">
-              {rows === null ? 'Loading...' : 'No minimum wage set yet, so nothing is checked. Add your country’s monthly amount below.'}
+              No minimum wage set yet, so nothing is checked. Add your country’s monthly amount below.
             </p>
           ) : (
             <div className="space-y-2">

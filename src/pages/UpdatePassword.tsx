@@ -3,8 +3,9 @@ import { supabase } from '../lib/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import ShowPasswordButton from '../components/UI/ShowPasswordButton';
-import { Check, X, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
+import { Check, X, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import AuthShell, { AuthButton } from '../components/Company/AuthShell';
+import { LoaderBlock } from '../components/UI/FigbloomLoader';
 
 /** How long to wait for the sign-in client to read a link before deciding it did not work. */
 const LINK_WAIT_MS = 5000;
@@ -257,9 +258,7 @@ const UpdatePasswordPage = ({ waitMs = LINK_WAIT_MS }: { waitMs?: number }) => {
   if (link.status === 'checking') {
     return (
       <AuthShell title="Checking your link" subtitle="One moment while we check your reset link.">
-        <div className="flex justify-center py-6">
-          <Loader2 className="animate-spin h-8 w-8 text-gray-400" />
-        </div>
+        <LoaderBlock label="Checking" compact />
       </AuthShell>
     );
   }

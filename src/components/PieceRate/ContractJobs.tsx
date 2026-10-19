@@ -6,6 +6,7 @@ import { formatKsh, longDate } from '../../lib/casualPay';
 import { createJob, loadJobs, moveJob } from '../../lib/pieceRateApi';
 import { JOB_STATUS_LABEL, KIND_LABEL, personName, type ContractJob, type JobStatus, type WorkPerson } from '../../lib/pieceRate';
 import { openPrivateFile } from '../../lib/privateFiles';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // Contract jobs: a set amount for a piece of work, paid only once it is completed and approved. Payroll or the
 // worker's supervisor gives the job; the worker (in the staff portal) or the supervisor marks it completed; payroll or
@@ -123,8 +124,8 @@ export default function ContractJobs({ people, canManage, onChanged }: Props) {
 
       <Card padding="none">
         {shown.length === 0 ? (
-          <EmptyState icon={<BriefcaseBusiness className="w-5 h-5" />} title={loading ? 'Loading...' : 'No jobs here'}
-            description={loading ? undefined : 'Give someone a job for a set amount; it is paid once it is completed and approved.'} />
+          loading ? <LoaderBlock label="Loading" compact /> : <EmptyState icon={<BriefcaseBusiness className="w-5 h-5" />} title="No jobs here"
+            description="Give someone a job for a set amount; it is paid once it is completed and approved." />
         ) : (
           <TableScroll>
             <table className="w-full text-xs">

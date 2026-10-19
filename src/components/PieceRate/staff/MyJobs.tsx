@@ -7,6 +7,7 @@ import { completeMyJob, loadMyJobs, MAX_JOB_FILE_BYTES } from '../../../lib/myWo
 import { openPrivateFile } from '../../../lib/privateFiles';
 import { JOB_STATUS_LABEL, type JobStatus } from '../../../lib/pieceRate';
 import { jobDue, type MyJob } from '../../../lib/myWork';
+import { LoaderBlock } from '../../UI/FigbloomLoader';
 
 // My contract jobs: what was agreed, for how much, by when, and where each stands. I mark an open job done, with an
 // optional note and photo or document; my supervisor (or payroll) is told and approves it or sends it back. It is paid
@@ -71,8 +72,8 @@ export default function MyJobs({ employeeNumber, today, onChanged }: Props) {
   if (jobs === null || jobs.length === 0) {
     return (
       <Card>
-        <EmptyState icon={<BriefcaseBusiness className="w-5 h-5" />} title={jobs === null ? 'Loading...' : 'No jobs yet'}
-          description={jobs === null ? undefined : 'Jobs your supervisor or payroll gives you, for a set amount, show here.'} />
+        {jobs === null ? <LoaderBlock label="Loading" compact /> : <EmptyState icon={<BriefcaseBusiness className="w-5 h-5" />} title="No jobs yet"
+          description="Jobs your supervisor or payroll gives you, for a set amount, show here." />}
       </Card>
     );
   }

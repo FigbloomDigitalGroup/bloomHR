@@ -22,6 +22,7 @@ import {
 } from '../../lib/loans';
 import { loadLoanProducts, loadLoanSettings, loadMyLoans, requestLoan, withdrawLoan, type LoanWithSchedule } from '../../lib/loansApi';
 import { loadMyEmployee, type MyEmployee } from '../../lib/salaryAdvanceApi';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // Staff portal: apply for a loan, with what it costs worked out as they type, and follow their loans to repaid.
 
@@ -148,7 +149,7 @@ export default function LoanRequest() {
           <h2 className="text-[15px] font-bold text-ink mb-3">Apply for a loan</h2>
 
           {loading ? (
-            <p className="text-[12.5px] text-muted-foreground">Loading...</p>
+            <LoaderBlock label="Loading" compact />
           ) : (
             <form onSubmit={submit} noValidate className="space-y-4">
               {blocked && (

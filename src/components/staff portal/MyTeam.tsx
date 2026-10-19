@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { ClipboardList, Users } from 'lucide-react';
 import { Card, EmptyState, PageHeader, StatusPill, TabBar, type TabBarItem } from '../UI';
-import FigbloomLoader from '../UI/FigbloomLoader';
+import FigbloomLoader, { LoaderBlock } from '../UI/FigbloomLoader';
 import { loadKpiAccess, loadKpis, loadPeriods, type Kpi, type KpiAccess, type KpiPeriod } from '../../lib/kpiApi';
 import { loadOvertimePeople, loadWaitingOvertime, type OvertimeEntry, type OvertimePerson } from '../../lib/overtimeApi';
 import { loadCasuals } from '../../lib/casualApi';
@@ -232,7 +232,7 @@ function TeamOnLeave() {
         </div>
       </div>
       {rows === null ? (
-        <p className="m-0 text-[12px] text-muted-foreground">Loading...</p>
+        <LoaderBlock label="Loading" compact />
       ) : rows.length === 0 ? (
         <p className="m-0 text-[12px] text-muted-foreground">Nobody on your team has approved leave this month.</p>
       ) : (

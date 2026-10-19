@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { Card, EmptyState, PageHeader } from '../UI';
 import { formatDay, parseDay, summarizeContract, type ContractRecord, type ContractState } from '../../lib/contract';
 import ContractsToSign from './ContractsToSign';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 const TONE: Record<ContractState, string> = {
   'no-end': 'bg-gray-100 text-gray-700',
@@ -44,7 +45,7 @@ export default function MyContract() {
     };
   }, []);
 
-  if (state === 'loading') return <div className="p-6 text-sm text-gray-500">Loading your contract…</div>;
+  if (state === 'loading') return <LoaderBlock label="Loading your contract" />;
   if (state === 'error') return <EmptyState icon={<FileText className="w-4 h-4" />} title="Could not load your contract" description="Please refresh the page. If it keeps happening, tell HR." />;
   if (state === 'none' || !record) {
     return <EmptyState icon={<FileText className="w-4 h-4" />} title="No employee record yet" description="Your contract appears here once HR has added you to the company's employee list with your work email." />;

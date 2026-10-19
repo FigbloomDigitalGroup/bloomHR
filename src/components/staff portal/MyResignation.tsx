@@ -14,6 +14,7 @@ import {
   type ExitRecord,
   type MyExitState,
 } from '../../lib/exits';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 const input = 'w-full border border-border rounded-xl px-3 py-2.5 text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-brand/40';
 const MAX_LETTER_BYTES = 10 * 1024 * 1024;
@@ -89,7 +90,7 @@ export default function MyResignation() {
   }, [load]);
 
   if (error) return <EmptyState icon={<LogOut className="w-4 h-4" />} title="Could not load your resignation" description={error} />;
-  if (!state) return <div className="p-6 text-sm text-gray-500">Loading…</div>;
+  if (!state) return <LoaderBlock label="Loading" />;
   if (!state.employeeNumber) {
     return <EmptyState icon={<LogOut className="w-4 h-4" />} title="No employee record yet" description="Ask HR to add you to the company’s employee list with your work email." />;
   }

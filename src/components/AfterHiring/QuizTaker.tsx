@@ -4,6 +4,7 @@ import { Button } from '../UI';
 import { type QuizResult, type QuizToTake, loadQuizToTake, submitQuiz } from '../../lib/afterHiring';
 
 import { confirmDialog } from '../../lib/confirmDialog';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 // Taking a test in the staff portal: one choice per question, then the answers are sent and marked by the database
 // (the right answers never reach the browser). One attempt; the result shows straight away.
 
@@ -64,7 +65,7 @@ export default function QuizTaker({ assignmentId, onFinished, onClose }: {
   }
 
   if (!quiz) {
-    return problem ? <p role="alert" className="text-sm text-status-danger">{problem}</p> : <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-label="Loading the test" />;
+    return problem ? <p role="alert" className="text-sm text-status-danger">{problem}</p> : <LoaderBlock label="Loading the test" compact />;
   }
 
   return (

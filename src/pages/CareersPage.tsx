@@ -11,6 +11,7 @@ import {
   fetchCareersJobs,
   uploadCv,
 } from '../lib/careers';
+import { LoaderBlock } from '../components/UI/FigbloomLoader';
 
 // A company's hosted careers page (/careers/<slug>, FIG-838): its open jobs, each job, and an application form, in the
 // company's logo and colours. No sign-in. Companies without developers link to it, or embed it on their own website
@@ -69,9 +70,7 @@ function Shell({ company, children }: { company: CareersCompany | null; children
 }
 
 const Loading = ({ label }: { label: string }) => (
-  <div className="flex min-h-[40vh] items-center justify-center" role="status">
-    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-label={label} />
-  </div>
+  <LoaderBlock label={label} />
 );
 
 function Facts({ job }: { job: CareersJob }) {

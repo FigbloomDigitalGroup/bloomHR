@@ -23,6 +23,7 @@ import {
   type ContributionKind,
 } from '../../lib/contributions';
 import { loadContributions, openContributionDocument, requestContribution, stopContribution } from '../../lib/contributionsApi';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // The staff portal's "My contributions" (FIG-898): ask payroll to take a contribution from your pay (pension AVC,
 // SACCO, welfare, ...) or to count an insurance premium or mortgage interest for tax relief; see your requests and
@@ -191,7 +192,7 @@ export default function MyContributions() {
       <Card>
         <h3 className="m-0 text-xs font-bold text-ink">Running now</h3>
         {list === null ? (
-          <p className="text-xs text-muted-foreground mt-2">Loading…</p>
+          <LoaderBlock label="Loading" compact />
         ) : active.length === 0 ? (
           <p className="text-xs text-muted-foreground mt-2">None yet.</p>
         ) : (

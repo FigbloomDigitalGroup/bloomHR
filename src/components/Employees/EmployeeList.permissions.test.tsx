@@ -91,4 +91,15 @@ describe('employee list buttons by module', () => {
   it('HR whose role lost hr-admin, approve-exits and employee-edit sees none of them', async () => {
     await expectButtons('HR', ['dashboard', 'employees', 'leaves'], []);
   });
+  it('shows the Figbloom logo loader while the list loads, then the list', async () => {
+    state.role = 'HR';
+    state.modules = DEFAULTS.HR;
+    render(
+      <MemoryRouter>
+        <EmployeeList selectedTown="" onTownChange={() => {}} selectedRegion="" onRegionChange={() => {}} />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('status', { name: 'Loading employees' }).querySelector('.fb-arc')).toBeTruthy();
+    await waitFor(() => screen.getByText(/Jane/));
+  });
 });

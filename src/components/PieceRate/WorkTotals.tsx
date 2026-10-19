@@ -5,6 +5,7 @@ import { Card, EmptyState, StatusPill, TableScroll } from '../UI';
 import { formatKsh, today } from '../../lib/casualPay';
 import { loadTotals } from '../../lib/pieceRateApi';
 import { FREQUENCY_LABEL, KIND_LABEL, formatQty, monthOf, round2, type WorkTotal } from '../../lib/pieceRate';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // Running totals for a period, per worker: what they produced of each kind of work and its gross (approved work only),
 // what is still waiting for approval, and approved contract jobs. Read-only: the payout and month-end stages pay from
@@ -49,7 +50,7 @@ export default function WorkTotals() {
         )}
       </div>
       {!rows || rows.length === 0 ? (
-        <EmptyState icon={<Sigma className="w-5 h-5" />} title={rows ? 'No work in this period' : 'Loading...'} />
+        !rows ? <LoaderBlock label="Loading" compact /> : <EmptyState icon={<Sigma className="w-5 h-5" />} title="No work in this period" />
       ) : (
         <TableScroll>
           <table className="w-full text-xs">

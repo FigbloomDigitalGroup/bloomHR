@@ -25,6 +25,7 @@ import { confirmDialog } from '../../lib/confirmDialog';
 import type { Rates } from '../../lib/statutoryCalc';
 import TaxTreatmentHint from './TaxTreatmentHint';
 import ContributionRequests from './ContributionRequests';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 // The Deductions tab (was the "Deductions" pop-up): the company's own deduction types (SACCO, welfare...) and what
 // each employee has taken from pay every month.
 
@@ -443,8 +444,8 @@ export default function PayrollDeductionsTab({ onChanged, draftNotice, rates }: 
               <tbody>
                 {loading && (
                   <tr>
-                    <td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">
-                      Loading…
+                    <td colSpan={5}>
+                      <LoaderBlock label="Loading" compact />
                     </td>
                   </tr>
                 )}

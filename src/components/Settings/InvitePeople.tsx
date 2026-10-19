@@ -8,6 +8,7 @@ import { sendInvitations, summariseInvites } from '../../lib/employeeInvite';
 import EmployeeNumberingCard from './EmployeeNumbering';
 
 import { confirmDialog } from '../../lib/confirmDialog';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 const effectiveStatus = (inv: Invitation): { label: string; tone: StatusTone } => {
   if (inv.status === 'accepted') return { label: 'Joined', tone: 'success' };
@@ -202,7 +203,7 @@ export default function InvitePeople({ callerRole = 'ADMIN' }: InvitePeopleProps
         {loadError ? (
           <div className="p-4 text-[13px] text-status-danger">Could not load invitations: {loadError}</div>
         ) : invitations === null ? (
-          <div className="p-4 text-[13px] text-muted-foreground">Loading…</div>
+          <LoaderBlock label="Loading invitations" compact />
         ) : invitations.length === 0 ? (
           <EmptyState icon={<span aria-hidden>✉</span>} title="No invitations yet" description="Invite someone above and they will appear here." />
         ) : (

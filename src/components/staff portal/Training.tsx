@@ -31,6 +31,7 @@ import {
   Image,
   File
 } from 'lucide-react';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // Types
 type TrainingDocument = {
@@ -530,12 +531,7 @@ const TrainingModule = () => {
   // Render loading state
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-96">
-        <div className="animate-pulse flex flex-col items-center">
-          <div className="h-12 w-12 bg-gray-200 rounded-full mb-4"></div>
-          <div className="h-4 bg-gray-200 rounded w-32"></div>
-        </div>
-      </div>
+      <LoaderBlock label="Loading training" />
     );
   }
 

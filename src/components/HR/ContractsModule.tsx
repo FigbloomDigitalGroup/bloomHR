@@ -22,6 +22,7 @@ import {
   type ContractFilter,
   type SigningContract,
 } from '../../lib/contractSigning';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 const input = 'w-full border border-border rounded-xl px-3 py-2.5 text-[12.5px] text-ink focus:outline-none focus:ring-2 focus:ring-brand/40';
 const day = (d: string | null | undefined) => formatDay(parseDay(d)) || '—';
@@ -300,7 +301,7 @@ export default function ContractsModule() {
         <Button onClick={() => setSending(true)} icon={<Send className="w-3.5 h-3.5" />}>Send contract</Button>
       </div>
       {contracts === null ? (
-        <div className="p-6 text-sm text-gray-500">Loading…</div>
+        <LoaderBlock label="Loading contracts" compact />
       ) : shown.length === 0 ? (
         <EmptyState
           icon={<FileSignature className="w-4 h-4" />}

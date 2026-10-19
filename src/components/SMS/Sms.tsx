@@ -11,6 +11,7 @@ import { getSmsBalance, sendSingleSms } from '../../lib/smsApi';
 import { Card, Button, TabBar, Modal } from '../UI';
 import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
 import toast from 'react-hot-toast';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // Types
 type SMSPackage = {
@@ -1537,10 +1538,7 @@ export function SMSCenter() {
 
                     <div className="border border-border rounded-lg max-h-80 overflow-y-auto">
                       {isLoadingEmployees ? (
-                        <div className="flex items-center justify-center p-8">
-                          <Loader className="w-4 h-4 animate-spin text-brand" />
-                          <span className="ml-2 text-xs text-muted-foreground">Loading employees...</span>
-                        </div>
+                        <LoaderBlock label="Loading employees" compact />
                       ) : filteredEmployees.length === 0 ? (
                         <div className="p-4 text-center text-subtle text-xs">
                           No employees found with valid phone numbers

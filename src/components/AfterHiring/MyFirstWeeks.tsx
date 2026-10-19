@@ -4,6 +4,7 @@ import { Button, Card, Modal, StatusPill } from '../UI';
 import OrientationChecklist from './OrientationChecklist';
 import QuizTaker from './QuizTaker';
 import { type AfterHiring, isOverdue, loadAfterHiring, setChecklistItemDone, shortDate } from '../../lib/afterHiring';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // The staff portal's "My first weeks": the employee's orientation checklist (they tick their own items), the
 // training they must complete and the tests they must take.
@@ -19,7 +20,7 @@ export default function MyFirstWeeks({ onOpenTraining }: { onOpenTraining?: () =
   useEffect(load, [load]);
 
   if (problem) return <p className="text-sm text-muted-foreground p-4">{problem}</p>;
-  if (!data) return <p className="text-sm text-muted-foreground p-4">Loading…</p>;
+  if (!data) return <LoaderBlock label="Loading your first weeks" />;
 
   const nothing = data.orientation.length === 0 && data.training.length === 0 && data.tests.length === 0;
   return (

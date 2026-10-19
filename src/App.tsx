@@ -18,7 +18,6 @@ import MFAVerification from './pages/MFAverification';
 import { landingTarget, useCompanyProfile, withProfileRole } from './hooks/useCompanyProfile';
 import { syncThemeWithAccount } from './lib/preferences';
 import CompanyGate from './components/Company/CompanyGate';
-import AppSkeleton from './components/Layout/AppSkeleton';
 import FigbloomLoader from './components/UI/FigbloomLoader';
 import { useCompanySwitching } from './hooks/useMyCompanies';
 import { useMobileNav } from './components/Layout/useMobileNav';
@@ -109,6 +108,8 @@ interface Branch {
 const MFA_OPEN_PATHS = ['/login', '/mfa', '/update-password', '/join', '/create-company'];
 
 const Loader = () => <FigbloomLoader fullScreen />;
+// while the person's company and workspace load
+const WorkspaceLoader = () => <FigbloomLoader fullScreen label="Loading your workspace" />;
 
 /** A screen of the admin app, opened by the modules of the person's role (src/lib/routeModules.ts). */
 const gate = (path: string, element: React.ReactNode) => (
@@ -929,7 +930,7 @@ function App() {
     <UserProvider>
       <ErrorBoundary>
         <div className="min-h-screen bg-page overflow-x-hidden">
-          {switchingCompany && <AppSkeleton label="Switching company…" />}
+          {switchingCompany && <FigbloomLoader fullScreen label="Switching company" />}
           <Suspense fallback={<Loader />}>
           <Routes>
             <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
@@ -963,7 +964,7 @@ function App() {
                     </button>
                   </div>
                 ) : (
-                  <AppSkeleton />
+                  <WorkspaceLoader />
                 )
               }
             />
@@ -977,7 +978,7 @@ function App() {
                 ) : companyState.status === 'ready' ? (
                   <CompanyGate userId={session.user.id}><OnboardingPrint /></CompanyGate>
                 ) : (
-                  <AppSkeleton />
+                  <WorkspaceLoader />
                 )
               }
             />
@@ -997,7 +998,7 @@ function App() {
                     </button>
                   </div>
                 ) : companyState.status === 'loading' ? (
-                  <AppSkeleton />
+                  <WorkspaceLoader />
                 ) : usesStaffPortal(user.role) ? (
                   <CompanyGate userId={session.user.id}>
                     <StaffPortalLanding />

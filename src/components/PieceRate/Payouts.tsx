@@ -20,6 +20,7 @@ import {
   approvePayoutBatch, cancelPayoutBatch, createPayoutBatch, loadEquityDebitAccount, loadPayoutBatches, loadPayoutLines,
   markPayoutExported, refreshPayoutDetails, removePayoutLine,
 } from '../../lib/piecePayoutsApi';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // Payouts (FIG-812 stage 4), payroll only: pay daily and weekly workers (and finished contract jobs) during the month.
 // Each payout holds back AHL and the reserve from employees and withholding tax from contractors; the month-end payroll
@@ -420,7 +421,7 @@ export default function Payouts({ people, settings }: { people: WorkPerson[]; se
 
       <Card padding="none">
         {batches.length === 0 ? (
-          <EmptyState icon={<Wallet className="w-5 h-5" />} title={loading ? 'Loading...' : 'No payouts yet'} />
+          loading ? <LoaderBlock label="Loading" compact /> : <EmptyState icon={<Wallet className="w-5 h-5" />} title="No payouts yet" />
         ) : (
           <TableScroll>
             <table className="w-full text-xs">

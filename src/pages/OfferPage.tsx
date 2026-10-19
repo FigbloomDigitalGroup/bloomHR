@@ -13,6 +13,7 @@ import {
   offerValues,
   respondToOffer,
 } from '../lib/offers';
+import FigbloomLoader from '../components/UI/FigbloomLoader';
 
 // The page an offer email links to (/offer?token=...). Anyone with the link sees that one offer, and nothing else:
 // the letter on the company's letterhead, a PDF of it, and (while it is open) Accept or Decline with an optional
@@ -52,8 +53,8 @@ export default function OfferPage() {
 
   if (offer === undefined) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-page" role="status">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-label="Loading your offer" />
+      <div className="min-h-screen flex items-center justify-center bg-page">
+        <FigbloomLoader label="Loading your offer" />
       </div>
     );
   }

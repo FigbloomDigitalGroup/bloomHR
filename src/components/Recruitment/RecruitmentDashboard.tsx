@@ -13,6 +13,7 @@ import { ApplicationDetailModal } from './components/ApplicationDetailModal';
 import RecruitmentPipeline from './pipeline/RecruitmentPipeline';
 import { branches } from './components/constants/branches';
 import { jobPositions } from './components/constants/jobPositions';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -126,9 +127,7 @@ export default function RecruitmentDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading recruitment data...</div>
-      </div>
+      <LoaderBlock label="Loading recruitment" />
     );
   }
 

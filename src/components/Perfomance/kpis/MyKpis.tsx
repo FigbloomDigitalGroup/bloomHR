@@ -17,6 +17,7 @@ import {
 } from '../../../lib/kpiApi';
 import { BandPill, PeriodSelect, PeriodStatusPill, ScoreText } from './shared';
 import { CheckinForm } from './Scorecards';
+import { LoaderBlock } from '../../UI/FigbloomLoader';
 
 /** The signed-in employee's KPIs for a review period, with self-assessments (staff portal and the Performance page). */
 export default function MyKpis({ embedded = false }: { embedded?: boolean }) {
@@ -70,7 +71,7 @@ export default function MyKpis({ embedded = false }: { embedded?: boolean }) {
 
   const header = !embedded && <PageHeader title="My KPIs" subtitle="What you are measured on, and how you are doing" />;
 
-  if (loading) return <div>{header}<Card><p className="text-[13px] text-muted-foreground">Loading…</p></Card></div>;
+  if (loading) return <div>{header}<Card><LoaderBlock label="Loading your KPIs" compact /></Card></div>;
 
   if (!access?.employeeNumber || periods.length === 0) {
     return (

@@ -65,6 +65,8 @@ describe('UpdatePassword: dashboard (implicit) links', () => {
   it('opens the form when the client announces the recovery session', async () => {
     openAt('/update-password#access_token=a1&refresh_token=r1&expires_in=3600&token_type=bearer&type=recovery', 5000);
     expect(screen.getByText('Checking your link')).toBeTruthy();
+    // the Figbloom logo loader, not a plain spinner
+    expect(screen.getByRole('status', { name: 'Checking' }).querySelector('.fb-arc')).toBeTruthy();
     await waitFor(() => expect(auth.listeners.length).toBeGreaterThan(0));
     act(() => auth.listeners.forEach(l => l('PASSWORD_RECOVERY', session)));
     await formShown();
