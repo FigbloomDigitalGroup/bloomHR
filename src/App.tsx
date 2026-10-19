@@ -202,6 +202,18 @@ function App() {
 
   // Capture initial URL to detect auth params even if Supabase clears them
   const initialUrl = useRef(window.location.href);
+  // The reset page with the link's query and hash: the live ones, or, once the sign-in client has read and
+  // cleared them, the ones the page opened with, so /update-password still sees the link's tokens or error.
+  const recoveryTarget = useCallback(() => {
+    const live = window.location.search + window.location.hash;
+    if (/(type=recovery|token_hash=|access_token=|error_code=|error_description=|[?&]code=)/.test(live)) return '/update-password' + live;
+    try {
+      const first = new URL(initialUrl.current);
+      return '/update-password' + first.search + first.hash;
+    } catch {
+      return '/update-password';
+    }
+  }, []);
   const [branches, setBranches] = useState<string[]>([]);
   const [regions, setRegions] = useState<string[]>([]);
   const [filteredTowns, setFilteredTowns] = useState<string[]>([]);
@@ -575,47 +587,22 @@ function App() {
     const handleEmailConfirmation = async () => {
       // Parse initial URL to ensure we don't miss params due to Supabase clearing them
       let type: string | null = searchParams.get('type');
-      let token: string | null = searchParams.get('token');
       let accessToken: string | null = searchParams.get('access_token');
-      let code: string | null = searchParams.get('code');
 
       try {
         const urlObj = new URL(initialUrl.current);
         if (!type) type = urlObj.searchParams.get('type') || new URLSearchParams(urlObj.hash.substring(1)).get('type');
-        if (!token) token = urlObj.searchParams.get('token');
         if (!accessToken) accessToken = urlObj.searchParams.get('access_token') || new URLSearchParams(urlObj.hash.substring(1)).get('access_token');
-        if (!code) code = urlObj.searchParams.get('code');
       } catch (e) {
         console.error('Error parsing initial URL:', e);
       }
 
       // Handle password recovery - this runs AFTER Supabase auto-login
-      if (type === 'recovery' && (token || accessToken || code)) {
+      if (type === 'recovery') {
         console.log('🔐 Password recovery detected in confirmation effect');
         sessionStorage.setItem('isPasswordRecovery', 'true');
-
-        // Manual exchange for PKCE flow to ensure session is established
-        if (code) {
-          try {
-            // First check if session was already established by auto-detection
-            const { data: { session: existingSession } } = await supabase.auth.getSession();
-            if (existingSession) {
-              console.log('✅ Session already established via Auto-Exchange');
-            } else {
-              console.log('Testing manual exchange...');
-              const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-              if (error) {
-                console.error('Manual code exchange failed:', error);
-              } else if (data.session) {
-                console.log('✅ Manual code exchange successful');
-              }
-            }
-          } catch (err) {
-            console.error('Error during manual code exchange:', err);
-          }
-        }
-
-        // We let onAuthStateChange handle the navigation to ensure session is fully established first
+        // The link's code or token is used on /update-password and nowhere else: each works only once, so
+        // using it here too would make the reset page fail with "already used".
         return;
       }
 
@@ -702,6 +689,8 @@ function App() {
           console.log('🔐 Password recovery detected - allowing UpdatePassword page to handle auth');
           if (urlHasRecoveryToken) {
             sessionStorage.setItem('isPasswordRecovery', 'true');
+            // a dashboard link lands on the site address (/): take it to the reset page, tokens and all
+            if (currentPath !== '/update-password') navigate(recoveryTarget(), { replace: true });
           }
           setAuthChecked(true);
           setIsInitializing(false);
@@ -795,7 +784,7 @@ function App() {
         }
 
         if ((urlHasRecoveryToken || isRecoveryFlag) && currentPath !== '/update-password') {
-          navigate('/update-password' + location.search + location.hash, { replace: true });
+          navigate(recoveryTarget(), { replace: true });
         }
         return; // Exit early, let UpdatePassword handle everything
       }
@@ -919,7 +908,7 @@ function App() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate, location.pathname, location.search, location.hash, searchParams, branches, clearAllTimers]);
+  }, [navigate, location.pathname, location.search, location.hash, searchParams, branches, clearAllTimers, recoveryTarget]);
 
   // Reset navigation flag when location changes
   useEffect(() => {
