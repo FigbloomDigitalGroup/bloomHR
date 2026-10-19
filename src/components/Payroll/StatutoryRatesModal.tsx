@@ -7,7 +7,8 @@ import FigbloomLoader from '../UI/FigbloomLoader';
 import TableScroll from '../UI/TableScroll';
 
 // The statutory rates payroll uses for a month (statutory_rates), and where each comes from. Payroll can give the
-// company its own rate for a code from a date; the defaults change only with the law (by migration).
+// company its own rate for a code from a date; the defaults change only with the law, entered by a Figbloom platform
+// admin on the platform rates screen (FIG-813, /platform/rates).
 
 const formatValue = (r: RateRow) => {
   if (r.bands) {

@@ -47,8 +47,11 @@ type Employee = Record<string, any>;
 export const TANZANIA = 'Tanzania';
 export const TZS = 'TZS';
 
-/** The rate codes Tanzania payroll can't run without (sdl_min_employees defaults to 10 when not set). */
-export const TANZANIA_REQUIRED_RATES = ['paye_bands', 'nonresident_paye_rate', 'nssf_rate', 'nssf_employer_rate', 'sdl_rate', 'wcf_rate', 'heslb_rate'] as const;
+/** The rate codes Tanzania payroll can't run without: every figure the engine uses is a dated rate, none is in the code. */
+export const TANZANIA_REQUIRED_RATES = [
+  'paye_bands', 'nonresident_paye_rate', 'secondary_paye_rate', 'nssf_rate', 'nssf_employer_rate', 'nssf_deductible', 'sdl_rate',
+  'sdl_min_employees', 'wcf_rate', 'heslb_rate', 'wht_resident', 'wht_nonresident',
+] as const;
 
 const num = (v: unknown) => {
   const n = Number(v);
@@ -112,13 +115,13 @@ export interface TanzaniaStatutory {
 
 /** Whether SDL applies: the company has at least sdl_min_employees people in Tanzania (unknown headcount: it applies). */
 export const sdlApplies = (headcount: number | undefined, rates: Rates) =>
-  headcount === undefined || headcount >= rateOf(rates, 'sdl_min_employees', 10);
+  headcount === undefined || headcount >= rateOf(rates, 'sdl_min_employees');
 
 /** Tanzania's statutory figures for one month's pay (see the top of this file). */
 export function tanzaniaStatutory(i: TanzaniaStatutoryInput, rates: Rates): TanzaniaStatutory {
   const gross = pos(i.grossPay);
   if (i.contractor) {
-    const whtRate = i.resident ? rateOf(rates, 'wht_resident', 0.05) : rateOf(rates, 'wht_nonresident', 0.15);
+    const whtRate = i.resident ? rateOf(rates, 'wht_resident') : rateOf(rates, 'wht_nonresident');
     return { nssf: 0, nssfEmployer: 0, taxablePay: 0, paye: 0, heslb: 0, sdl: 0, wcf: 0, wht: tzs(gross * whtRate), whtRate };
   }
   const pensionable = Math.min(pos(i.pensionablePay), rateOf(rates, 'nssf_upper_limit', Infinity));
@@ -126,12 +129,12 @@ export function tanzaniaStatutory(i: TanzaniaStatutoryInput, rates: Rates): Tanz
   const nssfEmployer = tzs(pensionable * rateOf(rates, 'nssf_employer_rate'));
   // a non-resident's 15% is on gross employment income; a resident's (and a secondary employment's) on pay less NSSF
   const taxablePay = i.resident
-    ? round2(Math.max(0, pos(i.taxablePay) - (rateOf(rates, 'nssf_deductible', 1) ? nssf : 0)))
+    ? round2(Math.max(0, pos(i.taxablePay) - (rateOf(rates, 'nssf_deductible') ? nssf : 0)))
     : round2(pos(i.taxablePay));
   const paye = !i.resident
     ? tzs(taxablePay * rateOf(rates, 'nonresident_paye_rate'))
     : i.secondary
-      ? tzs(taxablePay * rateOf(rates, 'secondary_paye_rate', 0.3))
+      ? tzs(taxablePay * rateOf(rates, 'secondary_paye_rate'))
       : tzs(taxByBands(taxablePay, bandsOf(rates)));
   const heslb = i.heslb ? tzs(pos(i.basicPay) * rateOf(rates, 'heslb_rate')) : 0;
   const sdl = i.sdl ? tzs(gross * rateOf(rates, 'sdl_rate')) : 0;
@@ -259,7 +262,7 @@ export const tanzaniaDeductionLines = (p: PayslipRecord): PayslipLine[] =>
       ? [{ label: `Withholding tax (${round2(num(p.wht_rate) * 100)}%)`, amount: num(p.wht_tax) }]
       : [
           { label: p.tax_resident === false ? 'PAYE (non-resident, flat)' : 'PAYE', amount: num(p.paye_tax) },
-          { label: 'NSSF (10%)', amount: num(p.nssf_deduction) },
+          { label: 'NSSF', amount: num(p.nssf_deduction) },
           { label: 'HESLB loan repayment', amount: num(p.heslb_deduction) },
         ]
   );

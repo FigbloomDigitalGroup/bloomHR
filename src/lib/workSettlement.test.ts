@@ -17,7 +17,7 @@ const rates = {
     { upto: 24000, rate: 0.1 }, { upto: 32333, rate: 0.25 }, { upto: 500000, rate: 0.3 }, { upto: 800000, rate: 0.325 }, { upto: null, rate: 0.35 },
   ],
   personal_relief: 2400, shif_rate: 0.0275, shif_minimum: 300, nssf_rate: 0.06, nssf_upper_limit: 108000, ahl_rate: 0.015,
-  shif_deductible: 1, ahl_deductible: 1, wht_contractual: 0.03, wht_professional: 0.05, nita_levy: 50,
+  shif_deductible: 1, ahl_deductible: 1, wht_contractual: 0.03, wht_professional: 0.05, nita_levy: 50, per_diem_rate: 0.33,
 };
 
 const ctx = (over: Partial<PayslipContext> = {}): PayslipContext => ({

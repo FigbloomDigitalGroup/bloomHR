@@ -1,4 +1,4 @@
-import { employeeInputs, statutoryFor, type Rates, type StatutoryInput } from './statutoryCalc';
+import { employeeInputs, perDiemRateOf, statutoryFor, type Rates, type StatutoryInput } from './statutoryCalc';
 import { statutoryPayWith, summariseEarnings, type EarningItem } from './earnings';
 import { basicAfterLeave } from './leavePay';
 import type { DeductionItem } from './voluntaryDeductions';
@@ -265,7 +265,7 @@ export function applyPayslipOverride<T extends Payslip>(record: T, override: Pay
   }
 
   // the per diem is a share of the basic earned this month, not taxed (as payroll works it out)
-  const { perDiem } = basicAfterLeave(num(next.basic_salary), num(record.leave_deduction));
+  const { perDiem } = basicAfterLeave(num(next.basic_salary), num(record.leave_deduction), perDiemRateOf(ctx.rates));
   const statutory = statutoryFor(
     { ...statutoryPayWith(grossPay - perDiem - earnings.total, items), ...ctx.inputs, apply: ctx.apply },
     ctx.rates,

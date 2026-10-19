@@ -1,4 +1,4 @@
-import { employeeInputs, statutoryFor, type Rates } from './statutoryCalc';
+import { employeeInputs, perDiemRateOf, statutoryFor, type Rates } from './statutoryCalc';
 import { statutoryPayWith, summariseEarnings, type EarningItem } from './earnings';
 import { basicAfterLeave, leavePayFor, leavePayoutItems, type LeavePayRow, type LeavePayoutDue, type LeaveRateBasis } from './leavePay';
 import { withAbsencePay } from './absencePay';
@@ -131,8 +131,9 @@ export function calculatePayslip(employee: Record<string, any>, ctx: PayslipCont
   const leave = withAbsencePay(leavePayFor(ctx.leaveByEmployee.get(employeeId), basicSalary, leaveBasis), ctx.absenceByEmployee.get(employeeId), basicSalary, leaveBasis);
   const leaveDeduction = leave.total;
 
-  // Per diem is PART of basic salary (33%), not extra payment: 33% of the basic earned this month
-  const { perDiem } = basicAfterLeave(basicSalary, leaveDeduction);
+  // Per diem is PART of basic salary, not extra payment: the month's per diem share (per_diem_rate, 33% by default) of
+  // the basic earned this month
+  const { perDiem } = basicAfterLeave(basicSalary, leaveDeduction, perDiemRateOf(rates ?? {}));
 
   const overtimePay = overtime.pay;
 

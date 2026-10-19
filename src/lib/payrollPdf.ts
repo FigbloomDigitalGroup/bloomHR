@@ -82,8 +82,8 @@ const money = (v: number) => Math.round(v).toLocaleString('en-KE');
 
 /** Uganda's register (FIG-905): PAYE, NSSF and LST, with the employer's NSSF as the employer cost. */
 export const UGANDA_REGISTER_COLUMNS = [
-  'No.', 'Employee', 'Department', 'Basic', 'Allowances', 'Overtime', 'Work & jobs', 'Leave deduction', 'Gross pay', 'PAYE', 'NSSF (5%)', 'LST',
-  'WHT', 'Other deductions', 'Paid during month', 'Arrears b/f', 'Carried forward', 'Net pay', 'NSSF (employer, 10%)',
+  'No.', 'Employee', 'Department', 'Basic', 'Allowances', 'Overtime', 'Work & jobs', 'Leave deduction', 'Gross pay', 'PAYE', 'NSSF', 'LST',
+  'WHT', 'Other deductions', 'Paid during month', 'Arrears b/f', 'Carried forward', 'Net pay', 'NSSF (employer)',
 ] as const;
 
 function ugandaRegister(rows: PayrollRegisterRow[]) {

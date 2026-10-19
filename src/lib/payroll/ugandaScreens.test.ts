@@ -15,13 +15,13 @@ const employee = { 'Employee Number': 'U1', 'First Name': 'Akello', 'Last Name':
 const slip = calculateUgandaPayslip(employee, { ...baseContext({ workByEmployee: undefined }), period: '2026-10', rates: UGANDA_RATES, lstPaidThisYear: new Map([['U1', 75000]]) });
 
 describe('the payslip', () => {
-  it('shows PAYE, NSSF (5%) and LST, with the employer NSSF (10%) as an employer cost', () => {
+  it('shows PAYE, NSSF and LST, with the employer NSSF as an employer cost', () => {
     expect(isKenyaPayslip(slip)).toBe(false);
     expect(isKenyaPayslip({})).toBe(true);
     expect(countryPayslipLines({ country: 'Kenya' })).toBeNull();
     expect(countryPayslipLines(slip)).toEqual({
-      deductions: [{ label: 'PAYE', amount: 330750 }, { label: 'NSSF (5%)', amount: 75000 }, { label: 'Local service tax', amount: 25000 }],
-      employerCosts: [{ label: 'NSSF (employer, 10%)', amount: 150000 }],
+      deductions: [{ label: 'PAYE', amount: 330750 }, { label: 'NSSF', amount: 75000 }, { label: 'Local service tax', amount: 25000 }],
+      employerCosts: [{ label: 'NSSF (employer)', amount: 150000 }],
     });
   });
 });
@@ -33,7 +33,7 @@ describe('the register', () => {
     const ug = groups[1];
     expect(ug.columns).toBe(UGANDA_REGISTER_COLUMNS);
     const at = (col: string) => ug.lines[0].amounts[UGANDA_REGISTER_COLUMNS.indexOf(col as never) - 3];
-    expect([at('Gross pay'), at('PAYE'), at('NSSF (5%)'), at('LST'), at('Other deductions'), at('Net pay'), at('NSSF (employer, 10%)')]).toEqual([
+    expect([at('Gross pay'), at('PAYE'), at('NSSF'), at('LST'), at('Other deductions'), at('Net pay'), at('NSSF (employer)')]).toEqual([
       1500000, 330750, 75000, 25000, 0, 1069250, 150000,
     ]);
   });

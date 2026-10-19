@@ -267,8 +267,8 @@ const columnOf = (label: string) => (/^PAYE\b/.test(label) ? 'PAYE' : /^Withhold
 /** Each country's own statutory columns, shown even in a month they are nothing. */
 const STANDARD: Record<string, { deductions: string[]; employer: string[] }> = {
   Kenya: { deductions: ['PAYE', 'NSSF', 'SHIF', 'Housing levy'], employer: ['NSSF (employer)', 'Housing levy (employer)', 'NITA levy'] },
-  Tanzania: { deductions: ['PAYE', 'NSSF (10%)', 'HESLB loan repayment'], employer: ['NSSF (employer)', 'SDL (skills levy)', 'WCF (workers compensation)'] },
-  Uganda: { deductions: ['PAYE', 'NSSF (5%)', 'Local service tax'], employer: ['NSSF (employer, 10%)'] },
+  Tanzania: { deductions: ['PAYE', 'NSSF', 'HESLB loan repayment'], employer: ['NSSF (employer)', 'SDL (skills levy)', 'WCF (workers compensation)'] },
+  Uganda: { deductions: ['PAYE', 'NSSF', 'Local service tax'], employer: ['NSSF (employer)'] },
 };
 
 /** A payslip's statutory deductions and employer costs, labelled by its own country's engine. */
@@ -481,7 +481,7 @@ function remittanceItems(country: string, ls: PayslipBreakdown[]): Item[] {
   if (country === 'Uganda') {
     return [
       { authority: 'URA', label: wht ? 'PAYE and withholding tax' : 'PAYE', amount: round2(sum((p) => p.paye_tax) + wht), day: 15 },
-      pair('NSSF Uganda', 'NSSF (5% + 10%)', sum((p) => p.nssf_deduction), sum((p) => p.employer_nssf), 15),
+      pair('NSSF Uganda', 'NSSF', sum((p) => p.nssf_deduction), sum((p) => p.employer_nssf), 15),
       { authority: 'Local government', label: 'Local service tax (LST)', amount: sum((p) => p.lst_deduction), day: null, note: 'As the local government asks' },
     ];
   }

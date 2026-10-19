@@ -111,16 +111,14 @@ export function leavePayFor(row: LeavePayRow | undefined, basic: number, basis: 
   return { items, total: round2(items.reduce((s, i) => s + i.amount, 0)), dailyRate };
 }
 
-/** The share of basic salary payroll treats as per diem (not taxed), as PayrollDashboard always has. */
-export const PER_DIEM_SHARE = 0.33;
-
 /**
  * The basic salary earned in a month once its leave deduction is taken off, and the per diem part of it: the per diem
- * is a share of the basic actually paid, so a month of unpaid leave leaves neither.
+ * is a share of the basic actually paid, so a month of unpaid leave leaves neither. The share is the month's
+ * per_diem_rate (a dated rate, lib/statutoryCalc perDiemRateOf: 33% by default, the company's own when it sets one).
  */
-export const basicAfterLeave = (basic: number, leaveDeduction: number) => {
+export const basicAfterLeave = (basic: number, leaveDeduction: number, perDiemRate: number) => {
   const earnedBasic = Math.max(0, num(basic) - Math.max(0, num(leaveDeduction)));
-  return { earnedBasic, perDiem: earnedBasic * PER_DIEM_SHARE };
+  return { earnedBasic, perDiem: earnedBasic * Math.max(0, num(perDiemRate)) };
 };
 
 const dayText = (days: number) => `${+days.toFixed(2)} ${days === 1 ? 'day' : 'days'}`;

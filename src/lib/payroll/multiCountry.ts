@@ -249,7 +249,12 @@ export interface ReadinessInput {
   fxRates?: Map<string, number> | null;
   /** people a USD country couldn't put on its USD payslips (calculateRun's heldBack) */
   heldBack?: HeldBackPerson[];
+  /** draft countries worked out with other statutory rates than those in force for the month now (FIG-813) */
+  ratesChanged?: string[];
 }
+
+/** Why a stale draft is held back (FIG-813). */
+export const RATES_CHANGED = 'Rates changed since this was calculated: press Recalculate';
 
 /** Before approval: per country, whether it is ready, waiting for its rules, or held back, and why. */
 export function countryReadiness(input: ReadinessInput): CountryReadiness[] {
@@ -306,6 +311,9 @@ export function countryReadiness(input: ReadinessInput): CountryReadiness[] {
       );
     }
     if (input.runStarted && slips.length === 0 && (g?.employees.length ?? 0) > 0 && !reason) blocking.push('Not worked out yet: press Recalculate');
+    // a new rate (platform or the company's own) starts on or before this month since its draft was worked out: held
+    // back, not just warned, so no one approves payslips on rates that are no longer the law (the database refuses too)
+    if (run?.status === 'draft' && (input.ratesChanged ?? []).some((c) => sameCountry(c, country))) blocking.push(RATES_CHANGED);
     // a draft payslip saved before its employee moved to another country's branch
     const moved = slips.filter((p) => {
       const now = countryOfEmployee.get(text(p.employee_id));

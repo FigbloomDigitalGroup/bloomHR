@@ -46,7 +46,11 @@ const text = (v: unknown) => (v === null || v === undefined ? '' : String(v).tri
 const whole = (n: number) => Math.round(n + Number.EPSILON);
 const nonZero = (lines: PayslipLine[]) => lines.filter((l) => l.amount !== 0);
 
-export const UGANDA_REQUIRED_RATES = ['paye_bands', 'paye_bands_non_resident', 'nssf_rate', 'nssf_employer_rate', 'lst_bands'] as const;
+/** The rate codes Uganda payroll can't run without: every figure the engine uses is a dated rate, none is in the code. */
+export const UGANDA_REQUIRED_RATES = [
+  'paye_bands', 'paye_bands_non_resident', 'nssf_rate', 'nssf_employer_rate', 'nssf_deductible', 'lst_bands', 'lst_deductible',
+  'lst_first_month', 'lst_months',
+] as const;
 
 // ---------------------------------------------------------------------------------------------
 // PAYE
@@ -123,8 +127,8 @@ export interface LstResult {
  * the year's amount: once paid, it stops.
  */
 export function lstFor(i: LstInput): LstResult {
-  const firstMonth = rateOf(i.rates, 'lst_first_month', 7);
-  const months = Math.max(1, rateOf(i.rates, 'lst_months', 4));
+  const firstMonth = rateOf(i.rates, 'lst_first_month');
+  const months = Math.max(1, rateOf(i.rates, 'lst_months'));
   const fy = ugandaFinancialYear(i.period, firstMonth);
   const annual = lstAnnual(i.monthlyGross, i.rates);
   const m = Number(i.period.split('-')[1]);
@@ -165,7 +169,7 @@ export function ugandaStatutory(i: UgandaStatutoryInput, rates: Rates): UgandaSt
   // the employee's NSSF is not deductible (nssf_deductible 0); LST is, in the month it is taken (lst_deductible 1)
   const chargeableIncome = Math.max(
     0,
-    gross - Math.max(0, i.nonTaxable) - (rateOf(rates, 'lst_deductible', 1) ? i.lst : 0) - (rateOf(rates, 'nssf_deductible', 0) ? nssf : 0)
+    gross - Math.max(0, i.nonTaxable) - (rateOf(rates, 'lst_deductible') ? i.lst : 0) - (rateOf(rates, 'nssf_deductible') ? nssf : 0)
   );
   return { nssf, employerNssf, chargeableIncome, paye: ugandaPaye(chargeableIncome, rates, i.resident), wht: 0 };
 }
@@ -198,7 +202,7 @@ export function calculateUgandaPayslip(employee: Record<string, any>, ctx: Paysl
   // LST: employees only, unless exempt (soldiers, and anyone payroll marks exempt)
   const lst =
     contractor || employee.lst_exempt === true
-      ? { annual: 0, amount: 0, instalment: 0, financialYear: ugandaFinancialYear(period).label }
+      ? { annual: 0, amount: 0, instalment: 0, financialYear: ugandaFinancialYear(period, rateOf(rates, 'lst_first_month') || undefined).label }
       : lstFor({ monthlyGross: grossPay, period, paidThisYear: ctx.lstPaidThisYear?.get(employeeId) ?? 0, collection: ctx.lstCollection ?? 'instalments', rates });
 
   const whtRate = contractor ? whtRateFor(employee, rates) : 0;
@@ -326,11 +330,11 @@ export function ugandaPayslipResult(record: PayslipRecord): PayslipResult {
         ? [{ label: 'Withholding tax', amount: num(record.wht_tax) }]
         : [
             { label: 'PAYE', amount: num(record.paye_tax) },
-            { label: 'NSSF (5%)', amount: num(record.nssf_deduction) },
+            { label: 'NSSF', amount: num(record.nssf_deduction) },
             { label: 'Local service tax', amount: num(record.lst_deduction) },
           ]
     ),
-    employerCosts: nonZero([{ label: 'NSSF (employer, 10%)', amount: num(record.employer_nssf) }]),
+    employerCosts: nonZero([{ label: 'NSSF (employer)', amount: num(record.employer_nssf) }]),
     grossPay,
     taxablePay: record.taxable_pay === undefined || record.taxable_pay === null ? grossPay : num(record.taxable_pay),
     tax: contractor ? num(record.wht_tax) : num(record.paye_tax),
@@ -470,9 +474,9 @@ export function ugandaMobileMoneyFile(payslips: PayslipRecord[], employees: Empl
 
 const UGANDA_RETURNS: ReturnFile[] = [
   { key: 'ura-paye', label: 'URA PAYE return', name: 'ura-paye', what: 'DT-2008 employee schedule: TIN, income, chargeable income and PAYE', authority: 'URA', build: (ps, es) => uraPayeFile(ps, es) },
-  { key: 'nssf-ug', label: 'NSSF Uganda', name: 'nssf-uganda', what: 'contribution schedule: 5% employee and 10% employer', authority: 'NSSF Uganda', build: (ps, es) => nssfUgandaFile(ps, es) },
+  { key: 'nssf-ug', label: 'NSSF Uganda', name: 'nssf-uganda', what: 'contribution schedule: employee and employer shares', authority: 'NSSF Uganda', build: (ps, es) => nssfUgandaFile(ps, es) },
   { key: 'lst', label: 'Local service tax', name: 'local-service-tax', what: 'LST taken this month, by employee, for the local government', authority: 'Local government', optional: true, build: (ps, es, { rates }) => lstFile(ps, es, rates) },
-  { key: 'ura-wht', label: 'URA withholding tax (contractors)', name: 'ura-wht', what: 'each contractor’s gross and 6% withholding tax', authority: 'URA', optional: true, build: (ps, es) => ugandaWhtFile(ps, es) },
+  { key: 'ura-wht', label: 'URA withholding tax (contractors)', name: 'ura-wht', what: 'each contractor’s gross and withholding tax', authority: 'URA', optional: true, build: (ps, es) => ugandaWhtFile(ps, es) },
 ];
 
 // ---------------------------------------------------------------------------------------------

@@ -20,7 +20,7 @@ const rates = {
   personal_relief: 2400, insurance_relief_rate: 0.15, insurance_relief_cap: 5000, pension_deduction_cap: 30000,
   prmf_deduction_cap: 15000, mortgage_interest_cap: 30000, non_cash_benefit_exempt_limit: 5000, meals_exempt_limit: 5000,
   pwd_exempt_income: 150000, shif_deductible: 1, ahl_deductible: 1, shif_rate: 0.0275, shif_minimum: 300, ahl_rate: 0.015,
-  nssf_rate: 0.06, nssf_lower_limit: 9000, nssf_upper_limit: 108000,
+  nssf_rate: 0.06, nssf_lower_limit: 9000, nssf_upper_limit: 108000, per_diem_rate: 0.33,
 };
 const employee = { 'Employee Number': 'E1', 'Tax PIN': 'A123', 'NSSF Number': '1', 'SHIF Number': '2' };
 const ctx: StatutoryContext = statutoryContextFor(employee, rates, false);
@@ -29,7 +29,7 @@ const ctx: StatutoryContext = statutoryContextFor(employee, rates, false);
 const calculate = (pay: { basic: number; house?: number; transport?: number; hours?: number; rate?: number; items?: EarningItem[]; leave?: number; voluntary?: number; loan?: number }) => {
   const earnings = summariseEarnings(pay.items ?? []);
   const leave = pay.leave ?? 0;
-  const { perDiem } = basicAfterLeave(pay.basic, leave);
+  const { perDiem } = basicAfterLeave(pay.basic, leave, 0.33);
   const overtime = (pay.hours ?? 0) * (pay.rate ?? 0);
   const gross = pay.basic + (pay.house ?? 0) + (pay.transport ?? 0) + overtime + earnings.commission + earnings.bonus - leave;
   const taxableGross = gross - perDiem - earnings.nonTaxable;
