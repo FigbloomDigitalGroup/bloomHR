@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { CheckCircle2, ClipboardCheck, FileCheck2, FileSignature, ListChecks, Loader2, Mail, Pencil, Printer, ScrollText, Undo2, X } from 'lucide-react';
+import { CheckCircle2, ClipboardCheck, FileCheck2, FileSignature, ListChecks, Loader2, Mail, Pencil, Printer, ScrollText, SlidersHorizontal, Undo2, X } from 'lucide-react';
 import { Button, Card, EmptyState, PageHeader, SearchInput, StatusPill, TabBar } from '../UI';
 import OnboardingSummary from './OnboardingSummary';
 import DocumentsReview from './DocumentsReview';
@@ -9,6 +9,8 @@ import HealthReview from './HealthReview';
 import AgreementsReview from './AgreementsReview';
 import PoliciesModal from './PoliciesModal';
 import RequiredDocumentsModal from './RequiredDocumentsModal';
+import OnboardingEssentialsModal from './OnboardingEssentialsModal';
+import StillToProvide from './StillToProvide';
 import AfterHiringPanel from '../AfterHiring/AfterHiringPanel';
 import AfterHiringSetupModal from '../AfterHiring/AfterHiringSetupModal';
 import { type ProgressSummary, loadAfterHiringSummary } from '../../lib/afterHiring';
@@ -29,7 +31,8 @@ import { ONBOARDING_STATUSES, type OnboardingStatus } from '../../lib/onboarding
 import FigbloomLoader from '../UI/FigbloomLoader';
 
 // HR's onboarding page: where every employee is, what each still needs, inviting them, and reviewing what they
-// submitted (approve, or send back with a comment). Only approved employees are paid.
+// submitted (approve, or send back with a comment). Only approved employees are paid. Approving needs the company's
+// essentials only (20261021700000); the rest is "still to provide" and can follow later, with due dates.
 
 const ACTION_LABELS: Record<string, string> = {
   invited: 'Invited',
@@ -77,6 +80,7 @@ function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: (
   };
 
   const status = row.status;
+  const blocking = Boolean(record && (record.missing.essentialsEmployee.length > 0 || record.missing.essentialsEmployer.length > 0));
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto" role="dialog" aria-label={`Review ${row.name}`}>
       <div className="bg-white rounded-[10px] border border-border shadow-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
@@ -100,22 +104,28 @@ function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: (
           {!record && !problem && <FigbloomLoader label="Loading" size={48} />}
           {record && (
             <>
-              {(record.missing.employee.length > 0 || record.missing.employer.length > 0) && (
-                <div className="rounded-lg bg-orange-tint-alt px-3 py-2 text-sm text-ink space-y-1">
-                  {record.missing.employee.length > 0 && (
-                    <p><span className="font-medium">The employee still needs to give: </span>{record.missing.employee.join(', ')}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <section aria-label="Essentials" className={`rounded-lg px-3 py-2 text-sm text-ink space-y-1 ${blocking ? 'bg-orange-tint-alt' : 'bg-secondary'}`}>
+                  <h3 className="font-semibold">Essentials <span className="font-normal text-muted-foreground">(needed to approve)</span></h3>
+                  {!blocking && <p className="text-muted-foreground">All in.{status === 'submitted' ? ' You can approve.' : ''}</p>}
+                  {record.missing.essentialsEmployee.length > 0 && (
+                    <p><span className="font-medium">The employee still needs to give: </span>{record.missing.essentialsEmployee.join(', ')}</p>
                   )}
-                  {record.missing.employer.length > 0 && (
-                    <p><span className="font-medium">HR still needs to enter: </span>{record.missing.employer.join(', ')}</p>
+                  {record.missing.essentialsEmployer.length > 0 && (
+                    <p><span className="font-medium">HR still needs to enter: </span>{record.missing.essentialsEmployer.join(', ')}</p>
                   )}
-                </div>
-              )}
-              {record.missing.documentsOutstanding.length > 0 && (
-                <div className="rounded-lg bg-secondary px-3 py-2 text-sm text-ink">
-                  <span className="font-medium">Documents outstanding: </span>{record.missing.documentsOutstanding.join(', ')}
-                  <span className="block text-xs text-muted-foreground mt-0.5">They don’t stop you approving; the employee can upload them later.</span>
-                </div>
-              )}
+                </section>
+                <section aria-label="Can follow later" className="rounded-lg bg-secondary px-3 py-2 text-sm text-ink">
+                  <h3 className="font-semibold">
+                    {status === 'approved' ? 'Still to provide' : 'Can follow later'}{' '}
+                    <span className="font-normal text-muted-foreground">(doesn’t stop approval or pay)</span>
+                  </h3>
+                  <StillToProvide followUps={record.missing.followUps} employeeId={row.id} onChanged={documentsChanged} />
+                  {record.missing.followUps.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">The employee is reminded until they are in. Set a due date to chase an item.</p>
+                  )}
+                </section>
+              </div>
               <OnboardingSummary record={record} />
               <section className="border-t border-border pt-4">
                 <h3 className="text-sm font-semibold text-ink mb-3">Documents and referees</h3>
@@ -176,7 +186,7 @@ function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: (
               </Button>
             )}
             {status === 'submitted' && (
-              <Button disabled={busy !== null || !record || record.missing.employer.length > 0} onClick={() => void decide('approve')}
+              <Button disabled={busy !== null || !record || blocking} onClick={() => void decide('approve')}
                 icon={busy === 'approve' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}>
                 Approve
               </Button>
@@ -188,7 +198,7 @@ function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: (
   );
 }
 
-type Filter = 'all' | 'documents' | OnboardingStatus;
+type Filter = 'all' | 'followups' | OnboardingStatus;
 
 export default function OnboardingReview() {
   const [rows, setRows] = useState<OverviewRow[] | null>(null);
@@ -197,6 +207,7 @@ export default function OnboardingReview() {
   const [reviewing, setReviewing] = useState<OverviewRow | null>(null);
   const [inviting, setInviting] = useState<string | null>(null);
   const [settingDocuments, setSettingDocuments] = useState(false);
+  const [settingEssentials, setSettingEssentials] = useState(false);
   const [settingPolicies, setSettingPolicies] = useState(false);
   const [settingAfterHiring, setSettingAfterHiring] = useState(false);
   const [afterHiring, setAfterHiring] = useState<Map<string, ProgressSummary>>(new Map());
@@ -224,7 +235,7 @@ export default function OnboardingReview() {
     const q = search.trim().toLowerCase();
     return (rows ?? []).filter(
       (r) =>
-        (filter === 'all' || r.status === filter || (filter === 'documents' && r.documents_outstanding.length > 0)) &&
+        (filter === 'all' || r.status === filter || (filter === 'followups' && r.followups.length > 0)) &&
         (!q || [r.name, r.employee_number, r.payroll_number, r.job_title, r.work_email].some((v) => String(v ?? '').toLowerCase().includes(q)))
     );
   }, [rows, filter, search]);
@@ -240,24 +251,25 @@ export default function OnboardingReview() {
     load();
   };
 
-  const withDocuments = (rows ?? []).filter((r) => r.documents_outstanding.length > 0).length;
+  const withFollowUps = (rows ?? []).filter((r) => r.followups.length > 0).length;
   const tabs = [
     { id: 'all', label: `All (${counts.all})` },
     ...ONBOARDING_STATUSES.map((s) => ({ id: s, label: `${STATUS_LABELS[s]} (${counts[s] ?? 0})` })),
-    { id: 'documents', label: `Documents outstanding (${withDocuments})` },
+    { id: 'followups', label: `Still to provide (${withFollowUps})` },
   ];
 
   return (
     <div className="p-4 sm:p-6 space-y-4">
       <PageHeader
         title="Onboarding"
-        subtitle="Employees fill in their own details; you review and approve them. Only approved employees are paid."
+        subtitle="Employees fill in their own details; you approve them once the essentials are in, and only approved employees are paid. Documents, referees and policies can follow later."
         actions={
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" icon={<FileSignature className="h-4 w-4" />} onClick={() => navigate('/offers')}>Offers</Button>
             <Button variant="secondary" icon={<ListChecks className="h-4 w-4" />} onClick={() => setSettingAfterHiring(true)}>After hiring</Button>
             <Button variant="secondary" icon={<ScrollText className="h-4 w-4" />} onClick={() => setSettingPolicies(true)}>Policies</Button>
             <Button variant="secondary" icon={<FileCheck2 className="h-4 w-4" />} onClick={() => setSettingDocuments(true)}>Required documents</Button>
+            <Button variant="secondary" icon={<SlidersHorizontal className="h-4 w-4" />} onClick={() => setSettingEssentials(true)}>Essentials</Button>
           </div>
         }
       />
@@ -281,15 +293,15 @@ export default function OnboardingReview() {
                   {r.payroll_number} · {r.job_title || 'No position yet'}
                   {r.work_email ? ` · ${r.work_email}` : ''}
                 </p>
-                {(r.employee_part.length > 0 || r.employer_part.length > 0) && r.status !== 'approved' && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {r.employee_part.length > 0 && `Employee: ${r.employee_part.length} missing`}
-                    {r.employee_part.length > 0 && r.employer_part.length > 0 && ' · '}
-                    {r.employer_part.length > 0 && `HR: ${r.employer_part.join(', ')}`}
-                  </p>
+                {r.essentials_missing.length > 0 && r.status !== 'approved' && (
+                  <p className="text-xs text-muted-foreground mt-1">Needed to approve: {r.essentials_missing.join(', ')}</p>
                 )}
-                {r.documents_outstanding.length > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">Documents outstanding: {r.documents_outstanding.length}</p>
+                {r.followups.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1" title={r.followups.join(', ')}>
+                    Still to provide: {r.followups.length}
+                    {r.followups_overdue > 0 && <span className="text-status-danger"> ({r.followups_overdue} overdue)</span>}
+                    {' · '}{r.followups.slice(0, 3).join(', ')}{r.followups.length > 3 ? ', …' : ''}
+                  </p>
                 )}
                 {afterHiring.has(r.id) && (
                   <p className="text-xs text-muted-foreground mt-1">
@@ -319,6 +331,7 @@ export default function OnboardingReview() {
 
       {reviewing && <ReviewPanel row={reviewing} onClose={() => setReviewing(null)} onChanged={load} />}
       {settingDocuments && <RequiredDocumentsModal onClose={() => { setSettingDocuments(false); load(); }} />}
+      {settingEssentials && <OnboardingEssentialsModal onClose={() => { setSettingEssentials(false); load(); }} />}
       {settingAfterHiring && <AfterHiringSetupModal onClose={() => { setSettingAfterHiring(false); load(); }} />}
       {settingPolicies && <PoliciesModal onClose={() => { setSettingPolicies(false); load(); }} />}
     </div>

@@ -60,6 +60,7 @@ const HR_PAGES: Record<string, string> = {
   application_received: '/recruitment',
   loan_requested: '/loans',
   contribution_requested: '/payroll?tab=deductions',
+  onboarding_followups_overdue: '/onboarding',
   contract_expiring: '/hr-lifecycle',
   probation_expiring: '/hr-lifecycle',
   contract_signed: '/hr-lifecycle',
