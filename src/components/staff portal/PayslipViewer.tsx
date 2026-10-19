@@ -20,8 +20,8 @@ import {
 import toast from 'react-hot-toast';
 import { payslipDeductionLines } from '../../lib/voluntaryDeductions';
 import { nonTaxableEarningsOf, payslipEarningLines } from '../../lib/earnings';
-import { leaveLineLabel, leaveLineWorking, payslipLeaveLines, type LeaveItem } from '../../lib/leavePay';
-import { overtimeLineLabel, overtimeLineWorking, payslipOvertimeLines, payslipOvertimePay, type OvertimeItem } from '../../lib/overtimePay';
+import { leaveLineLabel, payslipLeaveLines, type LeaveItem } from '../../lib/leavePay';
+import { overtimeLineLabel, payslipOvertimeLines, payslipOvertimePay, type OvertimeItem } from '../../lib/overtimePay';
 import html2pdf from 'html2pdf.js';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -32,10 +32,8 @@ import { loadMyP9 } from '../../lib/p9';
 import { loadCompanyIdentity, type CompanyIdentity } from '../../lib/companyProfile';
 import { useBackToClose } from '../../hooks/useBackToClose';
 import { currencyOf, currencySymbol } from '../../lib/payroll/currency';
-import { isUsdPayslip } from '../../lib/payroll/usdPay';
-import { CountryDeductionLines, CountryEmployerLines, hasCountryLines } from '../Payroll/CountryPayslipLines';
-import { PayslipSettlementBlock, WhtDeductionLine, WorkEarningLines, netPayLabel } from '../Payroll/PayslipSettlement';
-import LocalStatutorySection from '../Payroll/LocalStatutorySection';
+import { PayslipDocument } from '../Payroll/PayslipDocument';
+import { usePayslipExtras } from '../Payroll/usePayslipExtras';
 
 // HARDCODED STATUTORY SETTINGS - Updated to match payroll dashboard
 const statutorySettings = {
@@ -438,6 +436,43 @@ const GlowButton = ({
 };
 
 
+/** An older payroll record (before saved payslips) in the shape the shared payslip reads, with its worked-out figures. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- payroll_records rows are untyped
+const legacyPayslipRecord = (record: any, c: ReturnType<typeof calculatePayrollValues>, payPeriod: string | null) => ({
+  ...record,
+  employee_id: record["Employee ID"] || record.employee_id,
+  employee_name: record["Employee Name"] || record.employee_name,
+  position: record["Position"] || record.position,
+  branch: record["Branch"] || record.branch,
+  jobGroup: record["Job Group"] || record.jobGroup,
+  employeeNu: record["Phone Number"] || record.employeeNu,
+  bank_name: record["Bank Name"] || record.bank_name,
+  account_number: record["Account Number"] || record.account_number,
+  payment_method: paymentMethodLabel(record["Payment Method"] || record.payment_method),
+  pay_period: payPeriod,
+  basic_salary: c.basicSalary,
+  house_allowance: c.houseAllowance,
+  transport_allowance: c.transportAllowance,
+  medical_allowance: c.medicalAllowance,
+  other_allowances: c.otherAllowances,
+  overtime_pay: c.overtimePay,
+  commission: c.commission,
+  bonus: c.bonus,
+  per_diem: c.perDiem,
+  gross_pay: c.grossPay,
+  paye_tax: c.payeTax,
+  nhif_deduction: c.nhifDeduction,
+  nssf_deduction: c.nssfDeduction,
+  housing_levy: c.housingLevy,
+  tax_relief: c.taxRelief,
+  advance_deduction: c.advanceDeduction,
+  loan_deduction: c.loanDeduction,
+  welfare_deduction: c.welfareDeduction,
+  other_deductions: c.otherDeductions,
+  total_deductions: c.totalDeductions,
+  net_pay: c.netPay,
+});
+
 // PayslipModal Component (Updated with advance deduction)
 const PayslipModal = ({
   record,
@@ -451,6 +486,9 @@ const PayslipModal = ({
   // Extract pay period from record
   const payPeriod = record["Pay Period"] || record.pay_period || null;
   const calculated = calculatePayrollValues(record, overrideStatutoryChecks, salaryAdvances, payPeriod);
+  // the shared payslip (FIG-814): a saved payslip as it is; an older payroll record with the figures worked out above
+  const documentRecord = record.run_id !== undefined ? record : legacyPayslipRecord(record, calculated, payPeriod);
+  const extras = usePayslipExtras(documentRecord, companyInfo);
 
   const handleDownloadPDF = () => {
     const element = document.getElementById('payslip-content');
@@ -493,154 +531,7 @@ const PayslipModal = ({
         </div>
 
         <div className="p-2 bg-gray-50 payslip-container print:p-0 print:w-[210mm] print:h-[297mm]">
-          <div id="payslip-content" className="bg-white border text-black border-gray-300 text-xs leading-tight mx-auto" style={{ maxWidth: '800px', boxShadow: '0 4px 15px rgba(0, 0, 0, 0.05)', fontFamily: 'Calibri, Helvetica, sans-serif' }}>
-            <div className="bg-white text-black p-6 flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-end border-b-[3px] border-double border-gray-300">
-              <div className="flex items-center min-w-0">
-                {companyInfo?.image_url && (
-                  <img src={companyInfo.image_url} alt="Company Logo" className="h-16 w-16 mr-4 object-contain shrink-0" />
-                )}
-                <div className="min-w-0">
-                  <h1 className="text-xl sm:text-2xl font-bold uppercase text-gray-900 break-words">{companyInfo?.company_name || 'Your Company Name'}</h1>
-                  <div className="text-gray-600 text-sm font-semibold mt-1">{companyInfo?.company_tagline || 'Excellence in service'}</div>
-                </div>
-              </div>
-              <div className="sm:text-right">
-                <h2 className="text-2xl sm:text-3xl font-bold uppercase text-gray-900 mb-1">PAYSLIP</h2>
-                <div className="text-gray-600 font-semibold text-sm">
-                  {payPeriodLabel(payPeriod)}
-                </div>
-              </div>
-            </div>
-
-            <div className="p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-                <div className="border border-gray-300 p-4">
-                  <h3 className="font-bold border-b border-gray-300 pb-2 mb-3 text-gray-900 text-sm">Employee information</h3>
-                  <div className="space-y-1.5 text-black">
-                    <div className="flex justify-between"><span className="font-semibold text-gray-600">Full name:</span><span className="font-bold text-right">{record["Employee Name"] || record.employee_name || 'N/A'}</span></div>
-                    <div className="flex justify-between"><span className="font-semibold text-gray-600">Employee no:</span><span className="font-bold text-right">{record["Employee ID"] || record.employee_id || 'N/A'}</span></div>
-                    <div className="flex justify-between"><span className="font-semibold text-gray-600">Position:</span><span className="font-bold text-right">{record["Position"] || record.position || 'N/A'}</span></div>
-                    <div className="flex justify-between"><span className="font-semibold text-gray-600">Dept:</span><span className="font-bold text-right">Operations</span></div>
-                    <div className="flex justify-between"><span className="font-semibold text-gray-600">Region:</span><span className="font-bold text-right">{record["Branch"] || record.branch || 'N/A'}</span></div>
-                  </div>
-                </div>
-
-                <div className="border border-gray-300 p-4">
-                  <h3 className="font-bold border-b border-gray-300 pb-2 mb-3 text-gray-900 text-sm">Payment details</h3>
-                  <div className="space-y-1.5 text-black">
-                    <div className="flex justify-between"><span className="font-semibold text-gray-600">Method:</span><span className="font-bold text-right">{paymentMethodLabel(record["Payment Method"] || record.payment_method)}</span></div>
-                    {paymentMethodLabel(record["Payment Method"] || record.payment_method) === 'Bank Transfer' && (
-                      <>
-                        <div className="flex justify-between"><span className="font-semibold text-gray-600">Bank:</span><span className="font-bold text-right">{record["Bank Name"] || record.bank_name || 'N/A'}</span></div>
-                        <div className="flex justify-between"><span className="font-semibold text-gray-600">Account:</span><span className="font-bold text-right">{record["Account Number"] || record.account_number || 'N/A'}</span></div>
-                      </>
-                    )}
-                    {paymentMethodLabel(record["Payment Method"] || record.payment_method) === 'M-Pesa' && (
-                      <div className="flex justify-between"><span className="font-semibold text-gray-600">M-Pesa no:</span><span className="font-bold text-right">{record["Phone Number"] || record.employeeNu || 'N/A'}</span></div>
-                    )}
-                    <div className="flex justify-between"><span className="font-semibold text-gray-600">Job group:</span><span className="font-bold text-right">{record["Job Group"] || record.jobGroup || 'N/A'}</span></div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-                <div className="border border-gray-300">
-                  <div className="bg-gray-100 border-b border-gray-300 font-bold p-3 text-gray-900">Earnings</div>
-                  <div className="p-3 space-y-2 text-black">
-                    <div className="flex justify-between"><span>Basic</span><span className="font-semibold">{calculated.sym} {calculated.basicSalary.toLocaleString()}</span></div>
-                    {calculated.leaveLines.map((line, i) => (
-                      <div key={`leave-${line.name}-${i}`} className="flex justify-between gap-3"><span>{leaveLineLabel(line)}<span className="block text-gray-500 text-xs">{leaveLineWorking(line)}</span></span><span className="font-semibold text-red-700 whitespace-nowrap">−{calculated.sym} {line.amount.toLocaleString()}</span></div>
-                    ))}
-                    <div className="flex justify-between"><span>House</span><span className="font-semibold">{calculated.sym} {calculated.houseAllowance.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Transport</span><span className="font-semibold">{calculated.sym} {calculated.transportAllowance.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Medical</span><span className="font-semibold">{calculated.sym} {calculated.medicalAllowance.toLocaleString()}</span></div>
-                    <div className="flex justify-between"><span>Other</span><span className="font-semibold">{calculated.sym} {calculated.otherAllowances.toLocaleString()}</span></div>
-                    {calculated.overtimeLines.length > 0 ? (
-                      calculated.overtimeLines.map((line, i) => (
-                        <div key={`overtime-${line.day_type}-${i}`} className="flex justify-between gap-3"><span>{overtimeLineLabel(line)}<span className="block text-gray-500 text-xs">{overtimeLineWorking(line)}</span></span><span className="font-semibold whitespace-nowrap">{calculated.sym} {line.amount.toLocaleString()}</span></div>
-                      ))
-                    ) : (
-                      <div className="flex justify-between"><span>Overtime</span><span className="font-semibold">{calculated.sym} {calculated.overtimePay.toLocaleString()}</span></div>
-                    )}
-                    {calculated.earningLines.map((line, i) => (
-                      <div key={`${line.name}-${i}`} className="flex justify-between"><span>{line.name}{line.taxable ? '' : ' (not taxed)'}</span><span className="font-semibold">{calculated.sym} {line.amount.toLocaleString()}</span></div>
-                    ))}
-                    {/* the month's piece rate work and contract jobs (FIG-812) */}
-                    <WorkEarningLines record={record} />
-                    {!hasCountryLines(record) && <div className="flex justify-between bg-gray-50 p-1 border border-gray-200 mt-2"><span>Per diem</span><span className="font-bold">{calculated.sym} {calculated.perDiem.toLocaleString()}</span></div>}
-                  </div>
-                </div>
-
-                <div className="border border-gray-300">
-                  <div className="bg-gray-100 border-b border-gray-300 font-bold p-3 text-gray-900">Deductions</div>
-                  <div className="p-3 space-y-2 text-black">
-                    {hasCountryLines(record) ? (
-                      <CountryDeductionLines record={record} sym={calculated.sym} />
-                    ) : (
-                      <>
-                        <div className="flex justify-between"><span>PAYE</span><span className="font-semibold">{calculated.sym} {Math.round(calculated.payeTax).toLocaleString()}</span></div>
-                        <div className="flex justify-between"><span>SHIF</span><span className="font-semibold">{calculated.sym} {calculated.nhifDeduction.toLocaleString()}</span></div>
-                        <div className="flex justify-between"><span>NSSF</span><span className="font-semibold">{calculated.sym} {calculated.nssfDeduction.toLocaleString()}</span></div>
-                        <div className="flex justify-between"><span>AHL</span><span className="font-semibold">{calculated.sym} {calculated.housingLevy.toLocaleString()}</span></div>
-                        <WhtDeductionLine record={record} />
-                      </>
-                    )}
-                    <div className="flex justify-between"><span>Advance</span><span className="font-semibold">{calculated.sym} {calculated.advanceDeduction.toLocaleString()}</span></div>
-                    {calculated.deductionLines.map((line, i) => (
-                      <div key={`${line.name}-${i}`} className="flex justify-between"><span>{line.name}</span><span className="font-semibold">{calculated.sym} {line.amount.toLocaleString()}</span></div>
-                    ))}
-                    {hasCountryLines(record) ? (
-                      <CountryEmployerLines record={record} sym={calculated.sym} />
-                    ) : (
-                      <div className="flex justify-between text-gray-600 mt-2 border-t border-gray-200 pt-1"><span>Tax relief:</span><span className="font-semibold">{calculated.sym} {isUsdPayslip(record) ? (-(Number(record.tax_relief) || 0)).toLocaleString() : '-2400'}</span></div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <PayslipSettlementBlock record={record} />
-              {/* paid in USD (FIG-906): the statutory figures in the local currency */}
-              <LocalStatutorySection record={record} />
-
-              <div className="border border-gray-300 p-4 mb-8 bg-gray-50">
-                <div className="flex justify-between border-b border-gray-300 pb-2 mb-2 text-sm text-black">
-                  <span className="font-bold">Gross pay</span>
-                  <span className="font-bold">{calculated.sym} {calculated.grossPay.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between border-b border-gray-300 pb-2 mb-3 text-sm text-black">
-                  <span className="font-bold">Total deductions</span>
-                  <span className="font-bold">{calculated.sym} {calculated.totalDeductions.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center text-lg text-black mt-2">
-                  <span className="font-bold">{netPayLabel(record)}</span>
-                  <span className="font-bold border-b-[3px] border-gray-400 border-double pb-0.5">{calculated.sym} {Math.round(calculated.netPay).toLocaleString()}</span>
-                </div>
-              </div>
-
-              {/* a note payroll added when editing the payslip (FIG-883) */}
-              {record.payslip_note && (
-                <div className="border border-gray-300 p-3 mb-6 text-black">
-                  <span className="font-bold">Note: </span>
-                  <span className="whitespace-pre-line">{record.payslip_note}</span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-4 text-center text-xs">
-                <div className="p-2 pt-8">
-                  <div className="border-t border-gray-300 pt-2 font-bold text-gray-800">Employee signature</div>
-                  <div className="text-gray-500 mt-1">Date: ________________________</div>
-                </div>
-                <div className="p-2 pt-8">
-                  <div className="border-t border-gray-300 pt-2 font-bold text-gray-800">Authorized signatory</div>
-                  <div className="text-gray-500 mt-1">Date: ________________________</div>
-                </div>
-              </div>
-
-              <div className="text-center text-gray-500 text-xs border-t border-gray-300 pt-4 mt-6">
-                Generated on {new Date().toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })} {new Date().toLocaleTimeString()} &bull; {companyInfo?.company_name || 'Company'} &bull; Strictly confidential
-              </div>
-            </div>
-          </div>
+          <PayslipDocument record={documentRecord} companyInfo={companyInfo} extras={extras} id="payslip-content" />
         </div>
 
         {(onPrevious || onNext) && (

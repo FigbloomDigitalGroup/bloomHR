@@ -14,6 +14,7 @@ import {
   whtFile,
 } from '../../payrollExports';
 import type { EmployeeRecord } from '../../profileCompleteness';
+import { taxWorkingOf } from '../taxDetails';
 import type { CountryPayrollEngine, EmployeeProblem, PayslipLine, PayslipRecord, PayslipResult, ReturnFile } from './types';
 
 // Kenya's payroll (FIG-905 stage 2): the calculation the payroll page always used (lib/payslipCalc, unchanged: PAYE,
@@ -35,6 +36,8 @@ export function kenyaPayslipResult(record: PayslipRecord, rates: Rates): Payslip
   const grossPay = num(record.gross_pay);
   // the employer's share, from the employee's at the employer rate (both are on the same pay)
   const employerShare = (employee: number, employeeRateCode: string, employerRateCode: string) => {
+    // without the month's rates (a saved payslip on its own): the employer matches the employee's share, as the law sets both
+    if (rates[employeeRateCode] === undefined || rates[employeeRateCode] === null) return employee;
     const r = num(rates[employeeRateCode]);
     const er = rates[employerRateCode] === undefined ? r : num(rates[employerRateCode]);
     return r > 0 ? round2((employee * er) / r) : 0;
@@ -72,9 +75,11 @@ export function kenyaPayslipResult(record: PayslipRecord, rates: Rates): Payslip
       { label: 'NITA levy', amount: num(record.nita_levy) },
     ]),
     grossPay,
-    taxablePay: round2(Math.max(0, grossPay - num(record.per_diem))),
+    // what PAYE was worked out on, as the engine saved it; payslips saved before then: gross less the per diem
+    taxablePay: record.taxable_pay === null || record.taxable_pay === undefined ? round2(Math.max(0, grossPay - num(record.per_diem))) : num(record.taxable_pay),
     tax: contractor ? num(record.wht_tax) : num(record.paye_tax),
     netPay: num(record.net_pay),
+    working: taxWorkingOf(record, 'Kenya'),
   };
 }
 

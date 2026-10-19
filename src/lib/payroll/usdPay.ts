@@ -6,6 +6,7 @@ import { paymentKind } from '../paymentMethods';
 import { currencyFor } from '../branches';
 import type { CountryPayrollEngine, PayslipRecord } from './countries/types';
 import { currencyOf } from './currency';
+import { taxDetailsInUsd } from './taxDetails';
 
 // Paying a country in US dollars at the rate the company enters each month (FIG-906). "Don't complicate it with FX":
 // nothing is fetched. Each company picks a pay currency per country, the local one (the default) or USD
@@ -171,6 +172,8 @@ export function recordInUsd(local: PayslipRecord, rate: number, localCurrency: s
   out.deduction_items = itemsDiv(local.deduction_items, rate, ['amount']);
   out.leave_items = itemsDiv(local.leave_items, rate, ['amount', 'daily_rate']);
   out.overtime_items = itemsDiv(local.overtime_items, rate, ['amount', 'hourly_rate']);
+  // the working of taxable pay and tax (FIG-814), in USD like the rest of the payslip
+  if (local.tax_details) out.tax_details = taxDetailsInUsd(local.tax_details, rate);
   out.total_deductions = cents(DEDUCTION_FIELDS.reduce((s, f) => s + num(out[f]), 0));
   out.net_pay = cents(num(out.gross_pay) - num(out.total_deductions));
   out.currency = USD;

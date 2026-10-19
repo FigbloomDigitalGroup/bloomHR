@@ -9,6 +9,7 @@ import { isContractor } from '../../workSettlement';
 import { type ExportFile, isContractorSlip } from '../../payrollExports';
 import type { EmployeeRecord } from '../../profileCompleteness';
 import { isValidSocialSecurityNumber, isValidTaxNumber, normaliseNssfNumber, normaliseTaxNumber } from '../../onboardingValidation';
+import { tanzaniaTaxDetails, taxWorkingOf } from '../taxDetails';
 import type { CountryPayrollEngine, EmployeeProblem, PayslipLine, PayslipRecord, PayslipResult, ReturnFile } from './types';
 
 // Tanzania (mainland) payroll (FIG-905 stage 3). Everyone in a Tanzania branch is worked out here, in TZS, with
@@ -139,12 +140,14 @@ export function tanzaniaStatutory(i: TanzaniaStatutoryInput, rates: Rates): Tanz
 }
 
 /** The payslip columns Tanzania's figures are saved in (salary_history). */
-const tzFields = (s: TanzaniaStatutory, resident: boolean) => ({
+const tzFields = (s: TanzaniaStatutory, resident: boolean, i: TanzaniaStatutoryInput, rates: Rates) => ({
   employer_nssf: s.nssfEmployer,
   sdl_levy: s.sdl,
   wcf_levy: s.wcf,
   taxable_pay: s.taxablePay,
   tax_resident: resident,
+  // how taxable pay and PAYE were worked out, for the payslip (FIG-814)
+  tax_details: tanzaniaTaxDetails({ grossPay: i.grossPay, taxablePay: i.taxablePay, resident, contractor: i.contractor }, s, rates),
 });
 
 /** Tanzania's rules for the shared payslip calculation. */
@@ -153,22 +156,20 @@ export const TANZANIA_RULES: PayslipRules = {
     const resident = isTaxResident(employee);
     // salary and allowances are taxed and pensionable; each earning as its type says (lib/earnings)
     const pay = statutoryPayWith(grossPay - earnings.total, earnings.items);
-    const s = tanzaniaStatutory(
-      {
-        taxablePay: pay.cashPay,
-        pensionablePay: pay.pensionablePay,
-        grossPay,
-        // basic and fixed allowances (and piece rate work): not overtime or the month's one-off earnings
-        wcfPay: grossPay - pos(overtimePay) - earnings.total,
-        basicPay: basicEarned,
-        resident,
-        secondary: isSecondaryEmployment(employee),
-        heslb: isHeslbBorrower(employee),
-        sdl: sdlApplies(ctx.countryHeadcount, rates),
-        contractor,
-      },
-      rates
-    );
+    const input: TanzaniaStatutoryInput = {
+      taxablePay: pay.cashPay,
+      pensionablePay: pay.pensionablePay,
+      grossPay,
+      // basic and fixed allowances (and piece rate work): not overtime or the month's one-off earnings
+      wcfPay: grossPay - pos(overtimePay) - earnings.total,
+      basicPay: basicEarned,
+      resident,
+      secondary: isSecondaryEmployment(employee),
+      heslb: isHeslbBorrower(employee),
+      sdl: sdlApplies(ctx.countryHeadcount, rates),
+      contractor,
+    };
+    const s = tanzaniaStatutory(input, rates);
     return {
       paye: s.paye,
       nssf: s.nssf,
@@ -178,7 +179,7 @@ export const TANZANIA_RULES: PayslipRules = {
       whtRate: s.whtRate,
       taxRelief: 0,
       otherStatutory: { heslb_deduction: s.heslb },
-      fields: tzFields(s, resident),
+      fields: tzFields(s, resident, input, rates),
       perDiem: 0,
       // Kenya's Employment Act two-thirds cap is not Tanzania's law (ELRA s.28 has its own rules, see the migration)
       cap: false,
@@ -202,22 +203,20 @@ export function tanzaniaEditContext(employee: Employee | undefined, rates: Rates
     country: ({ record, grossPay, basicEarned, items }) => {
       const earningsTotal = items.reduce((t, i) => t + num(i.amount), 0);
       const pay = statutoryPayWith(grossPay - earningsTotal, items);
-      const s = tanzaniaStatutory(
-        {
-          taxablePay: pay.cashPay,
-          pensionablePay: pay.pensionablePay,
-          grossPay,
-          wcfPay: grossPay - num(record.overtime_pay) - earningsTotal,
-          basicPay: basicEarned,
-          resident,
-          secondary: isSecondaryEmployment(e),
-          heslb: isHeslbBorrower(e),
-          sdl: headcount === undefined ? num(record.sdl_levy) > 0 : sdlApplies(headcount, r),
-          contractor: isContractor(e),
-        },
-        r
-      );
-      return { paye: s.paye, nssf: s.nssf, wht: s.wht, whtRate: s.whtRate, otherStatutory: { heslb_deduction: s.heslb }, fields: tzFields(s, resident) };
+      const input: TanzaniaStatutoryInput = {
+        taxablePay: pay.cashPay,
+        pensionablePay: pay.pensionablePay,
+        grossPay,
+        wcfPay: grossPay - num(record.overtime_pay) - earningsTotal,
+        basicPay: basicEarned,
+        resident,
+        secondary: isSecondaryEmployment(e),
+        heslb: isHeslbBorrower(e),
+        sdl: headcount === undefined ? num(record.sdl_levy) > 0 : sdlApplies(headcount, r),
+        contractor: isContractor(e),
+      };
+      const s = tanzaniaStatutory(input, r);
+      return { paye: s.paye, nssf: s.nssf, wht: s.wht, whtRate: s.whtRate, otherStatutory: { heslb_deduction: s.heslb }, fields: tzFields(s, resident, input, r) };
     },
   };
 }
@@ -249,6 +248,7 @@ export function tanzaniaPayslipResult(record: PayslipRecord): PayslipResult {
     taxablePay: num(record.taxable_pay),
     tax: contractor ? num(record.wht_tax) : num(record.paye_tax),
     netPay: num(record.net_pay),
+    working: taxWorkingOf(record, TANZANIA),
   };
 }
 

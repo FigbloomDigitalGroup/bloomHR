@@ -2,6 +2,7 @@ import type { PayslipContext } from '../../payslipCalc';
 import type { Rates } from '../../statutoryCalc';
 import type { EmployeeRecord } from '../../profileCompleteness';
 import type { ExportFile } from '../../payrollExports';
+import type { TaxWorking } from '../taxDetails';
 
 // The country engine interface (FIG-905 stage 2). One payroll run pays everyone, but each employee is worked out by
 // their branch's country's engine, in that country's currency, and each country files its own returns. Kenya is the
@@ -38,6 +39,8 @@ export interface PayslipResult {
   taxablePay: number;
   tax: number;
   netPay: number;
+  /** how taxable pay and tax were worked out: pay not taxed, benefits, deductions before tax, reliefs (FIG-814); null for a contractor */
+  working: TaxWorking | null;
 }
 
 /** A statutory or payment file for one country's payslips (P10, NSSF, SHA...). */

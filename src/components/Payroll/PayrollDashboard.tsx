@@ -165,6 +165,8 @@ const toSalaryHistory = (record: any): SalaryHistoryRecord => ({
   // the pay PAYE was worked out on (Tanzania's taxable pay, Uganda's chargeable income) and the residency it was taxed on
   taxable_pay: record.taxable_pay ?? null,
   tax_resident: record.tax_resident ?? null,
+  // how taxable pay and PAYE were worked out, for the payslip (FIG-814)
+  tax_details: record.tax_details ?? null,
   payment_method: record.payment_method || "",
   bank_name: record.bank_name || "",
   account_number: record.account_number || "",
@@ -195,6 +197,7 @@ const fromSalaryHistory = (saved: any, live: any | undefined) => ({
   local_amounts: saved.local_amounts ?? null,
   taxable_pay: saved.taxable_pay ?? null,
   tax_resident: saved.tax_resident ?? null,
+  tax_details: saved.tax_details ?? null,
   payment_method: paymentMethodLabel(saved.payment_method),
   bank_name: saved.bank_name || "",
   account_number: saved.account_number || "",
@@ -2104,6 +2107,12 @@ export default function PayrollDashboard() {
           <DeductionCapSetting canEdit={canEditRates} onChanged={() => setDeductionsVersion((v) => v + 1)} />
           <MinimumWageCard canEdit={canEditRates} />
           <PayslipEmailSetting canEdit={canEditRates} />
+          {/* how payslips look (FIG-814), for people with Payslip design */}
+          {!permissionsLoading && hasPermission("payslip-design") && (
+            <button type="button" className="text-xs font-semibold text-brand underline" onClick={() => navigate("/settings/payslip-design")}>
+              Payslip design: letterhead, contacts, footer and sections
+            </button>
+          )}
         </div>
       )}
 

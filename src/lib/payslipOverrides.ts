@@ -3,6 +3,7 @@ import { statutoryPayWith, summariseEarnings, type EarningItem } from './earning
 import { basicAfterLeave } from './leavePay';
 import type { DeductionItem } from './voluntaryDeductions';
 import { payslipOvertimePay } from './overtimePay';
+import { kenyaTaxDetails } from './payroll/taxDetails';
 import { arrearsNote, isContractor, isContractorPayslip, isSettlementPayslip, settleMonth, whtOn, whtRateFor } from './workSettlement';
 
 /**
@@ -296,13 +297,16 @@ export function applyPayslipOverride<T extends Payslip>(record: T, override: Pay
     nssf_deduction: statutory.nssf,
     housing_levy: statutory.ahl,
     tax_relief: statutory.personalRelief,
+    // the working the payslip shows (FIG-814), on the edited pay
+    taxable_pay: statutory.taxablePay,
+    tax_details: kenyaTaxDetails(statutory, ctx.rates, { perDiem, nonTaxable: earnings.nonTaxable, benefits: ctx.inputs.benefits }, false),
     deduction_items: [...deductionItemsOf(record), ...oneOffDeductions],
     other_deductions: otherDeductions,
     total_deductions: totalDeductions,
     net_pay: settlement ? settlement.netPay : round2(grossPay - totalDeductions),
     payslip_note: o.note ?? null,
   });
-  if (ctx.wht) Object.assign(next, { wht_rate: ctx.wht.rate, wht_tax: whtTax, tax_relief: 0 });
+  if (ctx.wht) Object.assign(next, { wht_rate: ctx.wht.rate, wht_tax: whtTax, tax_relief: 0, taxable_pay: null, tax_details: null });
   if (settlement) Object.assign(next, { arrears_carried_forward: settlement.carriedForward, arrears_note: arrearsNote(settlement) });
   return next as EditablePayslip<T>;
 }
@@ -364,13 +368,21 @@ export const EDITED_COLUMNS = [
   'overtime_rate', 'commission', 'bonus', 'per_diem', 'gross_pay', 'paye_tax', 'nhif_deduction', 'nssf_deduction',
   'housing_levy', 'tax_relief', 'other_deductions', 'total_deductions', 'net_pay', 'earning_items', 'deduction_items',
   'payslip_note', 'wht_tax', 'arrears_carried_forward', 'arrears_note',
+  // the pay PAYE was worked out on and how (FIG-814)
+  'taxable_pay', 'tax_details',
 ] as const;
 
 export const editedColumnsOf = (record: Payslip) =>
   Object.fromEntries(
     EDITED_COLUMNS.map((k) => [
       k,
-      k === 'earning_items' || k === 'deduction_items' ? (Array.isArray(record[k]) ? record[k] : []) : k === 'payslip_note' || k === 'arrears_note' ? (record[k] || null) : num(record[k]),
+      k === 'earning_items' || k === 'deduction_items'
+        ? (Array.isArray(record[k]) ? record[k] : [])
+        : k === 'payslip_note' || k === 'arrears_note' || k === 'tax_details'
+          ? (record[k] || null)
+          : k === 'taxable_pay'
+            ? (record[k] === null || record[k] === undefined ? null : num(record[k]))
+            : num(record[k]),
     ]),
   );
 

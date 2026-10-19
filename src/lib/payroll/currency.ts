@@ -15,9 +15,12 @@ export const currencySymbol = (currency: string | null | undefined): string => {
   return SYMBOLS[c] ?? c;
 };
 
-/** "KSh 12,345.5", the way payslips always showed amounts (the number as it is, with thousands separators). */
-export const money = (amount: number | null | undefined, currency?: string | null): string =>
-  `${currencySymbol(currency)} ${(Number(amount) || 0).toLocaleString()}`;
+/** "KSh 12,345" for a whole amount, "KSh 12,345.50" otherwise (always two decimals when there are cents). */
+export const money = (amount: number | null | undefined, currency?: string | null): string => {
+  const n = Math.round((Number(amount) || 0) * 100) / 100;
+  const digits = Number.isInteger(n) ? 0 : 2;
+  return `${currencySymbol(currency)} ${n.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: 2 })}`;
+};
 
 /** "KSh 12,346": rounded to a whole amount. */
 export const moneyRounded = (amount: number | null | undefined, currency?: string | null): string =>

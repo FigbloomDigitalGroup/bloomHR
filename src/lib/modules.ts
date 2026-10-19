@@ -17,6 +17,7 @@
 //   employee-edit    HR, MANAGER, REGIONAL the Add employee and Edit buttons (were: ADMIN, HR, MANAGER, REGIONAL by name)
 //   hr-admin         HR                    HR's extra powers on employee and leave screens (were: ADMIN or HR by name)
 //   hr-lifecycle     (administrators)      was already checked by the database but missing from the catalogue
+// payslip-design (20261021600000_payslip_details.sql) was given once to administrators and every role holding payroll.
 // (custom roles based on those roles got them too). Administrators always have every module.
 
 export type ModuleArea = 'overview' | 'workspace' | 'people' | 'time' | 'performance' | 'pay' | 'system';
@@ -75,6 +76,7 @@ export const MODULES: ModuleInfo[] = [
   { id: 'kpi-admin', name: 'Manage KPIs', area: 'performance', explain: 'Set up KPIs, templates, job titles and review periods for everyone' },
   // pay and money
   { id: 'payroll', name: 'Payroll', area: 'pay', explain: 'Run, approve and pay payroll, and see everyone’s pay' },
+  { id: 'payslip-design', name: 'Payslip design', area: 'pay', explain: 'Design the payslip: letterhead, contacts, footer, sections' },
   { id: 'work-records', name: 'Work & Piece Rate', area: 'pay', explain: 'Set up kinds of work and rates, record and approve work, casual days and overtime' },
   { id: 'casual-overtime', name: 'Casual workers & overtime', area: 'pay', explain: 'Open the Casual workers and Overtime screens' },
   { id: 'salaryadmin', name: 'Salary Advance', area: 'pay', explain: 'Review and approve salary advance requests' },

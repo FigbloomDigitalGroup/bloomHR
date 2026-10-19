@@ -12,6 +12,7 @@ import { NO_WORK, isContractor, settlementFields, whtRateFor, workMonthOf, type 
 import type { ExportFile } from '../../payrollExports';
 import { isValidSocialSecurityNumber, isValidTaxNumber } from '../../onboardingValidation';
 import type { EmployeeRecord } from '../../profileCompleteness';
+import { taxWorkingOf, ugandaTaxDetails } from '../taxDetails';
 import type { CountryPayrollEngine, EmployeeProblem, PayslipLine, PayslipRecord, PayslipResult, ReturnFile } from './types';
 
 // Uganda's payroll (FIG-905 stage 4). Every figure comes from the month's dated statutory_rates for Uganda
@@ -259,6 +260,8 @@ export function calculateUgandaPayslip(employee: Record<string, any>, ctx: Paysl
     employer_nssf: s.employerNssf,
     // Uganda's chargeable income, in the column every country keeps the pay PAYE is worked out on
     taxable_pay: s.chargeableIncome,
+    // how chargeable income and PAYE were worked out, for the payslip (FIG-814)
+    tax_details: ugandaTaxDetails({ nonTaxable: earnings.nonTaxable, lst: lst.amount, contractor }, s, rates),
     tax_resident: contractor ? null : isTaxResident(employee),
     loan_deduction: loanDeduction,
     advance_deduction: advanceDeduction,
@@ -292,7 +295,10 @@ export function recalculateUgandaPayslip(record: PayslipRecord, rates: Rates, em
     { grossPay: num(record.gross_pay), nonTaxable, lst, resident: isTaxResident(employee), contractor, whtRate: num(record.wht_rate) },
     rates
   );
-  return { ...record, paye_tax: s.paye, nssf_deduction: s.nssf, employer_nssf: s.employerNssf, taxable_pay: s.chargeableIncome, wht_tax: contractor ? s.wht : 0 };
+  return {
+    ...record, paye_tax: s.paye, nssf_deduction: s.nssf, employer_nssf: s.employerNssf, taxable_pay: s.chargeableIncome, wht_tax: contractor ? s.wht : 0,
+    tax_details: ugandaTaxDetails({ nonTaxable, lst, contractor }, s, rates),
+  };
 }
 
 /** Uganda's payslip figures, labelled. */
@@ -329,6 +335,7 @@ export function ugandaPayslipResult(record: PayslipRecord): PayslipResult {
     taxablePay: record.taxable_pay === undefined || record.taxable_pay === null ? grossPay : num(record.taxable_pay),
     tax: contractor ? num(record.wht_tax) : num(record.paye_tax),
     netPay: num(record.net_pay),
+    working: taxWorkingOf(record, 'Uganda'),
   };
 }
 

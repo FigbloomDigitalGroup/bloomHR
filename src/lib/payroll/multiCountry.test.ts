@@ -78,7 +78,7 @@ describe('totals per currency', () => {
   });
 
   it('formats each currency', () => {
-    expect(money(1234.5, 'KES')).toBe('KSh 1,234.5');
+    expect(money(1234.5, 'KES')).toBe('KSh 1,234.50');
     expect(moneyRounded(1234.5, 'TZS')).toBe('TSh 1,235');
     expect(moneyRounded(10, 'UGX')).toBe('USh 10');
     expect(moneyShort(3100000, 'KES')).toBe('KSh 3.1M');
