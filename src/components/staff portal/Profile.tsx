@@ -9,8 +9,15 @@ import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import MyTwoStepCard from '../Settings/MyTwoStep';
 import MyContributions from './MyContributions';
+import { LeavingTheCompany, ResignationStatusCard } from './ResignationCards';
+import { useMyOpenResignation } from './useMyOpenResignation';
 
-const Profile = () => {
+interface ProfileProps {
+  /** opens the Resignation section (it is no longer in the menu; resigning starts here) */
+  onOpenResignation?: () => void;
+}
+
+const Profile = ({ onOpenResignation }: ProfileProps) => {
   const [employeeData, setEmployeeData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -18,6 +25,8 @@ const Profile = () => {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  // a resignation under way shows at the top; otherwise resigning starts at the bottom
+  const openResignation = useMyOpenResignation();
 
   // Fetch employee data
   useEffect(() => {
@@ -148,6 +157,8 @@ const Profile = () => {
 
   return (
     <div className="p-6">
+      {openResignation && onOpenResignation && <ResignationStatusCard exit={openResignation} onView={onOpenResignation} />}
+
       {/* Profile Image Section */}
       <div className="bg-white rounded-lg p-6 border border-gray-200 mb-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -479,6 +490,9 @@ const Profile = () => {
 
       {/* your own sign-in code (FIG-891) */}
       <MyTwoStepCard className="mt-6" />
+
+      {/* resigning lives here, behind a confirmation, rather than in the menu */}
+      {!openResignation && onOpenResignation && <LeavingTheCompany onStart={onOpenResignation} />}
     </div>
   );
 };

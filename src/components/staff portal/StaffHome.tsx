@@ -7,6 +7,8 @@ import toast from 'react-hot-toast';
 import StatusPill from '../UI/StatusPill';
 import EmptyState from '../UI/EmptyState';
 import CompleteProfileCard from './CompleteProfileCard';
+import { ResignationHomeLine } from './ResignationCards';
+import { useMyOpenResignation } from './useMyOpenResignation';
 import { StatusIcon } from '../Tasks/TaskBits';
 import { BirthdayWishes, type Me } from '../Celebrations/BirthdayWishes';
 import { supabase } from '../../lib/supabase';
@@ -47,6 +49,8 @@ export default function StaffHome({ setActiveTab, userName, onOpenTask, showMyWo
   const [birthdays, setBirthdays] = useState<UpcomingItem[]>([]);
   const [weekLoading, setWeekLoading] = useState(true);
   const [me, setMe] = useState<Me | null>(null);
+  // a resignation under way stays in sight (resigning itself is in Profile, not the menu)
+  const openResignation = useMyOpenResignation();
 
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +107,8 @@ export default function StaffHome({ setActiveTab, userName, onOpenTask, showMyWo
       <Greeting userName={userName} onProfile={() => setActiveTab('details')} />
 
       <CompleteProfileCard onOpen={() => setActiveTab('onboarding')} />
+
+      {openResignation && <ResignationHomeLine exit={openResignation} onView={() => setActiveTab('resignation')} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 items-start">
         <MyTasks
