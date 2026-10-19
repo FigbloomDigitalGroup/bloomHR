@@ -5,6 +5,7 @@ import LeaveYearSetting from './LeaveYearSetting';
 import LeaveForfeitReport from './LeaveForfeitReport';
 import { loadLeaveYearSettings } from '../../lib/leaveYearDb';
 import { BALANCE_RULE_LABELS, BalanceRule, CountDays, describeFree, useLeaveCheck } from '../../lib/leaveRules';
+import { BalanceSortKey, SortDirection, filterBalances, sortBalances } from '../../lib/leaveBalancesView';
 import { LEAVE_DOCUMENTS_BUCKET, LeaveDocumentRule, uploadLeaveDocument } from '../../lib/leaveDocuments';
 import LeaveDocuments from './LeaveDocuments';
 import EmployeePicker from '../UI/EmployeePicker';
@@ -36,7 +37,10 @@ import {
   ThumbsDown,
   RefreshCw,
   Loader2,
-  Search as SearchIcon
+  Search as SearchIcon,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@supabase/supabase-js';
@@ -1595,6 +1599,10 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
   const [applicationsPerPage, setApplicationsPerPage] = useState(10);
   const [balancesPage, setBalancesPage] = useState(1);
   const [balancesPerPage, setBalancesPerPage] = useState(10);
+  // Leave Balances: A-Z by employee unless a column is chosen, with a search and a leave type filter
+  const [balanceSort, setBalanceSort] = useState<{ key: BalanceSortKey; direction: SortDirection }>({ key: 'employee', direction: 'asc' });
+  const [balanceSearch, setBalanceSearch] = useState('');
+  const [balanceTypeFilter, setBalanceTypeFilter] = useState('');
   const [typesPage, setTypesPage] = useState(1);
   const [typesPerPage, setTypesPerPage] = useState(10);
   const [holidaysPage, setHolidaysPage] = useState(1);
@@ -1731,11 +1739,26 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
 
   // leave is counted from when people joined (FIG-878): who has no date the database can read
   const withoutStartDate = useMemo(() => employees.filter((e) => !employeeJoined(e as Record<string, unknown>)), [employees]);
-  const paginatedBalances = leaveBalances.slice(
+  const shownBalances = useMemo(
+    () => sortBalances(filterBalances(leaveBalances, balanceSearch, balanceTypeFilter), balanceSort.key, balanceSort.direction),
+    [leaveBalances, balanceSearch, balanceTypeFilter, balanceSort]
+  );
+  const balanceTypes = useMemo(
+    () => [...new Map(leaveBalances.map((b) => [b.leave_type_id, b.leave_type_name])).entries()].sort((a, b) => a[1].localeCompare(b[1])),
+    [leaveBalances]
+  );
+  const paginatedBalances = shownBalances.slice(
     (balancesPage - 1) * balancesPerPage,
     balancesPage * balancesPerPage
   );
-  const totalBalancePages = Math.ceil(leaveBalances.length / balancesPerPage);
+  const totalBalancePages = Math.ceil(shownBalances.length / balancesPerPage);
+  // a column clicked again turns round; day columns start with the most, the others with A
+  const sortBalancesBy = (key: BalanceSortKey) => {
+    setBalanceSort((prev) => prev.key === key
+      ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+      : { key, direction: key === 'earned' || key === 'used' || key === 'remaining' ? 'desc' : 'asc' });
+    setBalancesPage(1);
+  };
 
   const paginatedTypes = leaveTypes.slice(
     (typesPage - 1) * typesPerPage,
@@ -1750,15 +1773,8 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
   const totalHolidayPages = Math.ceil(holidays.length / holidaysPerPage);
 
   // Function to update balance accruals
-  const updateBalanceAccrual = (balanceIndex: number, field: 'monthly_accrual' | 'quarterly_accrual' | 'annual_accrual', value: number) => {
-    setLeaveBalances(prev => {
-      const updated = [...prev];
-      updated[balanceIndex] = {
-        ...updated[balanceIndex],
-        [field]: value
-      };
-      return updated;
-    });
+  const updateBalanceAccrual = (balanceId: string, field: 'monthly_accrual' | 'quarterly_accrual' | 'annual_accrual', value: number) => {
+    setLeaveBalances(prev => prev.map(b => b.id === balanceId ? { ...b, [field]: value } : b));
   };
 
   // Sets one employee's own yearly days for a leave type (the balance for this year follows straight away).
@@ -2731,6 +2747,22 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
   );
 
   // Leave Balances Tab Content
+  const sortableBalanceHeader = (key: BalanceSortKey, label: string) => {
+    const active = balanceSort.key === key;
+    const Icon = !active ? ArrowUpDown : balanceSort.direction === 'asc' ? ArrowUp : ArrowDown;
+    return (
+      <th
+        className="text-left py-3 px-4 text-gray-700 font-base"
+        aria-sort={active ? (balanceSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+      >
+        <button type="button" onClick={() => sortBalancesBy(key)} className={`inline-flex items-center gap-1 hover:text-gray-900 ${active ? 'text-gray-900 font-medium' : ''}`}>
+          {label}
+          <Icon className={`w-3 h-3 ${active ? '' : 'text-gray-400'}`} aria-hidden="true" />
+        </button>
+      </th>
+    );
+  };
+
   const renderLeaveBalancesTab = () => (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-4 md:p-6 border-b border-gray-200">
@@ -2773,29 +2805,56 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
         </div>
       )}
 
+      <div className="px-4 md:px-6 pt-4 flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1 min-w-0">
+          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" aria-hidden="true" />
+          <input
+            type="search"
+            value={balanceSearch}
+            onChange={(e) => { setBalanceSearch(e.target.value); setBalancesPage(1); }}
+            placeholder="Search by name or employee number"
+            aria-label="Search leave balances"
+            className="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-1.5 text-xs"
+          />
+        </div>
+        <select
+          value={balanceTypeFilter}
+          onChange={(e) => { setBalanceTypeFilter(e.target.value); setBalancesPage(1); }}
+          aria-label="Leave type"
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-xs sm:w-48"
+        >
+          <option value="">All leave types</option>
+          {balanceTypes.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+        </select>
+      </div>
+      {(balanceSearch || balanceTypeFilter) && shownBalances.length === 0 && (
+        <p className="px-4 md:px-6 pt-3 text-xs text-gray-500">No balances match. Clear the search or choose all leave types.</p>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="text-left py-3 px-4 text-gray-700 font-base">Employee</th>
-              <th className="text-left py-3 px-4 text-gray-700 font-base">Leave Type</th>
-              <th className="text-left py-3 px-4 text-gray-700 font-base">Office</th>
+              {sortableBalanceHeader('employee', 'Employee')}
+              {sortableBalanceHeader('number', 'Number')}
+              {sortableBalanceHeader('leave_type', 'Leave Type')}
+              {sortableBalanceHeader('office', 'Office')}
               <th className="text-left py-3 px-4 text-gray-700 font-base">Yearly days</th>
-              <th className="text-left py-3 px-4 text-gray-700 font-base">Earned</th>
-              <th className="text-left py-3 px-4 text-gray-700 font-base">Used</th>
-              <th className="text-left py-3 px-4 text-gray-700 font-base">Remaining</th>
+              {sortableBalanceHeader('earned', 'Earned')}
+              {sortableBalanceHeader('used', 'Used')}
+              {sortableBalanceHeader('remaining', 'Remaining')}
               <th className="text-left py-3 px-4 text-gray-700 font-base">Monthly Accrual</th>
               <th className="text-left py-3 px-4 text-gray-700 font-base">Last Accrual</th>
             </tr>
           </thead>
           <tbody>
-            {paginatedBalances.map((balance, index) => (
+            {paginatedBalances.map((balance) => (
               <tr key={balance.id} className="border-b border-gray-300 hover:bg-gray-50">
                 <td className="py-4 px-4">
-                  <div className="space-y-1">
-                    <p className="text-gray-900 font-base">{balance.first_name} {balance.last_name}</p>
-                    <p className="text-gray-500 text-xs">{balance.employee_number}</p>
-                  </div>
+                  <p className="text-gray-900 font-base">{balance.first_name} {balance.last_name}</p>
+                </td>
+                <td className="py-4 px-4">
+                  <p className="text-gray-500">{balance.employee_number}</p>
                 </td>
                 <td className="py-4 px-4">
                   <p className="text-gray-700">{balance.leave_type_name}</p>
@@ -2844,7 +2903,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
                   <input
                     type="number"
                     value={balance.monthly_accrual}
-                    onChange={(e) => updateBalanceAccrual(index, 'monthly_accrual', Number(e.target.value))}
+                    onChange={(e) => updateBalanceAccrual(balance.id, 'monthly_accrual', Number(e.target.value))}
                     className="w-16 border border-gray-300 rounded px-2 py-1 text-xs"
                     min="0"
                     step="0.5"
