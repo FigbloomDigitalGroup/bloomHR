@@ -56,7 +56,10 @@ describe('CompanyGate', () => {
     state.isLoading = true;
     gate();
     expect(screen.queryByText('the app')).toBeNull();
-    expect(screen.getByText(/Loading your workspace/)).toBeTruthy();
+    // the Figbloom logo loader over the whole screen
+    const loader = screen.getByRole('status', { name: 'Loading your workspace' });
+    expect(loader.querySelector('.fb-arc')).toBeTruthy();
+    expect(loader.closest('.fixed.inset-0')).toBeTruthy();
   });
 
   it('lets people through if the companies could not be loaded (the database still limits them)', () => {

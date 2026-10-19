@@ -30,6 +30,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import ModuleGate from '../ProtectedRoutes/ModuleGate';
 import { useBranches } from '../../hooks/useBranches';
 import { branchOf } from '../../lib/branches';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 type Employee = Database['public']['Tables']['employees']['Row'];
 
@@ -300,13 +301,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
 
   if (loading) {
     return (
-      <div className="p-6 flex justify-center items-center min-h-[60vh] text-xs">
-        <div className="animate-pulse flex flex-col items-center">
-          <div className="w-14 h-14 bg-green-tint rounded-full mb-5" />
-          <div className="h-4 bg-secondary rounded-full w-64 mb-3" />
-          <div className="h-3 bg-secondary rounded-full w-48" />
-        </div>
-      </div>
+      <LoaderBlock label="Loading employees" />
     );
   }
 

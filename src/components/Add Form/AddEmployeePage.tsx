@@ -27,6 +27,7 @@ import { lockedPayFields, payFromGroup } from '../../lib/jobGroups';
 import { activeTitleNames, useJobTitles } from '../../hooks/useJobTitles';
 import { useDepartments } from '../../hooks/useDepartments';
 import { titleDefaults, titleKey } from '../../lib/jobTitles';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'Work Mobile': string | null;
@@ -602,20 +603,7 @@ const AddEmployeePage = () => {
 
   if (isPageLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <motion.div
-          animate={{
-            rotate: 360,
-            scale: [1, 1.2, 1]
-          }}
-          transition={{
-            duration: 1,
-            repeat: Infinity,
-            ease: "linear"
-          }}
-          className="w-16 h-16 border-4 border-gray-900 border-t-transparent rounded-full"
-        />
-      </div>
+      <LoaderBlock label="Loading" />
     );
   }
 

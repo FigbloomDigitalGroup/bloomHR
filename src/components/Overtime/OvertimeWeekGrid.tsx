@@ -6,6 +6,7 @@ import { loadOvertime, setOvertimeHours, type OvertimeEntry, type OvertimePerson
 import { addDays, shortDay, today, weekDays, weekStart } from '../../lib/casualPay';
 import { DAY_TYPE_LABEL, round2 } from '../../lib/overtimePay';
 import OvertimeUploadModal from './OvertimeUploadModal';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // The week's overtime: a row per person, a column per day, the hours in each cell. Supervisors and payroll fill it in
 // (what they enter is approved); an employee's own request shows with an orange dot until it is approved. The kind of
@@ -134,8 +135,8 @@ export default function OvertimeWeekGrid({ people, canUpload, onChanged }: Props
       </div>
 
       {shown.length === 0 ? (
-        <EmptyState icon={<Clock className="w-5 h-5" />} title={loading ? 'Loading...' : 'Nobody to record overtime for'}
-          description={loading ? undefined : 'The people you supervise show here (payroll sees everyone).'} />
+        loading ? <LoaderBlock label="Loading" compact /> : <EmptyState icon={<Clock className="w-5 h-5" />} title="Nobody to record overtime for"
+          description="The people you supervise show here (payroll sees everyone)." />
       ) : (
         <TableScroll>
           <table className="w-full text-xs">

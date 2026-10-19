@@ -5,6 +5,7 @@ import { Button, Card, EmployeePicker, EmptyState, Modal, StatusPill, TabBar } f
 import { formatDay, parseDay } from '../../lib/contract';
 import { DEFAULT_NOTICE_DAYS, OPEN_STATUSES, REASON_CATEGORIES, STATUS_LABEL, addDays, listExits, reasonLabel, startExit, today, type ExitKind, type ExitRecord } from '../../lib/exits';
 import ExitDetail, { STATUS_TONE } from './ExitDetail';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 const input = 'w-full border border-border rounded-xl px-3 py-2.5 text-[12.5px] text-ink focus:outline-none focus:ring-2 focus:ring-brand/40';
 const filters = [
@@ -160,7 +161,7 @@ export default function ExitsModule({ onRefresh }: { onRefresh?: () => void }) {
         <Button onClick={() => setStarting(true)} icon={<Plus className="w-3.5 h-3.5" />}>Start an exit</Button>
       </div>
       {exits === null ? (
-        <div className="p-6 text-sm text-gray-500">Loading…</div>
+        <LoaderBlock label="Loading exits" compact />
       ) : shown.length === 0 ? (
         <EmptyState icon={<LogOut className="w-4 h-4" />} title="No exits here" description="Resignations from the staff portal and terminations HR starts appear here." />
       ) : (

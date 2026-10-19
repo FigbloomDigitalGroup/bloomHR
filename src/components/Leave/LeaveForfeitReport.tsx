@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download, Loader2 } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { leaveYearLabel, leaveYearOf } from '../../lib/leaveAccrual';
 import { forfeitCsv, forfeitWhy, summariseForfeits } from '../../lib/leaveForfeit';
 import { ForfeitRow, loadForfeitReport } from '../../lib/leaveYearDb';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 const download = (fileName: string, csv: string) => {
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -84,7 +85,7 @@ export default function LeaveForfeitReport({ startMonth }: { startMonth: number 
 
       {error && <p className="text-xs text-red-600">{error}</p>}
       {loading ? (
-        <div className="flex items-center gap-2 text-xs text-gray-500"><Loader2 className="w-4 h-4 animate-spin" /> Loading...</div>
+        <LoaderBlock label="Loading" compact />
       ) : rows.length === 0 ? (
         <p className="text-xs text-gray-500">No leave was lost or paid out {year ? `in ${leaveYearLabel(year, startMonth)}` : 'yet'}.</p>
       ) : (

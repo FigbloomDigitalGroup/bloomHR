@@ -9,6 +9,7 @@ import {
   DEFAULT_OVERTIME_SETTINGS, formatKsh, hoursByType, overtimePayFor, round2,
   type OvertimeMonthRow, type OvertimeSettings,
 } from '../../lib/overtimePay';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // The month's approved overtime per employee: hours by kind of day and, for payroll, what it pays (what the month's
 // payslips will add to gross pay). Payroll can give someone their own hourly rate here.
@@ -122,7 +123,7 @@ export default function OvertimeMonthTotals({ people, canManage, canSeePay, vers
         {canManage && !settings.enabled && <span className="text-status-danger font-semibold">Overtime is turned off in the payroll settings</span>}
       </div>
       {rows.length === 0 ? (
-        <EmptyState icon={<Clock className="w-5 h-5" />} title={loading ? 'Loading...' : 'No approved overtime this month'} />
+        loading ? <LoaderBlock label="Loading" compact /> : <EmptyState icon={<Clock className="w-5 h-5" />} title="No approved overtime this month" />
       ) : (
         <TableScroll>
           <table className="w-full text-xs">

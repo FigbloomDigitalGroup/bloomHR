@@ -20,6 +20,7 @@ import { utils, writeFile } from 'xlsx';
 import ModuleGate from '../ProtectedRoutes/ModuleGate';
 
 import { confirmDialog } from '../../lib/confirmDialog';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 type Asset = Database['public']['Tables']['assets']['Row'];
 type Employee = Database['public']['Tables']['employees']['Row'];
 
@@ -316,19 +317,7 @@ const AssetManagement: React.FC = () => {
   // Loading state
   if (loading) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="p-6 max-w-7xl mx-auto flex justify-center items-center min-h-[60vh] text-xs"
-      >
-        <div className="text-center">
-          <div className="animate-pulse flex flex-col items-center">
-            <div className="w-16 h-16 bg-gradient-to-r from-blue-50 to-blue-200 rounded-full mb-6"></div>
-            <div className="h-5 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full w-64 mb-4"></div>
-            <div className="h-4 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full w-48"></div>
-          </div>
-        </div>
-      </motion.div>
+      <LoaderBlock label="Loading assets" />
     );
   }
   

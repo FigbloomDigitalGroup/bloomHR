@@ -8,6 +8,7 @@ import {
   KIND_LABEL, STATUS_LABEL, entryAmount, parseQuantity, personName, rateOn, round2, typeOpenOn,
   type WorkEntry, type WorkPerson, type WorkRate, type WorkStatus, type WorkType,
 } from '../../lib/pieceRate';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // A day's work, phone first: pick the day, then for each worker type how much of each kind of work they did. Amounts
 // show as you type. Save as a draft (only you, payroll and the supervisor see it) or submit it; it can be changed
@@ -212,10 +213,10 @@ export default function DailyEntry({ people, types, rates, canManage, onChanged 
         </Card>
       ) : workers.length === 0 ? (
         <Card>
-          <EmptyState icon={<Sprout className="w-5 h-5" />} title={loading ? 'Loading...' : 'No workers paid by work'}
-            description={loading ? undefined : canManage
+          {loading ? <LoaderBlock label="Loading" compact /> : <EmptyState icon={<Sprout className="w-5 h-5" />} title="No workers paid by work"
+            description={canManage
               ? 'Set people to be paid by work under Workers. Casual workers paid a daily rate are on the Casual workers page.'
-              : 'People on your team who are paid for their work show here.'} />
+              : 'People on your team who are paid for their work show here.'} />}
         </Card>
       ) : (
         <ul className="list-none m-0 p-0 grid grid-cols-1 lg:grid-cols-2 gap-3">

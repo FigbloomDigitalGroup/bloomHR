@@ -10,6 +10,7 @@ import CandidateView, { isInterviewStage } from './CandidateView';
 import StageEditor from './StageEditor';
 import { CareersToggle } from '../../Settings/CareersSettings';
 import { Candidate, CompanyUser, Interview, Stage, StageMove, candidateName, sortStages } from './types';
+import { LoaderBlock } from '../../UI/FigbloomLoader';
 
 const GENERAL = 'general'; // applications with no job posting use the company's default stages
 
@@ -132,7 +133,7 @@ export default function RecruitmentPipeline() {
       </Card>
 
       {loading ? (
-        <p className="text-[13px] text-muted-foreground">Loading pipeline...</p>
+        <LoaderBlock label="Loading the pipeline" compact />
       ) : candidates.length === 0 ? (
         <Card>
           <EmptyState
@@ -185,7 +186,7 @@ export default function RecruitmentPipeline() {
 
       <Modal open={!!openId} onClose={() => { setOpenId(null); setScheduleOnOpen(false); }} title="Candidate" hideTitle size="5xl" className="bg-background rounded-2xl shadow-xl p-4 sm:p-6">
         {!detail ? (
-          <p className="text-[13px] text-muted-foreground">Loading candidate...</p>
+          <LoaderBlock label="Loading the candidate" compact />
         ) : (
           <CandidateView
             candidate={detail.candidate}

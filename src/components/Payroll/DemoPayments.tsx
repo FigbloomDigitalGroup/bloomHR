@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, Loader, Wallet } from 'lucide-react';
 import { Modal } from '../UI';
 import { type DemoChannel, type DemoPayLine, totalNet } from '../../lib/demoPayments';
 import { isKesPayslip, mpesaKenyaNote } from '../../lib/paymentMethods';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // Pretend paying for sales demos (PAYMENTS_DEMO in lib/inAppPayments): "Pay all employees" and the per-person "Pay"
 // on an approved month. Everything happens in the page's memory: nothing is saved, nothing is sent, no money moves.
@@ -144,10 +145,7 @@ export function DemoPayAllDialog({ open, onClose, periodLabel, lines, onPaid, on
         )}
 
         {stage === 'sending' && (
-          <div className="py-8 flex flex-col items-center gap-3 text-xs text-muted-foreground" role="status">
-            <Loader className="w-6 h-6 animate-spin text-brand" />
-            Sending payments…
-          </div>
+          <LoaderBlock label="Sending payments" compact />
         )}
 
         {stage === 'done' && (

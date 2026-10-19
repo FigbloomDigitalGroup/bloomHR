@@ -16,6 +16,8 @@ interface Props {
   fullScreen?: boolean;
   /** width and height of the logo, in px */
   size?: number;
+  /** a small logo and label, for a card or a part of a page */
+  compact?: boolean;
 }
 
 const CYCLE_MS = 2200; // the length of the animation in index.css
@@ -39,10 +41,11 @@ function useLoaderTiming() {
   return timing;
 }
 
-export default function FigbloomLoader({ label = 'Getting things ready', fullScreen = false, size = 120 }: Props) {
+export default function FigbloomLoader({ label = 'Getting things ready', fullScreen = false, compact = false, size = compact ? 56 : 120 }: Props) {
   const { phase, followsOn } = useLoaderTiming();
+  const className = ['fb-loader', compact && 'fb-loader--compact', !followsOn && 'fb-loader--fade-in'].filter(Boolean).join(' ');
   const loader = (
-    <div className={followsOn ? 'fb-loader' : 'fb-loader fb-loader--fade-in'} role="status" aria-live="polite"
+    <div className={className} role="status" aria-live="polite" aria-label={label}
       style={{ ['--fb-phase' as string]: `${phase}ms` }}>
       <svg viewBox="8 5 48 48" aria-hidden="true" style={{ width: size, height: size }}>
         <circle className="fb-arc" cx="32" cy="29" r="19" pathLength={360} fill="none" strokeWidth="5.5" strokeLinecap="round" />
@@ -59,4 +62,16 @@ export default function FigbloomLoader({ label = 'Getting things ready', fullScr
   );
   if (!fullScreen) return loader;
   return <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-page/90">{loader}</div>;
+}
+
+/**
+ * The loader centred in the space a page or a card would fill: a page's content area (the default), or a card or
+ * part of a page (compact).
+ */
+export function LoaderBlock({ label = 'Loading', compact = false }: { label?: string; compact?: boolean }) {
+  return (
+    <div className={compact ? 'flex items-center justify-center py-8' : 'flex min-h-[60vh] items-center justify-center'}>
+      <FigbloomLoader label={label} compact={compact} />
+    </div>
+  );
 }

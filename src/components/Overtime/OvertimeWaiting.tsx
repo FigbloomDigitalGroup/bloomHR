@@ -5,6 +5,7 @@ import { Button, Card, EmptyState, Modal, TableScroll } from '../UI';
 import { approveOvertime, rejectOvertime, type OvertimeEntry, type OvertimePerson } from '../../lib/overtimeApi';
 import { longDate } from '../../lib/casualPay';
 import { DAY_TYPE_LABEL } from '../../lib/overtimePay';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // Overtime employees asked for, waiting for the supervisor's or payroll's decision. Approved overtime is paid with
 // that month's salary; a rejection needs a reason, which the employee sees.
@@ -66,8 +67,8 @@ export default function OvertimeWaiting({ entries, people, loading, onChanged }:
         )}
       </div>
       {entries.length === 0 ? (
-        <EmptyState icon={<CheckCheck className="w-5 h-5" />} title={loading ? 'Loading...' : 'Nothing waiting'}
-          description={loading ? undefined : 'Overtime your team asks for in the staff portal shows here for you to approve.'} />
+        loading ? <LoaderBlock label="Loading" compact /> : <EmptyState icon={<CheckCheck className="w-5 h-5" />} title="Nothing waiting"
+          description="Overtime your team asks for in the staff portal shows here for you to approve." />
       ) : (
         <TableScroll>
           <table className="w-full text-xs">

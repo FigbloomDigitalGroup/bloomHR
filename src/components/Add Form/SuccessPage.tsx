@@ -6,6 +6,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import GlowButton from '../UI/GlowButton';
 import InviteStatus from './InviteStatus';
 import type { InviteOutcome } from '../../lib/employeeInvite';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 const SuccessPage = () => {
   const navigate = useNavigate();
@@ -34,20 +35,7 @@ const SuccessPage = () => {
 
   if (isPageLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <motion.div
-          animate={{ 
-            rotate: 360,
-            scale: [1, 1.2, 1]
-          }}
-          transition={{ 
-            duration: 1,
-            repeat: Infinity,
-            ease: "linear"
-          }}
-          className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full"
-        />
-      </div>
+      <LoaderBlock label="Loading" />
     );
   }
 

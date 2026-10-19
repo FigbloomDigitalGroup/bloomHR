@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Card } from '../UI';
 import ApprovalChain from './ApprovalChain';
 import { ApprovalChain as Chain, LeaveAwaitingMe as Waiting, loadApprovalChains, loadLeaveAwaitingMe } from '../../lib/approvals';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 const day = (d: string | null) => (d ? new Date(d).toLocaleDateString() : '');
 
@@ -35,7 +36,7 @@ export default function LeaveAwaitingMe({ showEmpty = false }: { showEmpty?: boo
     return (
       <Card>
         <p className="m-0 text-[13px] font-bold text-ink">Waiting for your approval</p>
-        <p className="m-0 mt-1 text-[12px] text-muted-foreground">{loaded ? 'No leave is waiting for you to approve.' : 'Loading...'}</p>
+        {loaded ? <p className="m-0 mt-1 text-[12px] text-muted-foreground">No leave is waiting for you to approve.</p> : <LoaderBlock label="Loading" compact />}
       </Card>
     );
   }

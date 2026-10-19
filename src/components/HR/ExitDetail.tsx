@@ -28,6 +28,7 @@ import {
   type ExitStatus,
   type FinalDuesRecord,
 } from '../../lib/exits';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 export const STATUS_TONE: Record<ExitStatus, StatusTone> = {
   requested: 'warning',
@@ -408,7 +409,7 @@ export default function ExitDetail({ exitId, onBack, onChanged }: { exitId: stri
   };
 
   if (error) return <Card><p className="m-0 text-[12.5px] text-status-danger">{error}</p><Button variant="ghost" onClick={onBack}>Back</Button></Card>;
-  if (!exit || interview === undefined || dues === undefined) return <div className="p-6 text-sm text-gray-500">Loading…</div>;
+  if (!exit || interview === undefined || dues === undefined) return <LoaderBlock label="Loading the exit" />;
 
   const open = exit.status === 'requested' || exit.status === 'approved' || exit.status === 'clearance';
   const allClear = items.length > 0 && items.every((i) => i.done);

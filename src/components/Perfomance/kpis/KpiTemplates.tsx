@@ -26,6 +26,7 @@ import {
   type TemplateScope,
 } from '../../../lib/kpiTemplates';
 import { inputClass, labelClass, tdClass, thClass } from './shared';
+import { LoaderBlock } from '../../UI/FigbloomLoader';
 
 interface Props {
   kpis: Kpi[];
@@ -171,7 +172,7 @@ export default function KpiTemplates({ kpis, periods, people, departments }: Pro
       )}
 
       {templates === null ? (
-        <Card><p className="text-[13px] text-muted-foreground">Loading…</p></Card>
+        <Card><LoaderBlock label="Loading KPI templates" compact /></Card>
       ) : templates.length === 0 ? (
         <Card>
           <EmptyState

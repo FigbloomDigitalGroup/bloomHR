@@ -19,6 +19,7 @@ import {
   setChecklistItemDone,
   shortDate,
 } from '../../lib/afterHiring';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // "After hiring" on the onboarding review: the employee's offer, orientation checklist (HR ticks any item, or assigns
 // another checklist), required training and tests (HR assigns one, sees the score, lets them take it again).
@@ -51,7 +52,7 @@ export default function AfterHiringPanel({ employeeId }: { employeeId: string })
   };
 
   if (problem) return <p className="text-sm text-muted-foreground">{problem}</p>;
-  if (!data) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (!data) return <LoaderBlock label="Loading" compact />;
 
   const assignedQuizzes = new Set(data.tests.map((t) => t.quiz_id));
   return (

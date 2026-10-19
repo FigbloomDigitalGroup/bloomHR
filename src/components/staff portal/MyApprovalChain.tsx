@@ -9,6 +9,7 @@ import {
   skipText,
   stepText,
 } from '../../lib/staffCompany';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 /**
  * Who the signed-in employee's leave goes to, before they apply: "Your leave goes to Max Manager (line manager),
@@ -57,9 +58,7 @@ export default function MyApprovalChain({ compact = false }: { compact?: boolean
       </p>
 
       {loading ? (
-        <div className="mt-4 space-y-2" aria-label="Loading">
-          {[0, 1].map((i) => <div key={i} className="h-10 rounded-lg bg-secondary animate-pulse" />)}
-        </div>
+        <LoaderBlock label="Loading" compact />
       ) : failed || !chain ? (
         <p className="m-0 mt-4 text-[12.5px] text-status-danger" role="alert">Could not load who approves your leave. Try again later.</p>
       ) : (

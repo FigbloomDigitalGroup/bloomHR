@@ -5,6 +5,7 @@ import { Button, Card, EmptyState, PageHeader, StatusPill, TableScroll, type Sta
 import { loadMyOvertime, myEmployeeNumber, requestOvertime, withdrawOvertime, type OvertimeEntry, type OvertimeStatus } from '../../lib/overtimeApi';
 import { longDate, today } from '../../lib/casualPay';
 import { DAY_TYPE_LABEL, round2 } from '../../lib/overtimePay';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // The staff portal's Overtime page (FIG-889): the employee's own overtime, as their supervisor or payroll recorded it,
 // and a form to ask for overtime they worked. A request waits for the supervisor's or payroll's approval; approved
@@ -111,7 +112,7 @@ export default function MyOvertime() {
               Approved this month: {approvedThisMonth} {approvedThisMonth === 1 ? 'hour' : 'hours'}
             </div>
             {entries.length === 0 ? (
-              <EmptyState icon={<Clock className="w-5 h-5" />} title={number === undefined ? 'Loading...' : 'No overtime yet'} />
+              number === undefined ? <LoaderBlock label="Loading" compact /> : <EmptyState icon={<Clock className="w-5 h-5" />} title="No overtime yet" />
             ) : (
               <TableScroll>
                 <table className="w-full text-xs">

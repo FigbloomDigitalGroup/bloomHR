@@ -597,7 +597,7 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
                 <Card>
                   <h2 className="text-[13px] font-bold text-ink mb-3">Leave Requests by Status</h2>
                   {analyticsLoading ? (
-                    <div className="h-64 animate-pulse bg-gray-100 rounded-lg" />
+                    <div className="h-64 flex items-center justify-center"><FigbloomLoader label="Loading" compact /></div>
                   ) : leaveByStatus.length === 0 ? (
                     <EmptyState icon={<CalendarDays className="w-[18px] h-[18px]" strokeWidth={2} />} title="No leave data" description="Leave requests will appear here once submitted." />
                   ) : (
@@ -618,7 +618,7 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
                 <Card>
                   <h2 className="text-[13px] font-bold text-ink mb-3">Employees by Town</h2>
                   {analyticsLoading ? (
-                    <div className="h-64 animate-pulse bg-gray-100 rounded-lg" />
+                    <div className="h-64 flex items-center justify-center"><FigbloomLoader label="Loading" compact /></div>
                   ) : employeesByTown.length === 0 ? (
                     <EmptyState icon={<Users className="w-[18px] h-[18px]" strokeWidth={2} />} title="No employee data" description="Employee counts by town will appear here." />
                   ) : (
@@ -720,17 +720,7 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
 
                 <div className="space-y-2.5 flex-1">
                   {isNewsLoading ? (
-                    <div className="animate-pulse space-y-4">
-                      {[1, 2, 3].map(i => (
-                        <div key={i} className="flex gap-4">
-                          <div className="w-10 h-10 bg-gray-100 rounded-lg" />
-                          <div className="flex-1">
-                            <div className="h-4 bg-gray-100 rounded w-3/4 mb-2" />
-                            <div className="h-3 bg-gray-50 rounded w-1/2" />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <div className="flex justify-center py-8"><FigbloomLoader label="Loading" compact /></div>
                   ) : newsItems.length === 0 ? (
                     <EmptyState
                       icon={<Calendar className="w-4 h-4" />}

@@ -6,6 +6,7 @@ import { companyApi, InvitePreview } from '../lib/companyApi';
 import { ApiError } from '../lib/adminApi';
 import AuthShell, { AuthButton, Field, authLinkClass } from '../components/Company/AuthShell';
 import { useSessionEmail } from '../components/Company/useSessionEmail';
+import { LoaderBlock } from '../components/UI/FigbloomLoader';
 
 const roleLabel = (role: string) => role.charAt(0) + role.slice(1).toLowerCase();
 
@@ -121,7 +122,7 @@ export default function JoinCompany() {
   if (preview === undefined || sessionEmail === undefined) {
     return (
       <AuthShell title="Opening your invitation…">
-        <p className="text-xs text-gray-500">One moment.</p>
+        <LoaderBlock label="One moment" compact />
       </AuthShell>
     );
   }
@@ -129,7 +130,7 @@ export default function JoinCompany() {
   if (finishing) {
     return (
       <AuthShell title="Setting up your account…" subtitle="You will land in your workspace automatically.">
-        <p className="text-xs text-gray-500">One moment.</p>
+        <LoaderBlock label="One moment" compact />
       </AuthShell>
     );
   }

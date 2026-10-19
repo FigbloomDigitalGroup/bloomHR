@@ -12,6 +12,7 @@ import CasualDaysGrid from './CasualDaysGrid';
 import CasualPayRuns from './CasualPayRuns';
 import { casualRateShortfall } from '../../lib/minimumWage';
 import { useMinimumWages } from '../../hooks/useMinimumWages';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // Casual workers: people paid by the day who are not on the monthly payroll. Payroll and HR register them; their
 // supervisor and payroll record the days they work; payroll pays them in pay runs and downloads the payout files.
@@ -190,8 +191,8 @@ export default function CasualWorkers() {
             </label>
           </div>
           {shown.length === 0 ? (
-            <EmptyState icon={<HardHat className="w-5 h-5" />} title={loading ? 'Loading...' : 'No casual workers'}
-              description={loading ? undefined : canRegister ? 'Register people paid by the day, one at a time or from a spreadsheet.' : 'Casuals you supervise show here.'} />
+            loading ? <LoaderBlock label="Loading" compact /> : <EmptyState icon={<HardHat className="w-5 h-5" />} title="No casual workers"
+              description={canRegister ? 'Register people paid by the day, one at a time or from a spreadsheet.' : 'Casuals you supervise show here.'} />
           ) : (
             <TableScroll>
               <table className="w-full text-xs">

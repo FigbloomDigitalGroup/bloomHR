@@ -1,5 +1,6 @@
 import { AlertTriangle, CalendarPlus, ExternalLink, ListTodo, PartyPopper, Plane } from 'lucide-react';
 import { inDaysLabel, shortDay, type CalendarEntry } from '../../lib/upcoming';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 const RANGE_CHOICES = [30, 90, 365] as const;
 export type RangeChoice = (typeof RANGE_CHOICES)[number];
@@ -86,9 +87,7 @@ export default function ComingUpList({
         </p>
       )}
       {loading ? (
-        <div className="space-y-2 py-1">
-          {[0, 1, 2].map((i) => <div key={i} className="h-10 rounded-lg bg-secondary animate-pulse" />)}
-        </div>
+        <LoaderBlock label="Loading" compact />
       ) : items.length === 0 ? (
         <p className="text-[12px] text-muted-foreground py-2">Nothing coming up in the next {rangeLabel(range)}.</p>
       ) : (

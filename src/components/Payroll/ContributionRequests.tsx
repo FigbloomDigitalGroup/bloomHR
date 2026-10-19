@@ -21,6 +21,7 @@ import {
   stopContribution,
   syncContributions,
 } from '../../lib/contributionsApi';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // Payroll → Deductions: contributions staff asked for from the staff portal (FIG-898). Approve (it becomes the payroll
 // input it belongs to: a voluntary deduction, or the employee's pension / PRMF / insurance / mortgage amount) or
@@ -102,7 +103,7 @@ export default function ContributionRequests({ onChanged }: Props) {
   if (list === null) {
     return (
       <Card padding="sm">
-        <p className="text-xs text-muted-foreground">Loading contribution requests…</p>
+        <LoaderBlock label="Loading contribution requests" compact />
       </Card>
     );
   }

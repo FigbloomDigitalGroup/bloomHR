@@ -13,6 +13,7 @@ import {
   type PayrollPayment,
   type SkippedEmployee,
 } from '../../lib/payrollPayments';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 const REFRESH_MS = 10000;
 
@@ -106,8 +107,8 @@ export default function RunPaymentsPanel({ run }: { run: PayrollRun }) {
 
   if (payments === null) {
     return (
-      <Card className="text-[12px] text-muted-foreground flex items-center gap-2">
-        <Loader className="w-3.5 h-3.5 animate-spin" /> Loading payments…
+      <Card>
+        <LoaderBlock label="Loading payments" compact />
       </Card>
     );
   }

@@ -12,6 +12,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { useEmployeeDirectory } from '../../hooks/useEmployeeDirectory';
 import { useDepartments } from '../../hooks/useDepartments';
 import { departmentPath } from '../../lib/orgStructure';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 
 type Employee = any;
@@ -636,19 +637,7 @@ Company Name
 
   if (loading) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="p-6 max-w-6xl mx-auto flex justify-center items-center min-h-[60vh] text-xs"
-      >
-        <div className="text-center">
-          <div className="animate-pulse flex flex-col items-center">
-            <div className="w-16 h-16 bg-green-tint rounded-full mb-6"></div>
-            <div className="h-5 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full w-64 mb-4"></div>
-            <div className="h-4 bg-gradient-to-r from-gray-100 to-gray-200 rounded-full w-48"></div>
-          </div>
-        </div>
-      </motion.div>
+      <LoaderBlock label="Loading the employee" />
     );
   }
 

@@ -18,6 +18,7 @@ import {
 } from '../../../lib/kpiApi';
 import type { Department } from '../../../lib/orgStructure';
 import { BandPill, PeriodSelect, ScoreText, SourceNote, inputClass, labelClass, tdClass, thClass } from './shared';
+import { LoaderBlock } from '../../UI/FigbloomLoader';
 
 interface Props {
   kpis: Kpi[];
@@ -126,7 +127,7 @@ export default function Scorecards({ kpis, periods, people, departments, access,
 
       {shown.length === 0 ? (
         <Card>
-          <EmptyState icon={<ClipboardList size={20} />} title={loading ? 'Loading…' : 'No scorecards'} description={loading ? undefined : 'Nobody here has KPIs in this period yet.'} />
+          {loading ? <LoaderBlock label="Loading" compact /> : <EmptyState icon={<ClipboardList size={20} />} title="No scorecards" description="Nobody here has KPIs in this period yet." />}
         </Card>
       ) : (
         <Card padding="none">

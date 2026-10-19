@@ -8,6 +8,7 @@ import { formatQty, monthOf, type WorkType } from '../../../lib/pieceRate';
 import {
   MY_STATE_LABEL, MY_STATE_TONE, canEditEntry, dayWindow, entryLocked, entryState, groupByDay, monthChoices, type MyEntry,
 } from '../../../lib/myWork';
+import { LoaderBlock } from '../../UI/FigbloomLoader';
 
 // My entries, by day, with where each stands: draft, waiting, approved, rejected (with the reason) or reopened.
 // Drafts and rejected work can be corrected and sent again (in Record my work); approved work and anything in a month
@@ -61,8 +62,8 @@ export default function MyEntries({ employeeNumber, types, today, pastDays, clos
 
       {entries === null || days.length === 0 ? (
         <Card>
-          <EmptyState icon={<ClipboardList className="w-5 h-5" />} title={entries === null ? 'Loading...' : 'No work recorded this month'}
-            description={entries === null ? undefined : 'Work you record, and work your supervisor records for you, shows here.'} />
+          {entries === null ? <LoaderBlock label="Loading" compact /> : <EmptyState icon={<ClipboardList className="w-5 h-5" />} title="No work recorded this month"
+            description="Work you record, and work your supervisor records for you, shows here." />}
         </Card>
       ) : (
         <ul className="list-none m-0 p-0 space-y-3">

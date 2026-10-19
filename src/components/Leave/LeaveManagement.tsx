@@ -48,7 +48,7 @@ import LeaveScheduler from './LeaveScheduler';
 import ApprovalChain from '../Approvals/ApprovalChain';
 import { ApprovalChain as ApprovalChainData, loadApprovalChains } from '../../lib/approvals';
 import { PageHeader, StatCard, Card, TabBar, Button, EmptyState, Modal } from '../UI';
-import FigbloomLoader from '../UI/FigbloomLoader';
+import FigbloomLoader, { LoaderBlock } from '../UI/FigbloomLoader';
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -620,42 +620,6 @@ const getDisplayName = (currentTown: string, isArea: boolean) => {
   }
 
   return currentTown;
-};
-
-// Skeleton Loader Component for Table Rows
-const TableSkeletonLoader = ({ rows = 5, columns = 9 }) => {
-  return (
-    <>
-      {Array.from({ length: rows }).map((_, rowIndex) => (
-        <tr key={rowIndex} className="border-b border-gray-300 animate-pulse">
-          {Array.from({ length: columns }).map((_, colIndex) => (
-            <td key={colIndex} className="py-4 px-4">
-              <div className="h-4 bg-gray-200 rounded"></div>
-            </td>
-          ))}
-        </tr>
-      ))}
-    </>
-  );
-};
-
-// Stats Card Skeleton Loader
-const StatsSkeletonLoader = () => {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-      {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm animate-pulse">
-          <div className="flex items-center justify-between mb-3">
-            <div className="p-2 rounded-lg bg-gray-200 h-9 w-9"></div>
-          </div>
-          <div className="space-y-1">
-            <div className="h-3 bg-gray-200 rounded w-3/4"></div>
-            <div className="h-5 bg-gray-200 rounded w-1/2"></div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
 };
 
 // Leave Type Form Modal
@@ -3110,7 +3074,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
 
       {/* Stats Cards */}
       {loading ? (
-        <StatsSkeletonLoader />
+        <LoaderBlock label="Loading leave applications" compact />
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <StatCard label="Pending Applications" value={pendingApplications} tint="orange" icon={<Clock className="w-[18px] h-[18px]" strokeWidth={1.8} />} />
@@ -3205,9 +3169,7 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
-                  <TableSkeletonLoader rows={5} columns={9} />
-                ) : paginatedApplications.length === 0 ? (
+                {loading ? null : paginatedApplications.length === 0 ? (
                   <tr>
                     <td colSpan={9}>
                       <EmptyState

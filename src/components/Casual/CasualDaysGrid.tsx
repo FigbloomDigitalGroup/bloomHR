@@ -8,6 +8,7 @@ import {
   type CasualDay, type CasualWorker, type DayPortion,
 } from '../../lib/casualPay';
 import CasualUploadModal from './CasualUploadModal';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // The week's register: a row per casual, a column per day, Full day / Half day / Absent in each cell. Supervisors
 // and payroll fill it in; payroll's entries count at once, a supervisor's wait for payroll's approval. Days in an
@@ -98,8 +99,8 @@ export default function CasualDaysGrid({ casuals, canApprove, onChanged, hideMon
       </div>
 
       {rows.length === 0 ? (
-        <EmptyState icon={<CheckCheck className="w-5 h-5" />} title={loading ? 'Loading...' : 'No casual workers this week'}
-          description={loading ? undefined : 'Casuals show here from their start date until they finish.'} />
+        loading ? <LoaderBlock label="Loading" compact /> : <EmptyState icon={<CheckCheck className="w-5 h-5" />} title="No casual workers this week"
+          description="Casuals show here from their start date until they finish." />
       ) : (
         <TableScroll>
           <table className="w-full text-xs">

@@ -20,6 +20,7 @@ import {
   type QueueTab,
 } from '../../lib/salaryAdvance';
 import { approveAdvance, declineAdvance, loadAdvanceQueue, loadPayees, markAdvancePaid } from '../../lib/salaryAdvanceApi';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // The approver's queue for salary advances: approve or decline what is pending, then record the payment.
 //
@@ -149,7 +150,7 @@ export default function AdvanceQueue({ canDecide, onChanged, demoDelayMs }: Adva
 
       {loading && rows.length === 0 ? (
         <Card>
-          <p className="text-[12.5px] text-muted-foreground">Loading requests...</p>
+          <LoaderBlock label="Loading requests" compact />
         </Card>
       ) : list.length === 0 ? (
         <Card>

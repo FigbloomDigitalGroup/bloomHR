@@ -37,6 +37,7 @@ import {
   type EmployeeLoan,
 } from '../../lib/loansApi';
 import type { LoanInstalment, LoanRepayment } from '../../lib/loans';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // HR's loans page: decide on requests, set up a loan for an employee, record that finance paid it out, and follow
 // each loan's schedule and balance. Payroll takes the instalments once a loan is marked disbursed.
@@ -314,7 +315,7 @@ export default function LoansAdmin() {
         <LoanSettingsCard canEdit={canManage} />
       ) : loading && loans.length === 0 ? (
         <Card>
-          <p className="text-[12.5px] text-muted-foreground">Loading loans...</p>
+          <LoaderBlock label="Loading loans" compact />
         </Card>
       ) : list.length === 0 ? (
         <Card>

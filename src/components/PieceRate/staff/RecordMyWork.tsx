@@ -9,6 +9,7 @@ import { entryAmount, parseQuantity, rateOn, round2, typeOpenOn, type WorkRate, 
 import {
   MY_STATE_LABEL, MY_STATE_TONE, canEditEntry, dayProblem, dayWindow, entryState, type MyEntry,
 } from '../../../lib/myWork';
+import { LoaderBlock } from '../../UI/FigbloomLoader';
 
 // Record my work, phone first: pick the day (today by default; back to the company's limit, never a future day), type
 // how much of each kind of work I did and see what it pays as I type, at the rate for that day. Save it as a draft or
@@ -168,8 +169,8 @@ export default function RecordMyWork({ employeeNumber, types, rates, today, past
 
       {dayTypes.length === 0 ? (
         <Card>
-          <EmptyState icon={<Sprout className="w-5 h-5" />} title={loading ? 'Loading...' : 'No kinds of work yet'}
-            description={loading ? undefined : 'Payroll sets up the kinds of work and their rates.'} />
+          {loading ? <LoaderBlock label="Loading" compact /> : <EmptyState icon={<Sprout className="w-5 h-5" />} title="No kinds of work yet"
+            description="Payroll sets up the kinds of work and their rates." />}
         </Card>
       ) : (
         <Card padding="sm">

@@ -15,6 +15,7 @@ import { toCsv, type ExportFile } from '../../lib/payrollExports';
 import { XLSX_TYPE, toXlsx } from '../../lib/xlsxExport';
 import { casualRateShortfall, money, perDayMinimum } from '../../lib/minimumWage';
 import { useMinimumWages } from '../../hooks/useMinimumWages';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // Paying casuals: pick a period (a day, a week or any dates), see each person's days x daily rate, add one-off
 // additions or deductions with a note, approve (the lines are then fixed), download the M-Pesa or bank file, and
@@ -382,8 +383,8 @@ export default function CasualPayRuns() {
         <Button icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setCreating(true)}>New pay run</Button>
       </div>
       {runs.length === 0 ? (
-        <EmptyState icon={<Wallet className="w-5 h-5" />} title={loading ? 'Loading...' : 'No pay runs yet'}
-          description={loading ? undefined : 'Start one for a day, a week or any dates.'} />
+        loading ? <LoaderBlock label="Loading" compact /> : <EmptyState icon={<Wallet className="w-5 h-5" />} title="No pay runs yet"
+          description="Start one for a day, a week or any dates." />
       ) : (
         <ul>
           {runs.map((r) => (

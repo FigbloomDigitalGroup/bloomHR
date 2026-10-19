@@ -5,6 +5,7 @@ import { Button, Card, EmptyState, Modal, StatusPill, TableScroll } from '../UI'
 import { formatKsh, longDate } from '../../lib/casualPay';
 import { decideEntries, loadWaitingEntries } from '../../lib/pieceRateApi';
 import { SOURCE_LABEL, formatQty, personName, round2, type WorkEntry, type WorkPerson, type WorkType } from '../../lib/pieceRate';
+import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // Work waiting for a decision. A supervisor approves their workers' own submissions; payroll approves those and what
 // supervisors entered (when the company asks payroll to check it). Approve one, several or all; a rejection needs a
@@ -130,8 +131,8 @@ export default function WorkApprovals({ people, types, canManage, onChanged }: P
           )}
         </div>
         {mine.length === 0 ? (
-          <EmptyState icon={<CheckCheck className="w-5 h-5" />} title={loading ? 'Loading...' : 'Nothing waiting'}
-            description={loading ? undefined : canManage
+          loading ? <LoaderBlock label="Loading" compact /> : <EmptyState icon={<CheckCheck className="w-5 h-5" />} title="Nothing waiting"
+            description={canManage
               ? 'Work submitted by supervisors and workers shows here for approval.'
               : 'Work your team submits for themselves shows here for you to approve.'} />
         ) : (
