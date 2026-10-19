@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
   updateTask: vi.fn(),
   startDirectMessage: vi.fn(),
   sendMessage: vi.fn(),
+  exits: [] as Record<string, unknown>[],
 }));
 
 vi.mock('../../lib/supabase', () => ({
@@ -36,6 +37,10 @@ vi.mock('../chat/services/chatServices', () => ({
     startDirectMessage: (...a: unknown[]) => state.startDirectMessage(...a),
     sendMessage: (...a: unknown[]) => state.sendMessage(...a),
   },
+}));
+vi.mock('../../lib/exits', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/exits')>()),
+  loadMyExit: () => Promise.resolve({ employeeNumber: 'E1', noticeDays: 30, exits: state.exits }),
 }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 
@@ -76,6 +81,7 @@ beforeEach(() => {
   state.leave = [];
   state.people = [];
   state.hidden = new Set();
+  state.exits = [];
   state.updateTask.mockReset();
 });
 afterEach(cleanup);
@@ -231,5 +237,27 @@ describe('StaffHome', () => {
     renderHome();
     expect(within(screen.getByRole('navigation', { name: 'Quick links' })).queryByRole('button', { name: 'My work' })).toBeNull();
     await screen.findByText('Nothing assigned to you right now');
+  });
+
+  describe('a resignation under way', () => {
+    const exit = (status: string) => ({ id: 'x1', status, last_working_day: '2026-11-13', decision_note: null });
+
+    it('shows a line that opens it, while it is sent, accepted or in clearance', async () => {
+      for (const status of ['requested', 'approved', 'clearance']) {
+        state.exits = [exit(status)];
+        const { setActiveTab } = renderHome();
+        fireEvent.click(await screen.findByRole('button', { name: /Your resignation/ }));
+        expect(setActiveTab).toHaveBeenCalledWith('resignation');
+        expect(screen.getByText(/Last working day 13 Nov 2026/)).toBeTruthy();
+        cleanup();
+      }
+    });
+
+    it('shows nothing for a withdrawn, declined or completed one', async () => {
+      state.exits = [exit('cancelled'), exit('declined'), exit('completed')];
+      renderHome();
+      await screen.findByText('Nothing assigned to you right now');
+      expect(screen.queryByText('Your resignation')).toBeNull();
+    });
   });
 });

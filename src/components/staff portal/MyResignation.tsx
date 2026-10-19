@@ -1,27 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import { LogOut } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Button, Card, EmptyState, PageHeader, StatusPill, type StatusTone } from '../UI';
+import { Button, Card, EmptyState, PageHeader, StatusPill } from '../UI';
+import { EXIT_TONE } from './ResignationCards';
 import { formatDay, parseDay } from '../../lib/contract';
 import {
   STATUS_LABEL,
   earliestLastDay,
+  findOpenExit,
   loadMyExit,
   submitResignation,
   withdrawResignation,
   type ExitRecord,
-  type ExitStatus,
   type MyExitState,
 } from '../../lib/exits';
-
-const TONE: Record<ExitStatus, StatusTone> = {
-  requested: 'warning',
-  approved: 'success',
-  clearance: 'info',
-  completed: 'neutral',
-  declined: 'danger',
-  cancelled: 'neutral',
-};
 
 const input = 'w-full border border-border rounded-xl px-3 py-2.5 text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-brand/40';
 const MAX_LETTER_BYTES = 10 * 1024 * 1024;
@@ -31,7 +23,7 @@ function ResignationStatus({ exit, onWithdraw, busy }: { exit: ExitRecord; onWit
     <Card className="mb-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-[13px] font-bold text-ink">Your resignation</div>
-        <StatusPill label={STATUS_LABEL[exit.status]} tone={TONE[exit.status]} />
+        <StatusPill label={STATUS_LABEL[exit.status]} tone={EXIT_TONE[exit.status]} />
       </div>
       <dl className="mt-3 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
         <div>
@@ -102,7 +94,7 @@ export default function MyResignation() {
     return <EmptyState icon={<LogOut className="w-4 h-4" />} title="No employee record yet" description="Ask HR to add you to the company’s employee list with your work email." />;
   }
 
-  const open = state.exits.find((x) => ['requested', 'approved', 'clearance'].includes(x.status));
+  const open = findOpenExit(state.exits);
   const earliest = earliestLastDay(state.noticeDays);
   const tooEarly = !!lastDay && lastDay < earliest;
 
@@ -200,7 +192,7 @@ export default function MyResignation() {
                 <span>
                   Resignation of {formatDay(parseDay(x.notice_given_on))}, last day {formatDay(parseDay(x.last_working_day))}
                 </span>
-                <StatusPill label={STATUS_LABEL[x.status]} tone={TONE[x.status]} />
+                <StatusPill label={STATUS_LABEL[x.status]} tone={EXIT_TONE[x.status]} />
               </li>
             ))}
           </ul>

@@ -89,6 +89,12 @@ export const STATUS_LABEL: Record<ExitStatus, string> = {
   cancelled: 'Cancelled',
 };
 
+/** A resignation still under way: sent and waiting for HR, accepted, or serving notice through clearance. */
+export const OPEN_EXIT_STATUSES: readonly ExitStatus[] = ['requested', 'approved', 'clearance'];
+
+/** The one exit still under way (the newest), if any; withdrawn, declined and completed ones are history. */
+export const findOpenExit = (exits: ExitRecord[]): ExitRecord | undefined => exits.find((x) => OPEN_EXIT_STATUSES.includes(x.status));
+
 export const REASON_CATEGORIES: { id: string; label: string }[] = [
   { id: 'misconduct', label: 'Misconduct' },
   { id: 'poor_performance', label: 'Poor performance' },

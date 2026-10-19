@@ -20,7 +20,6 @@ import {
   Warning as PhWarning,
   ClipboardText as PhClipboardText,
   ListChecks as PhListChecks,
-  SignOut as PhSignOut,
   Target as PhTarget,
   UsersThree as PhUsersThree,
   Buildings as PhBuildings,
@@ -944,6 +943,8 @@ interface MenuItem {
   id: string;
   label: string;
   icon?: any;
+  /** other words the menu search finds this item by */
+  keywords?: string[];
   hasSubmenu?: boolean;
   submenu?: {
     id: string;
@@ -1041,11 +1042,11 @@ const staffMenuGroups: MenuGroup[] = [
         ]
       },
       { id: 'contract', label: 'Contracts', icon: PhFile },
-      { id: 'details', label: 'Profile', icon: PhUserCircle },
+      // resigning starts at the bottom of Profile (behind a confirmation), so searching for it finds Profile
+      { id: 'details', label: 'Profile', icon: PhUserCircle, keywords: ['resign', 'resignation', 'leaving'] },
       { id: 'biodata', label: 'Bio Data', icon: PhBriefcase },
       { id: 'documents', label: 'Documents', icon: PhUpload },
       { id: 'appearance', label: 'Appearance', icon: PhPalette },
-      { id: 'resignation', label: 'Resignation', icon: PhSignOut },
     ]
   }
 ];
@@ -1474,8 +1475,9 @@ const StaffPortal = () => {
             <div className="relative z-10 flex-1 overflow-y-auto px-3 pb-4 sidebar-scroll hover:overflow-y-auto overflow-hidden">
               <div className="space-y-6">
                 {menuGroups.map((group) => {
+                  const query = searchQuery.toLowerCase();
                   const filteredItems = group.items.filter(item =>
-                    item.label.toLowerCase().includes(searchQuery.toLowerCase())
+                    [item.label, ...(item.keywords ?? [])].some((word) => word.toLowerCase().includes(query))
                   );
 
                   if (filteredItems.length === 0 && searchQuery) return null;
@@ -1503,7 +1505,8 @@ const StaffPortal = () => {
                       {/* Items */}
                       <div className="space-y-1">
                         {filteredItems.map((item) => {
-                          const isActive = activeTab === item.id;
+                          // the Resignation section opens from Profile, so Profile stays lit there
+                          const isActive = activeTab === item.id || (item.id === 'details' && activeTab === 'resignation');
                           const isMenuExpanded = expandedMenu === item.id;
                           // the row is drawn as the light "active" pill when it is the page or its submenu is open: its text must follow
                           const highlighted = isActive || (item.hasSubmenu && isMenuExpanded);
@@ -1785,7 +1788,7 @@ const StaffPortal = () => {
               )}
               {activeTab === 'contract' && <MyContract />}
               {activeTab === 'resignation' && <MyResignation />}
-              {activeTab === 'details' && <Profile />}
+              {activeTab === 'details' && <Profile onOpenResignation={() => setActiveTab('resignation')} />}
               {activeTab === 'documents' && <MyDocumentsPage />}
               {activeTab === 'appearance' && <Appearance />}
               {activeTab === 'incident-report' && <IncidentReport />}
