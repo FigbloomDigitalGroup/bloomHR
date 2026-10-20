@@ -14,12 +14,18 @@ import {
 import { addDepartment, loadDepartments, type Department } from './orgStructure';
 import { loadJobGroups, saveJobGroup, type JobGroup } from './jobGroups';
 import { formatEmployeeNumber, loadEmployeeNumbering, numberingError, saveEmployeeNumbering, type EmployeeNumbering } from './employeeNumbering';
-import { normaliseWorkEmail, sendInvitations, summariseInvites } from './employeeInvite';
+import { normaliseWorkEmail, sendInvitations, summariseInvites, workEmailProblem } from './employeeInvite';
+import { loadBranches, type Branch } from './branches';
+import { describeSaveError, findExistingEmployees, saveEmployeesInBatches } from './bulkEmployees';
+import { queueInvitations, rememberInviteBatch } from './inviteQueue';
+import { startOnboardingByEmail } from './onboarding';
+import { isValidPhone } from './formValidation';
 import { supabase } from './supabase';
 
 // The company set-up chat (ai_routes.js, POST /api/ai/setup). The AI only proposes; this file shows what a proposal
 // would change and applies it when the person clicks Apply, through the same functions the Settings pages use, with
-// the person's own session (so the database's rules decide what they may change).
+// the person's own session (so the database's rules decide what they may change). Employees are added the way Bulk
+// upload adds them (save_employees_batch, then a queued invitation to join and onboarding for each new person).
 
 export type ProfileProposalField = Exclude<keyof CompanyProfileFields, 'logo_url' | 'primary_color' | 'secondary_color' | 'letterhead_header_url' | 'letterhead_footer_url'>;
 
@@ -28,7 +34,27 @@ export type SetupProposal =
   | { type: 'departments'; items: { name: string; parent: string | null }[] }
   | { type: 'job_groups'; items: { code: string; name: string }[] }
   | { type: 'employee_numbering'; mode: 'system' | 'own'; prefix?: string; digits?: number }
-  | { type: 'invitations'; items: { email: string; role: string }[] };
+  | { type: 'invitations'; items: { email: string; role: string }[] }
+  | { type: 'add_employees'; items: NewEmployee[] };
+
+/** A person to add as an employee, as ai_routes.js checked it (names and a valid work email; the rest optional). */
+export interface NewEmployee {
+  first_name: string;
+  last_name: string;
+  work_email: string;
+  phone?: string;
+  job_title?: string;
+  /** a department's name, as the company has it */
+  department?: string;
+  /** a branch's name, as the company has it; none = the default branch */
+  branch?: string;
+  employment_type?: string;
+  /** YYYY-MM-DD */
+  start_date?: string;
+  basic_salary?: number;
+  /** only when the company types its own numbers */
+  employee_number?: string;
+}
 
 /** What the company has set up so far (null where the person may not see it or it could not be loaded). */
 export interface SetupState {
@@ -39,12 +65,13 @@ export interface SetupState {
   numbering: EmployeeNumbering | null;
   invitations: Invitation[] | null;
   employeeCount: number | null;
+  branches?: Branch[] | null;
 }
 
 const settled = <T,>(r: PromiseSettledResult<T>): T | null => (r.status === 'fulfilled' ? r.value : null);
 
 export async function loadSetupState(): Promise<SetupState> {
-  const [companies, profile, departments, jobGroups, numbering, invitations, employees] = await Promise.allSettled([
+  const [companies, profile, departments, jobGroups, numbering, invitations, employees, branches] = await Promise.allSettled([
     companyApi.myCompanies(),
     loadCompanyProfile(),
     loadDepartments(),
@@ -52,6 +79,7 @@ export async function loadSetupState(): Promise<SetupState> {
     loadEmployeeNumbering(),
     companyApi.listInvitations(),
     supabase.from('employees').select('"Employee Number"', { head: true, count: 'exact' }),
+    loadBranches(),
   ]);
   const p = settled(profile);
   const count = settled(employees);
@@ -63,6 +91,7 @@ export async function loadSetupState(): Promise<SetupState> {
     numbering: settled(numbering),
     invitations: settled(invitations),
     employeeCount: count && !count.error ? count.count ?? 0 : null,
+    branches: settled(branches),
   };
 }
 
@@ -86,6 +115,8 @@ export function setupSummary(s: SetupState) {
     employee_numbering: s.numbering ? (s.numbering.mode === 'own' ? 'own numbers' : `system, next ${s.numbering.preview}`) : 'unknown',
     invitations: s.invitations?.filter((i) => i.status !== 'revoked').slice(0, 50).map((i) => `${i.email} (${i.role}, ${i.status})`) ?? 'unknown',
     employees: s.employeeCount ?? 'unknown',
+    // "Name (Country)": the server also reads the countries from here, to pick the law that applies
+    branches: s.branches === undefined || s.branches === null ? 'unknown' : s.branches.filter((b) => b.active).map((b) => `${b.name} (${b.country})${b.is_default ? ', default' : ''}`),
   };
 }
 
@@ -120,7 +151,64 @@ export function whatIsNew(p: SetupProposal, s: SetupState): SetupProposal | null
       );
       return items.length ? { type: 'invitations', items } : null;
     }
+    case 'add_employees': {
+      // people already in the company are found when applying (the state does not hold every employee's email)
+      const items = p.items.filter((e, i) => p.items.findIndex((o) => same(o.work_email, e.work_email)) === i);
+      return items.length ? { type: 'add_employees', items } : null;
+    }
   }
+}
+
+const findByName = <T extends { name: string; active: boolean }>(list: T[] | null | undefined, name: string) =>
+  (list ?? []).find((x) => x.active && same(x.name, name));
+
+/**
+ * Why these people cannot be added as they are (empty when they can): the checks Bulk upload makes (names, a work
+ * email, the company's own number when it types its own), and that each department and branch named exists.
+ */
+export function employeeProblems(items: NewEmployee[], s: SetupState): string[] {
+  const own = s.numbering?.mode === 'own';
+  const problems: string[] = [];
+  const numbers = new Set<string>();
+  for (const e of items) {
+    const who = `${e.first_name} ${e.last_name}`.trim() || e.work_email;
+    if (!e.first_name?.trim() || !e.last_name?.trim()) problems.push(`${who}: missing first or last name`);
+    const emailProblem = workEmailProblem(e.work_email);
+    if (emailProblem) problems.push(`${who}: ${emailProblem}`);
+    if (e.phone && !isValidPhone(e.phone)) problems.push(`${who}: phone "${e.phone}" is not a valid number`);
+    if (e.department && !findByName(s.departments, e.department)) {
+      problems.push(`${who}: there is no department "${e.department}" yet (add it first)`);
+    }
+    if (e.branch && !findByName(s.branches, e.branch)) problems.push(`${who}: there is no branch "${e.branch}" (add it under Branches first)`);
+    if (own) {
+      const number = e.employee_number?.trim() ?? '';
+      if (!number) problems.push(`${who}: missing Employee Number (your company uses its own numbers)`);
+      else if (numbers.has(number)) problems.push(`${who}: Employee Number ${number} is used by another person in the list`);
+      numbers.add(number);
+    }
+  }
+  return problems;
+}
+
+/** The employee record a person becomes, in the columns Add employee and Bulk upload save. */
+export function employeeRecord(e: NewEmployee, s: SetupState): Record<string, unknown> {
+  const department = e.department ? findByName(s.departments, e.department) : undefined;
+  const branch = e.branch ? findByName(s.branches, e.branch) : undefined;
+  return {
+    // the system's next number unless the company types its own (save_employees_batch gives it)
+    'Employee Number': s.numbering?.mode === 'own' ? e.employee_number?.trim() ?? '' : '',
+    'First Name': e.first_name.trim(),
+    'Last Name': e.last_name.trim(),
+    'Work Email': normaliseWorkEmail(e.work_email),
+    ...(e.phone ? { 'Mobile Number': e.phone } : {}),
+    ...(e.job_title ? { 'Job Title': e.job_title } : {}),
+    // as Add employee saves a department: its id, and its name in Job Level
+    ...(department ? { department_id: department.id, 'Job Level': department.name } : {}),
+    ...(branch ? { branch_id: branch.id, Branch: branch.name } : {}),
+    ...(e.employment_type ? { 'Employee Type': e.employment_type } : {}),
+    ...(e.start_date ? { 'Start Date': e.start_date } : {}),
+    ...(e.basic_salary !== undefined ? { 'Basic Salary': e.basic_salary } : {}),
+  };
 }
 
 const PROFILE_LABELS: Record<ProfileProposalField, string> = {
@@ -145,9 +233,15 @@ function profileValue(key: ProfileProposalField, value: unknown): string {
 export interface ProposalView {
   title: string;
   lines: { text: string; was?: string }[];
+  /** shown as a table instead of lines (employees to add) */
+  table?: { columns: string[]; rows: string[][] };
+  /** what stops it being applied as it is */
+  problems?: string[];
   note?: string;
   applyLabel: string;
 }
+
+const money = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
 /** How a proposal's card reads. */
 export function describeProposal(p: SetupProposal, s: SetupState): ProposalView {
@@ -196,6 +290,32 @@ export function describeProposal(p: SetupProposal, s: SetupState): ProposalView 
         note: 'Each person gets an email with a link to join.',
         applyLabel: 'Send invitations',
       };
+    case 'add_employees': {
+      const own = s.numbering?.mode === 'own';
+      const problems = employeeProblems(p.items, s);
+      return {
+        title: `Add ${plural(p.items.length, 'employee', 'employees')}`,
+        lines: [],
+        table: {
+          columns: [...(own ? ['Number'] : []), 'Name', 'Work email', 'Phone', 'Job title', 'Department', 'Branch', 'Type', 'Starts', 'Basic salary'],
+          rows: p.items.map((e) => [
+            ...(own ? [e.employee_number ?? '—'] : []),
+            `${e.first_name} ${e.last_name}`,
+            e.work_email,
+            e.phone ?? '—',
+            e.job_title ?? '—',
+            e.department ?? '—',
+            e.branch ?? '—',
+            e.employment_type ?? '—',
+            e.start_date ?? '—',
+            e.basic_salary !== undefined ? money(e.basic_salary) : '—',
+          ]),
+        },
+        ...(problems.length ? { problems } : {}),
+        note: `${own ? '' : `Numbers are given by the system (next ${s.numbering?.preview ?? 'in order'}). `}Each new employee is emailed a link to join as Staff and fill in the rest of their details. Anyone already in the company is left as they are.`,
+        applyLabel: `Add ${plural(p.items.length, 'employee', 'employees')}`,
+      };
+    }
   }
 }
 
@@ -274,6 +394,54 @@ export async function applyProposal(p: SetupProposal, s: SetupState): Promise<st
       ].filter(Boolean);
       // nothing was made at all: show it as refused (an invitation made but not emailed can still be sent by hand)
       if (outcomes.every((o) => o.status === 'failed')) throw new Error(notSent[0]?.reason || 'The invitations were not sent.');
+      return parts.join(' ');
+    }
+
+    case 'add_employees': {
+      const problems = employeeProblems(p.items, s);
+      if (problems.length) throw new Error(problems.slice(0, 3).join('; ') + (problems.length > 3 ? ` (and ${problems.length - 3} more)` : ''));
+
+      // only new people: save_employees_batch would update an employee whose work email or number a row has
+      const own = s.numbering?.mode === 'own';
+      const existing = await findExistingEmployees(
+        p.items.map((e) => normaliseWorkEmail(e.work_email)),
+        own ? p.items.map((e) => e.employee_number?.trim() ?? '') : []
+      );
+      const already = p.items.filter((e) => existing.emails.has(normaliseWorkEmail(e.work_email)));
+      const numberTaken = p.items.filter((e) => !already.includes(e) && own && existing.numbers.has(e.employee_number?.trim() ?? ''));
+      const fresh = p.items.filter((e) => !already.includes(e) && !numberTaken.includes(e));
+
+      const saved = fresh.length
+        ? await saveEmployeesInBatches(fresh.map((e, i) => ({ row: i + 1, data: employeeRecord(e, s) })))
+        : [];
+      const created = saved.filter((r) => r.outcome === 'created');
+      const failed = saved
+        .filter((r) => r.outcome !== 'created')
+        .map((r) => {
+          const e = fresh[r.row_no - 1];
+          return `${e ? `${e.first_name} ${e.last_name}` : `Row ${r.row_no}`}: ${r.outcome === 'error' ? describeSaveError(r.error_code, r.error_message) : 'already an employee'}`;
+        });
+
+      // as after Bulk upload: everyone added is emailed a link to join (sent in the background) and is now onboarding
+      let notInvited: string[] = [];
+      const emails = created.map((r) => r.work_email).filter((x): x is string => !!x);
+      if (emails.length) {
+        const queued = await queueInvitations(emails.map((email) => ({ email, role: 'STAFF' })));
+        rememberInviteBatch(queued.batchId);
+        notInvited = queued.rejected.map((r) => r.email);
+        const rejected = new Set(notInvited);
+        await startOnboardingByEmail(emails.filter((email) => !rejected.has(email)));
+      }
+
+      const numbers = created.length <= 5 ? created.map((r) => r.employee_number).filter(Boolean) : [];
+      const parts = [
+        created.length && `Added ${plural(created.length, 'employee', 'employees')}${numbers.length ? ` (${numbers.join(', ')})` : ''}; their invitations to join are on their way.`,
+        already.length && `Already employees, left as they are: ${already.map((e) => e.work_email).join(', ')}.`,
+        numberTaken.length && `Not added, their Employee Number is taken: ${numberTaken.map((e) => `${e.first_name} ${e.last_name} (${e.employee_number})`).join(', ')}.`,
+        failed.length && `Not added: ${failed.join('; ')}.`,
+        notInvited.length && `Not invited (send it from Invite people): ${notInvited.join(', ')}.`,
+      ].filter(Boolean);
+      if (!created.length && !already.length) throw new Error(parts.join(' ') || 'No one was added.');
       return parts.join(' ');
     }
   }

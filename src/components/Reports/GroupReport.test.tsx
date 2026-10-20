@@ -127,6 +127,24 @@ describe('the dashboard cards', () => {
     expect(screen.getByText('KSh 109,305')).toBeTruthy();
   });
 
+  it('shows gross and net pay against the month before, and nothing to compare when that month has no payslips', () => {
+    const before = kenyaOnly.payslips.map((p) => ({ ...p, pay_period: '2026-09', gross_pay: Number(p.gross_pay) * 0.8, net_pay: Number(p.net_pay) * 0.8 }));
+    render(<GroupOverviewView {...kenyaOnly} previousPayslips={before} payPeriod="2026-10" ratesByCountry={RATES} canPayroll />);
+    const card = (label: string) => screen.getByText(`${label} · October 2026`).closest('.rounded-card') as HTMLElement;
+    expect(card('Gross pay').textContent).toContain('+25% on September 2026');
+    expect(card('Net pay').textContent).toContain('+25% on September 2026');
+    expect(card('Employer cost').textContent).not.toContain('on September');
+    cleanup();
+    render(<GroupOverviewView {...kenyaOnly} payPeriod="2026-10" ratesByCountry={RATES} canPayroll />);
+    expect(screen.queryByText(/on September/)).toBeNull();
+  });
+
+  it('shows headcount by country as bars, one per country', () => {
+    render(<GroupOverviewView branches={BRANCHES} employees={EMPLOYEES} payslips={PAYSLIPS} payPeriod="2026-10" ratesByCountry={RATES} canPayroll />);
+    const bars = screen.getByRole('list', { name: 'Current staff by country' });
+    expect(within(bars).getAllByRole('listitem').length).toBeGreaterThan(1);
+  });
+
   it('shows no money without payroll', () => {
     const { container } = render(<GroupOverviewView {...kenyaOnly} payPeriod="2026-10" ratesByCountry={RATES} canPayroll={false} />);
     expect(container.textContent).toBe('');

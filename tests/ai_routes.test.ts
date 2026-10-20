@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
   modelCalls: [] as { url: string; auth: string; body: any }[],
   budgets: new Map<string, number>(),
   budgetCalls: [] as Record<string, unknown>[],
+  rates: [] as Record<string, unknown>[],
   modelReply: { ok: true, status: 200, json: { choices: [{ message: { content: 'An answer' } }], usage: { total_tokens: 7 } } } as {
     ok: boolean;
     status: number;
@@ -53,6 +54,14 @@ vi.mock('@supabase/supabase-js', () => {
     from: (name: string) => {
       if (name === 'user_profiles') return table(() => state.profiles);
       if (name === 'role_permissions') return table(() => state.permissions);
+      // the default statutory rates the legal answers quote (hr_law.js); select().is('tenant_id', null)
+      if (name === 'statutory_rates') {
+        const b = {
+          select: () => b,
+          is: async (k: string, v: unknown) => ({ data: state.rates.filter((r) => r[k] === v), error: null }),
+        };
+        return b;
+      }
       throw new Error(`unexpected table ${name}`);
     },
   };
@@ -150,10 +159,40 @@ describe('asking the model', () => {
     expect(call.body.model).toBe('gpt-4.1-mini');
     expect(call.body).not.toHaveProperty('temperature');
     expect(call.auth).toBe('Bearer sk-server-only');
-    expect(call.body.messages).toEqual([
-      { role: 'system', content: 'You are an HR assistant. Analyze this HR data and respond helpfully: {"employees":[]}' },
-      { role: 'user', content: 'Who is on leave?' },
-    ]);
+    expect(call.body.messages).toHaveLength(2);
+    expect(call.body.messages[0].role).toBe('system');
+    expect(call.body.messages[0].content.startsWith('You are an HR assistant. Analyze this HR data and respond helpfully: {"employees":[]}')).toBe(true);
+    expect(call.body.messages[1]).toEqual({ role: 'user', content: 'Who is on leave?' });
+  });
+
+  it('gives the HR assistant the cited law for the question, with the rules for answering it', async () => {
+    expect((await ask(who('hr'), { ...question, prompt: 'How many days of annual leave must we give?' })).status).toBe(200);
+    const system = state.modelCalls[0].body.messages[0].content as string;
+    expect(system).toContain('Employment Act 2007, s.28');
+    expect(system).toContain('a guide, not legal advice');
+    expect(system).toContain('say you do not have a cited rule');
+    expect(system).not.toContain('Employment and Labour Relations Act'); // Tanzania not asked about
+  });
+
+  it("follows the country in the question, else the company's data", async () => {
+    await ask(who('hr'), { ...question, prompt: 'What is the maternity leave in Uganda?' });
+    expect(state.modelCalls[0].body.messages[0].content).toContain('Employment Act 2006, s.56');
+    await ask(who('hr'), { ...question, prompt: 'What notice do we give?', context: '{"employees":[{"branch":"Dar es Salaam","country":"Tanzania"}]}' });
+    expect(state.modelCalls[1].body.messages[0].content).toContain('Employment and Labour Relations Act 2004, s.41');
+  });
+
+  it("quotes the default rates in force today from statutory_rates when asked about one, never another company's", async () => {
+    state.rates = [
+      { tenant_id: null, country: 'Kenya', code: 'nssf_rate', value: 0.06, bands: null, effective_from: '2025-02-01', effective_to: null, source: 'NSSF Act 2013' },
+      { tenant_id: null, country: 'Kenya', code: 'old_rate', value: 0.05, bands: null, effective_from: '2020-01-01', effective_to: '2021-01-01', source: '' },
+      { tenant_id: 'tenant-b', country: 'Kenya', code: 'nssf_rate', value: 0.99, bands: null, effective_from: '2025-02-01', effective_to: null, source: '' },
+    ];
+    await ask(who('hr'), { ...question, prompt: 'How much NSSF do we deduct?' });
+    const system = state.modelCalls[0].body.messages[0].content as string;
+    expect(system).toContain('Kenya nssf_rate: 0.06 (from 2025-02-01; NSSF Act 2013)');
+    expect(system).not.toContain('old_rate');
+    expect(system).not.toContain('0.99');
+    state.rates = [];
   });
 
   it('passes the earlier conversation between the instruction and the new question', async () => {
@@ -424,5 +463,69 @@ describe('setup: setting a company up by chatting (proposals only)', () => {
     expect(routes.SETUP_CURRENCIES).toEqual(profile.CURRENCIES);
     expect(routes.SETUP_WEEK_DAYS).toEqual(profile.WEEK_DAYS);
     expect(routes.SETUP_INVITE_ROLES).toEqual(INVITABLE_ROLES.filter((r) => r !== 'ADMIN'));
+    const { STANDARD_EMPLOYEE_TYPES } = await import('../src/lib/employmentTypes');
+    expect(routes.SETUP_EMPLOYEE_TYPES).toEqual(STANDARD_EMPLOYEE_TYPES);
+  });
+
+  it('tells the model to propose employees straight away, and gives it the law for the company countries', async () => {
+    const messages = [{ role: 'user', content: 'How long can probation be? Also add Jane Wanjiru, jane@bloom.co.ke' }];
+    await askSetup(who('admin'), { messages, company: { profile: { country: 'Kenya' }, branches: ['Kampala (Uganda)'] } });
+    const system = state.modelCalls[0].body.messages[0].content as string;
+    expect(system).toContain('"type": "add_employees"');
+    expect(system).toContain('in that same reply');
+    expect(system).toContain('Do not ask them to confirm the list first');
+    expect(system).toContain('Employment Act 2007, s.42'); // Kenya probation
+    expect(system).toContain('Employment Act 2006, s.67'); // Uganda probation (a branch there)
+    expect(state.modelCalls[0].body.max_completion_tokens).toBeGreaterThanOrEqual(6000);
+  });
+
+  it('keeps employees it can add, tidied, and caps how many', async () => {
+    const many = Array.from({ length: 60 }, (_, i) => ({ first_name: 'P', last_name: `${i}`, work_email: `p${i}@bloom.co.ke` }));
+    replyWith(
+      JSON.stringify({
+        reply: 'Here they are.',
+        proposals: [
+          {
+            type: 'add_employees',
+            items: [
+              {
+                first_name: ' Jane ', last_name: 'Wanjiru', work_email: 'Jane.W@Bloom.co.ke', phone: '0712 345 678', job_title: 'Accountant',
+                department: 'Finance', branch: 'Nairobi', employment_type: 'permanent', start_date: '2026-11-01', basic_salary: '85,000',
+                employee_number: 'BF/001', password: 'x',
+              },
+              // optional fields that do not fit are dropped, the person kept
+              { first_name: 'Otieno', last_name: 'Juma', work_email: 'otieno@bloom.co.ke', phone: '12', employment_type: 'Boss', start_date: '2026-02-30', basic_salary: -5 },
+              { first_name: 'No', last_name: 'Email' },
+              { first_name: 'Bad', last_name: 'Email', work_email: 'nope' },
+              { first_name: 'Only', work_email: 'only@bloom.co.ke' },
+              { first_name: 'Jane', last_name: 'Again', work_email: 'jane.w@bloom.co.ke' }, // the same email twice
+              'not a person',
+            ],
+          },
+          { type: 'add_employees', items: many },
+          { type: 'add_employees', items: [{ first_name: 'x' }] },
+        ],
+      })
+    );
+    const answer = await (await askSetup(who('admin'), chat)).json();
+    expect(answer.proposals[0]).toEqual({
+      type: 'add_employees',
+      items: [
+        {
+          first_name: 'Jane', last_name: 'Wanjiru', work_email: 'jane.w@bloom.co.ke', phone: '0712 345 678', job_title: 'Accountant',
+          department: 'Finance', branch: 'Nairobi', employment_type: 'Permanent', start_date: '2026-11-01', basic_salary: 85000, employee_number: 'BF/001',
+        },
+        { first_name: 'Otieno', last_name: 'Juma', work_email: 'otieno@bloom.co.ke' },
+      ],
+    });
+    expect(answer.proposals[1].items).toHaveLength(50);
+    expect(answer.proposals).toHaveLength(2);
+  });
+
+  it("reads the company's countries from its profile and branches", async () => {
+    const { setupCountries } = await import('../ai_routes.js');
+    expect(setupCountries({ profile: { country: 'Kenya' }, branches: ['Arusha (Tanzania)', 'HQ (Kenya), default'] })).toEqual(['Kenya', 'Tanzania']);
+    expect(setupCountries({ profile: { country: 'Rwanda' } })).toEqual(['General']);
+    expect(setupCountries({ profile: 'not set up yet', branches: 'unknown' })).toEqual([]);
   });
 });
