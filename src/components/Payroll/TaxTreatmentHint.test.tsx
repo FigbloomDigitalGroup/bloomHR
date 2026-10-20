@@ -92,13 +92,13 @@ describe('TaxTreatmentHint', () => {
     rerender(<TaxTreatmentHint kind="deduction" name="Life insurance" onUse={onUse} />);
     expect(onUse).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Use this' }));
-    expect(onUse).toHaveBeenCalledWith('relief');
+    expect(onUse).toHaveBeenCalledWith('relief', expect.objectContaining({ by: 'rule', ruleId: 'insurance' }));
 
     rerender(<TaxTreatmentHint kind="deduction" name="Gym membership" onUse={onUse} debounceMs={0} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Ask AI' }));
     await screen.findByText('AI suggestion');
     expect(onUse).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'Use this' }));
-    expect(onUse).toHaveBeenLastCalledWith('not_taxable');
+    expect(onUse).toHaveBeenLastCalledWith('not_taxable', expect.objectContaining({ by: 'ai', ruleId: null }));
   });
 });

@@ -8,17 +8,20 @@ import {
   approveRun, createRun, deleteRun, loadRunLines, loadRuns, markRunPaid, refreshRun, reopenRun, saveAdjustment,
 } from '../../lib/casualApi';
 import {
-  addDays, casualBankFile, casualMpesaFile, formatKsh, lineNet, periodLabel, runTotal, today, weekStart,
+  addDays, casualBankFile, casualMpesaFile, formatKsh, lineNet, periodLabel, runTotal, standingItemsOf, today, weekStart,
   type CasualPayLine, type CasualPayRun,
 } from '../../lib/casualPay';
+import { maxOneOffDeduction } from '../../lib/payItems';
+import { loadDeductionCap } from '../../lib/workSettlementApi';
 import { toCsv, type ExportFile } from '../../lib/payrollExports';
 import { XLSX_TYPE, toXlsx } from '../../lib/xlsxExport';
 import { casualRateShortfall, money, perDayMinimum } from '../../lib/minimumWage';
 import { useMinimumWages } from '../../hooks/useMinimumWages';
 import { LoaderBlock } from '../UI/FigbloomLoader';
 
-// Paying casuals: pick a period (a day, a week or any dates), see each person's days x daily rate, add one-off
-// additions or deductions with a note, approve (the lines are then fixed), download the M-Pesa or bank file, and
+// Paying casuals: pick a period (a day, a week or any dates), see each person's days x daily rate and the company's
+// standing pay items for casuals (lunch per day worked and the like, Payroll > Pay items; worked out by the database),
+// add one-off additions or deductions with a note, approve (the lines are then fixed), download the M-Pesa or bank file, and
 // mark the run paid. No PAYE, NSSF, SHIF or AHL is taken: casuals are not on the monthly payroll.
 
 const STATUS: Record<CasualPayRun['status'], { label: string; tone: StatusTone }> = {
@@ -96,7 +99,7 @@ function NewRunModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   );
 }
 
-function AdjustModal({ line, onClose, onSaved }: { line: CasualPayLine; onClose: () => void; onSaved: () => void }) {
+function AdjustModal({ line, capOn, onClose, onSaved }: { line: CasualPayLine; capOn: boolean; onClose: () => void; onSaved: () => void }) {
   const [add, setAdd] = useState(String(Number(line.additions) || ''));
   const [ded, setDed] = useState(String(Number(line.deductions) || ''));
   const [note, setNote] = useState(line.adjustment_note ?? '');
@@ -107,7 +110,13 @@ function AdjustModal({ line, onClose, onSaved }: { line: CasualPayLine; onClose:
   const save = async () => {
     if (additions < 0 || deductions < 0) return setProblem('Amounts can’t be below 0.');
     if ((additions || deductions) && !note.trim()) return setProblem('Say what the addition or deduction is for.');
-    if (deductions > Number(line.days_amount) + additions) return setProblem('A deduction can’t be more than their pay.');
+    if (deductions > maxOneOffDeduction(line, additions, capOn)) {
+      return setProblem(
+        capOn
+          ? `The deduction can be at most ${formatKsh(maxOneOffDeduction(line, additions, capOn))}: all deductions stay within two-thirds of the pay (Employment Act s.19(3)).`
+          : 'A deduction can’t be more than their pay.',
+      );
+    }
     try {
       await saveAdjustment(line.id, additions, deductions, note);
       onSaved();
@@ -125,9 +134,15 @@ function AdjustModal({ line, onClose, onSaved }: { line: CasualPayLine; onClose:
           <label className="flex flex-col gap-1">Deduction (KSh)<input className={field} inputMode="decimal" value={ded} onChange={(e) => setDed(e.target.value)} /></label>
         </div>
         <label className="flex flex-col gap-1">What for<input className={field} value={note} placeholder="Transport, overtime, a lost tool..." onChange={(e) => setNote(e.target.value)} /></label>
+        <StandingList line={line} />
         <p className="text-muted-foreground">
-          Days {formatKsh(line.days_amount)} + {formatKsh(additions)} - {formatKsh(deductions)} ={' '}
-          <span className="font-semibold text-ink">{formatKsh(lineNet({ days_amount: line.days_amount, additions, deductions }))}</span>
+          Days {formatKsh(line.days_amount)}
+          {Number(line.standing_additions) > 0 && <> + standing {formatKsh(line.standing_additions ?? 0)}</>}
+          {Number(line.standing_deductions) > 0 && <> - standing {formatKsh(line.standing_deductions ?? 0)}</>} + {formatKsh(additions)} -{' '}
+          {formatKsh(deductions)} ={' '}
+          <span className="font-semibold text-ink">
+            {formatKsh(lineNet({ ...line, additions, deductions }))}
+          </span>
         </p>
         {problem && <p role="alert" className="text-status-danger">{problem}</p>}
         <div className="flex justify-end gap-2">
@@ -136,6 +151,27 @@ function AdjustModal({ line, onClose, onSaved }: { line: CasualPayLine; onClose:
         </div>
       </div>
     </Modal>
+  );
+}
+
+// a line's additions and deductions: its standing items and its one-off adjustment together
+const additionsOf = (l: CasualPayLine) => Math.round((Number(l.standing_additions ?? 0) + Number(l.additions)) * 100) / 100;
+const deductionsOf = (l: CasualPayLine) => Math.round((Number(l.standing_deductions ?? 0) + Number(l.deductions)) * 100) / 100;
+
+/** A line's standing items: "Lunch: -KSh 500", and a note when the two-thirds limit cut one. */
+function StandingList({ line }: { line: CasualPayLine }) {
+  const items = standingItemsOf(line);
+  if (!items.length) return null;
+  return (
+    <ul className="m-0 p-0 list-none text-[10.5px] text-subtle" data-testid="standing-items">
+      {items.map((i) => (
+        <li key={`${i.kind}:${i.name}`}>
+          {i.name}: {i.kind === 'deduction' ? '-' : '+'}
+          {formatKsh(i.amount)}
+          {i.amount < i.full && ` (of ${formatKsh(i.full)}: the rest is over the deduction limit)`}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -151,6 +187,17 @@ function RunDetail({ run, onBack, onChanged }: { run: CasualPayRun; onBack: () =
   const [paidOn, setPaidOn] = useState(today());
   const [busy, setBusy] = useState(false);
   const draft = run.status === 'draft';
+  // Employment Act s.19(3) two-thirds limit on deductions (company setting, on unless turned off)
+  const [capOn, setCapOn] = useState(true);
+  useEffect(() => {
+    let live = true;
+    loadDeductionCap()
+      .then((on) => live && setCapOn(on))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
   // daily rates below the per-day minimum wage on the run's last day (FIG-812 stage 6): a warning, never a block
   const wages = useMinimumWages(run.period_end);
 
@@ -271,14 +318,15 @@ function RunDetail({ run, onBack, onChanged }: { run: CasualPayRun; onBack: () =
                 <tr key={l.id} className="border-b border-border last:border-0">
                   <td className="px-3 py-2">
                     <div className="font-semibold text-ink">{l.worker_name}</div>
+                    <StandingList line={l} />
                     {l.adjustment_note && <div className="text-[10.5px] text-subtle">{l.adjustment_note}</div>}
                   </td>
                   <td className="px-3 py-2 text-right">{l.full_days}</td>
                   <td className="px-3 py-2 text-right">{l.half_days}</td>
                   <td className="px-3 py-2 text-right">{l.daily_rate ? formatKsh(l.daily_rate) : ''}</td>
                   <td className="px-3 py-2 text-right">{formatKsh(l.days_amount)}</td>
-                  <td className="px-3 py-2 text-right">{Number(l.additions) ? formatKsh(l.additions) : '-'}</td>
-                  <td className="px-3 py-2 text-right">{Number(l.deductions) ? formatKsh(l.deductions) : '-'}</td>
+                  <td className="px-3 py-2 text-right">{additionsOf(l) ? formatKsh(additionsOf(l)) : '-'}</td>
+                  <td className="px-3 py-2 text-right">{deductionsOf(l) ? formatKsh(deductionsOf(l)) : '-'}</td>
                   <td className="px-3 py-2 text-right font-semibold text-ink">{formatKsh(lineNet(l))}</td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     {l.payment_method === 'Bank Transfer' ? 'Bank' : 'M-Pesa'}
@@ -349,7 +397,7 @@ function RunDetail({ run, onBack, onChanged }: { run: CasualPayRun; onBack: () =
         </Card>
       )}
 
-      {adjusting && <AdjustModal line={adjusting} onClose={() => setAdjusting(null)} onSaved={() => { void reload(); onChanged(); }} />}
+      {adjusting && <AdjustModal line={adjusting} capOn={capOn} onClose={() => setAdjusting(null)} onSaved={() => { void reload(); onChanged(); }} />}
     </div>
   );
 }
@@ -379,7 +427,10 @@ export default function CasualPayRuns() {
   return (
     <Card padding="none">
       <div className="flex items-center gap-2 p-3 border-b border-border">
-        <p className="text-xs text-muted-foreground flex-1">Days x daily rate, with no PAYE, NSSF, SHIF or AHL taken.</p>
+        <p className="text-xs text-muted-foreground flex-1">
+          Days x daily rate, with no PAYE, NSSF, SHIF or AHL taken. Standing deductions and allowances for casuals (such as lunch per
+          day worked) are set under Payroll, Pay items, and applied to each run.
+        </p>
         <Button icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setCreating(true)}>New pay run</Button>
       </div>
       {runs.length === 0 ? (

@@ -4,7 +4,10 @@ import {
   TAX_DISCLAIMER,
   explainRule,
   findTaxRule,
+  goAheadFor,
+  ruleSource,
   treatmentLabel,
+  type GoAhead,
   type PayItemKind,
   type TaxTreatment,
 } from '../../lib/kenyaTaxTreatment';
@@ -27,9 +30,41 @@ export interface TaxTreatmentHintProps {
   /** the statutory rates in force, to show caps in KSh (without them the hint says "the monthly limit") */
   rates?: Rates | null;
   /** when the form has a tax-treatment field: fills it after the user presses "Use this" */
-  onUse?: (treatment: TaxTreatment) => void;
+  onUse?: (treatment: TaxTreatment, source: TaxTreatmentSource) => void;
   /** wait this long after the last keystroke before looking the name up */
   debounceMs?: number;
+  /** the AI button's label */
+  askLabel?: string;
+  /** also say whether the company can go ahead with the item (Employment Act s.19 for deductions) */
+  showGoAhead?: boolean;
+}
+
+/** Where a treatment handed to the form came from, to save with it. */
+export interface TaxTreatmentSource {
+  by: 'rule' | 'ai';
+  /** the rules-table id, for a rule */
+  ruleId: string | null;
+  /** a line naming the source and its legal basis */
+  text: string;
+}
+
+const GO_AHEAD_LABEL: Record<GoAhead['status'], string> = {
+  yes: 'You can go ahead',
+  with_conditions: 'You can go ahead, on conditions',
+  no: 'Do not go ahead',
+};
+const GO_AHEAD_TONE: Record<GoAhead['status'], string> = {
+  yes: 'text-status-success',
+  with_conditions: 'text-orange-text',
+  no: 'text-status-danger',
+};
+
+function GoAheadLine({ goAhead }: { goAhead: GoAhead }) {
+  return (
+    <p data-testid="go-ahead">
+      <span className={`font-semibold ${GO_AHEAD_TONE[goAhead.status]}`}>{GO_AHEAD_LABEL[goAhead.status]}.</span> {goAhead.note}
+    </p>
+  );
 }
 
 const BADGE: Record<TaxTreatment, string> = {
@@ -51,7 +86,16 @@ function Badge({ treatment, kind }: { treatment: TaxTreatment; kind: PayItemKind
   );
 }
 
-export default function TaxTreatmentHint({ kind, name, description, rates, onUse, debounceMs = 300 }: TaxTreatmentHintProps) {
+export default function TaxTreatmentHint({
+  kind,
+  name,
+  description,
+  rates,
+  onUse,
+  debounceMs = 300,
+  askLabel = 'Ask AI',
+  showGoAhead = false,
+}: TaxTreatmentHintProps) {
   const [settled, setSettled] = useState(name.trim());
   const [ai, setAi] = useState<{ state: 'idle' } | { state: 'asking' } | { state: 'done'; answer: AITaxSuggestion } | { state: 'error'; message: string }>({
     state: 'idle',
@@ -83,9 +127,9 @@ export default function TaxTreatmentHint({ kind, name, description, rates, onUse
     }
   };
 
-  const applyButton = (treatment: TaxTreatment) =>
+  const applyButton = (treatment: TaxTreatment, source: TaxTreatmentSource) =>
     onUse && (
-      <button type="button" className={smallButton} onClick={() => onUse(treatment)}>
+      <button type="button" className={smallButton} onClick={() => onUse(treatment, source)}>
         Use this
       </button>
     );
@@ -100,9 +144,10 @@ export default function TaxTreatmentHint({ kind, name, description, rates, onUse
           <span className="font-semibold">{rule.title}</span>
           <Badge treatment={rule.treatment} kind={kind} />
           <span className="flex-1" />
-          {applyButton(rule.treatment)}
+          {applyButton(rule.treatment, { by: 'rule', ruleId: rule.id, text: ruleSource(rule) })}
         </div>
         <p>{explainRule(rule, rates)}</p>
+        {showGoAhead && <GoAheadLine goAhead={goAheadFor(rule, kind)} />}
         {kind === 'deduction' && rule.inThisApp && <p className="text-muted-foreground">{rule.inThisApp}</p>}
         {rule.caveats.length > 0 && (
           <ul className="list-disc pl-4 text-muted-foreground">
@@ -124,7 +169,7 @@ export default function TaxTreatmentHint({ kind, name, description, rates, onUse
           <span className="text-muted-foreground">No built-in tax rule for “{settled}”.</span>
           <button type="button" className={smallButton} onClick={askAi} disabled={ai.state === 'asking'}>
             {ai.state === 'asking' ? <Loader className="w-3 h-3 animate-spin" aria-hidden /> : <Sparkles className="w-3 h-3" aria-hidden />}
-            {ai.state === 'asking' ? 'Asking…' : 'Ask AI'}
+            {ai.state === 'asking' ? 'Asking…' : askLabel}
           </button>
         </div>
       )}
@@ -137,9 +182,22 @@ export default function TaxTreatmentHint({ kind, name, description, rates, onUse
             <Badge treatment={ai.answer.treatment} kind={kind} />
             <span className="text-[10px] text-subtle">{ai.answer.confidence} confidence</span>
             <span className="flex-1" />
-            {applyButton(ai.answer.treatment)}
+            {applyButton(ai.answer.treatment, {
+              by: 'ai',
+              ruleId: null,
+              text: `AI suggestion (${ai.answer.confidence} confidence), confirmed by the person saving it: ${ai.answer.legal_basis}`,
+            })}
           </div>
           <p>{ai.answer.explanation}</p>
+          {showGoAhead && (
+            <GoAheadLine
+              goAhead={
+                ai.answer.go_ahead && ai.answer.go_ahead_reason
+                  ? { status: ai.answer.go_ahead, note: ai.answer.go_ahead_reason }
+                  : goAheadFor(null, kind)
+              }
+            />
+          )}
           {ai.answer.caveats.length > 0 && (
             <ul className="list-disc pl-4 text-muted-foreground">
               {ai.answer.caveats.map((c) => (

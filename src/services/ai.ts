@@ -57,6 +57,9 @@ export interface AITaxSuggestion {
   legal_basis: string;
   confidence: 'high' | 'medium' | 'low';
   caveats: string[];
+  /** whether the employer can go ahead with it, and why (left out when the AI gave no valid answer) */
+  go_ahead?: 'yes' | 'with_conditions' | 'no';
+  go_ahead_reason?: string;
 }
 
 /** One turn of the set-up chat; the AI's own turns are sent back as the JSON it gave, with each proposal's status. */
