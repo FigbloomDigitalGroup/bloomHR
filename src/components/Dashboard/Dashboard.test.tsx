@@ -176,3 +176,101 @@ describe('Dashboard: Setup guide link', () => {
     expect(screen.queryByRole('button', { name: 'Setup guide' })).toBeNull();
   });
 });
+
+describe('Dashboard: at a glance', () => {
+  const staff = [
+    { Town: 'Nairobi', Status: 'Active', 'Start Date': '2020-01-01' },
+    { Town: 'Nairobi', Status: 'Active', 'Start Date': '2026-10-05' },
+    { Town: 'Kisumu', Status: 'Active', 'Start Date': '2024-02-01' },
+    { Town: 'Mombasa', Status: 'Terminated', 'Start Date': '2019-03-01', 'Termination Date': '2026-10-02' },
+  ];
+  const leave = [
+    { 'Employee Number': 'E1', status: 'Approved', 'Start Date': '2026-10-15', 'End Date': '2026-10-20', 'Leave Type': 'Annual' },
+    { 'Employee Number': 'E2', status: 'Pending', 'Start Date': '2026-10-25', 'End Date': '2026-10-26', 'Leave Type': 'Annual' },
+    { 'Employee Number': 'E3', status: 'Pending', 'Start Date': '2026-11-02', 'End Date': '2026-11-03', 'Leave Type': 'Sick' },
+    { 'Employee Number': 'E4', status: 'Rejected', 'Start Date': '2026-09-01', 'End Date': '2026-09-02', 'Leave Type': 'Annual' },
+  ];
+
+  const tile = async (label: string) => (await screen.findByText(label)).closest('.rounded-card') as HTMLElement;
+
+  it('shows who is on leave today, what waits for approval, and this month’s joiners and leavers', async () => {
+    state.tables.employees = { data: staff, count: 4 };
+    state.tables.leave_application = { data: leave, count: 4 };
+    open();
+    const onLeave = await tile('On leave today');
+    expect(await within(onLeave).findByText('1')).toBeTruthy();
+    const requests = await tile('Leave Requests');
+    expect(await within(requests).findByText('2 waiting for approval')).toBeTruthy();
+    const people = await tile('Total Employees');
+    expect(await within(people).findByText('1 joined · 1 left in Oct')).toBeTruthy();
+    expect(within(people).getByRole('img', { name: /On staff over the last 12 months: .* 3 in Oct 2026/ })).toBeTruthy();
+  });
+
+  it('opens Leave from the leave tiles only for whoever can open it', async () => {
+    state.tables.leave_application = { data: leave, count: 4 };
+    state.modules = ['leaves'];
+    open();
+    fireEvent.click(await screen.findByRole('button', { name: /On leave today: 1/ }));
+    expect(state.navigate).toHaveBeenCalledWith('/leaves');
+    cleanup();
+    state.modules = [];
+    open();
+    await screen.findByText('On leave today');
+    expect(screen.queryByRole('button', { name: /On leave today/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Leave Requests/ })).toBeNull();
+  });
+
+  it('shows a dash, not a made-up zero, when leave cannot be read', async () => {
+    state.tables.leave_application = { error: { message: 'permission denied' } };
+    open();
+    const onLeave = await tile('On leave today');
+    expect(await within(onLeave).findByText('—')).toBeTruthy();
+  });
+});
+
+describe('Dashboard: Analytics', () => {
+  // the charts size themselves to their card; jsdom has no ResizeObserver
+  beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const openAnalytics = async () => {
+    open();
+    fireEvent.click(await screen.findByRole('button', { name: 'Analytics' }));
+    return screen.findByTestId('dashboard-analytics');
+  };
+
+  it('draws headcount by town, leave by status, and the monthly charts with a table twin', async () => {
+    state.tables.employees = {
+      data: [
+        { Town: 'Nairobi', Status: 'Active', 'Start Date': '2026-10-01' },
+        { Town: 'Nairobi', Status: 'Active', 'Start Date': '2024-01-01' },
+        { Town: 'Kisumu', Status: 'Active', 'Start Date': '2024-01-01' },
+        { Town: 'Mombasa', Status: 'Resigned', 'Start Date': '2024-01-01', 'Termination Date': '2026-06-30' },
+      ],
+      count: 4,
+    };
+    state.tables.leave_application = { data: [{ status: 'Approved' }, { status: 'approved' }, { status: null }], count: 3 };
+    const analytics = await openAnalytics();
+    const towns = await within(analytics).findByRole('list', { name: 'Current staff by town' });
+    expect(within(towns).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Nairobi2 people', 'Kisumu1 person']);
+    const status = within(analytics).getByRole('list', { name: 'Leave requests by status' });
+    expect(within(status).getByText('Approved').closest('li')?.textContent).toContain('67%');
+    expect(within(status).getByText('Pending').closest('li')?.textContent).toContain('33%');
+    expect(within(analytics).getByText('3 requests in all')).toBeTruthy();
+    const trend = within(analytics).getByRole('table', { name: 'People on staff at the end of each month' });
+    expect(within(trend).getByRole('row', { name: /Oct 2026/ }).textContent).toBe('Oct 20263');
+    const flows = within(analytics).getByRole('table', { name: 'People who joined and left each month' });
+    expect(within(flows).getByRole('row', { name: /Jun 2026/ }).textContent).toBe('Jun 202601');
+  });
+
+  it('says so when there is nothing to chart', async () => {
+    const analytics = await openAnalytics();
+    expect(await within(analytics).findByText('No leave data')).toBeTruthy();
+    expect(within(analytics).getAllByText('No employee data')).toHaveLength(2);
+    expect(within(analytics).getByText('Nobody joined or left this year')).toBeTruthy();
+  });
+});

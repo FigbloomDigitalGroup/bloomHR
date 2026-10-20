@@ -16,22 +16,28 @@ interface StatCardProps {
   value: ReactNode;
   icon: ReactNode;
   tint?: StatTint;
+  /** a short line under the value: the change on last month, what is waiting, ... (text colours, never the tint) */
+  note?: ReactNode;
+  /** a small chart under the figure, such as a sparkline */
+  trend?: ReactNode;
   className?: string;
 }
 
-export default function StatCard({ label, value, icon, tint = 'green', className = '' }: StatCardProps) {
+export default function StatCard({ label, value, icon, tint = 'green', note, trend, className = '' }: StatCardProps) {
   const { bg, fg } = tintClasses[tint];
   return (
-    <Card className={className}>
-      <div className="flex items-center justify-between gap-3">
+    <Card className={`h-full ${className}`}>
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[11.5px] font-semibold text-muted-foreground">{label}</div>
-          <div className="text-xl sm:text-2xl font-bold text-ink mt-1 break-words">{value}</div>
+          <div className="text-xl sm:text-2xl font-bold text-ink mt-1 break-words leading-tight">{value}</div>
+          {note && <div className="text-[11.5px] text-muted-foreground mt-1">{note}</div>}
         </div>
-        <div className={`w-[38px] h-[38px] shrink-0 rounded-tile flex items-center justify-center ${bg} ${fg}`}>
+        <div className={`w-[38px] h-[38px] shrink-0 rounded-tile flex items-center justify-center ${bg} ${fg}`} aria-hidden="true">
           {icon}
         </div>
       </div>
+      {trend && <div className="mt-3">{trend}</div>}
     </Card>
   );
 }
