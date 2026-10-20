@@ -8,6 +8,7 @@ import {
   Menu,
   ChevronLeft,
   ShieldAlert,
+  HeartPulse,
   UserX,
   LayoutGrid,
   Landmark,
@@ -105,6 +106,8 @@ const menuGroups = [
       { id: 'reports', label: 'Reports', icon: PieChart, path: '/reports' },
       { id: 'email admin', label: 'Email Admin', icon: ShieldEllipsis, path: '/adminconfirm' },
       { id: 'incident-reports', label: 'Incidents', icon: ShieldAlert, path: '/incident-reports' },
+      // workplace accidents and work injuries (WIBA): the same people as incident reports
+      { id: 'work-injuries', label: 'Work injuries', icon: HeartPulse, path: '/work-injuries' },
       { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
       { id: 'setup-assistant', label: 'Set up with AI', icon: Sparkles, path: '/setup-assistant' },
       { id: 'departments', label: 'Departments', icon: Building2, path: '/departments' },

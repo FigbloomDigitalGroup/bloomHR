@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { PageHeader, StatCard, Card, TabBar, EmptyState, Button } from '../UI';
 import GetStarted, { SHOW_SETUP_GUIDE } from './GetStarted';
 import GroupOverview from './GroupOverview';
+import WibaCoverBanner from '../WorkInjury/WibaCoverBanner';
 import { money } from '../../lib/payroll/currency';
 import { TodaysBirthdayWishes } from '../Celebrations/BirthdayWishes';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -102,6 +103,8 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
   const navigate = useNavigate();
   const { hasPermission, hasAllPermissions, loading: permissionsLoading } = usePermissions();
   const canManageBranches = !permissionsLoading && canOpenScreen('/settings/branches', hasPermission);
+  // whoever handles work injuries is warned when the company's WIBA insurance is missing or expired
+  const handlesWorkInjuries = !permissionsLoading && canOpenScreen('/work-injuries', hasPermission);
   // the "Get <company> set up" checklist is for whoever holds Settings and Invite people (GetStarted.tsx)
   const setsUpCompany = !permissionsLoading && hasAllPermissions(['settings', 'invite-people']);
 
@@ -579,6 +582,7 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
         />
 
         <GetStarted />
+        {handlesWorkInjuries && <WibaCoverBanner />}
         <TodaysBirthdayWishes className="mb-4" />
 
         {/* Filters & Tabs */}

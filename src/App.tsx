@@ -63,6 +63,7 @@ const LeaveDisciplinePage = lazy(() => import('./components/LeaveDiscipline/Leav
 const OvertimePage = lazy(() => import('./components/Overtime/OvertimePage'));
 const PieceRatePage = lazy(() => import('./components/PieceRate/PieceRatePage'));
 const IncidentReportsManagement = lazy(() => import('./components/Settings/IncidentReportsManagement'));
+const WorkInjuries = lazy(() => import('./components/WorkInjury/WorkInjuries'));
 const WarningModule = lazy(() => import('./components/Warning/StaffCheck'));
 const BaseReport = lazy(() => import('./components/Reports/BaseReport'));
 const ReportsList = lazy(() => import('./components/Reports/ReportLists'));
@@ -1097,6 +1098,7 @@ function App() {
                                 {gate('/overtime', <OvertimePage />)}
                                 {gate('/loans', <LoansAdmin />)}
                                 {gate('/incident-reports', <IncidentReportsManagement />)}
+                                {gate('/work-injuries', <WorkInjuries />)}
                                 {gate('/adminconfirm', <StaffSignupRequests />)}
                                 {gate('/recruitment', <RecruitmentDashboard />)}
                                 {gate('/performance', <PerformanceDashboard selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange} />)}

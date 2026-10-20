@@ -39,6 +39,8 @@ const INCIDENT_TYPES = [
     { value: 'theft', label: 'Theft' },
     { value: 'policy_violation', label: 'Policy Violation' },
     { value: 'workplace_violence', label: 'Workplace Violence' },
+    { value: 'workplace_injury', label: 'Workplace Accident / Injury' },
+    { value: 'occupational_disease', label: 'Occupational Disease' },
     { value: 'other', label: 'Other' }
 ];
 

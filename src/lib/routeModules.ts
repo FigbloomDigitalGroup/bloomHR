@@ -83,6 +83,8 @@ export const SCREENS: ScreenAccess[] = [
   S('/leave-discipline', 'Leave discipline', ['leaves', 'employees', 'team-work']),
   S('/staffcheck', 'Disciplinary', ['staffcheck']),
   S('/incident-reports', 'Incidents', ['incident-reports']),
+  // workplace accidents and work injury (WIBA) cases: the same people as incident reports
+  S('/work-injuries', 'Work injuries (WIBA)', ['incident-reports']),
 
   // performance
   S('/performance', 'Performance', ['performance']),
