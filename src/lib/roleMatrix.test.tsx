@@ -77,10 +77,13 @@ const GUARDED_CHANGES: Record<string, { gained: string[]; lost: string[] }> = {
   '/hr-lifecycle': { gained: [], lost: ['CHECKER', 'MANAGER'] },
 };
 
+// Menu entries added after the reference capture (their own tests below)
+const ADDED_SINCE = ['Video calls'];
+
 describe('the seven system roles see the same screens as before', () => {
-  it.each(ROLES)('%s: the same sidebar entries, in the same order', (role) => {
+  it.each(ROLES)('%s: the same sidebar entries, in the same order (plus the screens added since)', (role) => {
     const after = usesStaffPortal(role) ? [] : sidebarFor(role, DEFAULT_ROLE_MODULES_AFTER[role]);
-    expect(after).toEqual(B.roles[role].sidebar);
+    expect(after.filter((l) => !ADDED_SINCE.includes(l))).toEqual(B.roles[role].sidebar);
   });
 
   it.each(ROLES)('%s: the guarded routes open for the same roles (except the listed fixes)', (role) => {
@@ -171,6 +174,19 @@ describe('custom roles follow their ticks', () => {
     expect(canOpenScreen('/hr-lifecycle', has)).toBe(true);
     expect(inMenu('/hr-lifecycle', has)).toBe(false);
     expect(inMenu('/hr-lifecycle', hasFor('MANAGER', ['hr-lifecycle']))).toBe(true);
+  });
+
+  it('Video calls: every admin-app role with Teams opens it and sees it after Teams; staff keep it in the portal', () => {
+    for (const role of ROLES.filter((r) => !usesStaffPortal(r))) {
+      const modules = DEFAULT_ROLE_MODULES_AFTER[role];
+      const has = hasFor(role, modules);
+      expect([role, canOpenScreen('/video-calls', has)]).toEqual([role, has('teams')]);
+      const menu = sidebarFor(role, modules);
+      if (has('teams')) expect([role, menu[menu.indexOf('Teams') + 1]]).toEqual([role, 'Video calls']);
+    }
+    expect(canOpenScreen('/video-calls', () => true)).toBe(true);
+    expect(canOpenScreen('/video-calls', hasFor('MANAGER', ['payroll']))).toBe(false);
+    expect(routesFor('STAFF', ['teams'])).toEqual([]);
   });
 
   it('a screen of a module switched off for every company is offered to nobody, administrators included', () => {
