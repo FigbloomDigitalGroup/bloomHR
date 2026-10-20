@@ -9,6 +9,7 @@ import { COMPANY_PROFILE_SAVED } from '../Dashboard/GetStarted';
 import { saveEmployerPin } from '../../lib/p9';
 import WorkWeekCard from './WorkWeek';
 import CompanyEmailSettingsCard from './CompanyEmailSettings';
+import CompanyMailServerCard from './CompanyMailServer';
 import {
   BUSINESS_TYPES,
   COUNTRIES,
@@ -453,6 +454,7 @@ export default function CompanyProfilePage() {
 
         <WorkWeekCard />
         <CompanyEmailSettingsCard />
+        <CompanyMailServerCard />
       </div>
     </div>
   );

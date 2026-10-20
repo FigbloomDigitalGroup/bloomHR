@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Users, CalendarDays, Calendar, Wallet, NotepadText, Phone, AlertCircle, MapPin, RefreshCw, Cake, ChevronRight, PartyPopper, Plane, Sparkles } from "lucide-react";
+import React, { useState, useEffect, useRef, useMemo, type ReactNode } from "react";
+import { Users, CalendarDays, Calendar, Wallet, NotepadText, Phone, AlertCircle, MapPin, RefreshCw, Cake, ChevronRight, PartyPopper, Plane, Sparkles, TrendingUp, UserPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase"
 import { fetchAllResult } from "../../lib/fetchAll";
@@ -17,14 +17,28 @@ import { loadBirthdayPeople, loadCompanyEvents } from '../../lib/upcomingApi';
 import { upcomingBirthdays, type UpcomingItem } from '../../lib/celebrations';
 import { WEEK_DAYS, withinDays } from '../../lib/staffHome';
 import { adminWeekItems, holidaysForCompany, type AdminWeekItem } from '../../lib/adminWeek';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import FigbloomLoader from "../UI/FigbloomLoader";
+import { foldIntoOther, headcountByTown, leaveByStatus, monthLabel, onLeaveToday, pendingLeave, staffByMonth } from '../../lib/dashboardStats';
+import { BarList, ChartHeading, HeadcountTrend, JoinersLeavers, ShareBar, Sparkline } from './DashboardCharts';
 
-const LEAVE_STATUS_COLORS: Record<string, string> = {
-  Pending: '#F26A1B',
-  Approved: '#17402A',
-  Rejected: '#C0392B',
-};
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- the untyped rows the dashboard reads */
+type Row = Record<string, any>;
+
+/** A stat tile that opens a screen, for whoever can open it; the plain tile for everyone else. */
+function TileLink({ to, label, children }: { to: string | null; label: string; children: ReactNode }) {
+  const navigate = useNavigate();
+  if (!to) return <>{children}</>;
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(to)}
+      aria-label={label}
+      className="block w-full h-full text-left rounded-card transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+    >
+      {children}
+    </button>
+  );
+}
 
 interface AreaTownMapping {
   [area: string]: string[];
@@ -95,13 +109,15 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
   const [leaveStartingThisWeek, setLeaveStartingThisWeek] = useState(0);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [isNewsLoading, setIsNewsLoading] = useState(true);
-  const [analyticsLoading, setAnalyticsLoading] = useState(true);
-  const [leaveByStatus, setLeaveByStatus] = useState<{ name: string; value: number }[]>([]);
-  const [employeesByTown, setEmployeesByTown] = useState<{ town: string; count: number }[]>([]);
+  // everyone's town, status, start and termination dates, and every leave request's status and dates, read once for
+  // the at-a-glance figures and the analytics charts: undefined while loading, null when they can't be read
+  const [staffRows, setStaffRows] = useState<Row[] | null | undefined>(undefined);
+  const [leaveRows, setLeaveRows] = useState<Row[] | null | undefined>(undefined);
 
   const navigate = useNavigate();
   const { hasPermission, hasAllPermissions, loading: permissionsLoading } = usePermissions();
   const canManageBranches = !permissionsLoading && canOpenScreen('/settings/branches', hasPermission);
+  const canOpenLeave = !permissionsLoading && canOpenScreen('/leaves', hasPermission);
   // the "Get <company> set up" checklist is for whoever holds Settings and Invite people (GetStarted.tsx)
   const setsUpCompany = !permissionsLoading && hasAllPermissions(['settings', 'invite-people']);
 
@@ -173,13 +189,15 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
       try {
         // Fetch the area-town mapping from the database
         const { data: employeesData, error: employeesError } = await fetchAllResult((from, to) =>
-          supabase.from('employees').select('Branch, Town').order('"Employee Number"').order('id').range(from, to)
+          supabase.from('employees').select('Branch, Town, Status, "Start Date", "Termination Date"').order('"Employee Number"').order('id').range(from, to)
         );
 
         if (employeesError) {
           console.error("Error loading area-town mapping:", employeesError);
+          setStaffRows(null);
           return;
         }
+        setStaffRows((employeesData ?? []) as Row[]);
 
         // Convert the data to a mapping object
         const mapping: AreaTownMapping = {};
@@ -249,46 +267,34 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
     fetchWeekNews();
   }, []);
 
-  // Lazily fetch analytics data the first time the Analytics tab is opened
+  // Every leave request's status and dates (a page at a time: one request is capped at 1000 rows), for who is on leave
+  // today, what is waiting for approval and the requests by status
   useEffect(() => {
-    if (activeTab !== 'analytics' || !analyticsLoading) return;
-
-    const fetchAnalytics = async () => {
-      try {
-        // every row, a page at a time (one request is capped at 1000 rows)
-        const [{ data: leaveRows }, { data: employeeRows }] = await Promise.all([
-          fetchAllResult((from, to) => supabase.from('leave_application').select('status').order('id').range(from, to)),
-          fetchAllResult((from, to) =>
-            supabase.from('employees').select('Town').order('"Employee Number"').order('id').range(from, to)
-          ),
-        ]);
-
-        const statusCounts: Record<string, number> = {};
-        (leaveRows || []).forEach((row: any) => {
-          const status = row.status ? row.status.charAt(0).toUpperCase() + row.status.slice(1).toLowerCase() : 'Pending';
-          statusCounts[status] = (statusCounts[status] || 0) + 1;
-        });
-        setLeaveByStatus(Object.entries(statusCounts).map(([name, value]) => ({ name, value })));
-
-        const townCounts: Record<string, number> = {};
-        (employeeRows || []).forEach((row: any) => {
-          const town = row.Town || 'Unassigned';
-          townCounts[town] = (townCounts[town] || 0) + 1;
-        });
-        const sortedTowns = Object.entries(townCounts)
-          .map(([town, count]) => ({ town, count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 8);
-        setEmployeesByTown(sortedTowns);
-      } catch (error) {
-        console.error('Error fetching analytics data:', error);
-      } finally {
-        setAnalyticsLoading(false);
-      }
+    let cancelled = false;
+    fetchAllResult((from, to) =>
+      supabase.from('leave_application').select('"Employee Number", "Start Date", "End Date", status').order('id').range(from, to)
+    )
+      .then(({ data, error }) => {
+        if (!cancelled) setLeaveRows(error ? null : ((data ?? []) as Row[]));
+      })
+      .catch(() => {
+        if (!cancelled) setLeaveRows(null);
+      });
+    return () => {
+      cancelled = true;
     };
+  }, []);
 
-    fetchAnalytics();
-  }, [activeTab, analyticsLoading]);
+  const today = useMemo(() => new Date(), []);
+  const months = useMemo(() => (staffRows ? staffByMonth(staffRows, today) : []), [staffRows, today]);
+  const thisMonth = months[months.length - 1];
+  const towns = useMemo(() => (staffRows ? foldIntoOther(headcountByTown(staffRows)) : []), [staffRows]);
+  const leaveStatus = useMemo(() => (leaveRows ? leaveByStatus(leaveRows) : []), [leaveRows]);
+  const onLeaveNow = leaveRows ? onLeaveToday(leaveRows, today) : null;
+  const awaitingApproval = leaveRows ? pendingLeave(leaveRows) : null;
+  // the tiles' extra lines are for the whole company, so they show only when the dashboard is not narrowed to a town
+  const wholeCompany = !currentTown || currentTown === 'ADMIN_ALL';
+  const analyticsLoading = staffRows === undefined || leaveRows === undefined;
 
   // Fetch ALL data for dashboard
   const fetchDashboardData = async (fetchId: number) => {
@@ -524,7 +530,7 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
   };
 
   return (
-    <div className="min-h-screen p-6 md:p-8 font-sans bg-transparent">
+    <div className="min-h-screen p-4 sm:p-6 md:p-8 font-sans bg-transparent">
       {/* Popup Messages */}
       <AnimatePresence>
         {showUnauthorizedPopup && (
@@ -601,66 +607,100 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
           /* Main Content */
           <div className="space-y-4">
 
-            {/* Stat Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <StatCard label="Total Employees" value={stats.employees} icon={<Users className="w-[18px] h-[18px]" strokeWidth={1.8} />} tint="green" />
-              <StatCard label="Leave Requests" value={stats.leaveRequests} icon={<CalendarDays className="w-[18px] h-[18px]" strokeWidth={1.8} />} tint="orange" />
-              {canManageBranches ? (
-                <button
-                  type="button"
-                  onClick={() => navigate('/settings/branches')}
-                  aria-label={`Active Branches: ${stats.activeBranches}. Open Settings, Branches`}
-                  className="block w-full text-left rounded-card transition-shadow hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                >
-                  <StatCard label="Active Branches" value={stats.activeBranches} icon={<MapPin className="w-[18px] h-[18px]" strokeWidth={1.8} />} tint="green" />
-                </button>
-              ) : (
+            {/* At a glance: one row of stat tiles */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4" data-testid="dashboard-kpis">
+              <StatCard
+                label="Total Employees"
+                value={stats.employees.toLocaleString()}
+                icon={<Users className="w-[18px] h-[18px]" strokeWidth={1.8} />}
+                tint="green"
+                note={wholeCompany && thisMonth ? `${thisMonth.joiners} joined · ${thisMonth.leavers} left in ${monthLabel(thisMonth.month)}` : undefined}
+                trend={
+                  wholeCompany && months.length > 1 && (staffRows?.length ?? 0) > 0 ? (
+                    <Sparkline
+                      values={months.map((m) => m.headcount)}
+                      label={`On staff over the last 12 months: ${months[0].headcount} in ${monthLabel(months[0].month, true)}, ${thisMonth.headcount} in ${monthLabel(thisMonth.month, true)}`}
+                    />
+                  ) : undefined
+                }
+              />
+              <TileLink to={canOpenLeave ? '/leaves' : null} label={`On leave today: ${onLeaveNow ?? 'unknown'}. Open Leave`}>
+                <StatCard
+                  label="On leave today"
+                  value={onLeaveNow === null ? '—' : onLeaveNow.toLocaleString()}
+                  icon={<Plane className="w-[18px] h-[18px]" strokeWidth={1.8} />}
+                  tint="info"
+                  note={
+                    isNewsLoading ? undefined
+                      : leaveStartingThisWeek === 0 ? 'Nobody starts leave this week'
+                        : leaveStartingThisWeek === 1 ? '1 person starts leave this week'
+                          : `${leaveStartingThisWeek} people start leave this week`
+                  }
+                />
+              </TileLink>
+              <TileLink to={canOpenLeave ? '/leaves' : null} label={`Leave Requests: ${stats.leaveRequests}. Open Leave`}>
+                <StatCard
+                  label="Leave Requests"
+                  value={stats.leaveRequests.toLocaleString()}
+                  icon={<CalendarDays className="w-[18px] h-[18px]" strokeWidth={1.8} />}
+                  tint="orange"
+                  note={wholeCompany && awaitingApproval !== null ? `${awaitingApproval.toLocaleString()} waiting for approval` : undefined}
+                />
+              </TileLink>
+              <TileLink to={canManageBranches ? '/settings/branches' : null} label={`Active Branches: ${stats.activeBranches}. Open Settings, Branches`}>
                 <StatCard label="Active Branches" value={stats.activeBranches} icon={<MapPin className="w-[18px] h-[18px]" strokeWidth={1.8} />} tint="green" />
-              )}
+              </TileLink>
             </div>
 
             {/* the group view: headcount by country and payroll money per currency (FIG-905) */}
             <GroupOverview />
 
             {activeTab === 'analytics' ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch" data-testid="dashboard-analytics">
                 <Card>
-                  <h2 className="text-[13px] font-bold text-ink mb-3">Leave Requests by Status</h2>
+                  <ChartHeading title="Headcount, last 12 months" subtitle="People on staff at each month's end, from start and termination dates" />
                   {analyticsLoading ? (
-                    <div className="h-64 flex items-center justify-center"><FigbloomLoader label="Loading" compact /></div>
-                  ) : leaveByStatus.length === 0 ? (
-                    <EmptyState icon={<CalendarDays className="w-[18px] h-[18px]" strokeWidth={2} />} title="No leave data" description="Leave requests will appear here once submitted." />
+                    <div className="h-56 flex items-center justify-center"><FigbloomLoader label="Loading" compact /></div>
+                  ) : !staffRows || staffRows.length === 0 ? (
+                    <EmptyState icon={<TrendingUp className="w-[18px] h-[18px]" strokeWidth={2} />} title="No employee data" description="Headcount over time appears here once staff are added." />
                   ) : (
-                    <ResponsiveContainer width="100%" height={260}>
-                      <PieChart>
-                        <Pie data={leaveByStatus} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={2}>
-                          {leaveByStatus.map((entry) => (
-                            <Cell key={entry.name} fill={LEAVE_STATUS_COLORS[entry.name] || '#9CA3A0'} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <HeadcountTrend points={months} />
                   )}
                 </Card>
 
                 <Card>
-                  <h2 className="text-[13px] font-bold text-ink mb-3">Employees by Town</h2>
+                  <ChartHeading title="Joiners and leavers" subtitle="Each month, by start date and termination date" />
                   {analyticsLoading ? (
-                    <div className="h-64 flex items-center justify-center"><FigbloomLoader label="Loading" compact /></div>
-                  ) : employeesByTown.length === 0 ? (
+                    <div className="h-56 flex items-center justify-center"><FigbloomLoader label="Loading" compact /></div>
+                  ) : months.every((m) => m.joiners === 0 && m.leavers === 0) ? (
+                    <EmptyState icon={<UserPlus className="w-[18px] h-[18px]" strokeWidth={2} />} title="Nobody joined or left this year" description="People who join or leave in the last 12 months appear here." />
+                  ) : (
+                    <JoinersLeavers points={months} />
+                  )}
+                </Card>
+
+                <Card>
+                  <ChartHeading title="Headcount by town" subtitle="Current staff, the biggest towns first" />
+                  {analyticsLoading ? (
+                    <div className="h-56 flex items-center justify-center"><FigbloomLoader label="Loading" compact /></div>
+                  ) : towns.length === 0 ? (
                     <EmptyState icon={<Users className="w-[18px] h-[18px]" strokeWidth={2} />} title="No employee data" description="Employee counts by town will appear here." />
                   ) : (
-                    <ResponsiveContainer width="100%" height={260}>
-                      <BarChart data={employeesByTown} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E2E6E2" vertical={false} />
-                        <XAxis dataKey="town" tick={{ fontSize: 10.5, fill: '#5F6B62' }} interval={0} angle={-20} textAnchor="end" height={50} />
-                        <YAxis allowDecimals={false} tick={{ fontSize: 10.5, fill: '#5F6B62' }} />
-                        <Tooltip />
-                        <Bar dataKey="count" fill="#17402A" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <BarList rows={towns} caption="Current staff by town" />
+                  )}
+                </Card>
+
+                <Card>
+                  <ChartHeading
+                    title="Leave requests by status"
+                    subtitle={leaveStatus.length ? `${leaveStatus.reduce((t, r) => t + r.value, 0).toLocaleString()} requests in all` : undefined}
+                  />
+                  {analyticsLoading ? (
+                    <div className="h-56 flex items-center justify-center"><FigbloomLoader label="Loading" compact /></div>
+                  ) : leaveStatus.length === 0 ? (
+                    <EmptyState icon={<CalendarDays className="w-[18px] h-[18px]" strokeWidth={2} />} title="No leave data" description="Leave requests will appear here once submitted." />
+                  ) : (
+                    <ShareBar rows={leaveStatus} caption="Leave requests by status" />
                   )}
                 </Card>
               </div>

@@ -101,6 +101,27 @@ describe('Set up with AI', () => {
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
   });
 
+  it('shows employees to add as a table, and keeps Apply off until each department exists', async () => {
+    askSetup.mockResolvedValue({
+      reply: "I've suggested adding them below.",
+      proposals: [
+        { type: 'add_employees', items: [{ first_name: 'Jane', last_name: 'Wanjiru', work_email: 'jane@bloom.co.ke', department: 'Finance' }] },
+        { type: 'add_employees', items: [{ first_name: 'Otieno', last_name: 'Juma', work_email: 'otieno@bloom.co.ke', department: 'Farm' }] },
+      ],
+    });
+    applyProposal.mockResolvedValue('Added 1 employee.');
+    show();
+    await say('Add Jane Wanjiru (jane@bloom.co.ke, Finance) and Otieno Juma (otieno@bloom.co.ke, Farm)');
+    expect(await screen.findByRole('cell', { name: 'Jane Wanjiru' })).toBeTruthy();
+    expect(screen.getAllByRole('columnheader', { name: 'Work email' })).toHaveLength(2);
+    expect(screen.getByText('Otieno Juma: there is no department "Farm" yet (add it first)')).toBeTruthy();
+    const [ok, blocked] = screen.getAllByRole('button', { name: 'Add 1 employee' }) as HTMLButtonElement[];
+    expect(blocked.disabled).toBe(true);
+    fireEvent.click(ok);
+    expect(await screen.findByText('Added 1 employee.')).toBeTruthy();
+    expect(applyProposal).toHaveBeenCalledTimes(1);
+  });
+
   it('shows an AI error without losing the conversation', async () => {
     askSetup.mockRejectedValue(new Error('AI limit reached for now. Try again later.'));
     show();

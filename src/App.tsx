@@ -89,6 +89,8 @@ const NoCompany = lazy(() => import('./pages/NoCompany'));
 const Appearance = lazy(() => import('./components/Settings/Appearance'));
 const InvitePeople = lazy(() => import('./components/Settings/InvitePeople'));
 const ChatLayout = lazy(() => import('./components/chat/ChatLayout').then((m) => ({ default: m.ChatLayout })));
+// the staff portal's Video Conference, for admins, HR, managers... (rooms private to the company: lib/meetingRooms.ts)
+const VideoCalls = lazy(() => import('./components/staff portal/VideoConf'));
 
 interface User {
   email: string;
@@ -1077,6 +1079,7 @@ function App() {
                                   renderReportData={() => null}
                                 />)}
                                 {gate('/teams', <ChatLayout />)}
+                                {gate('/video-calls', <VideoCalls />)}
                                 {gate('/staffcheck', <WarningModule />)}
                                 {gate('/payroll', <PayrollDashboard />)}
                                 {gate('/settings/payslip-design', <PayslipDesignPage />)}

@@ -26,6 +26,7 @@ export const SIDEBAR_MENU: SidebarMenuGroup[] = [
     items: [
       { id: 'task-manager', label: 'Task Manager', path: '/tasks' },
       { id: 'teams', label: 'Teams', path: '/teams' },
+      { id: 'video-calls', label: 'Video calls', path: '/video-calls' },
       { id: 'messages', label: 'SMS Center', path: '/sms' },
       { id: 'email-portal', label: 'Email Portal', path: '/email-portal' },
     ],

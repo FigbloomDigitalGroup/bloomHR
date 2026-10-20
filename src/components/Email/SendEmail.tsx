@@ -1,14 +1,16 @@
 
 import { useState, useEffect } from 'react';
-import { queueBulkEmail, sendEmailViaServer } from '../../lib/emailApi';
+import { Link } from 'react-router-dom';
+import { getEmailSender, queueBulkEmail, sendEmailViaServer, type EmailSender } from '../../lib/emailApi';
 import EmployeePicker from '../UI/EmployeePicker';
 import { supabase } from '../../lib/supabase';
 import { fetchAllResult } from '../../lib/fetchAll';
-import { Loader2, Send, Filter, Users, X, Check, Paperclip } from 'lucide-react';
+import { Loader2, Send, Filter, Users, X, Check, Paperclip, Mail } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { motion, AnimatePresence } from 'framer-motion';
 import SearchableDropdown from '../UI/SearchableDropdown';
 import FigbloomLoader from '../UI/FigbloomLoader';
+import { usePermissions } from '../../hooks/usePermissions';
+import { MAIL_SERVER_ANCHOR } from '../Settings/CompanyMailServer';
 
 
 interface Employee {
@@ -28,8 +30,11 @@ export default function SendEmail() {
 
   // Form State
   const [mode, setMode] = useState<'single' | 'bulk'>('single');
-  const [provider, setProvider] = useState<'resend' | 'cpanel'>('resend'); // Default provider
-  const [cpanelUser, setCpanelUser] = useState<string>(''); // Default cPanel user
+  // who the email comes from: the company's own mail server when it has one turned on (Settings > Company), otherwise
+  // Figbloom HR mail. The server decides; this only says which.
+  const [sender, setSender] = useState<EmailSender | null>(null);
+  const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
+  const canChangeSender = !permissionsLoading && hasAnyPermission(['settings']);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
 
   // Bulk Filters
@@ -47,6 +52,9 @@ export default function SendEmail() {
 
   useEffect(() => {
     fetchEmployees();
+    getEmailSender()
+      .then(setSender)
+      .catch((e) => console.error('Could not tell who the email comes from:', e));
   }, []);
 
   const fetchEmployees = async () => {
@@ -152,9 +160,10 @@ export default function SendEmail() {
     setSending(true);
     const toastId = toast.loading(`Sending email to ${recipients.length} recipients...`);
 
-    // An email to many people through Resend is handed to the server in one request and queued: it goes out over the
-    // next few minutes, so a company-wide email reaches thousands without the browser sending each one (FIG-820).
-    if (mode === 'bulk' && provider === 'resend') {
+    // An email to many people through Figbloom HR mail is handed to the server in one request and queued: it goes out
+    // over the next few minutes, so a company-wide email reaches thousands without the browser sending each one
+    // (FIG-820). The queue sends through Figbloom HR mail only, so a company with its own mail server sends one by one.
+    if (mode === 'bulk' && !sender?.own_server) {
       try {
         const { queued, skipped } = await queueBulkEmail({
           to: recipients.map((r) => r['Work Email']),
@@ -213,8 +222,6 @@ export default function SendEmail() {
               subject: subject,
               html: body,
               attachments: attachments.length > 0 ? attachments : undefined,
-              provider, // Pass selected provider
-              cpanelUser: provider === 'cpanel' ? cpanelUser : undefined // The server only allows the mailboxes it is set up for
             },
             { purpose: 'email-portal' }
           );
@@ -269,84 +276,50 @@ export default function SendEmail() {
 
       <div className="p-6 space-y-8">
         {/* Controls Bar */}
-        <div className="flex flex-col space-y-6 lg:flex-row lg:space-y-0 lg:items-center lg:justify-between bg-gray-50/50 p-4 rounded-2xl border border-gray-100/50">
-
-          <div className="flex flex-wrap items-center gap-6">
-            {/* Provider Selection */}
-            <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 ml-1">Email Provider</label>
-              <div className="flex items-center space-x-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
-                <button
-                  onClick={() => setProvider('resend')}
-                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 ${provider === 'resend'
-                    ? 'bg-[#03c04a] text-white shadow-md'
-                    : 'text-gray-500 hover:bg-gray-50'
-                    }`}
-                >
-                  Resend API
-                </button>
-                <button
-                  onClick={() => setProvider('cpanel')}
-                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 ${provider === 'cpanel'
-                    ? 'bg-[#03c04a] text-white shadow-md'
-                    : 'text-gray-500 hover:bg-gray-50'
-                    }`}
-                >
-                  cPanel (SMTP)
-                </button>
-              </div>
-            </div>
-
-            {/* Recipient Mode Selection */}
-            <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 ml-1">Recipient Type</label>
-              <div className="flex items-center space-x-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
-                <button
-                  onClick={() => { setMode('single'); setSelectedEmployeeId(''); }}
-                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 ${mode === 'single'
-                    ? 'bg-[#03c04a] text-white shadow-md'
-                    : 'text-gray-500 hover:bg-gray-50'
-                    }`}
-                >
-                  Single Employee
-                </button>
-                <button
-                  onClick={() => { setMode('bulk'); setSelectedBranch('all'); setSelectedDepartment('all'); }}
-                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 ${mode === 'bulk'
-                    ? 'bg-[#03c04a] text-white shadow-md'
-                    : 'text-gray-500 hover:bg-gray-50'
-                    }`}
-                >
-                  Bulk / Groups
-                </button>
-              </div>
+        <div className="flex flex-col space-y-4 lg:flex-row lg:space-y-0 lg:items-center lg:justify-between bg-gray-50/50 p-4 rounded-2xl border border-gray-100/50">
+          {/* Recipient Mode Selection */}
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 ml-1">Recipient Type</label>
+            <div className="flex items-center space-x-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
+              <button
+                onClick={() => { setMode('single'); setSelectedEmployeeId(''); }}
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 ${mode === 'single'
+                  ? 'bg-[#03c04a] text-white shadow-md'
+                  : 'text-gray-500 hover:bg-gray-50'
+                  }`}
+              >
+                Single Employee
+              </button>
+              <button
+                onClick={() => { setMode('bulk'); setSelectedBranch('all'); setSelectedDepartment('all'); }}
+                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-200 ${mode === 'bulk'
+                  ? 'bg-[#03c04a] text-white shadow-md'
+                  : 'text-gray-500 hover:bg-gray-50'
+                  }`}
+              >
+                Bulk / Groups
+              </button>
             </div>
           </div>
 
-          {/* Conditional cPanel Settings */}
-          <AnimatePresence>
-            {provider === 'cpanel' && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="flex flex-col space-y-2"
-              >
-                <label className="text-[10px] uppercase tracking-wider font-bold text-gray-400 ml-1">cPanel Configuration</label>
-                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-gray-200 shadow-sm border-l-4 border-l-[#03c04a]">
-                  <input
-                    type="text"
-                    placeholder="Username/Email"
-                    className="text-xs font-medium border-none p-0 focus:ring-0 w-40 placeholder:text-gray-300"
-                    value={cpanelUser}
-                    onChange={(e) => setCpanelUser(e.target.value)}
-                  />
-                  <div className="w-px h-4 bg-gray-200" />
-                  <span className="text-[10px] text-gray-400 font-medium">Auth User</span>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Who the email comes from (set under Settings > Company) */}
+          {sender && (
+            <p className="flex flex-wrap items-center gap-1.5 text-xs text-gray-600" data-testid="email-sender">
+              <Mail className="w-4 h-4 text-green-600" />
+              {sender.own_server ? (
+                <span>
+                  Sending from <span className="font-semibold text-gray-900">{sender.from_address}</span> (your mail server)
+                </span>
+              ) : (
+                <span>Sending via Figbloom HR mail</span>
+              )}
+              {canChangeSender && (
+                <Link to={`/settings/company#${MAIL_SERVER_ANCHOR}`} className="font-semibold text-green-700 hover:underline">
+                  {sender.own_server ? 'Mail server settings' : 'Send from your own mail server'}
+                </Link>
+              )}
+            </p>
+          )}
         </div>
 
         {/* Dynamic Selection Controls */}

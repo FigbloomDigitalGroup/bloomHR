@@ -29,7 +29,7 @@ import {
   HardHat,
   Timer,
   Sprout,
-  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature, History, Sparkles, BriefcaseBusiness, MapPin
+  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature, History, Sparkles, BriefcaseBusiness, MapPin, Video
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
@@ -52,6 +52,7 @@ const ICONS: Record<string, LucideIcon> = {
   calendar: CalendarDays,
   'task-manager': Kanban,
   teams: Network,
+  'video-calls': Video,
   messages: MessagesSquare,
   'email-portal': Mails,
   employees: UsersRound,
