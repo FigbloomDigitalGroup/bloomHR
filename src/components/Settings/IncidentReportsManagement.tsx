@@ -8,8 +8,11 @@ import {
     User,
     Calendar,
     MapPin,
-    ChevronDown
+    ChevronDown,
+    HeartPulse
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { isInjuryIncident } from '../../lib/workInjury';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
 import { Card, Button, SearchInput, StatusPill, EmptyState } from '../UI';
@@ -47,6 +50,8 @@ const INCIDENT_TYPES = [
     { value: 'theft', label: 'Theft' },
     { value: 'policy_violation', label: 'Policy Violation' },
     { value: 'workplace_violence', label: 'Workplace Violence' },
+    { value: 'workplace_injury', label: 'Workplace Accident / Injury' },
+    { value: 'occupational_disease', label: 'Occupational Disease' },
     { value: 'other', label: 'Other' }
 ];
 
@@ -100,6 +105,7 @@ const IncidentReportsManagement = () => {
     const [adminNotes, setAdminNotes] = useState('');
     const [resolution, setResolution] = useState('');
     const [isUpdating, setIsUpdating] = useState(false);
+    const navigate = useNavigate();
 
     useEffect(() => {
         fetchReports();
@@ -533,7 +539,18 @@ const IncidentReportsManagement = () => {
                             </div>
                         </div>
 
-                        <div className="px-6 py-4 border-t border-border bg-gray-50 flex justify-end gap-2.5">
+                        <div className="px-6 py-4 border-t border-border bg-gray-50 flex flex-wrap justify-end gap-2.5">
+                            {/* an accident at work, an injury or an occupational disease: follow it up as a work injury (WIBA) case */}
+                            {(isInjuryIncident(selectedReport.incident_type) || selectedReport.incident_type === 'safety_violation' || selectedReport.incident_type === 'workplace_violence') && (
+                                <Button
+                                    variant="secondary"
+                                    className="mr-auto"
+                                    icon={<HeartPulse className="h-3.5 w-3.5" />}
+                                    onClick={() => navigate(`/work-injuries?incident=${selectedReport.id}`)}
+                                >
+                                    Open work injury case
+                                </Button>
+                            )}
                             <Button variant="secondary" onClick={closeDetails} disabled={isUpdating}>
                                 Close
                             </Button>
