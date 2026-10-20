@@ -32,96 +32,69 @@ import {
   Sprout,
   LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature, History, Sparkles, BriefcaseBusiness, MapPin, Video
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useMyPreferences } from '../../hooks/useMyPreferences';
 import { useLocation, useNavigate } from 'react-router-dom';
 import bloomMark from '../../../public/bloom-mark.png';
 import { usePermissions } from '../../hooks/usePermissions';
 import { inMenu } from '../../lib/routeModules';
+import { SIDEBAR_MENU } from '../../lib/sidebarMenu';
 import { supabase } from '../../lib/supabase';
 import { IN_LIST_SIZE, chunks, fetchAll } from '../../lib/fetchAll';
 import { SearchInput } from '../UI';
 import { onOverlayEntry } from '../../hooks/useBackToClose';
 
-// The menu, grouped. Who sees each entry is decided by its path in routeModules.ts (the modules of the person's role,
-// FIG-827), the same list the routes and the header search use.
-const menuGroups = [
-  {
-    title: "Overview",
-    items: [
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid, path: '/dashboard' },
-      { id: 'calendar', label: 'Calendar', icon: CalendarDays, path: '/calendar' },
-    ]
-  },
-  {
-    title: "Workspace",
-    items: [
-      { id: 'task-manager', label: 'Task Manager', icon: Kanban, path: '/tasks' },
-      { id: 'teams', label: 'Teams', icon: Network, path: '/teams' },
-      { id: 'video-calls', label: 'Video calls', icon: Video, path: '/video-calls' },
-      { id: 'messages', label: 'SMS Center', icon: MessagesSquare, path: '/sms' },
-      { id: 'email-portal', label: 'Email Portal', icon: Mails, path: '/email-portal' },
-    ]
-  },
-  {
-    title: "Team",
-    items: [
-      { id: 'employees', label: 'Employees', icon: UsersRound, path: '/employees' },
-      { id: 'organogram', label: 'Organogram', icon: OrgChart, path: '/organogram' },
-      { id: 'onboarding', label: 'Onboarding', icon: ClipboardCheck, path: '/onboarding' },
-      { id: 'recruitment', label: 'Recruitment', icon: UserPlus2, path: '/recruitment' },
-      { id: 'offers', label: 'Offers', icon: FileSignature, path: '/offers' },
-      { id: 'leaves', label: 'Time Off', icon: CalendarRange, path: '/leaves' },
-      // absences, failures to notify, missing leave documents and warnings for them: HR, and supervisors for their team
-      { id: 'leave-discipline', label: 'Leave discipline', icon: UserX, path: '/leave-discipline' },
-      { id: 'performance', label: 'Performance', icon: Target, path: '/performance' },
-      { id: 'training', label: 'Training', icon: Award, path: '/training' },
-      { id: 'assign-managers', label: 'Assign Managers', icon: UserCheck, path: '/assign-managers' },
-      { id: 'staffcheck', label: 'Disciplinary', icon: ShieldAlert, path: '/staffcheck' },
-      { id: 'hr-lifecycle', label: 'HR Lifecycle', icon: HeartHandshake, path: '/hr-lifecycle' },
-    ]
-  },
-  {
-    title: "Finance",
-    items: [
-      { id: 'payroll', label: 'Payroll', icon: Landmark, path: '/payroll' },
-      // people paid by the day, outside the monthly payroll: payroll, HR, and managers who supervise casuals
-      { id: 'casual-workers', label: 'Casual workers', icon: HardHat, path: '/casual-workers' },
-      // overtime hours per day, approved and paid with the month's salary: payroll, and managers for their team
-      // piece rate and contract jobs: payroll, and managers who supervise people paid by work
-      { id: 'piece-rate', label: 'Piece rate & jobs', icon: Sprout, path: '/piece-rate' },
-      { id: 'overtime', label: 'Overtime', icon: Timer, path: '/overtime' },
-      // job groups and their pay: for Payroll and Employees, who can't open Settings
-      { id: 'job-groups', label: 'Job groups', icon: Layers, path: '/settings/job-groups' },
-      { id: 'expense', label: 'Expenses', icon: Receipt, path: '/expenses' },
-      { id: 'advanced', label: 'Salary Advance', icon: Landmark, path: '/salaryadmin' },
-      // HR and payroll (and admins): staff loans with interest
-      { id: 'loans', label: 'Loans', icon: HandCoins, path: '/loans' },
-      { id: 'asset', label: 'Assets', icon: Package, path: '/asset' },
-      { id: 'mpesa-zap', label: 'Mpesa Zap', icon: Smartphone, path: '/mpesa-zap' },
-    ]
-  },
-  {
-    title: "System",
-    items: [
-      { id: 'reports', label: 'Reports', icon: PieChart, path: '/reports' },
-      { id: 'email admin', label: 'Email Admin', icon: ShieldEllipsis, path: '/adminconfirm' },
-      { id: 'incident-reports', label: 'Incidents', icon: ShieldAlert, path: '/incident-reports' },
-      // workplace accidents and work injuries (WIBA): the same people as incident reports
-      { id: 'work-injuries', label: 'Work injuries', icon: HeartPulse, path: '/work-injuries' },
-      { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
-      { id: 'setup-assistant', label: 'Set up with AI', icon: Sparkles, path: '/setup-assistant' },
-      { id: 'departments', label: 'Departments', icon: Building2, path: '/departments' },
-      // offices, each in a country (FIG-905): holidays and the minimum wage follow an employee's branch
-      { id: 'branches', label: 'Branches', icon: MapPin, path: '/settings/branches' },
-      // the job titles list (KPI templates can be set per title): HR and the Employees module
-      { id: 'job-titles', label: 'Job titles', icon: BriefcaseBusiness, path: '/settings/job-titles' },
-      { id: 'audit-trail', label: 'Audit Trail', icon: History, path: '/settings/audit-trail' },
-      { id: 'role-permissions', label: 'Role Permissions', icon: ShieldHalf, path: '/role-permissions' },
-      { id: 'appearance', label: 'Appearance', icon: Palette, path: '/appearance' },
-    ]
-  }
-];
+// The menu, grouped (src/lib/sidebarMenu.ts, shared with the Roles screen's preview), with an icon per entry. Who
+// sees each entry is decided by its path in routeModules.ts (the modules of the person's role, FIG-827), the same list
+// the routes and the header search use.
+const ICONS: Record<string, LucideIcon> = {
+  dashboard: LayoutGrid,
+  calendar: CalendarDays,
+  'task-manager': Kanban,
+  teams: Network,
+  'video-calls': Video,
+  messages: MessagesSquare,
+  'email-portal': Mails,
+  employees: UsersRound,
+  organogram: OrgChart,
+  onboarding: ClipboardCheck,
+  recruitment: UserPlus2,
+  offers: FileSignature,
+  leaves: CalendarRange,
+  'leave-discipline': UserX,
+  performance: Target,
+  training: Award,
+  'assign-managers': UserCheck,
+  staffcheck: ShieldAlert,
+  'hr-lifecycle': HeartHandshake,
+  payroll: Landmark,
+  'casual-workers': HardHat,
+  'piece-rate': Sprout,
+  overtime: Timer,
+  'job-groups': Layers,
+  expense: Receipt,
+  advanced: Landmark,
+  loans: HandCoins,
+  asset: Package,
+  'mpesa-zap': Smartphone,
+  reports: PieChart,
+  'email admin': ShieldEllipsis,
+  'incident-reports': ShieldAlert,
+  'work-injuries': HeartPulse,
+  settings: Settings,
+  'setup-assistant': Sparkles,
+  departments: Building2,
+  branches: MapPin,
+  'job-titles': BriefcaseBusiness,
+  'audit-trail': History,
+  'role-permissions': ShieldHalf,
+  appearance: Palette,
+};
+const menuGroups = SIDEBAR_MENU.map((group) => ({
+  title: group.title,
+  items: group.items.map((item) => ({ ...item, icon: ICONS[item.id] ?? LayoutGrid })),
+}));
 
 
 interface SidebarProps {

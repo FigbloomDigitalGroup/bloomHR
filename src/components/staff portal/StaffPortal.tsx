@@ -73,6 +73,7 @@ import MyApprovalChain from './MyApprovalChain';
 import LeavePlanningHints from './LeavePlanningHints';
 import { isCompanySection } from '../../lib/staffCompany';
 import MyAbsences from './MyAbsences';
+import { STAFF_PORTAL_MENU, STAFF_PORTAL_MY_TEAM, STAFF_PORTAL_MY_WORK, type PortalMenuGroup } from '../../lib/sidebarMenu';
 import { NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
 import { describeFree, useLeaveCheck } from '../../lib/leaveRules';
 import { LEAVE_DOCUMENTS_BUCKET, LeaveDocumentRule, loadLeaveDocumentRules, uploadLeaveDocument } from '../../lib/leaveDocuments';
@@ -970,104 +971,40 @@ interface MenuGroup {
   items: MenuItem[];
 }
 
-// Staff Menu Groups
-const staffMenuGroups: MenuGroup[] = [
-  {
-    title: "Overview",
-    items: [
-      { id: 'home', label: 'Dashboard', icon: PhSquaresFour },
-    ]
-  },
-  {
-    title: "Work & Development",
-    items: [
-      { id: 'tasks', label: 'Tasks', icon: PhKanban },
-      { id: 'my-kpis', label: 'My KPIs', icon: PhTarget },
-      { id: 'training', label: 'Training', icon: PhGraduationCap },
-      { id: 'job-applications', label: 'Job Opportunities', icon: PhTrendUp },
-      { id: 'incident-report', label: 'Report Incident', icon: PhShieldCheck },
-    ]
-  },
-  {
-    title: "Finance",
-    items: [
-      {
-        id: 'financial',
-        label: 'Financial',
-        icon: PhWallet,
-        hasSubmenu: true,
-        submenu: [
-          { id: 'salary-advance', label: 'Salary Advance' },
-          { id: 'loan', label: 'Loans' }
-        ]
-      },
-      { id: 'payslips', label: 'Payslips', icon: PhFileText },
-      { id: 'overtime', label: 'Overtime', icon: PhClock },
-    ]
-  },
-  {
-    title: "Communication",
-    items: [
-      {
-        id: 'communication',
-        label: 'Communication',
-        icon: PhPhone,
-        hasSubmenu: true,
-        submenu: [
-          { id: 'chat', label: 'Chat' },
-          { id: 'VideoConf', label: 'Video Conference' }
-        ]
-      }
-    ]
-  },
-  {
-    title: "Company",
-    items: [
-      {
-        id: 'company',
-        label: 'Company',
-        icon: PhBuildings,
-        hasSubmenu: true,
-        submenu: [
-          { id: 'company-calendar', label: 'Calendar' },
-          { id: 'company-organogram', label: 'Organogram' },
-          { id: 'company-departments', label: 'Departments' },
-          { id: 'company-approvers', label: 'Who approves my leave' }
-        ]
-      }
-    ]
-  },
-  {
-    title: "Personal & HR",
-    items: [
-      { id: 'onboarding', label: 'Onboarding', icon: PhClipboardText },
-      { id: 'first-weeks', label: 'My First Weeks', icon: PhListChecks },
-      {
-        id: 'leave',
-        label: 'Leave',
-        icon: PhCalendarBlank,
-        hasSubmenu: true,
-        submenu: [
-          { id: 'leave', label: 'Apply for Leave' },
-          { id: 'leave-history', label: 'Leave History' },
-          // anyone may be a Leave Approver, line manager or department head, whatever their role
-          { id: 'leave-approvals', label: 'Approve leave' }
-        ]
-      },
-      { id: 'contract', label: 'Contracts', icon: PhFile },
-      // resigning starts at the bottom of Profile (behind a confirmation), so searching for it finds Profile
-      { id: 'details', label: 'Profile', icon: PhUserCircle, keywords: ['resign', 'resignation', 'leaving'] },
-      { id: 'biodata', label: 'Bio Data', icon: PhBriefcase },
-      { id: 'documents', label: 'Documents', icon: PhUpload },
-      { id: 'appearance', label: 'Appearance', icon: PhPalette },
-    ]
-  }
-];
+// Staff Menu Groups: the entries are in src/lib/sidebarMenu.ts (shared with the Roles screen's preview), the icons here
+const STAFF_ICONS: Record<string, any> = {
+  home: PhSquaresFour,
+  tasks: PhKanban,
+  'my-kpis': PhTarget,
+  training: PhGraduationCap,
+  'job-applications': PhTrendUp,
+  'incident-report': PhShieldCheck,
+  financial: PhWallet,
+  payslips: PhFileText,
+  overtime: PhClock,
+  communication: PhPhone,
+  company: PhBuildings,
+  onboarding: PhClipboardText,
+  'first-weeks': PhListChecks,
+  leave: PhCalendarBlank,
+  contract: PhFile,
+  details: PhUserCircle,
+  biodata: PhBriefcase,
+  documents: PhUpload,
+  appearance: PhPalette,
+  'my-team': PhUsersThree,
+  'my-work': PhPlant,
+};
+const withIcons = (group: PortalMenuGroup): MenuGroup => ({
+  title: group.title,
+  items: group.items.map((item) => ({ ...item, icon: STAFF_ICONS[item.id], ...(item.submenu ? { hasSubmenu: true } : {}) })),
+});
+const staffMenuGroups: MenuGroup[] = STAFF_PORTAL_MENU.map(withIcons);
 
 // Shown only to someone who supervises at least one person (migration 20261018900000)
-const myTeamGroup: MenuGroup = { title: 'My team', items: [{ id: 'my-team', label: 'My team', icon: PhUsersThree }] };
+const myTeamGroup: MenuGroup = withIcons(STAFF_PORTAL_MY_TEAM);
 // Shown only to someone paid by work or given contract jobs (FIG-812, migration 20261020100000)
-const myWorkGroup: MenuGroup = { title: 'My work', items: [{ id: 'my-work', label: 'My work', icon: PhPlant }] };
+const myWorkGroup: MenuGroup = withIcons(STAFF_PORTAL_MY_WORK);
 
 // Main StaffPortal Component with Time Tracking
 const StaffPortal = () => {

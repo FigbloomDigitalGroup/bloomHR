@@ -38,49 +38,51 @@ import CareersSettingsCard from './CareersSettings';
 import LoanSettingsCard from '../Loans/LoanSettingsCard';
 
 import { confirmDialog } from '../../lib/confirmDialog';
-import { CompanyRole, rolesApi, roleDisplayName, roleKeyFor, roleSelection, useCompanyRoles } from '../../lib/roles';
-// The system roles' look (icon, colour, whether they work at one location). The company's roles, its own and these by
-// the names it gave them, come from useCompanyRoles(); a company's own role looks like its base role.
+import { CompanyRole, SYSTEM_ROLE_DESCRIPTIONS, rolesApi, roleDisplayName, roleKeyFor, roleSelection, useCompanyRoles } from '../../lib/roles';
+// The system roles' look (icon, colour, whether they work at one location) and what each gets by default
+// (SYSTEM_ROLE_DESCRIPTIONS: the modules a new company's roles start with; a company may change them on Role
+// Permissions). The company's roles, its own and these by the names it gave them, come from useCompanyRoles(); a
+// company's own role looks like its base role.
 const ROLES = {
   ADMIN: {
     label: 'Admin',
-    description: 'Full access to all features and settings across all locations',
+    description: SYSTEM_ROLE_DESCRIPTIONS.ADMIN,
     icon: <Shield className="w-4 h-4 text-purple-500" />,
     requiresLocation: false
   },
   REGIONAL: {
     label: 'Regional Manager',
-    description: 'Can manage users across multiple locations or regions',
+    description: SYSTEM_ROLE_DESCRIPTIONS.REGIONAL,
     icon: <MapPin className="w-4 h-4 text-violet-500" />,
     requiresLocation: true
   },
   MANAGER: {
     label: 'Manager',
-    description: 'Can manage users and content for specific locations',
+    description: SYSTEM_ROLE_DESCRIPTIONS.MANAGER,
     icon: <Settings className="w-4 h-4 text-blue-500" />,
     requiresLocation: true
   },
   OPERATIONS: {
     label: 'Operations',
-    description: 'Can manage operational tasks for specific locations',
+    description: SYSTEM_ROLE_DESCRIPTIONS.OPERATIONS,
     icon: <Settings className="w-4 h-4 text-indigo-500" />,
     requiresLocation: true
   },
   STAFF: {
     label: 'Staff',
-    description: 'Standard access with limited permissions for specific locations',
+    description: SYSTEM_ROLE_DESCRIPTIONS.STAFF,
     icon: <User className="w-4 h-4 text-green-500" />,
     requiresLocation: true
   },
   HR: {
     label: 'HR',
-    description: 'Read-only access to location-specific features',
+    description: SYSTEM_ROLE_DESCRIPTIONS.HR,
     icon: <Eye className="w-4 h-4 text-gray-500" />,
     requiresLocation: true
   },
   CHECKER: {
     label: 'Checker',
-    description: 'Read-only access to location-specific features',
+    description: SYSTEM_ROLE_DESCRIPTIONS.CHECKER,
     icon: <Eye className="w-4 h-4 text-orange-500" />,
     requiresLocation: true
   }
@@ -333,6 +335,13 @@ const UserEditModal = ({
     setEditedUser({ ...editedUser, role, company_role_id: companyRoleId });
   };
   const selectedKey = roleKeyFor(roles, editedUser.role, editedUser.company_role_id);
+  const selectedRole = roles.find((r) => r.role_key === selectedKey);
+  // what the role gets: a standard role's description (the company's wording, else the default); a company's own role
+  // says what it is based on
+  const roleDescription = (r: CompanyRole) =>
+    r.is_system
+      ? r.description ?? SYSTEM_ROLE_DESCRIPTIONS[r.base_role]
+      : [`Based on ${roleDisplayName(roles, r.base_role)}`, r.description].filter(Boolean).join('. ');
 
   const validatePassword = () => {
     if (!user && !editedUser.password) {
@@ -447,7 +456,7 @@ const UserEditModal = ({
                     type="button"
                     key={r.role_key}
                     aria-pressed={selected}
-                    title={r.is_system ? r.description ?? undefined : `Based on ${roleDisplayName(roles, r.base_role)}`}
+                    title={roleDescription(r)}
                     onClick={() => handleRoleChange(r)}
                     className={`p-2 border rounded-lg text-xs font-medium ${selected ?
                       (r.base_role === 'ADMIN' ? 'border-purple-500 bg-purple-50 text-purple-700' :
@@ -465,6 +474,11 @@ const UserEditModal = ({
                 );
               })}
             </div>
+            {selectedRole && (
+              <p className="mt-1.5 mb-0 text-[11px] text-gray-500" data-testid="role-description">
+                {roleDescription(selectedRole).replace(/\.\s*$/, '')}. What each role can open is set on Role Permissions.
+              </p>
+            )}
           </div>
 
           <div className="p-3 bg-gray-50 rounded-lg">

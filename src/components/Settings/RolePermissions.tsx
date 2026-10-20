@@ -39,6 +39,8 @@ import {
 import { confirmDialog } from '../../lib/confirmDialog';
 import { MODULE_AREAS, moduleInfo } from '../../lib/modules';
 import { screensFor, usesStaffPortal } from '../../lib/routeModules';
+import RoleHoldersCard from './RoleHolders';
+import RolePreviewPanel from './RolePreviewPanel';
 interface Permission {
     id: string;
     module_name: string;
@@ -531,7 +533,7 @@ export default function RolePermissions() {
                                 )}
                             </div>
                             {!current.is_system && people > 0 && (
-                                <p className="m-0 mt-1.5 text-[11px] text-muted-foreground">To delete or switch off this role, first give the people who have it another role (Settings, User Roles).</p>
+                                <p className="m-0 mt-1.5 text-[11px] text-muted-foreground">To delete or switch off this role, first give the people who have it another role (Change role, under Who has {current.name}).</p>
                             )}
                         </Card>
                     )}
@@ -578,6 +580,12 @@ export default function RolePermissions() {
                     </div>
 
                     {current && <RoleSummary role={current} modules={currentRolePermissions} />}
+
+                    {/* the menu a holder would get, from the ticks on screen (saved or not) */}
+                    {current && <RolePreviewPanel role={current} modules={currentRolePermissions} />}
+
+                    {/* the people who hold it, each of whom can be given another role */}
+                    {current && <RoleHoldersCard role={current} roles={roles} count={people} onChanged={loadRoles} />}
 
                     {current?.base_role === 'ADMIN' && (
                         <div className="flex items-start gap-2 p-3 mb-3.5 bg-status-info-tint rounded-xl text-xs text-status-info">
