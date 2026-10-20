@@ -29,7 +29,7 @@ import {
   HardHat,
   Timer,
   Sprout,
-  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature, History, Sparkles, BriefcaseBusiness, MapPin
+  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature, History, Sparkles, BriefcaseBusiness, MapPin, Video
 } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useMyPreferences } from '../../hooks/useMyPreferences';
@@ -57,6 +57,7 @@ const menuGroups = [
     items: [
       { id: 'task-manager', label: 'Task Manager', icon: Kanban, path: '/tasks' },
       { id: 'teams', label: 'Teams', icon: Network, path: '/teams' },
+      { id: 'video-calls', label: 'Video calls', icon: Video, path: '/video-calls' },
       { id: 'messages', label: 'SMS Center', icon: MessagesSquare, path: '/sms' },
       { id: 'email-portal', label: 'Email Portal', icon: Mails, path: '/email-portal' },
     ]
