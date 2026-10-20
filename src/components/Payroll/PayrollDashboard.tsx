@@ -120,6 +120,11 @@ import { useBranches } from "../../hooks/useBranches";
 import PayrollEmployeesTab from "./PayrollEmployeesTab";
 import PayrollDeductionsTab from "./PayrollDeductionsTab";
 import PayrollEarningsTab from "./PayrollEarningsTab";
+import PayrollPayItemsTab from "./PayrollPayItemsTab";
+import { applyCatalogue, daysWorkedInMonth, overTwoThirds, workingDaysInMonth } from "../../lib/payItems";
+import { loadPayItems } from "../../lib/payItemsApi";
+import { loadCompanyWorkWeek, MONDAY_TO_FRIDAY } from "../../lib/workWeek";
+import { employeeBranch } from "../../lib/branches";
 import PayrollRatesTab from "./PayrollRatesTab";
 import { PlatformRatesLink, RatesChangedNotice } from "./RatesChangedNotice";
 import PlatformRatesBanner from "./PlatformRatesBanner";
@@ -231,6 +236,9 @@ export default function PayrollDashboard() {
   ]);
   // this month's figures worked out from current employee details; shown until the month's payroll run is started
   const [liveRecords, setLiveRecords] = useState<any[]>([]);
+  // employee records with the company's standard pay items' benefits and tax details added (lib/payItems), so an
+  // edited payslip is worked out again with them
+  const [catalogueEmployees, setCatalogueEmployees] = useState<Map<string, any>>(new Map());
   // the month's payroll run and its saved payslips (runPeriod says which month they were loaded for)
   const [run, setRun] = useState<PayrollRun | null>(null);
   const [runPayslips, setRunPayslips] = useState<any[]>([]);
@@ -1083,6 +1091,9 @@ export default function PayrollDashboard() {
         // Uganda (FIG-905): LST already paid this financial year, and whether it is taken in instalments or at once
         const [lstPaidThisYear, lstCollection] = await Promise.all([loadLstPaidThisYear(actualPeriod), loadLstCollection()]);
         setDeductionCap(capOn);
+        // the company's standard deductions, allowances and benefits (lib/payItems), and its work week for the
+        // ones paid per day worked; a failure stops the calculation, like the deductions above
+        const [payItems, workWeek] = await Promise.all([loadPayItems(), loadCompanyWorkWeek().catch(() => MONDAY_TO_FRIDAY)]);
 
         if (data) {
           setEmployees(data);
@@ -1108,12 +1119,34 @@ export default function PayrollDashboard() {
           // currency (lib/payroll, FIG-905). Staff in a country with no engine yet are worked out by nobody (never on
           // another country's rules). Only employees whose onboarding HR has approved are paid (the database refuses
           // payslips for anyone else); "Not onboarded" lists the rest.
+          // standard pay items, applied through the same deduction, earning and benefit inputs the engine already uses
+          const monthWorkingDays = workingDaysInMonth(actualPeriod, workWeek);
+          const catalogue = applyCatalogue({
+            employees: data.filter(isPayrollReady),
+            items: payItems,
+            voluntaryByEmployee,
+            earningsByEmployee,
+            monthOf: (e: any) => {
+              const number = e["Employee Number"];
+              const leaveRow = leaveByEmployee.get(number);
+              const absenceRow = absenceByEmployee.get(number);
+              const workingDays = Number(leaveRow?.month_working_days) || Number(absenceRow?.month_working_days) || monthWorkingDays;
+              const daysOff = (Number(leaveRow?.unpaid_days) || 0) + (Number(leaveRow?.half_pay_days) || 0) + (Number(absenceRow?.absence_days) || 0);
+              return {
+                country: payrollCountryOf(e, companyBranches).country,
+                basic: Number(e["Basic Salary"]) || 0,
+                daysWorked: daysWorkedInMonth(workingDays, daysOff),
+                coverage: { branchId: employeeBranch(e, companyBranches)?.id ?? null },
+              };
+            },
+          });
+          setCatalogueEmployees(new Map(catalogue.employees.map((e: any) => [e["Employee Number"], e])));
           const month = {
             period: actualPeriod,
             overrideStatutoryChecks,
-            voluntaryByEmployee,
+            voluntaryByEmployee: catalogue.voluntaryByEmployee,
             payrollLoans,
-            earningsByEmployee,
+            earningsByEmployee: catalogue.earningsByEmployee,
             leaveByEmployee,
             leaveBasis,
             absenceByEmployee,
@@ -1126,7 +1159,7 @@ export default function PayrollDashboard() {
             lstCollection,
           };
           const { records: payrollData, notCalculated: waiting, heldBack: held } = calculateRun(
-            data.filter(isPayrollReady),
+            catalogue.employees,
             companyBranches,
             (country) => {
               const countryRates = ratesByCountry?.get(country);
@@ -1202,7 +1235,7 @@ export default function PayrollDashboard() {
   const payslipEdits = usePayslipOverrides(monthRun?.id, runVersion);
   // an edited payslip is worked out again on its employee's country's rules (FIG-905)
   const payslipContext = (employeeNumber: string) => {
-    const employee = employees.find((e) => e["Employee Number"] === employeeNumber);
+    const employee = catalogueEmployees.get(employeeNumber) ?? employees.find((e) => e["Employee Number"] === employeeNumber);
     const country = employee ? payrollCountryOf(employee, companyBranches).country : "Kenya";
     if (country === "Tanzania") {
       const headcount = employees.filter((e) => isPayrollReady(e) && payrollCountryOf(e, companyBranches).country === "Tanzania").length;
@@ -2073,6 +2106,22 @@ export default function PayrollDashboard() {
               ? `Payroll for ${periodLabel} is a draft: press Recalculate to apply earning changes to it.`
               : monthRun
                 ? `Payroll for ${periodLabel} is ${monthRun.status}: its payslips keep the earnings they were approved with.`
+                : null
+          }
+        />
+      )}
+
+      {tab === "pay-items" && (
+        <PayrollPayItemsTab
+          onChanged={() => setDeductionsVersion((v) => v + 1)}
+          rates={rates}
+          canEdit={canEditRates}
+          overLimit={overTwoThirds(payrollRecords)}
+          draftNotice={
+            monthRun?.status === "draft"
+              ? `Payroll for ${periodLabel} is a draft: press Recalculate to apply pay item changes to it.`
+              : monthRun
+                ? `Payroll for ${periodLabel} is ${monthRun.status}, so changes apply from the next month you run.`
                 : null
           }
         />

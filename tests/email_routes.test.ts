@@ -29,6 +29,10 @@ const state = vi.hoisted(() => ({
   // queue_bulk_email(): the company's employees' work emails, and what was asked to be queued
   employeeEmails: [] as string[],
   queued: [] as Record<string, any>[],
+  // company_mail_servers rows, and every mail transport made (with its login)
+  mailServers: [] as Record<string, any>[],
+  transports: [] as Record<string, any>[],
+  smtpErrorCode: '',
 }));
 
 vi.mock('@supabase/supabase-js', () => {
@@ -48,6 +52,21 @@ vi.mock('@supabase/supabase-js', () => {
         rows().unshift({ id: `00000000-0000-4000-8000-${String(rows().length + 1).padStart(12, '0')}`, created_at: new Date().toISOString(), ...row });
         return { error: null };
       },
+      // company_mail_servers: one row per tenant
+      upsert: async (row: Record<string, unknown>) => {
+        const i = rows().findIndex((r) => r.tenant_id === row.tenant_id);
+        if (i >= 0) rows()[i] = { ...row };
+        else rows().push({ ...row });
+        return { error: null };
+      },
+      update: (patch: Record<string, unknown>) => ({
+        eq: async (k: string, v: unknown) => {
+          rows().forEach((r) => {
+            if (r[k] === v) Object.assign(r, patch);
+          });
+          return { error: null };
+        },
+      }),
     };
     return b;
   };
@@ -75,6 +94,7 @@ vi.mock('@supabase/supabase-js', () => {
       if (name === 'user_profiles') return table(() => state.profiles);
       if (name === 'role_permissions') return table(() => state.permissions);
       if (name === 'sent_emails') return table(() => state.sentEmails);
+      if (name === 'company_mail_servers') return table(() => state.mailServers);
       throw new Error(`unexpected table ${name}`);
     },
   };
@@ -94,14 +114,18 @@ vi.mock('resend', () => ({
 
 vi.mock('nodemailer', () => ({
   default: {
-    createTransport: (opts: { auth?: { user?: string } }) => ({
-      sendMail: async (msg: Record<string, unknown>) => {
-        if (state.smtpError) throw state.smtpError;
-        state.smtpSends.push(msg);
-        if (opts?.auth?.user) state.cpanelLogins.push(String(opts.auth.user));
-        return { messageId: 'smtp-1' };
-      },
-    }),
+    createTransport: (opts: { auth?: { user?: string } }) => {
+      state.transports.push(opts);
+      return {
+        sendMail: async (msg: Record<string, unknown>) => {
+          if (state.smtpErrorCode) throw Object.assign(new Error('535 refused hr@client.co.ke pass hunter2'), { code: state.smtpErrorCode });
+          if (state.smtpError) throw state.smtpError;
+          state.smtpSends.push(msg);
+          if (opts?.auth?.user) state.cpanelLogins.push(String(opts.auth.user));
+          return { messageId: 'smtp-1' };
+        },
+      };
+    },
   },
 }));
 
@@ -125,6 +149,7 @@ process.env.CPANEL_USER = 'hr@example.org';
 process.env.CPANEL_PASSWORD = 'cpanel-pass';
 process.env.CPANEL_HOST = 'mail.example.org';
 process.env.CPANEL_ALLOWED_USERS = 'payroll@example.org, support@example.org';
+const KEY = Buffer.alloc(32, 7).toString('base64');
 
 let server: Server;
 let base: string;
@@ -170,6 +195,10 @@ beforeEach(() => {
   state.rateLimitDown = false;
   state.employeeEmails = [];
   state.queued = [];
+  state.mailServers = [];
+  state.transports = [];
+  state.smtpErrorCode = '';
+  process.env.MAIL_SERVER_ENCRYPTION_KEY = KEY;
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
 });
@@ -474,5 +503,166 @@ describe('sent-mail log', () => {
     const body = await res.json();
     expect(body).toMatchObject({ subject: 'Hello', last_event: 'sent' });
     expect(JSON.stringify(body)).not.toContain('secret internal detail');
+  });
+});
+
+describe("a company's own mail server", () => {
+  const settings = {
+    host: 'mail.client.co.ke',
+    port: 465,
+    secure: true,
+    username: 'hr@client.co.ke',
+    password: 'hunter2',
+    from_name: 'Client HR',
+    from_address: 'hr@client.co.ke',
+    enabled: true,
+  };
+  const { password: _omit, ...noPassword } = settings;
+  const save = (token: string | null, body: Record<string, unknown>) => call('PUT', '/mail-server', token, body);
+
+  it('only the Settings permission (ADMIN) may see, save or test it', async () => {
+    for (const name of ['hr', 'staff', 'ops']) {
+      expect((await call('GET', '/mail-server', who(name))).status).toBe(403);
+      expect((await save(who(name), settings)).status).toBe(403);
+      expect((await call('POST', '/mail-server/test', who(name))).status).toBe(403);
+    }
+    expect((await save(null, settings)).status).toBe(401);
+    expect(state.mailServers).toHaveLength(0);
+    expect((await save(who('admin'), settings)).status).toBe(200);
+  });
+
+  it('stores the password encrypted, and never hands it back, only whether one is set', async () => {
+    const res = await save(who('admin'), settings);
+    const body = await res.json();
+    expect(body.settings).toMatchObject({
+      host: 'mail.client.co.ke', port: 465, secure: true, from_address: 'hr@client.co.ke', enabled: true, password_set: true,
+    });
+    expect(JSON.stringify(body)).not.toContain('hunter2');
+    expect(JSON.stringify(body)).not.toContain('password_encrypted');
+
+    const stored = state.mailServers[0];
+    expect(stored.tenant_id).toBe(TENANT);
+    expect(stored.password_encrypted).toMatch(/^v1:/);
+    expect(stored.password_encrypted).not.toContain('hunter2');
+    expect(Buffer.from(stored.password_encrypted.split(':')[3], 'base64').toString()).not.toContain('hunter2');
+
+    const read = await (await call('GET', '/mail-server', who('admin'))).json();
+    expect(read.settings.password_set).toBe(true);
+    expect(JSON.stringify(read)).not.toContain('hunter2');
+    expect(JSON.stringify(read)).not.toContain(stored.password_encrypted);
+  });
+
+  it('keeps the saved password when an update leaves it out', async () => {
+    await save(who('admin'), settings);
+    const before = state.mailServers[0].password_encrypted;
+    expect((await save(who('admin'), { ...noPassword, from_name: 'People Team' })).status).toBe(200);
+    expect(state.mailServers[0]).toMatchObject({ password_encrypted: before, from_name: 'People Team' });
+    await send(who('admin'), mail);
+    expect(state.transports.at(-1)).toMatchObject({ auth: { user: 'hr@client.co.ke', pass: 'hunter2' } });
+  });
+
+  it('refuses bad settings: unknown ports, private or local hosts, header injection, turning on with no password', async () => {
+    const admin = who('admin');
+    expect((await save(admin, { ...settings, port: 3306 })).status).toBe(400);
+    for (const host of ['localhost', '127.0.0.1', '10.0.0.5', '192.168.1.1', '169.254.169.254', 'not a host', '']) {
+      expect((await save(admin, { ...settings, host })).status).toBe(400);
+    }
+    expect((await save(admin, { ...settings, from_address: 'hr@client.co.ke\r\nBcc: spy@x.co' })).status).toBe(400);
+    expect((await save(admin, { ...settings, from_name: 'HR" <ceo@x.co>' })).status).toBe(400);
+    expect((await save(admin, noPassword)).status).toBe(400);
+    expect(state.mailServers).toHaveLength(0);
+  });
+
+  it('says clearly when the encryption key is missing on the server', async () => {
+    delete process.env.MAIL_SERVER_ENCRYPTION_KEY;
+    const res = await save(who('admin'), settings);
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toContain('MAIL_SERVER_ENCRYPTION_KEY');
+    expect(state.mailServers).toHaveLength(0);
+  });
+
+  it("sends the company's email through its own server, from its own address, whatever provider is asked for", async () => {
+    await save(who('admin'), settings);
+    for (const provider of [undefined, 'resend', 'cpanel']) {
+      expect((await send(who('hr'), provider ? { ...mail, provider } : mail)).status).toBe(200);
+    }
+    expect(state.resendSends).toHaveLength(0);
+    expect(state.smtpSends).toHaveLength(3);
+    expect(state.smtpSends[0]).toMatchObject({ from: '"Client HR" <hr@client.co.ke>', to: ['jane@example.org'], subject: 'Hello' });
+    expect(state.transports.at(-1)).toMatchObject({
+      host: 'mail.client.co.ke', port: 465, secure: true, auth: { user: 'hr@client.co.ke', pass: 'hunter2' },
+    });
+    expect(state.sentEmails.map((r) => [r.tenant_id, r.provider, r.from_address])).toEqual(
+      Array(3).fill([TENANT, 'own_server', 'hr@client.co.ke']),
+    );
+  });
+
+  it('uses STARTTLS (never a plain login) on port 587', async () => {
+    await save(who('admin'), { ...settings, port: 587, secure: false });
+    await send(who('admin'), mail);
+    expect(state.transports.at(-1)).toMatchObject({ port: 587, secure: false, requireTLS: true });
+  });
+
+  it("falls back to Figbloom HR mail (and the server's cPanel account) when the company's server is off", async () => {
+    await save(who('admin'), { ...settings, enabled: false });
+    expect((await send(who('admin'), mail)).status).toBe(200);
+    expect(state.resendSends).toHaveLength(1);
+    expect((await send(who('admin'), { ...mail, provider: 'cpanel' })).status).toBe(200);
+    expect(state.cpanelLogins).toEqual(['hr@example.org']);
+    expect(state.sentEmails.map((r) => r.provider)).toEqual(['cpanel', 'resend']);
+  });
+
+  it("is only ever the caller's own company's server", async () => {
+    state.mailServers.push({
+      tenant_id: 'other-tenant', host: 'mail.other.co', port: 465, secure: true, username: 'x@other.co', from_address: 'x@other.co',
+      password_encrypted: 'v1:a:b:c', enabled: true,
+    });
+    expect((await send(who('admin'), mail)).status).toBe(200);
+    expect(state.resendSends).toHaveLength(1);
+    expect(state.transports.some((t) => t.host === 'mail.other.co')).toBe(false);
+    expect((await (await call('GET', '/mail-server', who('admin'))).json()).settings).toBeNull();
+  });
+
+  it("reports a failure of the company's server without its reply or the password, and does not send another way", async () => {
+    await save(who('admin'), settings);
+    state.smtpErrorCode = 'EAUTH';
+    const res = await send(who('admin'), mail);
+    expect(res.status).toBe(502);
+    const text = JSON.stringify(await res.json());
+    expect(text).toContain('refused the username or password');
+    expect(text).not.toContain('hunter2');
+    expect(text).not.toContain('535');
+    expect(state.resendSends).toHaveLength(0);
+    expect(state.sentEmails).toHaveLength(0);
+  });
+
+  it('tells everyone signed in who the email comes from', async () => {
+    expect(await (await call('GET', '/sender', who('staff'))).json()).toEqual({ own_server: false, from_address: null, from_name: '' });
+    await save(who('admin'), settings);
+    expect(await (await call('GET', '/sender', who('staff'))).json()).toEqual({
+      own_server: true, from_address: 'hr@client.co.ke', from_name: 'Client HR',
+    });
+    expect((await call('GET', '/sender', null)).status).toBe(401);
+  });
+
+  it('sends a test email to the caller and records how it went', async () => {
+    expect((await call('POST', '/mail-server/test', who('admin'))).status).toBe(400); // nothing saved yet
+    await save(who('admin'), { ...settings, enabled: false }); // a test works before it is turned on
+    const res = await call('POST', '/mail-server/test', who('admin'));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true });
+    const me = state.authUsers.find((u) => u.id === who('admin'))!.email;
+    expect(state.smtpSends[0]).toMatchObject({ to: me, from: '"Client HR" <hr@client.co.ke>' });
+    expect(state.mailServers[0]).toMatchObject({ last_test_ok: true });
+
+    state.smtpErrorCode = 'ECONNECTION';
+    const failed = await call('POST', '/mail-server/test', who('admin'));
+    expect(failed.status).toBe(200); // the request worked; the answer says the mail server did not
+    const body = await failed.json();
+    expect(body).toMatchObject({ ok: false });
+    expect(body.message).toContain('Could not connect to mail.client.co.ke on port 465');
+    expect(JSON.stringify(body)).not.toContain('hunter2');
+    expect(state.mailServers[0]).toMatchObject({ last_test_ok: false });
+    expect((await (await call('GET', '/mail-server', who('admin'))).json()).settings.last_test_message).toContain('Could not connect');
   });
 });

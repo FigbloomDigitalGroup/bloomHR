@@ -49,7 +49,7 @@ export const MODULES: ModuleInfo[] = [
   { id: 'task-manager', name: 'Task Manager', area: 'workspace', explain: 'Use the task board for their own and shared tasks' },
   { id: 'task-projects', name: 'Manage projects', area: 'workspace', explain: 'Create projects, add members, assign tasks to teams, recurring tasks and labels' },
   { id: 'task-oversight', name: 'See every task', area: 'workspace', explain: 'See every task in the company, read-only, with its comments and files' },
-  { id: 'teams', name: 'Teams', area: 'workspace', explain: 'Chat with colleagues in channels and direct messages' },
+  { id: 'teams', name: 'Teams', area: 'workspace', explain: 'Chat with colleagues in channels and direct messages, and video calls' },
   { id: 'chat-channels', name: 'Create chat channels', area: 'workspace', explain: 'Start new chat channels' },
   { id: 'chat-admin', name: 'Moderate chat', area: 'workspace', explain: 'See private channels, manage any channel and its members, edit or remove anyone’s messages (never direct messages)' },
   { id: 'sms', name: 'SMS Center', area: 'workspace', explain: 'Send SMS messages to staff' },

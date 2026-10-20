@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { TAX_DISCLAIMER, TAX_RULES, explainRule, findTaxRule, treatmentLabel } from './kenyaTaxTreatment';
+import {
+  SECTION_19_NOTE,
+  TAX_DISCLAIMER,
+  TAX_RULES,
+  explainRule,
+  findTaxRule,
+  goAheadFor,
+  ruleSource,
+  treatmentLabel,
+} from './kenyaTaxTreatment';
 
 const idFor = (name: string, kind: 'deduction' | 'earning' | 'benefit' = 'deduction') => findTaxRule(name, kind)?.id ?? null;
 
@@ -78,5 +87,45 @@ describe('the rules', () => {
   it('labels a non-taxed earning "Not taxable" and a deduction "Not tax-deductible"', () => {
     expect(treatmentLabel('not_taxable', 'deduction')).toBe('Not tax-deductible');
     expect(treatmentLabel('not_taxable', 'earning')).toBe('Not taxable');
+  });
+});
+
+describe('common pay items a company adds', () => {
+  const byId = (id: string) => TAX_RULES.find((r) => r.id === id)!;
+
+  it('finds a rule, with its citation, for the usual names', () => {
+    expect(idFor('Lunch', 'deduction')).toBe('meals_deduction');
+    expect(idFor('Staff lunch', 'benefit')).toBe('meals');
+    expect(idFor('Staff meals', 'benefit')).toBe('meals');
+    expect(idFor('Car benefit', 'benefit')).toBe('car_benefit');
+    expect(idFor('Medical cover', 'benefit')).toBe('employer_medical');
+    expect(idFor('Medical', 'deduction')).toBe('medical_deduction');
+    expect(idFor('Housing', 'benefit')).toBe('housing_benefit');
+    expect(idFor('Per diem', 'earning')).toBe('per_diem');
+    expect(idFor('School fees', 'benefit')).toBe('school_fees');
+    expect(idFor('Airtime', 'benefit')).toBe('airtime');
+    expect(idFor('Airtime allowance', 'earning')).toBe('airtime');
+    expect(idFor('Employer pension contribution', 'benefit')).toBe('employer_pension');
+    expect(idFor('WIBA', 'benefit')).toBe('wiba');
+    expect(idFor('WIBA cover', 'deduction')).toBe('wiba_deduction');
+  });
+
+  it('reads money limits from the statutory rates, never from the code', () => {
+    expect(byId('meals').capCode).toBe('meals_exempt_limit');
+    expect(explainRule(byId('meals'), { meals_exempt_limit: 5000 })).toContain('KSh 5,000');
+    expect(explainRule(byId('airtime'), { non_cash_benefit_exempt_limit: 5000 })).toContain('KSh 5,000');
+    for (const r of TAX_RULES) expect(r.explanation).not.toMatch(/KSh\s?\d/);
+  });
+
+  it('says whether the company can go ahead', () => {
+    expect(goAheadFor(byId('nssf'), 'deduction').status).toBe('no');
+    expect(goAheadFor(byId('wiba_deduction'), 'deduction').status).toBe('no');
+    expect(goAheadFor(byId('meals_deduction'), 'deduction')).toEqual({ status: 'with_conditions', note: SECTION_19_NOTE });
+    expect(goAheadFor(null, 'deduction').note).toContain('s.19(3)');
+    expect(goAheadFor(byId('meals'), 'benefit').status).toBe('yes');
+  });
+
+  it('names its source for saving with the item', () => {
+    expect(ruleSource(byId('meals'))).toContain('Income Tax Act s.5');
   });
 });

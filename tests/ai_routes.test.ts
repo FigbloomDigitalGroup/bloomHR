@@ -317,6 +317,20 @@ describe('tax_treatment: how a pay item is taxed (a suggestion only)', () => {
     });
   });
 
+  it('asks whether the employer can go ahead, and passes on a valid answer', async () => {
+    replyWith(JSON.stringify({ ...good, go_ahead: ' With_Conditions ', go_ahead_reason: 'Get the  employee’s written consent.' }));
+    const res = await askTax(who('admin'), item);
+    expect(await res.json()).toEqual({ ...good, go_ahead: 'with_conditions', go_ahead_reason: 'Get the employee’s written consent.' });
+    expect(state.modelCalls[0].body.messages[0].content).toContain('s.19(3)');
+  });
+
+  it('leaves out a go-ahead that is unknown or has no reason', async () => {
+    replyWith(JSON.stringify({ ...good, go_ahead: 'maybe', go_ahead_reason: 'Unsure.' }));
+    expect(await (await askTax(who('admin'), item)).json()).toEqual(good);
+    replyWith(JSON.stringify({ ...good, go_ahead: 'yes', go_ahead_reason: '' }));
+    expect(await (await askTax(who('admin'), item)).json()).toEqual(good);
+  });
+
   it.each([
     ['not JSON', 'It is taxable.'],
     ['an unknown treatment', JSON.stringify({ ...good, treatment: 'exempt' })],

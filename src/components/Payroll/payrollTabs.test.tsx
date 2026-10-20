@@ -27,9 +27,9 @@ const renderAt = (url: string) =>
   );
 
 describe('payroll tabs', () => {
-  it('lists Run, Employees\' pay, Deductions, Earnings, Rates, Files and History', () => {
+  it('lists Run, Employees\' pay, Deductions, Earnings, Pay items, Rates, Files and History', () => {
     renderAt('/payroll');
-    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Run', "Employees' pay", 'Deductions', 'Earnings', 'Rates', 'Files', 'History']);
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Run', "Employees' pay", 'Deductions', 'Earnings', 'Pay items', 'Rates', 'Files', 'History']);
   });
 
   it('opens Run when the address names no tab, or one that does not exist', () => {
