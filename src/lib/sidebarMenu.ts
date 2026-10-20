@@ -75,6 +75,8 @@ export const SIDEBAR_MENU: SidebarMenuGroup[] = [
       { id: 'reports', label: 'Reports', path: '/reports' },
       { id: 'email admin', label: 'Email Admin', path: '/adminconfirm' },
       { id: 'incident-reports', label: 'Incidents', path: '/incident-reports' },
+      // workplace accidents and work injuries (WIBA): the same people as incident reports
+      { id: 'work-injuries', label: 'Work injuries', path: '/work-injuries' },
       { id: 'settings', label: 'Settings', path: '/settings' },
       { id: 'setup-assistant', label: 'Set up with AI', path: '/setup-assistant' },
       { id: 'departments', label: 'Departments', path: '/departments' },
