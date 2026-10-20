@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { chunks } from './fetchAll';
+import { chunks, IN_LIST_SIZE } from './fetchAll';
 
 // Saving a bulk employee upload (FIG-818): a few hundred rows per call to save_employees_batch() (migration
 // 20261014300000) instead of one request per row, so 10,000 employees take a minute, not hours. The function runs
@@ -34,6 +34,31 @@ export function describeSaveError(code: string | null | undefined, message: stri
   if (code === '23505' && /sha_number|shif/i.test(text)) return 'another employee already has this SHIF number';
   if (/row-level security/i.test(text)) return 'you may not add or change employees';
   return text || 'could not be saved';
+}
+
+/**
+ * Which of these work emails and employee numbers the company's employees already have. save_employees_batch updates
+ * the employee a row's number or work email belongs to, so a caller that only means to add people checks first.
+ */
+export async function findExistingEmployees(
+  workEmails: string[],
+  numbers: string[] = []
+): Promise<{ emails: Set<string>; numbers: Set<string> }> {
+  const found = { emails: new Set<string>(), numbers: new Set<string>() };
+  const add = (rows: { 'Employee Number': string | null; 'Work Email': string | null }[] | null) => {
+    for (const r of rows ?? []) {
+      if (r['Work Email']) found.emails.add(String(r['Work Email']).trim().toLowerCase());
+      if (r['Employee Number']) found.numbers.add(String(r['Employee Number']).trim());
+    }
+  };
+  for (const [column, values] of [['Work Email', workEmails], ['Employee Number', numbers]] as const) {
+    for (const chunk of chunks(values, IN_LIST_SIZE)) {
+      const { data, error } = await supabase.from('employees').select('"Employee Number", "Work Email"').in(column, chunk);
+      if (error) throw new Error(describeSaveError((error as { code?: string }).code, error.message));
+      add(data as { 'Employee Number': string | null; 'Work Email': string | null }[] | null);
+    }
+  }
+  return found;
 }
 
 /**

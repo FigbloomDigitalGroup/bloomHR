@@ -32,7 +32,7 @@ interface Turn {
   proposals: Proposal[];
 }
 
-const STARTERS = ['Start with our company details', 'Suggest departments for us', 'Set up employee numbers', 'Invite my team'];
+const STARTERS = ['Start with our company details', 'Suggest departments for us', 'Set up employee numbers', 'Invite my team', 'Add employees'];
 const MAX_TURNS_SENT = 20; // the server takes at most 20 messages
 
 /** The conversation as the server takes it: the AI's turns as the JSON it gave, with what became of each proposal. */
@@ -208,14 +208,22 @@ export default function SetupAssistant() {
             </div>
           )}
           <form onSubmit={submit} className="flex gap-2">
-            <input
+            {/* a text area, so a pasted list of people keeps its lines; Enter sends, Shift+Enter starts a new line */}
+            <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Tell me about your company…"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  void send(draft);
+                }
+              }}
+              placeholder="Tell me about your company, or paste a list of people to add…"
               aria-label="Message"
-              maxLength={4000}
+              maxLength={20000}
+              rows={draft.includes('\n') ? 4 : 1}
               disabled={!state}
-              className="flex-1 min-w-0 rounded-tile border border-border bg-white px-3 py-2 text-[13px] text-ink outline-none focus:border-brand"
+              className="flex-1 min-w-0 resize-none rounded-tile border border-border bg-white px-3 py-2 text-[13px] text-ink outline-none focus:border-brand"
             />
             <Button type="submit" disabled={!draft.trim() || asking || !state} icon={<Send className="w-4 h-4" />} aria-label="Send">
               <span className="hidden sm:inline">Send</span>
@@ -251,20 +259,55 @@ function ProposalCard({ item, state, onApply, onSkip }: { item: Proposal; state:
         )}
         {item.status === 'skipped' && <span className="text-[11.5px] font-semibold text-muted-foreground">Skipped</span>}
       </div>
-      <ul className="m-0 pl-4 space-y-0.5 list-disc text-ink">
-        {view.lines.map((l, i) => (
-          <li key={i}>
-            {l.text}
-            {l.was && !decided && <span className="text-muted-foreground"> (now {l.was})</span>}
-          </li>
-        ))}
-      </ul>
+      {view.lines.length > 0 && (
+        <ul className="m-0 pl-4 space-y-0.5 list-disc text-ink">
+          {view.lines.map((l, i) => (
+            <li key={i}>
+              {l.text}
+              {l.was && !decided && <span className="text-muted-foreground"> (now {l.was})</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {view.table && (
+        <div className="max-h-72 overflow-auto rounded-tile border border-border">
+          <table className="w-full text-left text-[12px]">
+            <thead className="sticky top-0 bg-background">
+              <tr>
+                {view.table.columns.map((c) => (
+                  <th key={c} scope="col" className="whitespace-nowrap px-2 py-1.5 font-semibold text-muted-foreground">
+                    {c}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {view.table.rows.map((row, r) => (
+                <tr key={r} className="border-t border-border">
+                  {row.map((cell, c) => (
+                    <td key={c} className="whitespace-nowrap px-2 py-1.5 text-ink">
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {view.problems && !decided && (
+        <ul className="m-0 pl-4 space-y-0.5 list-disc text-[11.5px] text-status-danger" aria-label="Fix these first">
+          {view.problems.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ul>
+      )}
       {view.note && !decided && <p className="m-0 text-[11.5px] text-muted-foreground">{view.note}</p>}
       {item.note && <p className={`m-0 text-[11.5px] ${item.status === 'failed' ? 'text-status-danger' : 'text-muted-foreground'}`}>{item.note}</p>}
       {!decided &&
         (shown ? (
           <div className="flex gap-2">
-            <Button onClick={onApply} disabled={item.status === 'applying'}>
+            <Button onClick={onApply} disabled={item.status === 'applying' || !!view.problems?.length}>
               {item.status === 'applying' ? 'Saving…' : item.status === 'failed' ? 'Try again' : view.applyLabel}
             </Button>
             <Button variant="ghost" onClick={onSkip} disabled={item.status === 'applying'}>
