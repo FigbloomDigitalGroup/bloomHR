@@ -220,8 +220,10 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
     ? (hasEntries(selectedDay) ? [selectedDay] : [])
     : gridDays.filter((day) => isSameMonth(day, currentMonth) && hasEntries(day));
 
+  // "The next 30 days / 1 year" counts today as day one: 1 year from 20 Oct ends on 19 Oct, so a yearly holiday on
+  // today's date is listed once, not twice
   const upcoming = useMemo(
-    () => comingUp({ events, holidays, leave: myLeave, tasks: myTasks, employeeNumber: taskOwner }, new Date(), range).filter((i) => shown[i.kind]),
+    () => comingUp({ events, holidays, leave: myLeave, tasks: myTasks, employeeNumber: taskOwner }, new Date(), range - 1).filter((i) => shown[i.kind]),
     [events, holidays, myLeave, myTasks, taskOwner, range, shown]
   );
 
