@@ -105,6 +105,13 @@ describe('comingUp', () => {
     expect(comingUp(input, today, 30)).toHaveLength(0);
     expect(comingUp(input, today, 90)).toHaveLength(1);
   });
+
+  it('counts today as the first day: 30 days ends on day 29, and a yearly holiday on today is listed once in 1 year', () => {
+    const events = { events: [{ title: 'Day 29', date: '2026-11-15' }, { title: 'Day 30', date: '2026-11-16' }] };
+    expect(comingUp(events, today, 30).map((i) => i.title)).toEqual(['Day 29']);
+    const holidays = { holidays: [{ name: 'Mashujaa Day', date: '2019-10-17', recurring: true }] };
+    expect(comingUp(holidays, today, 365).map((i) => [i.title, i.daysAway])).toEqual([['Mashujaa Day', 0]]);
+  });
 });
 
 describe('myOpenTasks', () => {
