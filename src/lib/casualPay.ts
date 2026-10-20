@@ -64,6 +64,10 @@ export interface CasualPayLine {
   additions: number | string;
   deductions: number | string;
   adjustment_note: string | null;
+  /** the company's standing pay items for the worker, worked out with the days (migration 20261022700000) */
+  standing_additions?: number | string | null;
+  standing_deductions?: number | string | null;
+  standing_items?: unknown;
   net_pay: number | string;
   payment_method: string | null;
   phone: string | null;
@@ -74,6 +78,14 @@ export interface CasualPayLine {
   account_name: string | null;
   account_number: string | null;
   payroll_number: string | null;
+}
+
+/** One standing item on a casual pay line: what it took or added, and what it came to before any limit. */
+export interface CasualStandingLine {
+  name: string;
+  kind: 'deduction' | 'allowance';
+  amount: number;
+  full: number;
 }
 
 export interface LimitAlert {
@@ -123,11 +135,28 @@ export function dayTotals(days: Pick<CasualDay, 'portion' | 'daily_rate'>[]): Da
   return t;
 }
 
-/** A pay line's take-home: days, plus additions, less deductions; never below nothing. */
-export const lineNet = (l: Pick<CasualPayLine, 'days_amount' | 'additions' | 'deductions'>) =>
-  Math.max(0, round2(num(l.days_amount) + num(l.additions) - num(l.deductions)));
+type NetParts = Pick<CasualPayLine, 'days_amount' | 'additions' | 'deductions'> &
+  Partial<Pick<CasualPayLine, 'standing_additions' | 'standing_deductions'>>;
 
-export const runTotal = (lines: Pick<CasualPayLine, 'days_amount' | 'additions' | 'deductions'>[]) =>
+/** A pay line's take-home: days, plus standing and one-off additions, less standing and one-off deductions; never below nothing. */
+export const lineNet = (l: NetParts) =>
+  Math.max(
+    0,
+    round2(num(l.days_amount) + num(l.standing_additions) + num(l.additions) - num(l.standing_deductions) - num(l.deductions)),
+  );
+
+/** A line's standing items (the company's pay items for casuals, lib/payItems), as the database saved them. */
+export const standingItemsOf = (l: Pick<CasualPayLine, 'standing_items'>): CasualStandingLine[] =>
+  Array.isArray(l.standing_items)
+    ? (l.standing_items as Partial<CasualStandingLine>[]).map((i) => ({
+        name: text(i.name),
+        kind: i.kind === 'allowance' ? 'allowance' : 'deduction',
+        amount: num(i.amount),
+        full: num(i.full ?? i.amount),
+      }))
+    : [];
+
+export const runTotal = (lines: NetParts[]) =>
   round2(lines.reduce((sum, l) => sum + lineNet(l), 0));
 
 export const formatKsh = (n: number | string) =>

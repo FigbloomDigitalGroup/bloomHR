@@ -54,7 +54,8 @@ export default function DeductionCapSetting({ canEdit, onChanged }: { canEdit: b
           <span className="block text-[11px] text-muted-foreground">
             For workers paid by piece rate or contract jobs: when a month&apos;s deductions and arrears are more than two-thirds of
             the month&apos;s wages, the rest carries forward to next month as an arrear. PAYE, NSSF, SHIF and AHL are always
-            taken in full. Net pay is never below 0: anything more than is left to pay carries forward too.
+            taken in full. Net pay is never below 0: anything more than is left to pay carries forward too. On casual pay runs,
+            standing and one-off deductions together stay within two-thirds of the line&apos;s pay.
           </span>
         </span>
       </label>
