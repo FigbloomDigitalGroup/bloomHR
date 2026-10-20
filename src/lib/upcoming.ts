@@ -175,13 +175,12 @@ export interface ComingUpInput {
 const KIND_ORDER: Record<UpcomingKind, number> = { holiday: 0, event: 1, leave: 2, task: 3, birthday: 4 };
 
 /**
- * Everything in the next `withinDays` days counting today, soonest first, with overdue tasks at the very top. A leave
- * already under way is listed (as from today) until its last day. "1 year" from 20 Oct ends on 19 Oct, so a yearly
- * holiday on today's date is listed once, not twice.
+ * Everything from today to `withinDays` days ahead, soonest first, with overdue tasks at the very top. A leave already
+ * under way is listed (as from today) until its last day.
  */
 export function comingUp(input: ComingUpInput, today: Date, withinDays: number): CalendarEntry[] {
   const from = startOfDay(today);
-  const to = addDays(from, withinDays - 1);
+  const to = addDays(from, withinDays);
   const items: CalendarEntry[] = [];
 
   for (const e of eventsBetween(input.events ?? [], from, to)) {
