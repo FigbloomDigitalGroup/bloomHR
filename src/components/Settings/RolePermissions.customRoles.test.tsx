@@ -148,3 +148,43 @@ describe('RolePermissions with the company’s own roles', () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to save permissions: You cannot give a role access you do not have yourself'));
   });
 });
+
+describe('Preview as this role and who has it', () => {
+  it('the preview follows the ticks before they are saved', async () => {
+    await open();
+    fireEvent.click(screen.getByRole('button', { name: /Supervisors/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Preview as this role/ }));
+    const overview = () => screen.getByRole('region', { name: 'Overview' });
+    expect(within(overview()).getByRole('list', { name: 'Overview: not shown' }).textContent).toContain('Tick Dashboard');
+
+    fireEvent.click(sw('Dashboard'));
+    expect(within(overview()).getByRole('list', { name: 'Overview: shown' }).textContent).toContain('Dashboard');
+    expect(db.rpc).not.toHaveBeenCalledWith('set_company_role_modules', expect.anything());
+  });
+
+  it('a role based on Staff previews the staff portal', async () => {
+    await open();
+    fireEvent.click(screen.getByRole('button', { name: /Operators/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Preview as this role/ }));
+    expect(screen.getByRole('region', { name: 'Finance' }).textContent).toContain('Payslips');
+    expect(screen.queryByRole('region', { name: 'System' })).toBeNull();
+  });
+
+  it('lists the people with the selected role', async () => {
+    db.rpc.mockImplementation(async (fn: string, args?: { p_role_key?: string }) => {
+      if (fn === 'company_role_holders') return { data: [{ role_key: 'CR_op', people: 1 }], error: null };
+      if (fn === 'company_role_holder_list') {
+        return {
+          data: args?.p_role_key === 'CR_op' ? [{ user_id: 'u-1', full_name: 'Amina Otieno', email: 'amina@co.ke', location: 'Nairobi', account_status: 'ACTIVE' }] : [],
+          error: null,
+        };
+      }
+      return { data: null, error: null };
+    });
+    await open();
+    fireEvent.click(screen.getByRole('button', { name: /Operators/ }));
+    const list = await screen.findByRole('list', { name: 'People with Operators' });
+    expect(list.textContent).toContain('Amina Otieno');
+    expect(screen.getByRole('button', { name: 'Change role for Amina Otieno' })).toBeTruthy();
+  });
+});

@@ -22,6 +22,22 @@ export const SYSTEM_ROLE_LABELS: Record<SystemRole, string> = {
   STAFF: 'Staff',
 };
 
+/**
+ * What each system role gets by default, in plain words: the modules a new company's roles start with (seeded in
+ * 20261006000160_reference_data.sql and 20261021200000_roles_everywhere.sql). The same wording as
+ * system_role_description() in the database (20261022500000_role_holders_list.sql). A company may tick other modules
+ * on Role Permissions, which then decide.
+ */
+export const SYSTEM_ROLE_DESCRIPTIONS: Record<SystemRole, string> = {
+  ADMIN: 'Everything: every screen, setting and role',
+  HR: 'People: employee records, hiring, leave, performance, training, discipline, exits and staff loans. Not payroll or settings',
+  CHECKER: 'Money checks: payroll, salary advances and M-Pesa payments, with employee records and reports',
+  MANAGER: "Their people: employees, leave, performance, salary advances and incidents, and their team's casual work and overtime",
+  REGIONAL: 'Several branches: employees, leave, performance, salary advances and reports',
+  OPERATIONS: 'Day to day: employees, hiring, leave, training, discipline, SMS and reports',
+  STAFF: 'The staff portal only: their own profile, leave, payslips, tasks and chat',
+};
+
 /** Only a role based on ADMIN may hold these (admin_only_modules()). */
 export const ADMIN_ONLY_MODULES = ['settings', 'role-permissions'];
 /** A role based on STAFF may not hold these either (staff_restricted_modules()); task modules are allowed. */
@@ -124,6 +140,22 @@ export interface RoleHolders {
   [roleKey: string]: number;
 }
 
+/** Someone who holds a role (company_role_holder_list(), migration 20261022500000). */
+export interface RoleHolder {
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
+  location: string | null;
+  account_status: string | null;
+}
+
+const asHolder = (row: unknown): RoleHolder | null => {
+  const r = row as Partial<RoleHolder> | null;
+  if (!r || typeof r.user_id !== 'string') return null;
+  const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  return { user_id: r.user_id, full_name: text(r.full_name), email: text(r.email), location: text(r.location), account_status: text(r.account_status) };
+};
+
 /** Calls the role functions (they check who may do what); errors come back as messages people can read. */
 async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(fn, args);
@@ -156,6 +188,12 @@ export const rolesApi = {
     } catch {
       return {};
     }
+  },
+
+  /** The people who hold a role (by role key), by name. Fails with a message when they cannot be loaded. */
+  async holderList(roleKey: string): Promise<RoleHolder[]> {
+    const data = await rpc<unknown>('company_role_holder_list', { p_role_key: roleKey });
+    return (Array.isArray(data) ? data : []).map(asHolder).filter((h): h is RoleHolder => h !== null);
   },
 
   create: (input: { name: string; baseRole: string; description?: string | null; modules?: string[] }) =>
