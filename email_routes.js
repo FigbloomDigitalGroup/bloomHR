@@ -8,10 +8,18 @@
 // is recorded in sent_emails with the caller's company, the log lists only that company's rows, and the provider is
 // asked for one email's details only after the row has been found in the caller's company.
 //
+// A company can send from its own mail server (cPanel or any SMTP, company_mail_server.js): when it has one turned on,
+// every send of that company's goes through it, from its own address, whatever provider the request names. Otherwise
+// mail goes through Resend (or the server-wide SMTP / cPanel account, kept as a fallback) as before.
+//
 //   POST /api/email/send   { purpose, to, subject, html, attachments?, provider?, cpanelUser? }
 //   POST /api/email/bulk   { purpose: "email-portal", to: [...], subject, html, attachments? }  (queued, see below)
 //   GET  /api/email/logs?limit=&cursor=
 //   GET  /api/email/logs/:id
+//   GET  /api/email/sender               who the company's email comes from (any signed-in member)
+//   GET  /api/email/mail-server          the company's own mail server settings, never the password (Settings)
+//   PUT  /api/email/mail-server          save them; a password left out keeps the saved one (Settings)
+//   POST /api/email/mail-server/test     send a test email to the caller through the saved server (Settings)
 import express from "express";
 import nodemailer from "nodemailer";
 import { Resend } from "resend";
@@ -19,6 +27,15 @@ import dotenv from "dotenv";
 import fetch from "node-fetch";
 import { authenticate, HttpError, admin } from "./admin_routes.js";
 import { callerHasModule, createSharedBudget } from "./authz.js";
+import {
+    asSettings,
+    describeSmtpError,
+    fromHeader,
+    isActive,
+    loadMailServer,
+    publicSettings,
+    transportFor,
+} from "./company_mail_server.js";
 
 dotenv.config();
 
@@ -51,6 +68,9 @@ const PURPOSES = {
     "staff-signup": { modules: ["adminconfirm"] },
 };
 const LOG_MODULES = ["email-portal", "adminconfirm"];
+// who may see and change the company's own mail server (ADMIN always)
+const MAIL_SERVER_MODULES = ["settings"];
+const MISSING_TABLE = ["42P01", "PGRST205"];
 
 const MAX_RECIPIENTS = 50; // per request
 const MAX_SUBJECT = 200;
@@ -254,6 +274,28 @@ router.post(
         const record = (used, providerId, from) =>
             recordSend(caller, { provider: used, providerId, purpose, from, to: recipients, subject });
 
+        // 0. The company's own mail server, when it has one turned on. It wins over any provider asked for, and a
+        // failure is reported rather than the email being sent from another address instead.
+        const own = await loadMailServer(caller.tenantId);
+        if (isActive(own)) {
+            let info;
+            try {
+                info = await transportFor(own).sendMail({
+                    from: fromHeader(own),
+                    to: recipients,
+                    subject,
+                    html,
+                    attachments: files.map((att) => ({ filename: att.filename, content: att.content, encoding: "base64" })),
+                });
+            } catch (err) {
+                if (err instanceof HttpError) throw err;
+                console.error("[email] company mail server error:", err?.code || err);
+                throw new HttpError(502, `Your mail server did not send it. ${describeSmtpError(err, own)}`);
+            }
+            await record("own_server", info.messageId, own.from_address);
+            return res.json({ message: "Email sent successfully from your mail server", id: info.messageId });
+        }
+
         // 1. Send via Resend
         if (provider === "resend" && resend) {
             const from = process.env.SMTP_FROM || "onboarding@resend.dev";
@@ -304,6 +346,90 @@ router.post(
         const info = await transporter.sendMail(mailOptions);
         await record("smtp", info.messageId, mailOptions.from);
         res.json({ message: "Email sent successfully", id: info.messageId });
+    })
+);
+
+// Who the company's email comes from, for the line under "Compose Email": its own server's address when it has one
+// turned on, otherwise Figbloom HR mail. Any signed-in member may ask; it is only the From address.
+router.get(
+    "/sender",
+    handler(async (_req, res, caller) => {
+        const own = await loadMailServer(caller.tenantId);
+        if (isActive(own)) return res.json({ own_server: true, from_address: own.from_address, from_name: own.from_name || "" });
+        res.json({ own_server: false, from_address: null, from_name: "" });
+    })
+);
+
+// The company's own mail server settings, without the password: { settings: {...} | null }
+router.get(
+    "/mail-server",
+    handler(async (_req, res, caller) => {
+        if (!(await callerHasModule(caller, MAIL_SERVER_MODULES))) throw new HttpError(403, "Forbidden");
+        res.json({ settings: publicSettings(await loadMailServer(caller.tenantId)) });
+    })
+);
+
+// Saves the company's own mail server. A password left out (or empty) keeps the saved one.
+router.put(
+    "/mail-server",
+    handler(async (req, res, caller) => {
+        if (!(await callerHasModule(caller, MAIL_SERVER_MODULES))) throw new HttpError(403, "Forbidden");
+        const existing = await loadMailServer(caller.tenantId);
+        const row = { ...asSettings(req.body, existing, caller.tenantId), updated_by: caller.id, updated_at: new Date().toISOString() };
+        const { error } = await admin.from("company_mail_servers").upsert(row, { onConflict: "tenant_id" });
+        if (error) {
+            if (MISSING_TABLE.includes(String(error.code))) {
+                throw new HttpError(503, "Own mail servers are not set up on this system yet (database update pending)");
+            }
+            throw new HttpError(500, "Could not save the mail server settings");
+        }
+        res.json({ settings: publicSettings(row) });
+    })
+);
+
+// Sends a test email to the caller through the saved server (turned on or not), and records how it went:
+// { ok, message, tested_at }.
+router.post(
+    "/mail-server/test",
+    handler(async (_req, res, caller) => {
+        if (!(await callerHasModule(caller, MAIL_SERVER_MODULES))) throw new HttpError(403, "Forbidden");
+        const own = await loadMailServer(caller.tenantId);
+        if (!own || !own.password_encrypted) throw new HttpError(400, "Save the mail server settings, with the password, first");
+        const to = String(caller.email || "");
+        if (!EMAIL_RE.test(to)) throw new HttpError(400, "Your login has no email address to send the test to");
+        if (!(await takeUserBudget(caller, "default", 1)) || !(await takeCompanyBudget(caller, 1))) {
+            throw new HttpError(429, "Email limit reached for now. Try again later.");
+        }
+
+        const subject = "Test email from Figbloom HR";
+        let ok = true;
+        let message = `Test email sent to ${to}.`;
+        let providerId = null;
+        try {
+            const info = await transportFor(own).sendMail({
+                from: fromHeader(own),
+                to,
+                subject,
+                html: `<p>This is a test email sent through your mail server (${own.host}).</p><p>If you can read it, your company's email can be sent from ${own.from_address}.</p>`,
+            });
+            providerId = info.messageId;
+        } catch (err) {
+            if (err instanceof HttpError) throw err;
+            console.error("[email] company mail server test failed:", err?.code || err);
+            ok = false;
+            message = describeSmtpError(err, own);
+        }
+
+        const testedAt = new Date().toISOString();
+        const { error } = await admin
+            .from("company_mail_servers")
+            .update({ last_test_ok: ok, last_test_at: testedAt, last_test_message: message })
+            .eq("tenant_id", caller.tenantId);
+        if (error) console.error("[email] could not record the mail server test:", error);
+        if (ok) await recordSend(caller, { provider: "own_server", providerId, purpose: "mail-server-test", from: own.from_address, to: [to], subject });
+
+        // the request worked either way: the answer says whether the mail server did
+        res.json({ ok, message, tested_at: testedAt });
     })
 );
 

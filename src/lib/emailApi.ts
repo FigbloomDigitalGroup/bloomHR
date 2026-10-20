@@ -21,8 +21,9 @@ export interface OutgoingEmail {
   subject: string;
   html: string;
   attachments?: { filename: string; content: string }[];
+  /** Ignored when the company sends from its own mail server, which always wins. */
   provider?: 'resend' | 'cpanel';
-  /** cPanel mailbox to send as; the server only allows the ones it is configured with. */
+  /** cPanel mailbox to send as (the server-wide cPanel account); the server only allows the ones it is configured with. */
   cpanelUser?: string;
 }
 
@@ -66,3 +67,39 @@ export const listEmailLogs = (limit: number, cursor?: string) =>
   );
 
 export const getEmailLog = (id: string) => request<any>('GET', `/logs/${encodeURIComponent(id)}`);
+
+/** Who the company's email comes from: its own mail server's address, or Figbloom HR mail. */
+export interface EmailSender {
+  own_server: boolean;
+  from_address: string | null;
+  from_name: string;
+}
+export const getEmailSender = () => request<EmailSender>('GET', '/sender');
+
+/** The company's own mail server (cPanel or any SMTP) as the server shows it: never the password, only whether one is set. */
+export interface MailServerSettings {
+  host: string;
+  port: number;
+  /** true: SSL/TLS from the start (usually port 465); false: STARTTLS (usually port 587) */
+  secure: boolean;
+  username: string;
+  from_name: string;
+  from_address: string;
+  enabled: boolean;
+  password_set: boolean;
+  last_test_ok: boolean | null;
+  last_test_at: string | null;
+  last_test_message: string | null;
+  updated_at: string | null;
+}
+
+/** What is saved. A password left out (or empty) keeps the saved one. */
+export type MailServerInput = Pick<MailServerSettings, 'host' | 'port' | 'secure' | 'username' | 'from_name' | 'from_address' | 'enabled'> & {
+  password?: string;
+};
+
+export const getMailServer = () => request<{ settings: MailServerSettings | null }>('GET', '/mail-server');
+export const saveMailServer = (settings: MailServerInput) => request<{ settings: MailServerSettings }>('PUT', '/mail-server', settings);
+
+/** Sends a test email to the signed-in person through the saved server, and says how it went. */
+export const testMailServer = () => request<{ ok: boolean; message: string; tested_at: string }>('POST', '/mail-server/test');
