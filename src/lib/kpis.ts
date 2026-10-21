@@ -10,11 +10,14 @@
 //   overall score   the weighted average of the scored KPIs' achievement: sum(achievement x weight) / sum(weight)
 //   rating band     Exceeds, Meets or Below, from RATING_BANDS
 //   weights check   an employee's weights in a period should total 100 (a warning only)
+//   measures        how a KPI's actual is found: typed in, or calculated from tasks (20261023200000), which fixes the
+//                   KPI's unit and direction
 
 export type KpiUnit = 'number' | 'percent' | 'currency_ksh' | 'yes_no' | 'rating_1_5';
 export type KpiDirection = 'higher_is_better' | 'lower_is_better';
 export type KpiFrequency = 'monthly' | 'quarterly' | 'annual';
 export type PeriodStatus = 'draft' | 'open' | 'closed';
+export type KpiMeasure = 'manual' | 'tasks_on_time' | 'tasks_completed' | 'tasks_late' | 'task_days';
 
 export const ACHIEVEMENT_CAP = 150;
 export const WEIGHTS_TOTAL = 100;
@@ -32,6 +35,45 @@ export const DIRECTION_LABEL: Record<KpiDirection, string> = {
 };
 export const FREQUENCY_LABEL: Record<KpiFrequency, string> = { monthly: 'Monthly', quarterly: 'Quarterly', annual: 'Annual' };
 export const PERIOD_STATUS_LABEL: Record<PeriodStatus, string> = { draft: 'Draft', open: 'Open', closed: 'Closed' };
+export const MEASURE_LABEL: Record<KpiMeasure, string> = {
+  manual: 'Entered by hand',
+  tasks_on_time: 'Tasks done on time (%)',
+  tasks_completed: 'Tasks completed',
+  tasks_late: 'Late tasks',
+  task_days: 'Average days to complete a task',
+};
+export const MEASURE_HINT: Record<KpiMeasure, string> = {
+  manual: 'The employee self-assesses and their manager or HR enters the final score.',
+  tasks_on_time: 'Of the tasks due in the period so far, the share done by their due date.',
+  tasks_completed: 'Tasks the employee finished in the period.',
+  tasks_late: 'Tasks due in the period that were not done by their due date (done late or still open).',
+  task_days: 'The median number of days from a task being created to it being done.',
+};
+/** The unit and direction a calculated measure fixes. */
+export const MEASURE_FIXED: Record<Exclude<KpiMeasure, 'manual'>, { unit: KpiUnit; direction: KpiDirection }> = {
+  tasks_on_time: { unit: 'percent', direction: 'higher_is_better' },
+  tasks_completed: { unit: 'number', direction: 'higher_is_better' },
+  tasks_late: { unit: 'number', direction: 'lower_is_better' },
+  task_days: { unit: 'number', direction: 'lower_is_better' },
+};
+
+/** What a calculated value was worked out from, e.g. "8 of 10 due tasks done on time". */
+export function measureDetail(measure: KpiMeasure, detail: Record<string, number> | null | undefined): string {
+  if (!detail || measure === 'manual') return '';
+  const n = (k: string) => Number(detail[k] ?? 0);
+  const tasks = (k: number) => (k === 1 ? 'task' : 'tasks');
+  switch (measure) {
+    case 'tasks_on_time':
+      return n('due') === 0 ? 'No tasks due yet' : `${n('on_time')} of ${n('due')} due ${tasks(n('due'))} done on time`;
+    case 'tasks_late':
+      return n('due') === 0 ? 'No tasks due yet' : `${n('late')} of ${n('due')} due ${tasks(n('due'))} late`;
+    case 'tasks_completed':
+      return `${n('done')} ${tasks(n('done'))} done`;
+    case 'task_days':
+      return n('done') === 0 ? 'No tasks done yet' : `Median of ${n('done')} ${tasks(n('done'))} done`;
+  }
+}
+
 export const KPI_CATEGORIES = ['Financial', 'Customer', 'Process', 'People'] as const;
 
 export type BandId = 'exceeds' | 'meets' | 'below';
@@ -168,6 +210,7 @@ export interface KpiTemplate {
   default_weight: number;
   frequency: KpiFrequency;
   category: string;
+  measure?: KpiMeasure;
 }
 
 /** Starter KPIs offered on an empty library. */
@@ -175,7 +218,7 @@ export const KPI_TEMPLATES: readonly KpiTemplate[] = [
   { name: 'Sales revenue', description: 'Revenue closed in the period.', unit: 'currency_ksh', direction: 'higher_is_better', default_target: 1_000_000, default_weight: 30, frequency: 'quarterly', category: 'Financial' },
   { name: 'Customer satisfaction', description: 'Average customer rating from surveys or feedback.', unit: 'rating_1_5', direction: 'higher_is_better', default_target: 4, default_weight: 20, frequency: 'quarterly', category: 'Customer' },
   { name: 'Attendance rate', description: 'Days present as a share of working days.', unit: 'percent', direction: 'higher_is_better', default_target: 95, default_weight: 15, frequency: 'monthly', category: 'People' },
-  { name: 'Tasks completed on time', description: 'Share of assigned tasks delivered by their due date.', unit: 'percent', direction: 'higher_is_better', default_target: 90, default_weight: 20, frequency: 'monthly', category: 'Process' },
+  { name: 'Tasks completed on time', description: 'Share of assigned tasks delivered by their due date.', unit: 'percent', direction: 'higher_is_better', default_target: 90, default_weight: 20, frequency: 'monthly', category: 'Process', measure: 'tasks_on_time' },
   { name: 'Quality / error rate', description: 'Share of work returned or with errors.', unit: 'percent', direction: 'lower_is_better', default_target: 2, default_weight: 15, frequency: 'monthly', category: 'Process' },
 ];
 

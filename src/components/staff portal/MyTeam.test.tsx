@@ -49,7 +49,7 @@ const member = (n: string, first: string, over: Partial<TeamMember> = {}): TeamM
 const TEAM = [member('E1', 'Amina'), member('E2', 'Brian', { job_title: 'Driver', department: null })];
 const CALLS: Kpi = {
   id: 'k1', name: 'Calls made', description: null, unit: 'number', direction: 'higher_is_better', default_target: 100,
-  default_weight: 50, frequency: 'quarterly', category: null, archived: false,
+  default_weight: 50, frequency: 'quarterly', category: null, measure: 'manual', archived: false,
 };
 const Q4: KpiPeriod = { id: 'p1', name: 'Q4 2026', starts_on: '2026-10-01', ends_on: '2026-12-31', status: 'open' };
 const row = (over: Partial<KpiAssignment>): KpiAssignment => ({

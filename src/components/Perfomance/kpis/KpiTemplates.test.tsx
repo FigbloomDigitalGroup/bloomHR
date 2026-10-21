@@ -29,7 +29,7 @@ import KpiTemplates from './KpiTemplates';
 
 const kpi = (id: string, name: string, weight: number): Kpi => ({
   id, name, description: null, unit: 'number', direction: 'higher_is_better', default_target: 10, default_weight: weight,
-  frequency: 'quarterly', category: null, archived: false,
+  frequency: 'quarterly', category: null, measure: 'manual', archived: false,
 });
 const KPIS = [kpi('k1', 'Revenue', 60), kpi('k2', 'Calls', 40), kpi('k3', 'Attendance', 100)];
 const OPEN: KpiPeriod = { id: 'p1', name: 'Q4 2026', starts_on: '2026-10-01', ends_on: '2026-12-31', status: 'open' };

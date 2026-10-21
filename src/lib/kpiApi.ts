@@ -11,11 +11,13 @@ import {
   ratingBand,
   type KpiDirection,
   type KpiFrequency,
+  type KpiMeasure,
   type KpiUnit,
   type PeriodStatus,
 } from './kpis';
 
-// Reading and saving custom KPIs (migrations 20261016900000, 20261019300000 for templates). The database decides who may do what; these return its
+// Reading and saving custom KPIs (migrations 20261016900000, 20261019300000 for templates, 20261023200000 for KPIs
+// calculated from tasks). The database decides who may do what; these return its
 // refusals as plain sentences.
 
 export interface Kpi {
@@ -28,6 +30,8 @@ export interface Kpi {
   default_weight: number;
   frequency: KpiFrequency;
   category: string | null;
+  /** typed in, or calculated from tasks */
+  measure: KpiMeasure;
   archived: boolean;
 }
 export type KpiInput = Omit<Kpi, 'id' | 'archived'>;
@@ -64,7 +68,14 @@ export interface KpiAssignment {
   actual_value: number | null;
   manager_comment: string | null;
   scored_at: string | null;
+  /** the value calculated from tasks (KPIs with a calculated measure), what it came from and when it last changed */
+  auto_value?: number | null;
+  auto_detail?: Record<string, number> | null;
+  auto_at?: string | null;
 }
+
+/** The actual a KPI is scored on: the manager's (or HR's) final score, else the calculated value. */
+export const actualOf = (a: KpiAssignment): number | null => a.actual_value ?? a.auto_value ?? null;
 
 export interface KpiAccess {
   manages: boolean;
@@ -102,12 +113,13 @@ const toKpi = (r: Record<string, unknown>): Kpi => ({
   ...(r as unknown as Kpi),
   default_target: num(r.default_target),
   default_weight: Number(r.default_weight ?? 0),
+  measure: (r.measure as KpiMeasure) ?? 'manual',
 });
 
 export async function loadKpis(): Promise<Kpi[]> {
   const { data, error } = await supabase
     .from('kpis')
-    .select('id, name, description, unit, direction, default_target, default_weight, frequency, category, archived')
+    .select('id, name, description, unit, direction, default_target, default_weight, frequency, category, measure, archived')
     .order('name');
   if (error) fail(error);
   return ((data ?? []) as Record<string, unknown>[]).map(toKpi);
@@ -138,7 +150,7 @@ export async function savePeriod(id: string | null, fields: KpiPeriodInput): Pro
 }
 
 const ASSIGNMENT_COLUMNS =
-  'id, period_id, kpi_id, employee_number, target, weight, assigned_via, template_id, overridden, no_longer_matches, self_value, self_comment, self_at, actual_value, manager_comment, scored_at';
+  'id, period_id, kpi_id, employee_number, target, weight, assigned_via, template_id, overridden, no_longer_matches, self_value, self_comment, self_at, actual_value, manager_comment, scored_at, auto_value, auto_detail, auto_at';
 
 const toAssignment = (r: Record<string, unknown>): KpiAssignment => ({
   ...(r as unknown as KpiAssignment),
@@ -146,6 +158,7 @@ const toAssignment = (r: Record<string, unknown>): KpiAssignment => ({
   weight: Number(r.weight ?? 0),
   self_value: num(r.self_value),
   actual_value: num(r.actual_value),
+  auto_value: num(r.auto_value),
 });
 
 /** The period's assignments the signed-in person may see (HR all, a manager their team's, staff their own). */
@@ -154,6 +167,13 @@ export async function loadAssignments(periodId: string): Promise<KpiAssignment[]
     supabase.from('kpi_assignments').select(ASSIGNMENT_COLUMNS).eq('period_id', periodId).order('id').range(from, to)
   ).catch(fail);
   return rows.map(toAssignment);
+}
+
+/** Works out the period's calculated KPIs again now (they also update every hour); returns how many changed. */
+export async function refreshMeasures(periodId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('kpi_refresh_measures', { p_period: periodId });
+  if (error) fail(error);
+  return Number(data ?? 0);
 }
 
 /** Assigns the KPI to everyone in scope; returns how many people it was set for. */
@@ -241,7 +261,7 @@ export function buildScorecards(assignments: KpiAssignment[], kpis: Kpi[], peopl
     const lines = list
       .map((a) => {
         const kpi = kpiById.get(a.kpi_id);
-        const ach = kpi ? achievement({ unit: kpi.unit, direction: kpi.direction, target: a.target, actual: a.actual_value }) : null;
+        const ach = kpi ? achievement({ unit: kpi.unit, direction: kpi.direction, target: a.target, actual: actualOf(a) }) : null;
         return { assignment: a, kpi, achievement: ach };
       })
       .sort((x, y) => y.assignment.weight - x.assignment.weight || (x.kpi?.name ?? '').localeCompare(y.kpi?.name ?? ''));
@@ -261,7 +281,7 @@ export function buildScorecards(assignments: KpiAssignment[], kpis: Kpi[], peopl
 }
 
 export const SCORECARD_CSV_HEADERS = [
-  'Employee number', 'Employee', 'Department', 'KPI', 'Unit', 'Target', 'Weight %', 'Self-assessment', 'Actual (final)',
+  'Employee number', 'Employee', 'Department', 'KPI', 'Unit', 'Target', 'Weight %', 'Self-assessment', 'Calculated', 'Actual (final)',
   'Achievement %', 'Overall score %', 'Band',
 ] as const;
 
@@ -273,7 +293,8 @@ export function scorecardsCsv(cards: Scorecard[]): string {
       const unit = l.kpi?.unit ?? 'number';
       rows.push([
         c.employeeNumber, c.name, c.department, l.kpi?.name ?? '', unit, formatValue(unit, l.assignment.target),
-        String(l.assignment.weight), formatValue(unit, l.assignment.self_value), formatValue(unit, l.assignment.actual_value),
+        String(l.assignment.weight), formatValue(unit, l.assignment.self_value),
+        formatValue(unit, l.assignment.auto_value), formatValue(unit, l.assignment.actual_value),
         formatPercent(l.achievement), formatPercent(c.score), band,
       ]);
     }

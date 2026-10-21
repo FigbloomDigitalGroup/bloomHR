@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { AlertTriangle, ClipboardList, Download } from 'lucide-react';
+import { AlertTriangle, ClipboardList, Download, RefreshCw } from 'lucide-react';
 import { Button, Card, EmptyState, Modal, SearchInput, TableScroll } from '../../UI';
 import { checkWeights, defaultPeriodId, formatPercent, formatValue, parseNumber } from '../../../lib/kpis';
 import {
@@ -8,6 +8,7 @@ import {
   buildScorecards,
   downloadCsv,
   loadAssignments,
+  refreshMeasures,
   scorecardsCsv,
   type Kpi,
   type KpiAccess,
@@ -17,7 +18,7 @@ import {
   type Scorecard,
 } from '../../../lib/kpiApi';
 import type { Department } from '../../../lib/orgStructure';
-import { BandPill, PeriodSelect, ScoreText, SourceNote, inputClass, labelClass, tdClass, thClass } from './shared';
+import { ActualValue, BandPill, PeriodSelect, ScoreText, SourceNote, inputClass, labelClass, tdClass, thClass } from './shared';
 import { LoaderBlock } from '../../UI/FigbloomLoader';
 
 interface Props {
@@ -37,6 +38,7 @@ export default function Scorecards({ kpis, periods, people, departments, access,
   const [department, setDepartment] = useState('');
   const [search, setSearch] = useState('');
   const [openEmp, setOpenEmp] = useState<string | null>(null);
+  const [recalculating, setRecalculating] = useState(false);
 
   useEffect(() => {
     if (!periodId && periods.length) setPeriodId(defaultPeriodId(periods));
@@ -76,6 +78,23 @@ export default function Scorecards({ kpis, periods, people, departments, access,
   const offWeights = useMemo(() => shown.filter((c) => !checkWeights(c.lines.map((l) => l.assignment.weight)).ok), [shown]);
   const usedDepartments = departments.filter((d) => cards.some((c) => deptOf.get(c.employeeNumber) === d.id));
 
+  const calculatedIds = useMemo(() => new Set(kpis.filter((k) => k.measure !== 'manual').map((k) => k.id)), [kpis]);
+  const canRecalculate = period?.status === 'open' && (access.manages || access.team.length > 0)
+    && assignments.some((a) => calculatedIds.has(a.kpi_id));
+  const recalculate = async () => {
+    if (!periodId) return;
+    setRecalculating(true);
+    try {
+      const n = await refreshMeasures(periodId);
+      toast.success(n === 0 ? 'Calculated KPIs are up to date' : `${n} calculated ${n === 1 ? 'KPI' : 'KPIs'} updated`);
+      await reload();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
   const exportCsv = () => {
     if (shown.length === 0) return toast.error('Nothing to export');
     downloadCsv(`KPI-scorecards-${(period?.name ?? 'period').replace(/\s+/g, '-')}.csv`, scorecardsCsv(shown));
@@ -106,7 +125,13 @@ export default function Scorecards({ kpis, periods, people, departments, access,
           <div className="min-w-0">
             <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search people" aria-label="Search people" />
           </div>
-          <div className="flex sm:justify-end">
+          <div className="flex flex-wrap gap-2 sm:justify-end">
+            {canRecalculate && (
+              <Button variant="secondary" icon={<RefreshCw size={14} />} disabled={recalculating} onClick={recalculate}
+                title="KPIs calculated from tasks update every hour; this updates them now">
+                Recalculate
+              </Button>
+            )}
             <Button variant="secondary" icon={<Download size={14} />} onClick={exportCsv}>Export CSV</Button>
           </div>
         </div>
@@ -246,10 +271,7 @@ export function ScorecardDetail({
                     {formatValue(unit, a.self_value)}
                     {a.self_comment && <div className="text-[11px] text-muted-foreground whitespace-pre-wrap">{a.self_comment}</div>}
                   </td>
-                  <td className={tdClass}>
-                    {formatValue(unit, a.actual_value)}
-                    {a.manager_comment && <div className="text-[11px] text-muted-foreground whitespace-pre-wrap">{a.manager_comment}</div>}
-                  </td>
+                  <td className={tdClass}><ActualValue a={a} kpi={l.kpi} /></td>
                   <td className={tdClass}><span className="font-semibold tabular-nums">{formatPercent(l.achievement)}</span></td>
                   {canScore && (
                     <td className={`${tdClass} text-right`}>
@@ -272,7 +294,7 @@ export function ScorecardDetail({
             kind="final"
             unit={line.kpi?.unit ?? 'number'}
             title={`Final score: ${line.kpi?.name ?? ''}`}
-            initial={line.assignment.actual_value ?? line.assignment.self_value}
+            initial={line.assignment.actual_value ?? line.assignment.auto_value ?? line.assignment.self_value}
             onCancel={() => setScoring(null)}
             onSave={async (value, comment) => {
               await addCheckin(line.assignment.id, 'final', value, comment);

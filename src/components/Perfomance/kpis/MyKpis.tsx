@@ -15,7 +15,7 @@ import {
   type KpiAssignment,
   type KpiPeriod,
 } from '../../../lib/kpiApi';
-import { BandPill, PeriodSelect, PeriodStatusPill, ScoreText } from './shared';
+import { ActualValue, BandPill, PeriodSelect, PeriodStatusPill, ScoreText } from './shared';
 import { CheckinForm } from './Scorecards';
 import { LoaderBlock } from '../../UI/FigbloomLoader';
 
@@ -141,8 +141,7 @@ export default function MyKpis({ embedded = false }: { embedded?: boolean }) {
                   </div>
                   <div>
                     <dt className="text-[11px] text-muted-foreground">Final score</dt>
-                    <dd>{formatValue(unit, a.actual_value)}</dd>
-                    {a.manager_comment && <dd className="text-[11.5px] text-muted-foreground whitespace-pre-wrap">{a.manager_comment}</dd>}
+                    <dd><ActualValue a={a} kpi={l.kpi} /></dd>
                   </div>
                 </dl>
                 {open && assessing !== a.id && (
