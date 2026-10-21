@@ -23,6 +23,7 @@ import { useCompanySwitching } from './hooks/useMyCompanies';
 import { useMobileNav } from './components/Layout/useMobileNav';
 import { isStaleChunkError, reloadOnceForStaleChunk } from './lib/staleChunk';
 import { welcomeMessage } from './lib/welcome';
+import { IDLE_WARNING_MS, idleState, lastActivity, markActivity } from './lib/idleLogout';
 import { isHiddenModule } from './lib/hiddenModules';
 import { usesStaffPortal } from './lib/routeModules';
 
@@ -224,9 +225,8 @@ function App() {
   const [isFetchingBranches, setIsFetchingBranches] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
 
-  // Inactivity timer refs (using refs instead of state for timers)
-  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const warningTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // When this tab last wrote its activity to the shared store (mouse moves come too fast to write each one)
+  const lastActivityWriteRef = useRef(0);
 
   // Refs to track login state and prevent duplicate toasts
   const hasShownWelcomeToast = useRef(false);
@@ -273,10 +273,6 @@ function App() {
   }, [landingPending, companyState, session?.user?.id, navigate]);
   const [searchParams] = useSearchParams();
 
-  // Inactivity timeout constants
-  const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes in milliseconds
-  const WARNING_TIMEOUT = 60 * 1000; // 1 minute warning before logout
-
   // Check if current route should be excluded from inactivity timer
   const shouldExcludeFromInactivityTimer = useCallback(() => {
     const excludedRoutes = ['/login', '/mfa', '/update-password', '/join', '/offer', '/create-company'];
@@ -286,18 +282,7 @@ function App() {
     return isExcludedRoute || isAuthProcess || !session || !user;
   }, [location.pathname, session, user]);
 
-  // Clear all timers function
   const clearAllTimers = useCallback(() => {
-    if (inactivityTimerRef.current) {
-      clearTimeout(inactivityTimerRef.current);
-      inactivityTimerRef.current = null;
-    }
-    if (warningTimerRef.current) {
-      clearTimeout(warningTimerRef.current);
-      warningTimerRef.current = null;
-    }
-
-    // Clear any inactivity warning toast
     toast.dismiss('inactivity-warning');
   }, []);
 
@@ -315,7 +300,8 @@ function App() {
       clearAllTimers();
 
       try {
-        const { error } = await supabase.auth.signOut();
+        // this browser only: being away from one device must not sign the person out on their others
+        const { error } = await supabase.auth.signOut({ scope: 'local' });
 
         if (error) {
           console.error('Error during auto-logout:', error);
@@ -330,67 +316,54 @@ function App() {
     }
   }, [session, user, clearAllTimers, navigate]);
 
-  // Reset inactivity timer
-  const resetInactivityTimer = useCallback(() => {
-    // Don't set timer if we're on excluded routes or during auth processes
-    if (shouldExcludeFromInactivityTimer()) {
+  // Sign out after a spell away from every tab (see lib/idleLogout): activity in any tab is written to shared storage,
+  // and each tab checks how long it has been since, so one idle tab no longer signs out someone working in another
+  const watchIdle = !shouldExcludeFromInactivityTimer();
+  // the session object changes on each token refresh; that must not restart the watch and count as activity
+  const autoLogoutRef = useRef(handleAutoLogout);
+  autoLogoutRef.current = handleAutoLogout;
+  useEffect(() => {
+    if (!watchIdle) {
       clearAllTimers();
       return;
     }
 
-    // Clear existing timers first
-    clearAllTimers();
+    const handleUserActivity = () => {
+      const now = Date.now();
+      if (now - lastActivityWriteRef.current < 5000) return;
+      lastActivityWriteRef.current = now;
+      markActivity(now);
+    };
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    events.forEach(event => document.addEventListener(event, handleUserActivity, true));
 
-    // Only set timer if user is logged in and not in excluded routes
-    if (session && user) {
-      // Set warning timer (9 minutes)
-      warningTimerRef.current = setTimeout(() => {
+    lastActivityWriteRef.current = Date.now();
+    markActivity(lastActivityWriteRef.current);
+
+    const check = () => {
+      const state = idleState(Date.now(), lastActivity());
+      if (state === 'expired') {
+        autoLogoutRef.current();
+      } else if (state === 'warn') {
         toast.error('You will be logged out due to inactivity in 1 minute.', {
-          duration: 60000,
+          duration: IDLE_WARNING_MS,
           id: 'inactivity-warning'
         });
-      }, INACTIVITY_TIMEOUT - WARNING_TIMEOUT);
+      } else {
+        toast.dismiss('inactivity-warning');
+      }
+    };
+    const interval = setInterval(check, 15_000);
+    // a tab coming back into view (or a laptop waking up) checks straight away
+    document.addEventListener('visibilitychange', check);
 
-      // Set logout timer (10 minutes)
-      inactivityTimerRef.current = setTimeout(() => {
-        handleAutoLogout();
-      }, INACTIVITY_TIMEOUT);
-    }
-  }, [session, user, shouldExcludeFromInactivityTimer, clearAllTimers, handleAutoLogout, INACTIVITY_TIMEOUT, WARNING_TIMEOUT]);
-
-  // Activity detection event handlers
-  const handleUserActivity = useCallback(() => {
-    if (session && user && !shouldExcludeFromInactivityTimer()) {
-      resetInactivityTimer();
-    }
-  }, [session, user, resetInactivityTimer, shouldExcludeFromInactivityTimer]);
-
-  // Set up activity event listeners - ONLY when user is properly authenticated
-  useEffect(() => {
-    // Only set up listeners if user is logged in and not in auth processes
-    if (session && user && !shouldExcludeFromInactivityTimer()) {
-      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-
-      events.forEach(event => {
-        document.addEventListener(event, handleUserActivity, true);
-      });
-
-      // Initialize the timer
-      resetInactivityTimer();
-
-      return () => {
-        events.forEach(event => {
-          document.removeEventListener(event, handleUserActivity, true);
-        });
-
-        // Clear timers on cleanup
-        clearAllTimers();
-      };
-    } else {
-      // Clear timers if user is not properly authenticated or on excluded routes
+    return () => {
+      events.forEach(event => document.removeEventListener(event, handleUserActivity, true));
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', check);
       clearAllTimers();
-    }
-  }, [session, user, handleUserActivity, resetInactivityTimer, shouldExcludeFromInactivityTimer, clearAllTimers]);
+    };
+  }, [watchIdle, clearAllTimers]);
 
   // Fetch the company's branches and regions once someone is signed in (signed out there are none to see), and again
   // when a different user signs in
@@ -530,7 +503,8 @@ function App() {
       sessionStorage.removeItem('mfaCompleted');
 
       const loadingToast = toast.loading('Signing out...');
-      const { error } = await supabase.auth.signOut();
+      // this browser only: signing out on the phone must not sign the person out of their laptop too
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
       toast.dismiss(loadingToast);
 
       if (error) {
