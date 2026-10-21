@@ -142,6 +142,13 @@ export default function OnboardingForm() {
     void load();
   }, [load]);
 
+  // opened from a "policy to accept" notification (?section=policies): straight to the policies once they show
+  const loaded = record !== undefined && record !== null;
+  useEffect(() => {
+    if (!loaded || new URLSearchParams(window.location.search).get('section') !== 'policies') return;
+    document.getElementById('onboarding-policies')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }, [loaded]);
+
   // after a document or referee changes: the status and what is still needed, without touching unsaved edits
   const refresh = useCallback(async () => {
     try {
@@ -383,7 +390,7 @@ export default function OnboardingForm() {
             identityType={values['Type of Identification'] ? String(values['Type of Identification']) : null} />
         </section>
 
-        <section className="border-t border-border pt-5">
+        <section id="onboarding-policies" className="border-t border-border pt-5 scroll-mt-4">
           <h3 className="text-sm font-semibold text-ink">Company policies and agreements</h3>
           <p className="text-xs text-muted-foreground mt-0.5 mb-3">Read each one and tick to accept it. Your tick is recorded as your signature.</p>
           <AgreementsSection onChanged={() => void refresh()} />

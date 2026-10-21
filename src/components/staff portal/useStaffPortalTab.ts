@@ -6,11 +6,13 @@ import { onOverlayEntry, useExitGuard } from '../../hooks/useBackToClose';
 export const STAFF_TAB_PARAM = 'tab';
 export const STAFF_HOME = 'home';
 
-export type SetStaffTab = (tab: string, options?: { replace?: boolean }) => void;
+/** params: more for the section to read, e.g. My team's { view: 'work' } (a notification opening it there) */
+export type SetStaffTab = (tab: string, options?: { replace?: boolean; params?: Record<string, string> }) => void;
 
 /** The address of a staff portal section, on the page the portal is shown on. */
-export function staffTabSearch(tab: string): string {
-  return tab === STAFF_HOME ? '' : `?${STAFF_TAB_PARAM}=${encodeURIComponent(tab)}`;
+export function staffTabSearch(tab: string, params: Record<string, string> = {}): string {
+  if (tab === STAFF_HOME) return '';
+  return `?${new URLSearchParams({ [STAFF_TAB_PARAM]: tab, ...params }).toString()}`;
 }
 
 /**
@@ -29,8 +31,8 @@ export function useStaffPortalTab(): [string, SetStaffTab] {
 
   const setActiveTab = useCallback<SetStaffTab>(
     (tab, options) => {
-      if (tab === current.current && !options?.replace) return;
-      navigate({ pathname, search: staffTabSearch(tab) }, { replace: !!options?.replace || onOverlayEntry() });
+      if (tab === current.current && !options?.replace && !options?.params) return;
+      navigate({ pathname, search: staffTabSearch(tab, options?.params) }, { replace: !!options?.replace || onOverlayEntry() });
     },
     [navigate, pathname],
   );

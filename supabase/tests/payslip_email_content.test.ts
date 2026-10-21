@@ -21,7 +21,8 @@ describe('the payslip email', () => {
     const html = payslipEmailHtml({ ...base, passwordProtected: true });
     expect(html).toContain('Hi Amina,');
     expect(html).toContain('Your payslip for October 2026 is attached to this email as a PDF.');
-    expect(html).toContain('href="https://hr.acme.co/staff"');
+    // the button opens the Payslips section of the portal
+    expect(html).toContain('href="https://hr.acme.co/staff?tab=payslips"');
     expect(html).toContain('confidential');
   });
 

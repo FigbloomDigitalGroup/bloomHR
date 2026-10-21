@@ -17,7 +17,8 @@ describe('the notification email', () => {
     expect(html).toContain('Hi Amina,');
     expect(html).toContain('There are 2 updates for you:');
     expect(html).toContain('Reason: blurred.');
-    expect(html).toContain('href="https://hr.figbloom.org"');
+    // a document update opens the Onboarding section (lib/notificationLinks)
+    expect(html).toContain('href="https://hr.figbloom.org/?tab=onboarding"');
   });
 
   it('escapes what HR typed, and keeps the subject on one line', () => {
