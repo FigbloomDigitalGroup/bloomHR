@@ -1,0 +1,24 @@
+{
+  "name": "figbloom-infra",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "test": "vitest run",
+    "synth": "cdk synth --quiet",
+    "diff": "cdk diff --profile figbloom",
+    "cdk": "cdk"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.7",
+    "aws-cdk": "2.1144.0",
+    "tsx": "4.23.15",
+    "typescript": "5.9.2",
+    "vitest": "2.1.9"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.272.0",
+    "constructs": "10.8.1"
+  }
+}
