@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Check, Clock, Minus, X } from 'lucide-react';
+import { Check, Clock, Minus, RotateCcw, X } from 'lucide-react';
 import { Button, StatusPill } from '../UI';
 import type { StatusTone } from '../UI';
-import { ApprovalChain as Chain, ChainStep, ChainStepStatus, decideApproval } from '../../lib/approvals';
+import { ApprovalChain as Chain, ChainStep, ChainStepStatus, decideApproval, reopenLeave } from '../../lib/approvals';
 
 const STATUS: Record<ChainStepStatus, { label: string; tone: StatusTone }> = {
   approved: { label: 'Approved', tone: 'success' },
@@ -72,12 +72,15 @@ interface ApprovalChainProps {
 
 /**
  * An approval request's chain: each step with its status, who it is waiting on, and who decided it. The current
- * approver gets Approve / Reject with a comment; a later step's approver may reject early.
+ * approver gets Approve / Reject with a comment; a later step's approver may reject early. Whoever holds Reopen approved
+ * leave can send approved leave back to pending, with a reason, before it starts.
  */
 export default function ApprovalChain({ chain, onDecided, compact = false }: ApprovalChainProps) {
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reopening, setReopening] = useState(false);
+  const [reason, setReason] = useState('');
 
   if (!chain) return null;
 
@@ -118,10 +121,34 @@ export default function ApprovalChain({ chain, onDecided, compact = false }: App
     }
   };
 
+  const reopen = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await reopenLeave(chain.record_id, reason.trim());
+      setReason('');
+      setReopening(false);
+      await onDecided?.('pending');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const canAct = chain.status === 'pending' && (chain.can_approve || chain.can_reject);
+  const sentBack = chain.reopened;
 
   return (
     <div className="flex flex-col gap-3">
+      {sentBack && (
+        <div className="rounded-tile bg-orange-tint-alt px-3 py-2 text-[11.5px] text-ink">
+          <span className="font-semibold">
+            Sent back to pending{sentBack.actor_name ? ` by ${sentBack.actor_name}` : ''}{sentBack.acted_at ? `, ${when(sentBack.acted_at)}` : ''}
+          </span>
+          {sentBack.comment && <p className="m-0 mt-0.5 italic break-words">“{sentBack.comment}”</p>}
+        </div>
+      )}
       <ol className="m-0 p-0 list-none flex flex-col gap-2.5" aria-label="Approval chain">
         {chain.steps.map((s) => <StepLine key={s.position} step={s} />)}
       </ol>
@@ -150,6 +177,40 @@ export default function ApprovalChain({ chain, onDecided, compact = false }: App
             )}
             <Button variant="secondary" onClick={() => decide('rejected')} disabled={busy} icon={<X className="w-3 h-3" strokeWidth={2.4} />}>
               Reject
+            </Button>
+          </div>
+        </div>
+      )}
+      {chain.can_reopen && !reopening && (
+        <div className="border-t border-border pt-3">
+          <Button variant="secondary" onClick={() => setReopening(true)} icon={<RotateCcw className="w-3 h-3" strokeWidth={2.4} />}>
+            Send back to pending
+          </Button>
+        </div>
+      )}
+      {chain.can_reopen && reopening && (
+        <div className="flex flex-col gap-2 border-t border-border pt-3">
+          <label className="text-[11.5px] font-semibold text-ink" htmlFor={`reopen-reason-${chain.request_id}`}>
+            Why is it going back? (required)
+          </label>
+          <textarea
+            id={`reopen-reason-${chain.request_id}`}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            maxLength={1000}
+            rows={2}
+            className="w-full rounded-tile border border-border bg-white px-3 py-2 text-[12.5px] text-ink outline-none focus:border-brand"
+          />
+          <p className="m-0 text-[11.5px] text-muted-foreground">
+            The days go back to the balance, the approvers decide again from the first step, and the employee sees your reason.
+          </p>
+          {error && <p className="m-0 text-[11.5px] text-status-danger" role="alert">{error}</p>}
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={reopen} disabled={busy || !reason.trim()} icon={<RotateCcw className="w-3 h-3" strokeWidth={2.4} />}>
+              Send back to pending
+            </Button>
+            <Button variant="secondary" onClick={() => { setReopening(false); setError(null); }} disabled={busy}>
+              Cancel
             </Button>
           </div>
         </div>

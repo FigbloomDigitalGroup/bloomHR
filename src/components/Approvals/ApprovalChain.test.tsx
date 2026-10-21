@@ -3,9 +3,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import type { ApprovalChain as Chain } from '../../lib/approvals';
 
 const decideApproval = vi.hoisted(() => vi.fn());
+const reopenLeave = vi.hoisted(() => vi.fn());
 vi.mock('../../lib/approvals', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/approvals')>()),
   decideApproval,
+  reopenLeave,
 }));
 
 import ApprovalChain from './ApprovalChain';
@@ -32,6 +34,7 @@ const chain = (over: Partial<Chain> = {}): Chain => ({
 
 beforeEach(() => {
   decideApproval.mockReset();
+  reopenLeave.mockReset();
 });
 afterEach(() => cleanup());
 
@@ -97,5 +100,50 @@ describe('Approval chain', () => {
   it('shows nothing without a chain', () => {
     const { container } = render(<ApprovalChain chain={undefined} />);
     expect(container.innerHTML).toBe('');
+  });
+});
+
+describe('sending approved leave back to pending', () => {
+  const approved = (over: Partial<Chain> = {}) => chain({
+    status: 'approved',
+    current_step: 3,
+    steps: [step(1, 'Line manager', 'approved'), step(2, 'HR', 'approved'), step(3, 'Operations', 'approved')],
+    ...over,
+  });
+
+  it('only whoever may reopen sees the button', () => {
+    render(<ApprovalChain chain={approved()} />);
+    expect(screen.queryByRole('button', { name: 'Send back to pending' })).toBeNull();
+    cleanup();
+    render(<ApprovalChain chain={approved({ can_reopen: true })} />);
+    expect(screen.getByRole('button', { name: 'Send back to pending' })).toBeTruthy();
+  });
+
+  it('needs a reason, then sends it back', async () => {
+    reopenLeave.mockResolvedValue(undefined);
+    const onDecided = vi.fn();
+    render(<ApprovalChain chain={approved({ can_reopen: true })} onDecided={onDecided} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Send back to pending' }));
+    const send = screen.getByRole('button', { name: 'Send back to pending' });
+    expect((send as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText('Why is it going back? (required)'), { target: { value: ' Stock take ' } });
+    fireEvent.click(send);
+    await waitFor(() => expect(onDecided).toHaveBeenCalledWith('pending'));
+    expect(reopenLeave).toHaveBeenCalledWith('leave-1', 'Stock take');
+  });
+
+  it('shows the refusal', async () => {
+    reopenLeave.mockRejectedValue(new Error('This leave has already started'));
+    render(<ApprovalChain chain={approved({ can_reopen: true })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Send back to pending' }));
+    fireEvent.change(screen.getByLabelText('Why is it going back? (required)'), { target: { value: 'x' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send back to pending' }));
+    expect((await screen.findByRole('alert')).textContent).toMatch(/already started/);
+  });
+
+  it('a reopened chain says who sent it back and why', () => {
+    render(<ApprovalChain chain={chain({ reopened: { actor_name: 'Otis Ops', comment: 'Stock take', acted_at: '2026-10-20T10:00:00Z' } })} />);
+    expect(screen.getByText(/Sent back to pending by Otis Ops/)).toBeTruthy();
+    expect(screen.getByText('“Stock take”')).toBeTruthy();
   });
 });

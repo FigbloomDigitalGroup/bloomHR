@@ -1869,8 +1869,9 @@ export default function LeaveManagementSystem({ selectedTown, onTownChange }: To
       await refreshChains([application.id]);
 
       // The database takes approved leave off the balance as the final approval is saved (and refuses an approval
-      // that would overdraw it): reload the balances to show it.
-      if (status === 'approved') {
+      // that would overdraw it), and gives the days back when approved leave is sent back to pending: reload the
+      // balances to show it.
+      if (status === 'approved' || String(application.Status).toLowerCase() === 'approved') {
         setBalancesRefreshKey(k => k + 1);
       }
 

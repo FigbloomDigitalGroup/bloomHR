@@ -193,7 +193,13 @@ describe('the balance moves on approval', () => {
     expect(await approve(leave.id)).toBe('');
     expect((await rows<{ status: string }>(`select status from leave_application where id = '${leave.id}'`))[0].status).toBe('approved');
     expect(await used('E1', 'Sick Leave', 2030)).toBe(3);
-    await asUser(db, HR, () => db.query(`update leave_application set status = 'rejected' where id = '${leave.id}'`));
+    // a decided application's status changes only through its chain or reopen_leave (leave_reopen.test.ts), which
+    // set this flag
+    expect(await asUser(db, HR, () => run(`update leave_application set status = 'rejected' where id = '${leave.id}'`)))
+      .toMatch(/has been approved/);
+    await db.exec(`select set_config('app.approval_decision', 'on', false);
+                   update leave_application set status = 'rejected' where id = '${leave.id}';
+                   select set_config('app.approval_decision', '', false);`);
     expect(await used('E1', 'Sick Leave', 2030)).toBe(0);
     const kinds = await rows<{ change_type: string }>(
       `select a.change_type from leave_balance_adjustments a join leave_balances b on b.id = a.leave_balance_id

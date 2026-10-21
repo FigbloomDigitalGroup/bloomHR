@@ -40,7 +40,8 @@ export interface HRNotification {
         | 'leave_document_overdue'
         | 'contribution_requested'
         | 'company_digest'
-        | 'onboarding_followups_overdue';
+        | 'onboarding_followups_overdue'
+        | 'leave_reopened';
     title: string;
     message: string;
     // Nullable for leave notifications - only contract/probation reminders
