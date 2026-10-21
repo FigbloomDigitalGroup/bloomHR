@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { CheckCircle2, Loader2, Send, UploadCloud, User } from 'lucide-react';
+import { CheckCircle2, CloudOff, Loader2, Send, UploadCloud, User } from 'lucide-react';
 import { Button, Card, StatusPill } from '../UI';
 import { AmountField, Section, SelectField, TextField, YesNoField } from './Fields';
 import DocumentsSection from './DocumentsSection';
@@ -25,15 +25,31 @@ import type { EmployeeRecord } from '../../lib/profileCompleteness';
 import { uploadEmployeeAvatar } from '../../lib/avatarStorage';
 import { supabase } from '../../lib/supabase';
 import FigbloomLoader from '../UI/FigbloomLoader';
+import { useAutosave } from '../../hooks/useAutosave';
+import { useFormDraft } from '../../hooks/useFormDraft';
 
 // The employee's part of onboarding (staff portal): personal, identity and statutory, tax claims, bank, emergency
 // contact and next of kin. They save as they go and submit to HR once the company's essentials are in; the rest
 // (documents, referees, policies...) can follow after approval without sending the record back (20261021700000).
+//
+// Until HR approves, it saves itself a moment after they stop typing (a number not complete yet waits until it is).
+// Once approved, a change goes back to HR for review, so they save it themselves. Either way what is typed is kept in
+// the tab (useFormDraft), so a refresh doesn't lose it.
 
 const SEXES = ['Female', 'Male', 'Intersex'] as const;
 const MARITAL = ['Single', 'Married', 'Divorced', 'Widowed', 'Separated'] as const;
 
 const CAN_SUBMIT = ['draft', 'invited', 'changes_requested'];
+// the numbers the database refuses until complete (fieldProblem says when)
+const CHECKED_FIELDS = ['Tax PIN', 'ID Number', 'Mobile Number', 'NSSF Number', 'SHIF Number'];
+
+interface FormState {
+  values: EmployeeRecord;
+  emergency: Contact;
+  nextOfKin: Contact;
+}
+
+const timeText = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 function StatusBanner({ record }: { record: OnboardingRecord }) {
   const status = String(record.employee['onboarding_status'] ?? 'draft');
@@ -84,6 +100,9 @@ export default function OnboardingForm() {
   const [nextOfKin, setNextOfKin] = useState<Contact>(emptyContact());
   const [busy, setBusy] = useState<'save' | 'submit' | 'photo' | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  // the form as the server has it (set on loading and after each autosave), and how many times it was loaded
+  const [serverForm, setServerForm] = useState<FormState | null>(null);
+  const [generation, setGeneration] = useState(0);
   // the employee's country (their branch's, FIG-905): Tanzania and Uganda ask for a TIN and no SHA number
   const [country, setCountry] = useState<string | null>(null);
   useEffect(() => {
@@ -110,6 +129,8 @@ export default function OnboardingForm() {
         setValues(r.employee);
         setEmergency(r.emergency);
         setNextOfKin(r.nextOfKin);
+        setServerForm({ values: r.employee, emergency: r.emergency, nextOfKin: r.nextOfKin });
+        setGeneration((g) => g + 1);
       }
     } catch (err) {
       setRecord(null);
@@ -134,9 +155,39 @@ export default function OnboardingForm() {
   const set = (field: string) => (value: unknown) => setValues((v) => ({ ...v, [field]: value }));
   const problemOf = (field: string) => fieldProblem(field, values[field], values, country);
   const hasFormatProblems = useMemo(
-    () => ['Tax PIN', 'ID Number', 'Mobile Number', 'NSSF Number', 'SHIF Number'].some((f) => fieldProblem(f, values[f], values, country)),
+    () => CHECKED_FIELDS.some((f) => fieldProblem(f, values[f], values, country)),
     [values, country]
   );
+
+  const form = useMemo<FormState>(() => ({ values, emergency, nextOfKin }), [values, emergency, nextOfKin]);
+  const myNumber = record ? String(record.employee['Employee Number']) : null;
+  const approved = record ? String(record.employee['onboarding_status'] ?? 'draft') === 'approved' : false;
+
+  const draft = useFormDraft<FormState>(myNumber && serverForm ? `onboarding:${myNumber}` : null, form, serverForm ?? form, (d) => {
+    setValues(d.values);
+    setEmergency(d.emergency);
+    setNextOfKin(d.nextOfKin);
+  });
+
+  // what autosave sends: a number not complete yet keeps what the server has until it is
+  const saveable = useMemo<FormState>(() => {
+    const v = { ...values };
+    for (const f of CHECKED_FIELDS) {
+      if (fieldProblem(f, v[f], v, country)) v[f] = record?.employee[f] ?? null;
+    }
+    return { values: v, emergency, nextOfKin };
+  }, [values, emergency, nextOfKin, country, record]);
+
+  const autosave = useAutosave<FormState>(saveable, async (f) => {
+    if (!myNumber) return;
+    try {
+      await saveMyOnboarding(myNumber, f.values, f.emergency, f.nextOfKin);
+    } catch (err) {
+      throw new Error(errorMessage(err, 'Your details were not saved.'));
+    }
+    setServerForm(f);
+    void refresh();
+  }, { enabled: Boolean(record) && !approved && busy === null, generation });
 
   if (record === undefined) {
     return (
@@ -220,6 +271,19 @@ export default function OnboardingForm() {
       </p>
 
       <StatusBanner record={record} />
+
+      {draft.restoredAt !== null && (
+        <Card className="mb-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-ink flex-1 min-w-[200px]">
+              We kept what you typed before the page reloaded (last change at {timeText(draft.restoredAt)}).
+              {approved ? ' Save it to keep it.' : ''}
+            </p>
+            <Button variant="secondary" onClick={draft.discard}>Discard it</Button>
+            <Button variant="secondary" onClick={draft.dismiss}>OK</Button>
+          </div>
+        </Card>
+      )}
 
       {status !== 'approved' && record.missing.essentialsEmployee.length > 0 && (
         <Card className="mb-4">
@@ -335,7 +399,7 @@ export default function OnboardingForm() {
           <p role="alert" className="rounded-lg bg-orange-tint px-3 py-2 text-sm text-status-danger">{problem}</p>
         )}
 
-        <div className="flex flex-wrap gap-3 border-t border-border pt-5">
+        <div className="flex flex-wrap items-center gap-3 border-t border-border pt-5">
           <Button variant="secondary" onClick={() => void onSave()} disabled={busy !== null || hasFormatProblems}
             icon={busy === 'save' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}>
             Save
@@ -345,6 +409,20 @@ export default function OnboardingForm() {
               icon={busy === 'submit' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}>
               Submit to HR
             </Button>
+          )}
+          {!approved && (
+            <p className="m-0 text-xs text-muted-foreground inline-flex items-center gap-1.5" role="status" aria-live="polite">
+              {autosave.state === 'saving' && <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving...</>}
+              {autosave.state === 'saved' && autosave.savedAt !== null && (
+                <>Saved at {timeText(autosave.savedAt)}{hasFormatProblems ? ' (a number that isn’t complete yet saves when it is)' : ''}</>
+              )}
+              {autosave.state === 'error' && (
+                <span className="inline-flex items-center gap-1.5 text-status-danger">
+                  <CloudOff className="h-3.5 w-3.5" /> Not saved: {autosave.error} What you typed is kept on this page.
+                </span>
+              )}
+              {autosave.state === 'idle' && 'Your changes save as you type'}
+            </p>
           )}
         </div>
       </Card>
