@@ -1,6 +1,6 @@
 import { StatusPill, type StatusTone } from '../../UI';
-import { PERIOD_STATUS_LABEL, formatPercent, ratingBand, type BandId, type PeriodStatus } from '../../../lib/kpis';
-import type { KpiAssignment, KpiPeriod } from '../../../lib/kpiApi';
+import { PERIOD_STATUS_LABEL, formatPercent, formatValue, measureDetail, ratingBand, type BandId, type PeriodStatus } from '../../../lib/kpis';
+import type { Kpi, KpiAssignment, KpiPeriod } from '../../../lib/kpiApi';
 
 export const inputClass =
   'w-full min-w-0 border border-border rounded-tile bg-white px-3 py-2 text-[13px] text-ink outline-none focus:border-brand disabled:bg-secondary disabled:cursor-not-allowed';
@@ -67,5 +67,30 @@ export function SourceNote({ a, templateNames }: { a: KpiAssignment; templateNam
         </span>
       )}
     </div>
+  );
+}
+
+/** The actual a KPI is scored on: the final score, else the value calculated from tasks (with what it came from). */
+export function ActualValue({ a, kpi }: { a: KpiAssignment; kpi: Kpi | undefined }) {
+  const unit = kpi?.unit ?? 'number';
+  const calculated = !!kpi && kpi.measure !== 'manual';
+  if (a.actual_value !== null || !calculated) {
+    return (
+      <>
+        {formatValue(unit, a.actual_value)}
+        {a.manager_comment && <div className="text-[11px] text-muted-foreground whitespace-pre-wrap">{a.manager_comment}</div>}
+        {calculated && a.auto_value != null && (
+          <div className="text-[11px] text-muted-foreground">Calculated {formatValue(unit, a.auto_value)}, replaced by the final score</div>
+        )}
+      </>
+    );
+  }
+  const detail = measureDetail(kpi.measure, a.auto_detail);
+  return (
+    <>
+      {formatValue(unit, a.auto_value)}
+      <div className="text-[11px] text-status-info font-semibold">Calculated from tasks</div>
+      {detail && <div className="text-[11px] text-muted-foreground">{detail}</div>}
+    </>
   );
 }

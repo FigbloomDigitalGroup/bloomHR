@@ -8,11 +8,15 @@ import {
   FREQUENCY_LABEL,
   KPI_CATEGORIES,
   KPI_TEMPLATES,
+  MEASURE_FIXED,
+  MEASURE_HINT,
+  MEASURE_LABEL,
   UNIT_LABEL,
   formatValue,
   parseNumber,
   type KpiDirection,
   type KpiFrequency,
+  type KpiMeasure,
   type KpiTemplate,
   type KpiUnit,
 } from '../../../lib/kpis';
@@ -27,10 +31,10 @@ interface Props {
 
 const BLANK: KpiInput = {
   name: '', description: '', unit: 'number', direction: 'higher_is_better', default_target: null, default_weight: 0,
-  frequency: 'quarterly', category: null,
+  frequency: 'quarterly', category: null, measure: 'manual',
 };
 
-const fromTemplate = (t: KpiTemplate): KpiInput => ({ ...t });
+const fromTemplate = (t: KpiTemplate): KpiInput => ({ ...t, measure: t.measure ?? 'manual' });
 
 function KpiForm({ initial, onCancel, onSave, busy }: { initial: KpiInput; onCancel: () => void; onSave: (k: KpiInput) => void; busy: boolean }) {
   const [form, setForm] = useState({
@@ -50,6 +54,9 @@ function KpiForm({ initial, onCancel, onSave, busy }: { initial: KpiInput; onCan
         ? 'The target must be a number'
         : null;
   const usesTarget = form.unit !== 'rating_1_5';
+  const calculated = form.measure !== 'manual';
+  const setMeasure = (m: KpiMeasure) =>
+    setForm((f) => ({ ...f, measure: m, ...(m === 'manual' ? {} : MEASURE_FIXED[m]) }));
 
   return (
     <form
@@ -59,7 +66,7 @@ function KpiForm({ initial, onCancel, onSave, busy }: { initial: KpiInput; onCan
         onSave({
           name: form.name, description: form.description, unit: form.unit, direction: form.direction,
           default_target: usesTarget ? parseNumber(form.target) : 5, default_weight: weight ?? 0, frequency: form.frequency,
-          category: form.category || null,
+          category: form.category || null, measure: form.measure,
         });
       }}
       className="space-y-3"
@@ -72,16 +79,29 @@ function KpiForm({ initial, onCancel, onSave, busy }: { initial: KpiInput; onCan
         <label htmlFor="kpi-description" className={labelClass}>Description (optional)</label>
         <textarea id="kpi-description" className={inputClass} rows={2} value={form.description} onChange={(e) => set('description', e.target.value)} />
       </div>
+      <div>
+        <label htmlFor="kpi-measure" className={labelClass}>How it's measured</label>
+        <select id="kpi-measure" className={inputClass} value={form.measure} onChange={(e) => setMeasure(e.target.value as KpiMeasure)}>
+          <option value="manual">{MEASURE_LABEL.manual}</option>
+          <optgroup label="Calculated from tasks">
+            {(Object.keys(MEASURE_FIXED) as Exclude<KpiMeasure, 'manual'>[]).map((m) => <option key={m} value={m}>{MEASURE_LABEL[m]}</option>)}
+          </optgroup>
+        </select>
+        <p className="text-[11.5px] text-muted-foreground mt-1">
+          {MEASURE_HINT[form.measure]}
+          {calculated && ' Worked out every hour from the Task Manager; a manager can still enter a final score instead.'}
+        </p>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label htmlFor="kpi-unit" className={labelClass}>Measured as</label>
-          <select id="kpi-unit" className={inputClass} value={form.unit} onChange={(e) => set('unit', e.target.value as KpiUnit)}>
+          <select id="kpi-unit" className={inputClass} value={form.unit} disabled={calculated} onChange={(e) => set('unit', e.target.value as KpiUnit)}>
             {(Object.keys(UNIT_LABEL) as KpiUnit[]).map((u) => <option key={u} value={u}>{UNIT_LABEL[u]}</option>)}
           </select>
         </div>
         <div>
           <label htmlFor="kpi-direction" className={labelClass}>Direction</label>
-          <select id="kpi-direction" className={inputClass} value={form.direction} onChange={(e) => set('direction', e.target.value as KpiDirection)}>
+          <select id="kpi-direction" className={inputClass} value={form.direction} disabled={calculated} onChange={(e) => set('direction', e.target.value as KpiDirection)}>
             {(Object.keys(DIRECTION_LABEL) as KpiDirection[]).map((d) => <option key={d} value={d}>{DIRECTION_LABEL[d]}</option>)}
           </select>
         </div>
@@ -251,6 +271,7 @@ export default function KpiLibrary({ kpis, canManage, onChanged }: Props) {
                     <td className={tdClass}>
                       {UNIT_LABEL[k.unit]}
                       <div className="text-[11px] text-muted-foreground">{DIRECTION_LABEL[k.direction]}</div>
+                      {k.measure !== 'manual' && <div className="text-[11px] font-semibold text-status-info">From tasks: {MEASURE_LABEL[k.measure]}</div>}
                     </td>
                     <td className={tdClass}>{k.unit === 'rating_1_5' ? '—' : formatValue(k.unit, k.default_target)}</td>
                     <td className={tdClass}>{k.default_weight}%</td>

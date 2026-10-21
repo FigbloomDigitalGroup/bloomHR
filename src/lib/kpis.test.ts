@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MEASURE_FIXED,
+  measureDetail,
   ACHIEVEMENT_CAP,
   KPI_TEMPLATES,
   RATING_BANDS,
@@ -15,6 +17,23 @@ import {
 
 const hi = (target: number | null, actual: number | null) => achievement({ unit: 'number', direction: 'higher_is_better', target, actual });
 const lo = (target: number | null, actual: number | null) => achievement({ unit: 'percent', direction: 'lower_is_better', target, actual });
+
+describe('measures', () => {
+  it('says what a calculated value came from', () => {
+    expect(measureDetail('tasks_on_time', { on_time: 8, due: 10 })).toBe('8 of 10 due tasks done on time');
+    expect(measureDetail('tasks_on_time', { due: 0 })).toBe('No tasks due yet');
+    expect(measureDetail('tasks_late', { late: 1, due: 1 })).toBe('1 of 1 due task late');
+    expect(measureDetail('tasks_completed', { done: 1 })).toBe('1 task done');
+    expect(measureDetail('task_days', { done: 4 })).toBe('Median of 4 tasks done');
+    expect(measureDetail('manual', { done: 4 })).toBe('');
+    expect(measureDetail('tasks_completed', null)).toBe('');
+  });
+
+  it('fixes the unit and direction of each calculated measure', () => {
+    expect(MEASURE_FIXED.tasks_on_time).toEqual({ unit: 'percent', direction: 'higher_is_better' });
+    expect(MEASURE_FIXED.tasks_late.direction).toBe('lower_is_better');
+  });
+});
 
 describe('achievement', () => {
   it('higher is better: actual / target, capped', () => {

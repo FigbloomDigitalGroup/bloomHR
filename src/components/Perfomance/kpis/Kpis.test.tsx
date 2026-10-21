@@ -14,6 +14,7 @@ const api = vi.hoisted(() => ({
   loadKpiAccess: vi.fn(),
   loadKpis: vi.fn(),
   loadPeriods: vi.fn(),
+  refreshMeasures: vi.fn(),
 }));
 const confirm = vi.hoisted(() => vi.fn());
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
@@ -34,11 +35,11 @@ import MyKpis from './MyKpis';
 
 const SALES: Kpi = {
   id: 'k1', name: 'Sales revenue', description: 'Revenue closed', unit: 'currency_ksh', direction: 'higher_is_better',
-  default_target: 1000000, default_weight: 60, frequency: 'quarterly', category: 'Financial', archived: false,
+  default_target: 1000000, default_weight: 60, frequency: 'quarterly', category: 'Financial', measure: 'manual', archived: false,
 };
 const ERRORS: Kpi = {
   id: 'k2', name: 'Error rate', description: null, unit: 'percent', direction: 'lower_is_better',
-  default_target: 2, default_weight: 40, frequency: 'monthly', category: null, archived: false,
+  default_target: 2, default_weight: 40, frequency: 'monthly', category: null, measure: 'manual', archived: false,
 };
 const Q4: KpiPeriod = { id: 'p1', name: 'Q4 2026', starts_on: '2026-10-01', ends_on: '2026-12-31', status: 'open' };
 const person = (n: string, first: string, dept: string | null, title: string): KpiPerson => ({
@@ -94,6 +95,21 @@ describe('KPI library', () => {
     }));
   });
 
+  it('a KPI calculated from tasks takes its unit and direction from the measure', async () => {
+    render(<KpiLibrary kpis={[]} canManage onChanged={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add KPI' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Late tasks' } });
+    fireEvent.change(within(dialog).getByLabelText("How it's measured"), { target: { value: 'tasks_late' } });
+    expect((within(dialog).getByLabelText('Measured as') as HTMLSelectElement).disabled).toBe(true);
+    expect((within(dialog).getByLabelText('Direction') as HTMLSelectElement).value).toBe('lower_is_better');
+    fireEvent.change(within(dialog).getByLabelText('Default target'), { target: { value: '2' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.saveKpi).toHaveBeenCalledWith(null, expect.objectContaining({
+      name: 'Late tasks', measure: 'tasks_late', unit: 'number', direction: 'lower_is_better', default_target: 2,
+    })));
+  });
+
   it('refuses a weight over 100', () => {
     render(<KpiLibrary kpis={[]} canManage onChanged={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Add KPI' }));
@@ -109,6 +125,8 @@ describe('KPI library', () => {
     expect(screen.queryByRole('button', { name: 'Add template Sales revenue' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Add template Attendance rate' }));
     await waitFor(() => expect(api.saveKpi).toHaveBeenCalledWith(null, expect.objectContaining({ name: 'Attendance rate', unit: 'percent' })));
+    fireEvent.click(screen.getByRole('button', { name: 'Add template Tasks completed on time' }));
+    await waitFor(() => expect(api.saveKpi).toHaveBeenCalledWith(null, expect.objectContaining({ measure: 'tasks_on_time' })));
   });
 
   it('archives after asking', async () => {
@@ -233,6 +251,39 @@ describe('Scorecards', () => {
     page({ manages: true, employeeNumber: 'E1', team: [] });
     fireEvent.click(await screen.findByRole('button', { name: 'Open scorecard for Amina Test' }));
     expect(within(screen.getByRole('dialog')).queryByRole('button', { name: /Enter score|Update/ })).toBeNull();
+  });
+
+  it('scores a KPI calculated from tasks on its calculated value until a final score replaces it', async () => {
+    const onTime: Kpi = { ...ERRORS, id: 'k3', name: 'Tasks on time', unit: 'percent', direction: 'higher_is_better', measure: 'tasks_on_time' };
+    api.loadAssignments.mockResolvedValue([
+      row({ kpi_id: 'k3', weight: 100, target: 80, auto_value: 60, auto_detail: { on_time: 3, due: 5 } }),
+      row({ id: 'a2', employee_number: 'E2', kpi_id: 'k3', weight: 100, target: 80, auto_value: 60, actual_value: 80 }),
+    ]);
+    render(<Scorecards kpis={[onTime]} periods={[Q4]} people={PEOPLE} departments={DEPTS} access={HR} />);
+    const amina = (await screen.findByText('Amina Test')).closest('tr')!;
+    expect(within(amina).getByText('75%')).toBeTruthy(); // 60 / 80
+    // the final score (80 of 80), not the calculated 60: weights 100% and score 100%
+    expect(within(screen.getByText('Brian Test').closest('tr')!).getAllByText('100%')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Open scorecard for Amina Test' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Calculated from tasks')).toBeTruthy();
+    expect(within(dialog).getByText('3 of 5 due tasks done on time')).toBeTruthy();
+  });
+
+  it('recalculates the period’s calculated KPIs on request', async () => {
+    const onTime: Kpi = { ...ERRORS, id: 'k3', measure: 'tasks_on_time' };
+    api.loadAssignments.mockResolvedValue([row({ kpi_id: 'k3' })]);
+    api.refreshMeasures.mockResolvedValue(1);
+    render(<Scorecards kpis={[onTime]} periods={[Q4]} people={PEOPLE} departments={DEPTS} access={HR} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Recalculate' }));
+    await waitFor(() => expect(api.refreshMeasures).toHaveBeenCalledWith('p1'));
+    await waitFor(() => expect(api.loadAssignments).toHaveBeenCalledTimes(2));
+  });
+
+  it('no Recalculate without calculated KPIs', async () => {
+    page();
+    await screen.findByText('Amina Test');
+    expect(screen.queryByRole('button', { name: 'Recalculate' })).toBeNull();
   });
 
   it('exports the shown scorecards as CSV', async () => {
