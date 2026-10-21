@@ -203,8 +203,10 @@ describe('the new modules', () => {
     expect(await mods('oldHr')).toEqual(
       ['approve-exits', 'casual-overtime', 'chat-channels', 'employee-edit', 'employees', 'hr-admin', 'kpi-admin', 'loans', 'task-oversight']);
     expect(await mods('oldMgr')).toEqual(['chat-channels', 'employee-edit', 'leaves', 'team-work']);
-    expect(await mods('oldOps')).toEqual(['kpi-admin', 'performance']); // the old KPI rule: Performance, not MANAGER/REGIONAL
-    expect(await mods('oldOpsNoPerf')).toEqual(['leaves']);
+    // the old KPI rule: Performance, not MANAGER/REGIONAL (reopen-leave comes from a later migration,
+    // 20261023000000_leave_reopen.sql, given to OPERATIONS-based roles)
+    expect(await mods('oldOps')).toEqual(['kpi-admin', 'performance', 'reopen-leave']);
+    expect(await mods('oldOpsNoPerf')).toEqual(['leaves', 'reopen-leave']);
     expect(await mods('oldStaff')).toEqual(['kpi-admin', 'performance']);
     expect(await mods('oldReg')).toEqual(['employee-edit', 'performance']); // REGIONAL never managed KPIs
     // (payslip-design comes from a later migration, 20261021600000_payslip_details.sql, given to ADMIN-based roles too)

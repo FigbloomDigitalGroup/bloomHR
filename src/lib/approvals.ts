@@ -68,6 +68,10 @@ export interface ApprovalChain {
   can_approve: boolean;
   can_reject: boolean;
   steps: ChainStep[];
+  /** the signed-in person may send this approved leave back to pending (reopen-leave, before it starts) */
+  can_reopen?: boolean;
+  /** the last time it was sent back to pending; the steps show only what was decided since */
+  reopened?: { actor_name: string | null; comment: string | null; acted_at: string | null } | null;
 }
 
 /** What a step is called: its own label, else what its approver is ("Line manager", "HR", "Jane Doe"). */
@@ -145,6 +149,12 @@ export async function decideApproval(requestId: string, decision: 'approved' | '
   if (error) throw new Error(error.message);
   const row = (Array.isArray(data) ? data[0] : data) as { status: 'pending' | 'approved' | 'rejected' } | null;
   return row?.status ?? 'pending';
+}
+
+/** Sends approved leave back to pending (a reason is required); the chain starts again. Throws with the reason when refused. */
+export async function reopenLeave(leaveId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('reopen_leave', { p_application: leaveId, p_reason: reason });
+  if (error) throw new Error(error.message);
 }
 
 export interface LeaveAwaitingMe {

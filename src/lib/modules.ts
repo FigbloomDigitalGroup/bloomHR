@@ -18,6 +18,7 @@
 //   hr-admin         HR                    HR's extra powers on employee and leave screens (were: ADMIN or HR by name)
 //   hr-lifecycle     (administrators)      was already checked by the database but missing from the catalogue
 // payslip-design (20261021600000_payslip_details.sql) was given once to administrators and every role holding payroll.
+// reopen-leave (20261023000000_leave_reopen.sql) was given once to Operations: send approved leave back to pending.
 // (custom roles based on those roles got them too). Administrators always have every module.
 
 export type ModuleArea = 'overview' | 'workspace' | 'people' | 'time' | 'performance' | 'pay' | 'system';
@@ -68,6 +69,7 @@ export const MODULES: ModuleInfo[] = [
   { id: 'phone-approvals', name: 'Approvals', area: 'people', explain: 'Approve phone and device changes' },
   // time off and discipline
   { id: 'leaves', name: 'Time Off', area: 'time', explain: 'See and decide everyone’s leave requests' },
+  { id: 'reopen-leave', name: 'Reopen approved leave', area: 'time', explain: 'Send approved leave back to pending, with a reason, before it starts' },
   { id: 'staffcheck', name: 'Disciplinary', area: 'time', explain: 'Warnings and disciplinary cases' },
   { id: 'incident-reports', name: 'Incidents', area: 'time', explain: 'See and handle incident reports' },
   { id: 'team-work', name: 'My team’s work', area: 'time', explain: 'Casual workers, overtime, piece rate and leave discipline for the people who report to them' },
