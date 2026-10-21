@@ -52,3 +52,14 @@ export async function saveEmployeeNumbering(mode: EmployeeNumberMode, prefix: st
   if (error) throw new Error(error.message);
   return (Array.isArray(data) ? data[0] : data) as EmployeeNumbering;
 }
+
+/**
+ * Gives everyone whose number starts with `from` the prefix `to` instead (MCL-000123 -> FBL-000123), and new employees
+ * too (migration 20261023100000). Administrators and Settings only. Returns how many were renumbered; throws with the
+ * reason when refused (nothing is changed then).
+ */
+export async function renumberEmployees(from: string, to: string): Promise<number> {
+  const { data, error } = await supabase.rpc('renumber_employees', { p_from: from, p_to: to });
+  if (error) throw new Error(error.message);
+  return Number(data ?? 0);
+}

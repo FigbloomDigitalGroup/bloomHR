@@ -3,17 +3,21 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 
 const state = vi.hoisted(() => ({
   canEdit: true,
+  canRenumber: true,
   numbering: null as null | { mode: string; prefix: string; digits: number; next_number: number; preview: string },
 }));
 const saveEmployeeNumbering = vi.hoisted(() => vi.fn());
+const renumberEmployees = vi.hoisted(() => vi.fn());
 vi.mock('../../hooks/usePermissions', () => ({
-  usePermissions: () => ({ loading: false, hasAnyPermission: () => state.canEdit }),
+  // ['settings'] alone is the renumber check; ['settings', 'employees'] is editing
+  usePermissions: () => ({ loading: false, hasAnyPermission: (m: string[]) => (m.length === 1 ? state.canRenumber : state.canEdit) }),
 }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../../lib/employeeNumbering', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/employeeNumbering')>()),
   loadEmployeeNumbering: () => Promise.resolve(state.numbering),
   saveEmployeeNumbering,
+  renumberEmployees,
 }));
 
 import EmployeeNumberingCard from './EmployeeNumbering';
@@ -22,8 +26,10 @@ const DEFAULTS = { mode: 'system', prefix: 'MCL-', digits: 6, next_number: 1501,
 
 beforeEach(() => {
   state.canEdit = true;
+  state.canRenumber = true;
   state.numbering = { ...DEFAULTS };
   saveEmployeeNumbering.mockReset();
+  renumberEmployees.mockReset();
 });
 afterEach(() => cleanup());
 
@@ -76,5 +82,47 @@ describe('Employee numbers card', () => {
     const { container } = render(<EmployeeNumberingCard />);
     await new Promise((r) => setTimeout(r, 0));
     expect(container.innerHTML).toBe('');
+  });
+});
+
+describe('changing the prefix for everyone', () => {
+  it('offers to renumber existing employees when the prefix changes, and does it before saving', async () => {
+    renumberEmployees.mockResolvedValue(23);
+    saveEmployeeNumbering.mockResolvedValue({ ...DEFAULTS, prefix: 'FBL-', preview: 'FBL-001501' });
+    render(<EmployeeNumberingCard />);
+    expect(screen.queryByText(/Also change existing employees/)).toBeNull();
+    fireEvent.change(await screen.findByLabelText(/Prefix/), { target: { value: 'FBL-' } });
+    expect(screen.getByText(/MCL-000123 becomes FBL-000123/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('checkbox', { name: /Also change existing employees/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(saveEmployeeNumbering).toHaveBeenCalled());
+    expect(renumberEmployees).toHaveBeenCalledWith('MCL-', 'FBL-');
+    expect(renumberEmployees.mock.invocationCallOrder[0]).toBeLessThan(saveEmployeeNumbering.mock.invocationCallOrder[0]);
+  });
+
+  it('left unticked, existing numbers stay', async () => {
+    saveEmployeeNumbering.mockResolvedValue({ ...DEFAULTS, prefix: 'FBL-', preview: 'FBL-001501' });
+    render(<EmployeeNumberingCard />);
+    fireEvent.change(await screen.findByLabelText(/Prefix/), { target: { value: 'FBL-' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(saveEmployeeNumbering).toHaveBeenCalled());
+    expect(renumberEmployees).not.toHaveBeenCalled();
+  });
+
+  it('a refused renumber saves nothing', async () => {
+    renumberEmployees.mockRejectedValue(new Error('Nothing was changed'));
+    render(<EmployeeNumberingCard />);
+    fireEvent.change(await screen.findByLabelText(/Prefix/), { target: { value: 'FBL-' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: /Also change existing employees/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(renumberEmployees).toHaveBeenCalled());
+    expect(saveEmployeeNumbering).not.toHaveBeenCalled();
+  });
+
+  it('only for administrators and Settings', async () => {
+    state.canRenumber = false;
+    render(<EmployeeNumberingCard />);
+    fireEvent.change(await screen.findByLabelText(/Prefix/), { target: { value: 'FBL-' } });
+    expect(screen.queryByText(/Also change existing employees/)).toBeNull();
   });
 });
