@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
 import { forgetAccountOnSignInOut } from './lib/accountCache';
+import { forgetFormDraftsOnSignOut } from './lib/formDraft';
 import App from './App';
 import ConfigError from './components/Setup/ConfigError';
 import { missingConfig } from './lib/requiredConfig';
@@ -36,6 +37,7 @@ window.addEventListener('vite:preloadError', (event) => {
 applyA11y(loadA11y()); // text size, bolder text, contrast: also before the first render
 applyStoredTheme(); // before the first render, so the page never flashes the default colours
 forgetAccountOnSignInOut(queryClient); // a new sign-in never sees the last one's permissions or companies
+forgetFormDraftsOnSignOut(); // unsaved personal details typed in this tab go with the person who typed them
 const missing = missingConfig(import.meta.env);
 // A company's public careers page (FIG-838) stands alone: no sign-in, none of the app around it, and it may be
 // framed on the company's own website.

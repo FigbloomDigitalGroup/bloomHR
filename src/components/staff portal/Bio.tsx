@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { X, Save, ArrowLeft, Plus, Upload, AlertCircle, Users, Check, PencilLine } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
@@ -17,6 +17,7 @@ import { PAYMENT_METHODS, paymentMethodOption } from '../../lib/paymentMethods';
 import { loadEmployeeFieldValues } from '../../lib/employeeOptions';
 import { type Branch, employeeBranch, loadBranches } from '../../lib/branches';
 import { LoaderBlock } from '../UI/FigbloomLoader';
+import { useFormDraft } from '../../hooks/useFormDraft';
 
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'SHIF Number'?: string | null;
@@ -56,6 +57,13 @@ type StatutoryDeduction = {
   number: string;
   isActive: boolean;
 };
+
+interface BioForm {
+  employee: Partial<Employee>;
+  emergencyContact: EmergencyContact;
+  dependents: Dependent[];
+  statutoryDeductions: StatutoryDeduction[];
+}
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const idNumberRegex = /^[0-9]{6,12}$/;
@@ -132,6 +140,21 @@ const EmployeeBioPage = () => {
   const [statutoryDeductions, setStatutoryDeductions] = useState<StatutoryDeduction[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isEditMode, setIsEditMode] = useState(false);
+  // what was loaded: unsaved edits are kept in the tab against it (useFormDraft), so a refresh doesn't lose them
+  const [loadedBio, setLoadedBio] = useState<BioForm | null>(null);
+  const bioForm = useMemo<BioForm>(
+    () => ({ employee, emergencyContact, dependents, statutoryDeductions }),
+    [employee, emergencyContact, dependents, statutoryDeductions]
+  );
+  const bioNumber = loadedBio?.employee['Employee Number'];
+  const draft = useFormDraft<BioForm>(bioNumber ? `bio:${bioNumber}` : null, bioForm, loadedBio ?? bioForm, (d) => {
+    setEmployee(d.employee);
+    setEmergencyContact(d.emergencyContact);
+    setDependents(d.dependents);
+    setStatutoryDeductions(d.statutoryDeductions);
+    // a restored draft is being edited; discarding goes back to viewing
+    setIsEditMode(d !== loadedBio);
+  });
   // HR administration changes any field; pay shows to HR administration with Payroll (by default administrators)
   const { hasPermission, hasAllPermissions, loading: permissionsLoading } = usePermissions();
   const hrAdmin = !permissionsLoading && hasPermission('hr-admin');
@@ -218,25 +241,27 @@ const EmployeeBioPage = () => {
           supervisors: values.supervisors,
         }));
 
-        setEmployee(empData);
-
-        // Set single emergency contact
-        setEmergencyContact(
-          contacts ? {
+        const loaded: BioForm = {
+          employee: empData,
+          // single emergency contact
+          emergencyContact: contacts ? {
             name: contacts.full_name,
             relationship: contacts.relationship,
             phone: contacts.phone_number,
             email: contacts.email || ''
-          } : { name: '', relationship: '', phone: '', email: '' }
-        );
-
-        setDependents(deps?.map(d => ({
-          name: d.full_name,
-          relationship: d.relationship,
-          dateOfBirth: d.date_birth || undefined
-        })) || [{ name: '', relationship: '' }]);
-
-        setStatutoryDeductions(defaultDeductions);
+          } : { name: '', relationship: '', phone: '', email: '' },
+          dependents: deps?.map(d => ({
+            name: d.full_name,
+            relationship: d.relationship,
+            dateOfBirth: d.date_birth || undefined
+          })) || [{ name: '', relationship: '' }],
+          statutoryDeductions: defaultDeductions,
+        };
+        setEmployee(loaded.employee);
+        setEmergencyContact(loaded.emergencyContact);
+        setDependents(loaded.dependents);
+        setStatutoryDeductions(loaded.statutoryDeductions);
+        setLoadedBio(loaded);
 
         if (empData['Profile Image']) {
           setPreviewImage(empData['Profile Image']);
@@ -583,6 +608,7 @@ const EmployeeBioPage = () => {
         if (dependentsError) throw dependentsError;
       }
 
+      draft.clear();
       setIsEditMode(false);
       navigate(`/staff`, { state: { success: true } });
     } catch (err) {
@@ -595,7 +621,8 @@ const EmployeeBioPage = () => {
 
   const handleEditToggle = () => {
     if (isEditMode) {
-      // If canceling edit mode, reset form to original values
+      // canceling goes back to what was loaded (and forgets the kept draft)
+      draft.discard();
       setIsEditMode(false);
       setErrors({});
     } else {
@@ -708,6 +735,16 @@ const EmployeeBioPage = () => {
           )}
         </div>
       </div>
+
+      {draft.restoredAt !== null && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-white p-4" role="status">
+          <p className="m-0 flex-1 min-w-[200px] text-sm text-ink">
+            We kept what you typed before the page reloaded (last change at{' '}
+            {new Date(draft.restoredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}). Save Changes to keep it.
+          </p>
+          <GlowButton variant="secondary" onClick={() => { draft.discard(); setIsEditMode(false); }}>Discard it</GlowButton>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-300 overflow-hidden">
         {/* Header */}

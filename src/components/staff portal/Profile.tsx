@@ -11,6 +11,7 @@ import MyTwoStepCard from '../Settings/MyTwoStep';
 import MyContributions from './MyContributions';
 import { LeavingTheCompany, ResignationStatusCard } from './ResignationCards';
 import { useMyOpenResignation } from './useMyOpenResignation';
+import { useFormDraft } from '../../hooks/useFormDraft';
 
 interface ProfileProps {
   /** opens the Resignation section (it is no longer in the menu; resigning starts here) */
@@ -25,6 +26,13 @@ const Profile = ({ onOpenResignation }: ProfileProps) => {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  // what was loaded (or last saved): unsaved edits are kept in the tab against it, so a refresh doesn't lose them
+  const [loadedData, setLoadedData] = useState<any>(null);
+  const draft = useFormDraft<any>(loadedData ? `profile:${loadedData['Employee Number']}` : null, employeeData, loadedData, (d) => {
+    setEmployeeData(d);
+    // a restored draft is being edited; discarding goes back to viewing
+    setIsEditing(d !== loadedData);
+  });
   // a resignation under way shows at the top; otherwise resigning starts at the bottom
   const openResignation = useMyOpenResignation();
 
@@ -50,6 +58,7 @@ const Profile = ({ onOpenResignation }: ProfileProps) => {
 
           if (error) throw error;
           setEmployeeData(data);
+          setLoadedData(data);
           if (data?.["Profile Image"]) {
             setProfileImage(data["Profile Image"]);
           }
@@ -130,6 +139,8 @@ const Profile = ({ onOpenResignation }: ProfileProps) => {
       requireUpdatedRows(savedRows, NOT_SAVED_NOT_LINKED);
 
       toast.success('Deductions updated successfully');
+      setLoadedData(employeeData);
+      draft.clear();
       setIsEditing(false); // Exit edit mode after successful update
     } catch (error) {
       console.error('Error updating deductions:', error);
@@ -158,6 +169,18 @@ const Profile = ({ onOpenResignation }: ProfileProps) => {
   return (
     <div className="p-6">
       {openResignation && onOpenResignation && <ResignationStatusCard exit={openResignation} onView={onOpenResignation} />}
+
+      {draft.restoredAt !== null && (
+        <div className="bg-white rounded-lg p-4 border border-gray-200 mb-6 flex flex-wrap items-center gap-3" role="status">
+          <p className="m-0 flex-1 min-w-[200px] text-sm text-gray-900">
+            We kept what you typed before the page reloaded (last change at{' '}
+            {new Date(draft.restoredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}). Save to keep it.
+          </p>
+          <button onClick={draft.discard} className="px-4 py-2 border border-gray-300 text-xs font-medium rounded hover:bg-gray-50">
+            Discard it
+          </button>
+        </div>
+      )}
 
       {/* Profile Image Section */}
       <div className="bg-white rounded-lg p-6 border border-gray-200 mb-6">
@@ -202,7 +225,7 @@ const Profile = ({ onOpenResignation }: ProfileProps) => {
             </div>
           </div>
           <button
-            onClick={() => setIsEditing(!isEditing)}
+            onClick={() => (isEditing ? draft.discard() : setIsEditing(true))}
             className="flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-md text-xs font-medium"
           >
             {isEditing ? (
@@ -468,7 +491,7 @@ const Profile = ({ onOpenResignation }: ProfileProps) => {
       {isEditing && (
         <div className="mt-6 flex justify-end space-x-3">
           <button
-            onClick={() => setIsEditing(false)}
+            onClick={draft.discard}
             className="px-4 py-2 border border-gray-300 text-xs font-medium rounded hover:bg-gray-50"
           >
             Cancel

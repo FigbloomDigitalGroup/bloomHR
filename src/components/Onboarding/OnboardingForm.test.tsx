@@ -122,3 +122,64 @@ describe('OnboardingForm', () => {
     expect(screen.queryByRole('button', { name: /Submit to HR/ })).toBeNull();
   });
 });
+
+describe('saving as they type', () => {
+  beforeEach(() => sessionStorage.clear());
+  const slow = { timeout: 4000 };
+
+  it('saves a moment after they stop typing', async () => {
+    api.loadMyOnboarding.mockResolvedValue(record({}));
+    render(<OnboardingForm />);
+    fireEvent.change(await screen.findByLabelText(/^Preferred name/), { target: { value: 'Ami' } });
+    expect(api.saveMyOnboarding).not.toHaveBeenCalled();
+    await waitFor(() => expect(api.saveMyOnboarding).toHaveBeenCalled(), slow);
+    expect(api.saveMyOnboarding).toHaveBeenLastCalledWith('E1', expect.objectContaining({ preferred_name: 'Ami' }), expect.anything(), expect.anything());
+    expect(await screen.findByText(/Saved at/)).toBeTruthy();
+  });
+
+  it('a number not complete yet is not sent; the rest is', async () => {
+    api.loadMyOnboarding.mockResolvedValue(record({ 'Tax PIN': null }));
+    render(<OnboardingForm />);
+    fireEvent.change(await screen.findByPlaceholderText('A123456789B'), { target: { value: 'A12' } });
+    fireEvent.change(screen.getByLabelText(/^Preferred name/), { target: { value: 'Ami' } });
+    await waitFor(() => expect(api.saveMyOnboarding).toHaveBeenCalled(), slow);
+    const sent = api.saveMyOnboarding.mock.calls.at(-1)![1] as Record<string, unknown>;
+    expect(sent.preferred_name).toBe('Ami');
+    expect(sent['Tax PIN']).toBeNull();
+    expect(await screen.findByText(/a number that isn’t complete yet saves when it is/)).toBeTruthy();
+  });
+
+  it('once HR approved, nothing saves by itself (a change goes back to HR)', async () => {
+    api.loadMyOnboarding.mockResolvedValue(record({ onboarding_status: 'approved' }));
+    render(<OnboardingForm />);
+    fireEvent.change(await screen.findByLabelText(/^Preferred name/), { target: { value: 'Ami' } });
+    await new Promise((r) => setTimeout(r, 2000));
+    expect(api.saveMyOnboarding).not.toHaveBeenCalled();
+    expect(screen.queryByText(/save as you type/)).toBeNull();
+  });
+
+  it('says when a save was refused and keeps what was typed', async () => {
+    api.loadMyOnboarding.mockResolvedValue(record({}));
+    api.saveMyOnboarding.mockRejectedValue(new Error('That NSSF number is already someone else’s.'));
+    render(<OnboardingForm />);
+    fireEvent.change(await screen.findByLabelText(/^Preferred name/), { target: { value: 'Ami' } });
+    expect(await screen.findByText(/Not saved: That NSSF number is already someone else’s/, {}, slow)).toBeTruthy();
+    expect((screen.getByLabelText(/^Preferred name/) as HTMLInputElement).value).toBe('Ami');
+  });
+
+  it('after a refresh, what was typed comes back, and can be discarded', async () => {
+    api.loadMyOnboarding.mockResolvedValue(record({ onboarding_status: 'approved', preferred_name: 'Amina' }));
+    render(<OnboardingForm />);
+    fireEvent.change(await screen.findByLabelText(/^Preferred name/), { target: { value: 'Ami' } });
+    cleanup(); // the page reloads
+    render(<OnboardingForm />);
+    expect(await screen.findByText(/We kept what you typed before the page reloaded/)).toBeTruthy();
+    expect((screen.getByLabelText(/^Preferred name/) as HTMLInputElement).value).toBe('Ami');
+    fireEvent.click(screen.getByRole('button', { name: 'Discard it' }));
+    expect((screen.getByLabelText(/^Preferred name/) as HTMLInputElement).value).toBe('Amina');
+    cleanup();
+    render(<OnboardingForm />);
+    expect((await screen.findByLabelText(/^Preferred name/) as HTMLInputElement).value).toBe('Amina');
+    expect(screen.queryByText(/We kept what you typed/)).toBeNull();
+  });
+});
