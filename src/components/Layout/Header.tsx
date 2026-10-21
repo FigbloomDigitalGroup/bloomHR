@@ -6,6 +6,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { useHRNotifications, fetchAdminHRNotifications, markAdminNotificationRead, type HRNotification } from '../../hooks/useHRNotifications';
+import { usePermissions } from '../../hooks/usePermissions';
+import { adminNotificationTarget } from '../../lib/notificationLinks';
 import ScreenSearch from './ScreenSearch';
 import CompanySwitcher from '../Company/CompanySwitcher';
 import { useOnlinePeople } from '../chat/lib/presence';
@@ -38,6 +40,8 @@ interface NotificationItem {
   timestamp: Date;
   isRead: boolean;
   hrId?: number;
+  /** what it is (type and title), for the screen it opens (lib/notificationLinks) */
+  hr?: Pick<HRNotification, 'notification_type' | 'title' | 'message'>;
 }
 
 interface NotificationState {
@@ -149,6 +153,7 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
   }, [locationOpen]);
   const [companyProfile, setCompanyProfile] = useState<CompanyIdentity | null>(null);
   const navigate = useNavigate();
+  const { hasPermission } = usePermissions();
   // phones: Back closes the notifications panel first; "‹ Back" in the header away from the dashboard; and in the
   // installed app, Back on the dashboard asks before leaving
   const { pathname } = useLocation();
@@ -215,6 +220,7 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
         timestamp: new Date(n.created_at),
         isRead: false,
         hrId: n.id,
+        hr: { notification_type: n.notification_type, title: n.title, message: n.message },
       }));
 
       const allItems = [...staffItems, ...leaveItems, ...hrItems].sort((a, b) =>
@@ -353,7 +359,9 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
       setNotifications(prev => ({ ...prev, leave: Math.max(0, prev.leave - 1) }));
     } else if (notification.type === 'hr') {
       if (notification.hrId) markAdminNotificationRead(notification.hrId);
-      navigate('/hr-lifecycle', { replace });
+      // the screen it is about (one they may open), or their own staff portal section; else it is only marked read
+      const target = notification.hr ? adminNotificationTarget(notification.hr, hasPermission) : null;
+      if (target) navigate(target, { replace });
       setNotifications(prev => ({ ...prev, hr: Math.max(0, prev.hr - 1) }));
     }
 

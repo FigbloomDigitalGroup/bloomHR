@@ -55,7 +55,7 @@ export function appOrigin(appUrl: string): string {
 }
 
 /** The page an HR alert is handled on: the one all the items share, else the app's start page. */
-const HR_PAGES: Record<string, string> = {
+export const HR_PAGES: Record<string, string> = {
   leave_recommended: '/leaves',
   application_received: '/recruitment',
   loan_requested: '/loans',
@@ -65,7 +65,51 @@ const HR_PAGES: Record<string, string> = {
   probation_expiring: '/hr-lifecycle',
   contract_signed: '/hr-lifecycle',
   exit_requested: '/hr-lifecycle',
+  leave_exhausted: '/leaves',
+  casual_limit: '/casual-workers',
+  leave_document_overdue: '/leave-discipline',
 };
+
+/**
+ * The staff portal section an employee's notification opens (/staff?tab=...): a copy of src/lib/notificationLinks.ts
+ * for the types it maps by type alone (src/lib/notificationLinks.test.ts checks they agree). The types several features
+ * share are left out: their email opens the portal's home.
+ */
+export const STAFF_TABS: Record<string, string> = {
+  leave_approved: 'leave-history', leave_rejected: 'leave-history', leave_reopened: 'leave-history',
+  leave_scheduled: 'leave-history', leave_year_end_reminder: 'leave',
+  document_accepted: 'onboarding', document_rejected: 'onboarding', document_requested: 'onboarding',
+  onboarding_approved: 'onboarding', onboarding_changes_requested: 'onboarding', photo_removed: 'onboarding',
+  policy_to_accept: 'onboarding',
+  salary_advance_approved: 'salary-advance', salary_advance_rejected: 'salary-advance', salary_advance_paid: 'salary-advance',
+  loan_approved: 'loan', loan_rejected: 'loan', loan_disbursed: 'loan', loan_repaid: 'loan',
+  payslip_ready: 'payslips', salary_paid: 'payslips',
+  phone_change_approved: 'details', phone_change_rejected: 'details', suspended: 'details', reactivated: 'details',
+  incident_update: 'incident-report', task_assigned: 'tasks', exit_approved: 'resignation', exit_declined: 'resignation',
+  contract_sent: 'contract', contract_sent_back: 'contract', contract_accepted: 'contract', contract_cancelled: 'contract',
+};
+
+/** The portal address opened on one section (the address as it is when it can't be read). */
+export function staffPortalLink(appUrl: string, tab: string | null, extra: Record<string, string> = {}): string {
+  if (!tab || !/^https?:\/\//.test(appUrl)) return appUrl;
+  try {
+    const url = new URL(appUrl);
+    url.searchParams.set('tab', tab);
+    for (const [k, v] of Object.entries(extra)) url.searchParams.set(k, v);
+    return url.toString();
+  } catch {
+    return appUrl;
+  }
+}
+
+/** An employee's email opens the section all its items share, else the portal's home. */
+export function staffEmailLink(appUrl: string, items: Pick<NotificationItem, 'type'>[]): string {
+  const tabs = [...new Set(items.map((i) => STAFF_TABS[i.type] ?? null))];
+  if (tabs.length !== 1) return appUrl;
+  // only policies to accept: straight to them
+  const policies = items.every((i) => i.type === 'policy_to_accept');
+  return staffPortalLink(appUrl, tabs[0], policies ? { section: 'policies' } : {});
+}
 
 export function hrAlertLink(appUrl: string, items: Pick<NotificationItem, 'type'>[]): string {
   const origin = appOrigin(appUrl);
@@ -138,7 +182,7 @@ export function htmlFor({ firstName, companyName, items, appUrl }: NotificationE
     firstName,
     intro: items.length === 1 ? 'There is an update for you:' : `There are ${items.length} updates for you:`,
     rows: items,
-    link: appUrl,
+    link: staffEmailLink(appUrl, items),
     button: 'Open the staff portal',
     footer:
       'You get these emails for updates in the staff portal. You can choose everything, important only or none from ' +
@@ -243,7 +287,7 @@ export function payslipEmailHtml({ firstName, companyName, period, passwordProte
     firstName,
     intro: `Your payslip for ${periodLabel(period)} is attached to this email as a PDF.`,
     rows: [{ title: 'Opening the PDF', message: payslipPasswordNote(passwordProtected) }],
-    link: appUrl,
+    link: staffPortalLink(appUrl, 'payslips'),
     button: 'See your payslips in the staff portal',
     footer:
       'This email and its attachment are confidential and meant only for you. Payslips are always emailed; if you ' +

@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 vi.mock('../../lib/supabase', () => {
   // any query resolves to an empty result; realtime channels do nothing
   const chain: Record<string, unknown> = {};
-  for (const m of ['select', 'eq', 'neq', 'ilike', 'is', 'in', 'order', 'limit', 'gte', 'lte']) chain[m] = () => chain;
+  for (const m of ['select', 'eq', 'neq', 'ilike', 'is', 'in', 'order', 'limit', 'gt', 'gte', 'lte']) chain[m] = () => chain;
   chain.single = () => Promise.resolve({ data: null, error: null });
   chain.maybeSingle = () => Promise.resolve({ data: null, error: null });
   chain.then = (resolve: (v: unknown) => void) => resolve({ data: [], count: 0, error: null });
@@ -19,9 +19,11 @@ vi.mock('../../lib/supabase', () => {
     },
   };
 });
+const hrNotifs = vi.hoisted(() => ({ rows: [] as Record<string, unknown>[], check: () => {} }));
 vi.mock('../../hooks/useHRNotifications', () => ({
-  useHRNotifications: () => ({ checkAndNotify: () => {} }),
-  fetchAdminHRNotifications: () => Promise.resolve([]),
+  // the same function every render, as the real hook's (Header fetches again when it changes)
+  useHRNotifications: () => ({ checkAndNotify: hrNotifs.check }),
+  fetchAdminHRNotifications: () => Promise.resolve(hrNotifs.rows),
   markAdminNotificationRead: () => Promise.resolve(),
 }));
 const noCompanies = vi.hoisted(() => ({ data: [] as { is_current: boolean; name: string }[] }));
@@ -44,6 +46,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  hrNotifs.rows = [];
+  headerPerms.granted = ['employees', 'payroll'];
 });
 
 describe('Header menu button', () => {
@@ -128,5 +132,36 @@ describe('Header search', () => {
     // Role Permissions is not theirs
     expect(screen.queryByRole('button', { name: 'Role Permissions' })).toBeNull();
     expect(screen.getByText('No screens match')).toBeTruthy();
+  });
+});
+
+describe('Header notifications open the page they are about', () => {
+  function Where() {
+    const { pathname, search } = useLocation();
+    return <output data-testid="where">{pathname + search}</output>;
+  }
+  const open = async (row: Record<string, unknown>) => {
+    hrNotifs.rows = [{ id: 7, employee_number: 'E1', created_at: '2026-10-21T10:00:00Z', message: 'm', ...row }];
+    render(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <Routes>
+          <Route path="*" element={<><Header /><Where /></>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications' }));
+    fireEvent.click(await screen.findByText(String(row.title)));
+  };
+
+  it('a loan request opens Loans', async () => {
+    headerPerms.granted = ['loans'];
+    await open({ notification_type: 'loan_requested', title: 'Loan requested' });
+    expect(screen.getByTestId('where').textContent).toBe('/loans');
+  });
+
+  it('a leave approver without Time Off goes to the approvals in their staff portal', async () => {
+    headerPerms.granted = ['dashboard'];
+    await open({ notification_type: 'approval_needed', title: 'Leave awaiting your approval' });
+    expect(screen.getByTestId('where').textContent).toBe('/staff?tab=leave-approvals');
   });
 });

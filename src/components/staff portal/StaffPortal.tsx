@@ -48,6 +48,7 @@ import EmailNotificationsToggle from './EmailNotificationsToggle';
 import { supabase } from '../../lib/supabase';
 import { loadCompanyIdentity } from '../../lib/companyProfile';
 import { useNavigate } from 'react-router-dom';
+import { type StaffLink, staffNotificationLink } from '../../lib/notificationLinks';
 import TrainingModule from './Training';
 import MyKpis from '../Perfomance/kpis/MyKpis';
 import Profile from './Profile';
@@ -106,6 +107,8 @@ interface NotificationItem {
   message: string;
   timestamp: Date;
   isRead: boolean;
+  /** the section it is about (lib/notificationLinks); none: it is only marked read */
+  link?: StaffLink | null;
 }
 
 /** hr_notifications that are for HR, not the employee */
@@ -210,7 +213,7 @@ function NotificationSidebar({
   onMarkRead,
   onClearAll,
   onRemove,
-  onOpenApprovals
+  onOpen
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -218,7 +221,8 @@ function NotificationSidebar({
   onMarkRead: (n: NotificationItem) => void;
   onClearAll: () => void;
   onRemove: (id: string) => void;
-  onOpenApprovals: () => void;
+  /** opens the section the notification is about (and marks it read) */
+  onOpen: (n: NotificationItem) => void;
 }) {
   // the phone's Back closes the panel
   useBackToClose(isOpen, onClose);
@@ -278,22 +282,24 @@ function NotificationSidebar({
                     <p className="text-[10px] text-gray-600 mb-3 leading-relaxed">{n.message}</p>
                     <div className="flex items-center justify-between">
                       <span className="text-[9px] text-gray-400">{new Date(n.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      {n.type === 'approval' && (
-                        <button
-                          onClick={() => { onMarkRead(n); onOpenApprovals(); }}
-                          className="text-[10px] font-bold text-brand hover:text-brand-dark"
-                        >
-                          Approve or reject
-                        </button>
-                      )}
-                      {!n.isRead && n.type !== 'approval' && (
-                        <button
-                          onClick={() => onMarkRead(n)}
-                          className="text-[10px] font-bold text-brand hover:text-brand-dark"
-                        >
-                          Mark as read
-                        </button>
-                      )}
+                      <div className="flex items-center gap-3">
+                        {!n.isRead && !n.link && (
+                          <button
+                            onClick={() => onMarkRead(n)}
+                            className="text-[10px] font-bold text-brand hover:text-brand-dark"
+                          >
+                            Mark as read
+                          </button>
+                        )}
+                        {n.link && (
+                          <button
+                            onClick={() => onOpen(n)}
+                            className="text-[10px] font-bold text-brand hover:text-brand-dark"
+                          >
+                            {n.type === 'approval' ? 'Approve or reject' : 'Open'}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </motion.div>
                 ))
@@ -1116,7 +1122,8 @@ const StaffPortal = () => {
           title: n.title,
           message: n.message,
           timestamp: new Date(n.created_at),
-          isRead: false
+          isRead: false,
+          link: staffNotificationLink(n)
         }));
 
       const notificationItems = leaveItems.sort(
@@ -1759,7 +1766,11 @@ const StaffPortal = () => {
           onMarkRead={handleNotificationClick}
           onClearAll={handleClearAll}
           onRemove={handleRemoveNotification}
-          onOpenApprovals={() => { setNotificationSidebarOpen(false); setActiveTab('leave-approvals'); }}
+          onOpen={(n) => {
+            handleNotificationClick(n);
+            setNotificationSidebarOpen(false);
+            if (n.link) setActiveTab(n.link.tab, { params: n.link.params });
+          }}
         />
       </div>
     </div>
