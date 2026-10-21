@@ -50,16 +50,34 @@ jobs:
       - run: npm ci
       - run: npx vitest run --shard=${{ matrix.shard }}/6
 
+  # The AWS infrastructure code (infra/, its own package): type check, tests, and a synth that needs no AWS access
+  infra:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: infra/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm run synth
+
   # The branch rule requires a check called "build": it passes only when every job above passed. It runs even when a
   # job failed or was cancelled (always()), so a failure can never be reported as "skipped" (which would count as passing).
   build:
     runs-on: ubuntu-latest
-    needs: [checks, test]
+    needs: [checks, test, infra]
     if: always()
     steps:
       - name: Every check passed
         run: |
-          if [ "${{ needs.checks.result }}" != "success" ] || [ "${{ needs.test.result }}" != "success" ]; then
-            echo "checks: ${{ needs.checks.result }}, tests: ${{ needs.test.result }}"
+          if [ "${{ needs.checks.result }}" != "success" ] || [ "${{ needs.test.result }}" != "success" ] || [ "${{ needs.infra.result }}" != "success" ]; then
+            echo "checks: ${{ needs.checks.result }}, tests: ${{ needs.test.result }}, infra: ${{ needs.infra.result }}"
             exit 1
           fi
