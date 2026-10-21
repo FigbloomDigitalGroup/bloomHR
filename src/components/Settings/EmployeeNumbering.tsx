@@ -8,6 +8,7 @@ import {
   formatEmployeeNumber,
   loadEmployeeNumbering,
   numberingError,
+  renumberEmployees,
   saveEmployeeNumbering,
 } from '../../lib/employeeNumbering';
 
@@ -21,16 +22,19 @@ const MODES: { id: EmployeeNumberMode; label: string; hint: string }[] = [
 /**
  * How the company's employee numbers are given: by the system (prefix, digits, next number) or the company's own.
  * ADMIN and people with Settings or Employees change it; others who may see it read it; anyone else sees nothing.
+ * Changing the prefix can also renumber the employees who have the old one (ADMIN and Settings only).
  */
 export default function EmployeeNumberingCard({ className = 'mb-4' }: { className?: string }) {
   const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
   const canEdit = !permissionsLoading && hasAnyPermission(['settings', 'employees']);
+  const canRenumber = !permissionsLoading && hasAnyPermission(['settings']);
   const [saved, setSaved] = useState<Numbering | null>(null);
   const [mode, setMode] = useState<EmployeeNumberMode>('system');
   const [prefix, setPrefix] = useState('');
   const [digits, setDigits] = useState('6');
   const [next, setNext] = useState('1');
   const [busy, setBusy] = useState(false);
+  const [renumber, setRenumber] = useState(false);
 
   const show = (n: Numbering) => {
     setSaved(n);
@@ -38,6 +42,7 @@ export default function EmployeeNumberingCard({ className = 'mb-4' }: { classNam
     setPrefix(n.prefix);
     setDigits(String(n.digits));
     setNext(String(n.next_number));
+    setRenumber(false);
   };
 
   useEffect(() => {
@@ -58,12 +63,19 @@ export default function EmployeeNumberingCard({ className = 'mb-4' }: { classNam
   const changed = mode !== saved.mode || prefix !== saved.prefix || digitsN !== saved.digits || nextN !== saved.next_number;
   // the server skips numbers already in use; until saved, show the number as typed
   const preview = !changed ? saved.preview : problem ? null : formatEmployeeNumber(prefix, digitsN, nextN);
+  // existing employees can move to a new prefix with it (not to or from no prefix: nothing marks whose numbers those are)
+  const canMoveExisting = canRenumber && mode === 'system' && !problem && saved.prefix !== '' && prefix !== '' && prefix !== saved.prefix;
+  const example = formatEmployeeNumber(saved.prefix, saved.digits, 123);
 
   const save = async () => {
     setBusy(true);
     try {
       // the count moves only when the next number was changed here
       const moved = nextN !== saved.next_number;
+      if (canMoveExisting && renumber) {
+        const n = await renumberEmployees(saved.prefix, prefix);
+        toast.success(`${n} employee${n === 1 ? '' : 's'} renumbered from ${saved.prefix} to ${prefix}`);
+      }
       show(mode === 'system'
         ? await saveEmployeeNumbering(mode, prefix, digitsN, moved ? nextN : undefined)
         : await saveEmployeeNumbering(mode, saved.prefix, saved.digits));
@@ -78,7 +90,7 @@ export default function EmployeeNumberingCard({ className = 'mb-4' }: { classNam
   return (
     <Card className={className}>
       <h2 className="m-0 text-[14px] font-bold text-ink">Employee numbers</h2>
-      <p className="mt-0.5 mb-3.5 text-[12px] text-muted-foreground">How new employees get their number. Existing employees keep theirs.</p>
+      <p className="mt-0.5 mb-3.5 text-[12px] text-muted-foreground">How new employees get their number. Existing employees keep theirs unless you change the prefix for everyone.</p>
 
       {!canEdit ? (
         <p className="m-0 text-[12.5px] text-ink" role="status">
@@ -124,6 +136,19 @@ export default function EmployeeNumberingCard({ className = 'mb-4' }: { classNam
               Type the number when you add an employee; the bulk-upload template gets an Employee Number column, needed
               for each new employee. Anyone added without one (for example by another route) still gets a system number.
             </p>
+          )}
+
+          {canMoveExisting && (
+            <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-card border border-border bg-white p-3">
+              <input type="checkbox" checked={renumber} onChange={(e) => setRenumber(e.target.checked)} className="mt-0.5 accent-brand" />
+              <span>
+                <span className="block text-[12.5px] font-semibold text-ink">Also change existing employees’ numbers</span>
+                <span className="block text-[11.5px] text-muted-foreground">
+                  Everyone whose number starts with {saved.prefix} gets {prefix} instead ({example} becomes {prefix + example.slice(saved.prefix.length)}).
+                  Their leave, payroll and other records follow. Numbers without {saved.prefix} are left alone.
+                </span>
+              </span>
+            </label>
           )}
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
