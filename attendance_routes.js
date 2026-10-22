@@ -46,6 +46,13 @@ export function cleanLocation(loc) {
   return out;
 }
 
+/** The reason the person gave for clocking via the web; null when absent or blank. */
+export function cleanReason(reason) {
+  if (typeof reason !== "string") return null;
+  const s = reason.trim().slice(0, 300);
+  return s.length > 0 ? s : null;
+}
+
 router.post("/clock", async (req, res) => {
   try {
     if (!admin) throw new HttpError(503, "Clocking in through the server is not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
@@ -57,6 +64,7 @@ router.post("/clock", async (req, res) => {
       p_kind: action,
       p_location: cleanLocation(req.body?.location),
       p_ip: clientIp(req),
+      p_reason: cleanReason(req.body?.reason),
     });
     if (error) {
       if (error.hint === "clock_policy") return res.status(403).json({ error: error.message, reason: "clock_policy" });
