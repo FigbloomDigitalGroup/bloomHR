@@ -15,6 +15,10 @@ export interface AccountSettings {
   // CloudTrail logs move to cheaper Glacier storage after this many days, and are deleted after logRetentionDays.
   logArchiveAfterDays: number;
   logRetentionDays: number;
+  // An account can have only one per-service anomaly monitor, and AWS creates "Default-Services-Monitor" by itself when
+  // Cost Explorer is first turned on. Its ARN here: the alerts subscribe to it instead of creating a second one (which
+  // AWS refuses). Leave it out in an account without one.
+  serviceAnomalyMonitorArn?: string;
 }
 
 export const ACCOUNT_SETTINGS: AccountSettings = {
@@ -23,6 +27,8 @@ export const ACCOUNT_SETTINGS: AccountSettings = {
   anomalyThresholdUsd: 20,
   logArchiveAfterDays: 90,
   logRetentionDays: 7 * 365,
+  // AWS's Default-Services-Monitor in this account (`aws ce get-anomaly-monitors --region us-east-1`)
+  serviceAnomalyMonitorArn: 'arn:aws:ce::852845752791:anomalymonitor/fb7de741-0867-4ae9-be18-9778d6568964',
 };
 
 export type EnvironmentName = 'staging' | 'production';
