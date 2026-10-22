@@ -34,6 +34,12 @@ import {
   scanLine,
   scanRole,
   scanSource,
+  clockOutLabel,
+  clockedInVia,
+  isLastScan,
+  parseNetworks,
+  placeMapUrl,
+  placeText,
   type AttendanceDay,
   type DayScan,
 } from './attendance';
@@ -134,8 +140,23 @@ describe('attendanceCsv', () => {
     );
     const lines = csv.trim().split('\r\n');
     expect(lines[0]).toBe(ATTENDANCE_CSV_HEADERS.join(','));
-    expect(lines[1]).toBe('A,Mo Me,Sales,Nairobi HQ,2026-10-20,Late,08:31,17:01,8.50,31,"Traffic, ""jam"""');
-    expect(lines[2]).toBe('A,Mo Me,Sales,Nairobi HQ,2026-10-22,Not yet,,,,,');
+    expect(lines[1]).toBe('A,Mo Me,Sales,Nairobi HQ,2026-10-20,Late,08:31,17:01,8.50,31,"Traffic, ""jam""",,');
+    expect(lines[2]).toBe('A,Mo Me,Sales,Nairobi HQ,2026-10-22,Not yet,,,,,,,');
+  });
+
+  it('says how each clock-in was made, and where (FIG-1200)', () => {
+    const csv = attendanceCsv(
+      [
+        day({ employeeNumber: 'A', day: '2026-10-19', status: 'present', clockIn: '2026-10-19T05:00:00Z', source: 'app', place: 'office', placeDetail: 'Near Nairobi (120 m)' }),
+        day({ employeeNumber: 'A', day: '2026-10-20', status: 'present', clockIn: '2026-10-20T05:00:00Z', source: 'app', place: 'field', placeLocation: { latitude: 0.5143, longitude: 35.2698 } }),
+        day({ employeeNumber: 'A', day: '2026-10-21', status: 'present', clockIn: '2026-10-21T05:00:00Z', source: 'scanner' }),
+      ],
+      new Map()
+    );
+    const lines = csv.trim().split('\r\n');
+    expect(lines[1].endsWith(',App · office,Near Nairobi (120 m)')).toBe(true);
+    expect(lines[2].endsWith(',App · field,"0.51430, 35.26980"')).toBe(true);
+    expect(lines[3].endsWith(',Scanner,')).toBe(true);
   });
 });
 
@@ -256,5 +277,71 @@ describe('odd-hours flags and the scans of a day (20261023800000)', () => {
     expect(oddHoursProblem('')).toBe('Enter a time');
     expect(oddHoursSummary('05:00')).toBe('Clock-ins after midnight and before 5:00 am are flagged.');
     expect(oddHoursSummary('00:00')).toBe("Odd-hours clock-ins aren't flagged.");
+  });
+});
+
+describe('a scanner’s last scan before the end of the day (FIG-1200)', () => {
+  const TODAY = '2026-10-22';
+  const IN = '2026-10-22T05:00:00Z'; // 8:00 am
+  const LAST = '2026-10-22T11:48:00Z'; // 2:48 pm
+  const BEFORE_END = new Date('2026-10-22T13:00:00Z'); // 4:00 pm
+  const AFTER_END = new Date('2026-10-22T14:30:00Z'); // 5:30 pm
+  const scanned = (fields: Partial<AttendanceDay> = {}) =>
+    day({ employeeNumber: 'A', day: TODAY, clockIn: IN, clockOut: LAST, hours: 6.8, source: 'scanner', clockOutVia: 'scanner', endTime: '17:00', ...fields });
+
+  it('today before the end time: "Last scan", hours so far', () => {
+    expect(isLastScan(scanned(), TODAY, BEFORE_END)).toBe(true);
+    expect(clockOutLabel(scanned(), TODAY, BEFORE_END)).toBe('Last scan 2:48 pm');
+    expect(dayHours(scanned(), TODAY, BEFORE_END)).toEqual({ hours: 8, open: 'so_far' });
+    expect(dayHoursLabel(scanned(), TODAY, BEFORE_END)).toBe('8h 00m so far');
+  });
+
+  it('once the end time has passed: the clock-out, its hours', () => {
+    expect(isLastScan(scanned(), TODAY, AFTER_END)).toBe(false);
+    expect(clockOutLabel(scanned(), TODAY, AFTER_END)).toBe('2:48 pm');
+    expect(dayHoursLabel(scanned(), TODAY, AFTER_END)).toBe('6h 48m');
+  });
+
+  it('an app clock-out or HR’s correction is a clock-out straight away; a past day always is', () => {
+    expect(clockOutLabel(scanned({ clockOutVia: 'app' }), TODAY, BEFORE_END)).toBe('2:48 pm');
+    expect(clockOutLabel(scanned({ clockOutVia: 'hr', source: 'hr' }), TODAY, BEFORE_END)).toBe('2:48 pm');
+    expect(isLastScan(scanned({ day: '2026-10-21', clockIn: '2026-10-21T05:00:00Z', clockOut: '2026-10-21T11:48:00Z' }), TODAY, BEFORE_END)).toBe(false);
+    // no end time known: as before
+    expect(isLastScan(scanned({ endTime: null }), TODAY, BEFORE_END)).toBe(false);
+  });
+
+  it('the summary counts the time so far once, not the last scan’s hours on top', () => {
+    const open = openDaysByPerson([scanned()], TODAY, BEFORE_END);
+    expect(open.get('A')?.inNow).toBe(true);
+    expect(open.get('A')?.soFar).toBeCloseTo(8 - 6.8);
+    // the summary already has the recorded 6.8 hours: 6.8 + 1.2 = 8h so far
+    expect(totalHoursLabel(6.8, open.get('A'))).toBe('8h 00m so far');
+  });
+});
+
+describe('where a clock-in was made (FIG-1200)', () => {
+  it('labels: Scanner, HR correction, App, App · office/remote/field', () => {
+    expect(clockedInVia({ source: 'scanner' })).toBe('Scanner');
+    expect(clockedInVia({ source: 'hr' })).toBe('HR correction');
+    expect(clockedInVia({ source: 'app', place: null })).toBe('App');
+    expect(clockedInVia({ source: 'app', place: 'remote' })).toBe('App · remote');
+    expect(clockedInVia({ source: null })).toBe('');
+  });
+
+  it('the place: its detail, a field location (with a map link), or nothing', () => {
+    expect(placeText({ place: 'field', placeDetail: 'No location' })).toBe('No location');
+    expect(placeText({ place: 'field', placeLocation: { latitude: 0.5143, longitude: 35.2698 } })).toBe('0.51430, 35.26980');
+    expect(placeMapUrl({ place: 'field', placeLocation: { latitude: 0.5143, longitude: 35.2698 } })).toBe('https://www.google.com/maps?q=0.5143,35.2698');
+    expect(placeMapUrl({ place: 'office' })).toBeNull();
+  });
+
+  it('the scan list tags the app clock-in with its place', () => {
+    const s: DayScan = { at: '2026-10-19T05:02:00Z', via: 'app', scannerName: null, kind: 'clock_in', reason: null };
+    expect(scanLine(s, 'office')).toBe('8:02 am · App · office · clock-in');
+    expect(scanLine({ ...s, kind: 'clock_out' }, 'office')).toBe('8:02 am · App · clock-out');
+  });
+
+  it('office networks typed one per line or comma separated', () => {
+    expect(parseNetworks(' 41.90.12.7\n102.68.0.0/24, 41.90.12.7 \n\n')).toEqual(['41.90.12.7', '102.68.0.0/24']);
   });
 });

@@ -18,6 +18,7 @@ import {
 } from '../../lib/attendanceApi';
 import { loadBranches, type Branch } from '../../lib/branches';
 import WorkDaysMismatch from './WorkDaysMismatch';
+import ClockInPolicy from './ClockInPolicy';
 
 /**
  * The work schedule tab: the company's (the working days, start and end time and grace before someone is late) and a
@@ -59,6 +60,7 @@ export default function WorkSchedules() {
       />
       <TrackingFrom />
       <OddHoursUntil />
+      <ClockInPolicy />
       <ScheduleForm
         title="Company schedule"
         hint={company ? undefined : 'Not set yet: the company works Monday to Friday, 8:00 am to 5:00 pm.'}

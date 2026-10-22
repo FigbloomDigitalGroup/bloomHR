@@ -1,6 +1,21 @@
 import { supabase } from './supabase';
 import { fetchAll } from './fetchAll';
-import { DEFAULT_ODD_HOURS_UNTIL, type AttendanceDay, type AttendanceStatus, type AttendanceToday, type DayScan, type ScanKind, type ScanVia } from './attendance';
+import {
+  DEFAULT_ODD_HOURS_UNTIL,
+  type AttendanceDay,
+  type AttendanceStatus,
+  type AttendanceToday,
+  type ClockInPolicy,
+  type ClockOutVia,
+  type ClockPlace,
+  type DayScan,
+  type ScanKind,
+  type ScanVia,
+  type WorkArrangement,
+} from './attendance';
+
+const API_URL =
+  import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production' ? '/api' : 'http://localhost:3001/api');
 
 // Clocking in and out, the days HR sees, corrections and work schedules (migrations 20261023300000, 20261023400000). The database
 // decides who may do what; these turn its answers into plain shapes and its refusals into plain messages.
@@ -64,6 +79,10 @@ export const toToday = (r: Record<string, unknown>): AttendanceToday => ({
   endTime: String(r.end_time ?? '17:00'),
   lateAfter: String(r.late_after ?? '08:30'),
   graceMinutes: Number(r.grace_minutes ?? 30),
+  clockOutVia: (r.clock_out_via as ClockOutVia | null) ?? null,
+  source: (r.source as string | null) ?? null,
+  place: (r.place as ClockPlace | null) ?? null,
+  placeDetail: (r.place_detail as string | null) ?? null,
 });
 
 export async function loadToday(): Promise<AttendanceToday> {
@@ -72,16 +91,60 @@ export async function loadToday(): Promise<AttendanceToday> {
   return toToday((data ?? {}) as Record<string, unknown>);
 }
 
-export async function clockIn(location: ClockLocation | null): Promise<AttendanceToday> {
-  const { data, error } = await supabase.rpc('attendance_clock_in', { p_location: location });
+/**
+ * Clocks in or out through the server (POST /api/attendance/clock, attendance_routes.js), so a company's office-network
+ * rule sees the address the request really came from (migration 20261024100000). When the server can't be reached
+ * (or isn't set up, e.g. in local development), the database's own attendance_clock_in / attendance_clock_out are used:
+ * they apply the same rule, only without an address (the branch-location route still works).
+ */
+async function clock(kind: 'in' | 'out', location: ClockLocation | null): Promise<AttendanceToday> {
+  const { data: session } = await supabase.auth.getSession();
+  const token = session.session?.access_token;
+  if (token) {
+    let response: Response | null = null;
+    try {
+      response = await fetch(`${API_URL}/attendance/clock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: kind, location }),
+      });
+    } catch {
+      response = null;
+    }
+    if (response && response.status !== 404 && response.status < 500) {
+      const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!response.ok) throw new Error(String(payload.error || 'Something went wrong'));
+      return toToday(payload);
+    }
+  }
+  const { data, error } = await supabase.rpc(kind === 'in' ? 'attendance_clock_in' : 'attendance_clock_out', { p_location: location });
   if (error) fail(error);
   return toToday((data ?? {}) as Record<string, unknown>);
 }
 
-export async function clockOut(location: ClockLocation | null): Promise<AttendanceToday> {
-  const { data, error } = await supabase.rpc('attendance_clock_out', { p_location: location });
-  if (error) fail(error);
-  return toToday((data ?? {}) as Record<string, unknown>);
+export const clockIn = (location: ClockLocation | null) => clock('in', location);
+export const clockOut = (location: ClockLocation | null) => clock('out', location);
+
+/** What the portal card should offer today (attendance_my_clock_rules). */
+export interface ClockRules {
+  policy: ClockInPolicy;
+  arrangement: WorkArrangement;
+  /** 'anywhere': the app's Clock in works from anywhere; 'office': only from the office; 'scanner': use the scanner */
+  mode: 'anywhere' | 'office' | 'scanner';
+  /** their location decides it (field, or near a branch) */
+  wantsLocation: boolean;
+}
+
+/** Today's rules for the signed-in person; anywhere when they can't be read (the database still decides). */
+export async function loadClockRules(): Promise<ClockRules> {
+  const { data, error } = await supabase.rpc('attendance_my_clock_rules');
+  const d = (error ? {} : data ?? {}) as Record<string, unknown>;
+  return {
+    policy: (d.policy as ClockInPolicy) ?? 'anywhere',
+    arrangement: (d.arrangement as WorkArrangement) ?? 'on_site',
+    mode: (d.mode as ClockRules['mode']) ?? 'anywhere',
+    wantsLocation: d.wants_location === true,
+  };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -123,7 +186,17 @@ export const toDay = (r: Record<string, unknown>): AttendanceDay => ({
   note: (r.note as string | null) ?? null,
   flag: (r.flag as string | null) ?? null,
   counted: r.counted !== false,
+  endTime: r.end_time ? String(r.end_time).slice(0, 5) : null,
+  clockOutVia: (r.clock_out_via as ClockOutVia | null) ?? null,
+  place: (r.place as ClockPlace | null) ?? null,
+  placeDetail: (r.place_detail as string | null) ?? null,
+  placeLocation: toPoint(r.place_location),
 });
+
+const toPoint = (v: unknown): { latitude: number; longitude: number } | null => {
+  const p = (v ?? null) as { latitude?: unknown; longitude?: unknown } | null;
+  return p && typeof p.latitude === 'number' && typeof p.longitude === 'number' ? { latitude: p.latitude, longitude: p.longitude } : null;
+};
 
 export const toScan = (r: Record<string, unknown>): DayScan => ({
   at: String(r.punched_at ?? ''),
@@ -255,5 +328,81 @@ export async function saveOddHoursUntil(time: string): Promise<void> {
   const { error } = await supabase
     .from('attendance_settings')
     .upsert({ odd_hours_until: time }, { onConflict: 'tenant_id' });
+  if (error) fail(error);
+}
+
+// ---------------------------------------------------------------------------------------------
+// the clock-in policy and offices (migration 20261024100000, FIG-1200)
+// ---------------------------------------------------------------------------------------------
+export interface ClockInSettings {
+  policy: ClockInPolicy;
+  /** public IP addresses or ranges ("41.90.12.7", "41.90.12.0/24") */
+  networks: string[];
+  radiusM: number;
+}
+
+export const DEFAULT_CLOCK_IN_SETTINGS: ClockInSettings = { policy: 'anywhere', networks: [], radiusM: 300 };
+
+export async function loadClockInSettings(): Promise<ClockInSettings> {
+  const { data, error } = await supabase.from('attendance_settings').select('clock_in_policy, office_networks, office_radius_m').maybeSingle();
+  if (error) fail(error);
+  if (!data) return DEFAULT_CLOCK_IN_SETTINGS;
+  return {
+    policy: (data.clock_in_policy as ClockInPolicy) ?? 'anywhere',
+    networks: (data.office_networks as string[] | null) ?? [],
+    radiusM: Number(data.office_radius_m ?? 300),
+  };
+}
+
+/** Saves the policy (a company without settings yet keeps counting attendance from the day it already did). */
+export async function saveClockInSettings(s: ClockInSettings): Promise<ClockInSettings> {
+  const { data, error } = await supabase
+    .from('attendance_settings')
+    .upsert({ clock_in_policy: s.policy, office_networks: s.networks, office_radius_m: s.radiusM }, { onConflict: 'tenant_id' })
+    .select('clock_in_policy, office_networks, office_radius_m')
+    .maybeSingle();
+  if (error) fail(error);
+  return {
+    policy: (data?.clock_in_policy as ClockInPolicy) ?? s.policy,
+    networks: (data?.office_networks as string[] | null) ?? s.networks,
+    radiusM: Number(data?.office_radius_m ?? s.radiusM),
+  };
+}
+
+/** The public addresses the company's scanners call from (their IP lock, else the address last seen): suggestions. */
+export async function loadScannerAddresses(): Promise<string[]> {
+  const { data, error } = await supabase.from('attendance_devices').select('allowed_ip, last_ip');
+  if (error) return [];
+  const out = new Set<string>();
+  for (const d of (data ?? []) as { allowed_ip: string | null; last_ip: string | null }[]) {
+    const ip = d.allowed_ip || d.last_ip;
+    if (ip) out.add(ip);
+  }
+  return [...out];
+}
+
+export interface BranchLocation {
+  id: string;
+  name: string;
+  active: boolean;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export async function loadBranchLocations(): Promise<BranchLocation[]> {
+  const { data, error } = await supabase.from('branches').select('id, name, active, latitude, longitude').order('name');
+  if (error) fail(error);
+  return ((data ?? []) as Record<string, unknown>[]).map((b) => ({
+    id: String(b.id),
+    name: String(b.name ?? ''),
+    active: b.active !== false,
+    latitude: b.latitude === null || b.latitude === undefined ? null : Number(b.latitude),
+    longitude: b.longitude === null || b.longitude === undefined ? null : Number(b.longitude),
+  }));
+}
+
+/** Sets (or, with nulls, clears) where a branch is. */
+export async function saveBranchLocation(id: string, latitude: number | null, longitude: number | null): Promise<void> {
+  const { error } = await supabase.rpc('attendance_set_branch_location', { p_branch: id, p_latitude: latitude, p_longitude: longitude });
   if (error) fail(error);
 }

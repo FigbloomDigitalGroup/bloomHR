@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { AttendanceToday } from '../../lib/attendance';
+import { nairobiToday, type AttendanceToday } from '../../lib/attendance';
 
 const api = vi.hoisted(() => ({
   loadToday: vi.fn(),
   clockIn: vi.fn(),
   clockOut: vi.fn(),
   currentLocation: vi.fn(),
+  loadClockRules: vi.fn(),
 }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('react-hot-toast', () => ({ default: toast }));
@@ -22,6 +23,7 @@ const today = (over: Partial<AttendanceToday> = {}): AttendanceToday => ({
 beforeEach(() => {
   vi.clearAllMocks();
   api.currentLocation.mockResolvedValue({ latitude: -1.28, longitude: 36.82, accuracy: 20 });
+  api.loadClockRules.mockResolvedValue({ policy: 'anywhere', arrangement: 'on_site', mode: 'anywhere', wantsLocation: false });
 });
 afterEach(cleanup);
 
@@ -77,5 +79,58 @@ describe('ClockCard', () => {
     render(<ClockCard />);
     expect(await screen.findByText(/isn't linked to an employee record/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Clock in/ })).toBeNull();
+  });
+
+  it('keeps a clock-in refusal on the card, with the reason', async () => {
+    api.loadClockRules.mockResolvedValue({ policy: 'office', arrangement: 'on_site', mode: 'office', wantsLocation: true });
+    api.loadToday.mockResolvedValue(today());
+    api.clockIn.mockRejectedValue(new Error("Clock in from the office, or ask HR. You're 2.4 km from Nairobi."));
+    render(<ClockCard />);
+    fireEvent.click(await screen.findByRole('button', { name: /Clock in/ }));
+    expect((await screen.findByRole('alert')).textContent).toBe("Clock in from the office, or ask HR. You're 2.4 km from Nairobi.");
+    expect(toast.error).toHaveBeenCalledWith("Clock in from the office, or ask HR. You're 2.4 km from Nairobi.");
+  });
+
+  it('scanner only: no Clock in button, it says to use the scanner; a scanner day can’t be clocked out here', async () => {
+    api.loadClockRules.mockResolvedValue({ policy: 'scanner_only', arrangement: 'on_site', mode: 'scanner', wantsLocation: false });
+    api.loadToday.mockResolvedValue(today());
+    render(<ClockCard />);
+    expect(await screen.findByText('Clock in at the office scanner.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Clock in/ })).toBeNull();
+    cleanup();
+    api.loadToday.mockResolvedValue(today({ status: 'present', clockIn: new Date(Date.now() - 60 * 60_000).toISOString(), source: 'scanner' }));
+    render(<ClockCard />);
+    expect(await screen.findByText('Clock out at the office scanner.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Clock out/ })).toBeNull();
+  });
+
+  it('a field worker at a scanner-only company still clocks in from the app', async () => {
+    api.loadClockRules.mockResolvedValue({ policy: 'scanner_only', arrangement: 'field', mode: 'anywhere', wantsLocation: true });
+    api.loadToday.mockResolvedValue(today());
+    render(<ClockCard />);
+    expect(await screen.findByRole('button', { name: /Clock in/ })).toBeTruthy();
+  });
+
+  it('a scanner’s last scan before the end of the day is "Last scan", with hours so far and Clock out still offered', async () => {
+    const clockInAt = new Date(Date.now() - 120 * 60_000).toISOString();
+    api.loadToday.mockResolvedValue(today({
+      date: nairobiToday(), status: 'present', clockIn: clockInAt, clockOut: new Date(Date.now() - 30 * 60_000).toISOString(),
+      clockOutVia: 'scanner', source: 'scanner', endTime: '23:59',
+    }));
+    render(<ClockCard />);
+    expect(await screen.findByText('Last scan')).toBeTruthy();
+    expect(screen.getByText('Hours so far')).toBeTruthy();
+    expect(screen.getByText('2h 00m')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Clock out/ })).toBeTruthy();
+  });
+
+  it('after the end time (or an app clock-out) the last scan is the clock-out', async () => {
+    api.loadToday.mockResolvedValue(today({
+      date: nairobiToday(), status: 'present', clockIn: '2026-10-22T05:00:00Z', clockOut: '2026-10-22T13:00:00Z',
+      clockOutVia: 'scanner', source: 'scanner', endTime: '00:00',
+    }));
+    render(<ClockCard />);
+    expect(await screen.findByText('Clocked out')).toBeTruthy();
+    expect(screen.getByText('8h 00m')).toBeTruthy();
   });
 });

@@ -11,6 +11,7 @@ import aiRouter from "./ai_routes.js";
 import payrollPaymentsRouter from "./payroll_payments.js";
 import careersRouter from "./careers_routes.js";
 import iclockRouter from "./iclock_routes.js";
+import attendanceRouter from "./attendance_routes.js";
 
 /**
  * @param {{ mpesaRouter?: import("express").Router, routes?: { path: string, router: import("express").Router }[] }} options
@@ -43,6 +44,8 @@ export function buildApp({ mpesaRouter, routes = [] } = {}) {
   app.use("/api/ai", aiRouter);
   // queueing and retrying payroll payments only writes to the database; the money moves where the workers run
   app.use("/api/payroll-payments", payrollPaymentsRouter);
+  // the staff portal's Clock in / Clock out, so the office-network rule sees the real address (FIG-1200)
+  app.use("/api/attendance", attendanceRouter);
   for (const { path, router } of routes) app.use(path, router);
 
   // anything else under /api is an API 404 in JSON, never the website's home page
