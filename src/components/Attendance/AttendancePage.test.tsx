@@ -17,6 +17,10 @@ const api = vi.hoisted(() => ({
   loadDayScans: vi.fn(),
   loadOddHoursUntil: vi.fn(),
   saveOddHoursUntil: vi.fn(),
+  loadClockInSettings: vi.fn(),
+  saveClockInSettings: vi.fn(),
+  loadScannerAddresses: vi.fn(),
+  loadBranchLocations: vi.fn(),
 }));
 const downloadCsv = vi.hoisted(() => vi.fn());
 const people = vi.hoisted(() => ({ list: [] as unknown[] }));
@@ -70,6 +74,9 @@ beforeEach(() => {
   api.loadDayScans.mockResolvedValue([]);
   api.loadOddHoursUntil.mockResolvedValue('05:00');
   api.saveOddHoursUntil.mockResolvedValue(undefined);
+  api.loadClockInSettings.mockResolvedValue({ policy: 'anywhere', networks: [], radiusM: 300 });
+  api.loadScannerAddresses.mockResolvedValue([]);
+  api.loadBranchLocations.mockResolvedValue([]);
   api.loadAttendanceDays.mockResolvedValue(DAYS);
   api.loadSchedules.mockResolvedValue([]);
   api.setAttendanceDay.mockResolvedValue(undefined);
@@ -235,6 +242,60 @@ describe('Attendance page', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open days for Baraka Juma' }));
     expect(within(await screen.findByRole('dialog')).getByText('No clock-out')).toBeTruthy();
+  });
+
+  it('a scanner’s last scan today before the end time is "Last scan", counted so far; after it, the clock-out (FIG-1200)', async () => {
+    const today = nairobiToday();
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60_000).toISOString();
+    const anHourAgo = new Date(Date.now() - 60 * 60_000).toISOString();
+    api.loadAttendanceDays.mockResolvedValue([
+      day('E1', today, { status: 'present', clockIn: threeHoursAgo, clockOut: anHourAgo, hours: 2, lateMinutes: 0, source: 'scanner', clockOutVia: 'scanner', endTime: '23:59' }),
+      day('E2', today, { status: 'present', clockIn: threeHoursAgo, clockOut: anHourAgo, hours: 2, lateMinutes: 0, source: 'scanner', clockOutVia: 'scanner', endTime: '00:00' }),
+    ]);
+    render(<AttendancePage />);
+    await screen.findByText('Amina Otieno');
+    expect(within(rowOf('Amina Otieno')).getByText(/^(2h 59m|3h 00m) so far$/)).toBeTruthy();
+    expect(within(rowOf('Baraka Juma')).getByText('2h 00m')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open days for Amina Otieno' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/^Last scan \d{1,2}:\d{2} [ap]m$/)).toBeTruthy();
+    expect(within(dialog).getByText(/so far$/)).toBeTruthy();
+  });
+
+  it('an app clock-out or HR’s correction is a clock-out straight away', async () => {
+    const today = nairobiToday();
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60_000).toISOString();
+    const anHourAgo = new Date(Date.now() - 60 * 60_000).toISOString();
+    api.loadAttendanceDays.mockResolvedValue([
+      day('E1', today, { status: 'present', clockIn: threeHoursAgo, clockOut: anHourAgo, hours: 2, lateMinutes: 0, source: 'scanner', clockOutVia: 'app', endTime: '23:59' }),
+      day('E2', today, { status: 'present', clockIn: threeHoursAgo, clockOut: anHourAgo, hours: 2, lateMinutes: 0, source: 'hr', clockOutVia: 'hr', endTime: '23:59' }),
+    ]);
+    render(<AttendancePage />);
+    await screen.findByText('Amina Otieno');
+    expect(within(rowOf('Amina Otieno')).getByText('2h 00m')).toBeTruthy();
+    expect(within(rowOf('Baraka Juma')).getByText('2h 00m')).toBeTruthy();
+  });
+
+  it('shows where each clock-in was made: App · field with a map link, App · office, Scanner; and in the scans (FIG-1200)', async () => {
+    api.loadAttendanceDays.mockResolvedValue([
+      day('E1', '2026-10-19', { status: 'present', clockIn: '2026-10-19T05:05:00Z', source: 'app', place: 'field', placeLocation: { latitude: 0.5143, longitude: 35.2698 } }),
+      day('E1', '2026-10-20', { status: 'present', clockIn: '2026-10-20T05:05:00Z', source: 'app', place: 'office', placeDetail: 'Office network' }),
+      day('E1', '2026-10-21', { status: 'present', clockIn: '2026-10-21T05:05:00Z', source: 'scanner' }),
+    ]);
+    api.loadDayScans.mockResolvedValue([{ at: '2026-10-19T05:05:00Z', via: 'app', scannerName: null, kind: 'clock_in', reason: null }]);
+    render(<AttendancePage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Open days for Amina Otieno' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('App · field')).toBeTruthy();
+    const link = within(dialog).getByRole('link', { name: '0.51430, 35.26980' }) as HTMLAnchorElement;
+    expect(link.href).toBe('https://www.google.com/maps?q=0.5143,35.2698');
+    expect(within(dialog).getByText('App · office')).toBeTruthy();
+    expect(within(dialog).getByText('Office network')).toBeTruthy();
+    expect(within(dialog).getByText('Scanner')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Show scans for Mon 19 Oct' }));
+    const list = await within(dialog).findByRole('list', { name: 'Scans on Mon 19 Oct' });
+    expect(within(list).getByRole('listitem').textContent).toBe('8:05 am · App · field · clock-in');
   });
 
   it('shows a day before attendance counts as "Not counted", with its clock-in', async () => {

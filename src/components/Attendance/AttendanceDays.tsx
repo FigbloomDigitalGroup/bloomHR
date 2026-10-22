@@ -7,6 +7,8 @@ import { inputClass, labelClass, tdClass, thClass } from '../Perfomance/kpis/sha
 import {
   STATUS_TONE,
   attendanceCsv,
+  clockOutLabel,
+  clockedInVia,
   correctionProblem,
   dayHours,
   dayHoursLabel,
@@ -17,6 +19,8 @@ import {
   formatTime,
   missingClockOutLabel,
   openDaysByPerson,
+  placeMapUrl,
+  placeText,
   totalHoursLabel,
   nairobiParts,
   nairobiToIso,
@@ -26,6 +30,7 @@ import {
   summarise,
   weekOf,
   type AttendanceDay,
+  type ClockPlace,
   type CsvPerson,
   type DayScan,
 } from '../../lib/attendance';
@@ -279,8 +284,11 @@ export function EmployeeDays({ days, canCorrect, onChanged }: {
                     {d.status ? <StatusPill label={statusLabel(d.status)} tone={STATUS_TONE[d.status]} /> : <span className="text-[12px] text-muted-foreground">{dayStatusLabel(d)}</span>}
                     {d.status === 'late' && d.lateMinutes ? <div className="text-[11px] text-muted-foreground">{d.lateMinutes} min</div> : null}
                   </td>
-                  <td className={`${tdClass} tabular-nums`}>{formatTime(d.clockIn)}</td>
-                  <td className={`${tdClass} tabular-nums`}>{formatTime(d.clockOut)}</td>
+                  <td className={`${tdClass} tabular-nums`}>
+                    {formatTime(d.clockIn)}
+                    {d.clockIn && <ClockedInVia day={d} />}
+                  </td>
+                  <td className={`${tdClass} tabular-nums`}>{clockOutLabel(d, today)}</td>
                   <td className={`${tdClass} tabular-nums`}><span className={dayHours(d, today).open === 'missing' ? 'text-status-danger font-semibold' : ''}>{dayHoursLabel(d, today)}</span></td>
                   {canCorrect && (
                     <td className={`${tdClass} text-right`}>
@@ -295,7 +303,7 @@ export function EmployeeDays({ days, canCorrect, onChanged }: {
                 {open === d.day && (
                   <tr className="border-b border-border last:border-0 bg-secondary/30">
                     <td className={tdClass} colSpan={canCorrect ? 6 : 5}>
-                      <DayScans employeeNumber={d.employeeNumber} day={d.day} />
+                      <DayScans employeeNumber={d.employeeNumber} day={d.day} place={d.source === 'app' ? d.place : null} />
                     </td>
                   </tr>
                 )}
@@ -319,8 +327,27 @@ export function EmployeeDays({ days, canCorrect, onChanged }: {
   );
 }
 
-/** Every scan behind one day, in time order: "7:55 am · Front Door · clock-in", "8:02 am · App · clock-in". */
-export function DayScans({ employeeNumber, day }: { employeeNumber: string; day: string }) {
+/** How a day's clock-in was made: "Scanner", "App · office" with "Office network", "App · field" with a map link. */
+export function ClockedInVia({ day }: { day: AttendanceDay }) {
+  const via = clockedInVia(day);
+  if (!via) return null;
+  const detail = placeText(day);
+  const map = placeMapUrl(day);
+  return (
+    <div className="text-[11px] text-muted-foreground font-sans">
+      <span>{via}</span>
+      {detail && (
+        <>
+          {' · '}
+          {map ? <a href={map} target="_blank" rel="noreferrer" className="text-brand hover:underline">{detail}</a> : <span>{detail}</span>}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Every scan behind one day, in time order: "7:55 am · Front Door · clock-in", "8:02 am · App · office · clock-in". */
+export function DayScans({ employeeNumber, day, place = null }: { employeeNumber: string; day: string; place?: ClockPlace | null }) {
   const [scans, setScans] = useState<DayScan[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -341,7 +368,7 @@ export function DayScans({ employeeNumber, day }: { employeeNumber: string; day:
     <ul className="space-y-1" aria-label={`Scans on ${dayLabel(day)}`}>
       {scans.map((s, i) => (
         <li key={`${s.at}-${i}`} className={`text-[12px] tabular-nums ${s.kind === 'held' || s.kind === 'waiting' ? 'text-muted-foreground' : 'text-ink'}`}>
-          {scanLine(s)}
+          {scanLine(s, place)}
         </li>
       ))}
     </ul>

@@ -21,7 +21,20 @@ export interface AttendanceDay {
   flag?: string | null;
   /** false: a day before the company's "Count attendance from" (no status, not counted anywhere) */
   counted?: boolean;
+  /** the person's schedule end time that day, "HH:MM" (migration 20261024100000) */
+  endTime?: string | null;
+  /** where the clock-out came from: a scanner punch, the app's Clock out or HR's correction */
+  clockOutVia?: ClockOutVia | null;
+  /** where an app clock-in was made (FIG-1200) */
+  place?: ClockPlace | null;
+  /** "Office network", "Near Nairobi (120 m)", "Remote day", "No location" */
+  placeDetail?: string | null;
+  /** the location the app sent with the clock-in */
+  placeLocation?: { latitude: number; longitude: number } | null;
 }
+
+export type ClockOutVia = 'scanner' | 'app' | 'hr';
+export type ClockPlace = 'office' | 'remote' | 'field';
 
 /** The signed-in employee's day, for the portal card (attendance_today). */
 export interface AttendanceToday {
@@ -36,6 +49,11 @@ export interface AttendanceToday {
   endTime: string;
   lateAfter: string;
   graceMinutes: number;
+  /** where the clock-out came from, the record's source and the clock-in's place (migration 20261024100000) */
+  clockOutVia?: ClockOutVia | null;
+  source?: string | null;
+  place?: ClockPlace | null;
+  placeDetail?: string | null;
 }
 
 export const STATUS_LABEL: Record<AttendanceStatus, string> = {
@@ -266,10 +284,12 @@ export const dayStatusLabel = (d: Pick<AttendanceDay, 'status' | 'counted'>) =>
  * keeps hours empty until there is a clock-out; this is for showing only.
  */
 export function dayHours(
-  d: Pick<AttendanceDay, 'day' | 'clockIn' | 'clockOut' | 'hours'>,
+  d: Pick<AttendanceDay, 'day' | 'clockIn' | 'clockOut' | 'hours'> & Partial<Pick<AttendanceDay, 'clockOutVia' | 'endTime'>>,
   today: string,
   now: Date = new Date()
 ): { hours: number | null; open: 'so_far' | 'missing' | null } {
+  // a scanner's last scan today before the end of the day isn't a clock-out yet: hours so far
+  if (isLastScan(d, today, now)) return { hours: hoursBetween(d.clockIn, null, now), open: 'so_far' };
   if (d.clockIn && !d.clockOut) {
     if (d.day === today) return { hours: hoursBetween(d.clockIn, null, now), open: 'so_far' };
     if (d.day < today) return { hours: null, open: 'missing' };
@@ -277,8 +297,36 @@ export function dayHours(
   return { hours: d.hours, open: null };
 }
 
+/**
+ * Is the day's clock-out really a scanner's last scan so far? Today, before the person's schedule end time, the latest
+ * scan from a scanner shows as "Last scan 2:48 pm", not a clock-out (they may well scan again). Once the end time has
+ * passed, and on any past day, it is the clock-out; an app Clock out or HR's correction is a clock-out straight away.
+ * Display only: leaving early isn't judged.
+ */
+export function isLastScan(
+  d: Pick<AttendanceDay, 'day' | 'clockIn' | 'clockOut'> & Partial<Pick<AttendanceDay, 'clockOutVia' | 'endTime'>>,
+  today: string,
+  now: Date = new Date()
+): boolean {
+  if (!d.clockIn || !d.clockOut || d.clockOutVia !== 'scanner' || d.day !== today || !d.endTime) return false;
+  return nairobiParts(now).time < d.endTime.slice(0, 5);
+}
+
+/** The clock-out as shown: "5:04 pm", or "Last scan 2:48 pm" (isLastScan), or a dash. */
+export function clockOutLabel(
+  d: Pick<AttendanceDay, 'day' | 'clockIn' | 'clockOut'> & Partial<Pick<AttendanceDay, 'clockOutVia' | 'endTime'>>,
+  today: string,
+  now: Date = new Date()
+): string {
+  return isLastScan(d, today, now) ? `Last scan ${formatTime(d.clockOut)}` : formatTime(d.clockOut);
+}
+
 /** "8h 30m", "2h 10m so far" (today, still in) or "No clock-out" (a past day). */
-export function dayHoursLabel(d: Pick<AttendanceDay, 'day' | 'clockIn' | 'clockOut' | 'hours'>, today: string, now: Date = new Date()): string {
+export function dayHoursLabel(
+  d: Pick<AttendanceDay, 'day' | 'clockIn' | 'clockOut' | 'hours'> & Partial<Pick<AttendanceDay, 'clockOutVia' | 'endTime'>>,
+  today: string,
+  now: Date = new Date()
+): string {
   const h = dayHours(d, today, now);
   if (h.open === 'so_far') return `${formatHours(h.hours)} so far`;
   if (h.open === 'missing') return 'No clock-out';
@@ -301,7 +349,8 @@ export function openDaysByPerson(days: AttendanceDay[], today: string, now: Date
     if (!h.open) continue;
     const o = out.get(d.employeeNumber) ?? { soFar: 0, inNow: false, missing: 0 };
     if (h.open === 'so_far') {
-      o.soFar += h.hours ?? 0;
+      // a scanner's last scan so far: its recorded hours are already in the summary, so only the time since counts
+      o.soFar += isLastScan(d, today, now) ? Math.max(0, (h.hours ?? 0) - (d.hours ?? 0)) : h.hours ?? 0;
       o.inNow = true;
     } else {
       o.missing += 1;
@@ -355,9 +404,9 @@ const REASON_LABEL: Record<string, string> = {
   hr_corrected: 'HR corrected this day',
 };
 
-/** Where a scan came from: the scanner's name, "App" or "HR correction". */
-export const scanSource = (s: Pick<DayScan, 'via' | 'scannerName'>) =>
-  s.via === 'app' ? 'App' : s.via === 'hr' ? 'HR correction' : s.scannerName || 'Scanner';
+/** Where a scan came from: the scanner's name, "App" ("App · office" with the clock-in's place) or "HR correction". */
+export const scanSource = (s: Pick<DayScan, 'via' | 'scannerName'>, place?: ClockPlace | null) =>
+  s.via === 'app' ? appLabel(place) : s.via === 'hr' ? 'HR correction' : s.scannerName || 'Scanner';
 
 /** What a scan was: "clock-in", "clock-out", "" (in between) or "not counted (the scanner's clock was ahead)". */
 export function scanRole(s: Pick<DayScan, 'kind' | 'reason'>): string {
@@ -367,7 +416,61 @@ export function scanRole(s: Pick<DayScan, 'kind' | 'reason'>): string {
 }
 
 /** One line of a day's scans: "7:55 am · Front Door · clock-in", "12:30 pm · Front Door", "8:02 am · App · clock-in". */
-export const scanLine = (s: DayScan) => [formatTime(s.at), scanSource(s), scanRole(s)].filter(Boolean).join(' · ');
+export const scanLine = (s: DayScan, place?: ClockPlace | null) =>
+  [formatTime(s.at), scanSource(s, s.kind === 'clock_in' ? place : null), scanRole(s)].filter(Boolean).join(' · ');
+
+// ---------------------------------------------------------------------------------------------
+// where a clock-in was made (migration 20261024100000, FIG-1200)
+// ---------------------------------------------------------------------------------------------
+/** "App", "App · office", "App · remote", "App · field". */
+export const appLabel = (place?: ClockPlace | null) => (place ? `App · ${place}` : 'App');
+
+/** How a day's clock-in was made: "Scanner", "HR correction", "App · office" ...; '' with no record. */
+export function clockedInVia(d: Pick<AttendanceDay, 'source'> & Partial<Pick<AttendanceDay, 'place'>>): string {
+  if (d.source === 'scanner') return 'Scanner';
+  if (d.source === 'hr') return 'HR correction';
+  if (d.source === 'app') return appLabel(d.place);
+  return '';
+}
+
+/** The place's detail: "Office network", "Near Nairobi (120 m)", "No location", or a field clock-in's coordinates. */
+export function placeText(d: Partial<Pick<AttendanceDay, 'place' | 'placeDetail' | 'placeLocation'>>): string {
+  if (d.placeDetail) return d.placeDetail;
+  if (d.place === 'field' && d.placeLocation) return `${d.placeLocation.latitude.toFixed(5)}, ${d.placeLocation.longitude.toFixed(5)}`;
+  return '';
+}
+
+/** A map link for a field clock-in's location, or null. */
+export const placeMapUrl = (d: Partial<Pick<AttendanceDay, 'place' | 'placeLocation'>>) =>
+  d.place === 'field' && d.placeLocation
+    ? `https://www.google.com/maps?q=${d.placeLocation.latitude},${d.placeLocation.longitude}`
+    : null;
+
+export type ClockInPolicy = 'anywhere' | 'office' | 'scanner_only';
+export type WorkArrangement = 'on_site' | 'hybrid' | 'remote' | 'field';
+
+export const CLOCK_IN_POLICY_LABEL: Record<ClockInPolicy, string> = {
+  anywhere: 'Anywhere',
+  office: 'Only from an office',
+  scanner_only: 'Scanner only',
+};
+
+export const WORK_ARRANGEMENT_LABEL: Record<WorkArrangement, string> = {
+  on_site: 'On-site',
+  hybrid: 'Hybrid',
+  remote: 'Remote',
+  field: 'Field',
+};
+
+export const WORK_ARRANGEMENT_HINT: Record<WorkArrangement, string> = {
+  on_site: "Follows the company's clock-in policy.",
+  hybrid: "Clocks in from anywhere on their remote days; the company's policy on the others.",
+  remote: 'Clocks in from anywhere, any day.',
+  field: 'Clocks in from anywhere, any day; where they are is recorded.',
+};
+
+/** Office networks typed one per line (or comma or space separated): trimmed, blanks dropped, each once. */
+export const parseNetworks = (text: string) => [...new Set(text.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean))];
 
 // ---------------------------------------------------------------------------------------------
 // odd-hours clock-ins (migration 20261023800000)
@@ -393,6 +496,7 @@ export function oddHoursSummary(hhmm: string): string {
 // ---------------------------------------------------------------------------------------------
 export const ATTENDANCE_CSV_HEADERS = [
   'Employee number', 'Name', 'Department', 'Branch', 'Date', 'Status', 'Clock in', 'Clock out', 'Hours', 'Minutes late', 'Note',
+  'Clocked in via', 'Place',
 ] as const;
 
 export interface CsvPerson {
@@ -416,6 +520,8 @@ export function attendanceCsv(days: AttendanceDay[], people: Map<string, CsvPers
       d.hours === null ? '' : d.hours.toFixed(2),
       d.lateMinutes ? String(d.lateMinutes) : '',
       d.note ?? '',
+      clockedInVia(d),
+      placeText(d),
     ];
   });
   return toCsv(ATTENDANCE_CSV_HEADERS, rows);

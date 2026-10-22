@@ -38,6 +38,8 @@ import { activeTitleNames, useJobTitles } from '../../hooks/useJobTitles';
 
 import { confirmDialog } from '../../lib/confirmDialog';
 import { LoaderBlock } from '../UI/FigbloomLoader';
+import WorkArrangementField from '../Attendance/WorkArrangementField';
+import type { WorkArrangement } from '../../lib/attendance';
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'SHIF Number'?: string | null;
   'NSSF Number'?: string | null;
@@ -53,6 +55,9 @@ type Employee = Database['public']['Tables']['employees']['Row'] & {
   heslb_borrower?: boolean | null;
   heslb_index_number?: string | null;
   secondary_employment?: boolean | null;
+  // where they clock in from (20261024100000, FIG-1200): HR only
+  work_arrangement?: WorkArrangement | null;
+  remote_days?: number[] | null;
 };
 
 type DropdownOptions = {
@@ -1032,6 +1037,13 @@ const EditEmployeePage = () => {
                   <BranchPicker
                     value={employee.branch_id}
                     onChange={(b) => setEmployee(prev => ({ ...prev, branch_id: b?.id ?? null, Branch: b?.name ?? null }))}
+                    disabled={!isEditMode}
+                  />
+                  {/* where they may clock in from in the app (FIG-1200) */}
+                  <WorkArrangementField
+                    arrangement={employee.work_arrangement}
+                    remoteDays={employee.remote_days}
+                    onChange={(a, days) => setEmployee(prev => ({ ...prev, work_arrangement: a, remote_days: days }))}
                     disabled={!isEditMode}
                   />
                   <FormField
