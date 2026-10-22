@@ -19,6 +19,7 @@ const REPORTS = '00000000-0000-0000-0000-00000000e203';
 const ADMIN_B = '00000000-0000-0000-0000-00000000e204';
 const SERIAL = 'BRAV260421021';
 const MIGRATION = join(__dirname, '..', 'migrations', '20261023600000_attendance_scanners.sql');
+const CLOCK_MIGRATION = join(__dirname, '..', 'migrations', '20261023700000_attendance_scanner_clock.sql');
 
 let db: PGlite;
 let deviceA: string;
@@ -42,7 +43,7 @@ const asService = async <T>(fn: () => Promise<T>) => {
     await db.exec('reset role');
   }
 };
-interface Receipt { accepted: boolean; received: number; stored: number; applied: number; unmatched: number }
+interface Receipt { accepted: boolean; received: number; stored: number; applied: number; unmatched: number; held?: number }
 const receive = async (lines: string[], serial = SERIAL, ip = '41.90.12.34') =>
   (await asService(() => rows<{ r: Receipt }>(`select public.attendance_scanner_receive($1, $2, $3) as r`, [serial, ip, lines.join('\n')])))[0].r;
 const seen = async (serial: string, ip = '41.90.12.34') =>
@@ -134,7 +135,7 @@ describe('receiving punches', () => {
       line('bad pin!', '2026-02-02 08:00:00'),
       '',
     ]);
-    expect(r).toEqual({ accepted: true, received: 8, stored: 3, applied: 0, unmatched: 3 });
+    expect(r).toEqual({ accepted: true, received: 8, stored: 3, applied: 0, unmatched: 3, held: 0 });
     // sent again (the scanner resends after a restart): nothing new
     expect(await receive([line('6', '2026-02-02 07:55:12')])).toMatchObject({ stored: 0 });
     const [d] = await rows<{ last_ip: string; last_seen: boolean; last_error: string | null }>(
@@ -270,7 +271,63 @@ describe('who sees what', () => {
 describe('the migration', () => {
   it('runs again safely, keeping what is there', async () => {
     await db.exec(readFileSync(MIGRATION, 'utf8'));
+    await db.exec(readFileSync(CLOCK_MIGRATION, 'utf8'));
+    await db.exec('reset search_path');
     expect(await as(HR, `select serial_number from attendance_devices`)).toEqual([{ serial_number: SERIAL }]);
     expect(await receive([line('8', '2026-02-11 08:00:00')])).toMatchObject({ accepted: true, stored: 1 });
+  });
+});
+
+describe('a scanner whose clock is ahead (20261023700000)', () => {
+  /** a scanner's local time (Nairobi) `hours` from now, as it writes it: "YYYY-MM-DD HH:MM:SS" */
+  const nairobi = (hours: number) =>
+    new Date(Date.now() + 3 * 3600_000 + hours * 3600_000).toISOString().slice(0, 19).replace('T', ' ');
+  const warning = async () =>
+    (await rows<{ clock_warning: string | null }>(`select clock_warning from attendance_devices where id = $1`, [deviceA]))[0].clock_warning;
+
+  it('a punch stamped hours ahead is held back, not applied or offered for matching, and HR is told', async () => {
+    const r = await receive([line('31', nairobi(5))]);
+    expect(r).toMatchObject({ accepted: true, stored: 1, applied: 0, unmatched: 0, held: 1 });
+    expect(await rows(`select skipped_reason from attendance_scanner_punches where scanner_user_id = '31'`))
+      .toEqual([{ skipped_reason: 'clock_ahead' }]);
+    expect((await as<{ scanner_user_id: string }>(HR, `select scanner_user_id from public.attendance_scanner_unmatched()`))
+      .map((u) => u.scanner_user_id)).not.toContain('31');
+    expect(await warning()).toMatch(/about 5 hours ahead of Nairobi time, so 1 punch was held back. Restart the scanner/);
+    // HR can't write the warning themselves
+    expect(await fails(as(HR, `update attendance_devices set clock_warning = null where id = $1`, [deviceA]))).toMatch(/permission denied/);
+  });
+
+  it('a few minutes ahead is fine; once punches arrive on time the warning goes', async () => {
+    expect(await receive([line('32', nairobi(0.1))])).toMatchObject({ stored: 1, held: 0, unmatched: 1 });
+    expect(await warning()).toBeNull();
+  });
+
+  it('once: punches already received ahead by whole hours are moved back; others are held', async () => {
+    const insert = (pin: string, receivedAgoMin: number, aheadMin: number) =>
+      db.query(
+        `insert into attendance_scanner_punches (tenant_id, device_id, scanner_user_id, punched_at, received_at)
+         values ($1, $2, $3, now() - make_interval(mins => $4) + make_interval(mins => $5), now() - make_interval(mins => $4))`,
+        [A, deviceA, pin, receivedAgoMin, aheadMin]);
+    await insert('41', 90, 5 * 60); // five hours ahead (sent as it was punched)
+    await insert('42', 60, 5 * 60 - 3); // five hours ahead, sent 3 minutes after the punch
+    await insert('43', 30, 2 * 60 + 37); // 2 h 37 min ahead: not a time zone, held
+    await db.exec(readFileSync(CLOCK_MIGRATION, 'utf8'));
+    await db.exec('reset search_path');
+    const got = await rows<{ scanner_user_id: string; gap_min: number; skipped_reason: string | null }>(
+      `select scanner_user_id, round(extract(epoch from (punched_at - received_at)) / 60)::int as gap_min, skipped_reason
+       from attendance_scanner_punches where scanner_user_id in ('41', '42', '43') order by scanner_user_id`);
+    expect(got).toEqual([
+      { scanner_user_id: '41', gap_min: 0, skipped_reason: null },
+      { scanner_user_id: '42', gap_min: -3, skipped_reason: null },
+      { scanner_user_id: '43', gap_min: 157, skipped_reason: 'clock_ahead' },
+    ]);
+    // the corrected ones are offered for matching again; running the migration again changes nothing
+    const unmatched = (await as<{ scanner_user_id: string }>(HR, `select scanner_user_id from public.attendance_scanner_unmatched()`)).map((u) => u.scanner_user_id);
+    expect(unmatched).toEqual(expect.arrayContaining(['41', '42']));
+    expect(unmatched).not.toContain('43');
+    await db.exec(readFileSync(CLOCK_MIGRATION, 'utf8'));
+    await db.exec('reset search_path');
+    expect(await rows(`select scanner_user_id, round(extract(epoch from (punched_at - received_at)) / 60)::int as gap_min, skipped_reason
+       from attendance_scanner_punches where scanner_user_id in ('41', '42', '43') order by scanner_user_id`)).toEqual(got);
   });
 });

@@ -37,6 +37,9 @@ export interface Scanner {
   /** why the last call was refused (e.g. outside the IP lock); cleared when one is accepted */
   lastError: string | null;
   lastErrorAt: string | null;
+  /** the scanner's clock is ahead: its punches are held back until it is restarted (20261023700000) */
+  clockWarning: string | null;
+  clockWarningAt: string | null;
 }
 
 export interface ScannerInput {
@@ -59,6 +62,8 @@ export const toScanner = (r: Record<string, unknown>): Scanner => ({
   lastIp: str(r.last_ip),
   lastError: str(r.last_error),
   lastErrorAt: str(r.last_error_at),
+  clockWarning: str(r.clock_warning),
+  clockWarningAt: str(r.clock_warning_at),
 });
 
 /** A serial number as the database keeps it: trimmed, in capitals. */
@@ -69,7 +74,7 @@ export const serialLooksRight = (s: string) => /^[A-Z0-9][A-Z0-9_-]{2,39}$/.test
 export async function loadScanners(): Promise<Scanner[]> {
   const { data, error } = await supabase
     .from('attendance_devices')
-    .select('id, name, serial_number, brand, allowed_ip, active, last_seen_at, last_ip, last_error, last_error_at')
+    .select('id, name, serial_number, brand, allowed_ip, active, last_seen_at, last_ip, last_error, last_error_at, clock_warning, clock_warning_at')
     .order('created_at');
   if (error) fail(error);
   return ((data ?? []) as Record<string, unknown>[]).map(toScanner);
