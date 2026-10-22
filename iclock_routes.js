@@ -4,13 +4,22 @@
 //
 //   GET  /iclock/cdata?SN=...&options=all   hello: the settings the scanner should use (handshakeText)
 //   POST /iclock/cdata?SN=...&table=ATTLOG  punches, one per line: "PIN<tab>YYYY-MM-DD HH:MM:SS<tab>status<tab>verify..."
-//                                           -> "OK: <lines>"; other tables (OPERLOG, ATTPHOTO, USERINFO...) -> "OK"
-//   GET  /iclock/getrequest?SN=...          the check-in every few seconds, asking for commands -> "OK" (we send none)
-//   POST /iclock/devicecmd?SN=...           a command's result -> "OK"
+//                                           -> "OK: <lines>"
+//   POST /iclock/cdata?SN=...&table=USERINFO or table=OPERLOG
+//                                           user records ("USER PIN=3<tab>Name=Esther<tab>Pri=0..." or "PIN=3<tab>Name=
+//                                           Esther..."): each user's name is kept; every other line (the operation log,
+//                                           fingerprint templates) is dropped here and never reaches the database -> "OK"
+//                                           (other tables, e.g. ATTPHOTO -> "OK", nothing kept)
+//   GET  /iclock/getrequest?SN=...          the check-in every few seconds, asking for commands -> "OK", or, about once
+//                                           a day, the question for the scanner's users (commandText):
+//                                           "C:<id>:DATA QUERY USERINFO" (+ "C:<id>:DATA QUERY USERINFO PIN=<pin>" lines)
+//   POST /iclock/devicecmd?SN=...           a command's result ("ID=<id>&Return=<code>&CMD=DATA"; any user records in it
+//                                           are kept as above) -> "OK"
 // (some firmware adds .aspx to these; anything else under /iclock -> "OK")
 //
-// The database decides what is kept: attendance_scanner_seen records a check-in, attendance_scanner_receive stores and
-// applies punches. An unregistered or switched-off scanner, or one calling from outside its IP lock, is answered "OK"
+// The database decides what is kept: attendance_scanner_seen records a hello, attendance_scanner_poll a check-in (and
+// says when to ask for the users), attendance_scanner_receive stores and applies punches, and
+// attendance_scanner_receive_users keeps the names (migrations 20261023600000, 20261024000000). An unregistered or switched-off scanner, or one calling from outside its IP lock, is answered "OK"
 // all the same (so it doesn't retry every few seconds) and nothing it sends is kept. Answers are plain text and short.
 //
 // Where the scanner is calling from: older scanners only speak plain HTTP, so they call an AWS CloudFront relay that
@@ -32,7 +41,8 @@ export function handshakeText(serial) {
     `GET OPTION FROM: ${serial}`,
     // send every punch it holds (the database ignores ones it already has and ones before attendance counts)
     "ATTLOGStamp=None",
-    // don't send the operation log or photos
+    // don't send the operation log or photos. The operation log would also bring every enrolled fingerprint template
+    // (biometric data); the users' names are asked for by command instead (attendance_scanner_poll)
     "OPERLOGStamp=9999",
     "ATTPHOTOStamp=None",
     // after an error, try again in 30 seconds; check in for commands every 30 (punches go at once, Realtime below)
@@ -62,6 +72,21 @@ export function countLines(text) {
   return String(text || "")
     .split("\n")
     .filter((l) => l.trim() !== "").length;
+}
+
+/** The user records in an upload ("USER PIN=..." or "PIN=..." lines), without anything else it carries. */
+export function userLines(text) {
+  return String(text || "")
+    .split("\n")
+    .map((l) => l.replace(/\r$/, ""))
+    .filter((l) => /^\s*(USER\s+)?PIN=/i.test(l))
+    .join("\n");
+}
+
+/** The answer to a check-in: the commands, one per line, or "OK" when there are none. */
+export function commandText(commands) {
+  const list = (Array.isArray(commands) ? commands : []).map(String).filter((c) => /^C:\d+:[^\r\n]+$/.test(c));
+  return list.length ? list.join("\n") : "OK";
 }
 
 const first = (value) => String(Array.isArray(value) ? value[0] : value ?? "").split(",")[0].trim();
@@ -120,10 +145,22 @@ router.get(/^\/cdata(\.aspx)?$/i, async (req, res) => {
   return reply(res, seen?.accepted ? handshakeText(serial) : "OK");
 });
 
-// uploads: punches are kept, everything else is acknowledged and dropped
+/** Passes the user records in a body (if any) to the database; nothing else in it leaves this server. */
+async function keepUsers(serial, req) {
+  const lines = userLines(bodyText(req));
+  if (!serial || !lines) return;
+  await call("attendance_scanner_receive_users", { p_serial: serial, p_ip: clientIp(req), p_lines: lines });
+}
+
+// uploads: punches and user names are kept, everything else is acknowledged and dropped
 router.post(/^\/cdata(\.aspx)?$/i, async (req, res) => {
   const serial = readSerial(req.query);
   const table = String(req.query.table || "").toUpperCase();
+  if (serial && (table === "USERINFO" || table === "OPERLOG")) {
+    // names only help matching: whatever happens, "OK", so the scanner doesn't resend its log
+    await keepUsers(serial, req);
+    return reply(res, "OK");
+  }
   if (!serial || table !== "ATTLOG") return reply(res, "OK");
   const lines = bodyText(req);
   const result = await call("attendance_scanner_receive", { p_serial: serial, p_ip: clientIp(req), p_lines: lines });
@@ -132,10 +169,17 @@ router.post(/^\/cdata(\.aspx)?$/i, async (req, res) => {
   return reply(res, result.accepted ? `OK: ${countLines(lines)}` : "OK");
 });
 
-// the check-in, asking for commands: none
+// the check-in, asking for commands: none, or (about once a day) the question for the scanner's users
 router.get(/^\/getrequest(\.aspx)?$/i, async (req, res) => {
   const serial = readSerial(req.query);
-  if (serial) await call("attendance_scanner_seen", { p_serial: serial, p_ip: clientIp(req) });
+  if (!serial) return reply(res, "OK");
+  const poll = await call("attendance_scanner_poll", { p_serial: serial, p_ip: clientIp(req) });
+  return reply(res, poll?.accepted ? commandText(poll.commands) : "OK");
+});
+
+// a command's result: "OK" (user records some firmware puts in it are kept)
+router.post(/^\/devicecmd(\.aspx)?$/i, async (req, res) => {
+  await keepUsers(readSerial(req.query), req);
   return reply(res, "OK");
 });
 

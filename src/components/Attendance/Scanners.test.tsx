@@ -12,6 +12,10 @@ const api = vi.hoisted(() => ({
   loadUnmatched: vi.fn(),
   saveScannerUser: vi.fn(),
   removeScannerUser: vi.fn(),
+  loadIgnored: vi.fn(),
+  loadScannerNames: vi.fn(),
+  ignoreScannerUser: vi.fn(),
+  unignoreScannerUser: vi.fn(),
 }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
@@ -23,6 +27,7 @@ const staff = [
   toDirectoryEmployee({ 'Employee Number': 'FBL-000006', 'First Name': 'Amina', 'Last Name': 'Otieno' }),
   toDirectoryEmployee({ 'Employee Number': 'FBL-000007', 'First Name': 'Baraka', 'Last Name': 'Juma' }),
   toDirectoryEmployee({ 'Employee Number': 'FBL-000009', 'First Name': 'Chebet', 'Last Name': 'Kirui' }),
+  toDirectoryEmployee({ 'Employee Number': 'FBL-000010', 'First Name': 'Daudi', 'Last Name': 'Otieno' }),
 ];
 vi.mock('../../hooks/useEmployeeDirectory', () => ({
   useEmployeeDirectory: () => ({ employees: staff, loading: false, error: null }),
@@ -33,7 +38,7 @@ import Scanners from './Scanners';
 const FRONT: Scanner = {
   id: 'd1', name: 'Front door', serialNumber: 'BRAV260421021', brand: 'zkteco', allowedIp: '41.90.12.34', active: true,
   lastSeenAt: '2026-10-22T05:05:00Z', lastIp: '41.90.12.34', lastError: null, lastErrorAt: null,
-  clockWarning: null, clockWarningAt: null,
+  clockWarning: null, clockWarningAt: null, usersReceivedAt: null,
 };
 
 beforeEach(() => {
@@ -50,6 +55,10 @@ beforeEach(() => {
   ]);
   api.saveScannerUser.mockResolvedValue(undefined);
   api.removeScannerUser.mockResolvedValue(undefined);
+  api.loadIgnored.mockResolvedValue([]);
+  api.loadScannerNames.mockResolvedValue(new Map());
+  api.ignoreScannerUser.mockResolvedValue(undefined);
+  api.unignoreScannerUser.mockResolvedValue(undefined);
 });
 afterEach(cleanup);
 
@@ -158,5 +167,73 @@ describe('Scanners tab', () => {
     expect((within(matched).getByRole('button', { name: 'Save scanner user 9' }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(within(matched).getByRole('button', { name: 'Remove scanner user 9' }));
     await waitFor(() => expect(api.removeScannerUser).toHaveBeenCalledWith('m1'));
+  });
+
+  it('shows the name each scanner user has on the scanner, waiting and matched', async () => {
+    api.loadScannerNames.mockResolvedValue(new Map([['6', 'Baraka'], ['9', 'Chebet']]));
+    api.loadScanners.mockResolvedValue([{ ...FRONT, usersReceivedAt: '2026-10-22T06:00:00Z' }]);
+    render(<Scanners />);
+    const users = await screen.findByLabelText('Scanner users');
+    expect(await within(within(users).getByLabelText('Waiting for a match')).findByText('Scanner user 6 · Baraka')).toBeTruthy();
+    expect(within(within(users).getByLabelText('Waiting for a match')).getByText('Scanner user 7')).toBeTruthy();
+    expect(within(within(users).getByLabelText('Matched')).getByText('Scanner user 9 · Chebet')).toBeTruthy();
+    expect(screen.getByText('User names received Thu 22 Oct 2026, 9:00 am')).toBeTruthy();
+  });
+
+  it('Match automatically goes by the name: one person is suggested, several are named, a number the name disagrees with is not', async () => {
+    api.loadScannerNames.mockResolvedValue(new Map([['6', 'Baraka'], ['7', 'Zilpar'], ['42', 'Otieno']]));
+    render(<Scanners />);
+    const waiting = await within(await screen.findByLabelText('Scanner users')).findByLabelText('Waiting for a match');
+    await within(waiting).findByText('Scanner user 42 · Otieno');
+    fireEvent.click(within(waiting).getByRole('button', { name: 'Match automatically' }));
+    expect(within(waiting).getByRole('status').textContent).toBe('1 suggestion by the name on the scanner. Check them, then save.');
+    // 6 is "Baraka" on the scanner: Baraka Juma, not Amina (FBL-000006)
+    expect((within(waiting).getByLabelText('Employee for scanner user 6') as HTMLInputElement).value).toBe('Baraka Juma (FBL-000007)');
+    expect(within(waiting).getByText(/Suggested by name/)).toBeTruthy();
+    // 7 "Zilpar" fits nobody: no suggestion by number either
+    expect((within(waiting).getByLabelText('Employee for scanner user 7') as HTMLInputElement).value).toBe('');
+    // 42 "Otieno" is Amina Otieno or Daudi Otieno
+    expect(within(waiting).getByText("Several people match 'Otieno'. Pick the right one.")).toBeTruthy();
+    expect((within(waiting).getByLabelText('Employee for scanner user 42') as HTMLInputElement).value).toBe('');
+    expect(api.saveScannerUser).not.toHaveBeenCalled();
+  });
+
+  it('"Not staff, ignore" asks why, then the scanner user is ignored', async () => {
+    render(<Scanners />);
+    const waiting = await within(await screen.findByLabelText('Scanner users')).findByLabelText('Waiting for a match');
+    fireEvent.click(await within(waiting).findByRole('button', { name: 'Not staff, ignore scanner user 42' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Ignore' }));
+    expect(within(dialog).getByRole('alert').textContent).toMatch(/Say why/);
+    expect(api.ignoreScannerUser).not.toHaveBeenCalled();
+    fireEvent.change(within(dialog).getByLabelText('Why they aren’t staff'), { target: { value: 'The cook' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Ignore' }));
+    await waitFor(() => expect(api.ignoreScannerUser).toHaveBeenCalledWith('42', 'The cook'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(api.loadIgnored).toHaveBeenCalledTimes(2);
+  });
+
+  it('lists the ignored with Undo, and allows matching one to an employee later', async () => {
+    api.loadScannerNames.mockResolvedValue(new Map([['22', 'Beatrice']]));
+    api.loadIgnored.mockResolvedValue([{ id: 'i1', scannerUserId: '22', reason: 'The cook', ignoredAt: '2026-10-22T07:00:00Z' }]);
+    render(<Scanners />);
+    const ignored = await within(await screen.findByLabelText('Scanner users')).findByLabelText('Ignored');
+    expect(within(ignored).getByText('Scanner user 22 · Beatrice')).toBeTruthy();
+    expect(within(ignored).getByText(/The cook/)).toBeTruthy();
+    fireEvent.click(within(ignored).getByRole('button', { name: 'Undo ignore scanner user 22' }));
+    await waitFor(() => expect(api.unignoreScannerUser).toHaveBeenCalledWith('i1'));
+
+    const picker = within(ignored).getByLabelText('Employee for scanner user 22');
+    fireEvent.focus(picker);
+    fireEvent.change(picker, { target: { value: 'chebet' } });
+    fireEvent.mouseDown(await screen.findByRole('option'));
+    fireEvent.click(within(ignored).getByRole('button', { name: 'Save scanner user 22' }));
+    await waitFor(() => expect(api.saveScannerUser).toHaveBeenCalledWith(null, '22', 'FBL-000009'));
+  });
+
+  it('no Ignored section when nobody is ignored', async () => {
+    render(<Scanners />);
+    await within(await screen.findByLabelText('Scanner users')).findByLabelText('Waiting for a match');
+    expect(screen.queryByLabelText('Ignored')).toBeNull();
   });
 });
