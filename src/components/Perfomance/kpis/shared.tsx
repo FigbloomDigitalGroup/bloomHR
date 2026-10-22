@@ -83,8 +83,9 @@ export function SourceNote({ a, templateNames }: { a: KpiAssignment; templateNam
 /** The actual a KPI is scored on: the final score, else the calculated value (with what it came from). */
 export function ActualValue({ a, kpi }: { a: KpiAssignment; kpi: Kpi | undefined }) {
   const unit = kpi?.unit ?? 'number';
-  const calculated = !!kpi && kpi.measure !== 'manual';
-  if (a.actual_value !== null || !calculated) {
+  const measure = kpi && kpi.measure !== 'manual' ? kpi.measure : null;
+  const calculated = measure !== null;
+  if (a.actual_value !== null || measure === null) {
     return (
       <>
         {formatValue(unit, a.actual_value)}
@@ -95,11 +96,11 @@ export function ActualValue({ a, kpi }: { a: KpiAssignment; kpi: Kpi | undefined
       </>
     );
   }
-  const detail = measureDetail(kpi.measure, a.auto_detail);
+  const detail = measureDetail(measure, a.auto_detail);
   return (
     <>
       {formatValue(unit, a.auto_value)}
-      <div className="text-[11px] text-status-info font-semibold">Calculated from {SOURCE_LABEL[MEASURE_SOURCE[kpi.measure]]}</div>
+      <div className="text-[11px] text-status-info font-semibold">Calculated from {SOURCE_LABEL[MEASURE_SOURCE[measure]]}</div>
       {detail && <div className="text-[11px] text-muted-foreground">{detail}</div>}
     </>
   );
