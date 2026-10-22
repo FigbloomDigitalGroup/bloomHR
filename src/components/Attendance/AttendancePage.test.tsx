@@ -12,6 +12,8 @@ const api = vi.hoisted(() => ({
   loadSchedules: vi.fn(),
   saveSchedule: vi.fn(),
   removeSchedule: vi.fn(),
+  loadTrackingFrom: vi.fn(),
+  saveTrackingFrom: vi.fn(),
 }));
 const downloadCsv = vi.hoisted(() => vi.fn());
 const people = vi.hoisted(() => ({ list: [] as unknown[] }));
@@ -60,6 +62,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   people.list = [person('E1', 'Amina Otieno', 'Sales', 'Nairobi HQ'), person('E2', 'Baraka Juma', 'Ops', 'Dar es Salaam')];
   api.loadAttendanceAccess.mockResolvedValue(HR);
+  api.loadTrackingFrom.mockResolvedValue('2026-10-22');
+  api.saveTrackingFrom.mockResolvedValue(undefined);
   api.loadAttendanceDays.mockResolvedValue(DAYS);
   api.loadSchedules.mockResolvedValue([]);
   api.setAttendanceDay.mockResolvedValue(undefined);
@@ -146,6 +150,17 @@ describe('Attendance page', () => {
     await waitFor(() =>
       expect(api.saveSchedule).toHaveBeenLastCalledWith(null, 'b2', { work_days: [1, 2, 3, 4, 5], start_time: '08:00', end_time: '17:00', grace_minutes: 30 })
     );
+  });
+
+  it('sets the day attendance counts from', async () => {
+    render(<AttendancePage />);
+    await screen.findByText('Amina Otieno');
+    fireEvent.click(screen.getByRole('button', { name: 'Work schedule' }));
+    const from = (await screen.findByLabelText('Count attendance from')) as HTMLInputElement;
+    expect(from.value).toBe('2026-10-22');
+    fireEvent.change(from, { target: { value: '2026-10-19' } });
+    fireEvent.click(within(from.closest('div.grid') as HTMLElement).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.saveTrackingFrom).toHaveBeenCalledWith('2026-10-19'));
   });
 
   it('a manager sees their team, without corrections or schedules', async () => {

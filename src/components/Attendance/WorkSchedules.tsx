@@ -7,8 +7,10 @@ import { WEEK_DAYS, clockLabel, workDaysLabel } from '../../lib/attendance';
 import {
   DEFAULT_SCHEDULE,
   loadSchedules,
+  loadTrackingFrom,
   removeSchedule,
   saveSchedule,
+  saveTrackingFrom,
   type WorkSchedule,
   type WorkScheduleInput,
 } from '../../lib/attendanceApi';
@@ -53,6 +55,7 @@ export default function WorkSchedules() {
         refreshKey={schedules}
         fixHint="Make them match (the leave and payroll work week is in Settings → Company profile → Work week), unless the difference is intended."
       />
+      <TrackingFrom />
       <ScheduleForm
         title="Company schedule"
         hint={company ? undefined : 'Not set yet: the company works Monday to Friday, 8:00 am to 5:00 pm.'}
@@ -116,6 +119,58 @@ export default function WorkSchedules() {
         </Card>
       )}
     </div>
+  );
+}
+
+/** The day attendance counts from: working days before it are not marked absent (nobody could clock in yet). */
+export function TrackingFrom() {
+  const [saved, setSaved] = useState<string | null | undefined>(undefined);
+  const [day, setDay] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    loadTrackingFrom()
+      .then((d) => {
+        if (!live) return;
+        setSaved(d);
+        setDay(d ?? '');
+      })
+      .catch(() => live && setSaved(null));
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  if (saved === undefined) return null;
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      await saveTrackingFrom(day);
+      setSaved(day);
+      toast.success('Saved');
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card padding="sm">
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
+        <div className="min-w-0">
+          <label htmlFor="attendance-from" className={labelClass}>Count attendance from</label>
+          <input id="attendance-from" type="date" className={inputClass} value={day} onChange={(e) => setDay(e.target.value)} />
+          <p className="text-[11.5px] text-muted-foreground mt-1">
+            Working days before this aren't marked absent, because staff couldn't clock in yet.
+            {saved === null && ' Not set: attendance counts from the day your company was set up.'}
+          </p>
+        </div>
+        <Button disabled={busy || !day || day === saved} onClick={() => void save()}>Save</Button>
+      </div>
+    </Card>
   );
 }
 

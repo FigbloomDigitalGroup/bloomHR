@@ -4,7 +4,8 @@
 // after clocking out keeps the first clock-in; days are classed present / late / absent / leave / holiday / off against
 // the employee's schedule (a branch's own, the company's, or Monday to Friday 08:00 with 30 minutes' grace); the old
 // portal-open rows are ignored; HR corrects days with a note; staff can't write the table, clock someone else in or read
-// others; managers see their reports; companies never see each other's.
+// others; managers see their reports; companies never see each other's. Working days before the company's
+// attendance_tracking_from (20261023400000) are not absent.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -21,6 +22,7 @@ const ADMIN_B = '00000000-0000-0000-0000-00000000e105';
 // the week of Mon 19 - Sun 25 October 2026; "today" is Thursday 22nd
 const TODAY = '2026-10-22';
 const MIGRATION = join(__dirname, '..', 'migrations', '20261023300000_attendance_clock_in.sql');
+const TRACKING_MIGRATION = join(__dirname, '..', 'migrations', '20261023400000_attendance_tracking_from.sql');
 
 let db: PGlite;
 let dar: string;
@@ -62,6 +64,9 @@ beforeAll(async () => {
   await db.exec(`
     insert into role_permissions (role_name, permissions, tenant_id) values
       ('HR', array['employees'], '${A}'), ('STAFF', array['dashboard'], '${A}');
+    -- both companies have counted attendance for a long time (the tracking-from tests change A's)
+    insert into attendance_settings (tenant_id, tracking_from) values ('${A}', '2025-01-01'), ('${B}', '2025-01-01')
+      on conflict (tenant_id) do update set tracking_from = excluded.tracking_from;
     insert into employees ("Employee Number", "First Name", "Work Email", "Status", "Start Date", "Termination Date", manager_email, tenant_id) values
       ('A-ME', 'Mo', 'me@a.co', 'Active', '2025-01-06', null, 'lead@a.co', '${A}'),
       ('A-THEM', 'Tia', 'them@a.co', 'Active', '2025-01-06', null, null, '${A}'),
@@ -259,14 +264,49 @@ describe('companies are kept apart', () => {
   });
 });
 
+describe('the day attendance counts from', () => {
+  const setFrom = (day: string) => db.query(`update attendance_settings set tracking_from = $1 where tenant_id = $2`, [day, A]);
+
+  it('working days before it are not absent (left empty); clock-ins on them still show', async () => {
+    await setFrom('2026-10-20');
+    try {
+      expect(await statuses('A-THEM')).toMatchObject({ '19': null, '20': 'leave' });
+      expect((await statuses('A-ME'))['19']).toBe('present');
+      expect((await statuses('A-GONE'))['19']).toBeNull();
+    } finally {
+      await setFrom('2025-01-01');
+    }
+    expect((await statuses('A-THEM'))['19']).toBe('absent');
+  });
+
+  it('a company without the setting counts from the day it was created', async () => {
+    const c = '00000000-0000-0000-0000-0000000000c3';
+    await db.query(`insert into tenants (id, name, slug, created_at) values ($1, 'New Co', 'new-co', '2026-10-21T05:00:00Z')`, [c]);
+    expect((await rows<{ d: string }>(`select public.attendance_tracking_from($1)::text as d`, [c]))[0].d).toBe('2026-10-21');
+  });
+
+  it('HR changes it; staff read it but can’t', async () => {
+    expect(await as(ME, `select tracking_from::text from attendance_settings`)).toEqual([{ tracking_from: '2025-01-01' }]);
+    await as(ME, `update attendance_settings set tracking_from = '2026-10-01'`);
+    expect((await rows<{ d: string }>(`select tracking_from::text as d from attendance_settings where tenant_id = $1`, [A]))[0].d).toBe('2025-01-01');
+    await as(HR, `update attendance_settings set tracking_from = '2025-02-01'`);
+    const row = (await rows<{ d: string; by: string }>(`select tracking_from::text as d, updated_by as by from attendance_settings where tenant_id = $1`, [A]))[0];
+    expect(row).toEqual({ d: '2025-02-01', by: HR });
+    expect(await as(ADMIN_B, `select tracking_from::text from attendance_settings`)).toEqual([{ tracking_from: '2025-01-01' }]);
+    await setFrom('2025-01-01');
+  });
+});
+
 describe('the migration', () => {
   it('can run again without changing anything', async () => {
     const snapshot = async () => ({
       logs: await rows(`select id, employee_number, work_date::text, login_time::text, logout_time::text, source, note from attendance_logs order by id`),
       schedules: await rows(`select tenant_id, branch_id, work_days, start_time::text, grace_minutes from work_schedules order by tenant_id, branch_id nulls first`),
+      tracking: await rows(`select tenant_id, tracking_from::text from attendance_settings order by tenant_id`),
     });
     const before = await snapshot();
     await db.exec(readFileSync(MIGRATION, 'utf8'));
+    await db.exec(readFileSync(TRACKING_MIGRATION, 'utf8'));
     await db.exec('reset search_path');
     expect(await snapshot()).toEqual(before);
   });

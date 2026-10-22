@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import { fetchAll } from './fetchAll';
 import type { AttendanceDay, AttendanceStatus, AttendanceToday } from './attendance';
 
-// Clocking in and out, the days HR sees, corrections and work schedules (migration 20261023300000). The database
+// Clocking in and out, the days HR sees, corrections and work schedules (migrations 20261023300000, 20261023400000). The database
 // decides who may do what; these turn its answers into plain shapes and its refusals into plain messages.
 
 /** A database refusal as something a person can act on. */
@@ -202,5 +202,22 @@ export async function saveSchedule(id: string | null, branchId: string | null, f
 
 export async function removeSchedule(id: string): Promise<void> {
   const { error } = await supabase.from('work_schedules').delete().eq('id', id);
+  if (error) fail(error);
+}
+
+// ---------------------------------------------------------------------------------------------
+// the day attendance counts from (migration 20261023400000)
+// ---------------------------------------------------------------------------------------------
+/** The company's "count attendance from" day ("YYYY-MM-DD"), or null when not set (it counts from the day the company was set up). */
+export async function loadTrackingFrom(): Promise<string | null> {
+  const { data, error } = await supabase.from('attendance_settings').select('tracking_from').maybeSingle();
+  if (error) fail(error);
+  return (data?.tracking_from as string | undefined) ?? null;
+}
+
+export async function saveTrackingFrom(day: string): Promise<void> {
+  const { error } = await supabase
+    .from('attendance_settings')
+    .upsert({ tracking_from: day }, { onConflict: 'tenant_id' });
   if (error) fail(error);
 }
