@@ -97,7 +97,7 @@ export async function loadToday(): Promise<AttendanceToday> {
  * (or isn't set up, e.g. in local development), the database's own attendance_clock_in / attendance_clock_out are used:
  * they apply the same rule, only without an address (the branch-location route still works).
  */
-async function clock(kind: 'in' | 'out', location: ClockLocation | null): Promise<AttendanceToday> {
+async function clock(kind: 'in' | 'out', location: ClockLocation | null, reason?: string): Promise<AttendanceToday> {
   const { data: session } = await supabase.auth.getSession();
   const token = session.session?.access_token;
   if (token) {
@@ -106,7 +106,7 @@ async function clock(kind: 'in' | 'out', location: ClockLocation | null): Promis
       response = await fetch(`${API_URL}/attendance/clock`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ action: kind, location }),
+        body: JSON.stringify({ action: kind, location, reason: reason ?? null }),
       });
     } catch {
       response = null;
@@ -117,13 +117,13 @@ async function clock(kind: 'in' | 'out', location: ClockLocation | null): Promis
       return toToday(payload);
     }
   }
-  const { data, error } = await supabase.rpc(kind === 'in' ? 'attendance_clock_in' : 'attendance_clock_out', { p_location: location });
+  const { data, error } = await supabase.rpc(kind === 'in' ? 'attendance_clock_in' : 'attendance_clock_out', { p_location: location, p_reason: reason ?? null });
   if (error) fail(error);
   return toToday((data ?? {}) as Record<string, unknown>);
 }
 
-export const clockIn = (location: ClockLocation | null) => clock('in', location);
-export const clockOut = (location: ClockLocation | null) => clock('out', location);
+export const clockIn = (location: ClockLocation | null, reason?: string) => clock('in', location, reason);
+export const clockOut = (location: ClockLocation | null, reason?: string) => clock('out', location, reason);
 
 /** What the portal card should offer today (attendance_my_clock_rules). */
 export interface ClockRules {

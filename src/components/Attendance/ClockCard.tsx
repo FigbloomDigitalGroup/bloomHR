@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import toast from 'react-hot-toast';
 import { Clock, LogIn, LogOut, MapPin } from 'lucide-react';
 import StatusPill from '../UI/StatusPill';
+import Modal from '../UI/Modal';
 import {
   STATUS_LABEL,
   STATUS_TONE,
@@ -24,6 +25,10 @@ import { clockIn, clockOut, currentLocation, loadClockRules, loadToday, type Clo
  * The company's clock-in policy and the person's work arrangement (migration 20261024100000): at a scanner-only company
  * the card says to use the scanner instead of offering Clock in; a refusal ("Clock in from the office, or ask HR")
  * stays on the card. A scanner's last scan today before the end of the day shows as "Last scan", with hours so far.
+ *
+ * Web clock-ins require a reason (migration 20261025000000): attendance is normally recorded at the door scanner.
+ * When someone uses the web app, a reason dialog collects why before the clock action is sent. Clock-out via web skips
+ * the dialog when the clock-in was already via the app (reason recorded then).
  */
 export default function ClockCard() {
   const [today, setToday] = useState<AttendanceToday | null>(null);
@@ -32,6 +37,11 @@ export default function ClockCard() {
   const [rules, setRules] = useState<ClockRules | null>(null);
   const [busy, setBusy] = useState<null | 'locating' | 'saving'>(null);
   const [now, setNow] = useState(() => new Date());
+
+  // reason dialog
+  const [pendingKind, setPendingKind] = useState<'in' | 'out' | null>(null);
+  const [reasonText, setReasonText] = useState('');
+  const reasonInputRef = useRef<HTMLTextAreaElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -61,13 +71,13 @@ export default function ClockCard() {
     return () => clearInterval(t);
   }, [working]);
 
-  const act = async (kind: 'in' | 'out') => {
+  const act = async (kind: 'in' | 'out', reason: string) => {
     setBusy('locating');
     setRefusal(null);
     try {
       const location = await currentLocation();
       setBusy('saving');
-      const t = kind === 'in' ? await clockIn(location) : await clockOut(location);
+      const t = kind === 'in' ? await clockIn(location, reason) : await clockOut(location, reason);
       setToday(t);
       setNow(new Date());
       toast.success(kind === 'in' ? `Clocked in at ${formatTime(t.clockIn)}` : `Clocked out at ${formatTime(t.clockOut)}`);
@@ -77,6 +87,32 @@ export default function ClockCard() {
     } finally {
       setBusy(null);
     }
+  };
+
+  // does this action need a reason dialog? clock-in always does; clock-out only when the clock-in was not via app
+  const needsReason = (kind: 'in' | 'out') => kind === 'in' || today?.source !== 'app';
+
+  const handleClockButton = (kind: 'in' | 'out') => {
+    if (needsReason(kind)) {
+      setReasonText('');
+      setPendingKind(kind);
+    } else {
+      void act(kind, '');
+    }
+  };
+
+  const confirmReason = () => {
+    if (!pendingKind || !reasonText.trim()) return;
+    const kind = pendingKind;
+    const reason = reasonText.trim();
+    setPendingKind(null);
+    setReasonText('');
+    void act(kind, reason);
+  };
+
+  const cancelReason = () => {
+    setPendingKind(null);
+    setReasonText('');
   };
 
   // scanner only (and not away today): the scanner, not the app; a day clocked in in the app can still clock out
@@ -90,75 +126,137 @@ export default function ClockCard() {
     : null;
 
   return (
-    <section className="bg-white border border-gray-200 rounded-2xl p-4 md:p-5 shadow-sm min-w-0" aria-label="Attendance">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-base md:text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-brand" /> Attendance
-          </h3>
+    <>
+      <section className="bg-white border border-gray-200 rounded-2xl p-4 md:p-5 shadow-sm min-w-0" aria-label="Attendance">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-base md:text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-brand" /> Attendance
+            </h3>
+            {today && (
+              <p className="text-[11px] md:text-xs text-gray-500 font-medium">
+                {dayNote ?? scheduleLine(today)}
+              </p>
+            )}
+          </div>
           {today && (
-            <p className="text-[11px] md:text-xs text-gray-500 font-medium">
-              {dayNote ?? scheduleLine(today)}
-            </p>
+            <div className="flex items-center gap-2">
+              {working && canClockOut && (
+                <Button busy={busy} onClick={() => handleClockButton('out')} icon={<LogOut className="w-4 h-4" />} label="Clock out" />
+              )}
+              {!scannerOnly && !today.clockIn && <Button busy={busy} onClick={() => handleClockButton('in')} icon={<LogIn className="w-4 h-4" />} label="Clock in" primary />}
+              {!scannerOnly && today.clockIn && today.clockOut && !lastScan && (
+                <Button busy={busy} onClick={() => handleClockButton('in')} icon={<LogIn className="w-4 h-4" />} label="Clock in again" />
+              )}
+            </div>
           )}
         </div>
+
+        {problem && <p className="mt-2 text-xs text-gray-600">{problem}</p>}
+        {today && scannerOnly && !(working && canClockOut) && (
+          <p className="mt-2 text-xs text-gray-600">{today.clockIn ? 'Clock out at the office scanner.' : 'Clock in at the office scanner.'}</p>
+        )}
+        {refusal && <p role="alert" className="mt-2 text-xs font-semibold text-status-danger">{refusal}</p>}
+        {!today && !problem && <p className="mt-2 text-xs text-gray-400">Loading…</p>}
+
         {today && (
-          <div className="flex items-center gap-2">
-            {working && canClockOut && (
-              <Button busy={busy} onClick={() => act('out')} icon={<LogOut className="w-4 h-4" />} label="Clock out" />
-            )}
-            {!scannerOnly && !today.clockIn && <Button busy={busy} onClick={() => act('in')} icon={<LogIn className="w-4 h-4" />} label="Clock in" primary />}
-            {!scannerOnly && today.clockIn && today.clockOut && !lastScan && (
-              <Button busy={busy} onClick={() => act('in')} icon={<LogIn className="w-4 h-4" />} label="Clock in again" />
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+            {today.clockIn ? (
+              <>
+                <div>
+                  <div className="text-[11px] text-gray-500">Clocked in</div>
+                  <div className="font-semibold text-gray-900 flex items-center gap-2">
+                    {formatTime(today.clockIn)}
+                    {late && <StatusPill label="Late" tone={STATUS_TONE.late} />}
+                  </div>
+                  {late && <div className="text-[11px] text-orange-text-alt">{lateLabel(today.lateMinutes)}</div>}
+                </div>
+                {today.clockOut && (
+                  <div>
+                    <div className="text-[11px] text-gray-500">{lastScan ? 'Last scan' : 'Clocked out'}</div>
+                    <div className="font-semibold text-gray-900">{formatTime(today.clockOut)}</div>
+                  </div>
+                )}
+                <div>
+                  <div className="text-[11px] text-gray-500">{today.clockOut && !lastScan ? 'Hours' : 'Hours so far'}</div>
+                  <div className="font-semibold text-gray-900 tabular-nums">{formatHours(hours)}</div>
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-gray-500">You haven't clocked in today.</p>
             )}
           </div>
         )}
-      </div>
 
-      {problem && <p className="mt-2 text-xs text-gray-600">{problem}</p>}
-      {today && scannerOnly && !(working && canClockOut) && (
-        <p className="mt-2 text-xs text-gray-600">{today.clockIn ? 'Clock out at the office scanner.' : 'Clock in at the office scanner.'}</p>
-      )}
-      {refusal && <p role="alert" className="mt-2 text-xs font-semibold text-status-danger">{refusal}</p>}
-      {!today && !problem && <p className="mt-2 text-xs text-gray-400">Loading…</p>}
+        {busy === 'locating' && (
+          <p className="mt-2 text-[11px] text-gray-500 flex items-center gap-1">
+            <MapPin className="w-3 h-3" /> Checking your location (you can say no; it's only kept with your clock-in)…
+          </p>
+        )}
+      </section>
 
-      {today && (
-        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-          {today.clockIn ? (
-            <>
-              <div>
-                <div className="text-[11px] text-gray-500">Clocked in</div>
-                <div className="font-semibold text-gray-900 flex items-center gap-2">
-                  {formatTime(today.clockIn)}
-                  {late && <StatusPill label="Late" tone={STATUS_TONE.late} />}
-                </div>
-                {late && <div className="text-[11px] text-orange-text-alt">{lateLabel(today.lateMinutes)}</div>}
-              </div>
-              {today.clockOut && (
-                <div>
-                  <div className="text-[11px] text-gray-500">{lastScan ? 'Last scan' : 'Clocked out'}</div>
-                  <div className="font-semibold text-gray-900">{formatTime(today.clockOut)}</div>
-                </div>
-              )}
-              <div>
-                <div className="text-[11px] text-gray-500">{today.clockOut && !lastScan ? 'Hours' : 'Hours so far'}</div>
-                <div className="font-semibold text-gray-900 tabular-nums">{formatHours(hours)}</div>
-              </div>
-            </>
-          ) : (
-            <p className="text-xs text-gray-500">You haven't clocked in today.</p>
-          )}
-        </div>
-      )}
-
-      {busy === 'locating' && (
-        <p className="mt-2 text-[11px] text-gray-500 flex items-center gap-1">
-          <MapPin className="w-3 h-3" /> Checking your location (you can say no; it's only kept with your clock-in)…
+      {/* reason dialog */}
+      <Modal
+        open={pendingKind !== null}
+        onClose={cancelReason}
+        title={pendingKind === 'in' ? 'Why are you clocking in via the web?' : 'Why are you clocking out via the web?'}
+        size="sm"
+        closeOnBackdrop={false}
+      >
+        <p className="text-sm text-gray-600 mb-3">
+          Attendance is normally recorded at the office scanner. Enter a reason for using the web app instead.
         </p>
-      )}
-    </section>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {REASON_PRESETS.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => {
+                setReasonText(preset);
+                reasonInputRef.current?.focus();
+              }}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                reasonText === preset
+                  ? 'bg-brand text-white border-brand'
+                  : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'
+              }`}
+            >
+              {preset}
+            </button>
+          ))}
+        </div>
+        <textarea
+          ref={reasonInputRef}
+          value={reasonText}
+          onChange={(e) => setReasonText(e.target.value)}
+          placeholder="e.g. Working remotely today"
+          rows={2}
+          maxLength={300}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
+        />
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={cancelReason}
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={confirmReason}
+            disabled={!reasonText.trim()}
+            className="px-4 py-2 rounded-lg text-sm font-semibold bg-brand text-white shadow-sm hover:bg-brand-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {pendingKind === 'in' ? 'Clock in' : 'Clock out'}
+          </button>
+        </div>
+      </Modal>
+    </>
   );
 }
+
+const REASON_PRESETS = ['Working remotely today', 'Field work', 'Scanner unavailable'];
 
 function Button({ busy, onClick, icon, label, primary = false }: {
   busy: null | 'locating' | 'saving';
