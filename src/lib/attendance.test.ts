@@ -19,6 +19,8 @@ import {
   summarise,
   weekOf,
   workDaysLabel,
+  workDaysMismatches,
+  workWeekIsoDays,
   type AttendanceDay,
 } from './attendance';
 
@@ -131,5 +133,31 @@ describe('correctionProblem', () => {
     expect(correctionProblem('09:00', '', '  ')).toMatch(/Add a note/);
     expect(correctionProblem('09:00', '17:00', 'Forgot')).toBeNull();
     expect(correctionProblem('09:00', '', 'Still here')).toBeNull();
+  });
+});
+
+describe('working days: attendance against leave and payroll', () => {
+  const MON_FRI = [1, 1, 1, 1, 1, 0, 0];
+
+  it('reads a work week as days, half days included', () => {
+    expect(workWeekIsoDays(MON_FRI)).toEqual([1, 2, 3, 4, 5]);
+    expect(workWeekIsoDays([1, 1, 1, 1, 1, 0.5, 0])).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it('says nothing when they match', () => {
+    expect(workDaysMismatches({ companyDays: [5, 4, 3, 2, 1], branches: [], companyWeek: MON_FRI, departments: [{ name: 'Ops', workWeek: null }] })).toEqual([]);
+  });
+
+  it('names the company schedule, a branch and a department that differ', () => {
+    expect(workDaysMismatches({
+      companyDays: [1, 2, 3, 4, 5, 6],
+      branches: [{ name: 'Dar', workDays: [1, 2, 3, 4, 5] }, { name: 'Kampala', workDays: [1, 2, 3, 4, 5, 6] }],
+      companyWeek: MON_FRI,
+      departments: [{ name: 'Farm', workWeek: [1, 1, 1, 1, 1, 0.5, 0] }, { name: 'Office', workWeek: MON_FRI }],
+    })).toEqual([
+      "The company's attendance schedule works Mon–Sat, but leave and payroll count Mon–Fri.",
+      "Kampala's attendance schedule works Mon–Sat, but leave and payroll count Mon–Fri.",
+      'Office works Mon–Fri for leave and payroll, but attendance expects Mon–Sat unless their branch has its own schedule.',
+    ]);
   });
 });

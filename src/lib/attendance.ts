@@ -165,6 +165,52 @@ export function workDaysLabel(days: number[]): string {
 }
 
 // ---------------------------------------------------------------------------------------------
+// attendance schedules against the leave and payroll work week (FIG-888)
+// ---------------------------------------------------------------------------------------------
+/** The days (1 = Monday) a leave and payroll work week (7 numbers, Monday first) works at all, half days included. */
+export const workWeekIsoDays = (week: readonly number[]) => week.flatMap((d, i) => (Number(d) > 0 ? [i + 1] : []));
+
+const sameDays = (a: readonly number[], b: readonly number[]) => {
+  const x = [...new Set(a)].sort((m, n) => m - n);
+  const y = [...new Set(b)].sort((m, n) => m - n);
+  return x.length === y.length && x.every((d, i) => d === y[i]);
+};
+
+export interface WorkDaysCheck {
+  /** the company's attendance schedule (or the built-in one) and each branch's own */
+  companyDays: number[];
+  branches: { name: string; workDays: number[] }[];
+  /** the company's leave and payroll work week, and departments with their own */
+  companyWeek: readonly number[];
+  departments: { name: string; workWeek: readonly number[] | null | undefined }[];
+}
+
+/**
+ * Where attendance and leave/payroll disagree about which days are worked, as sentences for HR: someone could be
+ * marked absent on a day leave and payroll treat as a day off, or the other way round.
+ */
+export function workDaysMismatches({ companyDays, branches, companyWeek, departments }: WorkDaysCheck): string[] {
+  const week = workWeekIsoDays(companyWeek);
+  const out: string[] = [];
+  if (!sameDays(companyDays, week)) {
+    out.push(`The company's attendance schedule works ${workDaysLabel(companyDays)}, but leave and payroll count ${workDaysLabel(week)}.`);
+  }
+  for (const b of branches) {
+    if (!sameDays(b.workDays, week)) {
+      out.push(`${b.name}'s attendance schedule works ${workDaysLabel(b.workDays)}, but leave and payroll count ${workDaysLabel(week)}.`);
+    }
+  }
+  for (const d of departments) {
+    if (!d.workWeek) continue;
+    const days = workWeekIsoDays(d.workWeek);
+    if (!sameDays(days, companyDays)) {
+      out.push(`${d.name} works ${workDaysLabel(days)} for leave and payroll, but attendance expects ${workDaysLabel(companyDays)} unless their branch has its own schedule.`);
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------
 // the summary per person
 // ---------------------------------------------------------------------------------------------
 export interface AttendanceSummary {
