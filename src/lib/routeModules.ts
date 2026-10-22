@@ -83,6 +83,8 @@ export const SCREENS: ScreenAccess[] = [
   // time off and discipline
   S('/leaves', 'Time Off', ['leaves']),
   S('/leave-discipline', 'Leave discipline', ['leaves', 'employees', 'team-work']),
+  // clock-ins against the work schedule: HR (and Reports) see everyone, managers their team (the database decides)
+  S('/attendance', 'Attendance', ['employees', 'hr-lifecycle', 'reports', 'team-work']),
   S('/staffcheck', 'Disciplinary', ['staffcheck']),
   S('/incident-reports', 'Incidents', ['incident-reports']),
   // workplace accidents and work injury (WIBA) cases: the same people as incident reports

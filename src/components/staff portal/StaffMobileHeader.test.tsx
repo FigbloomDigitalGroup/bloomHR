@@ -17,7 +17,6 @@ const setup = (overrides: Partial<Parameters<typeof StaffMobileHeader>[0]> = {})
   const props = {
     userName: 'jane',
     hasUnread: false,
-    loginStatus: { isLoggedIn: true, lastLogin: null },
     onOpenNotifications: vi.fn(),
     onOpenMenu: vi.fn(),
     onPasswordReset: vi.fn(),

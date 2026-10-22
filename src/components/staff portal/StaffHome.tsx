@@ -23,6 +23,7 @@ import {
 } from '../../lib/staffHome';
 import { LoaderBlock } from '../UI/FigbloomLoader';
 import LeaveAwaitingMe from '../Approvals/LeaveAwaitingMe';
+import ClockCard from '../Attendance/ClockCard';
 
 const SHOW_TASKS = 6;
 const SHOW_WEEK = 8;
@@ -38,8 +39,9 @@ interface StaffHomeProps {
 }
 
 /**
- * The staff portal home: a greeting, "My tasks" (a quick look at what is assigned to me, overdue first), "This week"
- * (events, public holidays, birthdays and my own leave in the next 7 days) and quick links at the bottom.
+ * The staff portal home: a greeting, Clock in / Clock out, "My tasks" (a quick look at what is assigned to me, overdue
+ * first), "This week" (events, public holidays, birthdays and my own leave in the next 7 days) and quick links at the
+ * bottom.
  */
 export default function StaffHome({ setActiveTab, userName, onOpenTask, showMyWork }: StaffHomeProps) {
   const [employeeNumber, setEmployeeNumber] = useState<string | null | undefined>(undefined);
@@ -111,6 +113,9 @@ export default function StaffHome({ setActiveTab, userName, onOpenTask, showMyWo
       <CompleteProfileCard onOpen={() => setActiveTab('onboarding')} />
 
       {openResignation && <ResignationHomeLine exit={openResignation} onView={() => setActiveTab('resignation')} />}
+
+      {/* clock in / clock out (only for someone with an employee record) */}
+      {employeeNumber && <ClockCard />}
 
       {/* leave waiting on my decision (nothing when there is none) */}
       <LeaveAwaitingMe />

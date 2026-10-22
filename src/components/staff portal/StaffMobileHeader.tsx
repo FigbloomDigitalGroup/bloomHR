@@ -7,7 +7,6 @@ import type { SetStaffTab } from './useStaffPortalTab';
 interface StaffMobileHeaderProps {
   userName: string;
   hasUnread: boolean;
-  loginStatus: { isLoggedIn: boolean; lastLogin: string | null };
   onOpenNotifications: () => void;
   onOpenMenu: () => void;
   onPasswordReset: () => void;
@@ -22,7 +21,6 @@ interface StaffMobileHeaderProps {
 export default function StaffMobileHeader({
   userName,
   hasUnread,
-  loginStatus,
   onOpenNotifications,
   onOpenMenu,
   onPasswordReset,
@@ -53,7 +51,6 @@ export default function StaffMobileHeader({
         <UserProfileDropdown
           compact
           onPasswordReset={onPasswordReset}
-          loginStatus={loginStatus}
           userName={userName}
           setActiveTab={setActiveTab}
         />

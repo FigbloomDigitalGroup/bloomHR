@@ -42,6 +42,8 @@ export const SIDEBAR_MENU: SidebarMenuGroup[] = [
       { id: 'leaves', label: 'Time Off', path: '/leaves' },
       // absences, failures to notify, missing leave documents and warnings for them: HR, and supervisors for their team
       { id: 'leave-discipline', label: 'Leave discipline', path: '/leave-discipline' },
+      // clock-ins, late and absent days, corrections and work schedules: HR, and managers for their team
+      { id: 'attendance', label: 'Attendance', path: '/attendance' },
       { id: 'performance', label: 'Performance', path: '/performance' },
       { id: 'training', label: 'Training', path: '/training' },
       { id: 'assign-managers', label: 'Assign Managers', path: '/assign-managers' },
