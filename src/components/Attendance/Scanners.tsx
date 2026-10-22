@@ -90,6 +90,9 @@ export default function Scanners() {
                     <td className={tdClass}>
                       <div className="font-semibold">{s.name}</div>
                       {s.lastError && <div className="text-[11px] text-status-danger">{s.lastError} ({seenLabel(s.lastErrorAt, '')})</div>}
+                      {s.clockWarning && (
+                        <div role="alert" className="text-[11px] text-orange-text-alt">{s.clockWarning} ({seenLabel(s.clockWarningAt, '')})</div>
+                      )}
                     </td>
                     <td className={`${tdClass} font-mono`}>{s.serialNumber}</td>
                     <td className={tdClass}>{seenLabel(s.lastSeenAt)}</td>

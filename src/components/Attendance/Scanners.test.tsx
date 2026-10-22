@@ -33,6 +33,7 @@ import Scanners from './Scanners';
 const FRONT: Scanner = {
   id: 'd1', name: 'Front door', serialNumber: 'BRAV260421021', brand: 'zkteco', allowedIp: '41.90.12.34', active: true,
   lastSeenAt: '2026-10-22T05:05:00Z', lastIp: '41.90.12.34', lastError: null, lastErrorAt: null,
+  clockWarning: null, clockWarningAt: null,
 };
 
 beforeEach(() => {
@@ -63,6 +64,15 @@ describe('Scanners tab', () => {
     expect(within(back).getByText('Any')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Switch off Front door' }));
     await waitFor(() => expect(api.setScannerActive).toHaveBeenCalledWith('d1', false));
+  });
+
+  it('warns HR when a scanner’s clock is ahead and its punches are held back', async () => {
+    api.loadScanners.mockResolvedValue([{
+      ...FRONT, clockWarning: "The scanner's clock is about 5 hours ahead of Nairobi time, so 2 punches were held back. Restart the scanner so it takes the time zone again; punches from then on count.",
+      clockWarningAt: '2026-10-22T09:30:00Z',
+    }]);
+    render(<Scanners />);
+    expect((await screen.findByRole('alert')).textContent).toMatch(/about 5 hours ahead.*Restart the scanner/);
   });
 
   it('adds a scanner, saying whether one with that serial tried to connect', async () => {
