@@ -26,3 +26,6 @@ export const ACCOUNT_SETTINGS: AccountSettings = {
 };
 
 export type EnvironmentName = 'staging' | 'production';
+
+// The app door scanners send punches to (its /iclock/* receiver). The scanner relay forwards to it over HTTPS.
+export const APP_HOST = 'bloom-hr-phi.vercel.app';
