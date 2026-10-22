@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { AccountSecurityStack } from '../lib/account-security-stack.js';
 import type { AccountSettings } from '../lib/config.js';
 import { EnvironmentStack } from '../lib/environment-stack.js';
+import { RELAY_HEADER, ScannerRelayStack } from '../lib/scanner-relay-stack.js';
 
 const env = { account: '123456789012', region: 'eu-west-1' };
 const settings: AccountSettings = {
@@ -86,5 +87,54 @@ describe('EnvironmentStack', () => {
       Name: '/figbloom/production/environment',
       Value: 'production',
     });
+  });
+});
+
+describe('ScannerRelayStack', () => {
+  const t = Template.fromStack(new ScannerRelayStack(new App(), 'Relay', { env, appHost: 'app.example.com' }));
+
+  it('accepts HTTP from scanners without redirecting, forwards over HTTPS only, and caches nothing', () => {
+    t.hasResourceProperties('AWS::CloudFront::Distribution', {
+      DistributionConfig: Match.objectLike({
+        DefaultCacheBehavior: Match.objectLike({
+          ViewerProtocolPolicy: 'allow-all',
+          AllowedMethods: Match.arrayWith(['POST']),
+          CachePolicyId: '4135ea2d-6df8-44a3-9df3-4b5a84be39ad',
+        }),
+        Origins: [
+          Match.objectLike({
+            DomainName: 'app.example.com',
+            CustomOriginConfig: Match.objectLike({ OriginProtocolPolicy: 'https-only' }),
+            OriginCustomHeaders: [
+              // a {{resolve:secretsmanager:...}} reference built around the secret's ARN: resolved by CloudFormation
+              Match.objectLike({
+                HeaderName: RELAY_HEADER,
+                HeaderValue: { 'Fn::Join': ['', Match.arrayWith([Match.stringLikeRegexp('resolve:secretsmanager')])] },
+              }),
+            ],
+          }),
+        ],
+      }),
+    });
+  });
+
+  it('lets only /iclock/ through, and passes the scanner IP and query string', () => {
+    t.hasResourceProperties('AWS::CloudFront::Function', {
+      FunctionCode: Match.stringLikeRegexp("/iclock/"),
+    });
+    t.hasResourceProperties('AWS::CloudFront::OriginRequestPolicy', {
+      OriginRequestPolicyConfig: Match.objectLike({
+        QueryStringsConfig: { QueryStringBehavior: 'all' },
+        HeadersConfig: { HeaderBehavior: 'whitelist', Headers: Match.arrayWith(['CloudFront-Viewer-Address']) },
+      }),
+    });
+  });
+
+  it('keeps the shared secret in Secrets Manager, generated (never in code)', () => {
+    t.hasResourceProperties('AWS::SecretsManager::Secret', {
+      Name: 'figbloom/scanner-relay/header-secret',
+      GenerateSecretString: Match.objectLike({ PasswordLength: 48 }),
+    });
+    t.hasOutput('ScannerServerAddress', {});
   });
 });

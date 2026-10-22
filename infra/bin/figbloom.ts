@@ -1,7 +1,8 @@
 import { App, Tags } from 'aws-cdk-lib';
 import { AccountSecurityStack } from '../lib/account-security-stack.js';
-import { ACCOUNT_ID, ACCOUNT_SETTINGS, REGION } from '../lib/config.js';
+import { ACCOUNT_ID, ACCOUNT_SETTINGS, APP_HOST, REGION } from '../lib/config.js';
 import { EnvironmentStack } from '../lib/environment-stack.js';
+import { ScannerRelayStack } from '../lib/scanner-relay-stack.js';
 
 const app = new App();
 const env = { account: ACCOUNT_ID, region: REGION };
@@ -26,4 +27,10 @@ new EnvironmentStack(app, 'FigbloomProduction', {
   env,
   description: 'Figbloom production environment',
   environmentName: 'production',
+});
+
+new ScannerRelayStack(app, 'FigbloomScannerRelay', {
+  env,
+  description: 'Figbloom scanner relay - door scanners on office networks send punches over HTTP, forwarded to the app over HTTPS',
+  appHost: APP_HOST,
 });
