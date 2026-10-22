@@ -160,7 +160,8 @@ describe('attendance_days', () => {
     expect(await statuses('A-ME')).toEqual({ '19': 'present', '20': 'late', '21': 'holiday', '22': null, '23': null, '24': 'off', '25': 'off' });
     const [mon, tue] = await days('A-ME');
     expect(mon).toMatchObject({ late_minutes: 0, hours: null, clock_out: null });
-    expect(tue).toMatchObject({ late_minutes: 31, hours: '8.50' });
+    // minutes late count from the late mark (8:30, 20261023900000): 8:31 is 1 minute late
+    expect(tue).toMatchObject({ late_minutes: 1, hours: '8.50' });
   });
 
   it('approved leave counts as leave, a pending one does not; legacy rows are ignored (Monday is absent)', async () => {
@@ -238,7 +239,7 @@ describe('managers and HR', () => {
     // correcting it again changes the same record
     await set('2026-10-15T05:45:00Z', '2026-10-15T14:00:00Z', 'Arrived 08:45');
     const d = (await days('A-THEM', '2026-10-15', '2026-10-15'))[0];
-    expect(d).toMatchObject({ status: 'late', late_minutes: 45, hours: '8.25' });
+    expect(d).toMatchObject({ status: 'late', late_minutes: 15, hours: '8.25' });
     expect((await rows<{ n: number }>(`select count(*)::int n from attendance_logs where employee_number = 'A-THEM' and work_date = '2026-10-15'`))[0].n).toBe(1);
   });
 
