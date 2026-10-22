@@ -92,11 +92,16 @@ describe('attendance measures', () => {
 
   it('days before attendance counted are left out', async () => {
     await db.query(`update attendance_settings set tracking_from = '2026-10-22' where tenant_id = $1`, [A]);
-    await refresh();
-    // Wednesday no longer counts: Monday and Tuesday still do (clocked in), and Thursday
-    expect(await auto('attendance_rate')).toEqual({ auto_value: '100.00', auto_detail: { present: 3, expected: 3 } });
-    expect((await auto('absent_days')).auto_value).toBe('0.00');
-    await db.query(`update attendance_settings set tracking_from = '2026-10-19' where tenant_id = $1`, [A]);
+    try {
+      await refresh();
+      // only Thursday counts: Monday to Wednesday don't, clocked in or not (20261023800000), so Tuesday's late day
+      // drops out of punctuality too
+      expect(await auto('attendance_rate')).toEqual({ auto_value: '100.00', auto_detail: { present: 1, expected: 1 } });
+      expect(await auto('punctuality')).toEqual({ auto_value: '100.00', auto_detail: { on_time: 1, present: 1 } });
+      expect((await auto('absent_days')).auto_value).toBe('0.00');
+    } finally {
+      await db.query(`update attendance_settings set tracking_from = '2026-10-19' where tenant_id = $1`, [A]);
+    }
   });
 
   it('a clock-in recorded later updates the value on the next run', async () => {

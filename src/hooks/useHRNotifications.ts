@@ -41,7 +41,8 @@ export interface HRNotification {
         | 'contribution_requested'
         | 'company_digest'
         | 'onboarding_followups_overdue'
-        | 'leave_reopened';
+        | 'leave_reopened'
+        | 'attendance_odd_hours';
     title: string;
     message: string;
     // Nullable for leave notifications - only contract/probation reminders

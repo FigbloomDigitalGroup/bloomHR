@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { CalendarClock, Download, Pencil } from 'lucide-react';
 import { Button, Card, EmptyState, Modal, SearchInput, StatusPill, TableScroll } from '../UI';
@@ -8,20 +8,28 @@ import {
   STATUS_TONE,
   attendanceCsv,
   correctionProblem,
+  dayHours,
+  dayHoursLabel,
   dayLabel,
+  dayStatusLabel,
   daysInRange,
-  formatHours,
+  flaggedByPerson,
   formatTime,
+  missingClockOutLabel,
+  openDaysByPerson,
+  totalHoursLabel,
   nairobiParts,
   nairobiToIso,
   nairobiToday,
+  scanLine,
   statusLabel,
   summarise,
   weekOf,
   type AttendanceDay,
   type CsvPerson,
+  type DayScan,
 } from '../../lib/attendance';
-import { loadAttendanceDays, removeAttendanceDay, setAttendanceDay, type AttendanceAccess } from '../../lib/attendanceApi';
+import { loadAttendanceDays, loadDayScans, removeAttendanceDay, setAttendanceDay, type AttendanceAccess } from '../../lib/attendanceApi';
 import { loadEmployeeDirectory, type DirectoryEmployee } from '../../lib/employeeDirectory';
 import { downloadCsv } from '../../lib/kpiApi';
 
@@ -67,6 +75,9 @@ export default function AttendanceDays({ access }: { access: AttendanceAccess })
 
   const byNumber = useMemo(() => new Map(people.map((p) => [p.employeeNumber, p])), [people]);
   const summaries = useMemo(() => summarise(days), [days]);
+  const flagged = useMemo(() => flaggedByPerson(days), [days]);
+  // today's time so far for anyone still clocked in, and past days left without a clock-out (as of this load)
+  const open = useMemo(() => openDaysByPerson(days, nairobiToday()), [days]);
   const departments = useMemo(
     () => [...new Set(summaries.map((s) => byNumber.get(s.employeeNumber)?.department).filter(Boolean) as string[])].sort(),
     [summaries, byNumber]
@@ -175,13 +186,25 @@ export default function AttendanceDays({ access }: { access: AttendanceAccess })
                       <td className={tdClass}>
                         <div className="font-semibold">{nameOf(s.employeeNumber)}</div>
                         <div className="text-[11px] text-muted-foreground">{[s.employeeNumber, p?.branch].filter(Boolean).join(' · ')}</div>
+                        {flagged.get(s.employeeNumber) ? (
+                          <StatusPill
+                            className="mt-1"
+                            tone="danger"
+                            label={`${flagged.get(s.employeeNumber)} flagged`}
+                          />
+                        ) : null}
                       </td>
                       <td className={tdClass}>{p?.department || '—'}</td>
                       <td className={`${tdClass} tabular-nums`}>{s.present}</td>
                       <td className={`${tdClass} tabular-nums`}>{s.late ? <span className="font-semibold text-orange-text-alt">{s.late}</span> : 0}</td>
                       <td className={`${tdClass} tabular-nums`}>{s.absent ? <span className="font-semibold text-status-danger">{s.absent}</span> : 0}</td>
                       <td className={`${tdClass} tabular-nums`}>{s.leave}</td>
-                      <td className={`${tdClass} tabular-nums`}>{formatHours(s.hours)}</td>
+                      <td className={`${tdClass} tabular-nums`}>
+                        {totalHoursLabel(s.hours, open.get(s.employeeNumber))}
+                        {open.get(s.employeeNumber)?.missing ? (
+                          <div className="text-[11px] font-semibold text-status-danger">{missingClockOutLabel(open.get(s.employeeNumber)!.missing)}</div>
+                        ) : null}
+                      </td>
                       <td className={`${tdClass} text-right`}>
                         <Button variant="secondary" aria-label={`Open days for ${nameOf(s.employeeNumber)}`} onClick={() => setOpenEmp(s.employeeNumber)}>Days</Button>
                       </td>
@@ -208,6 +231,7 @@ export function EmployeeDays({ days, canCorrect, onChanged }: {
   onChanged: () => void | Promise<void>;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
   const today = nairobiToday();
   if (days.length === 0) return <p className="text-[13px] text-muted-foreground">No days in this range.</p>;
   const current = days.find((d) => d.day === editing) ?? null;
@@ -227,29 +251,55 @@ export function EmployeeDays({ days, canCorrect, onChanged }: {
           </thead>
           <tbody>
             {days.map((d) => (
-              <tr key={d.day} className="border-b border-border last:border-0">
-                <td className={tdClass}>
-                  <div className="font-semibold whitespace-nowrap">{dayLabel(d.day)}</div>
-                  {d.note && <div className="text-[11px] text-muted-foreground whitespace-pre-wrap">{d.note}</div>}
-                  {d.source === 'hr' && <div className="text-[11px] text-status-info font-semibold">Corrected by HR</div>}
-                </td>
-                <td className={tdClass}>
-                  {d.status ? <StatusPill label={statusLabel(d.status)} tone={STATUS_TONE[d.status]} /> : <span className="text-[12px] text-muted-foreground">{statusLabel(null)}</span>}
-                  {d.status === 'late' && d.lateMinutes ? <div className="text-[11px] text-muted-foreground">{d.lateMinutes} min</div> : null}
-                </td>
-                <td className={`${tdClass} tabular-nums`}>{formatTime(d.clockIn)}</td>
-                <td className={`${tdClass} tabular-nums`}>{formatTime(d.clockOut)}</td>
-                <td className={`${tdClass} tabular-nums`}>{formatHours(d.hours)}</td>
-                {canCorrect && (
-                  <td className={`${tdClass} text-right`}>
+              <Fragment key={d.day}>
+                <tr className={`border-b border-border ${open === d.day ? '' : 'last:border-0'}`}>
+                  <td className={tdClass}>
+                    <div className="font-semibold whitespace-nowrap">{dayLabel(d.day)}</div>
+                    {d.flag && (
+                      <div className="mt-1 space-y-0.5">
+                        <StatusPill label="Odd hours" tone="danger" />
+                        <div className="text-[11px] text-status-danger">{d.flag}</div>
+                      </div>
+                    )}
+                    {d.note && <div className="text-[11px] text-muted-foreground whitespace-pre-wrap">{d.note}</div>}
+                    {d.source === 'hr' && <div className="text-[11px] text-status-info font-semibold">Corrected by HR</div>}
                     {d.day <= today && (
-                      <Button variant="secondary" icon={<Pencil size={12} />} aria-label={`Correct ${dayLabel(d.day)}`} onClick={() => setEditing(d.day)}>
-                        Correct
-                      </Button>
+                      <button
+                        type="button"
+                        className="mt-1 text-[11px] font-semibold text-brand hover:underline"
+                        aria-expanded={open === d.day}
+                        aria-label={`${open === d.day ? 'Hide' : 'Show'} scans for ${dayLabel(d.day)}`}
+                        onClick={() => setOpen((x) => (x === d.day ? null : d.day))}
+                      >
+                        {open === d.day ? 'Hide scans' : 'Scans'}
+                      </button>
                     )}
                   </td>
+                  <td className={tdClass}>
+                    {d.status ? <StatusPill label={statusLabel(d.status)} tone={STATUS_TONE[d.status]} /> : <span className="text-[12px] text-muted-foreground">{dayStatusLabel(d)}</span>}
+                    {d.status === 'late' && d.lateMinutes ? <div className="text-[11px] text-muted-foreground">{d.lateMinutes} min</div> : null}
+                  </td>
+                  <td className={`${tdClass} tabular-nums`}>{formatTime(d.clockIn)}</td>
+                  <td className={`${tdClass} tabular-nums`}>{formatTime(d.clockOut)}</td>
+                  <td className={`${tdClass} tabular-nums`}><span className={dayHours(d, today).open === 'missing' ? 'text-status-danger font-semibold' : ''}>{dayHoursLabel(d, today)}</span></td>
+                  {canCorrect && (
+                    <td className={`${tdClass} text-right`}>
+                      {d.day <= today && (
+                        <Button variant="secondary" icon={<Pencil size={12} />} aria-label={`Correct ${dayLabel(d.day)}`} onClick={() => setEditing(d.day)}>
+                          Correct
+                        </Button>
+                      )}
+                    </td>
+                  )}
+                </tr>
+                {open === d.day && (
+                  <tr className="border-b border-border last:border-0 bg-secondary/30">
+                    <td className={tdClass} colSpan={canCorrect ? 6 : 5}>
+                      <DayScans employeeNumber={d.employeeNumber} day={d.day} />
+                    </td>
+                  </tr>
                 )}
-              </tr>
+              </Fragment>
             ))}
           </tbody>
         </table>
@@ -266,6 +316,35 @@ export function EmployeeDays({ days, canCorrect, onChanged }: {
         />
       )}
     </div>
+  );
+}
+
+/** Every scan behind one day, in time order: "7:55 am · Front Door · clock-in", "8:02 am · App · clock-in". */
+export function DayScans({ employeeNumber, day }: { employeeNumber: string; day: string }) {
+  const [scans, setScans] = useState<DayScan[] | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    loadDayScans(employeeNumber, day)
+      .then((s) => live && setScans(s))
+      .catch((e) => live && setProblem((e as Error).message));
+    return () => {
+      live = false;
+    };
+  }, [employeeNumber, day]);
+
+  if (problem) return <p role="alert" className="text-[12px] text-status-danger">{problem}</p>;
+  if (!scans) return <LoaderBlock label="Loading scans" compact />;
+  if (scans.length === 0) return <p className="text-[12px] text-muted-foreground">No scans or clock-ins this day.</p>;
+  return (
+    <ul className="space-y-1" aria-label={`Scans on ${dayLabel(day)}`}>
+      {scans.map((s, i) => (
+        <li key={`${s.at}-${i}`} className={`text-[12px] tabular-nums ${s.kind === 'held' || s.kind === 'waiting' ? 'text-muted-foreground' : 'text-ink'}`}>
+          {scanLine(s)}
+        </li>
+      ))}
+    </ul>
   );
 }
 
