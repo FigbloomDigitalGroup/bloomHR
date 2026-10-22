@@ -77,6 +77,8 @@ describe('Attendance page', () => {
     await screen.findByText('Amina Otieno');
     const week = weekOf(nairobiToday());
     expect(api.loadAttendanceDays).toHaveBeenCalledWith(week.from, week.to);
+    // HR also sets up the door scanners
+    expect(screen.getByRole('button', { name: 'Scanners' })).toBeTruthy();
     const amina = within(rowOf('Amina Otieno')).getAllByRole('cell').map((c) => c.textContent);
     expect(amina.slice(1, 7)).toEqual(['Sales', '2', '1', '1', '0', '17h 30m']);
     const baraka = within(rowOf('Baraka Juma')).getAllByRole('cell').map((c) => c.textContent);
@@ -170,6 +172,7 @@ describe('Attendance page', () => {
     await screen.findByText('Amina Otieno');
     expect(screen.getByText('Showing you and the people who report to you.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Work schedule' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Scanners' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Open days for Amina Otieno' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).queryByRole('button', { name: /^Correct/ })).toBeNull();

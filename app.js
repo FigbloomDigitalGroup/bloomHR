@@ -10,6 +10,7 @@ import mfaRouter from "./mfa_routes.js";
 import aiRouter from "./ai_routes.js";
 import payrollPaymentsRouter from "./payroll_payments.js";
 import careersRouter from "./careers_routes.js";
+import iclockRouter from "./iclock_routes.js";
 
 /**
  * @param {{ mpesaRouter?: import("express").Router, routes?: { path: string, router: import("express").Router }[] }} options
@@ -23,6 +24,9 @@ export function buildApp({ mpesaRouter, routes = [] } = {}) {
   // each company's public careers API (FIG-838) answers CORS itself, from the websites that company allows, so it is
   // mounted before the app-wide CORS below
   app.use("/api/careers", careersRouter);
+  // door scanners call /iclock/... (vercel.json sends it here); they read their bodies as text themselves, so this
+  // comes before the app-wide JSON parser and CORS (a scanner isn't a browser)
+  app.use("/iclock", iclockRouter);
 
   // CORS_ORIGIN (comma separated) limits which sites may call the API; unset allows any, as before.
   const origins = (process.env.CORS_ORIGIN || "").split(",").map((o) => o.trim()).filter(Boolean);
