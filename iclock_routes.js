@@ -35,9 +35,9 @@ export function handshakeText(serial) {
     // don't send the operation log or photos
     "OPERLOGStamp=9999",
     "ATTPHOTOStamp=None",
-    // after an error, try again in 30 seconds; check in every 10
+    // after an error, try again in 30 seconds; check in for commands every 30 (punches go at once, Realtime below)
     "ErrorDelay=30",
-    "Delay=10",
+    "Delay=30",
     "TransTimes=00:00;14:05",
     "TransInterval=1",
     // only attendance punches

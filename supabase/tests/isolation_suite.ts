@@ -17,7 +17,9 @@ const ADMIN_B = '00000000-0000-0000-0000-00000000b0ad';
 // statutory_rates holds platform defaults (no company) next to companies' own rates; tested in employee_onboarding.test.ts.
 // document_types, banks and bank_branches are reference lists every company shares (read-only).
 // platform_admins and platform_rate_changes are Figbloom's own, above every company (finance_bill_readiness.test.ts).
-const NOT_TENANT_OWNED = ['tenants', 'permissions', 'user_profiles', 'memberships', 'user_preferences', 'Employee_Records_Duplicate', 'kenya_branches_duplicate', 'statutory_rates', 'document_types', 'banks', 'bank_branches', 'platform_admins', 'platform_rate_changes'];
+// attendance_scanner_unregistered is a door scanner that called in before any company registered its serial, so it has
+// no company yet; nobody reads it directly (HR asks about one serial they typed); attendance_scanners.test.ts.
+const NOT_TENANT_OWNED = ['tenants', 'permissions', 'user_profiles', 'memberships', 'user_preferences', 'Employee_Records_Duplicate', 'kenya_branches_duplicate', 'statutory_rates', 'document_types', 'banks', 'bank_branches', 'platform_admins', 'platform_rate_changes', 'attendance_scanner_unregistered'];
 
 let db: PGlite;
 
