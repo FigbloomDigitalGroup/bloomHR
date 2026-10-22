@@ -78,7 +78,7 @@ const GUARDED_CHANGES: Record<string, { gained: string[]; lost: string[] }> = {
 };
 
 // Menu entries added after the reference capture (their own tests below)
-const ADDED_SINCE = ['Video calls', 'Work injuries'];
+const ADDED_SINCE = ['Video calls', 'Work injuries', 'Attendance'];
 
 describe('the seven system roles see the same screens as before', () => {
   it.each(ROLES)('%s: the same sidebar entries, in the same order (plus the screens added since)', (role) => {
@@ -187,6 +187,15 @@ describe('custom roles follow their ticks', () => {
     expect(canOpenScreen('/video-calls', () => true)).toBe(true);
     expect(canOpenScreen('/video-calls', hasFor('MANAGER', ['payroll']))).toBe(false);
     expect(routesFor('STAFF', ['teams'])).toEqual([]);
+  });
+
+  it('Attendance: opens for Employees, HR Lifecycle, Reports or My team’s work, after Leave discipline in the menu', () => {
+    for (const m of ['employees', 'hr-lifecycle', 'reports', 'team-work']) {
+      expect([m, canOpenScreen('/attendance', hasFor('MANAGER', [m]))]).toEqual([m, true]);
+    }
+    expect(canOpenScreen('/attendance', hasFor('MANAGER', ['payroll']))).toBe(false);
+    const menu = sidebarFor('HR', DEFAULT_ROLE_MODULES_AFTER.HR);
+    expect(menu[menu.indexOf('Leave discipline') + 1]).toBe('Attendance');
   });
 
   it('a screen of a module switched off for every company is offered to nobody, administrators included', () => {

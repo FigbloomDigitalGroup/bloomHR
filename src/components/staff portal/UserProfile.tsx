@@ -7,13 +7,11 @@ import toast from "react-hot-toast";
 
 const UserProfileDropdown = ({
   onPasswordReset,
-  loginStatus,
   userName,
   setActiveTab,
   compact = false
 }: {
   onPasswordReset: () => void,
-  loginStatus: { isLoggedIn: boolean; lastLogin: string | null },
   userName: string,
   setActiveTab?: (tab: string) => void,
   /** phone header: just the initial, with the menu floating below it */
@@ -24,34 +22,6 @@ const UserProfileDropdown = ({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-
-  const getCurrentPosition = (): Promise<GeolocationPosition> => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Geolocation is not supported by this browser'));
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          resolve({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            timestamp: position.timestamp
-          });
-        },
-        (error) => {
-          reject(error);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        }
-      );
-    });
-  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -90,9 +60,7 @@ const UserProfileDropdown = ({
   const handleSignOut = async () => {
     try {
       setIsOpen(false);
-      // Log logout time with geolocation
-      await logLogoutTime();
-
+      // signing out records nothing: attendance is the Clock in / Clock out on the home page
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       toast.success('Signed out successfully');
@@ -106,52 +74,6 @@ const UserProfileDropdown = ({
   const handlePasswordReset = () => {
     setIsOpen(false);
     onPasswordReset();
-  };
-
-  const logLogoutTime = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Get employee number from user email
-      const { data: employeeData } = await supabase
-        .from('employees')
-        .select('"Employee Number"')
-        .eq('"Work Email"', user.email)
-        .single();
-
-      if (!employeeData) return;
-
-      // Get current login session
-      const { data: activeLog } = await supabase
-        .from('attendance_logs')
-        .select('id')
-        .eq('employee_number', employeeData["Employee Number"])
-        .is('logout_time', null)
-        .order('login_time', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (activeLog) {
-        const position = await getCurrentPosition();
-
-        await supabase
-          .from('attendance_logs')
-          .update({
-            logout_time: new Date().toISOString(),
-            geolocation: position ? {
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              accuracy: position.coords.accuracy,
-              timestamp: position.timestamp
-            } : null,
-            status: 'logged_out'
-          })
-          .eq('id', activeLog.id);
-      }
-    } catch (error) {
-      console.error('Error logging logout time:', error);
-    }
   };
 
   return (
@@ -182,9 +104,7 @@ const UserProfileDropdown = ({
         <div className="flex-1 min-w-0">
           <p className="text-xs font-medium text-gray-900 truncate">{userName}</p>
           <p className="text-xs text-gray-500 truncate">
-            {loginStatus.isLoggedIn ?
-              `Logged in at ${loginStatus.lastLogin ? new Date(loginStatus.lastLogin).toLocaleTimeString() : 'recently'}` :
-              'Not logged in'}
+            My account
           </p>
         </div>
         <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />

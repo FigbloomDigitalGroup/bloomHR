@@ -61,6 +61,7 @@ const SalaryAdvanceAdmin = lazy(() => import('./components/Settings/SalaryAdmin'
 const LoansAdmin = lazy(() => import('./components/Loans/LoansAdmin'));
 const CasualWorkers = lazy(() => import('./components/Casual/CasualWorkers'));
 const LeaveDisciplinePage = lazy(() => import('./components/LeaveDiscipline/LeaveDisciplinePage'));
+const AttendancePage = lazy(() => import('./components/Attendance/AttendancePage'));
 const OvertimePage = lazy(() => import('./components/Overtime/OvertimePage'));
 const PieceRatePage = lazy(() => import('./components/PieceRate/PieceRatePage'));
 const IncidentReportsManagement = lazy(() => import('./components/Settings/IncidentReportsManagement'));
@@ -1071,6 +1072,7 @@ function App() {
                                 {/* the database shows each person only what they may see on these */}
                                 {gate('/casual-workers', <CasualWorkers />)}
                                 {gate('/leave-discipline', <LeaveDisciplinePage />)}
+                                {gate('/attendance', <AttendancePage />)}
                                 {gate('/piece-rate', <PieceRatePage />)}
                                 {gate('/overtime', <OvertimePage />)}
                                 {gate('/loans', <LoansAdmin />)}

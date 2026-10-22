@@ -156,55 +156,6 @@ const parseApplicationDate = (app: any): Date => {
   return parsedDate;
 };
 
-// Header Status Component
-function HeaderStatus({
-  isLoggedIn,
-  lastLogin,
-}: {
-  isLoggedIn: boolean;
-  lastLogin: string | null;
-  userName: string;
-}) {
-
-  return (
-    <div className="flex items-center space-x-4">
-      {/* Login Status */}
-      <div className="flex items-center text-xs">
-        <PhClock className="h-4 w-4 text-gray-500 mr-1" weight="duotone" />
-        {isLoggedIn ? (
-          <span className="text-brand font-medium">
-            Logged in at {lastLogin ? new Date(lastLogin).toLocaleTimeString() : 'recently'}
-          </span>
-        ) : (
-          <span className="text-gray-500 font-medium">Not logged in</span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Time Tracking Functions
-async function logLoginTime(employeeNumber: string): Promise<boolean> {
-  try {
-    const { error } = await supabase
-      .from('attendance_logs')
-      .insert([{
-        employee_number: employeeNumber,
-        login_time: new Date().toISOString(),
-        logout_time: null,
-        status: 'logged_in'
-      }])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error logging login time:', error);
-    return false;
-  }
-}
-
 // NotificationSidebar Component
 function NotificationSidebar({
   isOpen,
@@ -1050,10 +1001,6 @@ const StaffPortal = () => {
   // collapsed stays collapsed (the mouse is always over the bar when the toggle is clicked, so hover must not re-open it)
   const isExpanded = !isCollapsed;
 
-  const [loginStatus, setLoginStatus] = useState({
-    isLoggedIn: false,
-    lastLogin: null as string | null
-  });
   const [userName, setUserName] = useState('Staff Member');
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile | null>(null);
   const [notifications, setNotifications] = useState<NotificationState>({
@@ -1190,9 +1137,8 @@ const StaffPortal = () => {
     setUnreadByChannel(prev => (prev[channelId] ? { ...prev, [channelId]: 0 } : prev));
   }, []);
 
-  // Check login status and fetch data on component mount
+  // Fetch data on component mount (opening the portal records nothing: attendance is the home page's Clock in)
   useEffect(() => {
-    checkLoginStatus();
     fetchUserData();
     fetchCompanyProfile();
     fetchUnreadMessageCount();
@@ -1282,50 +1228,6 @@ const StaffPortal = () => {
   // Badge on the "Leave" nav item (FIG-575): unread leave decisions only,
   // not warnings - those already have their own bell indicator.
   const unreadLeaveCount = notifications.items.filter(item => item.type === 'leave' && !item.isRead).length;
-
-  const checkLoginStatus = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Get employee number from user email
-      const { data: employeeData } = await supabase
-        .from('employees')
-        .select('"Employee Number"')
-        .eq('"Work Email"', user.email)
-        .single();
-
-      if (!employeeData) return;
-
-      // Check if user has an active login session
-      const { data: activeLog } = await supabase
-        .from('attendance_logs')
-        .select('login_time')
-        .eq('employee_number', employeeData["Employee Number"])
-        .is('logout_time', null)
-        .order('login_time', { ascending: false })
-        .limit(1)
-        .single();
-
-      setLoginStatus({
-        isLoggedIn: !!activeLog,
-        lastLogin: activeLog?.login_time || null
-      });
-
-      // If no active login session, create one automatically
-      if (!activeLog) {
-        const loggedIn = await logLoginTime(employeeData["Employee Number"]);
-        if (loggedIn) {
-          setLoginStatus({
-            isLoggedIn: true,
-            lastLogin: new Date().toISOString()
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error checking login status:', error);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-page relative flex font-sans text-gray-900 transition-colors duration-300 overflow-hidden">
@@ -1634,7 +1536,6 @@ const StaffPortal = () => {
         <StaffMobileHeader
           userName={userName}
           hasUnread={unreadNotifications.length > 0}
-          loginStatus={loginStatus}
           onOpenNotifications={() => setNotificationSidebarOpen(true)}
           onOpenMenu={() => setSidebarOpen(true)}
           onPasswordReset={() => setShowResetModal(true)}
@@ -1669,14 +1570,6 @@ const StaffPortal = () => {
 
             {/* Right: Status & Actions */}
             <div className="flex items-center space-x-4">
-              <HeaderStatus
-                isLoggedIn={loginStatus.isLoggedIn}
-                lastLogin={loginStatus.lastLogin}
-                userName={userName}
-              />
-
-              <div className="w-px h-6 bg-gray-200 mx-2"></div>
-
               <motion.button
                 onClick={() => setNotificationSidebarOpen(true)}
                 className="relative p-2.5 text-gray-400 hover:text-brand transition-colors rounded-full hover:bg-green-tint/50"
@@ -1690,7 +1583,6 @@ const StaffPortal = () => {
 
               <UserProfileDropdown
                 onPasswordReset={() => setShowResetModal(true)}
-                loginStatus={loginStatus}
                 userName={userName}
                 setActiveTab={setActiveTab}
               />

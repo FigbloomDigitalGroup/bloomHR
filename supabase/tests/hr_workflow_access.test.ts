@@ -196,16 +196,16 @@ describe('attendance_logs', () => {
         ('E-ME', 'logged_in', '${A}'), ('E-THEM', 'logged_in', '${A}'), ('E-ME', 'logged_in', '${B}');
     `);
   });
-  it('an employee clocks in and out for themselves only', async () => {
+  // clocking in and out goes through attendance_clock_in / _out (20261023300000, attendance_clock_in.test.ts)
+  it('an employee reads their own records and writes none directly', async () => {
     await asUser(db, U.STAFF, async () => {
       expect(await count(`select 1 from attendance_logs`)).toBe(1);
-      expect(await attempt(`insert into attendance_logs (employee_number, status) values ('E-ME', 'logged_in')`)).toBe(true);
+      expect(await attempt(`insert into attendance_logs (employee_number, status) values ('E-ME', 'logged_in')`)).toBe(false);
       expect(await attempt(`insert into attendance_logs (employee_number, status) values ('E-THEM', 'logged_in')`)).toBe(false);
-      expect(await count(`update attendance_logs set status = 'logged_out' where employee_number = 'E-ME' returning 1`)).toBe(1);
-      expect(await count(`update attendance_logs set status = 'logged_out' where employee_number = 'E-THEM' returning 1`)).toBe(0);
+      expect(await attempt(`update attendance_logs set status = 'logged_out' where employee_number = 'E-ME'`)).toBe(false);
     });
   });
-  it('HR sees the whole company; the manager (no employee-data module for attendance) sees none', async () => {
+  it('HR sees the whole company; a manager with no reports sees none', async () => {
     await asUser(db, U.HR, async () => expect(await count(`select 1 from attendance_logs`)).toBe(2));
     await asUser(db, U.MANAGER, async () => expect(await count(`select 1 from attendance_logs`)).toBe(0));
   });

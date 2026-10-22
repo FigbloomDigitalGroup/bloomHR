@@ -30,7 +30,7 @@ import {
   HardHat,
   Timer,
   Sprout,
-  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature, History, Sparkles, BriefcaseBusiness, MapPin, Video
+  LogOut, CalendarDays, ClipboardCheck, Layers, Network as OrgChart, Building2, FileSignature, History, Sparkles, BriefcaseBusiness, MapPin, Video, Clock
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
@@ -63,6 +63,7 @@ const ICONS: Record<string, LucideIcon> = {
   offers: FileSignature,
   leaves: CalendarRange,
   'leave-discipline': UserX,
+  attendance: Clock,
   performance: Target,
   training: Award,
   'assign-managers': UserCheck,

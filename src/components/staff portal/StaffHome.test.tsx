@@ -32,6 +32,7 @@ vi.mock('../../lib/upcomingApi', () => ({
 }));
 vi.mock('../../lib/hiddenModules', () => ({ isHiddenModule: (m?: string | null) => !!m && state.hidden.has(m) }));
 vi.mock('./CompleteProfileCard', () => ({ default: () => null }));
+vi.mock('../Attendance/ClockCard', () => ({ default: () => null }));
 vi.mock('../chat/services/chatServices', () => ({
   chatService: {
     startDirectMessage: (...a: unknown[]) => state.startDirectMessage(...a),

@@ -13,6 +13,7 @@ import {
   saveCompanyWorkWeek,
   workWeekError,
 } from '../../lib/workWeek';
+import WorkDaysMismatch from '../Attendance/WorkDaysMismatch';
 
 const selectClass = 'w-full rounded-tile border border-border bg-white px-2 py-1.5 text-[12px] text-ink outline-none focus:border-brand disabled:bg-secondary';
 
@@ -106,6 +107,12 @@ export default function WorkWeekCard({ className = '' }: { className?: string })
             {busy ? 'Saving...' : 'Save'}
           </Button>
         )}
+      </div>
+      <div className="mt-3">
+        <WorkDaysMismatch
+          refreshKey={saved}
+          fixHint="Make them match (attendance schedules are on the Attendance page, Work schedule tab), unless the difference is intended."
+        />
       </div>
     </Card>
   );

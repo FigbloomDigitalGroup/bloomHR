@@ -25,7 +25,6 @@ function Portal() {
       <StaffMobileHeader
         userName="jane"
         hasUnread={false}
-        loginStatus={{ isLoggedIn: true, lastLogin: null }}
         onOpenNotifications={() => {}}
         onOpenMenu={() => setMenu(true)}
         onPasswordReset={() => {}}
