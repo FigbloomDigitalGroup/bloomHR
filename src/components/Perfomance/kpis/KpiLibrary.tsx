@@ -11,7 +11,10 @@ import {
   MEASURE_FIXED,
   MEASURE_HINT,
   MEASURE_LABEL,
+  MEASURE_SOURCE,
+  SOURCE_LABEL,
   UNIT_LABEL,
+  measuresFrom,
   formatValue,
   parseNumber,
   type KpiDirection,
@@ -90,12 +93,16 @@ function KpiForm({ initial, onCancel, onSave, busy }: { initial: KpiInput; onCan
         <select id="kpi-measure" className={inputClass} value={form.measure} onChange={(e) => setMeasure(e.target.value as KpiMeasure)}>
           <option value="manual">{MEASURE_LABEL.manual}</option>
           <optgroup label="Calculated from tasks">
-            {(Object.keys(MEASURE_FIXED) as Exclude<KpiMeasure, 'manual'>[]).map((m) => <option key={m} value={m}>{MEASURE_LABEL[m]}</option>)}
+            {measuresFrom('tasks').map((m) => <option key={m} value={m}>{MEASURE_LABEL[m]}</option>)}
+          </optgroup>
+          <optgroup label="Calculated from attendance">
+            {measuresFrom('attendance').map((m) => <option key={m} value={m}>{MEASURE_LABEL[m]}</option>)}
           </optgroup>
         </select>
         <p className="text-[11.5px] text-muted-foreground mt-1">
           {MEASURE_HINT[form.measure]}
-          {calculated && ' Worked out every hour from the Task Manager; a manager can still enter a final score instead.'}
+          {form.measure !== 'manual' &&
+            ` Worked out every hour from ${MEASURE_SOURCE[form.measure] === 'tasks' ? 'the Task Manager' : 'clock-ins'}; a manager can still enter a final score instead.`}
         </p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -281,7 +288,11 @@ export default function KpiLibrary({ kpis, canManage, onChanged, periods = [], p
                     <td className={tdClass}>
                       {UNIT_LABEL[k.unit]}
                       <div className="text-[11px] text-muted-foreground">{DIRECTION_LABEL[k.direction]}</div>
-                      {k.measure !== 'manual' && <div className="text-[11px] font-semibold text-status-info">From tasks: {MEASURE_LABEL[k.measure]}</div>}
+                      {k.measure !== 'manual' && (
+                        <div className="text-[11px] font-semibold text-status-info">
+                          From {SOURCE_LABEL[MEASURE_SOURCE[k.measure]]}: {MEASURE_LABEL[k.measure]}
+                        </div>
+                      )}
                     </td>
                     <td className={tdClass}>{k.unit === 'rating_1_5' ? '—' : formatValue(k.unit, k.default_target)}</td>
                     <td className={tdClass}>{k.default_weight}%</td>
