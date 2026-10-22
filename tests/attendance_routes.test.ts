@@ -84,7 +84,7 @@ describe('POST /api/attendance/clock', () => {
     expect(await res.json()).toMatchObject({ place: 'office' });
     expect(state.calls).toEqual([{
       fn: 'attendance_clock_for_user',
-      args: { p_user: 'u1', p_kind: 'in', p_location: { latitude: -1.28, longitude: 36.82, accuracy: 12 }, p_ip: '102.68.0.44' },
+      args: { p_user: 'u1', p_kind: 'in', p_location: { latitude: -1.28, longitude: 36.82, accuracy: 12 }, p_ip: '102.68.0.44', p_reason: null },
     }]);
   });
 
