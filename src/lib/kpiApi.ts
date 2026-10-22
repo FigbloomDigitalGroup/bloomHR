@@ -17,7 +17,7 @@ import {
 } from './kpis';
 
 // Reading and saving custom KPIs (migrations 20261016900000, 20261019300000 for templates, 20261023200000 for KPIs
-// calculated from tasks). The database decides who may do what; these return its
+// calculated from tasks, 20261023500000 from attendance). The database decides who may do what; these return its
 // refusals as plain sentences.
 
 export interface Kpi {
@@ -30,7 +30,7 @@ export interface Kpi {
   default_weight: number;
   frequency: KpiFrequency;
   category: string | null;
-  /** typed in, or calculated from tasks */
+  /** typed in, or calculated from tasks or attendance */
   measure: KpiMeasure;
   archived: boolean;
 }
@@ -68,7 +68,7 @@ export interface KpiAssignment {
   actual_value: number | null;
   manager_comment: string | null;
   scored_at: string | null;
-  /** the value calculated from tasks (KPIs with a calculated measure), what it came from and when it last changed */
+  /** the calculated value (KPIs with a calculated measure), what it came from and when it last changed */
   auto_value?: number | null;
   auto_detail?: Record<string, number> | null;
   auto_at?: string | null;

@@ -46,7 +46,7 @@ const list = (labels: Record<string, string>) => Object.values(labels).join(', '
 
 const KPI_HELP = [
   ['KPIs: one row per KPI. A new name adds a KPI; the name of a KPI you already have changes it (blank cells keep what it has now).'],
-  [`How it's measured: ${list(MEASURE_LABEL)}. Blank means entered by hand. A measure from tasks fixes the unit and direction.`],
+  [`How it's measured: ${list(MEASURE_LABEL)}. Blank means entered by hand. A measure calculated from tasks or attendance fixes the unit and direction.`],
   [`Unit: ${list(UNIT_LABEL)}. Direction: ${list(DIRECTION_LABEL)}. Frequency: ${list(FREQUENCY_LABEL)}.`],
   ['Default weight is from 0 to 100. Fill in your rows under the headings below; delete nothing above them.'],
 ];

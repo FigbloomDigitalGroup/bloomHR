@@ -132,7 +132,7 @@ export default function Scorecards({ kpis, periods, people, departments, access,
           <div className="flex flex-wrap gap-2 sm:justify-end">
             {canRecalculate && (
               <Button variant="secondary" icon={<RefreshCw size={14} />} disabled={recalculating} onClick={recalculate}
-                title="KPIs calculated from tasks update every hour; this updates them now">
+                title="Calculated KPIs update every hour; this updates them now">
                 Recalculate
               </Button>
             )}

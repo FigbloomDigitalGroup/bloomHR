@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MEASURE_FIXED,
   measureDetail,
+  measuresFrom,
   ACHIEVEMENT_CAP,
   KPI_TEMPLATES,
   RATING_BANDS,
@@ -27,6 +28,17 @@ describe('measures', () => {
     expect(measureDetail('task_days', { done: 4 })).toBe('Median of 4 tasks done');
     expect(measureDetail('manual', { done: 4 })).toBe('');
     expect(measureDetail('tasks_completed', null)).toBe('');
+    expect(measureDetail('attendance_rate', { present: 18, expected: 20 })).toBe('Clocked in 18 of 20 working days');
+    expect(measureDetail('attendance_rate', { present: 0, expected: 0 })).toBe('No working days to count yet');
+    expect(measureDetail('punctuality', { on_time: 1, present: 1 })).toBe('On time 1 of 1 day');
+    expect(measureDetail('absent_days', { absent: 2, expected: 20 })).toBe('2 of 20 working days');
+    expect(measureDetail('avg_hours', { days: 5 })).toBe('Over 5 days clocked in and out');
+  });
+
+  it('groups the calculated measures by where they come from', () => {
+    expect(measuresFrom('tasks')).toEqual(['tasks_on_time', 'tasks_completed', 'tasks_late', 'task_days']);
+    expect(measuresFrom('attendance')).toEqual(['attendance_rate', 'punctuality', 'absent_days', 'avg_hours']);
+    expect(MEASURE_FIXED.absent_days).toEqual({ unit: 'number', direction: 'lower_is_better' });
   });
 
   it('fixes the unit and direction of each calculated measure', () => {

@@ -110,6 +110,15 @@ describe('KPI library', () => {
     })));
   });
 
+  it('offers attendance measures, worked out from clock-ins', () => {
+    render(<KpiLibrary kpis={[]} canManage onChanged={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add KPI' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText("How it's measured"), { target: { value: 'punctuality' } });
+    expect((within(dialog).getByLabelText('Measured as') as HTMLSelectElement).value).toBe('percent');
+    expect(within(dialog).getByText(/share they were on time.*from clock-ins/)).toBeTruthy();
+  });
+
   it('refuses a weight over 100', () => {
     render(<KpiLibrary kpis={[]} canManage onChanged={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Add KPI' }));
@@ -124,7 +133,7 @@ describe('KPI library', () => {
     render(<KpiLibrary kpis={[SALES]} canManage onChanged={vi.fn()} />);
     expect(screen.queryByRole('button', { name: 'Add template Sales revenue' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Add template Attendance rate' }));
-    await waitFor(() => expect(api.saveKpi).toHaveBeenCalledWith(null, expect.objectContaining({ name: 'Attendance rate', unit: 'percent' })));
+    await waitFor(() => expect(api.saveKpi).toHaveBeenCalledWith(null, expect.objectContaining({ name: 'Attendance rate', unit: 'percent', measure: 'attendance_rate' })));
     fireEvent.click(screen.getByRole('button', { name: 'Add template Tasks completed on time' }));
     await waitFor(() => expect(api.saveKpi).toHaveBeenCalledWith(null, expect.objectContaining({ measure: 'tasks_on_time' })));
   });

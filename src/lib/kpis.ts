@@ -10,14 +10,24 @@
 //   overall score   the weighted average of the scored KPIs' achievement: sum(achievement x weight) / sum(weight)
 //   rating band     Exceeds, Meets or Below, from RATING_BANDS
 //   weights check   an employee's weights in a period should total 100 (a warning only)
-//   measures        how a KPI's actual is found: typed in, or calculated from tasks (20261023200000), which fixes the
-//                   KPI's unit and direction
+//   measures        how a KPI's actual is found: typed in, or calculated from tasks (20261023200000) or attendance
+//                   (20261023500000), which fixes the KPI's unit and direction
 
 export type KpiUnit = 'number' | 'percent' | 'currency_ksh' | 'yes_no' | 'rating_1_5';
 export type KpiDirection = 'higher_is_better' | 'lower_is_better';
 export type KpiFrequency = 'monthly' | 'quarterly' | 'annual';
 export type PeriodStatus = 'draft' | 'open' | 'closed';
-export type KpiMeasure = 'manual' | 'tasks_on_time' | 'tasks_completed' | 'tasks_late' | 'task_days';
+export type KpiMeasure =
+  | 'manual'
+  | 'tasks_on_time'
+  | 'tasks_completed'
+  | 'tasks_late'
+  | 'task_days'
+  | 'attendance_rate'
+  | 'punctuality'
+  | 'absent_days'
+  | 'avg_hours';
+export type CalculatedMeasure = Exclude<KpiMeasure, 'manual'>;
 
 export const ACHIEVEMENT_CAP = 150;
 export const WEIGHTS_TOTAL = 100;
@@ -41,6 +51,10 @@ export const MEASURE_LABEL: Record<KpiMeasure, string> = {
   tasks_completed: 'Tasks completed',
   tasks_late: 'Late tasks',
   task_days: 'Average days to complete a task',
+  attendance_rate: 'Attendance rate (%)',
+  punctuality: 'Punctuality (%)',
+  absent_days: 'Days absent',
+  avg_hours: 'Average hours a day',
 };
 export const MEASURE_HINT: Record<KpiMeasure, string> = {
   manual: 'The employee self-assesses and their manager or HR enters the final score.',
@@ -48,20 +62,46 @@ export const MEASURE_HINT: Record<KpiMeasure, string> = {
   tasks_completed: 'Tasks the employee finished in the period.',
   tasks_late: 'Tasks due in the period that were not done by their due date (done late or still open).',
   task_days: 'The median number of days from a task being created to it being done.',
+  attendance_rate: 'Of the working days the employee was expected (not days off, holidays or leave), the share they clocked in.',
+  punctuality: 'Of the days the employee clocked in, the share they were on time for their work schedule.',
+  absent_days: 'Working days with no clock-in, no approved leave and no holiday.',
+  avg_hours: 'The average hours between clocking in and clocking out, on the days with both.',
 };
 /** The unit and direction a calculated measure fixes. */
-export const MEASURE_FIXED: Record<Exclude<KpiMeasure, 'manual'>, { unit: KpiUnit; direction: KpiDirection }> = {
+export const MEASURE_FIXED: Record<CalculatedMeasure, { unit: KpiUnit; direction: KpiDirection }> = {
   tasks_on_time: { unit: 'percent', direction: 'higher_is_better' },
   tasks_completed: { unit: 'number', direction: 'higher_is_better' },
   tasks_late: { unit: 'number', direction: 'lower_is_better' },
   task_days: { unit: 'number', direction: 'lower_is_better' },
+  attendance_rate: { unit: 'percent', direction: 'higher_is_better' },
+  punctuality: { unit: 'percent', direction: 'higher_is_better' },
+  absent_days: { unit: 'number', direction: 'lower_is_better' },
+  avg_hours: { unit: 'number', direction: 'higher_is_better' },
 };
+
+/** Where each calculated measure comes from, for grouping and for "Calculated from ...". */
+export type MeasureSource = 'tasks' | 'attendance';
+export const MEASURE_SOURCE: Record<CalculatedMeasure, MeasureSource> = {
+  tasks_on_time: 'tasks',
+  tasks_completed: 'tasks',
+  tasks_late: 'tasks',
+  task_days: 'tasks',
+  attendance_rate: 'attendance',
+  punctuality: 'attendance',
+  absent_days: 'attendance',
+  avg_hours: 'attendance',
+};
+export const SOURCE_LABEL: Record<MeasureSource, string> = { tasks: 'tasks', attendance: 'attendance' };
+/** The calculated measures from one source, in the order they are offered. */
+export const measuresFrom = (source: MeasureSource) =>
+  (Object.keys(MEASURE_SOURCE) as CalculatedMeasure[]).filter((m) => MEASURE_SOURCE[m] === source);
 
 /** What a calculated value was worked out from, e.g. "8 of 10 due tasks done on time". */
 export function measureDetail(measure: KpiMeasure, detail: Record<string, number> | null | undefined): string {
   if (!detail || measure === 'manual') return '';
   const n = (k: string) => Number(detail[k] ?? 0);
   const tasks = (k: number) => (k === 1 ? 'task' : 'tasks');
+  const days = (k: number) => (k === 1 ? 'day' : 'days');
   switch (measure) {
     case 'tasks_on_time':
       return n('due') === 0 ? 'No tasks due yet' : `${n('on_time')} of ${n('due')} due ${tasks(n('due'))} done on time`;
@@ -71,6 +111,14 @@ export function measureDetail(measure: KpiMeasure, detail: Record<string, number
       return `${n('done')} ${tasks(n('done'))} done`;
     case 'task_days':
       return n('done') === 0 ? 'No tasks done yet' : `Median of ${n('done')} ${tasks(n('done'))} done`;
+    case 'attendance_rate':
+      return n('expected') === 0 ? 'No working days to count yet' : `Clocked in ${n('present')} of ${n('expected')} working ${days(n('expected'))}`;
+    case 'punctuality':
+      return n('present') === 0 ? 'No clock-ins yet' : `On time ${n('on_time')} of ${n('present')} ${days(n('present'))}`;
+    case 'absent_days':
+      return n('expected') === 0 ? 'No working days to count yet' : `${n('absent')} of ${n('expected')} working ${days(n('expected'))}`;
+    case 'avg_hours':
+      return n('days') === 0 ? 'No full days yet' : `Over ${n('days')} ${days(n('days'))} clocked in and out`;
   }
 }
 
@@ -217,7 +265,7 @@ export interface KpiTemplate {
 export const KPI_TEMPLATES: readonly KpiTemplate[] = [
   { name: 'Sales revenue', description: 'Revenue closed in the period.', unit: 'currency_ksh', direction: 'higher_is_better', default_target: 1_000_000, default_weight: 30, frequency: 'quarterly', category: 'Financial' },
   { name: 'Customer satisfaction', description: 'Average customer rating from surveys or feedback.', unit: 'rating_1_5', direction: 'higher_is_better', default_target: 4, default_weight: 20, frequency: 'quarterly', category: 'Customer' },
-  { name: 'Attendance rate', description: 'Days present as a share of working days.', unit: 'percent', direction: 'higher_is_better', default_target: 95, default_weight: 15, frequency: 'monthly', category: 'People' },
+  { name: 'Attendance rate', description: 'Days present as a share of working days.', unit: 'percent', direction: 'higher_is_better', default_target: 95, default_weight: 15, frequency: 'monthly', category: 'People', measure: 'attendance_rate' },
   { name: 'Tasks completed on time', description: 'Share of assigned tasks delivered by their due date.', unit: 'percent', direction: 'higher_is_better', default_target: 90, default_weight: 20, frequency: 'monthly', category: 'Process', measure: 'tasks_on_time' },
   { name: 'Quality / error rate', description: 'Share of work returned or with errors.', unit: 'percent', direction: 'lower_is_better', default_target: 2, default_weight: 15, frequency: 'monthly', category: 'Process' },
 ];
