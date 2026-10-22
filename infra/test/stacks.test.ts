@@ -64,6 +64,11 @@ describe('AccountSecurityStack', () => {
   it('alerts on cost anomalies above the threshold', () => {
     const t = securityTemplate();
     t.hasResourceProperties('AWS::CE::AnomalyMonitor', { MonitorType: 'DIMENSIONAL', MonitorDimension: 'SERVICE' });
+    // an account that already has AWS's per-service monitor: the alerts use it, and no second one is created
+    const existing = 'arn:aws:ce::123456789012:anomalymonitor/abc';
+    const reuse = securityTemplate({ serviceAnomalyMonitorArn: existing });
+    reuse.resourceCountIs('AWS::CE::AnomalyMonitor', 0);
+    reuse.hasResourceProperties('AWS::CE::AnomalySubscription', { MonitorArnList: [existing] });
     const sub = Object.values(t.findResources('AWS::CE::AnomalySubscription'))[0];
     expect(JSON.parse(sub.Properties.ThresholdExpression).Dimensions.Values).toEqual(['20']);
     expect(sub.Properties.Subscribers).toHaveLength(2);

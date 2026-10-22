@@ -92,15 +92,18 @@ export class AccountSecurityStack extends Stack {
     });
 
     // --- Cost anomaly detection: catches a sudden spike on one service well before the monthly budget fills up ---
-    const monitor = new ce.CfnAnomalyMonitor(this, 'ServiceSpendMonitor', {
-      monitorName: 'figbloom-per-service',
-      monitorType: 'DIMENSIONAL',
-      monitorDimension: 'SERVICE',
-    });
+    // (the account's existing per-service monitor when there is one: only one is allowed)
+    const monitorArn =
+      settings.serviceAnomalyMonitorArn ??
+      new ce.CfnAnomalyMonitor(this, 'ServiceSpendMonitor', {
+        monitorName: 'figbloom-per-service',
+        monitorType: 'DIMENSIONAL',
+        monitorDimension: 'SERVICE',
+      }).attrMonitorArn;
     new ce.CfnAnomalySubscription(this, 'ServiceSpendAlerts', {
       subscriptionName: 'figbloom-spend-anomalies',
       frequency: 'DAILY',
-      monitorArnList: [monitor.attrMonitorArn],
+      monitorArnList: [monitorArn],
       subscribers: settings.alertEmails.map((address) => ({ type: 'EMAIL', address })),
       thresholdExpression: JSON.stringify({
         Dimensions: {
