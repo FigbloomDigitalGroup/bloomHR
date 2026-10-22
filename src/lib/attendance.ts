@@ -17,6 +17,10 @@ export interface AttendanceDay {
   lateMinutes: number | null;
   source: string | null;
   note: string | null;
+  /** a clock-in at odd hours, e.g. "Clocked in at 12:01 am, before 5:00 am" (migration 20261023800000) */
+  flag?: string | null;
+  /** false: a day before the company's "Count attendance from" (no status, not counted anywhere) */
+  counted?: boolean;
 }
 
 /** The signed-in employee's day, for the portal card (attendance_today). */
@@ -250,6 +254,138 @@ export function summarise(days: AttendanceDay[]): AttendanceSummary[] {
     s.hours += d.hours ?? 0;
   }
   return [...by.values()];
+}
+
+/** A day's status as the day view shows it: "Not counted" before attendance counts, else its label ("Not yet"...). */
+export const dayStatusLabel = (d: Pick<AttendanceDay, 'status' | 'counted'>) =>
+  d.counted === false ? 'Not counted' : statusLabel(d.status);
+
+/**
+ * A day's hours as shown: the recorded hours; today with a clock-in and no clock-out yet, the time so far (now minus
+ * the clock-in, `open: 'so_far'`); a past day with a clock-in and no clock-out, none (`open: 'missing'`). The database
+ * keeps hours empty until there is a clock-out; this is for showing only.
+ */
+export function dayHours(
+  d: Pick<AttendanceDay, 'day' | 'clockIn' | 'clockOut' | 'hours'>,
+  today: string,
+  now: Date = new Date()
+): { hours: number | null; open: 'so_far' | 'missing' | null } {
+  if (d.clockIn && !d.clockOut) {
+    if (d.day === today) return { hours: hoursBetween(d.clockIn, null, now), open: 'so_far' };
+    if (d.day < today) return { hours: null, open: 'missing' };
+  }
+  return { hours: d.hours, open: null };
+}
+
+/** "8h 30m", "2h 10m so far" (today, still in) or "No clock-out" (a past day). */
+export function dayHoursLabel(d: Pick<AttendanceDay, 'day' | 'clockIn' | 'clockOut' | 'hours'>, today: string, now: Date = new Date()): string {
+  const h = dayHours(d, today, now);
+  if (h.open === 'so_far') return `${formatHours(h.hours)} so far`;
+  if (h.open === 'missing') return 'No clock-out';
+  return formatHours(h.hours);
+}
+
+export interface OpenDays {
+  /** hours so far today (clocked in, not out yet) */
+  soFar: number;
+  inNow: boolean;
+  /** past days with a clock-in and no clock-out */
+  missing: number;
+}
+
+/** Per person: today's time so far while still clocked in, and past days without a clock-out (for HR to correct). */
+export function openDaysByPerson(days: AttendanceDay[], today: string, now: Date = new Date()): Map<string, OpenDays> {
+  const out = new Map<string, OpenDays>();
+  for (const d of days) {
+    const h = dayHours(d, today, now);
+    if (!h.open) continue;
+    const o = out.get(d.employeeNumber) ?? { soFar: 0, inNow: false, missing: 0 };
+    if (h.open === 'so_far') {
+      o.soFar += h.hours ?? 0;
+      o.inNow = true;
+    } else {
+      o.missing += 1;
+    }
+    out.set(d.employeeNumber, o);
+  }
+  return out;
+}
+
+/** The summary's hours: "17h 30m", or "19h 40m so far" while someone is still in today. */
+export const totalHoursLabel = (hours: number, open?: OpenDays) =>
+  open?.inNow ? `${formatHours(hours + open.soFar)} so far` : formatHours(hours);
+
+/** "1 day without a clock-out", "3 days without a clock-out". */
+export const missingClockOutLabel = (n: number) => `${n} ${n === 1 ? 'day' : 'days'} without a clock-out`;
+
+/** How many flagged (odd-hours) days each person has. */
+export function flaggedByPerson(days: AttendanceDay[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const d of days) if (d.flag) out.set(d.employeeNumber, (out.get(d.employeeNumber) ?? 0) + 1);
+  return out;
+}
+
+// ---------------------------------------------------------------------------------------------
+// every scan of a day (attendance_day_scans, migration 20261023800000)
+// ---------------------------------------------------------------------------------------------
+export type ScanVia = 'scanner' | 'app' | 'hr';
+/** the clock-in, the clock-out, a scan in between, one held back (not counted) or one not applied yet */
+export type ScanKind = 'clock_in' | 'clock_out' | 'between' | 'held' | 'waiting';
+
+export interface DayScan {
+  /** ISO moment */
+  at: string;
+  via: ScanVia;
+  scannerName: string | null;
+  kind: ScanKind;
+  /** why a scan was held back: 'clock_ahead', 'hr_corrected' */
+  reason: string | null;
+}
+
+const KIND_LABEL: Record<ScanKind, string> = {
+  clock_in: 'clock-in',
+  clock_out: 'clock-out',
+  between: '',
+  held: 'not counted',
+  waiting: 'not counted yet',
+};
+
+const REASON_LABEL: Record<string, string> = {
+  clock_ahead: "the scanner's clock was ahead",
+  hr_corrected: 'HR corrected this day',
+};
+
+/** Where a scan came from: the scanner's name, "App" or "HR correction". */
+export const scanSource = (s: Pick<DayScan, 'via' | 'scannerName'>) =>
+  s.via === 'app' ? 'App' : s.via === 'hr' ? 'HR correction' : s.scannerName || 'Scanner';
+
+/** What a scan was: "clock-in", "clock-out", "" (in between) or "not counted (the scanner's clock was ahead)". */
+export function scanRole(s: Pick<DayScan, 'kind' | 'reason'>): string {
+  const label = KIND_LABEL[s.kind] ?? '';
+  if (s.kind === 'held' && s.reason) return `${label} (${REASON_LABEL[s.reason] ?? s.reason.replace(/_/g, ' ')})`;
+  return label;
+}
+
+/** One line of a day's scans: "7:55 am · Front Door · clock-in", "12:30 pm · Front Door", "8:02 am · App · clock-in". */
+export const scanLine = (s: DayScan) => [formatTime(s.at), scanSource(s), scanRole(s)].filter(Boolean).join(' · ');
+
+// ---------------------------------------------------------------------------------------------
+// odd-hours clock-ins (migration 20261023800000)
+// ---------------------------------------------------------------------------------------------
+/** The built-in "odd-hours clock-in before" time. */
+export const DEFAULT_ODD_HOURS_UNTIL = '05:00';
+
+/** What is wrong with an odd-hours time ("HH:MM"), or null: from 00:00 (never flag) to 12:00. */
+export function oddHoursProblem(hhmm: string): string | null {
+  if (!/^\d{2}:\d{2}$/.test(hhmm)) return 'Enter a time';
+  if (hhmm > '12:00') return 'Choose a time from 00:00 to 12:00';
+  return null;
+}
+
+/** The setting as a sentence: "Clock-ins after midnight and before 5:00 am are flagged." */
+export function oddHoursSummary(hhmm: string): string {
+  if (hhmm === '00:00') return "Odd-hours clock-ins aren't flagged.";
+  return `Clock-ins after midnight and before ${clockLabel(hhmm)} are flagged.`;
 }
 
 // ---------------------------------------------------------------------------------------------

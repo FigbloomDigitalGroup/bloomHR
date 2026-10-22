@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { fetchAll } from './fetchAll';
-import type { AttendanceDay, AttendanceStatus, AttendanceToday } from './attendance';
+import { DEFAULT_ODD_HOURS_UNTIL, type AttendanceDay, type AttendanceStatus, type AttendanceToday, type DayScan, type ScanKind, type ScanVia } from './attendance';
 
 // Clocking in and out, the days HR sees, corrections and work schedules (migrations 20261023300000, 20261023400000). The database
 // decides who may do what; these turn its answers into plain shapes and its refusals into plain messages.
@@ -12,6 +12,7 @@ export function attendanceError(err: unknown): string {
   if (/work_schedules_grace_check/.test(e.message ?? '')) return 'Grace must be between 0 and 240 minutes';
   if (/work_schedules_times_check/.test(e.message ?? '')) return 'The end time must be after the start time';
   if (/work_schedules_days_check/.test(e.message ?? '')) return 'Choose at least one working day';
+  if (/attendance_settings_odd_hours_check/.test(e.message ?? '')) return 'Choose a time from 00:00 to 12:00';
   if (e.code === '42501' && /row-level security/.test(e.message ?? '')) return 'You are not allowed to do that';
   return e.message || 'Something went wrong';
 }
@@ -120,7 +121,24 @@ export const toDay = (r: Record<string, unknown>): AttendanceDay => ({
   lateMinutes: num(r.late_minutes),
   source: (r.source as string | null) ?? null,
   note: (r.note as string | null) ?? null,
+  flag: (r.flag as string | null) ?? null,
+  counted: r.counted !== false,
 });
+
+export const toScan = (r: Record<string, unknown>): DayScan => ({
+  at: String(r.punched_at ?? ''),
+  via: (r.via as ScanVia) ?? 'scanner',
+  scannerName: (r.scanner_name as string | null) ?? null,
+  kind: (r.kind as ScanKind) ?? 'between',
+  reason: (r.reason as string | null) ?? null,
+});
+
+/** Every scan behind one person's day, in time order (migration 20261023800000). */
+export async function loadDayScans(employeeNumber: string, date: string): Promise<DayScan[]> {
+  const { data, error } = await supabase.rpc('attendance_day_scans', { p_employee: employeeNumber, p_date: date });
+  if (error) fail(error);
+  return ((data ?? []) as Record<string, unknown>[]).map(toScan);
+}
 
 /** One row per person per day from `from` to `to` (one person's when given): who the signed-in person may see. */
 export async function loadAttendanceDays(from: string, to: string, employeeNumber?: string): Promise<AttendanceDay[]> {
@@ -219,5 +237,23 @@ export async function saveTrackingFrom(day: string): Promise<void> {
   const { error } = await supabase
     .from('attendance_settings')
     .upsert({ tracking_from: day }, { onConflict: 'tenant_id' });
+  if (error) fail(error);
+}
+
+// ---------------------------------------------------------------------------------------------
+// odd-hours clock-ins (migration 20261023800000)
+// ---------------------------------------------------------------------------------------------
+/** The company's "odd-hours clock-in before" time ("HH:MM"; 05:00 when not set, 00:00 = never flag). */
+export async function loadOddHoursUntil(): Promise<string> {
+  const { data, error } = await supabase.from('attendance_settings').select('odd_hours_until').maybeSingle();
+  if (error) fail(error);
+  return data?.odd_hours_until ? hhmm(data.odd_hours_until) : DEFAULT_ODD_HOURS_UNTIL;
+}
+
+/** Saves it (a company without settings yet keeps counting attendance from the day it already did). */
+export async function saveOddHoursUntil(time: string): Promise<void> {
+  const { error } = await supabase
+    .from('attendance_settings')
+    .upsert({ odd_hours_until: time }, { onConflict: 'tenant_id' });
   if (error) fail(error);
 }

@@ -3,12 +3,14 @@ import toast from 'react-hot-toast';
 import { Button, Card } from '../UI';
 import { LoaderBlock } from '../UI/FigbloomLoader';
 import { inputClass, labelClass } from '../Perfomance/kpis/shared';
-import { WEEK_DAYS, clockLabel, workDaysLabel } from '../../lib/attendance';
+import { DEFAULT_ODD_HOURS_UNTIL, WEEK_DAYS, clockLabel, oddHoursProblem, oddHoursSummary, workDaysLabel } from '../../lib/attendance';
 import {
   DEFAULT_SCHEDULE,
+  loadOddHoursUntil,
   loadSchedules,
   loadTrackingFrom,
   removeSchedule,
+  saveOddHoursUntil,
   saveSchedule,
   saveTrackingFrom,
   type WorkSchedule,
@@ -56,6 +58,7 @@ export default function WorkSchedules() {
         fixHint="Make them match (the leave and payroll work week is in Settings → Company profile → Work week), unless the difference is intended."
       />
       <TrackingFrom />
+      <OddHoursUntil />
       <ScheduleForm
         title="Company schedule"
         hint={company ? undefined : 'Not set yet: the company works Monday to Friday, 8:00 am to 5:00 pm.'}
@@ -164,11 +167,73 @@ export function TrackingFrom() {
           <label htmlFor="attendance-from" className={labelClass}>Count attendance from</label>
           <input id="attendance-from" type="date" className={inputClass} value={day} onChange={(e) => setDay(e.target.value)} />
           <p className="text-[11.5px] text-muted-foreground mt-1">
-            Working days before this aren't marked absent, because staff couldn't clock in yet.
+            Days before this don't count: not present, late or absent. Their scans are still kept.
             {saved === null && ' Not set: attendance counts from the day your company was set up.'}
           </p>
         </div>
         <Button disabled={busy || !day || day === saved} onClick={() => void save()}>Save</Button>
+      </div>
+    </Card>
+  );
+}
+
+/** The time before which a clock-in after midnight is flagged and HR is told (00:00 = never). */
+export function OddHoursUntil() {
+  const [saved, setSaved] = useState<string | undefined>(undefined);
+  const [time, setTime] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    loadOddHoursUntil()
+      .then((t) => {
+        if (!live) return;
+        setSaved(t);
+        setTime(t);
+      })
+      .catch(() => {
+        if (!live) return;
+        setSaved(DEFAULT_ODD_HOURS_UNTIL);
+        setTime(DEFAULT_ODD_HOURS_UNTIL);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  if (saved === undefined) return null;
+
+  const save = async () => {
+    const p = oddHoursProblem(time);
+    if (p) return setProblem(p);
+    setProblem(null);
+    setBusy(true);
+    try {
+      await saveOddHoursUntil(time);
+      setSaved(time);
+      toast.success('Saved');
+    } catch (e) {
+      setProblem((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card padding="sm">
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
+        <div className="min-w-0">
+          <label htmlFor="attendance-odd-hours" className={labelClass}>Odd-hours clock-in before</label>
+          <input id="attendance-odd-hours" type="time" min="00:00" max="12:00" className={inputClass} value={time}
+            onChange={(e) => setTime(e.target.value)} />
+          <p className="text-[11.5px] text-muted-foreground mt-1">
+            A clock-in after midnight and before this time is flagged and HR is notified. 00:00 turns it off.
+            {oddHoursProblem(time) ? '' : ` ${oddHoursSummary(time)}`}
+          </p>
+          {problem && <p role="alert" className="text-[12px] text-status-danger mt-1">{problem}</p>}
+        </div>
+        <Button disabled={busy || !time || time === saved} onClick={() => void save()}>Save</Button>
       </div>
     </Card>
   );

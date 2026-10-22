@@ -21,7 +21,21 @@ import {
   workDaysLabel,
   workDaysMismatches,
   workWeekIsoDays,
+  DEFAULT_ODD_HOURS_UNTIL,
+  dayHours,
+  dayHoursLabel,
+  dayStatusLabel,
+  missingClockOutLabel,
+  openDaysByPerson,
+  totalHoursLabel,
+  flaggedByPerson,
+  oddHoursProblem,
+  oddHoursSummary,
+  scanLine,
+  scanRole,
+  scanSource,
   type AttendanceDay,
+  type DayScan,
 } from './attendance';
 
 const day = (fields: Partial<AttendanceDay> & Pick<AttendanceDay, 'employeeNumber' | 'day'>): AttendanceDay => ({
@@ -159,5 +173,88 @@ describe('working days: attendance against leave and payroll', () => {
       "Kampala's attendance schedule works Mon–Sat, but leave and payroll count Mon–Fri.",
       'Office works Mon–Fri for leave and payroll, but attendance expects Mon–Sat unless their branch has its own schedule.',
     ]);
+  });
+});
+
+describe('days without a clock-out, and days that don’t count', () => {
+  const TODAY = '2026-10-22';
+  // 5:00 pm in Nairobi
+  const NOW = new Date('2026-10-22T14:00:00Z');
+
+  it('today, still in: the time so far; a past day: no clock-out; otherwise the hours', () => {
+    const inToday = day({ employeeNumber: 'A', day: TODAY, clockIn: '2026-10-22T11:40:00Z' }); // 2:40 pm
+    expect(dayHours(inToday, TODAY, NOW)).toEqual({ hours: 2 + 20 / 60, open: 'so_far' });
+    expect(dayHoursLabel(inToday, TODAY, NOW)).toBe('2h 20m so far');
+    const forgot = day({ employeeNumber: 'A', day: '2026-10-21', clockIn: '2026-10-21T05:00:00Z' });
+    expect(dayHours(forgot, TODAY, NOW)).toEqual({ hours: null, open: 'missing' });
+    expect(dayHoursLabel(forgot, TODAY, NOW)).toBe('No clock-out');
+    const done = day({ employeeNumber: 'A', day: '2026-10-20', clockIn: '2026-10-20T05:00:00Z', clockOut: '2026-10-20T14:00:00Z', hours: 9 });
+    expect(dayHoursLabel(done, TODAY, NOW)).toBe('9h 00m');
+    expect(dayHoursLabel(day({ employeeNumber: 'A', day: '2026-10-19' }), TODAY, NOW)).toBe('—');
+  });
+
+  it('sums each person’s time so far today and counts their past days without a clock-out', () => {
+    const open = openDaysByPerson([
+      day({ employeeNumber: 'A', day: TODAY, clockIn: '2026-10-22T12:00:00Z' }),
+      day({ employeeNumber: 'A', day: '2026-10-21', clockIn: '2026-10-21T05:00:00Z', clockOut: '2026-10-21T14:00:00Z', hours: 9 }),
+      day({ employeeNumber: 'B', day: '2026-10-20', clockIn: '2026-10-20T05:00:00Z' }),
+      day({ employeeNumber: 'B', day: '2026-10-21', clockIn: '2026-10-21T05:00:00Z' }),
+      day({ employeeNumber: 'C', day: '2026-10-21', clockIn: '2026-10-21T05:00:00Z', clockOut: '2026-10-21T06:00:00Z', hours: 1 }),
+    ], TODAY, NOW);
+    expect([...open]).toEqual([
+      ['A', { soFar: 2, inNow: true, missing: 0 }],
+      ['B', { soFar: 0, inNow: false, missing: 2 }],
+    ]);
+    expect(totalHoursLabel(9, open.get('A'))).toBe('11h 00m so far');
+    expect(totalHoursLabel(0, open.get('B'))).toBe('0m');
+    expect(totalHoursLabel(1, undefined)).toBe('1h 00m');
+    expect(missingClockOutLabel(1)).toBe('1 day without a clock-out');
+    expect(missingClockOutLabel(2)).toBe('2 days without a clock-out');
+  });
+
+  it('a day before attendance counts says so', () => {
+    expect(dayStatusLabel({ status: null, counted: false })).toBe('Not counted');
+    expect(dayStatusLabel({ status: null, counted: true })).toBe('Not yet');
+    expect(dayStatusLabel({ status: 'late' })).toBe('Late');
+  });
+});
+
+describe('odd-hours flags and the scans of a day (20261023800000)', () => {
+  it('counts each person’s flagged days', () => {
+    const got = flaggedByPerson([
+      day({ employeeNumber: 'A', day: '2026-10-19', flag: 'Clocked in at 12:01 am, before 5:00 am' }),
+      day({ employeeNumber: 'A', day: '2026-10-20', flag: null }),
+      day({ employeeNumber: 'A', day: '2026-10-21', flag: 'Clocked in at 4:59 am, before 5:00 am' }),
+      day({ employeeNumber: 'B', day: '2026-10-19' }),
+    ]);
+    expect([...got]).toEqual([['A', 2]]);
+  });
+
+  it('labels each scan: time, where from, and what it was', () => {
+    const scan = (fields: Partial<DayScan>): DayScan => ({ at: '2026-10-19T04:55:00Z', via: 'scanner', scannerName: 'Front Door', kind: 'between', reason: null, ...fields });
+    expect(scanLine(scan({ kind: 'clock_in' }))).toBe('7:55 am · Front Door · clock-in');
+    expect(scanLine(scan({ at: '2026-10-19T09:30:00Z' }))).toBe('12:30 pm · Front Door');
+    expect(scanLine(scan({ at: '2026-10-19T14:04:00Z', kind: 'clock_out' }))).toBe('5:04 pm · Front Door · clock-out');
+    expect(scanLine(scan({ at: '2026-10-19T05:02:00Z', via: 'app', scannerName: null, kind: 'clock_in' }))).toBe('8:02 am · App · clock-in');
+    expect(scanLine(scan({ via: 'hr', scannerName: null, kind: 'clock_out' }))).toBe('7:55 am · HR correction · clock-out');
+    expect(scanLine(scan({ kind: 'held', reason: 'clock_ahead' }))).toBe("7:55 am · Front Door · not counted (the scanner's clock was ahead)");
+    expect(scanLine(scan({ kind: 'held', reason: 'hr_corrected' }))).toBe('7:55 am · Front Door · not counted (HR corrected this day)');
+    expect(scanLine(scan({ kind: 'held', reason: 'something_new' }))).toBe('7:55 am · Front Door · not counted (something new)');
+    expect(scanLine(scan({ kind: 'waiting' }))).toBe('7:55 am · Front Door · not counted yet');
+    expect(scanSource({ via: 'scanner', scannerName: null })).toBe('Scanner');
+    expect(scanRole({ kind: 'between', reason: null })).toBe('');
+    // just after midnight
+    expect(scanLine(scan({ at: '2026-10-18T21:01:00Z', kind: 'clock_in' }))).toBe('12:01 am · Front Door · clock-in');
+  });
+
+  it('checks and explains the odd-hours setting', () => {
+    expect(DEFAULT_ODD_HOURS_UNTIL).toBe('05:00');
+    expect(oddHoursProblem('05:00')).toBeNull();
+    expect(oddHoursProblem('00:00')).toBeNull();
+    expect(oddHoursProblem('12:00')).toBeNull();
+    expect(oddHoursProblem('12:01')).toMatch(/00:00 to 12:00/);
+    expect(oddHoursProblem('')).toBe('Enter a time');
+    expect(oddHoursSummary('05:00')).toBe('Clock-ins after midnight and before 5:00 am are flagged.');
+    expect(oddHoursSummary('00:00')).toBe("Odd-hours clock-ins aren't flagged.");
   });
 });

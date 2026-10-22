@@ -23,6 +23,7 @@ const ADMIN_B = '00000000-0000-0000-0000-00000000e105';
 const TODAY = '2026-10-22';
 const MIGRATION = join(__dirname, '..', 'migrations', '20261023300000_attendance_clock_in.sql');
 const TRACKING_MIGRATION = join(__dirname, '..', 'migrations', '20261023400000_attendance_tracking_from.sql');
+const ODD_HOURS_MIGRATION = join(__dirname, '..', 'migrations', '20261023800000_attendance_odd_hours.sql');
 
 let db: PGlite;
 let dar: string;
@@ -267,11 +268,12 @@ describe('companies are kept apart', () => {
 describe('the day attendance counts from', () => {
   const setFrom = (day: string) => db.query(`update attendance_settings set tracking_from = $1 where tenant_id = $2`, [day, A]);
 
-  it('working days before it are not absent (left empty); clock-ins on them still show', async () => {
+  it('days before it don’t count (left empty, even with a clock-in: 20261023800000); clock-ins on them still show', async () => {
     await setFrom('2026-10-20');
     try {
       expect(await statuses('A-THEM')).toMatchObject({ '19': null, '20': 'leave' });
-      expect((await statuses('A-ME'))['19']).toBe('present');
+      expect((await statuses('A-ME'))['19']).toBeNull();
+      expect((await days('A-ME', '2026-10-19', '2026-10-19'))[0]).toMatchObject({ late_minutes: null, clock_in: expect.any(String) });
       expect((await statuses('A-GONE'))['19']).toBeNull();
     } finally {
       await setFrom('2025-01-01');
@@ -305,8 +307,12 @@ describe('the migration', () => {
       tracking: await rows(`select tenant_id, tracking_from::text from attendance_settings order by tenant_id`),
     });
     const before = await snapshot();
+    // 20261023800000 added a column to the days (the odd-hours flag): the older versions can only be created again
+    // once it is gone, and running it again afterwards puts it back
+    await db.exec(`drop function public.attendance_days_for(uuid, date, date, text, date); drop function public.attendance_days(date, date, text);`);
     await db.exec(readFileSync(MIGRATION, 'utf8'));
     await db.exec(readFileSync(TRACKING_MIGRATION, 'utf8'));
+    await db.exec(readFileSync(ODD_HOURS_MIGRATION, 'utf8'));
     await db.exec('reset search_path');
     expect(await snapshot()).toEqual(before);
   });

@@ -129,6 +129,7 @@ const ADMIN_BY_TYPE: Record<string, string> = {
   asset_assigned: '/asset',
   application_received: '/recruitment',
   casual_limit: '/casual-workers',
+  attendance_odd_hours: '/attendance',
 };
 
 /** The screen HR or an admin handles a notification on, or null when there is none (it is only marked read). */

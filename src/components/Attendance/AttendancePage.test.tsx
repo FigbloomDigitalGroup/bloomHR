@@ -14,6 +14,9 @@ const api = vi.hoisted(() => ({
   removeSchedule: vi.fn(),
   loadTrackingFrom: vi.fn(),
   saveTrackingFrom: vi.fn(),
+  loadDayScans: vi.fn(),
+  loadOddHoursUntil: vi.fn(),
+  saveOddHoursUntil: vi.fn(),
 }));
 const downloadCsv = vi.hoisted(() => vi.fn());
 const people = vi.hoisted(() => ({ list: [] as unknown[] }));
@@ -36,7 +39,7 @@ vi.mock('../../lib/branches', async (importOriginal) => ({
 vi.mock('../../lib/kpiApi', () => ({ downloadCsv }));
 
 import AttendancePage from './AttendancePage';
-import { nairobiToday, weekOf } from '../../lib/attendance';
+import { addDays, nairobiToday, weekOf } from '../../lib/attendance';
 
 const person = (n: string, fullName: string, department: string, branch: string): DirectoryEmployee => ({
   employeeNumber: n, firstName: fullName.split(' ')[0], middleName: '', lastName: '', fullName, jobTitle: '', branch, town: '',
@@ -64,6 +67,9 @@ beforeEach(() => {
   api.loadAttendanceAccess.mockResolvedValue(HR);
   api.loadTrackingFrom.mockResolvedValue('2026-10-22');
   api.saveTrackingFrom.mockResolvedValue(undefined);
+  api.loadDayScans.mockResolvedValue([]);
+  api.loadOddHoursUntil.mockResolvedValue('05:00');
+  api.saveOddHoursUntil.mockResolvedValue(undefined);
   api.loadAttendanceDays.mockResolvedValue(DAYS);
   api.loadSchedules.mockResolvedValue([]);
   api.setAttendanceDay.mockResolvedValue(undefined);
@@ -160,9 +166,106 @@ describe('Attendance page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Work schedule' }));
     const from = (await screen.findByLabelText('Count attendance from')) as HTMLInputElement;
     expect(from.value).toBe('2026-10-22');
+    expect(within(from.closest('div.grid') as HTMLElement).getByText(/Days before this don't count: not present, late or absent\. Their scans are still kept\./)).toBeTruthy();
     fireEvent.change(from, { target: { value: '2026-10-19' } });
     fireEvent.click(within(from.closest('div.grid') as HTMLElement).getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.saveTrackingFrom).toHaveBeenCalledWith('2026-10-19'));
+  });
+
+  it('flags odd-hours days in the summary and on the day, and lists each day’s scans', async () => {
+    const flag = 'Clocked in at 12:01 am, before 5:00 am';
+    api.loadAttendanceDays.mockResolvedValue([
+      ...DAYS.filter((d) => d.day !== '2026-10-19' || d.employeeNumber !== 'E1'),
+      day('E1', '2026-10-19', { status: 'present', clockIn: '2026-10-18T21:01:00Z', clockOut: '2026-10-19T14:05:00Z', hours: 17.07, lateMinutes: 0, flag }),
+    ]);
+    api.loadDayScans.mockResolvedValue([
+      { at: '2026-10-18T21:01:00Z', via: 'scanner', scannerName: 'Front Door', kind: 'clock_in', reason: null },
+      { at: '2026-10-19T05:02:00Z', via: 'app', scannerName: null, kind: 'between', reason: null },
+      { at: '2026-10-19T09:30:00Z', via: 'scanner', scannerName: 'Front Door', kind: 'between', reason: null },
+      { at: '2026-10-19T14:05:00Z', via: 'scanner', scannerName: 'Front Door', kind: 'clock_out', reason: null },
+      { at: '2026-10-19T16:00:00Z', via: 'scanner', scannerName: 'Front Door', kind: 'held', reason: 'clock_ahead' },
+    ]);
+    render(<AttendancePage />);
+    await screen.findByText('Amina Otieno');
+    expect(within(rowOf('Amina Otieno')).getByText('1 flagged')).toBeTruthy();
+    expect(within(rowOf('Baraka Juma')).queryByText(/flagged/)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open days for Amina Otieno' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Odd hours')).toBeTruthy();
+    expect(within(dialog).getByText(flag)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Show scans for Mon 19 Oct' }));
+    expect(api.loadDayScans).toHaveBeenCalledWith('E1', '2026-10-19');
+    const list = await within(dialog).findByRole('list', { name: 'Scans on Mon 19 Oct' });
+    expect(within(list).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      '12:01 am · Front Door · clock-in',
+      '8:02 am · App',
+      '12:30 pm · Front Door',
+      '5:05 pm · Front Door · clock-out',
+      "7:00 pm · Front Door · not counted (the scanner's clock was ahead)",
+    ]);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Hide scans for Mon 19 Oct' }));
+    expect(within(dialog).queryByRole('list')).toBeNull();
+  });
+
+  it('says when a day has no scans, and when the scans can’t be loaded', async () => {
+    render(<AttendancePage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Open days for Amina Otieno' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Show scans for Wed 21 Oct' }));
+    expect(await within(dialog).findByText('No scans or clock-ins this day.')).toBeTruthy();
+    api.loadDayScans.mockRejectedValue(new Error('You can see your own attendance and your team\'s only'));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Show scans for Tue 20 Oct' }));
+    expect((await within(dialog).findByRole('alert')).textContent).toMatch(/your own attendance/);
+  });
+
+  it('counts today’s time so far for someone still in, and marks past days without a clock-out', async () => {
+    const today = nairobiToday();
+    const yesterday = addDays(today, -1);
+    const twoHoursAgo = new Date(Date.now() - (2 * 60 + 10) * 60_000).toISOString();
+    api.loadAttendanceDays.mockResolvedValue([
+      day('E1', today, { status: 'present', clockIn: twoHoursAgo, lateMinutes: 0 }),
+      day('E2', yesterday, { status: 'present', clockIn: `${yesterday}T05:00:00Z`, lateMinutes: 0 }),
+    ]);
+    render(<AttendancePage />);
+    await screen.findByText('Amina Otieno');
+    expect(within(rowOf('Amina Otieno')).getByText(/^2h 1[01]m so far$/)).toBeTruthy();
+    expect(within(rowOf('Baraka Juma')).getByText('1 day without a clock-out')).toBeTruthy();
+    expect(within(rowOf('Baraka Juma')).queryByText(/so far/)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open days for Baraka Juma' }));
+    expect(within(await screen.findByRole('dialog')).getByText('No clock-out')).toBeTruthy();
+  });
+
+  it('shows a day before attendance counts as "Not counted", with its clock-in', async () => {
+    api.loadAttendanceDays.mockResolvedValue([
+      day('E1', '2026-10-19', { status: null, counted: false, clockIn: '2026-10-19T10:00:00Z', clockOut: '2026-10-19T14:00:00Z', hours: 4 }),
+    ]);
+    render(<AttendancePage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Open days for Amina Otieno' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Not counted')).toBeTruthy();
+    expect(within(dialog).getByText('1:00 pm')).toBeTruthy();
+    expect(within(dialog).getByText('4h 00m')).toBeTruthy();
+  });
+
+  it('sets the odd-hours clock-in time', async () => {
+    render(<AttendancePage />);
+    await screen.findByText('Amina Otieno');
+    fireEvent.click(screen.getByRole('button', { name: 'Work schedule' }));
+    const until = (await screen.findByLabelText('Odd-hours clock-in before')) as HTMLInputElement;
+    expect(until.value).toBe('05:00');
+    const card = until.closest('div.grid') as HTMLElement;
+    expect(within(card).getByText(/A clock-in after midnight and before this time is flagged and HR is notified\. 00:00 turns it off\./)).toBeTruthy();
+    expect(within(card).getByText(/before 5:00 am are flagged/)).toBeTruthy();
+    fireEvent.change(until, { target: { value: '13:00' } });
+    fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
+    expect(within(card).getByRole('alert').textContent).toMatch(/00:00 to 12:00/);
+    expect(api.saveOddHoursUntil).not.toHaveBeenCalled();
+    fireEvent.change(until, { target: { value: '00:00' } });
+    expect(within(card).getByText(/aren't flagged/)).toBeTruthy();
+    fireEvent.click(within(card).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.saveOddHoursUntil).toHaveBeenCalledWith('00:00'));
   });
 
   it('a manager sees their team, without corrections or schedules', async () => {

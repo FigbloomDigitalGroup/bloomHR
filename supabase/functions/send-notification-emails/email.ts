@@ -68,6 +68,7 @@ export const HR_PAGES: Record<string, string> = {
   leave_exhausted: '/leaves',
   casual_limit: '/casual-workers',
   leave_document_overdue: '/leave-discipline',
+  attendance_odd_hours: '/attendance',
 };
 
 /**
