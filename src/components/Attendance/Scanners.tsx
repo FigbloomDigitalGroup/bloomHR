@@ -6,7 +6,10 @@ import { inputClass, labelClass, tdClass, thClass } from '../Perfomance/kpis/sha
 import { useEmployeeDirectory } from '../../hooks/useEmployeeDirectory';
 import {
   checkSerialTried,
+  ignoreScannerUser,
+  loadIgnored,
   loadScanners,
+  loadScannerNames,
   loadScannerUsers,
   loadUnmatched,
   normaliseSerial,
@@ -17,7 +20,9 @@ import {
   seenLabel,
   serialLooksRight,
   setScannerActive,
-  suggestMatches,
+  suggestScannerMatches,
+  unignoreScannerUser,
+  type IgnoredScannerUser,
   type Scanner,
   type ScannerInput,
   type ScannerUser,
@@ -27,8 +32,9 @@ import {
 
 /**
  * The Scanners tab (HR): the company's door scanners (ZKTeco fingerprint terminals that send punches by themselves),
- * how to set one up, and which employee each scanner user ID is. Punches from a scanner user ID nobody is matched to
- * wait until HR matches it; then they count.
+ * how to set one up, and which employee each scanner user ID is (shown with the name the scanner has for them).
+ * Punches from a scanner user ID nobody is matched to wait until HR matches it; then they count. Scanner users who
+ * aren't staff (the cook) can be ignored.
  */
 export default function Scanners() {
   const [scanners, setScanners] = useState<Scanner[] | null>(null);
@@ -90,6 +96,9 @@ export default function Scanners() {
                     <td className={tdClass}>
                       <div className="font-semibold">{s.name}</div>
                       {s.lastError && <div className="text-[11px] text-status-danger">{s.lastError} ({seenLabel(s.lastErrorAt, '')})</div>}
+                      {s.usersReceivedAt && (
+                        <div className="text-[11px] text-muted-foreground">User names received {seenLabel(s.usersReceivedAt, '')}</div>
+                      )}
                       {s.clockWarning && (
                         <div role="alert" className="text-[11px] text-orange-text-alt">{s.clockWarning} ({seenLabel(s.clockWarningAt, '')})</div>
                       )}
@@ -276,22 +285,31 @@ export function SetupSteps() {
   );
 }
 
-/** Which employee each scanner user ID is: the IDs waiting for a match, and the matches made. */
+/** Which employee each scanner user ID is: the IDs waiting for a match, the matches made, and the ones ignored. */
 export function ScannerUsers() {
   const { employees } = useEmployeeDirectory();
   const [matched, setMatched] = useState<ScannerUser[] | null>(null);
   const [waiting, setWaiting] = useState<UnmatchedScannerUser[]>([]);
+  const [ignored, setIgnored] = useState<IgnoredScannerUser[]>([]);
+  // the name each scanner user ID has on the scanner
+  const [names, setNames] = useState<Map<string, string>>(new Map());
   // what HR has picked but not saved yet, by scanner user ID
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [suggested, setSuggested] = useState<Set<string>>(new Set());
+  // suggested by "Match automatically", and how (by the name on the scanner or by employee number)
+  const [suggested, setSuggested] = useState<Map<string, 'name' | 'number'>>(new Map());
+  // names on the scanner that fit several people, by scanner user ID
+  const [ambiguous, setAmbiguous] = useState<Map<string, string>>(new Map());
   const [noSuggestions, setNoSuggestions] = useState(false);
+  const [ignoring, setIgnoring] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const reload = useCallback(async () => {
     try {
-      const [m, w] = await Promise.all([loadScannerUsers(), loadUnmatched()]);
+      const [m, w, i, n] = await Promise.all([loadScannerUsers(), loadUnmatched(), loadIgnored(), loadScannerNames()]);
       setMatched(m);
       setWaiting(w);
+      setIgnored(i);
+      setNames(n);
     } catch (e) {
       toast.error((e as Error).message);
       setMatched((x) => x ?? []);
@@ -308,6 +326,15 @@ export function ScannerUsers() {
 
   if (!matched) return <LoaderBlock label="Loading" compact />;
 
+  /** "Scanner user 3 · Esther" (the name it has on the scanner, when the scanner sent it) */
+  const label = (id: string) => (names.get(id) ? `Scanner user ${id} · ${names.get(id)}` : `Scanner user ${id}`);
+
+  const forget = (ids: Iterable<string>) => {
+    const gone = new Set(ids);
+    setSuggested((s) => new Map([...s].filter(([k]) => !gone.has(k))));
+    setAmbiguous((a) => new Map([...a].filter(([k]) => !gone.has(k))));
+  };
+
   const pick = (scannerUserId: string, employeeNumber: string | null) => {
     setDrafts((d) => {
       const next = { ...d };
@@ -315,20 +342,17 @@ export function ScannerUsers() {
       else delete next[scannerUserId];
       return next;
     });
-    setSuggested((s) => {
-      const next = new Set(s);
-      next.delete(scannerUserId);
-      return next;
-    });
+    forget([scannerUserId]);
   };
 
   const matchAutomatically = () => {
-    const open = waiting.map((w) => w.scannerUserId).filter((id) => !drafts[id]);
+    const open = waiting.filter((w) => !drafts[w.scannerUserId]).map((w) => ({ scannerUserId: w.scannerUserId, name: names.get(w.scannerUserId) ?? null }));
     const taken = [...matched.map((m) => m.employeeNumber), ...Object.values(drafts)];
-    const found = suggestMatches(open, employees, taken);
-    setNoSuggestions(found.size === 0);
-    setDrafts((d) => ({ ...d, ...Object.fromEntries(found) }));
-    setSuggested((s) => new Set([...s, ...found.keys()]));
+    const found = suggestScannerMatches(open, employees, taken);
+    setNoSuggestions(found.matches.size === 0 && found.ambiguous.size === 0);
+    setDrafts((d) => ({ ...d, ...Object.fromEntries([...found.matches].map(([id, m]) => [id, m.employeeNumber])) }));
+    setSuggested((s) => new Map([...s, ...[...found.matches].map(([id, m]) => [id, m.by] as const)]));
+    setAmbiguous((a) => new Map([...a, ...found.ambiguous]));
   };
 
   const save = async (rows: { id: string | null; scannerUserId: string; employeeNumber: string }[]) => {
@@ -346,7 +370,7 @@ export function ScannerUsers() {
       // the ones saved are no longer drafts
       const done = new Set(rows.slice(0, saved).map((r) => r.scannerUserId));
       setDrafts((d) => Object.fromEntries(Object.entries(d).filter(([k]) => !done.has(k))));
-      setSuggested((s) => new Set([...s].filter((k) => !done.has(k))));
+      forget(done);
       setBusy(false);
       await reload();
     }
@@ -365,15 +389,29 @@ export function ScannerUsers() {
     }
   };
 
+  const undoIgnore = async (i: IgnoredScannerUser) => {
+    setBusy(true);
+    try {
+      await unignoreScannerUser(i.id);
+      toast.success(`${label(i.scannerUserId)} is waiting for a match again`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+      await reload();
+    }
+  };
+
   const waitingDrafts = waiting.filter((w) => drafts[w.scannerUserId]);
+  const byName = [...suggested.values()].filter((b) => b === 'name').length;
 
   return (
     <Card padding="sm" className="space-y-4" aria-label="Scanner users">
       <div>
         <div className="text-[13px] font-semibold text-ink">Scanner users</div>
         <div className="text-[11.5px] text-muted-foreground">
-          Each person is a number on the scanner (their user ID). Match each number to the employee, and their punches count as
-          clocking in and out.
+          Each person is a number on the scanner (their user ID), shown with the name the scanner has for them. Match each one
+          to the employee, and their punches count as clocking in and out.
         </div>
       </div>
 
@@ -393,11 +431,15 @@ export function ScannerUsers() {
           )}
         </div>
         {noSuggestions && suggested.size === 0 && (
-          <p role="status" className="text-[11.5px] text-muted-foreground">No employee numbers match the scanner user IDs waiting. Pick each person instead.</p>
+          <p role="status" className="text-[11.5px] text-muted-foreground">
+            No clear matches by the names on the scanner or by employee number. Pick each person instead.
+          </p>
         )}
         {suggested.size > 0 && (
           <p role="status" className="text-[11.5px] text-muted-foreground">
-            {suggested.size === 1 ? '1 suggestion' : `${suggested.size} suggestions`} by employee number. Check them, then save.
+            {suggested.size === 1 ? '1 suggestion' : `${suggested.size} suggestions`}
+            {byName === suggested.size ? ' by the name on the scanner' : byName === 0 ? ' by employee number' : ' by the name on the scanner or employee number'}
+            . Check them, then save.
           </p>
         )}
         {waiting.length === 0 ? (
@@ -405,27 +447,44 @@ export function ScannerUsers() {
         ) : (
           <ul className="divide-y divide-border">
             {waiting.map((w) => (
-              <li key={w.scannerUserId} className="py-2 grid grid-cols-1 sm:grid-cols-[10rem_1fr_auto] gap-2 items-center">
+              <li key={w.scannerUserId} className="py-2 grid grid-cols-1 sm:grid-cols-[12rem_1fr_auto] gap-2 items-center">
                 <div>
-                  <div className="text-[12.5px] font-semibold text-ink">Scanner user {w.scannerUserId}</div>
+                  <div className="text-[12.5px] font-semibold text-ink">{label(w.scannerUserId)}</div>
                   <div className="text-[11px] text-muted-foreground">
                     {w.punches === 1 ? '1 punch' : `${w.punches} punches`}, last {seenLabel(w.lastAt)}
-                    {suggested.has(w.scannerUserId) && <span className="ml-1 font-semibold text-status-info">· Suggested</span>}
+                    {suggested.has(w.scannerUserId) && (
+                      <span className="ml-1 font-semibold text-status-info">
+                        · Suggested by {suggested.get(w.scannerUserId) === 'name' ? 'name' : 'employee number'}
+                      </span>
+                    )}
                   </div>
+                  {ambiguous.has(w.scannerUserId) && (
+                    <div className="text-[11px] text-orange-text-alt">Several people match '{ambiguous.get(w.scannerUserId)}'. Pick the right one.</div>
+                  )}
                 </div>
                 <EmployeePicker
                   label={`Employee for scanner user ${w.scannerUserId}`}
                   value={drafts[w.scannerUserId] ?? ''}
                   onChange={(e) => pick(w.scannerUserId, e?.employeeNumber ?? null)}
                 />
-                <Button
-                  variant="secondary"
-                  disabled={busy || !drafts[w.scannerUserId]}
-                  aria-label={`Save scanner user ${w.scannerUserId}`}
-                  onClick={() => void save([{ id: null, scannerUserId: w.scannerUserId, employeeNumber: drafts[w.scannerUserId] }])}
-                >
-                  Save
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    disabled={busy || !drafts[w.scannerUserId]}
+                    aria-label={`Save scanner user ${w.scannerUserId}`}
+                    onClick={() => void save([{ id: null, scannerUserId: w.scannerUserId, employeeNumber: drafts[w.scannerUserId] }])}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    aria-label={`Not staff, ignore scanner user ${w.scannerUserId}`}
+                    onClick={() => setIgnoring(w.scannerUserId)}
+                  >
+                    Not staff, ignore
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>
@@ -442,8 +501,8 @@ export function ScannerUsers() {
               const draft = drafts[m.scannerUserId];
               const changed = !!draft && draft !== m.employeeNumber;
               return (
-                <li key={m.id} className="py-2 grid grid-cols-1 sm:grid-cols-[10rem_1fr_auto] gap-2 items-center">
-                  <div className="text-[12.5px] font-semibold text-ink">Scanner user {m.scannerUserId}</div>
+                <li key={m.id} className="py-2 grid grid-cols-1 sm:grid-cols-[12rem_1fr_auto] gap-2 items-center">
+                  <div className="text-[12.5px] font-semibold text-ink">{label(m.scannerUserId)}</div>
                   <EmployeePicker
                     label={`Employee for scanner user ${m.scannerUserId}`}
                     value={draft ?? m.employeeNumber}
@@ -470,6 +529,101 @@ export function ScannerUsers() {
           </ul>
         )}
       </section>
+
+      {ignored.length > 0 && (
+        <section className="space-y-2" aria-label="Ignored">
+          <div>
+            <div className="text-[12.5px] font-semibold text-ink">Ignored</div>
+            <div className="text-[11px] text-muted-foreground">Not staff: their punches are kept but never count. Match one to an employee if that changes.</div>
+          </div>
+          <ul className="divide-y divide-border">
+            {ignored.map((i) => (
+              <li key={i.id} className="py-2 grid grid-cols-1 sm:grid-cols-[12rem_1fr_auto] gap-2 items-center">
+                <div>
+                  <div className="text-[12.5px] font-semibold text-ink">{label(i.scannerUserId)}</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {i.reason}
+                    {i.ignoredAt ? ` (${seenLabel(i.ignoredAt, '')})` : ''}
+                  </div>
+                </div>
+                <EmployeePicker
+                  label={`Employee for scanner user ${i.scannerUserId}`}
+                  value={drafts[i.scannerUserId] ?? ''}
+                  onChange={(e) => pick(i.scannerUserId, e?.employeeNumber ?? null)}
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    disabled={busy || !drafts[i.scannerUserId]}
+                    aria-label={`Save scanner user ${i.scannerUserId}`}
+                    onClick={() => void save([{ id: null, scannerUserId: i.scannerUserId, employeeNumber: drafts[i.scannerUserId] }])}
+                  >
+                    Save
+                  </Button>
+                  <Button variant="ghost" disabled={busy} aria-label={`Undo ignore scanner user ${i.scannerUserId}`} onClick={() => void undoIgnore(i)}>
+                    Undo
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {ignoring && (
+        <IgnoreForm
+          title={`Not staff: ${label(ignoring)}`}
+          scannerUserId={ignoring}
+          onClose={() => setIgnoring(null)}
+          onSaved={async () => {
+            const id = ignoring;
+            setIgnoring(null);
+            pick(id, null);
+            await reload();
+          }}
+        />
+      )}
     </Card>
+  );
+}
+
+/** "Not staff, ignore": why (required), then the scanner user leaves "Waiting for a match". */
+export function IgnoreForm({ title, scannerUserId, onClose, onSaved }: { title: string; scannerUserId: string; onClose: () => void; onSaved: () => Promise<void> }) {
+  const [reason, setReason] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    if (!reason.trim()) return setProblem('Say why this scanner user isn’t staff, like “The cook”');
+    setBusy(true);
+    setProblem(null);
+    try {
+      await ignoreScannerUser(scannerUserId, reason);
+      toast.success(`Scanner user ${scannerUserId} ignored. Their punches are kept but don’t count.`);
+      await onSaved();
+    } catch (e) {
+      setProblem((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title={title} size="md" closeOnBackdrop={!busy}>
+      <div className="space-y-3">
+        <p className="text-[12.5px] text-ink">
+          Their punches stay on record but never count as attendance. You can undo this, or match them to an employee later.
+        </p>
+        <div>
+          <label htmlFor="ignore-reason" className={labelClass}>Why they aren’t staff</label>
+          <input id="ignore-reason" className={inputClass} placeholder="The cook (contractor)" maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} />
+        </div>
+        {problem && <p role="alert" className="text-[12px] text-status-danger">{problem}</p>}
+        <div className="flex flex-wrap gap-2 justify-end">
+          <Button variant="ghost" disabled={busy} onClick={onClose}>Cancel</Button>
+          <Button disabled={busy} onClick={() => void save()}>Ignore</Button>
+        </div>
+      </div>
+    </Modal>
   );
 }

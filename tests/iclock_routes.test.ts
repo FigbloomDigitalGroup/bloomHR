@@ -1,7 +1,8 @@
 // @vitest-environment node
 //
 // The door scanner receiver (iclock_routes.js), run through the real app: the push protocol's answers (the hello's
-// settings, "OK: <lines>" for punches, "OK" for everything else and for unknown scanners), bodies read as text whatever
+// settings, "OK: <lines>" for punches, "OK" for everything else and for unknown scanners, the user-list question on a
+// check-in when the database says it is due), user records passed on without anything else in the upload, bodies read as text whatever
 // their content type, the scanner's address (the relay's header believed only with its secret), and "ERROR" when the
 // database can't take the punches so the scanner sends them again. The database functions are stood in for here;
 // supabase/tests/attendance_scanners.test.ts checks what they do.
@@ -14,6 +15,7 @@ const state = vi.hoisted(() => ({
   known: new Set<string>(),
   calls: [] as { fn: string; args: Row }[],
   fail: false,
+  commands: [] as string[],
 }));
 
 vi.mock('@supabase/supabase-js', () => {
@@ -22,6 +24,8 @@ vi.mock('@supabase/supabase-js', () => {
     if (state.fail) return { data: null, error: { message: 'database down' } };
     const accepted = state.known.has(String(args.p_serial));
     if (fn === 'attendance_scanner_seen') return { data: { accepted }, error: null };
+    if (fn === 'attendance_scanner_poll') return { data: { accepted, commands: accepted ? state.commands : [] }, error: null };
+    if (fn === 'attendance_scanner_receive_users') return { data: { accepted, received: 1, users: 1 }, error: null };
     if (fn === 'attendance_scanner_receive') return { data: { accepted, received: 2, stored: accepted ? 2 : 0, applied: 0, unmatched: 0 }, error: null };
     return { data: null, error: { message: `unexpected rpc ${fn}` } };
   };
@@ -48,6 +52,7 @@ beforeEach(() => {
   state.known = new Set(['BRAV260421021']);
   state.calls = [];
   state.fail = false;
+  state.commands = [];
   delete process.env.ICLOCK_RELAY_SECRET;
 });
 
@@ -94,7 +99,7 @@ describe('the push protocol', () => {
 
   it('answers the check-in and command results with OK, the .aspx forms too', async () => {
     expect((await text(await fetch(`${base}/getrequest?SN=BRAV260421021`))).body).toBe('OK');
-    expect(state.calls.map((c) => c.fn)).toEqual(['attendance_scanner_seen']);
+    expect(state.calls.map((c) => c.fn)).toEqual(['attendance_scanner_poll']);
     expect((await text(await fetch(`${base}/getrequest.aspx?SN=BRAV260421021`))).body).toBe('OK');
     expect((await text(await fetch(`${base}/devicecmd?SN=BRAV260421021`, { method: 'POST', body: 'ID=1&Return=0&CMD=INFO' }))).body).toBe('OK');
     expect((await text(await fetch(`${base}/cdata.aspx?SN=BRAV260421021&options=all`))).body).toMatch(/^GET OPTION FROM: BRAV260421021\n/);
@@ -130,6 +135,68 @@ describe('the push protocol', () => {
     const res = await fetch(`${base.replace('/iclock', '/api')}/does-not-exist`);
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: 'Not found' });
+  });
+});
+
+describe('the users’ names (FIG-1198)', () => {
+  const USERS = [
+    'USER PIN=3\tName=Esther\tPri=0\tPasswd=\tCard=\tGrp=1\tTZ=0000000100000000\tVerify=0',
+    'FP PIN=3\tFID=6\tSize=1184\tValid=1\tTMP=TbNTUzIxAAAEKCsECAUHCc7QAAAcKWkBAAAAhP0c',
+    'OPLOG 4\t0\t2026-10-22 08:00:00\t0\t0\t0\t0',
+    'USER PIN=22\tName=Beatrice\tPri=0\tPasswd=\tCard=\tGrp=1',
+  ].join('\r\n');
+
+  it('an OPERLOG upload: only the user records reach the database (never fingerprint templates or the log)', async () => {
+    const res = await text(await fetch(`${base}/cdata?SN=BRAV260421021&table=OPERLOG&Stamp=1`, { method: 'POST', body: USERS, headers: { 'x-real-ip': '41.90.12.34' } }));
+    expect(res).toMatchObject({ status: 200, body: 'OK' });
+    expect(state.calls).toEqual([{
+      fn: 'attendance_scanner_receive_users',
+      args: {
+        p_serial: 'BRAV260421021', p_ip: '41.90.12.34',
+        p_lines: 'USER PIN=3\tName=Esther\tPri=0\tPasswd=\tCard=\tGrp=1\tTZ=0000000100000000\tVerify=0\nUSER PIN=22\tName=Beatrice\tPri=0\tPasswd=\tCard=\tGrp=1',
+      },
+    }]);
+  });
+
+  it('a USERINFO upload, in either form', async () => {
+    const body = 'PIN=9\tName=Franciskiprono\tPri=0\nUSER PIN=10\tName=Katam\n';
+    expect((await text(await fetch(`${base}/cdata.aspx?SN=BRAV260421021&table=USERINFO`, { method: 'POST', body }))).body).toBe('OK');
+    expect(state.calls[0]).toMatchObject({ fn: 'attendance_scanner_receive_users', args: { p_lines: 'PIN=9\tName=Franciskiprono\tPri=0\nUSER PIN=10\tName=Katam' } });
+  });
+
+  it('answers OK even when the database fails or the upload has no user records', async () => {
+    expect((await text(await fetch(`${base}/cdata?SN=BRAV260421021&table=USERINFO`, { method: 'POST', body: 'OPLOG 4\t0' }))).body).toBe('OK');
+    expect(state.calls).toEqual([]);
+    state.fail = true;
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    expect(await text(await fetch(`${base}/cdata?SN=BRAV260421021&table=USERINFO`, { method: 'POST', body: USERS }))).toMatchObject({ status: 200, body: 'OK' });
+    expect(errors.mock.calls.flat().join(' ')).not.toContain('Esther');
+    errors.mockRestore();
+  });
+
+  it('the check-in carries the question when it is due, one command per line', async () => {
+    state.commands = ['C:1793000000:DATA QUERY USERINFO', 'C:1793000001:DATA QUERY USERINFO PIN=22'];
+    const res = await text(await fetch(`${base}/getrequest?SN=BRAV260421021`));
+    expect(res).toMatchObject({ status: 200, body: 'C:1793000000:DATA QUERY USERINFO\nC:1793000001:DATA QUERY USERINFO PIN=22' });
+    expect(res.type).toMatch(/^text\/plain/);
+    // an unknown scanner is asked nothing; anything that isn't a command is never sent
+    expect((await text(await fetch(`${base}/getrequest?SN=NEW0000001`))).body).toBe('OK');
+    state.commands = ['REBOOT', 'C:1:DATA QUERY USERINFO\nC:2:REBOOT'];
+    expect((await text(await fetch(`${base}/getrequest?SN=BRAV260421021`))).body).toBe('OK');
+  });
+
+  it('a command’s result: OK, and user records in it are kept', async () => {
+    expect((await text(await fetch(`${base}/devicecmd?SN=BRAV260421021`, { method: 'POST', body: 'ID=1793000000&Return=0&CMD=DATA' }))).body).toBe('OK');
+    expect(state.calls).toEqual([]);
+    const body = 'ID=1793000001&Return=0&CMD=DATA\nUSER PIN=22\tName=Beatrice\tPri=0';
+    expect((await text(await fetch(`${base}/devicecmd.aspx?SN=BRAV260421021`, { method: 'POST', body }))).body).toBe('OK');
+    expect(state.calls).toMatchObject([{ fn: 'attendance_scanner_receive_users', args: { p_lines: 'USER PIN=22\tName=Beatrice\tPri=0' } }]);
+  });
+
+  it('helpers', () => {
+    expect(routes.userLines('OPLOG 1\r\n  USER PIN=1\tName=Onyii\r\nPIN=2\tName=Fidel\nFP PIN=1\tTMP=x')).toBe('  USER PIN=1\tName=Onyii\nPIN=2\tName=Fidel');
+    expect(routes.commandText([])).toBe('OK');
+    expect(routes.commandText(undefined)).toBe('OK');
   });
 });
 

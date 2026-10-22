@@ -2,7 +2,8 @@ import { supabase } from './supabase';
 import { clockLabel, dayLabel, nairobiParts } from './attendance';
 
 // Door scanners (migration 20261023600000): a company's ZKTeco scanners, which employee each scanner user ID is, and
-// the scanner user IDs whose punches are still waiting for a match. The scanners send their punches to the server
+// the scanner user IDs whose punches are still waiting for a match; the name each ID has on the scanner and the ones
+// HR marked "Not staff, ignore" (20261024000000). The scanners send their punches to the server
 // themselves (iclock_routes.js); HR only registers them and matches people here. The database decides who may do
 // what; these turn its answers into plain shapes and its refusals into plain messages.
 
@@ -13,6 +14,7 @@ export function scannerError(err: unknown): string {
   if (/attendance_devices_serial_key/.test(msg) || (e.code === '23505' && /serial/i.test(msg))) {
     return 'A scanner with this serial number is already registered. If it is yours, contact support.';
   }
+  if (/attendance_scanner_ignored_key/.test(msg)) return 'That scanner user is already ignored';
   if (/attendance_scanner_users_key/.test(msg) || e.code === '23505') return 'That scanner user ID is already matched to someone';
   if (e.code === '42501' && /row-level security|permission denied/.test(msg)) return 'You are not allowed to do that';
   return msg || 'Something went wrong';
@@ -40,6 +42,8 @@ export interface Scanner {
   /** the scanner's clock is ahead: its punches are held back until it is restarted (20261023700000) */
   clockWarning: string | null;
   clockWarningAt: string | null;
+  /** when the scanner last sent its users' names (20261024000000); null: not yet */
+  usersReceivedAt: string | null;
 }
 
 export interface ScannerInput {
@@ -64,6 +68,7 @@ export const toScanner = (r: Record<string, unknown>): Scanner => ({
   lastErrorAt: str(r.last_error_at),
   clockWarning: str(r.clock_warning),
   clockWarningAt: str(r.clock_warning_at),
+  usersReceivedAt: str(r.users_received_at),
 });
 
 /** A serial number as the database keeps it: trimmed, in capitals. */
@@ -74,7 +79,7 @@ export const serialLooksRight = (s: string) => /^[A-Z0-9][A-Z0-9_-]{2,39}$/.test
 export async function loadScanners(): Promise<Scanner[]> {
   const { data, error } = await supabase
     .from('attendance_devices')
-    .select('id, name, serial_number, brand, allowed_ip, active, last_seen_at, last_ip, last_error, last_error_at, clock_warning, clock_warning_at')
+    .select('id, name, serial_number, brand, allowed_ip, active, last_seen_at, last_ip, last_error, last_error_at, clock_warning, clock_warning_at, users_received_at')
     .order('created_at');
   if (error) fail(error);
   return ((data ?? []) as Record<string, unknown>[]).map(toScanner);
@@ -171,6 +176,50 @@ export async function removeScannerUser(id: string): Promise<void> {
   if (error) fail(error);
 }
 
+/**
+ * The name each scanner user ID has on the company's scanners (sent by the scanners themselves). When two scanners
+ * name one ID differently, the one received last counts. Scanner user ID -> name.
+ */
+export async function loadScannerNames(): Promise<Map<string, string>> {
+  const { data, error } = await supabase.from('attendance_scanner_names').select('scanner_user_id, name, updated_at');
+  if (error) fail(error);
+  const rows = ((data ?? []) as Record<string, unknown>[])
+    .map((r) => ({ id: String(r.scanner_user_id ?? ''), name: String(r.name ?? '').trim(), at: String(r.updated_at ?? '') }))
+    .filter((r) => r.id && r.name)
+    .sort((a, b) => a.at.localeCompare(b.at));
+  return new Map(rows.map((r) => [r.id, r.name]));
+}
+
+// ---------------------------------------------------------------------------------------------
+// "Not staff, ignore"
+// ---------------------------------------------------------------------------------------------
+export interface IgnoredScannerUser {
+  id: string;
+  scannerUserId: string;
+  reason: string;
+  ignoredAt: string | null;
+}
+
+export async function loadIgnored(): Promise<IgnoredScannerUser[]> {
+  const { data, error } = await supabase.from('attendance_scanner_ignored').select('id, scanner_user_id, reason, ignored_at');
+  if (error) fail(error);
+  return ((data ?? []) as Record<string, unknown>[])
+    .map((r) => ({ id: String(r.id), scannerUserId: String(r.scanner_user_id ?? ''), reason: String(r.reason ?? ''), ignoredAt: str(r.ignored_at) }))
+    .sort((a, b) => compareScannerIds(a.scannerUserId, b.scannerUserId));
+}
+
+/** Marks a scanner user as not staff: they leave "Waiting for a match" and their punches never count. */
+export async function ignoreScannerUser(scannerUserId: string, reason: string): Promise<void> {
+  const { error } = await supabase.from('attendance_scanner_ignored').insert({ scanner_user_id: scannerUserId.trim(), reason: reason.trim() });
+  if (error) fail(error);
+}
+
+/** Undo: the scanner user waits for a match again. */
+export async function unignoreScannerUser(id: string): Promise<void> {
+  const { error } = await supabase.from('attendance_scanner_ignored').delete().eq('id', id);
+  if (error) fail(error);
+}
+
 // ---------------------------------------------------------------------------------------------
 // pure helpers
 // ---------------------------------------------------------------------------------------------
@@ -214,6 +263,101 @@ export function suggestMatches(
     used.add(emp);
   }
   return out;
+}
+
+/** A name the way matching compares it: letters and digits only, lower case, accents dropped ("Ng'ang'a" -> "nganga"). */
+export function nameKey(name: string): string {
+  return name.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+export interface NameMatchEmployee {
+  employeeNumber: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  status?: string;
+}
+
+/** The separate parts of a person's name: "Morris Bundi Maina" -> morris, bundi, maina. */
+function nameParts(e: NameMatchEmployee): string[] {
+  return [e.firstName, e.middleName ?? '', e.lastName]
+    .join(' ')
+    .split(/[\s-]+/)
+    .map(nameKey)
+    .filter(Boolean);
+}
+
+/** Someone who has left can't be matched. */
+const isActive = (e: { status?: string }) => !/terminat|resign|exit|left|inactive|deceas|dismiss/i.test(e.status ?? '');
+
+/**
+ * Does the name on the scanner name this person? Compared without case or spaces, it must be one whole part of their
+ * name ("Esther", "Katam"), or parts run together in order ("Franciskiprono" = Francis Kiprono, "Esther Nalenyi");
+ * several words must each be a part ("Kiprono Francis"). "Ann" is not "Anne".
+ */
+export function nameFits(scannerName: string, e: NameMatchEmployee): boolean {
+  const key = nameKey(scannerName);
+  if (!key) return false;
+  const parts = nameParts(e);
+  if (parts.includes(key)) return true;
+  // parts run together, in order: first+last, first+middle, middle+last, first+middle+last...
+  for (let i = 0; i < parts.length; i += 1) {
+    for (let j = i + 1; j < parts.length; j += 1) {
+      if (parts[i] + parts[j] === key || parts.slice(i, j + 1).join('') === key) return true;
+    }
+  }
+  const words = scannerName.split(/\s+/).map(nameKey).filter(Boolean);
+  return words.length > 1 && words.every((w) => parts.includes(w));
+}
+
+/** The active employees the scanner's name fits. */
+export function employeesNamed<T extends NameMatchEmployee>(scannerName: string, employees: T[]): T[] {
+  return employees.filter((e) => isActive(e) && nameFits(scannerName, e));
+}
+
+export interface ScannerSuggestions {
+  /** scanner user ID -> the employee suggested, and why */
+  matches: Map<string, { employeeNumber: string; by: 'name' | 'number' }>;
+  /** scanner user ID -> its name on the scanner, when that name fits several people */
+  ambiguous: Map<string, string>;
+}
+
+/**
+ * "Match automatically", for each scanner user ID waiting (with its name on the scanner, when the scanner sent one):
+ *   - a name that fits exactly one active employee suggests them;
+ *   - a name that fits several suggests nobody (it is listed in ambiguous);
+ *   - a name that fits nobody suggests nobody;
+ *   - only with no name: the employee whose number has the ID's digits (FBL-000006 <-> 6), as suggestMatches. Once the
+ *     scanner sends a name, it decides: scanner user IDs don't follow employee numbers (Figbloom's ID 3 is Esther,
+ *     FBL-000010, not FBL-000003), so a name that disagrees always wins over the number.
+ * Employees already matched (taken) aren't suggested, and an employee two IDs point at is suggested for neither.
+ */
+export function suggestScannerMatches(
+  waiting: { scannerUserId: string; name?: string | null }[],
+  employees: NameMatchEmployee[],
+  taken: Iterable<string> = []
+): ScannerSuggestions {
+  const busy = new Set(taken);
+  const active = employees.filter(isActive);
+  const nameOf = (w: { name?: string | null }) => (w.name ?? '').trim();
+  const byNumber = suggestMatches(waiting.filter((w) => !nameOf(w)).map((w) => w.scannerUserId), active, busy);
+  const ambiguous = new Map<string, string>();
+  const picked = new Map<string, { employeeNumber: string; by: 'name' | 'number' }>(
+    [...byNumber].map(([id, employeeNumber]) => [id, { employeeNumber, by: 'number' as const }])
+  );
+  for (const w of waiting) {
+    const name = nameOf(w);
+    if (!name) continue;
+    const named = employeesNamed(name, active);
+    if (named.length > 1) ambiguous.set(w.scannerUserId, name);
+    else if (named.length === 1 && !busy.has(named[0].employeeNumber)) {
+      picked.set(w.scannerUserId, { employeeNumber: named[0].employeeNumber, by: 'name' });
+    }
+  }
+  // one employee for two scanner users: neither is clear
+  const count = new Map<string, number>();
+  for (const m of picked.values()) count.set(m.employeeNumber, (count.get(m.employeeNumber) ?? 0) + 1);
+  return { matches: new Map([...picked].filter(([, m]) => count.get(m.employeeNumber) === 1)), ambiguous };
 }
 
 /** "Thu 22 Oct 2026, 8:05 am" (Nairobi time), or the fallback when there is no time. */
