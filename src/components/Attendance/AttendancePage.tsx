@@ -4,13 +4,14 @@ import FigbloomLoader from '../UI/FigbloomLoader';
 import { loadAttendanceAccess, type AttendanceAccess } from '../../lib/attendanceApi';
 import AttendanceDays from './AttendanceDays';
 import WorkSchedules from './WorkSchedules';
+import Scanners from './Scanners';
 
-type TabId = 'days' | 'schedule';
+type TabId = 'days' | 'schedule' | 'scanners';
 
 /**
  * Attendance (migration 20261023300000): who clocked in, late, absent or on leave over a range of days, each person's
- * day by day with HR's corrections, a CSV, and the work schedules the days are measured against. HR sees everyone; a
- * manager their reports.
+ * day by day with HR's corrections, a CSV, the work schedules the days are measured against, and the door scanners
+ * that clock people in (migration 20261023600000). HR sees everyone; a manager their reports.
  */
 export default function AttendancePage() {
   const [access, setAccess] = useState<AttendanceAccess | null>(null);
@@ -29,6 +30,7 @@ export default function AttendancePage() {
   const tabs = useMemo<TabBarItem[]>(() => {
     const list: TabBarItem[] = [{ id: 'days', label: 'Attendance' }];
     if (access?.schedules) list.push({ id: 'schedule', label: 'Work schedule' });
+    if (access?.manages) list.push({ id: 'scanners', label: 'Scanners' });
     return list;
   }, [access]);
 
@@ -40,6 +42,7 @@ export default function AttendancePage() {
       {tabs.length > 1 && <TabBar items={tabs} activeId={tab} onChange={(id) => setTab(id as TabId)} className="mb-4" />}
       {tab === 'days' && <AttendanceDays access={access} />}
       {tab === 'schedule' && access.schedules && <WorkSchedules />}
+      {tab === 'scanners' && access.manages && <Scanners />}
     </div>
   );
 }
