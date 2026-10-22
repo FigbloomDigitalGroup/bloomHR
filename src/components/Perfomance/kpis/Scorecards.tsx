@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { AlertTriangle, ClipboardList, Download, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ClipboardList, Download, RefreshCw, Upload } from 'lucide-react';
 import { Button, Card, EmptyState, Modal, SearchInput, TableScroll } from '../../UI';
 import { checkWeights, defaultPeriodId, formatPercent, formatValue, parseNumber } from '../../../lib/kpis';
 import {
@@ -20,6 +20,7 @@ import {
 import type { Department } from '../../../lib/orgStructure';
 import { ActualValue, BandPill, PeriodSelect, ScoreText, SourceNote, inputClass, labelClass, tdClass, thClass } from './shared';
 import { LoaderBlock } from '../../UI/FigbloomLoader';
+import KpiUploadModal from './KpiUploadModal';
 
 interface Props {
   kpis: Kpi[];
@@ -29,9 +30,11 @@ interface Props {
   access: KpiAccess;
   /** the staff portal's My team: just the supervisor's reports, so no department filter */
   teamMode?: boolean;
+  /** after a spreadsheet upload: reload the page's KPIs */
+  onChanged?: () => void;
 }
 
-export default function Scorecards({ kpis, periods, people, departments, access, teamMode = false }: Props) {
+export default function Scorecards({ kpis, periods, people, departments, access, teamMode = false, onChanged }: Props) {
   const [periodId, setPeriodId] = useState(() => defaultPeriodId(periods));
   const [assignments, setAssignments] = useState<KpiAssignment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -39,6 +42,7 @@ export default function Scorecards({ kpis, periods, people, departments, access,
   const [search, setSearch] = useState('');
   const [openEmp, setOpenEmp] = useState<string | null>(null);
   const [recalculating, setRecalculating] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (!periodId && periods.length) setPeriodId(defaultPeriodId(periods));
@@ -133,9 +137,27 @@ export default function Scorecards({ kpis, periods, people, departments, access,
               </Button>
             )}
             <Button variant="secondary" icon={<Download size={14} />} onClick={exportCsv}>Export CSV</Button>
+            {access.manages && !teamMode && (
+              <Button variant="secondary" icon={<Upload size={14} />} onClick={() => setUploading(true)}>Upload spreadsheet</Button>
+            )}
           </div>
         </div>
       </Card>
+
+      {access.manages && !teamMode && (
+        <KpiUploadModal
+          open={uploading}
+          onClose={() => setUploading(false)}
+          kpis={kpis}
+          periods={periods}
+          people={people}
+          departments={departments}
+          onDone={() => {
+            void reload();
+            onChanged?.();
+          }}
+        />
+      )}
 
       {offWeights.length > 0 && (
         <div role="alert" className="flex items-start gap-2 rounded-tile px-3 py-2 text-[12px] text-orange-text-alt bg-orange-tint-alt">

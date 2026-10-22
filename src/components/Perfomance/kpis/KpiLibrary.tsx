@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Archive, Pencil, Plus, RotateCcw, Target } from 'lucide-react';
+import { Archive, Pencil, Plus, RotateCcw, Target, Upload } from 'lucide-react';
 import { Button, Card, EmptyState, Modal, StatusPill, TableScroll } from '../../UI';
 import { confirmDialog } from '../../../lib/confirmDialog';
 import {
@@ -20,13 +20,19 @@ import {
   type KpiTemplate,
   type KpiUnit,
 } from '../../../lib/kpis';
-import { saveKpi, setKpiArchived, type Kpi, type KpiInput } from '../../../lib/kpiApi';
+import { saveKpi, setKpiArchived, type Kpi, type KpiInput, type KpiPeriod, type KpiPerson } from '../../../lib/kpiApi';
+import type { Department } from '../../../lib/orgStructure';
 import { inputClass, labelClass, tdClass, thClass } from './shared';
+import KpiUploadModal from './KpiUploadModal';
 
 interface Props {
   kpis: Kpi[];
   canManage: boolean;
   onChanged: () => void;
+  /** for uploading a spreadsheet: the review periods, people and departments its rows may name */
+  periods?: KpiPeriod[];
+  people?: KpiPerson[];
+  departments?: Department[];
 }
 
 const BLANK: KpiInput = {
@@ -138,10 +144,11 @@ function KpiForm({ initial, onCancel, onSave, busy }: { initial: KpiInput; onCan
   );
 }
 
-export default function KpiLibrary({ kpis, canManage, onChanged }: Props) {
+export default function KpiLibrary({ kpis, canManage, onChanged, periods = [], people = [], departments = [] }: Props) {
   const [editing, setEditing] = useState<{ id: string | null; initial: KpiInput } | null>(null);
   const [busy, setBusy] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const visible = useMemo(() => kpis.filter((k) => showArchived || !k.archived), [kpis, showArchived]);
   const names = useMemo(() => new Set(kpis.map((k) => k.name.trim().toLowerCase())), [kpis]);
@@ -203,6 +210,9 @@ export default function KpiLibrary({ kpis, canManage, onChanged }: Props) {
             <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
             Show archived
           </label>
+          {canManage && (
+            <Button variant="secondary" icon={<Upload size={14} />} onClick={() => setUploading(true)}>Upload spreadsheet</Button>
+          )}
           {canManage && (
             <Button icon={<Plus size={14} />} onClick={() => setEditing({ id: null, initial: BLANK })}>Add KPI</Button>
           )}
@@ -302,6 +312,18 @@ export default function KpiLibrary({ kpis, canManage, onChanged }: Props) {
       <Modal open={!!editing} onClose={() => !busy && setEditing(null)} title={editing?.id ? 'Edit KPI' : 'Add KPI'} size="xl">
         {editing && <KpiForm initial={editing.initial} busy={busy} onCancel={() => setEditing(null)} onSave={save} />}
       </Modal>
+
+      {canManage && (
+        <KpiUploadModal
+          open={uploading}
+          onClose={() => setUploading(false)}
+          kpis={kpis}
+          periods={periods}
+          people={people}
+          departments={departments}
+          onDone={onChanged}
+        />
+      )}
     </div>
   );
 }

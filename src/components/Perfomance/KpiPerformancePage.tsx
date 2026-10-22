@@ -87,8 +87,10 @@ export default function KpiPerformancePage(props: TownProps) {
       ) : (
         <>
           <TabBar items={tabs} activeId={active ?? ''} onChange={(id) => setTab(id as TabId)} className="mb-4" />
-          {active === 'scorecards' && <Scorecards kpis={kpis} periods={periods} people={people} departments={departments} access={access} />}
-          {active === 'library' && <KpiLibrary kpis={kpis} canManage={access.manages} onChanged={load} />}
+          {active === 'scorecards' && <Scorecards kpis={kpis} periods={periods} people={people} departments={departments} access={access} onChanged={load} />}
+          {active === 'library' && (
+            <KpiLibrary kpis={kpis} canManage={access.manages} onChanged={load} periods={periods} people={people} departments={departments} />
+          )}
           {active === 'templates' && <KpiTemplates kpis={kpis} periods={periods} people={people} departments={departments} />}
           {active === 'periods' && <ReviewPeriods periods={periods} canManage={access.manages} onChanged={load} />}
           {active === 'assign' && <AssignKpis kpis={kpis} periods={periods} people={people} departments={departments} access={access} />}
