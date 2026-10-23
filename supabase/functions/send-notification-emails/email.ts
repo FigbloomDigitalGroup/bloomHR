@@ -69,6 +69,7 @@ export const HR_PAGES: Record<string, string> = {
   casual_limit: '/casual-workers',
   leave_document_overdue: '/leave-discipline',
   attendance_odd_hours: '/attendance',
+  missed_scan_requested: '/attendance?tab=missed',
 };
 
 /**
@@ -88,6 +89,7 @@ export const STAFF_TABS: Record<string, string> = {
   phone_change_approved: 'details', phone_change_rejected: 'details', suspended: 'details', reactivated: 'details',
   incident_update: 'incident-report', task_assigned: 'tasks', exit_approved: 'resignation', exit_declined: 'resignation',
   contract_sent: 'contract', contract_sent_back: 'contract', contract_accepted: 'contract', contract_cancelled: 'contract',
+  missed_scan_request: 'my-team', missed_scan_approved: 'home', missed_scan_declined: 'home',
 };
 
 /** The portal address opened on one section (the address as it is when it can't be read). */

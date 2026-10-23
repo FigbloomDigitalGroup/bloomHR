@@ -19,12 +19,13 @@ import TeamWork from '../PieceRate/TeamWork';
 import { loadWorkPeople } from '../../lib/pieceRateApi';
 import type { WorkPerson } from '../../lib/pieceRate';
 import { useUrlParam } from '../../hooks/useUrlParam';
+import MissedScanApprovals from '../Attendance/MissedScanApprovals';
 
 // My team (staff portal): for a staff member who supervises others (migration 20261018900000). The same screens HR
 // and managers use, limited to the supervisor's reports; the database decides what they may do (custom KPIs,
 // overtime, casual days and leave approvals all already allow a supervisor, whatever their role).
 
-type Tab = 'team' | 'tasks' | 'kpis' | 'overtime' | 'casual' | 'work' | 'leave';
+type Tab = 'team' | 'tasks' | 'kpis' | 'overtime' | 'casual' | 'work' | 'leave' | 'missed';
 
 export default function MyTeam({ team }: { team: TeamMember[] }) {
   // the tab is in the address (?view=kpis), so the phone's Back returns to the previous tab
@@ -49,6 +50,7 @@ export default function MyTeam({ team }: { team: TeamMember[] }) {
     ...(casuals.length ? [{ id: 'casual', label: 'Casual days' }] : []),
     ...(paidByWork ? [{ id: 'work', label: 'Work' }] : []),
     { id: 'leave', label: 'Leave' },
+    { id: 'missed', label: 'Missed scans' },
   ], [casuals.length, paidByWork]);
 
   return (
@@ -70,6 +72,7 @@ export default function MyTeam({ team }: { team: TeamMember[] }) {
           <TeamOnLeave />
         </div>
       )}
+      {tab === 'missed' && <MissedScanApprovals />}
     </div>
   );
 }

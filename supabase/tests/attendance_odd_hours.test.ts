@@ -219,10 +219,12 @@ describe('every scan of a day', () => {
       { at: '08:02', via: 'app', scanner_name: null, kind: 'clock_in', reason: null },
       { at: '17:10', via: 'scanner', scanner_name: 'Front Door', kind: 'clock_out', reason: null },
     ]);
-    await as(HR, `select public.attendance_set_day('A-ME', '2026-02-13', '2026-02-13T05:00:00Z', null, 'Forgot')`);
+    // HR fixed the clock-out: a later scan is held back (20261025100000: a clock-out left empty takes the scan instead)
+    await as(HR, `select public.attendance_set_day('A-ME', '2026-02-13', '2026-02-13T05:00:00Z', '2026-02-13T14:00:00Z', 'Forgot')`);
     await receive([line('1', '2026-02-13 18:00:00')]);
     expect(await scans(HR, 'A-ME', '2026-02-13')).toEqual([
       { at: '08:00', via: 'hr', scanner_name: null, kind: 'clock_in', reason: null },
+      { at: '17:00', via: 'hr', scanner_name: null, kind: 'clock_out', reason: null },
       { at: '18:00', via: 'scanner', scanner_name: 'Front Door', kind: 'held', reason: 'hr_corrected' },
     ]);
   });

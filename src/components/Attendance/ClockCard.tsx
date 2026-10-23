@@ -16,6 +16,7 @@ import {
   type AttendanceToday,
 } from '../../lib/attendance';
 import { clockIn, clockOut, currentLocation, loadClockRules, loadToday, type ClockRules } from '../../lib/attendanceApi';
+import MyMissedScans from './MyMissedScans';
 
 /**
  * The staff portal's Clock in / Clock out card (migration 20261023300000): today's schedule, when I clocked in (and
@@ -187,6 +188,8 @@ export default function ClockCard() {
             )}
           </div>
         )}
+
+        {today && <MyMissedScans />}
 
         {busy === 'locating' && (
           <p className="mt-2 text-[11px] text-gray-500 flex items-center gap-1">
