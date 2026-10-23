@@ -1,0 +1,605 @@
+// mailbox_routes.js - each person's own mailbox, read inside the app (FIG-1205, PR 1 of 3: reading).
+//
+// A person with the "My mailbox" module connects their own mailbox (e.g. mary@company.com on the company's cPanel) and
+// reads it here. Every request is on its own (Vercel keeps nothing between requests): it signs the caller in, loads
+// THEIR mailbox (found by their own user id and company, never by anything in the request), decrypts the password,
+// logs in to the mail server over TLS with short timeouts, does one thing, and logs out. No mail is stored.
+//
+// The password is encrypted (company_mail_server.js: AES-256-GCM with MAIL_SERVER_ENCRYPTION_KEY) with the person's
+// user id and company id bound in, so a stored password only opens for that person in that company. It is never sent
+// back to the browser.
+//
+// Limits: IMAP on 993 (SSL/TLS) or 143 (STARTTLS, required) only; a server name that is (or resolves to) our own
+// machine or a private network is refused, so this cannot be used to probe internal networks; emails and attachments
+// over 25 MB are not opened; connection tests are rate limited. Nothing about a message (contents, addresses,
+// subjects) or a password is ever logged, only error codes.
+//
+//   GET    /api/mailbox/account                 the caller's mailbox (never the password) and the suggested settings
+//   POST   /api/mailbox/test                    try logging in with these settings: { ok, message }
+//   PUT    /api/mailbox/account                 connect (or change): logs in first, saves only if that works
+//   DELETE /api/mailbox/account                 disconnect: deletes the row, password included
+//   GET    /api/mailbox/folders                 folders with their special use and unread counts
+//   GET    /api/mailbox/messages?folder=&page=  50 per page, newest first
+//   GET    /api/mailbox/message?folder=&uid=    one email: headers, text, html, attachments; marks it read
+//   GET    /api/mailbox/attachment?folder=&uid=&part=   the file, as a download
+import express from "express";
+import dns from "node:dns";
+import net from "node:net";
+import { pipeline } from "node:stream/promises";
+import { ImapFlow } from "imapflow";
+import { simpleParser } from "mailparser";
+import { authenticate, HttpError, admin } from "./admin_routes.js";
+import { callerHasModule, createSharedBudget } from "./authz.js";
+import { EMAIL_RE, SMTP_PORTS, asMailHost, decryptSecret, encryptSecret, isNonPublicResolved, loadMailServer } from "./company_mail_server.js";
+
+const router = express.Router();
+
+export const MAILBOX_MODULES = ["mailbox"];
+/** 993: SSL/TLS from the start; 143: plain, then STARTTLS (required: never logs in unencrypted). */
+export const IMAP_PORTS = [993, 143];
+export const PAGE_SIZE = 50;
+export const MAX_MESSAGE_BYTES = 25 * 1024 * 1024;
+const MISSING_TABLE = ["42P01", "PGRST205"];
+const UNREADABLE = "Your saved mailbox password can't be read. Disconnect and connect your mailbox again.";
+const NOT_CONNECTED = "Connect your mailbox first";
+const COLUMNS =
+    "user_id, tenant_id, email, imap_host, imap_port, secure, username, password_encrypted, smtp_host, smtp_port, connected_at, last_ok_at, last_error";
+
+// logging in with a password typed into the form: a budget per person, so the test cannot be used to guess passwords
+const HOUR = 60 * 60 * 1000;
+const takeLoginBudget = createSharedBudget("mailbox-login", { default: { limit: 20, windowMs: HOUR } });
+
+/** What the password is bound to: this person in this company (never usable for anyone else's row). */
+export const mailboxBinding = (userId, tenantId) => `user-mailbox:${tenantId}:${userId}`;
+
+const handler = (fn) => async (req, res) => {
+    try {
+        if (!admin) throw new HttpError(500, "Mailbox API is not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
+        const caller = await authenticate(req);
+        if (!(await callerHasModule(caller, MAILBOX_MODULES))) throw new HttpError(403, "Forbidden");
+        await fn(req, res, caller);
+    } catch (err) {
+        const status = err instanceof HttpError ? err.status : 500;
+        // only what kind of error it was: a mail server's reply can quote the login, an address or a subject
+        if (status >= 500) console.error("[mailbox]", err instanceof HttpError ? `${status} ${err.message}` : err?.code || err?.name || "error");
+        if (res.headersSent) {
+            res.destroy();
+            return;
+        }
+        res.status(status).json({ error: err instanceof HttpError ? err.message : "Request failed" });
+    }
+};
+
+// ---------------------------------------------------------------------------------------------
+// the stored mailbox
+// ---------------------------------------------------------------------------------------------
+
+/** The caller's own mailbox row (with the encrypted password), or null. */
+async function loadMailbox(caller) {
+    const { data, error } = await admin
+        .from("user_mailboxes")
+        .select(COLUMNS)
+        .eq("user_id", caller.id)
+        .eq("tenant_id", caller.tenantId)
+        .maybeSingle();
+    if (error) {
+        if (MISSING_TABLE.includes(String(error.code))) return null;
+        throw new HttpError(500, "Could not read your mailbox settings");
+    }
+    return data || null;
+}
+
+/** What the browser may see: everything but the password. */
+export const publicMailbox = (row) =>
+    row
+        ? {
+              email: row.email,
+              imap_host: row.imap_host,
+              imap_port: row.imap_port,
+              secure: row.secure,
+              username: row.username,
+              smtp_host: row.smtp_host ?? null,
+              smtp_port: row.smtp_port ?? null,
+              connected_at: row.connected_at ?? null,
+              last_ok_at: row.last_ok_at ?? null,
+              last_error: row.last_error ?? null,
+              password_set: Boolean(row.password_encrypted),
+          }
+        : null;
+
+// services that only send mail: their host is no guess for where to read it
+const SENDING_ONLY = /(^smtp\.|sendgrid|mailgun|amazonaws|resend|postmark|sparkpost|brevo|sendinblue|office365|outlook|gmail|google)/i;
+
+/**
+ * The settings to suggest: the caller's login email, and the company's own mail server (FIG-904) for both reading and
+ * sending when it is cPanel-style (cPanel serves IMAP and SMTP on the same host); otherwise mail.<their domain>.
+ */
+export function suggestedSettings(email, companyServer) {
+    const address = EMAIL_RE.test(String(email || "")) ? String(email).toLowerCase() : "";
+    const domain = address ? address.split("@")[1] : "";
+    const guess = domain ? `mail.${domain}` : "";
+    const useCompany = companyServer?.host && !SENDING_ONLY.test(companyServer.host);
+    return {
+        email: address,
+        imap_host: useCompany ? companyServer.host : guess,
+        imap_port: 993,
+        smtp_host: useCompany ? companyServer.host : guess,
+        smtp_port: useCompany && SMTP_PORTS.includes(companyServer.port) ? companyServer.port : 465,
+        from_company_server: Boolean(useCompany),
+    };
+}
+
+const oneLine = (v, max, message) => {
+    const s = typeof v === "string" ? v.trim() : "";
+    if (s.length > max || /[\r\n\0]/.test(s)) throw new HttpError(400, message);
+    return s;
+};
+
+/**
+ * The mailbox from a request body, checked. A password left out (or empty) keeps the saved one, as long as the server
+ * and login are the same. Returns { row (without the password), password (plain), changed }.
+ */
+export function asMailboxInput(body, existing, caller) {
+    const b = body || {};
+    const email = oneLine(b.email, 254, "Enter a valid email address").toLowerCase();
+    if (!EMAIL_RE.test(email)) throw new HttpError(400, "Enter a valid email address");
+    const imapHost = asMailHost(oneLine(b.imap_host, 253, "Invalid mail server"), "Enter the mail server's name, e.g. mail.yourcompany.com");
+    const imapPort = b.imap_port === undefined || b.imap_port === "" || b.imap_port === null ? 993 : Number(b.imap_port);
+    if (!IMAP_PORTS.includes(imapPort)) throw new HttpError(400, "The incoming mail port must be 993 (SSL/TLS) or 143 (STARTTLS)");
+    const username = oneLine(b.username ?? "", 254, "Invalid username") || email;
+    const smtpHost = b.smtp_host ? asMailHost(oneLine(b.smtp_host, 253, "Invalid outgoing mail server"), "Enter the outgoing mail server's name") : imapHost;
+    const smtpPort = b.smtp_port === undefined || b.smtp_port === "" || b.smtp_port === null ? 465 : Number(b.smtp_port);
+    if (!SMTP_PORTS.includes(smtpPort)) throw new HttpError(400, `The outgoing mail port must be one of ${SMTP_PORTS.join(", ")}`);
+
+    const sameLogin = existing && existing.imap_host === imapHost && existing.imap_port === imapPort && existing.username === username;
+    let password;
+    if (b.password !== undefined && b.password !== null && b.password !== "") {
+        if (typeof b.password !== "string" || b.password.length > 500) throw new HttpError(400, "Invalid password");
+        password = b.password;
+    } else if (sameLogin && existing.password_encrypted) {
+        password = decryptSecret(existing.password_encrypted, mailboxBinding(caller.id, caller.tenantId), UNREADABLE);
+    } else {
+        throw new HttpError(400, "Enter your mailbox password");
+    }
+
+    return {
+        row: {
+            user_id: caller.id,
+            tenant_id: caller.tenantId,
+            email,
+            imap_host: imapHost,
+            imap_port: imapPort,
+            secure: imapPort === 993,
+            username,
+            smtp_host: smtpHost,
+            smtp_port: smtpPort,
+        },
+        password,
+    };
+}
+
+// ---------------------------------------------------------------------------------------------
+// talking to the mail server
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The address to connect to for a mail server's name: refused when the name is (or resolves to) our own machine or a
+ * private network. Connecting to the address that was checked (with the name kept for TLS) means a second lookup
+ * cannot point somewhere else.
+ */
+export async function resolvePublicAddress(host) {
+    if (net.isIP(host)) {
+        if (isNonPublicResolved(host)) throw new HttpError(400, `${host} is not a public mail server`);
+        return host;
+    }
+    let found;
+    try {
+        found = await dns.promises.lookup(host, { all: true, verbatim: true });
+    } catch {
+        throw new HttpError(400, `Can't find a mail server called ${host}. Check the name.`);
+    }
+    if (!found.length) throw new HttpError(400, `Can't find a mail server called ${host}. Check the name.`);
+    if (found.some((a) => isNonPublicResolved(a.address))) throw new HttpError(400, `${host} is not a public mail server`);
+    return (found.find((a) => a.family === 4) || found[0]).address;
+}
+
+/** What went wrong logging in or reading, in plain words. Never the server's own reply, which can echo the login. */
+export function describeImapError(err, box) {
+    if (err instanceof HttpError) return err.message;
+    const where = `${box.imap_host} on port ${box.imap_port}`;
+    if (err?.authenticationFailed) return "Wrong email or password. Check them (the username is usually your full email address).";
+    const code = String(err?.code || "");
+    if (["ENOTFOUND", "EAI_AGAIN"].includes(code)) return `Can't find a mail server called ${box.imap_host}. Check the name.`;
+    if (err?.tlsFailed || /CERT|TLS|SSL|ALTNAME|SELF_SIGNED|UNABLE_TO_VERIFY/i.test(code)) {
+        return `The secure connection to ${box.imap_host} failed: its certificate is not valid for that name. Ask your host for the right mail server name (often your hosting server's name).`;
+    }
+    if (["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "ETIMEOUT", "EHOSTUNREACH", "ENETUNREACH", "CONNECT_TIMEOUT", "GREETING_TIMEOUT", "NoConnection", "EPIPE"].includes(code)) {
+        return `Can't reach ${where}. Check the server name and port.`;
+    }
+    return `The mail server ${box.imap_host} did not accept the request.`;
+}
+
+const errorCode = (err) => (err?.authenticationFailed ? "AUTH" : String(err?.code || err?.name || "error"));
+
+/** Logs in to the mailbox. Throws HttpError(400/502) with a plain message when it can't. */
+export async function connectMailbox(box, password) {
+    const address = await resolvePublicAddress(box.imap_host);
+    const client = new ImapFlow({
+        host: address,
+        servername: box.imap_host, // the certificate is checked against the name, not the address
+        port: box.imap_port,
+        secure: box.imap_port === 993,
+        doSTARTTLS: box.imap_port === 143 ? true : undefined,
+        auth: { user: box.username, pass: password },
+        tls: { minVersion: "TLSv1.2" },
+        logger: false,
+        emitLogs: false,
+        disableAutoIdle: true,
+        connectionTimeout: 10_000,
+        greetingTimeout: 10_000,
+        socketTimeout: 30_000,
+    });
+    // a socket error after logging in must not crash the process
+    client.on?.("error", () => {});
+    try {
+        await client.connect();
+    } catch (err) {
+        console.error("[mailbox] login failed:", errorCode(err));
+        safeClose(client);
+        throw new HttpError(err?.authenticationFailed ? 400 : 502, describeImapError(err, box));
+    }
+    return client;
+}
+
+function safeClose(client) {
+    try {
+        client.close();
+    } catch {
+        // already closed
+    }
+}
+
+async function logout(client) {
+    try {
+        await client.logout();
+    } catch {
+        safeClose(client);
+    }
+}
+
+/** How the last use went, kept on the row (only when it changed, or an hour on, so reading is not a write each time). */
+async function recordOutcome(box, error) {
+    const now = Date.now();
+    const recent = box.last_ok_at && now - new Date(box.last_ok_at).getTime() < HOUR;
+    if (!error && !box.last_error && recent) return;
+    if (error && box.last_error === error) return;
+    const patch = error ? { last_error: error } : { last_error: null, last_ok_at: new Date(now).toISOString() };
+    const { error: dbError } = await admin.from("user_mailboxes").update(patch).eq("user_id", box.user_id).eq("tenant_id", box.tenant_id);
+    if (dbError) console.error("[mailbox] could not record the last connection:", dbError.code || "error");
+}
+
+/** Runs `fn(client, box)` logged in to the caller's own mailbox, and always logs out. */
+async function withMailbox(caller, fn) {
+    const box = await loadMailbox(caller);
+    if (!box) throw new HttpError(404, NOT_CONNECTED);
+    const password = decryptSecret(box.password_encrypted, mailboxBinding(caller.id, caller.tenantId), UNREADABLE);
+    let client;
+    try {
+        client = await connectMailbox(box, password);
+    } catch (err) {
+        await recordOutcome(box, err.message);
+        throw err;
+    }
+    try {
+        const result = await fn(client, box);
+        await recordOutcome(box, null);
+        return result;
+    } catch (err) {
+        if (err instanceof HttpError) throw err;
+        console.error("[mailbox] request failed:", errorCode(err));
+        if (err?.responseStatus === "NO" || err?.serverResponseCode === "NONEXISTENT") throw new HttpError(404, "That folder or email isn't there any more. Refresh.");
+        throw new HttpError(502, describeImapError(err, box));
+    } finally {
+        await logout(client);
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// reading
+// ---------------------------------------------------------------------------------------------
+
+const asFolder = (v) => {
+    const s = v === undefined || v === "" ? "INBOX" : typeof v === "string" ? v : "";
+    if (!s || s.length > 512 || /[\r\n\0]/.test(s)) throw new HttpError(400, "Invalid folder");
+    return s;
+};
+const asUid = (v) => {
+    const s = String(v ?? "");
+    if (!/^[1-9]\d{0,9}$/.test(s) || Number(s) > 4294967295) throw new HttpError(400, "Invalid email id");
+    return s;
+};
+const asPage = (v) => {
+    if (v === undefined || v === "") return 1;
+    const s = String(v);
+    if (!/^[1-9]\d{0,4}$/.test(s)) throw new HttpError(400, "Invalid page");
+    return Number(s);
+};
+const asPart = (v) => {
+    const s = String(v ?? "");
+    if (!/^\d{1,3}(\.\d{1,3}){0,9}$/.test(s)) throw new HttpError(400, "Invalid attachment");
+    return s;
+};
+
+const SPECIAL = { "\\Inbox": "inbox", "\\Sent": "sent", "\\Drafts": "drafts", "\\Trash": "trash", "\\Junk": "junk", "\\Archive": "archive" };
+const SPECIAL_ORDER = ["inbox", "drafts", "sent", "archive", "junk", "trash"];
+
+const person = (a) => ({ name: a?.name || "", address: a?.address || "" });
+const people = (list) => (Array.isArray(list) ? list.map(person) : []);
+const parsedPeople = (field) => (field ? (Array.isArray(field) ? field : [field]).flatMap((f) => f.value || []).map(person) : []);
+
+const filenameOf = (node) => node.dispositionParameters?.filename || node.parameters?.name || "";
+
+/** Decoded size of a part, roughly: base64 grows things by a third. */
+const partSize = (node) => {
+    const size = Number(node.size) || 0;
+    return String(node.encoding || "").toLowerCase() === "base64" ? Math.floor((size * 3) / 4) : size;
+};
+
+/**
+ * The attachments in a message's body structure: parts sent as attachments, or with a file name that are not the
+ * message's own text or an image shown inside it. Each with its part number for downloading.
+ */
+export function attachmentsOf(structure) {
+    const found = [];
+    const walk = (node) => {
+        if (!node) return;
+        if (Array.isArray(node.childNodes) && node.childNodes.length) {
+            node.childNodes.forEach(walk);
+            return;
+        }
+        const type = String(node.type || "").toLowerCase();
+        const disposition = String(node.disposition || "").toLowerCase();
+        const filename = filenameOf(node);
+        const embedded = disposition === "inline" && node.id && type.startsWith("image/");
+        const isText = (type === "text/plain" || type === "text/html") && !filename;
+        if (disposition === "attachment" || (filename && !embedded && !isText) || (type === "message/rfc822" && node !== structure)) {
+            found.push({ part: node.part || "1", filename: filename || `attachment-${node.part || "1"}`, size: partSize(node), contentType: type || "application/octet-stream" });
+        }
+    };
+    walk(structure);
+    return found;
+}
+
+const findPart = (node, part) => {
+    if (!node) return null;
+    if ((node.part || "1") === part && !(Array.isArray(node.childNodes) && node.childNodes.length)) return node;
+    for (const child of node.childNodes || []) {
+        const hit = findPart(child, part);
+        if (hit) return hit;
+    }
+    return null;
+};
+
+const flagsOf = (msg) => (msg.flags instanceof Set ? msg.flags : new Set(msg.flags || []));
+
+const asIso = (d) => {
+    const t = d ? new Date(d) : null;
+    return t && !Number.isNaN(t.getTime()) ? t.toISOString() : null;
+};
+
+/** One line of the message list. */
+export const listEntry = (msg) => {
+    const flags = flagsOf(msg);
+    const env = msg.envelope || {};
+    return {
+        uid: msg.uid,
+        from: env.from?.[0] ? person(env.from[0]) : null,
+        to: people(env.to),
+        subject: env.subject || "",
+        date: asIso(env.date || msg.internalDate),
+        seen: flags.has("\\Seen"),
+        flagged: flags.has("\\Flagged"),
+        answered: flags.has("\\Answered"),
+        has_attachments: attachmentsOf(msg.bodyStructure).length > 0,
+        size: Number(msg.size) || 0,
+    };
+};
+
+router.get(
+    "/account",
+    handler(async (_req, res, caller) => {
+        const [box, company] = await Promise.all([loadMailbox(caller), loadMailServer(caller.tenantId).catch(() => null)]);
+        res.json({ account: publicMailbox(box), defaults: suggestedSettings(caller.email, company) });
+    })
+);
+
+/** The settings from the body, checked, then the login budget: { row, password }. */
+async function checkedInput(req, caller, existing) {
+    const input = asMailboxInput(req.body, existing, caller);
+    if (!(await takeLoginBudget(caller, "default", 1))) throw new HttpError(429, "Too many tries. Wait a while and try again.");
+    return input;
+}
+
+router.post(
+    "/test",
+    handler(async (req, res, caller) => {
+        const existing = await loadMailbox(caller);
+        const { row, password } = await checkedInput(req, caller, existing);
+        let client;
+        try {
+            client = await connectMailbox(row, password);
+        } catch (err) {
+            if (!(err instanceof HttpError)) throw err;
+            // the request worked: the answer says whether the mail server let us in
+            return res.json({ ok: false, message: err.message });
+        }
+        await logout(client);
+        res.json({ ok: true, message: `Connected to ${row.imap_host}. Your mailbox is ready.` });
+    })
+);
+
+router.put(
+    "/account",
+    handler(async (req, res, caller) => {
+        const existing = await loadMailbox(caller);
+        const { row, password } = await checkedInput(req, caller, existing);
+        // saved only once logging in works
+        await logout(await connectMailbox(row, password));
+        const now = new Date().toISOString();
+        const sameServer = existing && existing.imap_host === row.imap_host && existing.username === row.username;
+        const saved = {
+            ...row,
+            password_encrypted: encryptSecret(password, mailboxBinding(caller.id, caller.tenantId)),
+            connected_at: sameServer && existing.connected_at ? existing.connected_at : now,
+            last_ok_at: now,
+            last_error: null,
+            updated_at: now,
+        };
+        const { error } = await admin.from("user_mailboxes").upsert(saved, { onConflict: "user_id,tenant_id" });
+        if (error) {
+            if (MISSING_TABLE.includes(String(error.code))) throw new HttpError(503, "Mailboxes are not set up on this system yet (database update pending)");
+            throw new HttpError(500, "Could not save your mailbox");
+        }
+        res.json({ account: publicMailbox(saved) });
+    })
+);
+
+router.delete(
+    "/account",
+    handler(async (_req, res, caller) => {
+        const { error } = await admin.from("user_mailboxes").delete().eq("user_id", caller.id).eq("tenant_id", caller.tenantId);
+        if (error && !MISSING_TABLE.includes(String(error.code))) throw new HttpError(500, "Could not disconnect your mailbox");
+        res.json({ ok: true });
+    })
+);
+
+router.get(
+    "/folders",
+    handler(async (_req, res, caller) => {
+        const folders = await withMailbox(caller, (client) => client.list({ statusQuery: { messages: true, unseen: true } }));
+        const out = folders
+            .filter((f) => !(f.flags instanceof Set ? f.flags : new Set(f.flags || [])).has("\\Noselect"))
+            .map((f) => ({
+                path: f.path,
+                name: f.path.toUpperCase() === "INBOX" ? "Inbox" : f.name || f.path,
+                special: SPECIAL[f.specialUse] || (f.path.toUpperCase() === "INBOX" ? "inbox" : null),
+                unread: Number(f.status?.unseen) || 0,
+                total: Number(f.status?.messages) || 0,
+                delimiter: f.delimiter || "/",
+            }));
+        const rank = (f) => (f.special ? SPECIAL_ORDER.indexOf(f.special) : SPECIAL_ORDER.length);
+        out.sort((a, b) => rank(a) - rank(b) || a.path.localeCompare(b.path));
+        res.json({ folders: out });
+    })
+);
+
+router.get(
+    "/messages",
+    handler(async (req, res, caller) => {
+        const folder = asFolder(req.query.folder);
+        const page = asPage(req.query.page);
+        const result = await withMailbox(caller, async (client) => {
+            const mailbox = await client.mailboxOpen(folder, { readOnly: true });
+            const total = Number(mailbox?.exists) || 0;
+            const end = total - (page - 1) * PAGE_SIZE;
+            const messages = [];
+            if (end >= 1) {
+                const start = Math.max(1, end - PAGE_SIZE + 1);
+                // envelope and body structure only: no message is downloaded for the list
+                for await (const msg of client.fetch(`${start}:${end}`, { uid: true, flags: true, envelope: true, bodyStructure: true, size: true, internalDate: true })) {
+                    messages.push({ seq: msg.seq, entry: listEntry(msg) });
+                }
+            }
+            messages.sort((a, b) => b.seq - a.seq);
+            return { total, messages: messages.map((m) => m.entry) };
+        });
+        res.json({ folder, page, page_size: PAGE_SIZE, total: result.total, has_more: page * PAGE_SIZE < result.total, messages: result.messages });
+    })
+);
+
+router.get(
+    "/message",
+    handler(async (req, res, caller) => {
+        const folder = asFolder(req.query.folder);
+        const uid = asUid(req.query.uid);
+        const message = await withMailbox(caller, async (client) => {
+            // opened for writing, so the email can be marked read (as every mail program does on opening it)
+            await client.mailboxOpen(folder);
+            const meta = await client.fetchOne(uid, { uid: true, size: true, flags: true, bodyStructure: true }, { uid: true });
+            if (!meta) throw new HttpError(404, "That email isn't there any more. Refresh.");
+            if (Number(meta.size) > MAX_MESSAGE_BYTES) throw new HttpError(413, "This email is too large to open here (over 25 MB).");
+            const full = await client.fetchOne(uid, { uid: true, source: true }, { uid: true });
+            if (!full?.source) throw new HttpError(404, "That email isn't there any more. Refresh.");
+            const parsed = await simpleParser(full.source, { skipTextToHtml: true, skipTextLinks: true });
+            let flags = flagsOf(meta);
+            if (!flags.has("\\Seen")) {
+                try {
+                    await client.messageFlagsAdd(uid, ["\\Seen"], { uid: true });
+                    flags = new Set([...flags, "\\Seen"]);
+                } catch {
+                    // a read-only folder: it stays unread
+                }
+            }
+            return {
+                uid: Number(uid),
+                folder,
+                subject: parsed.subject || "",
+                from: parsedPeople(parsed.from),
+                to: parsedPeople(parsed.to),
+                cc: parsedPeople(parsed.cc),
+                reply_to: parsedPeople(parsed.replyTo),
+                date: asIso(parsed.date),
+                message_id: parsed.messageId || null,
+                seen: flags.has("\\Seen"),
+                flagged: flags.has("\\Flagged"),
+                // embedded images (cid:) are already data: URLs here; the browser shows the html in a sandbox
+                html: typeof parsed.html === "string" ? parsed.html : null,
+                text: parsed.text || "",
+                attachments: attachmentsOf(meta.bodyStructure),
+            };
+        });
+        res.set("Cache-Control", "no-store");
+        res.json({ message });
+    })
+);
+
+/** A file name safe for a Content-Disposition header: no paths, quotes or control characters, ASCII fallback too. */
+export function safeFilename(name) {
+    const clean =
+        String(name || "")
+            .replace(/[\u0000-\u001f\u007f"\\/:*?<>|]+/g, "_")
+            .replace(/^[.\s]+/, "")
+            .trim()
+            .slice(0, 150) || "attachment";
+    const ascii = clean.replace(/[^\x20-\x7e]/g, "_").replace(/[%;]/g, "_");
+    return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(clean).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)}`;
+}
+
+router.get(
+    "/attachment",
+    handler(async (req, res, caller) => {
+        const folder = asFolder(req.query.folder);
+        const uid = asUid(req.query.uid);
+        const part = asPart(req.query.part);
+        await withMailbox(caller, async (client) => {
+            await client.mailboxOpen(folder, { readOnly: true });
+            const meta = await client.fetchOne(uid, { uid: true, bodyStructure: true }, { uid: true });
+            const node = meta && findPart(meta.bodyStructure, part);
+            if (!node) throw new HttpError(404, "That attachment isn't there any more. Refresh.");
+            if (partSize(node) > MAX_MESSAGE_BYTES) throw new HttpError(413, "This attachment is too large to download here (over 25 MB).");
+            const download = await client.download(uid, part, { uid: true, maxBytes: MAX_MESSAGE_BYTES });
+            if (!download?.content) throw new HttpError(404, "That attachment isn't there any more. Refresh.");
+            res.status(200);
+            // always a download, never shown by the browser: a file from an email could be a web page
+            res.set({
+                "Content-Type": "application/octet-stream",
+                "Content-Disposition": safeFilename(download.meta?.filename || filenameOf(node) || `attachment-${part}`),
+                "X-Content-Type-Options": "nosniff",
+                "Cache-Control": "no-store",
+            });
+            await pipeline(download.content, res);
+        });
+    })
+);
+
+export default router;

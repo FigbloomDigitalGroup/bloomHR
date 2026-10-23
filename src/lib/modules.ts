@@ -19,6 +19,8 @@
 //   hr-lifecycle     (administrators)      was already checked by the database but missing from the catalogue
 // payslip-design (20261021600000_payslip_details.sql) was given once to administrators and every role holding payroll.
 // reopen-leave (20261023000000_leave_reopen.sql) was given once to Operations: send approved leave back to pending.
+// mailbox (20261025200000_user_mailboxes.sql) was given to no role: a company ticks it for the roles that should read
+// their own mailbox in the app.
 // (custom roles based on those roles got them too). Administrators always have every module.
 
 export type ModuleArea = 'overview' | 'workspace' | 'people' | 'time' | 'performance' | 'pay' | 'system';
@@ -55,6 +57,7 @@ export const MODULES: ModuleInfo[] = [
   { id: 'chat-admin', name: 'Moderate chat', area: 'workspace', explain: 'See private channels, manage any channel and its members, edit or remove anyone’s messages (never direct messages)' },
   { id: 'sms', name: 'SMS Center', area: 'workspace', explain: 'Send SMS messages to staff' },
   { id: 'email-portal', name: 'Email Portal', area: 'workspace', explain: 'Send emails to staff from the app' },
+  { id: 'mailbox', name: 'My mailbox', area: 'workspace', explain: 'Connect their own email account and read it in the Email Portal' },
   // people
   { id: 'employees', name: 'Employees', area: 'people', explain: 'See and edit employee records, departments, onboarding and bulk uploads' },
   { id: 'employee-edit', name: 'Add and edit employees', area: 'people', explain: 'Show Add employee and Edit on employee records (what can be saved still follows Employees)' },
