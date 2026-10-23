@@ -58,7 +58,7 @@ describe('Approval chain', () => {
     decideApproval.mockResolvedValue('pending');
     const onDecided = vi.fn();
     render(<ApprovalChain chain={chain({ can_approve: true, can_reject: true })} onDecided={onDecided} />);
-    fireEvent.change(screen.getByLabelText('Comment (optional)'), { target: { value: ' enjoy ' } });
+    fireEvent.change(screen.getByLabelText('Comment (optional to approve, required to reject)'), { target: { value: ' enjoy ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
     await waitFor(() => expect(onDecided).toHaveBeenCalledWith('pending'));
     expect(decideApproval).toHaveBeenCalledWith('req-1', 'approved', 'enjoy');
@@ -69,9 +69,18 @@ describe('Approval chain', () => {
     const onDecided = vi.fn();
     render(<ApprovalChain chain={chain({ can_reject: true })} onDecided={onDecided} />);
     expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+    fireEvent.change(screen.getByLabelText('Comment (optional to approve, required to reject)'), { target: { value: ' short staffed ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
     await waitFor(() => expect(onDecided).toHaveBeenCalledWith('rejected'));
-    expect(decideApproval).toHaveBeenCalledWith('req-1', 'rejected', '');
+    expect(decideApproval).toHaveBeenCalledWith('req-1', 'rejected', 'short staffed');
+  });
+
+  it('rejecting needs a reason', () => {
+    render(<ApprovalChain chain={chain({ can_approve: true, can_reject: true })} />);
+    fireEvent.change(screen.getByLabelText('Comment (optional to approve, required to reject)'), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
+    expect(screen.getByRole('alert').textContent).toBe('Give a reason for rejecting: the employee will see it');
+    expect(decideApproval).not.toHaveBeenCalled();
   });
 
   it('shows why the database refused', async () => {

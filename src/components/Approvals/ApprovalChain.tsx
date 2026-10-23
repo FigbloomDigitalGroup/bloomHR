@@ -108,6 +108,11 @@ export default function ApprovalChain({ chain, onDecided, compact = false }: App
   }
 
   const decide = async (decision: 'approved' | 'rejected') => {
+    // the employee is told why (decide_approval refuses a rejection without a reason too)
+    if (decision === 'rejected' && !comment.trim()) {
+      setError('Give a reason for rejecting: the employee will see it');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -155,7 +160,7 @@ export default function ApprovalChain({ chain, onDecided, compact = false }: App
       {canAct && (
         <div className="flex flex-col gap-2 border-t border-border pt-3">
           <label className="text-[11.5px] font-semibold text-ink" htmlFor={`approval-comment-${chain.request_id}`}>
-            Comment (optional)
+            Comment (optional to approve, required to reject)
           </label>
           <textarea
             id={`approval-comment-${chain.request_id}`}

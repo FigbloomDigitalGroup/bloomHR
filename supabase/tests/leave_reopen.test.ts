@@ -32,7 +32,7 @@ const request = async (leave: string) =>
     `select id, status, current_step from approval_requests where record_id = '${leave}'`))[0];
 const decide = async (user: string, leave: string, decision: string) => {
   const r = await request(leave);
-  return asUser(db, user, () => run(`select decide_approval('${r.id}', '${decision}', '')`));
+  return asUser(db, user, () => run(`select decide_approval('${r.id}', '${decision}', '${decision === 'rejected' ? 'not this week' : ''}')`));
 };
 const reversals = async () =>
   Number((await rows<{ n: number }>(`select count(*)::int n from leave_balance_adjustments where change_type = 'approval_reversal'`))[0].n);

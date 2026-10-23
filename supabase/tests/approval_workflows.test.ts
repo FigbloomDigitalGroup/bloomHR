@@ -147,6 +147,10 @@ describe('the default leave workflow is today\'s', () => {
 
   it('HR may reject before the recommendation, and an admin may act at any step', async () => {
     const id = await apply(U.ME, 'E-ME');
+    // a rejection needs a reason (20261025500000), and nothing is decided without one
+    expect(await decide(U.HR, id, 'rejected')).toMatch(/Give a reason for rejecting/);
+    expect(await decide(U.HR, id, 'rejected', '   ')).toMatch(/Give a reason for rejecting/);
+    expect(await request(id)).toMatchObject({ status: 'pending' });
     expect(await decide(U.HR, id, 'rejected', 'too busy')).toBe('');
     expect(await leave(id)).toEqual({ status: 'rejected', recstatus: null, notes: 'too busy', recommendation_notes: null });
 
