@@ -86,6 +86,9 @@ export default function ApprovalChain({ chain, onDecided, compact = false }: App
 
   if (compact) {
     const current = chain.steps.find((s) => s.status === 'current');
+    // a finished request says who ended it, and why: the step that rejected it, or the last to approve it
+    const decided = chain.steps.find((s) => s.status === 'rejected')
+      ?? (chain.status === 'approved' ? [...chain.steps].reverse().find((s) => s.status === 'approved') : undefined);
     return (
       <div className="flex flex-col gap-1 min-w-0">
         <ol className="m-0 p-0 list-none flex flex-wrap items-center gap-1" aria-label="Approval chain">
@@ -103,6 +106,13 @@ export default function ApprovalChain({ chain, onDecided, compact = false }: App
           ))}
         </ol>
         {current?.waiting_on && <span className="text-[10.5px] text-muted-foreground">Waiting on {current.waiting_on}</span>}
+        {decided?.actor_name && (
+          <span className="text-[10.5px] text-muted-foreground">
+            {decided.status === 'rejected' ? 'Rejected' : 'Approved'} by {decided.actor_name}
+            {decided.acted_as === 'admin' ? ' (admin)' : ''}{decided.acted_at ? `, ${when(decided.acted_at)}` : ''}
+          </span>
+        )}
+        {decided?.comment && <span className="text-[10.5px] text-ink italic break-words">“{decided.comment}”</span>}
       </div>
     );
   }
