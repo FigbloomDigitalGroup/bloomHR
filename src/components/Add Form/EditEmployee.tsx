@@ -408,18 +408,18 @@ const EditEmployeePage = () => {
       newErrors['Last Name'] = 'Last Name is required';
       isValid = false;
     }
-    if (!employee['Mobile Number']) {
-      newErrors['Mobile Number'] = 'Mobile Number is required';
-      isValid = false;
-    } else if (!isValidPhone(employee['Mobile Number'])) {
+    // mobile and personal email are the employee's to fill in (their profile asks for them): HR checks only what is
+    // there, so someone bulk-added with a name and work email can still be corrected
+    if (employee['Mobile Number'] && !isValidPhone(employee['Mobile Number'])) {
       newErrors['Mobile Number'] = 'Invalid phone number format';
       isValid = false;
     }
-    if (!employee['Personal Email']) {
-      newErrors['Personal Email'] = 'Personal Email is required';
-      isValid = false;
-    } else if (!emailRegex.test(employee['Personal Email'])) {
+    if (employee['Personal Email'] && !emailRegex.test(employee['Personal Email'])) {
       newErrors['Personal Email'] = 'Invalid email format';
+      isValid = false;
+    }
+    if (employee['Work Email'] && !emailRegex.test(employee['Work Email'])) {
+      newErrors['Work Email'] = 'Invalid email format';
       isValid = false;
     }
 
@@ -1183,7 +1183,6 @@ const EditEmployeePage = () => {
                     value={employee['Personal Email'] || ''}
                     onChange={handleInputChange}
                     error={errors['Personal Email']}
-                    required={isEditMode}
                     disabled={!isEditMode}
                   />
                   <FormField
@@ -1193,7 +1192,6 @@ const EditEmployeePage = () => {
                     value={employee['Mobile Number'] || ''}
                     onChange={handleInputChange}
                     error={errors['Mobile Number']}
-                    required={isEditMode}
                     disabled={!isEditMode}
                     placeholder="e.g., +254712345678"
                   />
