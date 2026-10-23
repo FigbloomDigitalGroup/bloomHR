@@ -32,6 +32,10 @@ const loan = async (id: string) =>
       total_repayable: string; start_period: string; decided_by: string | null; product_name: string | null;
     }>(`select * from employee_loans where id = '${id}'`)
   )[0];
+// a decision goes through the loan's approval chain (20261025600000); the default is one step, anyone with Staff loans
+const decide = (user: string, id: string, decision: 'approved' | 'rejected', comment: string | null = null) =>
+  as(user, `select decide_approval(r.id, '${decision}', ${comment === null ? 'null' : `'${comment}'`})
+            from approval_requests r where r.kind = 'loan' and r.record_id = '${id}'`);
 const ask = async (user: string, values: string) =>
   (await read<{ id: string }>(user, `insert into employee_loans ${values} returning id`))[0].id;
 
@@ -145,12 +149,12 @@ describe('asking for a loan (staff)', () => {
     );
   });
 
-  it('HR hears of the request', async () => {
+  it('HR (the approvers on the loan chain) hears of the request', async () => {
     const [n] = await rows<{ title: string; message: string; employee_number: string }>(
-      `select title, message, employee_number from hr_notifications where notification_type = 'loan_requested' and message like '%60,000%'`
+      `select title, message, employee_number from hr_notifications where notification_type = 'approval_needed' and message like '%60,000%'`
     );
-    expect(n).toMatchObject({ title: 'Loan request to review', employee_number: 'E1' });
-    expect(n.message).toBe('Esther One asked for a loan of KES 60,000.00 over 6 months.');
+    expect(n).toMatchObject({ title: 'Loan request awaiting your approval', employee_number: 'H1' });
+    expect(n.message).toBe("Esther One's loan request of KES 60,000.00 over 6 months is waiting for your approval.");
   });
 
   it('staff see only their own loans and schedules; other companies nothing', async () => {
@@ -183,7 +187,8 @@ describe('deciding', () => {
   it('approval copies the terms in force then; the employee hears of it', async () => {
     const id = (await rows<{ id: string }>(`select id from employee_loans where employee_number = 'E1' and status = 'requested'`))[0].id;
     await as(HR, `update loan_settings set annual_rate = 14`);
-    await as(HR, `update employee_loans set status = 'approved', decision_comment = 'Fine' where id = '${id}'`);
+    await expect(as(HR, `update employee_loans set status = 'approved' where id = '${id}'`)).rejects.toThrow(/approval chain/);
+    await decide(HR, id, 'approved', 'Fine');
     const l = await loan(id);
     expect(l.status).toBe('approved');
     expect(Number(l.annual_rate)).toBe(14);
@@ -198,8 +203,8 @@ describe('deciding', () => {
 
   it('a decline needs a reason; nobody decides on their own loan', async () => {
     const id = await ask(S2, `(employee_number, principal, months) values ('E2', 5000, 3)`);
-    await expect(as(HR, `update employee_loans set status = 'rejected' where id = '${id}'`)).rejects.toThrow(/Give a reason/);
-    await as(HR, `update employee_loans set status = 'rejected', decision_comment = 'Still on probation' where id = '${id}'`);
+    await expect(decide(HR, id, 'rejected')).rejects.toThrow(/Give a reason/);
+    await decide(HR, id, 'rejected', 'Still on probation');
     expect((await rows<{ message: string }>(`select message from hr_notifications where notification_type = 'loan_rejected'`))[0].message).toBe(
       'Your loan request of KES 5,000.00 was not approved. Reason: Still on probation.'
     );
@@ -211,7 +216,8 @@ describe('deciding', () => {
   });
 
   it('HR can set up an approved loan for an employee, with a rate of their own', async () => {
-    const id = await ask(PAY, `(employee_number, principal, months, status, annual_rate, start_period) values ('E2', 12000, 3, 'approved', 0, '${month(0)}')`);
+    // (on the default one-step chain HR decides themselves; 20261025600000)
+    const id = await ask(HR, `(employee_number, principal, months, status, annual_rate, start_period) values ('E2', 12000, 3, 'approved', 0, '${month(0)}')`);
     const l = await loan(id);
     expect(Number(l.annual_rate)).toBe(0);
     expect(Number(l.monthly_instalment)).toBe(4000);
