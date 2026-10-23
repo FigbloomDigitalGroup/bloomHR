@@ -5,7 +5,7 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import type { Construct } from 'constructs';
 
 export interface ScannerRelayStackProps extends StackProps {
-  // The app the scanners' punches go to, e.g. bloom-hr-phi.vercel.app (its /iclock/* receiver)
+  // The app the scanners' punches go to, e.g. hr.figbloom.org (its /iclock/* receiver)
   appHost: string;
 }
 
