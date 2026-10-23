@@ -26,6 +26,29 @@ const fail = (error: unknown): never => {
 // ---------------------------------------------------------------------------------------------
 // the scanners
 // ---------------------------------------------------------------------------------------------
+/** How a scanner's punches count (attendance_devices.punch_mode, migration 20261025300000). */
+export type PunchMode = 'first_last' | 'in_only' | 'out_only' | 'device_keys';
+
+export const DEFAULT_PUNCH_MODE: PunchMode = 'first_last';
+
+/** The modes HR picks from, in order, each with its plain-language description. */
+export const PUNCH_MODES: { value: PunchMode; label: string; description: string }[] = [
+  {
+    value: 'first_last',
+    label: 'First and last scan',
+    description: 'First scan of the day is the clock-in, the last is the clock-out (one shared door)',
+  },
+  { value: 'in_only', label: 'Clock-in only', description: 'Clock-in only (an entrance device)' },
+  { value: 'out_only', label: 'Clock-out only', description: 'Clock-out only (an exit device)' },
+  { value: 'device_keys', label: 'In/Out keys', description: 'Use the scanner’s In/Out keys' },
+];
+
+const isPunchMode = (v: unknown): v is PunchMode => PUNCH_MODES.some((m) => m.value === v);
+
+/** The short name of a mode, for the scanners table ("First and last scan"). */
+export const punchModeLabel = (mode: string | null | undefined) =>
+  PUNCH_MODES.find((m) => m.value === mode)?.label ?? PUNCH_MODES[0].label;
+
 export interface Scanner {
   id: string;
   name: string;
@@ -44,6 +67,8 @@ export interface Scanner {
   clockWarningAt: string | null;
   /** when the scanner last sent its users' names (20261024000000); null: not yet */
   usersReceivedAt: string | null;
+  /** how its punches count (20261025300000); changing it applies to punches from then on */
+  punchMode: PunchMode;
 }
 
 export interface ScannerInput {
@@ -51,6 +76,7 @@ export interface ScannerInput {
   serialNumber: string;
   allowedIp: string;
   active: boolean;
+  punchMode: PunchMode;
 }
 
 const str = (v: unknown) => (v === null || v === undefined || v === '' ? null : String(v));
@@ -69,6 +95,7 @@ export const toScanner = (r: Record<string, unknown>): Scanner => ({
   clockWarning: str(r.clock_warning),
   clockWarningAt: str(r.clock_warning_at),
   usersReceivedAt: str(r.users_received_at),
+  punchMode: isPunchMode(r.punch_mode) ? r.punch_mode : DEFAULT_PUNCH_MODE,
 });
 
 /** A serial number as the database keeps it: trimmed, in capitals. */
@@ -79,7 +106,7 @@ export const serialLooksRight = (s: string) => /^[A-Z0-9][A-Z0-9_-]{2,39}$/.test
 export async function loadScanners(): Promise<Scanner[]> {
   const { data, error } = await supabase
     .from('attendance_devices')
-    .select('id, name, serial_number, brand, allowed_ip, active, last_seen_at, last_ip, last_error, last_error_at, clock_warning, clock_warning_at, users_received_at')
+    .select('id, name, serial_number, brand, allowed_ip, active, last_seen_at, last_ip, last_error, last_error_at, clock_warning, clock_warning_at, users_received_at, punch_mode')
     .order('created_at');
   if (error) fail(error);
   return ((data ?? []) as Record<string, unknown>[]).map(toScanner);
@@ -92,6 +119,7 @@ export async function saveScanner(id: string | null, input: ScannerInput): Promi
     serial_number: normaliseSerial(input.serialNumber),
     allowed_ip: input.allowedIp.trim() || null,
     active: input.active,
+    punch_mode: input.punchMode,
   };
   const { error } = id
     ? await supabase.from('attendance_devices').update(row).eq('id', id)
