@@ -3,7 +3,7 @@ import { moduleInfo } from './modules';
 
 // Approval workflows each company sets up (migration 20261015800000, FIG-829): per kind of request, an ordered chain of
 // approvers. The database decides who may approve (decide_approval); these helpers read and save the chains.
-// Loans, salary advances, expense claims and requisitions joined leave in 20261025600000 (FIG-1216).
+// Loans, salary advances, expense claims and requisitions joined leave in 20261025700000 (FIG-1216).
 
 export type ApprovalKind = 'leave' | 'salary_advance' | 'bulk_import' | 'loan' | 'expense' | 'requisition';
 /** The kinds of money request: their approval writes the item's approval, and it joins Payments to make. */

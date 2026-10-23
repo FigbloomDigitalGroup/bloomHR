@@ -32,7 +32,7 @@ const loan = async (id: string) =>
       total_repayable: string; start_period: string; decided_by: string | null; product_name: string | null;
     }>(`select * from employee_loans where id = '${id}'`)
   )[0];
-// a decision goes through the loan's approval chain (20261025600000); the default is one step, anyone with Staff loans
+// a decision goes through the loan's approval chain (20261025700000); the default is one step, anyone with Staff loans
 const decide = (user: string, id: string, decision: 'approved' | 'rejected', comment: string | null = null) =>
   as(user, `select decide_approval(r.id, '${decision}', ${comment === null ? 'null' : `'${comment}'`})
             from approval_requests r where r.kind = 'loan' and r.record_id = '${id}'`);
@@ -216,7 +216,7 @@ describe('deciding', () => {
   });
 
   it('HR can set up an approved loan for an employee, with a rate of their own', async () => {
-    // (on the default one-step chain HR decides themselves; 20261025600000)
+    // (on the default one-step chain HR decides themselves; 20261025700000)
     const id = await ask(HR, `(employee_number, principal, months, status, annual_rate, start_period) values ('E2', 12000, 3, 'approved', 0, '${month(0)}')`);
     const l = await loan(id);
     expect(Number(l.annual_rate)).toBe(0);

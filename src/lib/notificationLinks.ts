@@ -62,7 +62,7 @@ const STAFF_BY_TYPE: Record<string, StaffLink> = {
 
 const has = (text: string | null | undefined, pattern: RegExp) => pattern.test(text ?? '');
 
-// A loan, advance, expense or requisition on its approval chain (20261025600000): the titles begin with what it is
+// A loan, advance, expense or requisition on its approval chain (20261025700000): the titles begin with what it is
 // ("Loan request awaiting your approval", "Salary advance moving on", "Requisition approved").
 type MoneyKind = 'loan' | 'salary_advance' | 'expense' | 'requisition';
 const moneyKind = (title: string | null | undefined): MoneyKind | null => {

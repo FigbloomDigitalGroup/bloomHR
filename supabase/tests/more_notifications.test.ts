@@ -26,7 +26,7 @@ const asHR = async (sql: string) => {
     await db.exec(`select set_config('request.jwt.claim.sub', '', false)`);
   }
 };
-// a decision on an advance or expense, written as its approval chain writes it (20261025600000): these tests are about
+// a decision on an advance or expense, written as its approval chain writes it (20261025700000): these tests are about
 // the employee's notification, not who may decide
 const decided = (sql: string) => asHR(`select set_config('app.approval_decision', 'on', false); ${sql}; select set_config('app.approval_decision', '', false)`);
 

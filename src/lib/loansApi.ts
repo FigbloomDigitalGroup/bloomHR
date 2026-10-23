@@ -222,7 +222,7 @@ export async function createLoan(loan: NewLoan): Promise<LoanStatus> {
 }
 
 /**
- * Approves a request's current step on its approval chain (20261025600000); the first repayment month can be changed
+ * Approves a request's current step on its approval chain (20261025700000); the first repayment month can be changed
  * in the same step. 'approved' once the last step approved it, 'pending' while later steps remain.
  */
 export async function approveLoan(id: string, requestId: string, input: { comment: string; startPeriod: string }) {

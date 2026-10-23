@@ -168,7 +168,7 @@ export interface NewRequisition {
 
 /**
  * Saves a requisition. Asked to approve it at once, it stays approved only when the company's requisition approvals are
- * one step the signed-in person decides; otherwise it goes on the chain (20261025600000): the status it got is returned.
+ * one step the signed-in person decides; otherwise it goes on the chain (20261025700000): the status it got is returned.
  */
 export async function createRequisition(r: NewRequisition): Promise<RequisitionStatus> {
   const other = r.payeeType === 'other';

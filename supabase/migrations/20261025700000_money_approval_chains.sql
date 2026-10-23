@@ -610,8 +610,8 @@ begin
 end $$;
 revoke all on function public.approval_apply_money(public.approval_requests, boolean, text, text) from public, anon, authenticated;
 
--- (20261015800000's for leave; money: the last approval or a rejection is written on the item, an earlier approval
--- tells the employee it moved on)
+-- (20261025600000's for leave, the rejection naming who rejected it; money: the last approval or a rejection is written
+-- on the item, an earlier approval tells the employee it moved on)
 create or replace function public.approval_apply(r public.approval_requests, p_decision text, p_final boolean,
                                                  p_by_step boolean, p_comment text, p_actor text)
 returns void
@@ -666,7 +666,8 @@ begin
       'Your ' || public.approval_leave_text(l) || ' has been approved.');
   else
     perform public.notify_employee_number(r.tenant_id, l."Employee Number", 'leave_rejected', 'Leave application rejected',
-      'Your ' || public.approval_leave_text(l) || ' has been rejected.' || public.with_note('Reason', note));
+      'Your ' || public.approval_leave_text(l) || ' has been rejected'
+      || coalesce(' by ' || nullif(btrim(p_actor), ''), '') || '.' || public.with_note('Reason', note));
   end if;
 end $$;
 

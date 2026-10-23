@@ -201,7 +201,7 @@ describe('leave is as before', () => {
 describe('items waiting when this migration runs', () => {
   it('go on the default chain quietly', async () => {
     const old = await bootDb({
-      file: '20261025600000_money_approval_chains.sql',
+      file: '20261025700000_money_approval_chains.sql',
       seed: async (d) => {
         await d.exec(`
           insert into employees ("Employee Number", "First Name", tenant_id) values ('E1', 'Esther', '${A}');

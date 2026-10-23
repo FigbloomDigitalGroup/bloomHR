@@ -35,7 +35,7 @@ const payment = async (source: string, id: string) =>
   (await rows<Payment>(`select * from payment_requests where source = $1 and source_id = $2`, [source, id]))[0];
 const notes = (type: string) => rows<{ employee_number: string; message: string }>(
   `select employee_number, message from hr_notifications where notification_type = $1 order by id`, [type]);
-// a decision goes through the item's approval chain (20261025600000); the default is one step, anyone with the module
+// a decision goes through the item's approval chain (20261025700000); the default is one step, anyone with the module
 const decide = (user: string, kind: string, id: string, decision: 'approved' | 'rejected', comment: string | null = null) =>
   as(user, `select decide_approval(r.id, '${decision}', ${comment === null ? 'null' : `'${comment}'`})
             from approval_requests r where r.kind = '${kind}' and r.record_id = '${id}'`);
@@ -194,7 +194,7 @@ describe('requisitions', () => {
       (payee_employee_number, amount, purpose, category) values ('E1', 4200, 'Printer toner for the branch', 'Supplies')
       returning id, requested_by, payee_name`))[0];
     expect(req).toMatchObject({ requested_by: 'E1', payee_name: 'Esther One' });
-    // HR, the approvers on the default chain, are told (20261025600000)
+    // HR, the approvers on the default chain, are told (20261025700000)
     expect((await notes('approval_needed')).at(-1)).toEqual({ employee_number: 'H1',
       message: "Esther One's requisition of KES 4,200.00 to Esther One for Printer toner for the branch is waiting for your approval." });
     expect(await fails(S1, `update requisitions set status = 'approved' where id = '${req.id}'`)).toMatch(/approval chain|Only HR/);
