@@ -15,6 +15,19 @@ vi.mock('../../lib/loansApi', () => ({
   saveLoanSettings: vi.fn(),
   saveLoanProduct: vi.fn(),
 }));
+// whether the signed-in person may decide the request comes from its approval chain (the database), not the page
+const chain = { can: true };
+vi.mock('../../lib/approvals', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/approvals')>()),
+  decideApproval: vi.fn(),
+  loadApprovalChains: vi.fn(async () => ({
+    r1: {
+      record_id: 'r1', request_id: 'q1', status: 'pending', current_step: 1, can_approve: chain.can, can_reject: chain.can,
+      steps: [{ position: 1, label: 'Staff loans', approver_type: 'module', status: 'current', waiting_on: 'anyone with Staff loans',
+                actor_name: null, acted_as: null, comment: null, acted_at: null }],
+    },
+  })),
+}));
 const HR_MODULES = ['dashboard', 'employees', 'hr-admin', 'leaves', 'loans'];
 const perms = { role: 'HR', modules: HR_MODULES };
 vi.mock('../../hooks/usePermissions', () => ({
@@ -72,6 +85,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   perms.role = 'HR';
   perms.modules = HR_MODULES;
+  chain.can = true;
   mocked.loadAllLoans.mockResolvedValue(LOANS);
   mocked.loadLoanSettings.mockResolvedValue(DEFAULT_LOAN_SETTINGS);
   mocked.loadLoanProducts.mockResolvedValue([]);
@@ -79,7 +93,9 @@ beforeEach(() => {
     schedules: { d1: loanSchedule(12000, 0, 3, 'flat', currentPeriod()) },
     repayments: { d1: [{ loan_id: 'd1', pay_period: addMonths(currentPeriod(), -1), amount: 4000 }] },
   });
-  for (const f of [mocked.approveLoan, mocked.declineLoan, mocked.markLoanDisbursed, mocked.cancelLoan, mocked.createLoan]) f.mockResolvedValue(undefined);
+  for (const f of [mocked.declineLoan, mocked.markLoanDisbursed, mocked.cancelLoan]) f.mockResolvedValue(undefined);
+  mocked.approveLoan.mockResolvedValue('approved');
+  mocked.createLoan.mockResolvedValue('approved');
   vi.stubGlobal('confirm', vi.fn(() => true));
 });
 afterEach(() => {
@@ -97,15 +113,16 @@ describe('the loans page', () => {
     expect(screen.getByText('KSh 8,000')).toBeTruthy(); // owed on Mary's loan
   });
 
-  it('approves with the first repayment month', async () => {
+  it('approves the step it waits on, with the first repayment month; the chain shows on the card', async () => {
     render(<LoansAdmin />);
     const card = await screen.findByTestId('loan-r1');
+    expect(within(card).getByLabelText('Approval chain')).toBeTruthy();
     fireEvent.click(within(card).getByRole('button', { name: 'Approve' }));
     const start = addMonths(currentPeriod(), 2);
     fireEvent.change(screen.getByLabelText('First repayment from'), { target: { value: start } });
     fireEvent.change(screen.getByLabelText('Note to the employee (optional)'), { target: { value: 'Approved by the committee' } });
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Approve' }));
-    await vi.waitFor(() => expect(mocked.approveLoan).toHaveBeenCalledWith('r1', { comment: 'Approved by the committee', startPeriod: start }));
+    await vi.waitFor(() => expect(mocked.approveLoan).toHaveBeenCalledWith('r1', 'q1', { comment: 'Approved by the committee', startPeriod: start }));
   });
 
   it('a decline needs a reason', async () => {
@@ -117,7 +134,7 @@ describe('the loans page', () => {
     expect(mocked.declineLoan).not.toHaveBeenCalled();
     fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'A loan is still being repaid' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Decline' }));
-    await vi.waitFor(() => expect(mocked.declineLoan).toHaveBeenCalledWith('r1', 'A loan is still being repaid'));
+    await vi.waitFor(() => expect(mocked.declineLoan).toHaveBeenCalledWith('q1', 'A loan is still being repaid'));
   });
 
   it('marks an approved loan disbursed, after asking', async () => {
@@ -164,7 +181,8 @@ describe('the loans page', () => {
     );
   });
 
-  it('someone who may not manage loans sees no buttons', async () => {
+  it('someone who may not manage loans or decide the step sees no buttons', async () => {
+    chain.can = false;
     perms.role = 'MANAGER';
     perms.modules = ['dashboard', 'employees', 'employee-edit', 'leaves', 'expenses', 'salaryadmin', 'team-work'];
     render(<LoansAdmin />);
@@ -173,12 +191,13 @@ describe('the loans page', () => {
     expect(screen.queryByRole('button', { name: 'New loan' })).toBeNull();
   });
 
-  it('the Payroll module manages loans (Checker by default)', async () => {
+  it('the Payroll module sets up loans (Checker by default); approving is for the step’s approvers', async () => {
+    chain.can = false;
     perms.role = 'CHECKER';
     perms.modules = ['dashboard', 'employees', 'payroll', 'settings'];
     render(<LoansAdmin />);
     const card = await screen.findByTestId('loan-r1');
-    expect(within(card).getByRole('button', { name: 'Approve' })).toBeTruthy();
+    expect(within(card).queryByRole('button', { name: 'Approve' })).toBeNull();
     expect(screen.getByRole('button', { name: 'New loan' })).toBeTruthy();
   });
 
@@ -191,6 +210,7 @@ describe('the loans page', () => {
   });
 
   it('HR whose role lost Staff loans (and has no Payroll) does not', async () => {
+    chain.can = false;
     perms.role = 'HR';
     perms.modules = HR_MODULES.filter((m) => m !== 'loans');
     render(<LoansAdmin />);

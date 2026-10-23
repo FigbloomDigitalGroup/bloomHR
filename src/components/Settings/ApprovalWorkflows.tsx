@@ -3,8 +3,10 @@ import toast from 'react-hot-toast';
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react';
 import { Button, Card, EmployeePicker, TabBar } from '../UI';
 import { usePermissions } from '../../hooks/usePermissions';
+import { MODULES, moduleInfo } from '../../lib/modules';
 import {
   APPROVAL_KINDS,
+  APPROVER_MODULES,
   APPROVER_ROLES,
   APPROVER_TYPES,
   ApprovalKind,
@@ -86,6 +88,23 @@ function StepEditor({ step, index, count, canEdit, departmentHeads, onChange, on
             >
               <option value="">Choose a role</option>
               {APPROVER_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+        )}
+        {step.approver_type === 'module' && (
+          <div>
+            <label className={labelClass} htmlFor={`step-${n}-module`}>Anyone who can</label>
+            <select
+              id={`step-${n}-module`}
+              className={inputClass}
+              value={step.approver_module || ''}
+              disabled={!canEdit}
+              onChange={(e) => set({ approver_module: e.target.value || null })}
+            >
+              <option value="">Choose</option>
+              {[...APPROVER_MODULES, ...MODULES.map((m) => m.id).filter((id) => !APPROVER_MODULES.includes(id))].map((id) => (
+                <option key={id} value={id}>{moduleInfo(id)?.name ?? id}</option>
+              ))}
             </select>
           </div>
         )}

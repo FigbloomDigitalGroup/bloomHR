@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { fetchAll } from './fetchAll';
 import { requireUpdatedRows } from './requireUpdated';
 import { paymentKind, paymentMethodLabel } from './paymentMethods';
+import { decideApproval } from './approvals';
 
 // Payments to make (migration 20261025400000, FIG-1209). Approved salary advances, loans, expenses and requisitions
 // wait in one list; finance pays each outside the app and records how. The database fills the list, checks who may
@@ -165,9 +166,13 @@ export interface NewRequisition {
   approve: boolean;
 }
 
-export async function createRequisition(r: NewRequisition) {
+/**
+ * Saves a requisition. Asked to approve it at once, it stays approved only when the company's requisition approvals are
+ * one step the signed-in person decides; otherwise it goes on the chain (20261025600000): the status it got is returned.
+ */
+export async function createRequisition(r: NewRequisition): Promise<RequisitionStatus> {
   const other = r.payeeType === 'other';
-  const { error } = await supabase.from('requisitions').insert({
+  const { data, error } = await supabase.from('requisitions').insert({
     payee_type: r.payeeType,
     payee_employee_number: other ? null : r.employeeNumber,
     payee_name: other ? r.payeeName.trim() : null,
@@ -177,19 +182,23 @@ export async function createRequisition(r: NewRequisition) {
     purpose: r.purpose.trim(),
     needed_by: r.neededBy || null,
     status: r.approve ? 'approved' : 'pending',
-  });
+  }).select('status').single();
   if (error) throw friendly(error);
+  return (data?.status ?? 'pending') as RequisitionStatus;
 }
 
-async function decide(id: string, values: Record<string, unknown>) {
+async function update(id: string, values: Record<string, unknown>) {
   const { data, error } = await supabase.from('requisitions').update(values).eq('id', id).select('id');
   if (error) throw friendly(error);
   requireUpdatedRows(data, NOT_SAVED);
 }
 
-export const approveRequisition = (id: string, comment: string) =>
-  decide(id, { status: 'approved', decision_comment: comment.trim() || null });
+/** Approves the step a requisition waits on (its approval chain's request): 'approved' at the last, else 'pending'. */
+export const approveRequisition = (requestId: string, comment: string) => decideApproval(requestId, 'approved', comment.trim());
 
-export const declineRequisition = (id: string, reason: string) => decide(id, { status: 'rejected', decision_comment: reason.trim() });
+/** Turns it down on its chain (a reason is needed). */
+export async function declineRequisition(requestId: string, reason: string) {
+  await decideApproval(requestId, 'rejected', reason.trim());
+}
 
-export const cancelRequisition = (id: string) => decide(id, { status: 'cancelled' });
+export const cancelRequisition = (id: string) => update(id, { status: 'cancelled' });

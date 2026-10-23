@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { IN_LIST_SIZE, chunks, fetchAll } from './fetchAll';
 import { requireUpdatedRows } from './requireUpdated';
+import { decideApproval } from './approvals';
 import type { MyEmployee } from './salaryAdvanceApi';
 import {
   ACTIVE_STATUSES,
@@ -200,8 +201,12 @@ export interface NewLoan {
 }
 
 /** HR sets up a loan for an employee: approved straight away. */
-export async function createLoan(loan: NewLoan) {
-  const { error } = await supabase.from('employee_loans').insert({
+/**
+ * HR sets up a loan for an employee, approved at once. When the company's loan approvals have more than one step (or
+ * one HR can't decide), the database puts it on the chain instead: the status it got is returned.
+ */
+export async function createLoan(loan: NewLoan): Promise<LoanStatus> {
+  const { data, error } = await supabase.from('employee_loans').insert({
     employee_number: loan.employeeNumber,
     product_id: loan.productId,
     principal: loan.amount,
@@ -211,15 +216,24 @@ export async function createLoan(loan: NewLoan) {
     interest_method: loan.interestMethod,
     reason: loan.reason.trim() || null,
     status: 'approved',
-  });
+  }).select('status').single();
   if (error) throw friendly(error);
+  return (data?.status ?? 'approved') as LoanStatus;
 }
 
-/** Approves a request; the first repayment month can be changed in the same step. */
-export const approveLoan = (id: string, input: { comment: string; startPeriod: string }) =>
-  update(id, { status: 'approved', decision_comment: input.comment.trim() || null, start_period: input.startPeriod });
+/**
+ * Approves a request's current step on its approval chain (20261025600000); the first repayment month can be changed
+ * in the same step. 'approved' once the last step approved it, 'pending' while later steps remain.
+ */
+export async function approveLoan(id: string, requestId: string, input: { comment: string; startPeriod: string }) {
+  await update(id, { start_period: input.startPeriod });
+  return decideApproval(requestId, 'approved', input.comment.trim());
+}
 
-export const declineLoan = (id: string, reason: string) => update(id, { status: 'rejected', decision_comment: reason.trim() });
+/** Turns a request down on its approval chain (a reason is needed). */
+export async function declineLoan(requestId: string, reason: string) {
+  await decideApproval(requestId, 'rejected', reason.trim());
+}
 
 /** Finance paid it outside the app: payroll takes the instalments from now on. */
 export const markLoanDisbursed = (id: string) => update(id, { status: 'disbursed' });

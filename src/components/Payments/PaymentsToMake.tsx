@@ -5,6 +5,8 @@ import { Ban, Check, CheckCircle2, ClipboardList, Hourglass, Plus, RefreshCw, Wa
 import { Button, Card, EmployeePicker, EmptyState, Modal, PageHeader, StatCard, StatusPill, TabBar } from '../UI';
 import type { StatusTone } from '../UI/StatusPill';
 import { LoaderBlock } from '../UI/FigbloomLoader';
+import ApprovalChain from '../Approvals/ApprovalChain';
+import { loadApprovalChains, type ApprovalChain as Chain } from '../../lib/approvals';
 import { confirmDialog } from '../../lib/confirmDialog';
 import { formatKsh } from '../../lib/loans';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -37,7 +39,9 @@ import {
 // (any other payment) on the third tab.
 //
 //   * To pay / Paid: the 'payments' module (finance). Administrators hold every module.
-//   * Requisitions: the 'requisitions' module approves and raises them; finance sees them read-only.
+//   * Requisitions: the 'requisitions' module raises and cancels them. Each goes through the company's requisition
+//     approvals (Settings > Approval workflows): Approve and Turn down decide the step it waits on, for whoever may
+//     decide it. Finance sees them read-only.
 
 type Tab = 'to_pay' | 'paid' | 'requisitions';
 
@@ -99,6 +103,7 @@ export default function PaymentsToMake() {
   const [payments, setPayments] = useState<PaymentRequest[]>([]);
   const [payees, setPayees] = useState<Record<string, Payee>>({});
   const [requisitions, setRequisitions] = useState<Requisition[]>([]);
+  const [chains, setChains] = useState<Record<string, Chain>>({});
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -119,6 +124,7 @@ export default function PaymentsToMake() {
       setPayments(p);
       setRequisitions(r);
       setPayees(who);
+      setChains(await loadApprovalChains('requisition', r.filter((x) => x.status === 'pending').map((x) => x.id)).catch(() => ({})));
     } catch (error) {
       console.error('Error loading payments:', error);
       toast.error('Could not load payments');
@@ -185,12 +191,25 @@ export default function PaymentsToMake() {
   const confirmDecision = async () => {
     if (!deciding) return;
     const { req, decision } = deciding;
+    const chain = chains[req.id];
+    if (!chain) return;
     if (decision === 'decline') {
       setDeclineTried(true);
       if (!comment.trim()) return;
-      if (await act(req.id, () => declineRequisition(req.id, comment), 'Requisition turned down')) setDeciding(null);
-    } else if (await act(req.id, () => approveRequisition(req.id, comment), 'Approved and sent to finance to pay')) {
+      if (await act(req.id, () => declineRequisition(chain.request_id, comment), 'Requisition turned down')) setDeciding(null);
+      return;
+    }
+    let status = 'approved';
+    const ok = await act(
+      req.id,
+      async () => {
+        status = await approveRequisition(chain.request_id, comment);
+      },
+      'Approved'
+    );
+    if (ok) {
       setDeciding(null);
+      toast(status === 'approved' ? 'Sent to finance to pay.' : 'Your step is approved. It now goes to the next approver.');
     }
   };
 
@@ -221,8 +240,8 @@ export default function PaymentsToMake() {
     if (!creating || createProblem) return;
     setBusyId('new');
     try {
-      await createRequisition({ ...creating, amount: Number(creating.amountText) });
-      toast.success(creating.approve ? 'Requisition approved and sent to finance to pay' : 'Requisition saved, waiting for approval');
+      const status = await createRequisition({ ...creating, amount: Number(creating.amountText) });
+      toast.success(status === 'approved' ? 'Requisition approved and sent to finance to pay' : 'Requisition saved. It goes through the requisition approvals.');
       setCreating(null);
       await load();
     } catch (error) {
@@ -382,6 +401,7 @@ export default function PaymentsToMake() {
           {requisitions.map((r) => {
             const busy = busyId === r.id;
             const status = REQUISITION_STATUS[r.status];
+            const chain = chains[r.id];
             return (
               <li key={r.id} data-testid={`requisition-${r.id}`}>
                 <Card className="h-full flex flex-col">
@@ -407,20 +427,28 @@ export default function PaymentsToMake() {
                       {r.decision_comment ? `: ${r.decision_comment}` : ''}
                     </p>
                   )}
-                  {canApprove && (r.status === 'pending' || r.status === 'approved') && (
+                  {r.status === 'pending' && chain && (
+                    <div className="mt-2">
+                      <ApprovalChain chain={chain} compact />
+                    </div>
+                  )}
+                  {/* deciding follows the chain (who may decide its step); cancelling is for those who raise requisitions */}
+                  {(canApprove || chain?.can_reject) && (r.status === 'pending' || r.status === 'approved') && (
                     <div className="mt-auto pt-3 flex flex-wrap gap-2">
-                      {r.status === 'pending' && (
+                      {r.status === 'pending' && chain?.can_reject && (
                         <>
-                          <Button
-                            onClick={() => {
-                              setDeciding({ req: r, decision: 'approve' });
-                              setComment('');
-                            }}
-                            disabled={busy}
-                            icon={<Check className="w-3.5 h-3.5" />}
-                          >
-                            Approve
-                          </Button>
+                          {chain.can_approve && (
+                            <Button
+                              onClick={() => {
+                                setDeciding({ req: r, decision: 'approve' });
+                                setComment('');
+                              }}
+                              disabled={busy}
+                              icon={<Check className="w-3.5 h-3.5" />}
+                            >
+                              Approve
+                            </Button>
+                          )}
                           <Button
                             variant="secondary"
                             onClick={() => {
@@ -435,9 +463,11 @@ export default function PaymentsToMake() {
                           </Button>
                         </>
                       )}
-                      <Button variant="ghost" onClick={() => void cancel(r)} disabled={busy} icon={<Ban className="w-3.5 h-3.5" />}>
-                        Cancel
-                      </Button>
+                      {canApprove && (
+                        <Button variant="ghost" onClick={() => void cancel(r)} disabled={busy} icon={<Ban className="w-3.5 h-3.5" />}>
+                          Cancel
+                        </Button>
+                      )}
                     </div>
                   )}
                 </Card>
@@ -586,7 +616,7 @@ export default function PaymentsToMake() {
               </label>
               <label className="inline-flex items-center gap-2 text-[12.5px] text-ink">
                 <input type="checkbox" checked={creating.approve} onChange={(e) => setCreating({ ...creating, approve: e.target.checked })} />
-                Approve it now and send it to finance
+                Approve it now and send it to finance (if the requisition approvals have more steps, it goes through them)
               </label>
               {createTried && createProblem && (
                 <p className="m-0 text-[11.5px] text-status-danger" role="alert">
