@@ -13,7 +13,7 @@ import {
 const day = (d: string | null) => (d ? new Date(d).toLocaleDateString() : '');
 
 /**
- * Loans, salary advances, expense claims and requisitions waiting on the signed-in person's decision (FIG-1210): a
+ * Loans, salary advances, expense claims and requisitions waiting on the signed-in person's decision (FIG-1216): a
  * line manager or named approver on the company's chain may not have the Loans or Salary Advance screens, so they
  * approve or reject here. Shows nothing when nothing is waiting.
  */

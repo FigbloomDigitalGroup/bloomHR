@@ -74,7 +74,7 @@ describe('Approval workflows card', () => {
     expect(steps[2]).toMatchObject({ approver_employee_number: 'E-CTO', label: 'CTO' });
   });
 
-  it('loans: the line manager, then anyone who can manage Staff loans (FIG-1210)', async () => {
+  it('loans: the line manager, then anyone who can manage Staff loans (FIG-1216)', async () => {
     state.workflow = { kind: 'loan', admins_can_act: true, department_head_available: false,
       steps: [{ approver_type: 'module', approver_module: 'loans', skip_if_requester: true }] };
     render(<ApprovalWorkflowsCard />);

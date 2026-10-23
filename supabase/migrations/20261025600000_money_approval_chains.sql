@@ -1,4 +1,4 @@
--- Approval chains for money (FIG-1210): loans, salary advances, expense claims and requisitions go through the
+-- Approval chains for money (FIG-1216): loans, salary advances, expense claims and requisitions go through the
 -- approval workflows each company sets up (Settings > Approval workflows), as leave does.
 --
 -- Until now each was approved in one step on its own screen. Now:

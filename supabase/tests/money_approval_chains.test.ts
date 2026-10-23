@@ -1,6 +1,6 @@
 // @vitest-environment node
 //
-// Approval chains for money (FIG-1210): loans, salary advances, expenses and requisitions go through the company's
+// Approval chains for money (FIG-1216): loans, salary advances, expenses and requisitions go through the company's
 // approval workflow, as leave does. The default chain is one step, "anyone with the module" that approved it before;
 // a company can make it longer (line manager, then HR, then a named person). The last approval writes the item's
 // approval (and so it joins Payments to make); a rejection needs a reason; deciding outside the chain is refused.
