@@ -92,7 +92,7 @@ export default function ApprovalChain({ chain, onDecided, compact = false }: App
           {chain.steps.map((s, i) => (
             <li key={s.position} className="flex items-center gap-1">
               <span
-                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill text-[10.5px] font-semibold ${dotClass[s.status]}`}
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill text-[10.5px] font-semibold whitespace-nowrap ${dotClass[s.status]}`}
                 title={`${s.label}: ${STATUS[s.status].label}`}
               >
                 <StepIcon status={s.status} />

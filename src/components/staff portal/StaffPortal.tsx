@@ -72,6 +72,7 @@ import { loadMyTeam, type TeamMember } from '../../lib/myTeamApi';
 import StaffCompany from './StaffCompany';
 import MyApprovalChain from './MyApprovalChain';
 import LeavePlanningHints from './LeavePlanningHints';
+import { leaveDateRange, leaveDaysLabel, shortSubmitted } from '../../lib/leaveDisplay';
 import { isCompanySection } from '../../lib/staffCompany';
 import MyAbsences from './MyAbsences';
 import { STAFF_PORTAL_MENU, STAFF_PORTAL_MY_TEAM, STAFF_PORTAL_MY_WORK, type PortalMenuGroup } from '../../lib/sidebarMenu';
@@ -831,79 +832,50 @@ const LeaveApplicationsList = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Leave Type
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Dates
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Days
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Approvals
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Documents
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Submitted On
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {applications.map((app) => (
-                <tr key={app.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-xs font-medium text-gray-900 capitalize">
+      {/* one card per application: reads at any width, no sideways scrolling */}
+      <ul className="m-0 p-0 list-none flex flex-col gap-3" aria-label="My leave applications">
+        {applications.map((app) => {
+          const rule = docRules.find((r) => r.leave_type === app["Leave Type"]);
+          return (
+            <li key={app.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-5">
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-x-6 gap-y-3">
+                <div className="min-w-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="m-0 text-sm font-semibold text-gray-900 capitalize">
                       {app["Leave Type"].replace(/-/g, ' ')}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1 truncate max-w-xs">
+                    </h3>
+                    <span className="shrink-0">{getStatusBadge(app.status)}</span>
+                  </div>
+                  {app.reason && (
+                    <p className="m-0 mt-1 text-xs text-gray-600 line-clamp-2 break-words" title={app.reason}>
                       {app.reason}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-xs text-gray-900">
-                      {new Date(app["Start Date"]).toLocaleDateString()}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      to {new Date(app["End Date"]).toLocaleDateString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
-                    {app.days} day{app.days !== 1 ? 's' : ''}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(app.status)}
-                  </td>
-                  <td className="px-6 py-4">
-                    {chains[app.id] ? <ApprovalChain chain={chains[app.id]} compact /> : <span className="text-xs text-gray-400">-</span>}
-                  </td>
-                  <td className="px-6 py-4">
-                    <LeaveDocuments
-                      app={app}
-                      rule={docRules.find((r) => r.leave_type === app["Leave Type"])}
-                      canAdd
-                      onChanged={() => setReloadKey((k) => k + 1)}
-                    />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
-                    {parseApplicationDate(app).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                    </p>
+                  )}
+                  <p className="m-0 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+                    <span className="whitespace-nowrap font-medium text-gray-800">
+                      {leaveDateRange(app["Start Date"], app["End Date"])}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span className="whitespace-nowrap">{leaveDaysLabel(app.days)}</span>
+                    <span aria-hidden="true">·</span>
+                    <span className="whitespace-nowrap">Submitted {shortSubmitted(parseApplicationDate(app))}</span>
+                  </p>
+                </div>
+                <div className="min-w-0 flex flex-col gap-2 lg:border-l lg:border-gray-100 lg:pl-6">
+                  <div>
+                    <div className="text-[10.5px] font-semibold uppercase tracking-wider text-gray-400 mb-1">Approvals</div>
+                    {chains[app.id] ? <ApprovalChain chain={chains[app.id]} compact /> : <span className="text-xs text-gray-400">—</span>}
+                  </div>
+                  <div>
+                    <div className="text-[10.5px] font-semibold uppercase tracking-wider text-gray-400 mb-1">Documents</div>
+                    <LeaveDocuments app={app} rule={rule} canAdd onChanged={() => setReloadKey((k) => k + 1)} />
+                  </div>
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 };
