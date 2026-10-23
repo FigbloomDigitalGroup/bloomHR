@@ -58,7 +58,8 @@ export const SCREENS: ScreenAccess[] = [
   // the staff portal's Video Conference, for the admin app (its transcripts are on the Teams module too)
   S('/video-calls', 'Video calls', ['teams']),
   S('/sms', 'SMS Center', ['sms']),
-  S('/email-portal', 'Email Portal', ['email-portal']),
+  // sending to staff (email-portal), or reading your own mailbox there (mailbox)
+  S('/email-portal', 'Email Portal', ['email-portal', 'mailbox']),
 
   // people
   S('/employees', 'Employees', ['employees']),

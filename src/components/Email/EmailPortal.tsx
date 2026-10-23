@@ -1,73 +1,47 @@
-
-import { useState } from 'react';
-import { List, Send } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { TabBar, type TabBarItem } from '../UI';
+import { usePermissions } from '../../hooks/usePermissions';
 import EmailDashboard from './EmailDashboard';
 import SendEmail from './SendEmail';
+import MyMailbox from './Mailbox/MyMailbox';
 
+type Tab = 'mailbox' | 'compose' | 'logs';
+
+/**
+ * The Email Portal. "My mailbox" (the mailbox module: your own mailbox, read here) comes first and opens by default for
+ * people who have it; Compose and Email logs are the company's sending tools (the email-portal module).
+ */
 export default function EmailPortal() {
-    const [activeTab, setActiveTab] = useState<'compose' | 'logs'>('compose');
+  const { hasAnyPermission, loading } = usePermissions();
+  const canMailbox = !loading && hasAnyPermission(['mailbox']);
+  const canSend = !loading && hasAnyPermission(['email-portal']);
 
-    return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Email Portal</h1>
-                    <p className="text-gray-600 mt-1">Manage communications and monitor email logs</p>
-                </div>
-            </div>
+  const tabs: TabBarItem[] = [
+    ...(canMailbox ? [{ id: 'mailbox', label: 'My mailbox' }] : []),
+    ...(canSend ? [{ id: 'compose', label: 'Compose & Send' }, { id: 'logs', label: 'Email Logs' }] : []),
+  ];
+  const [activeTab, setActiveTab] = useState<Tab | null>(null);
+  // once the permissions are known: the first tab they have, unless they already picked one
+  useEffect(() => {
+    if (loading) return;
+    setActiveTab((t) => (t && tabs.some((x) => x.id === t) ? t : ((tabs[0]?.id as Tab | undefined) ?? null)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, canMailbox, canSend]);
 
-            {/* Tabs */}
-            <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl w-fit">
-                <button
-                    onClick={() => setActiveTab('compose')}
-                    className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'compose'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'
-                        }`}
-                >
-                    <Send className="w-4 h-4 mr-2" />
-                    Compose & Send
-                </button>
-                <button
-                    onClick={() => setActiveTab('logs')}
-                    className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all ${activeTab === 'logs'
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200/50'
-                        }`}
-                >
-                    <List className="w-4 h-4 mr-2" />
-                    Email Logs
-                </button>
-            </div>
+  return (
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
+      <div>
+        <h1 className="text-2xl font-bold text-ink">Email Portal</h1>
+        <p className="text-[13px] text-muted-foreground mt-1">Read your own mailbox, send email to staff and see what was sent</p>
+      </div>
 
-            {/* Content Area */}
-            <div className="mt-6">
-                <AnimatePresence mode="wait">
-                    {activeTab === 'compose' ? (
-                        <motion.div
-                            key="compose"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            transition={{ duration: 0.2 }}
-                        >
-                            <SendEmail />
-                        </motion.div>
-                    ) : (
-                        <motion.div
-                            key="logs"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            transition={{ duration: 0.2 }}
-                        >
-                            <EmailDashboard />
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
-        </div>
-    );
+      {tabs.length > 1 && <TabBar items={tabs} activeId={activeTab ?? ''} onChange={(id) => setActiveTab(id as Tab)} />}
+
+      <div>
+        {activeTab === 'mailbox' && <MyMailbox />}
+        {activeTab === 'compose' && <SendEmail />}
+        {activeTab === 'logs' && <EmailDashboard />}
+      </div>
+    </div>
+  );
 }
