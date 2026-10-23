@@ -26,6 +26,9 @@ const asHR = async (sql: string) => {
     await db.exec(`select set_config('request.jwt.claim.sub', '', false)`);
   }
 };
+// a decision on an advance or expense, written as its approval chain writes it (20261025700000): these tests are about
+// the employee's notification, not who may decide
+const decided = (sql: string) => asHR(`select set_config('app.approval_decision', 'on', false); ${sql}; select set_config('app.approval_decision', '', false)`);
 
 beforeAll(async () => {
   db = await bootLiveDb();
@@ -46,11 +49,11 @@ describe('notifications for the employee', () => {
   it('salary advance approved, not approved (with the reason), paid', async () => {
     await db.exec(`insert into salary_advance (id, "Employee Number", "Amount Requested", tenant_id) values
       ('00000000-0000-0000-0000-0000000aa001', 'E-ME', 5000, '${A}'), ('00000000-0000-0000-0000-0000000aa002', 'E-ME', 9000, '${A}')`);
-    await asHR(`update salary_advance set status = 'approved', admin_adjusted_amount = 4000 where id = '00000000-0000-0000-0000-0000000aa001'`);
+    await decided(`update salary_advance set status = 'approved', admin_adjusted_amount = 4000 where id = '00000000-0000-0000-0000-0000000aa001'`);
     expect(await latest()).toEqual({ notification_type: 'salary_advance_approved', title: 'Salary advance approved', message: 'Your salary advance of KES 4,000.00 was approved.' });
-    await asHR(`update salary_advance set status = 'rejected', admin_notes = 'Over the limit' where id = '00000000-0000-0000-0000-0000000aa002'`);
+    await decided(`update salary_advance set status = 'rejected', admin_notes = 'Over the limit' where id = '00000000-0000-0000-0000-0000000aa002'`);
     expect((await latest()).message).toBe('Your salary advance request of KES 9,000.00 was not approved. Reason: Over the limit.');
-    await db.exec(`update salary_advance set status = 'paid' where id = '00000000-0000-0000-0000-0000000aa001'`); // the M-Pesa callback
+    await decided(`update salary_advance set status = 'paid' where id = '00000000-0000-0000-0000-0000000aa001'`); // the M-Pesa callback
     expect(await latest()).toMatchObject({ notification_type: 'salary_advance_paid', message: 'Your salary advance of KES 4,000.00 has been paid.' });
   });
 
@@ -72,7 +75,7 @@ describe('notifications for the employee', () => {
 
   it('expense not approved, phone change approved, incident updated (not anonymous ones)', async () => {
     await db.exec(`insert into expenses (id, title, amount, employee_id, tenant_id) values ('00000000-0000-0000-0000-0000000cc001', 'Fuel', 1500, 'E-ME', '${A}')`);
-    await asHR(`update expenses set status = 'rejected', rejection_reason = 'No receipt' where id = '00000000-0000-0000-0000-0000000cc001'`);
+    await decided(`update expenses set status = 'rejected', rejection_reason = 'No receipt' where id = '00000000-0000-0000-0000-0000000cc001'`);
     expect((await latest()).message).toBe('Your expense Fuel (KES 1,500.00) was not approved. Reason: No receipt.');
 
     await db.exec(`insert into phone_number_change_requests (id, employee_number, requested_phone, tenant_id) values ('00000000-0000-0000-0000-0000000dd001', 'E-ME', '0711000000', '${A}')`);

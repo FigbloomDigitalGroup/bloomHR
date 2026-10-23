@@ -23,6 +23,7 @@ import {
 } from '../../lib/staffHome';
 import { LoaderBlock } from '../UI/FigbloomLoader';
 import LeaveAwaitingMe from '../Approvals/LeaveAwaitingMe';
+import MoneyAwaitingMe from '../Approvals/MoneyAwaitingMe';
 import ClockCard from '../Attendance/ClockCard';
 
 const SHOW_TASKS = 6;
@@ -117,8 +118,9 @@ export default function StaffHome({ setActiveTab, userName, onOpenTask, showMyWo
       {/* clock in / clock out (only for someone with an employee record) */}
       {employeeNumber && <ClockCard />}
 
-      {/* leave waiting on my decision (nothing when there is none) */}
+      {/* leave, and loans, advances, expenses and requisitions, waiting on my decision (nothing when there is none) */}
       <LeaveAwaitingMe />
+      <MoneyAwaitingMe />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 items-start">
         <MyTasks

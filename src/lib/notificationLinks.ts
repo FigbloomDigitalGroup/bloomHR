@@ -62,6 +62,26 @@ const STAFF_BY_TYPE: Record<string, StaffLink> = {
 
 const has = (text: string | null | undefined, pattern: RegExp) => pattern.test(text ?? '');
 
+// A loan, advance, expense or requisition on its approval chain (20261025700000): the titles begin with what it is
+// ("Loan request awaiting your approval", "Salary advance moving on", "Requisition approved").
+type MoneyKind = 'loan' | 'salary_advance' | 'expense' | 'requisition';
+const moneyKind = (title: string | null | undefined): MoneyKind | null => {
+  if (has(title, /^Loan request /)) return 'loan';
+  if (has(title, /^Salary advance /)) return 'salary_advance';
+  if (has(title, /^Expense claim /)) return 'expense';
+  if (has(title, /^Requisition /)) return 'requisition';
+  return null;
+};
+// where HR decides or follows each; an approver who may not open it decides on their portal home
+const MONEY_ADMIN_PATH: Record<MoneyKind, string> = {
+  loan: '/loans',
+  salary_advance: '/salaryadmin',
+  expense: '/expenses',
+  requisition: '/payments?tab=requisitions',
+};
+// where the employee follows their own
+const MONEY_STAFF_TAB: Record<MoneyKind, string> = { loan: 'loan', salary_advance: 'salary-advance', expense: 'home', requisition: 'home' };
+
 /** The staff portal section a notification opens, or null when there is none for it (it is only marked read). */
 export function staffNotificationLink(n: NotificationLike): StaffLink | null {
   const { notification_type: type, title, message } = n;
@@ -73,15 +93,19 @@ export function staffNotificationLink(n: NotificationLike): StaffLink | null {
       if (has(title, /^Contribution/)) return { tab: 'payslips' };
       return { tab: 'details' };
     case 'approval_needed':
+      if (moneyKind(title)) return { tab: 'home' }; // "Money requests waiting for your approval"
       if (has(title, /leave/i)) return { tab: 'leave-approvals' };
       if (has(title, /work|contract job/i)) return { tab: 'my-team', params: { view: 'work' } };
       return null; // a payout is approved by payroll, not in the staff portal
-    case 'approval_progress':
+    case 'approval_progress': {
+      const money = moneyKind(title);
+      if (money) return { tab: MONEY_STAFF_TAB[money] };
       if (has(title, /overtime/i)) return { tab: 'overtime' };
       if (has(title, /contract job/i)) return { tab: 'my-work' };
       // someone's own work, or the work they entered for their team
       if (has(title, /^Work /)) return has(message, /^Your work/) ? { tab: 'my-work' } : { tab: 'my-team', params: { view: 'work' } };
       return { tab: 'leave-history' };
+    }
     default:
       return STAFF_BY_TYPE[type] ?? null;
   }
@@ -155,12 +179,18 @@ export function adminNotificationPath(n: NotificationLike): string | null {
       if (has(title, /contract job|payout/i)) return '/piece-rate';
       if (has(title, /^Contribution/)) return '/payroll?tab=deductions';
       return ADMIN_BY_TYPE[type];
-    case 'approval_needed':
+    case 'approval_needed': {
+      const money = moneyKind(title);
+      if (money) return MONEY_ADMIN_PATH[money];
       return has(title, /leave/i) ? '/leaves' : '/piece-rate';
-    case 'approval_progress':
+    }
+    case 'approval_progress': {
+      const money = moneyKind(title);
+      if (money) return MONEY_ADMIN_PATH[money];
       if (has(title, /overtime/i)) return '/overtime';
       if (has(title, /contract job|^Work /i)) return '/piece-rate';
       return '/leaves';
+    }
     default:
       return ADMIN_BY_TYPE[type] ?? null;
   }

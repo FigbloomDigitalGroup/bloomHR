@@ -21,9 +21,14 @@ import {
 } from '../../lib/salaryAdvance';
 import { approveAdvance, declineAdvance, loadAdvanceQueue, loadPayees, markAdvancePaid } from '../../lib/salaryAdvanceApi';
 import { LoaderBlock } from '../UI/FigbloomLoader';
+import ApprovalChain from '../Approvals/ApprovalChain';
+import { decideApproval, loadApprovalChains, type ApprovalChain as Chain } from '../../lib/approvals';
 
 // The approver's queue for salary advances: approve or decline what is pending, then record the payment.
 //
+//   * A request goes through the company's salary advance approvals (Settings > Approval workflows): Approve and
+//     Decline decide the step it is waiting on, for whoever may decide it, and the chain shows under it. A request
+//     with no chain (made before chains) is decided directly, by those who may decide.
 //   * "Mark as paid" is the real step: finance paid the advance outside the app (bank or M-Pesa bulk upload), and
 //     marking it paid is what makes payroll take it back.
 //   * "Pay advance" only appears for demos (PAYMENTS_DEMO while IN_APP_PAYMENTS is off). It walks through paying from
@@ -53,6 +58,7 @@ const dateText = (value: unknown) =>
 export default function AdvanceQueue({ canDecide, onChanged, demoDelayMs }: AdvanceQueueProps) {
   const [rows, setRows] = useState<AdvanceRow[]>([]);
   const [payees, setPayees] = useState<Record<string, PayeeRecord>>({});
+  const [chains, setChains] = useState<Record<string, Chain>>({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<QueueTab>('pending');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -70,6 +76,8 @@ export default function AdvanceQueue({ canDecide, onChanged, demoDelayMs }: Adva
       const data = await loadAdvanceQueue();
       setRows(data);
       setPayees(await loadPayees(data.map((r) => String(r['Employee Number'] ?? ''))));
+      const pending = data.filter((r) => queueTab(r) === 'pending' && r.id).map((r) => r.id!);
+      setChains(await loadApprovalChains('salary_advance', pending).catch(() => ({})));
     } catch (error) {
       console.error('Error loading salary advance queue:', error);
       toast.error('Could not load salary advance requests');
@@ -110,7 +118,9 @@ export default function AdvanceQueue({ canDecide, onChanged, demoDelayMs }: Adva
     setDeclineTried(true);
     if (!declining || !declineReason.trim()) return;
     const row = declining;
-    if (await act(row, () => declineAdvance(row.id!, declineReason), `Declined ${row['Full Name'] ?? 'the request'}'s advance`)) {
+    const chain = chains[row.id!];
+    const decline = chain ? () => decideApproval(chain.request_id, 'rejected', declineReason.trim()).then(() => undefined) : () => declineAdvance(row.id!, declineReason);
+    if (await act(row, decline, `Declined ${row['Full Name'] ?? 'the request'}'s advance`)) {
       setDeclining(null);
     }
   };
@@ -167,6 +177,15 @@ export default function AdvanceQueue({ canDecide, onChanged, demoDelayMs }: Adva
             const name = row['Full Name'] || String(row['Employee Number'] ?? '');
             const months = repaymentMonths(row);
             const busy = busyId === id;
+            const chain = chains[id];
+            // the chain says who may decide its step; without one, those who may decide on this screen
+            const mayDecide = chain ? chain.can_approve : canDecide;
+            const mayDecline = chain ? chain.can_reject : canDecide;
+            const approve = async () => {
+              if (!chain) return approveAdvance(id);
+              const status = await decideApproval(chain.request_id, 'approved', '');
+              if (status === 'pending') toast('Your step is approved. It now goes to the next approver.');
+            };
             return (
               <li key={id} data-testid={`advance-${id}`}>
                 <Card className="h-full flex flex-col">
@@ -223,15 +242,19 @@ export default function AdvanceQueue({ canDecide, onChanged, demoDelayMs }: Adva
                     </p>
                   )}
 
-                  {canDecide && tab === 'pending' && (
+                  {tab === 'pending' && chain && (
+                    <div className="mt-2">
+                      <ApprovalChain chain={chain} compact />
+                    </div>
+                  )}
+
+                  {tab === 'pending' && (mayDecide || mayDecline) && (
                     <div className="mt-auto pt-3 flex flex-wrap gap-2">
-                      <Button
-                        onClick={() => act(row, () => approveAdvance(id), `Approved ${name}'s advance`)}
-                        disabled={busy}
-                        icon={<Check className="w-3.5 h-3.5" />}
-                      >
-                        Approve
-                      </Button>
+                      {mayDecide && (
+                        <Button onClick={() => act(row, approve, `Approved ${name}'s advance`)} disabled={busy} icon={<Check className="w-3.5 h-3.5" />}>
+                          Approve
+                        </Button>
+                      )}
                       <Button
                         variant="secondary"
                         onClick={() => {

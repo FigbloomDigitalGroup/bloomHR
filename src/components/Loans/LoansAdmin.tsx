@@ -4,6 +4,8 @@ import { Ban, Banknote, CalendarClock, Check, CheckCircle2, HandCoins, Hourglass
 import { Button, Card, EmployeePicker, EmptyState, Modal, PageHeader, StatCard, TabBar } from '../UI';
 import LoanSchedule, { LoanBalance, LoanStatusPill } from './LoanSchedule';
 import LoanSettingsCard from './LoanSettingsCard';
+import ApprovalChain from '../Approvals/ApprovalChain';
+import { loadApprovalChains, type ApprovalChain as Chain } from '../../lib/approvals';
 import { DemoTag } from '../SalaryAdvance/PayAdvanceModal';
 import { confirmDialog, noticeDialog } from '../../lib/confirmDialog';
 import { IN_APP_PAYMENTS, PAYMENTS_DEMO } from '../../lib/inAppPayments';
@@ -42,6 +44,8 @@ import { LoaderBlock } from '../UI/FigbloomLoader';
 // HR's loans page: decide on requests, set up a loan for an employee, record that finance paid it out, and follow
 // each loan's schedule and balance. Payroll takes the instalments once a loan is marked disbursed.
 //
+//   * A request goes through the company's loan approvals (Settings > Approval workflows): Approve and Decline decide
+//     the step it is waiting on, for whoever may decide it; the chain shows under it.
 //   * "Mark as disbursed" is the real step: finance paid the loan outside the app, and marking it is what starts the
 //     payroll deductions.
 //   * "Pay out (demo)" only appears for demos (PAYMENTS_DEMO while IN_APP_PAYMENTS is off). Nothing is sent or saved.
@@ -92,6 +96,7 @@ export default function LoansAdmin() {
   const [loans, setLoans] = useState<EmployeeLoan[]>([]);
   const [schedules, setSchedules] = useState<Record<string, LoanInstalment[]>>({});
   const [repayments, setRepayments] = useState<Record<string, LoanRepayment[]>>({});
+  const [chains, setChains] = useState<Record<string, Chain>>({});
   const [settings, setSettings] = useState<LoanSettings>(DEFAULT_LOAN_SETTINGS);
   const [products, setProducts] = useState<LoanProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,6 +119,7 @@ export default function LoansAdmin() {
       setLoans(all);
       setSettings(s);
       setProducts(p);
+      setChains(await loadApprovalChains('loan', all.filter((l) => l.status === 'requested').map((l) => l.id)).catch(() => ({})));
       const loaded = await loadSchedules(all.filter((l) => ['disbursed', 'repaying', 'completed'].includes(l.status)).map((l) => l.id));
       setSchedules(loaded.schedules);
       setRepayments(loaded.repayments);
@@ -163,14 +169,29 @@ export default function LoansAdmin() {
   const confirmApprove = async () => {
     if (!approving) return;
     const loan = approving;
-    if (await act(loan, () => approveLoan(loan.id, { comment, startPeriod: approveStart }), `Approved ${loan.employee_name}'s loan`)) setApproving(null);
+    const chain = chains[loan.id];
+    if (!chain) return;
+    let status = 'approved';
+    const ok = await act(
+      loan,
+      async () => {
+        status = await approveLoan(loan.id, chain.request_id, { comment, startPeriod: approveStart });
+      },
+      `Approved ${loan.employee_name}'s loan`
+    );
+    if (ok) {
+      setApproving(null);
+      if (status === 'pending') toast('Your step is approved. It now goes to the next approver.');
+    }
   };
 
   const confirmDecline = async () => {
     setDeclineTried(true);
     if (!declining || !comment.trim()) return;
     const loan = declining;
-    if (await act(loan, () => declineLoan(loan.id, comment), `Declined ${loan.employee_name}'s loan`)) setDeclining(null);
+    const chain = chains[loan.id];
+    if (!chain) return;
+    if (await act(loan, () => declineLoan(chain.request_id, comment), `Declined ${loan.employee_name}'s loan`)) setDeclining(null);
   };
 
   const markDisbursed = async (loan: EmployeeLoan) => {
@@ -232,7 +253,7 @@ export default function LoansAdmin() {
     if (!creating || createProblem) return;
     setBusyId('new');
     try {
-      await createLoan({
+      const status = await createLoan({
         employeeNumber: creating.employeeNumber,
         productId: creating.productId || null,
         amount: Number(creating.amount),
@@ -242,7 +263,11 @@ export default function LoansAdmin() {
         interestMethod: creating.method || null,
         reason: creating.reason,
       });
-      toast.success('Loan set up and approved. Mark it disbursed once finance has paid it.');
+      toast.success(
+        status === 'approved'
+          ? 'Loan set up and approved. Finance is told to pay it.'
+          : 'Loan set up. It goes through the loan approvals before it can be paid.'
+      );
       setCreating(null);
       await load();
     } catch (error) {
@@ -358,6 +383,12 @@ export default function LoansAdmin() {
                     )}
                   </div>
 
+                  {loan.status === 'requested' && chains[loan.id] && (
+                    <div className="mt-2">
+                      <ApprovalChain chain={chains[loan.id]} compact />
+                    </div>
+                  )}
+
                   {loan.decided_by_email && tab !== 'requests' && (
                     <p className="mt-1 text-[11px] text-muted-foreground">
                       {loan.status === 'rejected' ? 'Declined' : 'Approved'} by {loan.decided_by_email} {dateText(loan.decided_at)}
@@ -383,11 +414,13 @@ export default function LoansAdmin() {
                         Schedule
                       </Button>
                     )}
-                    {canManage && loan.status === 'requested' && (
+                    {loan.status === 'requested' && (chains[loan.id]?.can_approve || chains[loan.id]?.can_reject) && (
                       <>
-                        <Button onClick={() => openApprove(loan)} disabled={busy} icon={<Check className="w-3.5 h-3.5" />}>
-                          Approve
-                        </Button>
+                        {chains[loan.id]?.can_approve && (
+                          <Button onClick={() => openApprove(loan)} disabled={busy} icon={<Check className="w-3.5 h-3.5" />}>
+                            Approve
+                          </Button>
+                        )}
                         <Button
                           variant="secondary"
                           onClick={() => {
@@ -519,7 +552,7 @@ export default function LoansAdmin() {
       <Modal open={!!creating} onClose={() => setCreating(null)} title="New loan" size="lg">
         {creating && (
           <>
-            <p className="text-[12px] text-muted-foreground mb-3">Set up a loan for an employee. It is approved straight away; mark it disbursed once finance has paid it.</p>
+            <p className="text-[12px] text-muted-foreground mb-3">Set up a loan for an employee. It is approved straight away when you are its only approver; otherwise it goes through the loan approvals first.</p>
             <div className="space-y-3">
               <div>
                 <label className="block text-[12px] font-semibold text-ink mb-1">Employee</label>

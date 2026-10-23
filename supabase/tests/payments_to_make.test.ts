@@ -35,6 +35,10 @@ const payment = async (source: string, id: string) =>
   (await rows<Payment>(`select * from payment_requests where source = $1 and source_id = $2`, [source, id]))[0];
 const notes = (type: string) => rows<{ employee_number: string; message: string }>(
   `select employee_number, message from hr_notifications where notification_type = $1 order by id`, [type]);
+// a decision goes through the item's approval chain (20261025700000); the default is one step, anyone with the module
+const decide = (user: string, kind: string, id: string, decision: 'approved' | 'rejected', comment: string | null = null) =>
+  as(user, `select decide_approval(r.id, '${decision}', ${comment === null ? 'null' : `'${comment}'`})
+            from approval_requests r where r.kind = '${kind}' and r.record_id = '${id}'`);
 const record = (user: string, id: string, via: string, ref: string | null, on = today) =>
   as(user, `select status from record_payment('${id}', '${via}', ${ref === null ? 'null' : `'${ref}'`}, '${on}')`);
 
@@ -82,7 +86,8 @@ describe('salary advances', () => {
   });
 
   it('approved (for an adjusted amount): it joins the list and finance is told', async () => {
-    await as(HR, `update salary_advance set status = 'approved', admin_adjusted_amount = 8000 where id = '${adv}'`);
+    await as(HR, `update salary_advance set admin_adjusted_amount = 8000 where id = '${adv}'`);
+    await decide(HR, 'salary_advance', adv, 'approved');
     expect(await payment('salary_advance', adv)).toMatchObject({
       status: 'to_pay', employee_number: 'E1', payee_name: 'Esther One', purpose: 'Salary advance: School fees' });
     expect(Number((await payment('salary_advance', adv)).amount)).toBe(8000);
@@ -119,17 +124,16 @@ describe('salary advances', () => {
     expect(await fails(FIN, `select record_payment('${id}', 'mpesa', 'QX12AB', '${today}')`)).toMatch(/already recorded/);
   });
 
-  it('turned down after approval: off the list; approved again: back on it', async () => {
+  it('cancelled after approval: off the list; its chain decided it, so it is not approved again by hand', async () => {
     const other = (await rows<{ id: string }>(`insert into salary_advance ("Employee Number", "Amount Requested", tenant_id)
       values ('E2', 5000, '${A}') returning id`))[0].id;
-    await as(HR, `update salary_advance set status = 'approved' where id = '${other}'`);
-    await as(HR, `update salary_advance set status = 'rejected' where id = '${other}'`);
+    await decide(HR, 'salary_advance', other, 'approved');
+    await as(HR, `update salary_advance set status = 'cancelled' where id = '${other}'`);
     const row = await payment('salary_advance', other);
     expect(row.status).toBe('cancelled');
     expect(await fails(FIN, `select record_payment('${row.id}', 'bank', 'B1', '${today}')`)).toMatch(/cancelled/);
-    await as(HR, `update salary_advance set status = 'approved' where id = '${other}'`);
-    expect((await payment('salary_advance', other)).status).toBe('to_pay');
-    expect(await rows(`select 1 from payment_requests where source_id = '${other}'`)).toHaveLength(1);
+    expect(await fails(HR, `update salary_advance set status = 'approved' where id = '${other}'`)).toMatch(/through its approval chain/);
+    expect((await payment('salary_advance', other)).status).toBe('cancelled');
   });
 
   it('marked paid on the Salary Advance screen: its row closes, with no method', async () => {
@@ -146,7 +150,7 @@ describe('loans', () => {
     const loan = (await as<{ id: string }>(S1, `insert into employee_loans (employee_number, principal, months, start_period, reason)
       values ('E1', 30000, 6, to_char(now(), 'YYYY-MM'), 'Rent') returning id`))[0].id;
     expect(await payment('loan', loan)).toBeUndefined();
-    await as(HR, `update employee_loans set status = 'approved' where id = '${loan}'`);
+    await decide(HR, 'loan', loan, 'approved');
     const row = await payment('loan', loan);
     expect(row).toMatchObject({ status: 'to_pay', payee_name: 'Esther One', purpose: 'Loan over 6 months: Rent' });
     // on the Loans screen finance can't pay it out: only through the list
@@ -173,7 +177,7 @@ describe('expenses', () => {
   it('approved: on the list; paid in cash (no reference needed): paid_at is set and the employee told how', async () => {
     const exp = (await rows<{ id: string }>(`insert into expenses (title, amount, employee_id, employee_full_name, tenant_id)
       values ('Taxi to client', 1500, 'E1', 'Esther One', '${A}') returning id`))[0].id;
-    await as(HR, `update expenses set status = 'approved' where id = '${exp}'`);
+    await decide(HR, 'expense', exp, 'approved');
     const row = await payment('expense', exp);
     expect(row).toMatchObject({ status: 'to_pay', purpose: 'Expense claim: Taxi to client' });
     await record(FIN, row.id, 'cash', null, '2026-01-15');
@@ -190,9 +194,10 @@ describe('requisitions', () => {
       (payee_employee_number, amount, purpose, category) values ('E1', 4200, 'Printer toner for the branch', 'Supplies')
       returning id, requested_by, payee_name`))[0];
     expect(req).toMatchObject({ requested_by: 'E1', payee_name: 'Esther One' });
-    expect((await notes('requisition_requested')).at(-1)).toEqual({ employee_number: 'E1',
-      message: 'Esther One asked for KES 4,200.00 to Esther One for Printer toner for the branch.' });
-    expect(await fails(S1, `update requisitions set status = 'approved' where id = '${req.id}'`)).toMatch(/Only HR/);
+    // HR, the approvers on the default chain, are told (20261025700000)
+    expect((await notes('approval_needed')).at(-1)).toEqual({ employee_number: 'H1',
+      message: "Esther One's requisition of KES 4,200.00 to Esther One for Printer toner for the branch is waiting for your approval." });
+    expect(await fails(S1, `update requisitions set status = 'approved' where id = '${req.id}'`)).toMatch(/approval chain|Only HR/);
     expect(await fails(S1, `insert into requisitions (payee_employee_number, amount, purpose, status)
       values ('E1', 10, 'x', 'approved')`)).toBeTruthy();
     const mine = (await as<{ requested_by: string }>(S2, `insert into requisitions (requested_by, payee_employee_number, amount, purpose)
@@ -202,14 +207,14 @@ describe('requisitions', () => {
 
   it('HR approves: it joins the list and the person who asked is told; turning one down needs a reason', async () => {
     const id = (await rows<{ id: string }>(`select id from requisitions where purpose = 'Printer toner for the branch'`))[0].id;
-    await as(HR, `update requisitions set status = 'approved' where id = '${id}'`);
+    await decide(HR, 'requisition', id, 'approved');
     expect(await payment('requisition', id)).toMatchObject({ status: 'to_pay', employee_number: 'E1', purpose: 'Requisition: Printer toner for the branch' });
     expect((await notes('requisition_approved')).map((n) => n.employee_number)).toEqual(['E1']);
     expect(await fails(HR, `update requisitions set amount = 9999 where id = '${id}'`)).toMatch(/can't change/);
 
     const other = (await rows<{ id: string }>(`select id from requisitions where purpose = 'Mine'`))[0].id;
-    expect(await fails(HR, `update requisitions set status = 'rejected' where id = '${other}'`)).toMatch(/reason/);
-    await as(HR, `update requisitions set status = 'rejected', decision_comment = 'Not budgeted' where id = '${other}'`);
+    expect(await fails(HR, `select decide_approval(r.id, 'rejected', null) from approval_requests r where r.record_id = '${other}'`)).toMatch(/reason/);
+    await decide(HR, 'requisition', other, 'rejected', 'Not budgeted');
     expect(await payment('requisition', other)).toBeUndefined();
   });
 
@@ -228,7 +233,7 @@ describe('requisitions', () => {
   it('nobody approves or records a payment to themselves', async () => {
     const own = (await as<{ id: string }>(HR, `insert into requisitions (payee_employee_number, amount, purpose)
       values ('H1', 800, 'My airtime') returning id`))[0].id;
-    expect(await fails(HR, `update requisitions set status = 'approved' where id = '${own}'`)).toMatch(/Someone else/);
+    expect(await fails(HR, `select decide_approval(r.id, 'approved', null) from approval_requests r where r.record_id = '${own}'`)).toMatch(/your own request/);
 
     const toFin = (await as<{ id: string }>(HR, `insert into requisitions (payee_employee_number, amount, purpose, status)
       values ('F1', 2000, 'Travel to Nakuru', 'approved') returning id`))[0].id;
@@ -250,12 +255,12 @@ describe('who sees the list', () => {
 
   it('finance sees how to pay the employees with something waiting, and only them; nobody else sees it', async () => {
     await db.exec(`update employees set payment_method = 'Bank Transfer', "Bank" = 'Equity', "Account Number" = '0123'
-      where "Employee Number" = 'E2' and tenant_id = '${A}'`);
+      where "Employee Number" = 'E1' and tenant_id = '${A}'`);
     const payees = await as<{ employee_number: string; bank: string | null }>(FIN, `select employee_number, bank from payment_payees() order by 1`);
     const waiting = (await rows<{ employee_number: string }>(`select distinct employee_number from payment_requests
       where tenant_id = '${A}' and status = 'to_pay' and employee_number is not null order by 1`)).map((r) => r.employee_number);
     expect(payees.map((p) => p.employee_number)).toEqual(waiting);
-    expect(payees.find((p) => p.employee_number === 'E2')?.bank).toBe('Equity');
+    expect(payees.find((p) => p.employee_number === 'E1')?.bank).toBe('Equity');
     expect(payees.map((p) => p.employee_number)).not.toContain('H1');
     expect(await as(HR, `select 1 from payment_payees()`)).toHaveLength(0);
     expect(await as(S2, `select 1 from payment_payees()`)).toHaveLength(0);

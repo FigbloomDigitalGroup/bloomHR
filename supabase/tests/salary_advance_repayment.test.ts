@@ -80,6 +80,9 @@ describe('salary advance repayment months', () => {
 
   it('the salary advance screen marks it paid with who; another company cannot see or touch it', async () => {
     await asUser(db, PAYER, async () => {
+      // approved through its approval chain first (20261025700000)
+      await db.query(`select decide_approval(r.id, 'approved', null) from approval_requests r
+        join salary_advance a on a.id = r.record_id where r.kind = 'salary_advance' and a."Employee Number" = 'E-ME'`);
       const { rows } = await db.query(`update salary_advance set status = 'paid', payment_processed = 'true', paid_by = '${PAYER}',
         paid_by_email = 'payer@a.co' where "Employee Number" = 'E-ME' returning id`);
       expect(rows).toHaveLength(1);

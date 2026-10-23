@@ -17,6 +17,19 @@ vi.mock('../../lib/paymentsApi', async (importOriginal) => {
     cancelRequisition: vi.fn(),
   };
 });
+// each pending requisition's approval chain (20261025700000): who may decide its step comes from the database
+const chainMay = { value: true };
+vi.mock('../../lib/approvals', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/approvals')>()),
+  decideApproval: vi.fn(),
+  loadApprovalChains: vi.fn(async () => ({
+    q1: {
+      record_id: 'q1', request_id: 'req-q1', status: 'pending', current_step: 1, can_approve: chainMay.value, can_reject: chainMay.value,
+      steps: [{ position: 1, label: 'Approve requisitions', approver_type: 'module', status: 'current', waiting_on: 'anyone with Approve requisitions',
+                actor_name: null, acted_as: null, comment: null, acted_at: null }],
+    },
+  })),
+}));
 const perms = { role: 'CHECKER', modules: ['payments'] };
 vi.mock('../../hooks/usePermissions', () => ({
   usePermissions: () => {
@@ -71,15 +84,16 @@ beforeEach(() => {
   vi.clearAllMocks();
   perms.role = 'CHECKER';
   perms.modules = ['payments'];
+  chainMay.value = true;
   mocked.loadPayments.mockResolvedValue(PAYMENTS);
   mocked.loadRequisitions.mockResolvedValue(REQUISITIONS);
   mocked.loadPayees.mockResolvedValue({
     E1: { employee_number: 'E1', payment_method: 'M-Pesa', mobile_number: '0712345678', bank: null, bank_branch: null, account_number: null, account_name: null },
   });
   mocked.recordPayment.mockResolvedValue(undefined);
-  mocked.approveRequisition.mockResolvedValue(undefined);
+  mocked.approveRequisition.mockResolvedValue('approved');
   mocked.declineRequisition.mockResolvedValue(undefined);
-  mocked.createRequisition.mockResolvedValue(undefined);
+  mocked.createRequisition.mockResolvedValue('approved');
 });
 afterEach(cleanup);
 
@@ -131,7 +145,7 @@ describe('HR: requisitions', () => {
     expect(within(card).getByText(/asked by Jane Wanjiru/)).toBeTruthy();
     fireEvent.click(within(card).getByRole('button', { name: /Approve/ }));
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Approve' }));
-    await waitFor(() => expect(mocked.approveRequisition).toHaveBeenCalledWith('q1', ''));
+    await waitFor(() => expect(mocked.approveRequisition).toHaveBeenCalledWith('req-q1', ''));
   });
 
   it('turning one down needs a reason', async () => {
@@ -143,7 +157,17 @@ describe('HR: requisitions', () => {
     expect(mocked.declineRequisition).not.toHaveBeenCalled();
     fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Not budgeted' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Turn down' }));
-    await waitFor(() => expect(mocked.declineRequisition).toHaveBeenCalledWith('q1', 'Not budgeted'));
+    await waitFor(() => expect(mocked.declineRequisition).toHaveBeenCalledWith('req-q1', 'Not budgeted'));
+  });
+
+  it('when the step is someone else’s (a longer chain), HR sees the chain and may cancel, not decide', async () => {
+    chainMay.value = false;
+    show();
+    const card = await screen.findByTestId('requisition-q1');
+    expect(within(card).getByLabelText('Approval chain')).toBeTruthy();
+    expect(within(card).queryByRole('button', { name: /Approve/ })).toBeNull();
+    expect(within(card).queryByRole('button', { name: /Turn down/ })).toBeNull();
+    expect(within(card).getByRole('button', { name: /Cancel/ })).toBeTruthy();
   });
 
   it('raises one for a supplier, approved at once', async () => {

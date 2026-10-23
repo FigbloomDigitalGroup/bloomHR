@@ -9,10 +9,18 @@ vi.mock('../../lib/salaryAdvanceApi', () => ({
   declineAdvance: vi.fn(),
   markAdvancePaid: vi.fn(),
 }));
+// a request's approval chain (20261025700000): none by default, so these decide directly as before
+const chains: { value: Record<string, unknown> } = { value: {} };
+vi.mock('../../lib/approvals', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/approvals')>()),
+  decideApproval: vi.fn(async () => 'approved'),
+  loadApprovalChains: vi.fn(async () => chains.value),
+}));
 // the real client must never be reached from the queue (it goes through salaryAdvanceApi)
 vi.mock('../../lib/supabase', () => ({ supabase: new Proxy({}, { get: () => { throw new Error('supabase used'); } }) }));
 
 import * as api from '../../lib/salaryAdvanceApi';
+import * as approvals from '../../lib/approvals';
 import AdvanceQueue from './AdvanceQueue';
 
 const mocked = vi.mocked(api);
@@ -31,6 +39,7 @@ const PAYEES = {
 let fetchSpy: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   vi.clearAllMocks();
+  chains.value = {};
   mocked.loadAdvanceQueue.mockResolvedValue(ROWS);
   mocked.loadPayees.mockResolvedValue(PAYEES);
   for (const f of [mocked.approveAdvance, mocked.declineAdvance, mocked.markAdvancePaid]) f.mockResolvedValue(undefined);
@@ -45,7 +54,31 @@ afterEach(() => {
 const show = () => render(<AdvanceQueue canDecide demoDelayMs={20} />);
 const card = (id: string) => screen.getByTestId(`advance-${id}`);
 
+const chainFor = (canDecide: boolean) => ({
+  record_id: 'p1', request_id: 'q1', status: 'pending', current_step: 1, can_approve: canDecide, can_reject: canDecide,
+  steps: [{ position: 1, label: 'Line manager', approver_type: 'reports_to', status: 'current', waiting_on: 'Max Manager',
+            actor_name: null, acted_as: null, comment: null, acted_at: null }],
+});
+
 describe('the advance queue', () => {
+  it('a request on an approval chain is decided through it, and its chain shows', async () => {
+    chains.value = { p1: chainFor(true) };
+    show();
+    await screen.findByText('Jane Wanjiru');
+    expect(within(card('p1')).getByText(/Line manager/)).toBeTruthy();
+    fireEvent.click(within(card('p1')).getByRole('button', { name: 'Approve' }));
+    await vi.waitFor(() => expect(vi.mocked(approvals.decideApproval)).toHaveBeenCalledWith('q1', 'approved', ''));
+    expect(mocked.approveAdvance).not.toHaveBeenCalled();
+  });
+
+  it('on a chain, only its step’s approvers get the buttons, whatever the screen allows', async () => {
+    chains.value = { p1: chainFor(false) };
+    show();
+    await screen.findByText('Jane Wanjiru');
+    expect(within(card('p1')).queryByRole('button', { name: 'Approve' })).toBeNull();
+    expect(within(card('p1')).queryByRole('button', { name: 'Decline' })).toBeNull();
+  });
+
   it('approves a pending request', async () => {
     show();
     await screen.findByText('Jane Wanjiru');
