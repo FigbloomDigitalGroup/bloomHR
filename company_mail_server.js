@@ -20,7 +20,7 @@ const VERSION = "v1";
 // connect to arbitrary services.
 export const SMTP_PORTS = [25, 465, 587, 2525];
 
-const EMAIL_RE = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/;
+export const EMAIL_RE = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/;
 const HOST_RE = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
 
 // a table that is not there yet (the migration has not been applied): treated as "no own server"
@@ -34,34 +34,45 @@ function encryptionKey() {
 }
 
 const keyMissing = () =>
-    new HttpError(503, `Your own mail server can't be used yet: ${KEY_ENV} is not set (or is not 32 bytes) on the server`);
+    new HttpError(503, `Mail server passwords can't be saved or used yet: ${KEY_ENV} is not set (or is not 32 bytes) on the server`);
 
-/** "v1:<iv>:<tag>:<ciphertext>", all base64. */
-export function encryptPassword(password, tenantId) {
+/**
+ * Encrypts a secret with MAIL_SERVER_ENCRYPTION_KEY, binding `binding` in as extra authenticated data: it decrypts only
+ * with the same binding. "v1:<iv>:<tag>:<ciphertext>", all base64. Shared with the personal mailboxes
+ * (mailbox_routes.js), which bind in the person and their company.
+ */
+export function encryptSecret(secret, binding) {
     const key = encryptionKey();
     if (!key) throw keyMissing();
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
-    cipher.setAAD(Buffer.from(String(tenantId), "utf8"));
-    const data = Buffer.concat([cipher.update(String(password), "utf8"), cipher.final()]);
+    cipher.setAAD(Buffer.from(String(binding), "utf8"));
+    const data = Buffer.concat([cipher.update(String(secret), "utf8"), cipher.final()]);
     return [VERSION, iv.toString("base64"), cipher.getAuthTag().toString("base64"), data.toString("base64")].join(":");
 }
 
-export function decryptPassword(stored, tenantId) {
+/** The secret encryptSecret stored, or an HttpError(500, unreadable) when the key or the binding is not the same. */
+export function decryptSecret(stored, binding, unreadable) {
     const key = encryptionKey();
     if (!key) throw keyMissing();
     const [version, iv, tag, data] = String(stored || "").split(":");
-    if (version !== VERSION || !iv || !tag || !data) throw new HttpError(500, "The saved mail server password can't be read. Enter it again.");
+    if (version !== VERSION || !iv || !tag || !data) throw new HttpError(500, unreadable);
     try {
         const decipher = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(iv, "base64"));
-        decipher.setAAD(Buffer.from(String(tenantId), "utf8"));
+        decipher.setAAD(Buffer.from(String(binding), "utf8"));
         decipher.setAuthTag(Buffer.from(tag, "base64"));
         return Buffer.concat([decipher.update(Buffer.from(data, "base64")), decipher.final()]).toString("utf8");
     } catch {
-        // a changed key, or a row copied from another company
-        throw new HttpError(500, "The saved mail server password can't be read. Enter it again.");
+        // a changed key, or a value copied from another row
+        throw new HttpError(500, unreadable);
     }
 }
+
+const UNREADABLE = "The saved mail server password can't be read. Enter it again.";
+
+/** The company's mail server password, tied to the company (its id is the binding). */
+export const encryptPassword = (password, tenantId) => encryptSecret(password, String(tenantId));
+export const decryptPassword = (stored, tenantId) => decryptSecret(stored, String(tenantId), UNREADABLE);
 
 /** The company's saved settings (with the encrypted password), or null. */
 export async function loadMailServer(tenantId) {
@@ -100,11 +111,36 @@ export const publicSettings = (row) =>
 export const isActive = (row) => Boolean(row && row.enabled && row.password_encrypted);
 
 // a host that is an IP address on our own machine or private network
-function isPrivateAddress(host) {
+export function isPrivateAddress(host) {
     if (!net.isIP(host)) return false;
     if (net.isIPv6(host)) return true; // mail servers are entered by name; an IPv6 literal is refused outright
     const [a, b] = host.split(".").map(Number);
-    return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+    return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
+}
+
+/**
+ * An address a mail server's name resolved to that is not on the public internet: our own machine, a private network,
+ * link-local, multicast, or (IPv6) unique-local, link-local or an IPv4 address in IPv6 form that is one of those.
+ */
+export function isNonPublicResolved(address) {
+    if (net.isIPv4(address)) return isPrivateAddress(address);
+    if (!net.isIPv6(address)) return true;
+    const a = address.toLowerCase();
+    if (a === "::" || a === "::1") return true;
+    const mapped = a.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (mapped) return isPrivateAddress(mapped[1]);
+    if (a.startsWith("::ffff:") || a.startsWith("64:ff9b:")) return true; // other IPv4-in-IPv6 forms: not worth the risk
+    const first = parseInt(a.split(":")[0] || "0", 16);
+    return (first & 0xfe00) === 0xfc00 || (first & 0xffc0) === 0xfe80 || (first & 0xff00) === 0xff00;
+}
+
+/** A mail server's name, checked: a public host name (or public IPv4 address), lower case, or an HttpError(400). */
+export function asMailHost(value, message = "Enter the mail server's name, e.g. mail.yourdomain.com") {
+    const host = (typeof value === "string" ? value.trim() : "").toLowerCase();
+    if (!host || host.length > 253 || /[\r\n]/.test(host) ||(!HOST_RE.test(host) && !net.isIP(host)) || host === "localhost" || isPrivateAddress(host)) {
+        throw new HttpError(400, message);
+    }
+    return host;
 }
 
 const oneLine = (v, max) => {
@@ -119,10 +155,7 @@ const oneLine = (v, max) => {
  */
 export function asSettings(body, existing, tenantId) {
     const b = body || {};
-    const host = oneLine(b.host, 253).toLowerCase();
-    if (!host || (!HOST_RE.test(host) && !net.isIP(host)) || host === "localhost" || isPrivateAddress(host)) {
-        throw new HttpError(400, "Enter the mail server's name, e.g. mail.yourdomain.com");
-    }
+    const host = asMailHost(oneLine(b.host, 253));
     const port = b.port === undefined || b.port === "" ? 465 : Number(b.port);
     if (!SMTP_PORTS.includes(port)) throw new HttpError(400, `The port must be one of ${SMTP_PORTS.join(", ")}`);
     const secure = b.secure === undefined ? port === 465 : b.secure === true;
