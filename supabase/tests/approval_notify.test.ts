@@ -28,7 +28,7 @@ const apply = async () =>
      values ('E-ME', 'Mia Staff', 'Annual Leave', '2030-11-04', '2030-11-06', 'pending') returning id`)))[0].id;
 const decide = async (user: string, leaveId: string, decision: string) => {
   const r = (await rows<{ id: string }>(`select id from approval_requests where record_id = '${leaveId}'`))[0];
-  return asUser(db, user, () => run(`select decide_approval('${r.id}', '${decision}', '')`));
+  return asUser(db, user, () => run(`select decide_approval('${r.id}', '${decision}', '${decision === 'rejected' ? 'not this week' : ''}')`));
 };
 const told = async (emp: string) =>
   (await rows<{ title: string; message: string }>(
