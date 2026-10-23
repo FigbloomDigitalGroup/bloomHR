@@ -30,7 +30,9 @@ const StepIcon = ({ status }: { status: ChainStepStatus }) => {
   return <Minus className={cls} strokeWidth={2.5} />;
 };
 
-const when = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString() : '');
+// the day and time a step was decided: "23/10/2026, 13:05"
+const when = (iso: string | null) =>
+  (iso ? new Date(iso).toLocaleString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
 
 /** One line per step: "Line manager · Approved by Jane Doe", "HR · Waiting on HR". */
 function StepLine({ step }: { step: ChainStep }) {
