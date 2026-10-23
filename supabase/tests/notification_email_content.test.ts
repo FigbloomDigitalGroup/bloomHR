@@ -17,6 +17,8 @@ describe('the notification email', () => {
     expect(html).toContain('Hi Amina,');
     expect(html).toContain('There are 2 updates for you:');
     expect(html).toContain('Reason: blurred.');
+    // each update says when, in East Africa time (10:00 UTC is 13:00 in Nairobi)
+    expect(html).toContain('13 Oct 2026, 13:00');
     // a document update opens the Onboarding section (lib/notificationLinks)
     expect(html).toContain('href="https://hr.figbloom.org/?tab=onboarding"');
   });

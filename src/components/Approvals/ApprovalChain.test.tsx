@@ -117,7 +117,8 @@ describe('Approval chain', () => {
       ],
     });
     const { unmount } = render(<ApprovalChain chain={rejected} compact />);
-    expect(screen.getByText(/^Rejected by Ian Duncan/)).toBeTruthy();
+    // with the day and the time it was decided
+    expect(screen.getByText(/^Rejected by Ian Duncan, .*\d{2}:\d{2}/)).toBeTruthy();
     expect(screen.getByText('“short staffed”')).toBeTruthy();
     unmount();
 
