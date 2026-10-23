@@ -15,6 +15,7 @@
 // subjects) or a password is ever logged, only error codes.
 //
 //   GET    /api/mailbox/account                 the caller's mailbox (never the password) and the suggested settings
+//   GET    /api/mailbox/servers?email=          where that address's mail is read and sent (see findMailServers)
 //   POST   /api/mailbox/test                    try logging in with these settings: { ok, message }
 //   PUT    /api/mailbox/account                 connect (or change): logs in first, saves only if that works
 //   DELETE /api/mailbox/account                 disconnect: deletes the row, password included
@@ -136,6 +137,109 @@ export function suggestedSettings(email, companyServer) {
     };
 }
 
+// ---------------------------------------------------------------------------------------------
+// finding the mail server for an address
+// ---------------------------------------------------------------------------------------------
+
+const GOOGLE_NOTE =
+    "Google mail needs an app password, not your normal password: turn on 2-Step Verification, then create one at myaccount.google.com/apppasswords and use it here.";
+const MICROSOFT_NOTE =
+    "Microsoft 365 and Outlook.com don't let other apps sign in with a password, so this mailbox can't be connected here yet.";
+
+/**
+ * The big mail providers: known by the address's domain or by where the domain's mail goes (its MX record). Zoho has a
+ * server per region (zoho.com, zoho.eu, zoho.in...), taken from the MX name.
+ */
+const PROVIDERS = [
+    {
+        id: "google",
+        domains: ["gmail.com", "googlemail.com"],
+        mx: /(^|\.)(google|googlemail)\.com$/i,
+        servers: () => ({ imap_host: "imap.gmail.com", smtp_host: "smtp.gmail.com" }),
+        supported: true,
+        note: GOOGLE_NOTE,
+    },
+    {
+        id: "microsoft",
+        domains: ["outlook.com", "hotmail.com", "live.com", "msn.com"],
+        mx: /(^|\.)(outlook\.com|office365\.us)$/i,
+        servers: () => ({ imap_host: "outlook.office365.com", smtp_host: "smtp.office365.com" }),
+        supported: false,
+        note: MICROSOFT_NOTE,
+    },
+    {
+        id: "zoho",
+        domains: ["zoho.com", "zohomail.com"],
+        mx: /(^|\.)zoho\.([a-z.]+)$/i,
+        servers: (mx) => {
+            const region = /(^|\.)zoho\.([a-z.]+)$/i.exec(mx || "")?.[2] || "com";
+            return { imap_host: `imap.zoho.${region}`, smtp_host: `smtp.zoho.${region}` };
+        },
+        supported: true,
+        note: "If it doesn't connect, turn on IMAP access in Zoho Mail's settings (Mail Accounts > IMAP).",
+    },
+];
+
+// spam filters in front of a domain: their MX is where mail arrives, not where it is read
+// (and forwarding services, which pass mail on and hold no mailbox)
+const FILTERING_MX =
+    /(mailchannels|spamexperts|antispamcloud|mimecast|pphosted|proofpoint|barracuda|messagelabs|spamtitan|trendmicro|forcepoint|sophos|iphmx|eforward|registrar-servers|improvmx|forwardemail)/i;
+const LOOKUP_MS = 4000;
+
+const inTime = (promise) =>
+    Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), LOOKUP_MS))]);
+
+/** Whether a name points to a public address (a suggestion is never a private or local machine). */
+async function resolvesPublic(host) {
+    try {
+        const found = await inTime(dns.promises.lookup(host, { all: true, verbatim: true }));
+        return found.length > 0 && !found.some((a) => isNonPublicResolved(a.address));
+    } catch {
+        return false;
+    }
+}
+
+/** The domain's mail servers (MX), most preferred first, or [] when it has none or they can't be looked up. */
+async function mxHosts(domain) {
+    try {
+        const records = await inTime(dns.promises.resolveMx(domain));
+        return records
+            .slice()
+            .sort((a, b) => a.priority - b.priority)
+            .map((r) => String(r.exchange || "").toLowerCase().replace(/\.$/, ""))
+            .filter(Boolean);
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Where an address's mail is read (IMAP) and sent (SMTP): a big provider by its domain or MX (with what to know about
+ * signing in), else mail.<domain> when that name exists, else the domain's own MX server (cPanel hosts often have no
+ * mail.<domain>: figbloom.org's mail is on lon105.truehost.cloud). `found` says how: "provider", "name", "mx", or null
+ * for a guess nobody could confirm.
+ */
+export async function findMailServers(email) {
+    const address = EMAIL_RE.test(String(email || "")) ? String(email).trim().toLowerCase() : "";
+    if (!address) throw new HttpError(400, "Enter a valid email address");
+    const domain = address.split("@")[1];
+    const result = (servers, extra) => ({ email: address, imap_port: 993, smtp_port: 465, provider: null, supported: true, note: null, ...servers, ...extra });
+    const fromProvider = (p, mx) => result(p.servers(mx), { provider: p.id, supported: p.supported, note: p.note, found: "provider" });
+
+    const byDomain = PROVIDERS.find((p) => p.domains.includes(domain));
+    if (byDomain) return fromProvider(byDomain);
+
+    const mx = await mxHosts(domain);
+    const byMx = mx.length ? PROVIDERS.find((p) => p.mx.test(mx[0])) : null;
+    if (byMx) return fromProvider(byMx, mx[0]);
+
+    const guess = `mail.${domain}`;
+    if (await resolvesPublic(guess)) return result({ imap_host: guess, smtp_host: guess }, { found: "name" });
+    const direct = mx.find((h) => !FILTERING_MX.test(h));
+    if (direct && (await resolvesPublic(direct))) return result({ imap_host: direct, smtp_host: direct }, { found: "mx" });
+    return result({ imap_host: guess, smtp_host: guess }, { found: null });
+}
+
 const oneLine = (v, max, message) => {
     const s = typeof v === "string" ? v.trim() : "";
     if (s.length > max || /[\r\n\0]/.test(s)) throw new HttpError(400, message);
@@ -214,7 +318,12 @@ export async function resolvePublicAddress(host) {
 export function describeImapError(err, box) {
     if (err instanceof HttpError) return err.message;
     const where = `${box.imap_host} on port ${box.imap_port}`;
-    if (err?.authenticationFailed) return "Wrong email or password. Check them (the username is usually your full email address).";
+    if (err?.authenticationFailed) {
+        // the big providers refuse normal passwords from other apps: say so instead of "wrong password"
+        if (/(^|\.)(gmail|googlemail)\.com$/i.test(box.imap_host)) return `Google didn't accept the password. ${GOOGLE_NOTE}`;
+        if (/(^|\.)(office365|outlook)\.com$/i.test(box.imap_host)) return MICROSOFT_NOTE;
+        return "Wrong email or password. Check them (the username is usually your full email address).";
+    }
     const code = String(err?.code || "");
     if (["ENOTFOUND", "EAI_AGAIN"].includes(code)) return `Can't find a mail server called ${box.imap_host}. Check the name.`;
     if (err?.tlsFailed || /CERT|TLS|SSL|ALTNAME|SELF_SIGNED|UNABLE_TO_VERIFY/i.test(code)) {
@@ -417,6 +526,13 @@ router.get(
     handler(async (_req, res, caller) => {
         const [box, company] = await Promise.all([loadMailbox(caller), loadMailServer(caller.tenantId).catch(() => null)]);
         res.json({ account: publicMailbox(box), defaults: suggestedSettings(caller.email, company) });
+    })
+);
+
+router.get(
+    "/servers",
+    handler(async (req, res) => {
+        res.json(await findMailServers(typeof req.query.email === "string" ? req.query.email : ""));
     })
 );
 

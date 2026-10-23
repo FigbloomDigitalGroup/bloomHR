@@ -19,6 +19,7 @@ const state = vi.hoisted(() => ({
   tables: {} as Record<string, Record<string, any>[]>,
   authUsers: [] as { id: string; email: string }[],
   dns: {} as Record<string, { address: string; family: number }[]>,
+  mx: {} as Record<string, { exchange: string; priority: number }[]>,
   // the fake IMAP server
   imapOptions: [] as Record<string, any>[],
   connectError: null as Record<string, unknown> | null,
@@ -113,6 +114,11 @@ vi.mock('node:dns', () => ({
       lookup: async (host: string) => {
         const found = state.dns[host];
         if (!found) throw Object.assign(new Error(`getaddrinfo ENOTFOUND ${host}`), { code: 'ENOTFOUND' });
+        return found;
+      },
+      resolveMx: async (domain: string) => {
+        const found = state.mx[domain];
+        if (!found) throw Object.assign(new Error(`queryMx ENOTFOUND ${domain}`), { code: 'ENOTFOUND' });
         return found;
       },
     },
@@ -292,6 +298,7 @@ beforeEach(() => {
     company_mail_servers: [],
   };
   state.dns = { 'mail.a.co': [{ address: '203.0.113.10', family: 4 }], 'mail.b.co': [{ address: '203.0.113.20', family: 4 }] };
+  state.mx = {};
   state.imapOptions = [];
   state.connectError = null;
   state.folders = [
@@ -469,6 +476,69 @@ describe('connecting', () => {
     await connect('admin-id');
     expect((await call('DELETE', '/account', 'hr-id')).status).toBe(200);
     expect(state.tables.user_mailboxes.map((r) => r.user_id)).toEqual(['admin-id']);
+  });
+});
+
+describe('finding the mail server', () => {
+  const servers = async (email: string, token = 'hr-id') => (await call('GET', `/servers?email=${encodeURIComponent(email)}`, token)).json();
+
+  it('needs the My mailbox module and a valid address', async () => {
+    expect((await call('GET', '/servers?email=x%40a.co', 'staff-id')).status).toBe(403);
+    expect((await call('GET', '/servers?email=nonsense', 'hr-id')).status).toBe(400);
+  });
+
+  it('uses mail.<domain> when it exists', async () => {
+    expect(await servers('Mary@A.co')).toEqual({
+      email: 'mary@a.co', imap_host: 'mail.a.co', imap_port: 993, smtp_host: 'mail.a.co', smtp_port: 465,
+      provider: null, supported: true, note: null, found: 'name',
+    });
+  });
+
+  it("otherwise the domain's own MX server, skipping spam filters, forwarders and private addresses", async () => {
+    state.mx['figbloom.org'] = [{ exchange: 'lon105.truehost.cloud.', priority: 10 }];
+    state.dns['lon105.truehost.cloud'] = [{ address: '54.36.164.223', family: 4 }];
+    expect(await servers('michael@figbloom.org')).toMatchObject({ imap_host: 'lon105.truehost.cloud', smtp_host: 'lon105.truehost.cloud', found: 'mx' });
+
+    state.mx['filtered.co'] = [
+      { exchange: 'mx2.mailchannels.net', priority: 5 },
+      { exchange: 'server9.host.co', priority: 20 },
+    ];
+    state.dns['mx2.mailchannels.net'] = [{ address: '203.0.113.50', family: 4 }];
+    state.dns['server9.host.co'] = [{ address: '203.0.113.9', family: 4 }];
+    expect(await servers('a@filtered.co')).toMatchObject({ imap_host: 'server9.host.co', found: 'mx' });
+
+    state.mx['forwarded.co'] = [{ exchange: 'eforward1.registrar-servers.com', priority: 10 }];
+    state.dns['eforward1.registrar-servers.com'] = [{ address: '203.0.113.60', family: 4 }];
+    expect(await servers('a@forwarded.co')).toMatchObject({ imap_host: 'mail.forwarded.co', found: null });
+
+    state.mx['inside.co'] = [{ exchange: 'mx.inside.co', priority: 10 }];
+    state.dns['mx.inside.co'] = [{ address: '10.0.0.5', family: 4 }];
+    expect(await servers('a@inside.co')).toMatchObject({ imap_host: 'mail.inside.co', found: null });
+
+    // nothing at all: the plain guess
+    expect(await servers('a@nowhere.co')).toMatchObject({ imap_host: 'mail.nowhere.co', found: null });
+    expect(state.imapOptions).toHaveLength(0);
+  });
+
+  it('knows Google (with the app password note), Zoho by region, and that Microsoft cannot be connected', async () => {
+    expect(await servers('a@gmail.com')).toMatchObject({ imap_host: 'imap.gmail.com', smtp_host: 'smtp.gmail.com', provider: 'google', supported: true, note: expect.stringMatching(/app password/) });
+    state.mx['workspace.co'] = [{ exchange: 'aspmx.l.google.com', priority: 1 }];
+    expect(await servers('a@workspace.co')).toMatchObject({ imap_host: 'imap.gmail.com', provider: 'google' });
+    state.mx['zo.co'] = [{ exchange: 'mx.zoho.eu', priority: 10 }];
+    expect(await servers('a@zo.co')).toMatchObject({ imap_host: 'imap.zoho.eu', smtp_host: 'smtp.zoho.eu', provider: 'zoho' });
+    expect(await servers('a@hotmail.com')).toMatchObject({ provider: 'microsoft', supported: false, note: expect.stringMatching(/can't be connected/) });
+    state.mx['m365.co'] = [{ exchange: 'm365-co.mail.protection.outlook.com', priority: 0 }];
+    expect(await servers('a@m365.co')).toMatchObject({ provider: 'microsoft', supported: false });
+  });
+
+  it("explains a refused Google or Microsoft password instead of 'wrong password'", async () => {
+    state.dns['imap.gmail.com'] = [{ address: '203.0.113.70', family: 4 }];
+    state.dns['outlook.office365.com'] = [{ address: '203.0.113.80', family: 4 }];
+    state.connectError = { authenticationFailed: true };
+    let body = await (await call('POST', '/test', 'hr-id', { email: 'a@gmail.com', imap_host: 'imap.gmail.com', password: 'x' })).json();
+    expect(body.message).toMatch(/^Google didn't accept the password\. .*app password/);
+    body = await (await call('POST', '/test', 'hr-id', { email: 'a@hotmail.com', imap_host: 'outlook.office365.com', password: 'x' })).json();
+    expect(body.message).toMatch(/Microsoft 365 and Outlook\.com don't let other apps sign in with a password/);
   });
 });
 

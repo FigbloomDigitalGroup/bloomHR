@@ -6,6 +6,7 @@ import EmailPortal from '../EmailPortal';
 
 const api = vi.hoisted(() => ({
   getMailbox: vi.fn(),
+  findMailServers: vi.fn(),
   testMailbox: vi.fn(),
   connectMailbox: vi.fn(),
   disconnectMailbox: vi.fn(),
@@ -76,6 +77,11 @@ beforeEach(() => {
   confirm.answer = true;
   Object.values(api).forEach((f) => f.mockReset());
   api.getMailbox.mockResolvedValue({ account: null, defaults: DEFAULTS });
+  // the server's answer for an address: mail.<domain> unless a test says otherwise
+  api.findMailServers.mockImplementation(async (email: string) => {
+    const domain = email.split('@')[1];
+    return { email, imap_host: `mail.${domain}`, imap_port: 993, smtp_host: `mail.${domain}`, smtp_port: 465, provider: null, supported: true, note: null, found: 'name' };
+  });
   api.listFolders.mockResolvedValue({ folders: FOLDERS });
   api.listMessages.mockResolvedValue({ folder: 'INBOX', page: 1, page_size: 50, total: 2, has_more: false, messages: ITEMS });
   api.getMessage.mockResolvedValue({ message: MESSAGE });
@@ -129,6 +135,61 @@ describe('connecting', () => {
     expect(api.connectMailbox.mock.calls[0][0]).toMatchObject({ email: 'joe@acme.co.ke', imap_host: 'mail.acme.co.ke', imap_port: 143, username: 'joe@acme.co.ke' });
     // connected: the mailbox opens
     expect(await screen.findByText('October payslip')).toBeTruthy();
+  });
+});
+
+describe('finding the mail server', () => {
+  const NO_COMPANY = { ...DEFAULTS, email: '', imap_host: '', smtp_host: '', from_company_server: false };
+  const answer = (over: Record<string, unknown>) =>
+    api.findMailServers.mockImplementation(async (email: string) => ({
+      email, imap_port: 993, smtp_port: 465, provider: null, supported: true, note: null, found: 'name', ...over,
+    }));
+
+  it("uses the server found from the domain's mail records, for reading and sending", async () => {
+    api.getMailbox.mockResolvedValue({ account: null, defaults: NO_COMPANY });
+    answer({ imap_host: 'lon105.truehost.cloud', smtp_host: 'lon105.truehost.cloud', found: 'mx' });
+    api.testMailbox.mockResolvedValue({ ok: true, message: 'Connected.' });
+    render(<MyMailbox />);
+    fireEvent.change(await screen.findByLabelText('Email address'), { target: { value: 'michael@figbloom.org' } });
+    // the guess first, then the server's answer once typing stops
+    expect(screen.getByText('mail.figbloom.org')).toBeTruthy();
+    expect(await screen.findByText('lon105.truehost.cloud', {}, { timeout: 2000 })).toBeTruthy();
+    expect(screen.getByText(/found from your domain’s mail records/)).toBeTruthy();
+    expect(api.findMailServers).toHaveBeenLastCalledWith('michael@figbloom.org');
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'pw' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Test connection' }));
+    await waitFor(() => expect(api.testMailbox).toHaveBeenCalled());
+    expect(api.testMailbox.mock.calls[0][0]).toMatchObject({ imap_host: 'lon105.truehost.cloud', smtp_host: 'lon105.truehost.cloud' });
+  });
+
+  it('Google: its own servers and the app password note', async () => {
+    api.getMailbox.mockResolvedValue({ account: null, defaults: NO_COMPANY });
+    answer({ imap_host: 'imap.gmail.com', smtp_host: 'smtp.gmail.com', provider: 'google', found: 'provider', note: 'Google mail needs an app password.' });
+    render(<MyMailbox />);
+    fireEvent.change(await screen.findByLabelText('Email address'), { target: { value: 'joe@gmail.com' } });
+    expect(await screen.findByText('Google mail needs an app password.', {}, { timeout: 2000 })).toBeTruthy();
+    expect(screen.getByText('imap.gmail.com')).toBeTruthy();
+    expect(screen.getByText(/sending through/).textContent).toContain('smtp.gmail.com');
+  });
+
+  it("Microsoft: says it can't be connected and doesn't let anyone try", async () => {
+    api.getMailbox.mockResolvedValue({ account: null, defaults: NO_COMPANY });
+    answer({ imap_host: 'outlook.office365.com', smtp_host: 'smtp.office365.com', provider: 'microsoft', supported: false, found: 'provider', note: "Microsoft can't be connected here yet." });
+    render(<MyMailbox />);
+    fireEvent.change(await screen.findByLabelText('Email address'), { target: { value: 'joe@hotmail.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'pw' } });
+    expect(await screen.findByText("Microsoft can't be connected here yet.", {}, { timeout: 2000 })).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Test connection' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Connect' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("keeps the company's mail server when it has one", async () => {
+    answer({ imap_host: 'somewhere.else', smtp_host: 'somewhere.else', found: 'mx' });
+    render(<MyMailbox />);
+    await screen.findByText('Connect your mailbox');
+    await waitFor(() => expect(api.findMailServers).toHaveBeenCalled(), { timeout: 2000 });
+    expect(screen.getByText('mail.client.co.ke')).toBeTruthy();
+    expect(screen.queryByText('somewhere.else')).toBeNull();
   });
 });
 
