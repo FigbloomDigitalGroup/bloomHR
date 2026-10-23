@@ -210,7 +210,7 @@ describe('only the current approver decides, in order', () => {
     expect(await request(id)).toMatchObject({ status: 'rejected', current_step: 2 });
     expect(await leave(id)).toMatchObject({ status: 'rejected', recstatus: 'not_recommended', notes: 'short staffed' });
     expect(await decide(U.CTO, id, 'approved')).toMatch(/already been rejected/);
-    expect((await notes('E-ME', 'leave_rejected')).at(-1)).toMatch(/has been rejected\. Reason: short staffed\./);
+    expect((await notes('E-ME', 'leave_rejected')).at(-1)).toMatch(/has been rejected by [^.]+\. Reason: short staffed\./);
     expect((await chain(U.ME, id)).steps.map((s) => s.status)).toEqual(['approved', 'rejected', 'not_reached']);
   });
 
