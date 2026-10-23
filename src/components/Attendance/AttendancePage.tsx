@@ -5,8 +5,9 @@ import { loadAttendanceAccess, type AttendanceAccess } from '../../lib/attendanc
 import AttendanceDays from './AttendanceDays';
 import WorkSchedules from './WorkSchedules';
 import Scanners from './Scanners';
+import MissedScanApprovals from './MissedScanApprovals';
 
-type TabId = 'days' | 'schedule' | 'scanners';
+type TabId = 'days' | 'schedule' | 'scanners' | 'missed';
 
 /**
  * Attendance (migration 20261023300000): who clocked in, late, absent or on leave over a range of days, each person's
@@ -15,7 +16,8 @@ type TabId = 'days' | 'schedule' | 'scanners';
  */
 export default function AttendancePage() {
   const [access, setAccess] = useState<AttendanceAccess | null>(null);
-  const [tab, setTab] = useState<TabId>('days');
+  // ?tab=missed: the notifications about a missed scan open its list
+  const [tab, setTab] = useState<TabId>(() => (new URLSearchParams(window.location.search).get('tab') === 'missed' ? 'missed' : 'days'));
 
   useEffect(() => {
     let cancelled = false;
@@ -31,6 +33,7 @@ export default function AttendancePage() {
     const list: TabBarItem[] = [{ id: 'days', label: 'Attendance' }];
     if (access?.schedules) list.push({ id: 'schedule', label: 'Work schedule' });
     if (access?.manages) list.push({ id: 'scanners', label: 'Scanners' });
+    if (access?.manages || access?.team.length) list.push({ id: 'missed', label: 'Missed scans' });
     return list;
   }, [access]);
 
@@ -43,6 +46,7 @@ export default function AttendancePage() {
       {tab === 'days' && <AttendanceDays access={access} />}
       {tab === 'schedule' && access.schedules && <WorkSchedules />}
       {tab === 'scanners' && access.manages && <Scanners />}
+      {tab === 'missed' && (access.manages || access.team.length > 0) && <MissedScanApprovals />}
     </div>
   );
 }

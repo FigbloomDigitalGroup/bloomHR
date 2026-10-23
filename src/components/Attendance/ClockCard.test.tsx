@@ -12,6 +12,11 @@ const api = vi.hoisted(() => ({
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('react-hot-toast', () => ({ default: toast }));
 vi.mock('../../lib/attendanceApi', () => api);
+// the "Forgot to scan?" link under the card (MissedScanForm.test.tsx tests it)
+vi.mock('../../lib/missedScanApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/missedScanApi')>()),
+  loadMissedScans: () => Promise.resolve([]),
+}));
 
 import ClockCard from './ClockCard';
 

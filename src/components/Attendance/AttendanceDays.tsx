@@ -37,6 +37,7 @@ import {
 import { loadAttendanceDays, loadDayScans, removeAttendanceDay, setAttendanceDay, type AttendanceAccess } from '../../lib/attendanceApi';
 import { loadEmployeeDirectory, type DirectoryEmployee } from '../../lib/employeeDirectory';
 import { downloadCsv } from '../../lib/kpiApi';
+import MissedScanHistory from './MissedScanHistory';
 
 const MAX_DAYS = 367;
 
@@ -304,6 +305,7 @@ export function EmployeeDays({ days, canCorrect, onChanged }: {
                   <tr className="border-b border-border last:border-0 bg-secondary/30">
                     <td className={tdClass} colSpan={canCorrect ? 6 : 5}>
                       <DayScans employeeNumber={d.employeeNumber} day={d.day} place={d.source === 'app' ? d.place : null} />
+                      <MissedScanHistory employeeNumber={d.employeeNumber} day={d.day} />
                     </td>
                   </tr>
                 )}
@@ -424,7 +426,7 @@ export function CorrectDay({ day, onCancel, onSaved }: {
           <input id="correct-in" type="time" className={inputClass} value={inTime} onChange={(e) => setInTime(e.target.value)} />
         </div>
         <div className="min-w-0">
-          <label htmlFor="correct-out" className={labelClass}>Clock out (leave empty if still at work)</label>
+          <label htmlFor="correct-out" className={labelClass}>Clock out (leave empty to take it from the scanner)</label>
           <input id="correct-out" type="time" className={inputClass} value={outTime} onChange={(e) => setOutTime(e.target.value)} />
         </div>
       </div>

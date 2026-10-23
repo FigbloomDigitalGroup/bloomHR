@@ -41,6 +41,12 @@ vi.mock('../../lib/branches', async (importOriginal) => ({
   ]),
 }));
 vi.mock('../../lib/kpiApi', () => ({ downloadCsv }));
+// missed-scan requests (MissedScanApprovals.test.tsx tests them)
+vi.mock('../../lib/missedScanApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/missedScanApi')>()),
+  loadMissedScans: () => Promise.resolve([]),
+  loadMissedScanSettings: () => Promise.resolve({ daysBack: 7, approver: 'manager' }),
+}));
 
 import AttendancePage from './AttendancePage';
 import { addDays, nairobiToday, weekOf } from '../../lib/attendance';
