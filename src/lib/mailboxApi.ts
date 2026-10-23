@@ -196,3 +196,71 @@ export interface SendResult {
 
 /** Sends from the person's own mailbox (From is always their mailbox) and saves a copy to their Sent folder. */
 export const sendMail = (input: SendInput) => request<SendResult>('POST', '/send', input);
+
+// ---------------------------------------------------------------------------------------------
+// managing mail (FIG-1205, PR 3 of 3)
+// ---------------------------------------------------------------------------------------------
+
+/** Emails acted on at once (the server's cap). */
+export const MAX_UIDS = 200;
+
+export interface DeleteResult {
+  ok: boolean;
+  folder: string;
+  uids: number[];
+  /** true: removed for good (only ever from Trash, when asked); false: moved to `trash` */
+  permanent: boolean;
+  trash: string | null;
+}
+
+export interface SearchFilters {
+  q?: string;
+  unread?: boolean;
+  attachments?: boolean;
+  /** YYYY-MM-DD, inclusive */
+  since?: string;
+  before?: string;
+}
+
+export interface SearchPage extends MessagePage {
+  q: string;
+  /** more than 500 matched: only the newest 500 are shown */
+  capped: boolean;
+}
+
+/** Mark read / unread and flag / unflag. */
+export const setFlags = (folder: string, uids: number[], change: { seen?: boolean; flagged?: boolean }) =>
+  request<{ ok: boolean }>('POST', '/flags', { folder, uids, ...change });
+/** Move to another folder of the mailbox. */
+export const moveMessages = (folder: string, uids: number[], to: string) => request<{ ok: boolean }>('POST', '/move', { folder, uids, to });
+/** To Trash; in Trash, `permanent` deletes for good (the screen asks first). */
+export const deleteMessages = (folder: string, uids: number[], permanent = false) =>
+  request<DeleteResult>('POST', '/delete', { folder, uids, ...(permanent ? { permanent: true } : {}) });
+/** Searches one folder, newest first, 50 a page. */
+export function searchMessages(folder: string, filters: SearchFilters, page = 1) {
+  const params: Record<string, string | number> = { folder, page };
+  if (filters.q) params.q = filters.q;
+  if (filters.unread) params.unread = 1;
+  if (filters.attachments) params.attachments = 1;
+  if (filters.since) params.since = filters.since;
+  if (filters.before) params.before = filters.before;
+  return request<SearchPage>('GET', `/search?${q(params)}`);
+}
+/** INBOX's unread count, for the sidebar badge; `connected: false` when there is no mailbox. */
+export const getUnreadCount = () => request<{ connected: boolean; unread: number }>('GET', '/unread');
+
+const TRASH_NAMES = ['trash', 'inbox.trash', 'inbox/trash', 'deleted items', 'inbox.deleted items', 'inbox/deleted items', 'deleted messages', 'inbox.deleted messages'];
+const ARCHIVE_NAMES = ['archive', 'inbox.archive', 'inbox/archive'];
+
+const byNames = (folders: MailFolder[], names: string[]) => {
+  for (const name of names) {
+    const hit = folders.find((f) => f.path.toLowerCase() === name);
+    if (hit) return hit.path;
+  }
+  return null;
+};
+
+/** The Trash folder as the server finds it: marked Trash, else Trash / INBOX.Trash, else Deleted Items. */
+export const findTrash = (folders: MailFolder[]) => folders.find((f) => f.special === 'trash')?.path ?? byNames(folders, TRASH_NAMES);
+/** The Archive folder (for the "e" shortcut), or null when there is none. */
+export const findArchive = (folders: MailFolder[]) => folders.find((f) => f.special === 'archive')?.path ?? byNames(folders, ARCHIVE_NAMES);
