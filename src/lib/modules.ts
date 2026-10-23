@@ -21,6 +21,8 @@
 // reopen-leave (20261023000000_leave_reopen.sql) was given once to Operations: send approved leave back to pending.
 // mailbox (20261025200000_user_mailboxes.sql) was given to no role: a company ticks it for the roles that should read
 // their own mailbox in the app.
+// payments (20261025400000_payments_to_make.sql) was given once to administrators and every role holding payroll, the
+// people who paid until then; requisitions to HR.
 // (custom roles based on those roles got them too). Administrators always have every module.
 
 export type ModuleArea = 'overview' | 'workspace' | 'people' | 'time' | 'performance' | 'pay' | 'system';
@@ -87,6 +89,8 @@ export const MODULES: ModuleInfo[] = [
   { id: 'salaryadmin', name: 'Salary Advance', area: 'pay', explain: 'Review and approve salary advance requests' },
   { id: 'loans', name: 'Staff loans', area: 'pay', explain: 'Manage staff loans and get loan requests' },
   { id: 'expenses', name: 'Expenses', area: 'pay', explain: 'Expense claims and approvals' },
+  { id: 'requisitions', name: 'Approve requisitions', area: 'pay', explain: 'Raise, approve or turn down requests for money (requisitions)' },
+  { id: 'payments', name: 'Payments to make', area: 'pay', explain: 'Get told when money is approved, and record how it was paid' },
   { id: 'asset', name: 'Assets', area: 'pay', explain: 'Track company assets' },
   { id: 'mpesa-zap', name: 'Mpesa Zap', area: 'pay', explain: 'M-Pesa payments' },
   // company set-up and security

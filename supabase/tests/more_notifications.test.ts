@@ -15,7 +15,8 @@ const U = {
 let db: PGlite;
 type Note = { notification_type: string; title: string; message: string };
 const mine = () => asUser(db, U.STAFF, async () => (await db.query<Note>(`select notification_type, title, message from hr_notifications order by id desc`)).rows);
-const latest = async () => (await mine())[0];
+// the employee's own (not the alerts for HR and finance, e.g. 'payment_due' when their advance is approved)
+const latest = async () => (await mine()).filter((n) => n.notification_type !== 'payment_due')[0];
 // what HR does in the app: signed in as HR (row-level security is not what these tests are about)
 const asHR = async (sql: string) => {
   await db.exec(`select set_config('request.jwt.claim.sub', '${U.HR}', false)`);

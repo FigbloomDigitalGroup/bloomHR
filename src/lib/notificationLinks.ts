@@ -55,6 +55,9 @@ const STAFF_BY_TYPE: Record<string, StaffLink> = {
   missed_scan_request: { tab: 'my-team', params: { view: 'missed' } },
   missed_scan_approved: { tab: 'home' },
   missed_scan_declined: { tab: 'home' },
+  payment_made: { tab: 'home' },
+  requisition_approved: { tab: 'home' },
+  requisition_rejected: { tab: 'home' },
 };
 
 const has = (text: string | null | undefined, pattern: RegExp) => pattern.test(text ?? '');
@@ -135,6 +138,11 @@ const ADMIN_BY_TYPE: Record<string, string> = {
   attendance_odd_hours: '/attendance',
   missed_scan_requested: '/attendance?tab=missed',
   missed_scan_request: '/attendance?tab=missed',
+  payment_due: '/payments',
+  payment_made: '/payments?tab=paid',
+  requisition_requested: '/payments?tab=requisitions',
+  requisition_approved: '/payments?tab=requisitions',
+  requisition_rejected: '/payments?tab=requisitions',
 };
 
 /** The screen HR or an admin handles a notification on, or null when there is none (it is only marked read). */

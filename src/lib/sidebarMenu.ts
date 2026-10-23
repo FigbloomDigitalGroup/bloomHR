@@ -67,6 +67,8 @@ export const SIDEBAR_MENU: SidebarMenuGroup[] = [
       { id: 'advanced', label: 'Salary Advance', path: '/salaryadmin' },
       // HR and payroll (and admins): staff loans with interest
       { id: 'loans', label: 'Loans', path: '/loans' },
+      // approved advances, loans, expenses and requisitions for finance to pay; HR's requisitions (FIG-1209)
+      { id: 'payments', label: 'Payments to make', path: '/payments' },
       { id: 'asset', label: 'Assets', path: '/asset' },
       { id: 'mpesa-zap', label: 'Mpesa Zap', path: '/mpesa-zap' },
     ],
