@@ -78,7 +78,7 @@ const GUARDED_CHANGES: Record<string, { gained: string[]; lost: string[] }> = {
 };
 
 // Menu entries added after the reference capture (their own tests below)
-const ADDED_SINCE = ['Video calls', 'Work injuries', 'Attendance'];
+const ADDED_SINCE = ['Video calls', 'Work injuries', 'Attendance', 'Payments to make'];
 
 describe('the seven system roles see the same screens as before', () => {
   it.each(ROLES)('%s: the same sidebar entries, in the same order (plus the screens added since)', (role) => {
