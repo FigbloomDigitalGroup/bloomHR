@@ -204,9 +204,12 @@ export const toScan = (r: Record<string, unknown>): DayScan => ({
   scannerName: (r.scanner_name as string | null) ?? null,
   kind: (r.kind as ScanKind) ?? 'between',
   reason: (r.reason as string | null) ?? null,
+  verify: typeof r.verify === 'number' ? r.verify : null,
+  status: typeof r.status === 'number' ? r.status : null,
+  punchMode: (r.punch_mode as string | null) ?? null,
 });
 
-/** Every scan behind one person's day, in time order (migration 20261023800000). */
+/** Every scan behind one person's day, in time order (migration 20261023800000; verify, status and mode 20261025300000). */
 export async function loadDayScans(employeeNumber: string, date: string): Promise<DayScan[]> {
   const { data, error } = await supabase.rpc('attendance_day_scans', { p_employee: employeeNumber, p_date: date });
   if (error) fail(error);

@@ -118,13 +118,15 @@ describe('Attendance: the Today view (FIG-1203)', () => {
   });
 
   it('opens a row to show that person’s scans for the day', async () => {
-    api.loadDayScans.mockResolvedValue([{ at: at('05:40'), via: 'scanner', scannerName: 'Front Door', kind: 'clock_in', reason: null }]);
+    api.loadDayScans.mockResolvedValue([
+      { at: at('05:40'), via: 'scanner', scannerName: 'Front Door', kind: 'clock_in', reason: null, verify: 4, status: 0, punchMode: 'device_keys' },
+    ]);
     render(<AttendancePage />);
     const t = await table();
     fireEvent.click(await within(t).findByRole('button', { name: 'Show scans for Amina Otieno' }));
     expect(api.loadDayScans).toHaveBeenCalledWith('E1', TODAY);
     const list = await within(t).findByRole('list', { name: /^Scans on / });
-    expect(within(list).getByRole('listitem').textContent).toBe('8:40 am · Front Door · clock-in');
+    expect(within(list).getByRole('listitem').textContent).toBe('8:40 am · Front Door · card · In key · clock-in');
     expect(screen.queryByRole('dialog')).toBeNull();
     fireEvent.click(within(t).getByRole('button', { name: 'Hide scans for Amina Otieno' }));
     expect(within(t).queryByRole('list')).toBeNull();
