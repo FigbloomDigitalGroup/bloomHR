@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { AlertTriangle, Archive, FileText, Folder, Inbox, Loader2, Mail, Paperclip, RefreshCw, Send, ShieldAlert, Star, Trash2, Unplug } from 'lucide-react';
+import { AlertTriangle, Archive, FileText, Folder, Inbox, Loader2, Mail, Paperclip, PenSquare, RefreshCw, Send, Settings, ShieldAlert, Star, Trash2, Unplug } from 'lucide-react';
 import { Button, Card, EmptyState } from '../../UI';
 import { confirmDialog } from '../../../lib/confirmDialog';
 import {
@@ -14,9 +14,12 @@ import {
   type MailMessage,
   type MailboxAccount,
   type MailboxDefaults,
+  type SendResult,
 } from '../../../lib/mailboxApi';
+import { forwardDraft, newDraft, replyDraft, type ComposeDraft } from '../../../lib/mailCompose';
 import MailboxConnect from './MailboxConnect';
-import MailReader from './MailReader';
+import MailCompose from './MailCompose';
+import MailReader, { type ReplyMode } from './MailReader';
 
 const FOLDER_ICONS: Record<string, typeof Inbox> = { inbox: Inbox, sent: Send, drafts: FileText, trash: Trash2, junk: ShieldAlert, archive: Archive };
 
@@ -51,10 +54,27 @@ export default function MyMailbox() {
   if (loadError) return <EmptyState icon={<AlertTriangle className="w-5 h-5" />} title="Your mailbox could not be loaded" description={loadError} />;
   if (!state) return <EmptyState icon={<Loader2 className="w-5 h-5 animate-spin" />} title="Loading your mailbox…" />;
   if (!state.account) return <MailboxConnect defaults={state.defaults} onConnected={(account) => setState({ ...state, account })} />;
-  return <MailboxView account={state.account} onDisconnected={() => setState({ ...state, account: null })} />;
+  return (
+    <MailboxView
+      account={state.account}
+      defaults={state.defaults}
+      onChanged={(account) => setState({ ...state, account })}
+      onDisconnected={() => setState({ ...state, account: null })}
+    />
+  );
 }
 
-function MailboxView({ account, onDisconnected }: { account: MailboxAccount; onDisconnected: () => void }) {
+function MailboxView({
+  account,
+  defaults,
+  onChanged,
+  onDisconnected,
+}: {
+  account: MailboxAccount;
+  defaults: MailboxDefaults;
+  onChanged: (account: MailboxAccount) => void;
+  onDisconnected: () => void;
+}) {
   const [folders, setFolders] = useState<MailFolder[]>([]);
   const [folder, setFolder] = useState('INBOX');
   const [items, setItems] = useState<MailListItem[]>([]);
@@ -65,6 +85,10 @@ function MailboxView({ account, onDisconnected }: { account: MailboxAccount; onD
   const [open, setOpen] = useState<MailMessage | null>(null);
   const [openUid, setOpenUid] = useState<number | null>(null);
   const [opening, setOpening] = useState(false);
+  const [compose, setCompose] = useState<ComposeDraft | null>(null);
+  // a new draft each time Compose opens, even for the same email
+  const [composeKey, setComposeKey] = useState(0);
+  const [editing, setEditing] = useState(false);
 
   const loadFolders = useCallback(async () => {
     try {
@@ -138,8 +162,42 @@ function MailboxView({ account, onDisconnected }: { account: MailboxAccount; onD
     }
   };
 
+  const startCompose = (draft: ComposeDraft) => {
+    setCompose(draft);
+    setComposeKey((k) => k + 1);
+  };
+
+  const respond = (mode: ReplyMode) => {
+    if (!open) return;
+    startCompose(mode === 'forward' ? forwardDraft(open) : replyDraft(open, account.email, mode === 'replyAll'));
+  };
+
+  const sent = (result: SendResult) => {
+    const replied = compose?.reply;
+    setCompose(null);
+    // a reply marks the original answered
+    if (replied && replied.folder === folder) setItems((prev) => prev.map((m) => (m.uid === replied.uid ? { ...m, answered: true } : m)));
+    loadFolders();
+    // the copy is in Sent: show it when that is the folder open
+    if (result.sent_folder && result.sent_folder === folder) loadMessages(folder, 1);
+  };
+
+  if (editing) {
+    return (
+      <MailboxConnect
+        defaults={defaults}
+        account={account}
+        onCancel={() => setEditing(false)}
+        onConnected={(saved) => {
+          setEditing(false);
+          onChanged(saved);
+        }}
+      />
+    );
+  }
+
   const current = folders.find((f) => f.path === folder);
-  const reading = openUid !== null;
+  const reading = openUid !== null || compose !== null;
 
   return (
     <div className="space-y-3">
@@ -148,9 +206,15 @@ function MailboxView({ account, onDisconnected }: { account: MailboxAccount; onD
           <div className="text-[13px] font-bold text-ink truncate">{account.email}</div>
           <div className="text-[11.5px] text-muted-foreground">{account.imap_host}</div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button icon={<PenSquare className="w-4 h-4" />} onClick={() => startCompose(newDraft())}>
+            New message
+          </Button>
           <Button variant="secondary" icon={<RefreshCw className={`w-4 h-4 ${listLoading ? 'animate-spin' : ''}`} />} onClick={refresh} disabled={listLoading}>
             Refresh
+          </Button>
+          <Button variant="ghost" icon={<Settings className="w-4 h-4" />} onClick={() => setEditing(true)}>
+            Settings
           </Button>
           <Button variant="ghost" icon={<Unplug className="w-4 h-4" />} onClick={disconnect}>
             Disconnect
@@ -245,10 +309,12 @@ function MailboxView({ account, onDisconnected }: { account: MailboxAccount; onD
         </section>
 
         <section className={`${reading ? 'flex' : 'hidden md:flex'} flex-col flex-1 min-w-0 p-4`} aria-label="Email">
-          {opening ? (
+          {compose ? (
+            <MailCompose key={composeKey} account={account} draft={compose} onClose={() => setCompose(null)} onSent={sent} />
+          ) : opening ? (
             <EmptyState icon={<Loader2 className="w-5 h-5 animate-spin" />} title="Opening the email…" />
           ) : open ? (
-            <MailReader message={open} onBack={() => setOpenUid(null)} />
+            <MailReader message={open} onBack={() => setOpenUid(null)} onRespond={respond} />
           ) : (
             <EmptyState icon={<Mail className="w-5 h-5" />} title="Choose an email to read it" className="m-auto" />
           )}

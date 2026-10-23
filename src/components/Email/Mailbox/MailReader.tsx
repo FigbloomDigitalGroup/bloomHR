@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Download, Paperclip } from 'lucide-react';
+import { ArrowLeft, Download, Forward, Paperclip, Reply, ReplyAll } from 'lucide-react';
 import { Button } from '../../UI';
 import { downloadAttachment, type MailAttachment, type MailMessage, type MailPerson } from '../../../lib/mailboxApi';
+import { fileSize } from '../../../lib/mailCompose';
 import MailBody from './MailBody';
 
 const personLabel = (p: MailPerson) => (p.name ? `${p.name} <${p.address}>` : p.address);
 const people = (list: MailPerson[]) => list.map(personLabel).join(', ');
 
-const fileSize = (bytes: number) =>
-  bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : bytes >= 1024 ? `${Math.round(bytes / 1024)} KB` : `${bytes} B`;
+export type ReplyMode = 'reply' | 'replyAll' | 'forward';
 
 function Row({ label, value }: { label: string; value: string }) {
   if (!value) return null;
@@ -21,8 +21,8 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** The reading pane: who, when, the subject, the attachments to download, and the body. */
-export default function MailReader({ message, onBack }: { message: MailMessage; onBack?: () => void }) {
+/** The reading pane: who, when, the subject, the attachments to download, the body, and Reply / Reply all / Forward. */
+export default function MailReader({ message, onBack, onRespond }: { message: MailMessage; onBack?: () => void; onRespond?: (mode: ReplyMode) => void }) {
   const [downloading, setDownloading] = useState('');
 
   const download = async (a: MailAttachment) => {
@@ -52,6 +52,19 @@ export default function MailReader({ message, onBack }: { message: MailMessage; 
         <Row label="Cc" value={people(message.cc)} />
         <Row label="Date" value={message.date ? new Date(message.date).toLocaleString() : ''} />
       </div>
+      {onRespond && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button variant="secondary" icon={<Reply className="w-4 h-4" />} onClick={() => onRespond('reply')}>
+            Reply
+          </Button>
+          <Button variant="secondary" icon={<ReplyAll className="w-4 h-4" />} onClick={() => onRespond('replyAll')}>
+            Reply all
+          </Button>
+          <Button variant="secondary" icon={<Forward className="w-4 h-4" />} onClick={() => onRespond('forward')}>
+            Forward
+          </Button>
+        </div>
+      )}
       {message.attachments.length > 0 && (
         <ul className="mt-3 flex flex-wrap gap-2" aria-label="Attachments">
           {message.attachments.map((a) => (

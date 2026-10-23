@@ -29,7 +29,11 @@ async function send(method: string, path: string, body?: unknown): Promise<Respo
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const response = await send(method, path, body);
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
+  if (!response.ok) {
+    // a body over the hosting limit is refused before it reaches the API, without a JSON answer
+    if (response.status === 413 && !payload.error) throw new Error('This is too large to send. Remove some attachments and try again.');
+    throw new Error(payload.error || `Request failed (${response.status})`);
+  }
   return payload as T;
 }
 
@@ -134,7 +138,8 @@ const q = (params: Record<string, string | number>) =>
 
 export const getMailbox = () => request<{ account: MailboxAccount | null; defaults: MailboxDefaults }>('GET', '/account');
 export const testMailbox = (input: MailboxInput) => request<{ ok: boolean; message: string }>('POST', '/test', input);
-export const connectMailbox = (input: MailboxInput) => request<{ account: MailboxAccount }>('PUT', '/account', input);
+/** Saves when reading works; `smtp` says whether sending works with the same login. */
+export const connectMailbox = (input: MailboxInput) => request<{ account: MailboxAccount; smtp?: { ok: boolean; message: string } }>('PUT', '/account', input);
 export const disconnectMailbox = () => request<{ ok: boolean }>('DELETE', '/account');
 export const listFolders = () => request<{ folders: MailFolder[] }>('GET', '/folders');
 export const listMessages = (folder: string, page = 1) => request<MessagePage>('GET', `/messages?${q({ folder, page })}`);
@@ -157,3 +162,37 @@ export async function downloadAttachment(folder: string, uid: number, attachment
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
+
+// ---------------------------------------------------------------------------------------------
+// sending (FIG-1205, PR 2 of 3)
+// ---------------------------------------------------------------------------------------------
+
+/** Files added from this device: 3 MB in all (they travel to the server as base64, under the hosting's 4.5 MB). */
+export const MAX_UPLOAD_BYTES = 3 * 1024 * 1024;
+/** The whole email, with the files being forwarded (read on the server). */
+export const MAX_SEND_BYTES = 20 * 1024 * 1024;
+export const MAX_RECIPIENTS = 50;
+
+export interface SendInput {
+  to: MailPerson[];
+  cc: MailPerson[];
+  bcc: MailPerson[];
+  subject: string;
+  text: string;
+  attachments: { filename: string; content_type: string; data: string }[];
+  reply?: { folder: string; uid: number };
+  forward?: { folder: string; uid: number; parts: string[] };
+}
+
+export interface SendResult {
+  ok: boolean;
+  saved_to_sent: boolean;
+  /** the Sent folder the copy went to (null when it couldn't be saved) */
+  sent_folder: string | null;
+  /** recipients the mail server refused (the rest got it) */
+  rejected: string[];
+  message: string;
+}
+
+/** Sends from the person's own mailbox (From is always their mailbox) and saves a copy to their Sent folder. */
+export const sendMail = (input: SendInput) => request<SendResult>('POST', '/send', input);
