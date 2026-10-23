@@ -21,6 +21,7 @@ import { adminWeekItems, holidaysForCompany, type AdminWeekItem } from '../../li
 import FigbloomLoader from "../UI/FigbloomLoader";
 import { foldIntoOther, headcountByTown, leaveByStatus, monthLabel, onLeaveToday, pendingLeave, staffByMonth } from '../../lib/dashboardStats';
 import { BarList, ChartHeading, HeadcountTrend, JoinersLeavers, ShareBar, Sparkline } from './DashboardCharts';
+import { AttendanceAnalyticsSection, AttendanceTodayCard, useAttendanceDashboard } from './AttendanceDashboard';
 
 /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- the untyped rows the dashboard reads */
 type Row = Record<string, any>;
@@ -123,6 +124,8 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
   const handlesWorkInjuries = !permissionsLoading && canOpenScreen('/work-injuries', hasPermission);
   // the "Get <company> set up" checklist is for whoever holds Settings and Invite people (GetStarted.tsx)
   const setsUpCompany = !permissionsLoading && hasAllPermissions(['settings', 'invite-people']);
+  // attendance today and its analytics, for whoever can open Attendance (HR and Reports: everyone; a manager: their team)
+  const attendance = useAttendanceDashboard(!permissionsLoading && canOpenScreen('/attendance', hasPermission));
 
   // The company's next 7 days (today plus 6), as the staff home's "This week": public holidays (every country's, tagged
   // when the company is in more than one), company events, birthdays (name only) and how many start leave
@@ -659,6 +662,8 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
             {/* the group view: headcount by country and payroll money per currency (FIG-905) */}
             <GroupOverview />
 
+            {activeTab === 'overview' && <AttendanceTodayCard data={attendance} />}
+
             {activeTab === 'analytics' ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch" data-testid="dashboard-analytics">
                 <Card>
@@ -707,6 +712,8 @@ export default function DashboardMain({ selectedTown, onTownChange }: TownProps)
                     <ShareBar rows={leaveStatus} caption="Leave requests by status" />
                   )}
                 </Card>
+
+                <AttendanceAnalyticsSection data={attendance} />
               </div>
             ) : (
             <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-4 items-start">
