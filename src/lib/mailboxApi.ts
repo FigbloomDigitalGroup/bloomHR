@@ -61,6 +61,23 @@ export interface MailboxDefaults {
   from_company_server: boolean;
 }
 
+/** Where an address's mail is read and sent, found by the server from its domain (GET /servers). */
+export interface MailServers {
+  email: string;
+  imap_host: string;
+  imap_port: number;
+  smtp_host: string;
+  smtp_port: number;
+  /** a big provider, known by the domain or where its mail goes */
+  provider: 'google' | 'microsoft' | 'zoho' | null;
+  /** false: this mailbox can't be connected with a password (Microsoft) */
+  supported: boolean;
+  /** what to know before connecting (an app password...) */
+  note: string | null;
+  /** how it was found: a provider, mail.<domain> exists, the domain's MX server, or an unconfirmed guess (null) */
+  found: 'provider' | 'name' | 'mx' | null;
+}
+
 export interface MailboxInput {
   email: string;
   password?: string;
@@ -137,6 +154,7 @@ const q = (params: Record<string, string | number>) =>
     .join('&');
 
 export const getMailbox = () => request<{ account: MailboxAccount | null; defaults: MailboxDefaults }>('GET', '/account');
+export const findMailServers = (email: string) => request<MailServers>('GET', `/servers?${q({ email })}`);
 export const testMailbox = (input: MailboxInput) => request<{ ok: boolean; message: string }>('POST', '/test', input);
 /** Saves when reading works; `smtp` says whether sending works with the same login. */
 export const connectMailbox = (input: MailboxInput) => request<{ account: MailboxAccount; smtp?: { ok: boolean; message: string } }>('PUT', '/account', input);

@@ -59,7 +59,7 @@ export const MODULES: ModuleInfo[] = [
   { id: 'chat-admin', name: 'Moderate chat', area: 'workspace', explain: 'See private channels, manage any channel and its members, edit or remove anyone’s messages (never direct messages)' },
   { id: 'sms', name: 'SMS Center', area: 'workspace', explain: 'Send SMS messages to staff' },
   { id: 'email-portal', name: 'Email Portal', area: 'workspace', explain: 'Send emails to staff from the app' },
-  { id: 'mailbox', name: 'My mailbox', area: 'workspace', explain: 'Connect their own email account and read it in the Email Portal' },
+  { id: 'mailbox', name: 'My mailbox', area: 'workspace', explain: 'Connect their own email account and read and send it in the app (Email Portal, or Mail in the staff portal)' },
   // people
   { id: 'employees', name: 'Employees', area: 'people', explain: 'See and edit employee records, departments, onboarding and bulk uploads' },
   { id: 'employee-edit', name: 'Add and edit employees', area: 'people', explain: 'Show Add employee and Edit on employee records (what can be saved still follows Employees)' },

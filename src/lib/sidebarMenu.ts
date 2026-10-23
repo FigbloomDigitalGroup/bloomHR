@@ -194,6 +194,20 @@ export const STAFF_PORTAL_MENU: PortalMenuGroup[] = [
   },
 ];
 
+/** Communication's Mail: their own mailbox, shown only with the My mailbox module (FIG-1205) */
+export const STAFF_PORTAL_MAIL = { id: 'mail', label: 'Mail' };
+
+/** The staff portal's menu, with Mail first under Communication when they have My mailbox. */
+export function staffPortalMenu({ mail }: { mail: boolean }): PortalMenuGroup[] {
+  if (!mail) return STAFF_PORTAL_MENU;
+  return STAFF_PORTAL_MENU.map((group) => ({
+    ...group,
+    items: group.items.map((item) =>
+      item.id === 'communication' ? { ...item, submenu: [STAFF_PORTAL_MAIL, ...(item.submenu ?? [])], keywords: [...(item.keywords ?? []), 'email', 'inbox'] } : item
+    ),
+  }));
+}
+
 /** Shown only to someone who supervises at least one person (migration 20261018900000) */
 export const STAFF_PORTAL_MY_TEAM: PortalMenuGroup = { title: 'My team', items: [{ id: 'my-team', label: 'My team' }] };
 /** Shown only to someone paid by work or given contract jobs (FIG-812, migration 20261020100000) */

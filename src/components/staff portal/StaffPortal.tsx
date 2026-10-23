@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Phosphor Icons - Premium icon set
@@ -75,7 +75,10 @@ import LeavePlanningHints from './LeavePlanningHints';
 import { leaveDateRange, leaveDaysLabel, shortSubmitted } from '../../lib/leaveDisplay';
 import { isCompanySection } from '../../lib/staffCompany';
 import MyAbsences from './MyAbsences';
-import { STAFF_PORTAL_MENU, STAFF_PORTAL_MY_TEAM, STAFF_PORTAL_MY_WORK, type PortalMenuGroup } from '../../lib/sidebarMenu';
+import { STAFF_PORTAL_MY_TEAM, STAFF_PORTAL_MY_WORK, staffPortalMenu, type PortalMenuGroup } from '../../lib/sidebarMenu';
+import MyMailbox from '../Email/Mailbox/MyMailbox';
+import { usePermissions } from '../../hooks/usePermissions';
+import { useMailboxUnread } from '../../hooks/useMailboxUnread';
 import { NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
 import { describeFree, useLeaveCheck } from '../../lib/leaveRules';
 import { LEAVE_DOCUMENTS_BUCKET, LeaveDocumentRule, loadLeaveDocumentRules, uploadLeaveDocument } from '../../lib/leaveDocuments';
@@ -928,7 +931,6 @@ const withIcons = (group: PortalMenuGroup): MenuGroup => ({
   title: group.title,
   items: group.items.map((item) => ({ ...item, icon: STAFF_ICONS[item.id], ...(item.submenu ? { hasSubmenu: true } : {}) })),
 });
-const staffMenuGroups: MenuGroup[] = STAFF_PORTAL_MENU.map(withIcons);
 
 // Shown only to someone who supervises at least one person (migration 20261018900000)
 const myTeamGroup: MenuGroup = withIcons(STAFF_PORTAL_MY_TEAM);
@@ -1002,6 +1004,17 @@ const StaffPortal = () => {
   const myWork = useMyWorkProfile();
   const showMyWork = !!myWork?.qualifies;
   const extraGroups = [...(showMyWork ? [myWorkGroup] : []), ...(team.length > 0 ? [myTeamGroup] : [])];
+  // Mail (their own mailbox) under Communication, for roles given My mailbox
+  const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
+  const canMail = !permissionsLoading && hasAnyPermission(['mailbox']);
+  const [myEmail, setMyEmail] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setMyEmail(data.user?.email ?? undefined)).catch(() => {});
+  }, []);
+  const mailUnread = useMailboxUnread(canMail, myEmail);
+  // Communication's badge: unread chat messages and new mail
+  const communicationUnread = unreadMessageCount + mailUnread;
+  const staffMenuGroups = useMemo(() => staffPortalMenu({ mail: canMail }).map(withIcons), [canMail]);
   const menuGroups = [staffMenuGroups[0], ...extraGroups, ...staffMenuGroups.slice(1)];
 
   const fetchCompanyProfile = async () => {
@@ -1370,7 +1383,7 @@ const StaffPortal = () => {
                                   {item.id === 'leave' && unreadLeaveCount > 0 && !isExpanded && (
                                     <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange border border-shell"></span>
                                   )}
-                                  {item.id === 'communication' && unreadMessageCount > 0 && !isExpanded && (
+                                  {item.id === 'communication' && communicationUnread > 0 && !isExpanded && (
                                     <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange border border-shell"></span>
                                   )}
                                 </div>
@@ -1392,9 +1405,9 @@ const StaffPortal = () => {
                                           {unreadLeaveCount > 99 ? '99+' : unreadLeaveCount}
                                         </span>
                                       )}
-                                      {item.id === 'communication' && unreadMessageCount > 0 && (
+                                      {item.id === 'communication' && communicationUnread > 0 && (
                                         <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-orange text-white text-[10px] font-bold mr-1">
-                                          {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                                          {communicationUnread > 99 ? '99+' : communicationUnread}
                                         </span>
                                       )}
                                       {item.hasSubmenu && (
@@ -1409,7 +1422,7 @@ const StaffPortal = () => {
                                   <div className="absolute left-full ml-5 px-2.5 py-1.5 bg-slate-800 text-white text-[10px] font-semibold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 whitespace-nowrap shadow-xl translate-x-2 group-hover:translate-x-0">
                                     {item.label}
                                     {item.id === 'leave' && unreadLeaveCount > 0 && ` (${unreadLeaveCount})`}
-                                    {item.id === 'communication' && unreadMessageCount > 0 && ` (${unreadMessageCount})`}
+                                    {item.id === 'communication' && communicationUnread > 0 && ` (${communicationUnread})`}
                                     <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 w-2 h-2 bg-slate-800 rotate-45" />
                                   </div>
                                 )}
@@ -1449,6 +1462,11 @@ const StaffPortal = () => {
                                             own count, so "Communication"'s badge reads as the total of
                                             its children rather than a single opaque number. Video
                                             Conference has no unread concept yet, so it gets none. */}
+                                        {subItem.id === 'mail' && mailUnread > 0 && (
+                                          <span className="ml-auto min-w-[16px] h-[16px] px-1 flex items-center justify-center rounded-full bg-orange text-white text-[9px] font-bold" aria-label={`${mailUnread} unread`}>
+                                            {mailUnread > 99 ? '99+' : mailUnread}
+                                          </span>
+                                        )}
                                         {subItem.id === 'chat' && unreadMessageCount > 0 && (
                                           <span className="ml-auto min-w-[16px] h-[16px] px-1 flex items-center justify-center rounded-full bg-orange text-white text-[9px] font-bold">
                                             {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
@@ -1617,6 +1635,7 @@ const StaffPortal = () => {
               {activeTab === 'job-applications' && <JobApplications />}
               {activeTab === 'chat' && <div className="relative h-full"><ChatLayout onMessagesRead={handleChatRead} /></div>}
               {activeTab === 'VideoConf' && <VideoConferenceComponent />}
+              {activeTab === 'mail' && canMail && <MyMailbox />}
             </motion.div>
           </div>
         </main>

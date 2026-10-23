@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { CheckCircle2, Mail, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info, Mail, XCircle } from 'lucide-react';
 import { Button, Card } from '../../UI';
 import ShowPasswordButton from '../../UI/ShowPasswordButton';
-import { connectMailbox, testMailbox, type MailboxAccount, type MailboxDefaults, type MailboxInput } from '../../../lib/mailboxApi';
+import {
+  connectMailbox, findMailServers, testMailbox, type MailboxAccount, type MailboxDefaults, type MailboxInput, type MailServers,
+} from '../../../lib/mailboxApi';
 
 const inputClass =
   'w-full rounded-tile border border-border bg-white px-3 py-2 text-[12.5px] text-ink outline-none focus:border-brand disabled:bg-secondary disabled:text-muted-foreground';
@@ -22,7 +24,8 @@ const domainOf = (email: string) => (/^[^\s@]+@([^\s@]+\.[^\s@]+)$/.exec(email.t
 
 /**
  * Connecting your own mailbox: usually just the email address and password, the server being suggested from the
- * company's mail server (or mail.<your domain>). Sending uses the same login on the outgoing server (the same host on
+ * company's mail server, or found by the server from the address's domain (Google, Zoho, mail.<domain>, or where the
+ * domain's mail goes); Microsoft mailboxes can't be connected with a password, which is said before anyone tries. Sending uses the same login on the outgoing server (the same host on
  * cPanel, port 465 SSL/TLS or 587 STARTTLS). Test logs in to both without saving; Connect logs in and saves.
  *
  * With `account`, it changes a connected mailbox's settings: the password can be left empty to keep the saved one.
@@ -51,19 +54,40 @@ export default function MailboxConnect({
   const [busy, setBusy] = useState<'' | 'testing' | 'saving'>('');
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
 
-  const guessed = domainOf(email) ? `mail.${domainOf(email)}` : defaults.imap_host;
+  // where this address's mail is, asked once the typing stops; kept with its domain so an old answer is never used
+  const domain = domainOf(email);
+  const [servers, setServers] = useState<(MailServers & { domain: string }) | null>(null);
+  useEffect(() => {
+    if (!domain) return;
+    let current = true;
+    const timer = setTimeout(() => {
+      findMailServers(email.trim())
+        .then((found) => current && setServers({ ...found, domain }))
+        .catch(() => {}); // the mail.<domain> guess stays
+    }, 500);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [domain]);
+  const found = servers && servers.domain === domain ? servers : null;
+  const unsupported = found?.supported === false;
+
+  const guessed = found?.imap_host || (domain ? `mail.${domain}` : defaults.imap_host);
+  const guessedSmtp = found?.smtp_host || guessed;
   const input: MailboxInput = {
     email: email.trim(),
     password,
     imap_host: (host ?? guessed).trim(),
     imap_port: port,
     username: (username ?? email).trim(),
-    smtp_host: (smtpHost ?? host ?? guessed).trim(),
+    smtp_host: (smtpHost ?? (host !== null ? host : guessedSmtp)).trim(),
     smtp_port: smtpPort,
   };
   // changing settings: an empty password keeps the saved one
   if (account && !password) delete input.password;
-  const ready = Boolean(input.email && (password || account) && input.imap_host);
+  const ready = Boolean(input.email && (password || account) && input.imap_host) && !unsupported;
 
   const test = async () => {
     setBusy('testing');
@@ -134,12 +158,27 @@ export default function MailboxConnect({
 
         <p className="text-[11.5px] text-muted-foreground">
           Mail server: <span className="font-semibold text-ink">{input.imap_host || '—'}</span>, port {port}
-          {defaults.from_company_server && host === defaults.imap_host ? ' (from your company’s mail settings)' : ''}; sending through{' '}
+          {defaults.from_company_server && host === defaults.imap_host
+            ? ' (from your company’s mail settings)'
+            : host === null && found?.found === 'mx'
+              ? ' (found from your domain’s mail records)'
+              : ''}
+          ; sending through{' '}
           {input.smtp_host || '—'}, port {smtpPort}.{' '}
           <button type="button" className="text-brand font-semibold hover:underline" onClick={() => setAdvanced((a) => !a)}>
             {advanced ? 'Hide server settings' : 'Change server settings'}
           </button>
         </p>
+
+        {found?.note && (
+          <p
+            role="note"
+            className={`flex items-start gap-1.5 rounded-tile border px-3 py-2 text-[12px] ${unsupported ? 'border-status-danger/30 bg-status-danger/5 text-status-danger' : 'border-border bg-secondary text-ink'}`}
+          >
+            {unsupported ? <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden /> : <Info className="w-4 h-4 shrink-0 text-brand" aria-hidden />}
+            {found.note}
+          </p>
+        )}
 
         {advanced && (
           <div className="grid gap-3 sm:grid-cols-2 rounded-tile border border-border p-3">
@@ -159,7 +198,7 @@ export default function MailboxConnect({
             <Field label="Outgoing mail server (SMTP)" hint="Usually the same as the incoming server. Uses the same username and password.">
               <input
                 className={inputClass}
-                value={smtpHost ?? host ?? guessed}
+                value={smtpHost ?? (host !== null ? host : guessedSmtp)}
                 onChange={(e) => setSmtpHost(e.target.value)}
                 aria-label="Outgoing mail server"
               />
