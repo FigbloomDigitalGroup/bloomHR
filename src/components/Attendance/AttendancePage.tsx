@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { PageHeader, TabBar, type TabBarItem } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import { loadAttendanceAccess, type AttendanceAccess } from '../../lib/attendanceApi';
-import AttendanceDays from './AttendanceDays';
+import AttendanceViews from './AttendanceViews';
 import WorkSchedules from './WorkSchedules';
 import Scanners from './Scanners';
 import MissedScanApprovals from './MissedScanApprovals';
@@ -43,7 +43,7 @@ export default function AttendancePage() {
     <div className="min-w-0 p-4 sm:p-6">
       <PageHeader title="Attendance" subtitle="Clock-ins measured against each person's work schedule" />
       {tabs.length > 1 && <TabBar items={tabs} activeId={tab} onChange={(id) => setTab(id as TabId)} className="mb-4" />}
-      {tab === 'days' && <AttendanceDays access={access} />}
+      {tab === 'days' && <AttendanceViews access={access} />}
       {tab === 'schedule' && access.schedules && <WorkSchedules />}
       {tab === 'scanners' && access.manages && <Scanners />}
       {tab === 'missed' && (access.manages || access.team.length > 0) && <MissedScanApprovals />}

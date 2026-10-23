@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 type Row = Record<string, unknown>;
@@ -40,11 +40,22 @@ vi.mock('react-router-dom', async (orig) => ({
   ...(await orig<typeof import('react-router-dom')>()),
   useNavigate: () => state.navigate,
 }));
+const attendance = vi.hoisted(() => ({
+  loadAttendanceAccess: vi.fn(),
+  loadAttendanceDays: vi.fn(),
+  directory: [] as unknown[],
+}));
+vi.mock('../../lib/attendanceApi', () => ({
+  loadAttendanceAccess: attendance.loadAttendanceAccess,
+  loadAttendanceDays: attendance.loadAttendanceDays,
+}));
+vi.mock('../../lib/employeeDirectory', () => ({ loadEmployeeDirectory: () => Promise.resolve(attendance.directory) }));
 vi.mock('./GetStarted', () => ({ default: () => null, SHOW_SETUP_GUIDE: 'show-setup-guide' }));
 vi.mock('./GroupOverview', () => ({ default: () => null }));
 vi.mock('../Celebrations/BirthdayWishes', () => ({ TodaysBirthdayWishes: () => null }));
 
 import DashboardMain from './Dashboard';
+import { addDays, nairobiToday } from '../../lib/attendance';
 
 const open = () =>
   render(
@@ -73,6 +84,10 @@ beforeEach(() => {
   state.people = [];
   state.modules = ['settings', 'employees'];
   state.navigate.mockReset();
+  // nobody sees attendance unless a test says so
+  attendance.loadAttendanceAccess.mockReset().mockResolvedValue({ seesAll: false, manages: false, schedules: false, employeeNumber: null, team: [] });
+  attendance.loadAttendanceDays.mockReset().mockResolvedValue([]);
+  attendance.directory = [];
 });
 afterEach(() => {
   cleanup();
@@ -272,5 +287,107 @@ describe('Dashboard: Analytics', () => {
     expect(await within(analytics).findByText('No leave data')).toBeTruthy();
     expect(within(analytics).getAllByText('No employee data')).toHaveLength(2);
     expect(within(analytics).getByText('Nobody joined or left this year')).toBeTruthy();
+  });
+});
+
+describe('Dashboard: attendance (FIG-1203)', () => {
+  beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const HR = { seesAll: true, manages: true, schedules: true, employeeNumber: 'E-HR', team: [] as string[] };
+  const MANAGER = { seesAll: false, manages: false, schedules: false, employeeNumber: 'E-LEAD', team: ['E1'] };
+  const day = (employeeNumber: string, d: string, fields: Record<string, unknown> = {}) => ({
+    employeeNumber, day: d, status: null, clockIn: null, clockOut: null, hours: null, lateMinutes: null, source: null, note: null, counted: true, ...fields,
+  });
+  const today = () => nairobiToday();
+  const someDays = () => {
+    const t = today();
+    const y = addDays(t, -1);
+    return [
+      day('E1', t, { status: 'present', clockIn: `${t}T05:00:00Z` }),
+      day('E2', t, { status: 'late', clockIn: `${t}T06:00:00Z`, lateMinutes: 30 }),
+      day('E3', t, { status: null }),
+      day('E4', t, { status: 'leave' }),
+      day('E1', y, { status: 'present', clockIn: `${y}T05:00:00Z` }),
+      day('E2', y, { status: 'absent' }),
+    ];
+  };
+  const card = () => screen.findByTestId('attendance-today-card');
+
+  it('shows HR today’s attendance on Overview, linking to the Attendance page', async () => {
+    attendance.loadAttendanceAccess.mockResolvedValue(HR);
+    attendance.loadAttendanceDays.mockResolvedValue(someDays());
+    open();
+    const c = await card();
+    expect(within(c).getByText('Attendance today')).toBeTruthy();
+    await within(c).findByText('Average arrival 8:30 am');
+    const figure = (label: string) => (within(c).getByText(label).closest('.rounded-card') as HTMLElement).textContent;
+    expect(figure('In')).toContain('2');
+    expect(figure('Late')).toContain('1');
+    expect(figure('Not in yet')).toContain('1');
+    expect(figure('On leave')).toContain('1');
+    const range = attendance.loadAttendanceDays.mock.calls[0] as [string, string];
+    expect(range[1]).toBe(today());
+    fireEvent.click(within(c).getByRole('button', { name: 'Open attendance →' }));
+    expect(state.navigate).toHaveBeenCalledWith('/attendance');
+  });
+
+  it('shows the Attendance section on Analytics', async () => {
+    attendance.loadAttendanceAccess.mockResolvedValue(HR);
+    attendance.loadAttendanceDays.mockResolvedValue(someDays());
+    attendance.directory = [{ employeeNumber: 'E2', fullName: 'Baraka Juma', department: 'Ops' }];
+    open();
+    fireEvent.click(await screen.findByRole('button', { name: 'Analytics' }));
+    const section = await screen.findByTestId('attendance-analytics');
+    expect(await within(section).findByText('Attendance rate, last 30 days')).toBeTruthy();
+    expect(within(section).getByText('50%')).toBeTruthy();
+    expect(within(section).getByText('Punctuality')).toBeTruthy();
+    expect(within(section).getByText('Average arrival')).toBeTruthy();
+    expect(within(section).getByRole('list', { name: 'Late arrivals by weekday' })).toBeTruthy();
+    const top = within(section).getByRole('list', { name: 'Most late arrivals this month' });
+    expect(within(top).getByText('Baraka Juma')).toBeTruthy();
+    expect(within(section).getByRole('list', { name: 'Attendance rate by department' })).toBeTruthy();
+    expect(screen.queryByTestId('attendance-today-card')).toBeNull();
+  });
+
+  it('labels a manager’s figures as their team’s', async () => {
+    state.modules = ['team-work'];
+    attendance.loadAttendanceAccess.mockResolvedValue(MANAGER);
+    attendance.loadAttendanceDays.mockResolvedValue(someDays());
+    open();
+    const c = await card();
+    expect(await within(c).findByText('Your team: attendance today')).toBeTruthy();
+  });
+
+  it('is hidden from someone who cannot open Attendance, without asking for it', async () => {
+    state.modules = ['settings'];
+    open();
+    await screen.findByText('Company Updates');
+    expect(screen.queryByTestId('attendance-today-card')).toBeNull();
+    expect(attendance.loadAttendanceAccess).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Analytics' }));
+    expect(screen.queryByTestId('attendance-analytics')).toBeNull();
+  });
+
+  it('is hidden when the database says they see nobody’s attendance', async () => {
+    open();
+    await screen.findByText('Company Updates');
+    await waitFor(() => expect(attendance.loadAttendanceAccess).toHaveBeenCalled());
+    expect(screen.queryByTestId('attendance-today-card')).toBeNull();
+    expect(attendance.loadAttendanceDays).not.toHaveBeenCalled();
+  });
+
+  it('says how to start before anyone has clocked in', async () => {
+    attendance.loadAttendanceAccess.mockResolvedValue(HR);
+    attendance.loadAttendanceDays.mockResolvedValue([day('E1', today(), { status: null })]);
+    open();
+    const c = await card();
+    expect(await within(c).findByText('No attendance yet')).toBeTruthy();
+    fireEvent.click(within(c).getByRole('button', { name: 'Set up attendance' }));
+    expect(state.navigate).toHaveBeenCalledWith('/attendance');
   });
 });
