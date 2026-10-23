@@ -33,5 +33,6 @@ export const ACCOUNT_SETTINGS: AccountSettings = {
 
 export type EnvironmentName = 'staging' | 'production';
 
-// The app door scanners send punches to (its /iclock/* receiver). The scanner relay forwards to it over HTTPS.
-export const APP_HOST = 'bloom-hr-phi.vercel.app';
+// The app door scanners send punches to (its /iclock/* receiver). The scanner relay forwards to it over HTTPS. Use the
+// app's own domain, not bloom-hr-phi.vercel.app: if that address ever redirects, CloudFront won't follow it.
+export const APP_HOST = 'hr.figbloom.org';
