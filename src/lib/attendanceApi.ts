@@ -213,6 +213,29 @@ export async function loadDayScans(employeeNumber: string, date: string): Promis
   return ((data ?? []) as Record<string, unknown>[]).map(toScan);
 }
 
+/**
+ * Why people clocked in or out with the app rather than a scanner on one date (attendance_logs.web_reason, migration
+ * 20261025000000), by employee number. Read straight from attendance_logs, whose own rules show the same people
+ * attendance_days does; empty when it can't be read (the reason is extra, never needed).
+ */
+export async function loadWebReasons(date: string): Promise<Map<string, string>> {
+  try {
+    const { data, error } = await supabase
+      .from('attendance_logs')
+      .select('employee_number, web_reason')
+      .eq('work_date', date)
+      .not('web_reason', 'is', null);
+    if (error) return new Map();
+    return new Map(
+      ((data ?? []) as { employee_number: string | null; web_reason: string | null }[])
+        .filter((r) => r.employee_number && r.web_reason)
+        .map((r) => [String(r.employee_number), String(r.web_reason)])
+    );
+  } catch {
+    return new Map();
+  }
+}
+
 /** One row per person per day from `from` to `to` (one person's when given): who the signed-in person may see. */
 export async function loadAttendanceDays(from: string, to: string, employeeNumber?: string): Promise<AttendanceDay[]> {
   const rows = await fetchAll<Record<string, unknown>>((a, b) =>

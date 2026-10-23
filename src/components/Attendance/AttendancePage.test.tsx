@@ -21,6 +21,7 @@ const api = vi.hoisted(() => ({
   saveClockInSettings: vi.fn(),
   loadScannerAddresses: vi.fn(),
   loadBranchLocations: vi.fn(),
+  loadWebReasons: vi.fn(),
 }));
 const downloadCsv = vi.hoisted(() => vi.fn());
 const people = vi.hoisted(() => ({ list: [] as unknown[] }));
@@ -65,6 +66,12 @@ const DAYS = [
 
 const rowOf = (name: string) => screen.getByText(name).closest('tr') as HTMLElement;
 
+/** The page opens on Today (FIG-1203); these tests are about the summary over a range of dates, one click away. */
+const renderRange = async () => {
+  render(<AttendancePage />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Date range' }));
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   people.list = [person('E1', 'Amina Otieno', 'Sales', 'Nairobi HQ'), person('E2', 'Baraka Juma', 'Ops', 'Dar es Salaam')];
@@ -77,6 +84,7 @@ beforeEach(() => {
   api.loadClockInSettings.mockResolvedValue({ policy: 'anywhere', networks: [], radiusM: 300 });
   api.loadScannerAddresses.mockResolvedValue([]);
   api.loadBranchLocations.mockResolvedValue([]);
+  api.loadWebReasons.mockResolvedValue(new Map());
   api.loadAttendanceDays.mockResolvedValue(DAYS);
   api.loadSchedules.mockResolvedValue([]);
   api.setAttendanceDay.mockResolvedValue(undefined);
@@ -86,7 +94,7 @@ afterEach(cleanup);
 
 describe('Attendance page', () => {
   it('loads this week and shows each person’s present, late, absent and leave days', async () => {
-    render(<AttendancePage />);
+    await renderRange();
     await screen.findByText('Amina Otieno');
     const week = weekOf(nairobiToday());
     expect(api.loadAttendanceDays).toHaveBeenCalledWith(week.from, week.to);
@@ -99,7 +107,7 @@ describe('Attendance page', () => {
   });
 
   it('filters by branch and search', async () => {
-    render(<AttendancePage />);
+    await renderRange();
     await screen.findByText('Amina Otieno');
     fireEvent.change(screen.getByLabelText('Branch'), { target: { value: 'Dar es Salaam' } });
     expect(screen.queryByText('Amina Otieno')).toBeNull();
@@ -110,14 +118,14 @@ describe('Attendance page', () => {
   });
 
   it('refuses a backwards date range', async () => {
-    render(<AttendancePage />);
+    await renderRange();
     await screen.findByText('Amina Otieno');
     fireEvent.change(screen.getByLabelText('To'), { target: { value: '2020-01-01' } });
     expect(screen.getByRole('alert').textContent).toMatch(/end date must be on or after/);
   });
 
   it('shows one person’s days and HR corrects one, with a note', async () => {
-    render(<AttendancePage />);
+    await renderRange();
     fireEvent.click(await screen.findByRole('button', { name: 'Open days for Amina Otieno' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('8:40 am')).toBeTruthy();
@@ -133,11 +141,12 @@ describe('Attendance page', () => {
     await waitFor(() =>
       expect(api.setAttendanceDay).toHaveBeenCalledWith('E1', '2026-10-21', '2026-10-21T05:10:00.000Z', '2026-10-21T14:00:00.000Z', 'Forgot to clock in')
     );
-    await waitFor(() => expect(api.loadAttendanceDays).toHaveBeenCalledTimes(2));
+    // Today's load, the range's, then the range again after the correction
+    await waitFor(() => expect(api.loadAttendanceDays).toHaveBeenCalledTimes(3));
   });
 
   it('exports the days shown as CSV', async () => {
-    render(<AttendancePage />);
+    await renderRange();
     await screen.findByText('Amina Otieno');
     fireEvent.change(screen.getByLabelText('Department'), { target: { value: 'Sales' } });
     fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
@@ -149,7 +158,7 @@ describe('Attendance page', () => {
   });
 
   it('sets the company schedule and gives a branch its own', async () => {
-    render(<AttendancePage />);
+    await renderRange();
     await screen.findByText('Amina Otieno');
     fireEvent.click(screen.getByRole('button', { name: 'Work schedule' }));
     const company = await screen.findByLabelText('Company schedule');
@@ -168,7 +177,7 @@ describe('Attendance page', () => {
   });
 
   it('sets the day attendance counts from', async () => {
-    render(<AttendancePage />);
+    await renderRange();
     await screen.findByText('Amina Otieno');
     fireEvent.click(screen.getByRole('button', { name: 'Work schedule' }));
     const from = (await screen.findByLabelText('Count attendance from')) as HTMLInputElement;
@@ -192,7 +201,7 @@ describe('Attendance page', () => {
       { at: '2026-10-19T14:05:00Z', via: 'scanner', scannerName: 'Front Door', kind: 'clock_out', reason: null },
       { at: '2026-10-19T16:00:00Z', via: 'scanner', scannerName: 'Front Door', kind: 'held', reason: 'clock_ahead' },
     ]);
-    render(<AttendancePage />);
+    await renderRange();
     await screen.findByText('Amina Otieno');
     expect(within(rowOf('Amina Otieno')).getByText('1 flagged')).toBeTruthy();
     expect(within(rowOf('Baraka Juma')).queryByText(/flagged/)).toBeNull();
@@ -216,7 +225,7 @@ describe('Attendance page', () => {
   });
 
   it('says when a day has no scans, and when the scans can’t be loaded', async () => {
-    render(<AttendancePage />);
+    await renderRange();
     fireEvent.click(await screen.findByRole('button', { name: 'Open days for Amina Otieno' }));
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Show scans for Wed 21 Oct' }));
@@ -234,7 +243,7 @@ describe('Attendance page', () => {
       day('E1', today, { status: 'present', clockIn: twoHoursAgo, lateMinutes: 0 }),
       day('E2', yesterday, { status: 'present', clockIn: `${yesterday}T05:00:00Z`, lateMinutes: 0 }),
     ]);
-    render(<AttendancePage />);
+    await renderRange();
     await screen.findByText('Amina Otieno');
     expect(within(rowOf('Amina Otieno')).getByText(/^2h 1[01]m so far$/)).toBeTruthy();
     expect(within(rowOf('Baraka Juma')).getByText('1 day without a clock-out')).toBeTruthy();
@@ -252,7 +261,7 @@ describe('Attendance page', () => {
       day('E1', today, { status: 'present', clockIn: threeHoursAgo, clockOut: anHourAgo, hours: 2, lateMinutes: 0, source: 'scanner', clockOutVia: 'scanner', endTime: '23:59' }),
       day('E2', today, { status: 'present', clockIn: threeHoursAgo, clockOut: anHourAgo, hours: 2, lateMinutes: 0, source: 'scanner', clockOutVia: 'scanner', endTime: '00:00' }),
     ]);
-    render(<AttendancePage />);
+    await renderRange();
     await screen.findByText('Amina Otieno');
     expect(within(rowOf('Amina Otieno')).getByText(/^(2h 59m|3h 00m) so far$/)).toBeTruthy();
     expect(within(rowOf('Baraka Juma')).getByText('2h 00m')).toBeTruthy();
@@ -271,7 +280,7 @@ describe('Attendance page', () => {
       day('E1', today, { status: 'present', clockIn: threeHoursAgo, clockOut: anHourAgo, hours: 2, lateMinutes: 0, source: 'scanner', clockOutVia: 'app', endTime: '23:59' }),
       day('E2', today, { status: 'present', clockIn: threeHoursAgo, clockOut: anHourAgo, hours: 2, lateMinutes: 0, source: 'hr', clockOutVia: 'hr', endTime: '23:59' }),
     ]);
-    render(<AttendancePage />);
+    await renderRange();
     await screen.findByText('Amina Otieno');
     expect(within(rowOf('Amina Otieno')).getByText('2h 00m')).toBeTruthy();
     expect(within(rowOf('Baraka Juma')).getByText('2h 00m')).toBeTruthy();
@@ -284,7 +293,7 @@ describe('Attendance page', () => {
       day('E1', '2026-10-21', { status: 'present', clockIn: '2026-10-21T05:05:00Z', source: 'scanner' }),
     ]);
     api.loadDayScans.mockResolvedValue([{ at: '2026-10-19T05:05:00Z', via: 'app', scannerName: null, kind: 'clock_in', reason: null }]);
-    render(<AttendancePage />);
+    await renderRange();
     fireEvent.click(await screen.findByRole('button', { name: 'Open days for Amina Otieno' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('App · field')).toBeTruthy();
@@ -302,7 +311,7 @@ describe('Attendance page', () => {
     api.loadAttendanceDays.mockResolvedValue([
       day('E1', '2026-10-19', { status: null, counted: false, clockIn: '2026-10-19T10:00:00Z', clockOut: '2026-10-19T14:00:00Z', hours: 4 }),
     ]);
-    render(<AttendancePage />);
+    await renderRange();
     fireEvent.click(await screen.findByRole('button', { name: 'Open days for Amina Otieno' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Not counted')).toBeTruthy();
@@ -311,7 +320,7 @@ describe('Attendance page', () => {
   });
 
   it('sets the odd-hours clock-in time', async () => {
-    render(<AttendancePage />);
+    await renderRange();
     await screen.findByText('Amina Otieno');
     fireEvent.click(screen.getByRole('button', { name: 'Work schedule' }));
     const until = (await screen.findByLabelText('Odd-hours clock-in before')) as HTMLInputElement;
@@ -332,7 +341,7 @@ describe('Attendance page', () => {
   it('a manager sees their team, without corrections or schedules', async () => {
     api.loadAttendanceAccess.mockResolvedValue(MANAGER);
     api.loadAttendanceDays.mockResolvedValue(DAYS.filter((d) => d.employeeNumber === 'E1'));
-    render(<AttendancePage />);
+    await renderRange();
     await screen.findByText('Amina Otieno');
     expect(screen.getByText('Showing you and the people who report to you.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Work schedule' })).toBeNull();

@@ -70,9 +70,17 @@ export function Sparkline({ values, label }: { values: number[]; label: string }
  * Horizontal bars for comparing a handful of named groups (towns, countries): one colour, the name on the left, the
  * value at the bar's tip. Long names wrap to a fixed column instead of crowding the bars.
  */
-export function BarList({ rows, caption, unit = ['person', 'people'] }: { rows: { name: string; value: number }[]; caption: string; unit?: [string, string] }) {
+export function BarList({ rows, caption, unit = ['person', 'people'], format, max: fixedMax }: {
+  rows: { name: string; value: number }[];
+  caption: string;
+  unit?: [string, string];
+  /** how a value reads at the bar's tip ("86%"); the number by default */
+  format?: (value: number) => string;
+  /** the value a full bar stands for (100 for a percentage); the largest value by default */
+  max?: number;
+}) {
   const colors = useChartColors();
-  const max = Math.max(1, ...rows.map((r) => r.value));
+  const max = fixedMax ?? Math.max(1, ...rows.map((r) => r.value));
   return (
     <ul className="space-y-2" aria-label={caption}>
       {rows.map((r) => (
@@ -85,8 +93,8 @@ export function BarList({ rows, caption, unit = ['person', 'people'] }: { rows: 
             />
           </span>
           <span className="text-[12px] font-semibold text-ink tabular-nums text-right min-w-[2ch]">
-            {r.value.toLocaleString()}
-            <span className="sr-only"> {r.value === 1 ? unit[0] : unit[1]}</span>
+            {format ? format(r.value) : r.value.toLocaleString()}
+            {!format && <span className="sr-only"> {r.value === 1 ? unit[0] : unit[1]}</span>}
           </span>
         </li>
       ))}
