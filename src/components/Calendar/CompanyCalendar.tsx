@@ -20,13 +20,14 @@ import { fetchAllResult } from '../../lib/fetchAll';
 import { PageHeader, Card, Button, Modal } from '../UI';
 import { birthdayMonthDay, toDay } from '../../lib/celebrations';
 import {
-  comingUp, dayKey, holidayDates, holidaysForCountry, myLeaveRanges, myOpenTasks, startOfDay, withCountryTags,
-  type CalendarEntry, type HolidayRow, type LeaveRow, type TaskRow, type UpcomingKind,
+  comingUp, dayKey, holidayDates, holidaysForCountry, leaveDaysTaken, myLeaveRanges, myOpenTasks, startOfDay, withCountryTags,
+  type CalendarEntry, type HolidayRow, type LeaveDayRules, type LeaveRow, type TaskRow, type UpcomingKind,
 } from '../../lib/upcoming';
-import { currentEmployeeNumber, loadMyLeave, loadMyTasks, myHolidayCountry } from '../../lib/upcomingApi';
+import { currentEmployeeNumber, loadMyLeave, loadMyLeaveDayRules, loadMyTasks, myHolidayCountry } from '../../lib/upcomingApi';
 import ComingUpList, { type RangeChoice } from './ComingUpList';
 
 import { confirmDialog } from '../../lib/confirmDialog';
+import { MONDAY_TO_FRIDAY } from '../../lib/workWeek';
 interface BirthdayEntry {
   name: string;
   town?: string;
@@ -82,6 +83,8 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
   const [holidays, setHolidays] = useState<HolidayRow[]>([]);
   const [events, setEvents] = useState<CompanyEvent[]>([]);
   const [myLeave, setMyLeave] = useState<LeaveRow[]>([]);
+  // how their leave is counted, so it is drawn only on the days it takes (no weekends or holidays for annual leave)
+  const [leaveRules, setLeaveRules] = useState<LeaveDayRules>({ workWeek: MONDAY_TO_FRIDAY, calendarTypes: new Set() });
   const [myTasks, setMyTasks] = useState<TaskRow[]>([]);
   // whose tasks are shown: the staff portal's employee, or the signed-in admin's own employee record
   const [taskOwner, setTaskOwner] = useState<string | null>(null);
@@ -128,7 +131,9 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
 
       if (myEmployeeNumber) {
         try {
-          setMyLeave(await loadMyLeave(myEmployeeNumber));
+          const [leave, rules] = await Promise.all([loadMyLeave(myEmployeeNumber), loadMyLeaveDayRules(myEmployeeNumber)]);
+          setMyLeave(leave);
+          setLeaveRules(rules);
         } catch (err) {
           console.error('Error loading your leave for the calendar:', err);
         }
@@ -180,18 +185,19 @@ export default function CompanyCalendar({ readOnly = false, myEmployeeNumber = n
     }
     return map;
   }, [events]);
+  // the holidays on screen: leave counted in working days skips them (only the weeks on screen are drawn)
+  const holidayKeys = useMemo(() => new Set(holidaysByDay.keys()), [holidaysByDay]);
   const myLeaveByDay = useMemo(() => {
     const map = new Map<string, LeaveEntry[]>();
     for (const l of myLeaveRanges(myLeave)) {
       const entry: LeaveEntry = { type: l.type, status: l.pending ? 'pending' : 'approved' };
-      const day = new Date(l.start);
-      for (let i = 0; day <= l.end && i < MAX_LEAVE_DAYS; i++, day.setDate(day.getDate() + 1)) {
+      for (const day of leaveDaysTaken(l, leaveRules, holidayKeys, MAX_LEAVE_DAYS)) {
         const key = dayKey(day);
         map.set(key, [...(map.get(key) || []), entry]);
       }
     }
     return map;
-  }, [myLeave]);
+  }, [myLeave, leaveRules, holidayKeys]);
   const tasksByDay = useMemo(() => {
     const map = new Map<string, DueTask[]>();
     const today = startOfDay(new Date());

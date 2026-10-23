@@ -190,3 +190,38 @@ describe('birthdays on the calendar', () => {
     expect(within(list).queryByText('Old Column')).toBeNull();
   });
 });
+
+describe('my leave on the calendar', () => {
+  // the Monday to Sunday week holding the 15th of the month on screen
+  const monday = new Date(eventDay.getFullYear(), eventDay.getMonth(), 15 - ((eventDay.getDay() + 6) % 7));
+  const ymd = (d: Date) => format(d, 'yyyy-MM-dd');
+  const at = (offset: number) => new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + offset);
+  const leaveIn = (offset: number) => document.querySelector(`[data-day="${ymd(at(offset))}"]`)?.textContent || '';
+
+  const showStaff = () =>
+    render(
+      <MemoryRouter>
+        <CompanyCalendar readOnly myEmployeeNumber="E1" />
+      </MemoryRouter>
+    );
+
+  it('draws leave counted in working days on working days only, and calendar-day leave on every day', async () => {
+    state.tables = {
+      leave_application: [
+        // Friday to the next Monday: the weekend between is not taken
+        { 'Leave Type': 'Annual Leave', 'Start Date': ymd(at(4)), 'End Date': ymd(at(7)), status: 'pending' },
+        { 'Leave Type': 'Maternity Leave', 'Start Date': ymd(at(0)), 'End Date': ymd(at(6)), status: 'approved' },
+      ],
+      leave_types: [{ id: 'lt-a', name: 'Annual Leave' }, { id: 'lt-m', name: 'Maternity Leave' }],
+      current_leave_policies: [{ leave_type_id: 'lt-a', count_days: 'working' }, { leave_type_id: 'lt-m', count_days: 'calendar' }],
+    };
+    showStaff();
+    await screen.findAllByText('My Maternity Leave');
+    expect(leaveIn(4)).toContain('My Annual Leave (pending)');
+    expect(leaveIn(5)).not.toContain('Annual Leave');
+    expect(leaveIn(6)).not.toContain('Annual Leave');
+    expect(leaveIn(7)).toContain('My Annual Leave (pending)');
+    expect(leaveIn(5)).toContain('My Maternity Leave');
+    expect(leaveIn(6)).toContain('My Maternity Leave');
+  });
+});

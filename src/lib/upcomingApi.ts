@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 import { fetchAllResult } from './fetchAll';
-import { holidaysForCountry, type EventRow, type HolidayRow, type LeaveRow, type TaskRow } from './upcoming';
+import { currentUserAndTenant } from './privateFiles';
+import { MONDAY_TO_FRIDAY } from './workWeek';
+import { holidaysForCountry, type EventRow, type HolidayRow, type LeaveDayRules, type LeaveRow, type TaskRow } from './upcoming';
 
 // Reading what the calendar's "Coming up" list and the leave form's hints need. Everyone can read the company's
 // holidays and events; tasks and leave are limited by row-level security, and asked for by employee number here.
@@ -58,6 +60,28 @@ export async function loadMyLeave(employeeNumber: string): Promise<LeaveRow[]> {
     end: l['End Date'],
     status: l.status,
   }));
+}
+
+/**
+ * How this employee's leave is counted, for drawing it on the calendar: their work week (their department's, else the
+ * company's) and the leave types counted in calendar days. Monday to Friday, every type in working days, when unknown.
+ */
+export async function loadMyLeaveDayRules(employeeNumber: string): Promise<LeaveDayRules> {
+  const [week, types, policies] = await Promise.all([
+    currentUserAndTenant()
+      .then(({ tenantId }) => supabase.rpc('work_week_for', { p_tenant: tenantId, p_employee: employeeNumber }))
+      .catch(() => ({ data: null })),
+    supabase.from('leave_types').select('id, name'),
+    supabase.from('current_leave_policies').select('leave_type_id, count_days'),
+  ]);
+  const days = Array.isArray(week.data) && week.data.length === 7 ? (week.data as unknown[]).map(Number) : MONDAY_TO_FRIDAY;
+  const calendarIds = new Set(
+    ((policies.data ?? []) as { leave_type_id: string; count_days: string | null }[]).filter((p) => p.count_days === 'calendar').map((p) => p.leave_type_id)
+  );
+  const calendarTypes = new Set(
+    ((types.data ?? []) as { id: string; name: string | null }[]).filter((t) => calendarIds.has(t.id)).map((t) => (t.name || '').trim().toLowerCase())
+  );
+  return { workWeek: days, calendarTypes };
 }
 
 /** Everyone's name, birthday ('MM-DD': the directory never gives colleagues the year) and work email. */

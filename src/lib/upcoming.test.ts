@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  comingUp, holidayDates, inDaysLabel, leaveHints, myOpenTasks, nextHolidays, shortDay, tasksDuringLeave, type TaskRow,
+  comingUp, holidayDates, inDaysLabel, leaveDaysTaken, leaveHints, myOpenTasks, nextHolidays, shortDay, tasksDuringLeave, type TaskRow,
 } from './upcoming';
 
 const today = new Date(2026, 9, 17); // Sat 17 Oct 2026
@@ -178,5 +178,33 @@ describe('leave planning', () => {
 describe('inDaysLabel', () => {
   it('words the gap', () => {
     expect([0, 1, 12, -1, -3].map(inDaysLabel)).toEqual(['Today', 'Tomorrow', 'in 12 days', 'Yesterday', '3 days ago']);
+  });
+});
+
+describe('leaveDaysTaken', () => {
+  const rules = { workWeek: [1, 1, 1, 1, 1, 0, 0], calendarTypes: new Set(['maternity leave']) };
+  const fri = new Date(2026, 10, 6);
+  const tue = new Date(2026, 10, 10);
+  const days = (type: string, r = rules, holidays = new Set<string>()) =>
+    leaveDaysTaken({ type, start: fri, end: tue }, r, holidays).map((d) => d.getDate());
+
+  it('skips the weekend for leave counted in working days', () => {
+    expect(days('Annual Leave')).toEqual([6, 9, 10]);
+  });
+
+  it('skips public holidays too', () => {
+    expect(days('Annual Leave', rules, new Set(['2026-11-09']))).toEqual([6, 10]);
+  });
+
+  it('takes every day for a type counted in calendar days, whatever its case', () => {
+    expect(days('Maternity Leave ')).toEqual([6, 7, 8, 9, 10]);
+  });
+
+  it("follows the employee's own work week (a half-day Saturday is a working day)", () => {
+    expect(days('Annual Leave', { ...rules, workWeek: [1, 1, 1, 1, 1, 0.5, 0] })).toEqual([6, 7, 9, 10]);
+  });
+
+  it('stops at the most days asked for', () => {
+    expect(leaveDaysTaken({ type: 'Maternity Leave', start: fri, end: tue }, rules, new Set(), 2)).toHaveLength(2);
   });
 });
