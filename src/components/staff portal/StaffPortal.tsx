@@ -112,7 +112,7 @@ interface NotificationItem {
 }
 
 /** hr_notifications that are for HR, not the employee */
-const HR_ONLY_NOTIFICATIONS = ['contract_expiring', 'probation_expiring', 'leave_recommended', 'exit_requested', 'application_received', 'loan_requested', 'contract_signed', 'leave_exhausted', 'casual_limit', 'leave_document_overdue', 'contribution_requested', 'onboarding_followups_overdue', 'attendance_odd_hours', 'missed_scan_requested'];
+const HR_ONLY_NOTIFICATIONS = ['contract_expiring', 'probation_expiring', 'leave_recommended', 'exit_requested', 'application_received', 'loan_requested', 'contract_signed', 'leave_exhausted', 'casual_limit', 'leave_document_overdue', 'contribution_requested', 'onboarding_followups_overdue', 'attendance_odd_hours', 'missed_scan_requested', 'payment_due', 'requisition_requested'];
 
 /** Marks an hr_notifications item ("hr-<id>") read, so it stays cleared; warnings are not stored as read. */
 const persistRead = (id: string) => {

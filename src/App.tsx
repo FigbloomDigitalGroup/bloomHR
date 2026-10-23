@@ -59,6 +59,7 @@ const BranchesPage = lazy(() => import('./components/Settings/Branches'));
 const AuditTrailPage = lazy(() => import('./components/Settings/AuditTrail'));
 const SalaryAdvanceAdmin = lazy(() => import('./components/Settings/SalaryAdmin'));
 const LoansAdmin = lazy(() => import('./components/Loans/LoansAdmin'));
+const PaymentsToMake = lazy(() => import('./components/Payments/PaymentsToMake'));
 const CasualWorkers = lazy(() => import('./components/Casual/CasualWorkers'));
 const LeaveDisciplinePage = lazy(() => import('./components/LeaveDiscipline/LeaveDisciplinePage'));
 const AttendancePage = lazy(() => import('./components/Attendance/AttendancePage'));
@@ -1076,6 +1077,7 @@ function App() {
                                 {gate('/piece-rate', <PieceRatePage />)}
                                 {gate('/overtime', <OvertimePage />)}
                                 {gate('/loans', <LoansAdmin />)}
+                                {gate('/payments', <PaymentsToMake />)}
                                 {gate('/incident-reports', <IncidentReportsManagement />)}
                                 {gate('/work-injuries', <WorkInjuries />)}
                                 {gate('/adminconfirm', <StaffSignupRequests />)}

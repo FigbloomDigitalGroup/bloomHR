@@ -108,6 +108,8 @@ export const SCREENS: ScreenAccess[] = [
   S('/salaryadmin', 'Salary Advance', ['salaryadmin']),
   S('/loans', 'Loans', ['payroll', 'loans']),
   sub('/loanadmin', 'Loan requests', ['payroll', 'loans']),
+  // finance pays what was approved; HR raises and approves requisitions there
+  S('/payments', 'Payments to make', ['payments', 'requisitions']),
   S('/asset', 'Assets', ['asset']),
   sub('/asset/scan', 'Scan an asset', ['asset']),
   S('/mpesa-zap', 'Mpesa Zap', ['mpesa-zap']),

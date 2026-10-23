@@ -43,7 +43,8 @@ export interface HRNotification {
         | 'onboarding_followups_overdue'
         | 'leave_reopened'
         | 'attendance_odd_hours'
-        | 'missed_scan_requested' | 'missed_scan_request' | 'missed_scan_approved' | 'missed_scan_declined';
+        | 'missed_scan_requested' | 'missed_scan_request' | 'missed_scan_approved' | 'missed_scan_declined'
+        | 'payment_due' | 'payment_made' | 'requisition_requested' | 'requisition_approved' | 'requisition_rejected';
     title: string;
     message: string;
     // Nullable for leave notifications - only contract/probation reminders
