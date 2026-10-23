@@ -7,12 +7,15 @@ import {
   employeesNamed,
   idDigits,
   nameKey,
+  PUNCH_MODES,
+  punchModeLabel,
   scannerError,
   scannerServers,
   seenLabel,
   serialLooksRight,
   suggestMatches,
   suggestScannerMatches,
+  toScanner,
 } from './attendanceScanners';
 
 const people = (...numbers: string[]) => numbers.map((employeeNumber) => ({ employeeNumber }));
@@ -145,5 +148,25 @@ describe('helpers', () => {
   it('where scanners connect: the relay host when set, and this app', () => {
     expect(scannerServers('https://scanners.example.com/', 'hr.example.com')).toEqual({ relay: 'scanners.example.com', app: 'hr.example.com' });
     expect(scannerServers('', 'hr.example.com')).toEqual({ relay: null, app: 'hr.example.com' });
+  });
+});
+
+describe('scanner modes', () => {
+  it('reads the mode, first and last scan when missing or unknown', () => {
+    expect(toScanner({ id: 'd1', punch_mode: 'out_only' }).punchMode).toBe('out_only');
+    expect(toScanner({ id: 'd1' }).punchMode).toBe('first_last');
+    expect(toScanner({ id: 'd1', punch_mode: 'sometimes' }).punchMode).toBe('first_last');
+  });
+
+  it('names each mode in plain words', () => {
+    expect(PUNCH_MODES.map((m) => m.value)).toEqual(['first_last', 'in_only', 'out_only', 'device_keys']);
+    expect(PUNCH_MODES.map((m) => m.description)).toEqual([
+      'First scan of the day is the clock-in, the last is the clock-out (one shared door)',
+      'Clock-in only (an entrance device)',
+      'Clock-out only (an exit device)',
+      'Use the scanner’s In/Out keys',
+    ]);
+    expect(punchModeLabel('device_keys')).toBe('In/Out keys');
+    expect(punchModeLabel(null)).toBe('First and last scan');
   });
 });

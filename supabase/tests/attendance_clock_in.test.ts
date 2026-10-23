@@ -311,6 +311,8 @@ describe('the migration', () => {
     // 20261023800000 added a column to the days (the odd-hours flag): the older versions can only be created again
     // once it is gone, and running it again afterwards puts it back
     await db.exec(`drop function public.attendance_days_for(uuid, date, date, text, date); drop function public.attendance_days(date, date, text);`);
+    // and 20261025300000 added columns to attendance_day_scans, which 20261023800000 creates
+    await db.exec(`drop function public.attendance_day_scans(text, date);`);
     await db.exec(readFileSync(MIGRATION, 'utf8'));
     await db.exec(readFileSync(TRACKING_MIGRATION, 'utf8'));
     await db.exec(readFileSync(ODD_HOURS_MIGRATION, 'utf8'));

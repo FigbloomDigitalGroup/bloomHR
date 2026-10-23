@@ -289,6 +289,9 @@ describe('the migration', () => {
       settings: await rows(`select tenant_id, tracking_from::text, odd_hours_until::text from attendance_settings order by tenant_id`),
     });
     const before = await snapshot();
+    // 20261025300000 added columns to attendance_day_scans (verify, status, mode): this version can only be created
+    // again once it is gone
+    await db.exec(`drop function public.attendance_day_scans(text, date);`);
     await db.exec(readFileSync(MIGRATION, 'utf8'));
     await db.exec('reset search_path');
     expect(await snapshot()).toEqual(before);
