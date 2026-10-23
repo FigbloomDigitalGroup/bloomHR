@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
 const perms = vi.hoisted(() => ({ granted: null as string[] | null }));
@@ -9,6 +9,14 @@ vi.mock('../../hooks/usePermissions', () => ({
     hasAnyPermission: (ps: string[]) => !perms.granted || ps.some((p) => perms.granted!.includes(p)),
     loading: false,
   }),
+}));
+// the new-mail count (its asking is tested in useMailboxUnread.test.tsx): what the sidebar was given, and the count
+const mail = vi.hoisted(() => ({ unread: 0, calls: [] as [boolean, string | undefined][] }));
+vi.mock('../../hooks/useMailboxUnread', () => ({
+  useMailboxUnread: (enabled: boolean, who: string | undefined) => {
+    mail.calls.push([enabled, who]);
+    return enabled ? mail.unread : 0;
+  },
 }));
 vi.mock('../../hooks/useMyPreferences', () => ({
   useMyPreferences: () => ({ data: null }),
@@ -166,5 +174,58 @@ describe('Job groups in the menu', () => {
     perms.granted = ['dashboard', 'leaves'];
     sidebar();
     expect(screen.queryByText('Job groups')).toBeNull();
+  });
+});
+
+describe('new mail on Email Portal', () => {
+  const sidebar = (collapsed = false) =>
+    render(
+      <MemoryRouter>
+        <Sidebar user={{ email: 'mary@co.com', role: 'HR' }} isCollapsed={collapsed} onToggle={() => {}} />
+      </MemoryRouter>,
+    );
+  const portal = () => screen.getByText('Email Portal').closest('button') as HTMLElement;
+  beforeEach(() => {
+    setWidth(1280);
+    mail.unread = 0;
+    mail.calls = [];
+  });
+  afterEach(() => {
+    perms.granted = null;
+  });
+
+  it('shows the unread count (99+ past 99) for people with the My mailbox module', () => {
+    perms.granted = ['mailbox'];
+    mail.unread = 7;
+    sidebar();
+    expect(portal().textContent).toBe('Email Portal7');
+    expect(within(portal()).getByTitle('7 unread')).toBeTruthy();
+    expect(mail.calls.at(-1)).toEqual([true, 'mary@co.com']);
+    cleanup();
+    mail.unread = 120;
+    sidebar();
+    expect(portal().textContent).toBe('Email Portal99+');
+  });
+
+  it('hides at 0', () => {
+    perms.granted = ['mailbox'];
+    sidebar();
+    expect(portal().textContent).toBe('Email Portal');
+  });
+
+  it('a dot on the collapsed sidebar', () => {
+    perms.granted = ['mailbox'];
+    mail.unread = 2;
+    sidebar(true);
+    const icon = document.querySelector('[aria-label="2 unread"]');
+    expect(icon).toBeTruthy();
+  });
+
+  it('is not asked for without the module (sending only)', () => {
+    perms.granted = ['email-portal'];
+    mail.unread = 7;
+    sidebar();
+    expect(portal().textContent).toBe('Email Portal');
+    expect(mail.calls.every(([enabled]) => enabled === false)).toBe(true);
   });
 });

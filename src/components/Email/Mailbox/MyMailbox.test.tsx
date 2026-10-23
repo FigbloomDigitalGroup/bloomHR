@@ -14,10 +14,15 @@ const api = vi.hoisted(() => ({
   getMessage: vi.fn(),
   downloadAttachment: vi.fn(),
   sendMail: vi.fn(),
+  setFlags: vi.fn(),
+  moveMessages: vi.fn(),
+  deleteMessages: vi.fn(),
+  searchMessages: vi.fn(),
 }));
 const perms = vi.hoisted(() => ({ list: ['mailbox'] as string[] }));
 const confirm = vi.hoisted(() => ({ answer: true }));
-vi.mock('../../../lib/mailboxApi', () => ({ ...api, MAX_UPLOAD_BYTES: 3 * 1024 * 1024, MAX_SEND_BYTES: 20 * 1024 * 1024, MAX_RECIPIENTS: 50 }));
+// the real folder helpers (findTrash, findArchive), the calls to the server mocked
+vi.mock('../../../lib/mailboxApi', async (actual) => ({ ...(await actual<Record<string, unknown>>()), ...api }));
 vi.mock('../../../lib/confirmDialog', () => ({ confirmDialog: async () => confirm.answer }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../../../hooks/usePermissions', () => ({
@@ -76,6 +81,10 @@ beforeEach(() => {
   api.getMessage.mockResolvedValue({ message: MESSAGE });
   api.downloadAttachment.mockResolvedValue(undefined);
   api.sendMail.mockResolvedValue({ ok: true, saved_to_sent: true, sent_folder: 'Sent', rejected: [], message: 'Sent.' });
+  api.setFlags.mockResolvedValue({ ok: true });
+  api.moveMessages.mockResolvedValue({ ok: true });
+  api.deleteMessages.mockResolvedValue({ ok: true, permanent: false, trash: 'Trash' });
+  api.searchMessages.mockResolvedValue({ folder: 'INBOX', q: 'pay', page: 1, page_size: 50, total: 1, capped: false, has_more: false, messages: [ITEMS[0]] });
   vi.mocked(toast.success).mockReset();
   vi.mocked(toast.error).mockReset();
 });
@@ -408,5 +417,174 @@ describe('sending', () => {
     expect('password' in input).toBe(false);
     expect(toast.error).toHaveBeenCalledWith("Your mailbox is connected, but sending doesn't work yet: Your mail server refused your password for sending.");
     expect(await screen.findByRole('button', { name: 'New message' })).toBeTruthy();
+  });
+});
+
+describe('managing mail', () => {
+  const MANY_FOLDERS = [
+    ...FOLDERS,
+    { path: 'Projects', name: 'Projects', special: null, unread: 0, total: 0, delimiter: '/' },
+    { path: 'Trash', name: 'Trash', special: 'trash', unread: 0, total: 3, delimiter: '/' },
+  ];
+  const ITEMS3 = [...ITEMS, { ...ITEMS[1], uid: 10, subject: 'Old news', seen: true }];
+
+  beforeEach(() => {
+    api.getMailbox.mockResolvedValue({ account: ACCOUNT, defaults: DEFAULTS });
+    api.listFolders.mockResolvedValue({ folders: MANY_FOLDERS });
+    api.listMessages.mockResolvedValue({ folder: 'INBOX', page: 1, page_size: 50, total: 3, has_more: false, messages: ITEMS3 });
+  });
+
+  const toolbar = () => screen.getByRole('toolbar', { name: 'Selected emails' });
+  const list = () => screen.getByRole('region', { name: /messages$/ });
+  const select = (subject: string) => fireEvent.click(screen.getByLabelText(`Select ${subject}`));
+
+  it('multi-select: the toolbar marks read and unread, flags, moves and deletes the chosen emails', async () => {
+    render(<MyMailbox />);
+    await screen.findByText('October payslip');
+    await waitFor(() => expect(within(screen.getByRole('navigation', { name: 'Folders' })).getByText('Projects')).toBeTruthy());
+    expect(within(toolbar()).getByText(/Select emails to act on several/)).toBeTruthy();
+    select('October payslip');
+    select('Lunch');
+    expect(within(toolbar()).getByText('2 selected')).toBeTruthy();
+
+    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Mark read' }));
+    await waitFor(() => expect(api.setFlags).toHaveBeenCalledWith('INBOX', [12, 11], { seen: true }));
+    // read now: not bold, and the Inbox's count went down
+    await waitFor(() => expect(within(list()).getByText('October payslip').className).not.toContain('font-bold'));
+    expect(within(screen.getByRole('navigation', { name: 'Folders' })).queryByText('1')).toBeNull();
+
+    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Mark unread' }));
+    await waitFor(() => expect(api.setFlags).toHaveBeenLastCalledWith('INBOX', [12, 11], { seen: false }));
+    await waitFor(() => expect(within(list()).getByText('Lunch').className).toContain('font-bold'));
+
+    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Flag' }));
+    await waitFor(() => expect(api.setFlags).toHaveBeenLastCalledWith('INBOX', [12, 11], { flagged: true }));
+    // all flagged: the same button unflags
+    fireEvent.click(await within(toolbar()).findByRole('button', { name: 'Unflag' }));
+    await waitFor(() => expect(api.setFlags).toHaveBeenLastCalledWith('INBOX', [12, 11], { flagged: false }));
+
+    // move: a folder picker of the other folders
+    const picker = within(toolbar()).getByLabelText('Move to…') as HTMLSelectElement;
+    expect([...picker.options].map((o) => o.value)).toEqual(['', 'Sent', 'Projects', 'Trash']);
+    fireEvent.change(picker, { target: { value: 'Projects' } });
+    await waitFor(() => expect(api.moveMessages).toHaveBeenCalledWith('INBOX', [12, 11], 'Projects'));
+    await waitFor(() => expect(within(list()).queryByText('October payslip')).toBeNull());
+    expect(toast.success).toHaveBeenCalledWith('Moved 2 emails to Projects.');
+    expect(within(list()).getByText('Old news')).toBeTruthy();
+
+    // delete outside Trash: to Trash, no question asked
+    select('Old news');
+    confirm.answer = false;
+    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(api.deleteMessages).toHaveBeenCalledWith('INBOX', [10], false));
+    expect(toast.success).toHaveBeenCalledWith('Moved 1 email to Trash.');
+  });
+
+  it('in Trash, Delete asks "Delete permanently?" first, and only then deletes for good', async () => {
+    const dialog = await import('../../../lib/confirmDialog');
+    const spy = vi.spyOn(dialog, 'confirmDialog');
+    api.deleteMessages.mockResolvedValue({ ok: true, permanent: true, trash: 'Trash' });
+    render(<MyMailbox />);
+    await waitFor(() => expect(within(screen.getByRole('navigation', { name: 'Folders' })).getByText('Trash')).toBeTruthy());
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Folders' })).getByText('Trash'));
+    await waitFor(() => expect(api.listMessages).toHaveBeenLastCalledWith('Trash', 1));
+    select(await screen.findByText('Lunch').then(() => 'Lunch'));
+    confirm.answer = false;
+    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith(expect.objectContaining({ title: 'Delete permanently?', tone: 'danger' })));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(api.deleteMessages).not.toHaveBeenCalled();
+    confirm.answer = true;
+    fireEvent.click(within(toolbar()).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(api.deleteMessages).toHaveBeenCalledWith('Trash', [11], true));
+    expect(toast.success).toHaveBeenCalledWith('Deleted 1 email permanently.');
+    spy.mockRestore();
+  });
+
+  it('a star per message flags and unflags it', async () => {
+    render(<MyMailbox />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Flag October payslip' }));
+    await waitFor(() => expect(api.setFlags).toHaveBeenCalledWith('INBOX', [12], { flagged: true }));
+    const star = await screen.findByRole('button', { name: 'Unflag October payslip' });
+    expect(star.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(star);
+    await waitFor(() => expect(api.setFlags).toHaveBeenLastCalledWith('INBOX', [12], { flagged: false }));
+    expect(api.getMessage).not.toHaveBeenCalled();
+  });
+
+  it('the reader: flag, Mark unread (back to the list), and deleting goes on to the next email', async () => {
+    render(<MyMailbox />);
+    fireEvent.click(await screen.findByText('October payslip'));
+    const pane = await screen.findByRole('region', { name: 'Email' });
+    fireEvent.click(await within(pane).findByRole('button', { name: 'Flag' }));
+    await waitFor(() => expect(api.setFlags).toHaveBeenCalledWith('INBOX', [12], { flagged: true }));
+    expect(await within(pane).findByRole('button', { name: 'Unflag' })).toBeTruthy();
+
+    fireEvent.click(within(pane).getByRole('button', { name: 'Mark unread' }));
+    await waitFor(() => expect(api.setFlags).toHaveBeenLastCalledWith('INBOX', [12], { seen: false }));
+    await waitFor(() => expect(within(pane).queryByRole('button', { name: 'Reply' })).toBeNull());
+    expect(within(list()).getByText('October payslip').className).toContain('font-bold');
+
+    // open it again, delete: the next (older) email opens
+    api.getMessage.mockImplementation(async (_f: string, uid: number) => ({ message: { ...MESSAGE, uid, subject: uid === 11 ? 'Lunch' : MESSAGE.subject } }));
+    fireEvent.click(within(list()).getByText('October payslip'));
+    fireEvent.click(await within(pane).findByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(api.deleteMessages).toHaveBeenCalledWith('INBOX', [12], false));
+    await waitFor(() => expect(api.getMessage).toHaveBeenLastCalledWith('INBOX', 11));
+    expect(await within(pane).findByRole('heading', { name: 'Lunch' })).toBeTruthy();
+
+    // moving from the reader: the same
+    fireEvent.change(within(pane).getByLabelText('Move this email to'), { target: { value: 'Projects' } });
+    await waitFor(() => expect(api.moveMessages).toHaveBeenCalledWith('INBOX', [11], 'Projects'));
+    await waitFor(() => expect(api.getMessage).toHaveBeenLastCalledWith('INBOX', 10));
+  });
+
+  it('search: results in the list, with a way back to the folder, and Clear', async () => {
+    render(<MyMailbox />);
+    await screen.findByText('Lunch');
+    fireEvent.change(screen.getByLabelText('Search mail'), { target: { value: '  payslip ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Search filters' }));
+    fireEvent.click(screen.getByLabelText('Unread only'));
+    fireEvent.change(screen.getByLabelText('From date'), { target: { value: '2026-10-01' } });
+    fireEvent.submit(screen.getByRole('search'));
+    await waitFor(() => expect(api.searchMessages).toHaveBeenCalledWith('INBOX', { q: 'payslip', unread: true, since: '2026-10-01' }, 1));
+    expect(await screen.findByRole('status')).toBeTruthy();
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('1 result'));
+    expect(within(list()).queryByText('Lunch')).toBeNull();
+    expect(within(list()).getByText('October payslip')).toBeTruthy();
+
+    // back to the folder
+    api.listMessages.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Inbox' }));
+    await waitFor(() => expect(api.listMessages).toHaveBeenCalledWith('INBOX', 1));
+    expect(await within(list()).findByText('Lunch')).toBeTruthy();
+    expect((screen.getByLabelText('Search mail') as HTMLInputElement).value).toBe('');
+
+    // Clear does the same
+    api.searchMessages.mockResolvedValue({ folder: 'INBOX', q: 'x', page: 1, page_size: 50, total: 500, capped: true, has_more: true, messages: [ITEMS[1]] });
+    fireEvent.change(screen.getByLabelText('Search mail'), { target: { value: 'x' } });
+    fireEvent.submit(screen.getByRole('search'));
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('The newest 500 results'));
+    expect(screen.getByRole('button', { name: 'More results' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
+    expect((screen.getByLabelText('Search mail') as HTMLInputElement).value).toBe('');
+  });
+
+  it('keyboard: j / k move through the list, # deletes, not while typing; the shortcuts are explained', async () => {
+    render(<MyMailbox />);
+    await screen.findByText('Lunch');
+    expect(screen.getByLabelText(/^Keyboard shortcuts: j \/ k next \/ previous email/)).toBeTruthy();
+    fireEvent.keyDown(window, { key: 'j' });
+    await waitFor(() => expect(api.getMessage).toHaveBeenLastCalledWith('INBOX', 12));
+    fireEvent.keyDown(window, { key: 'j' });
+    await waitFor(() => expect(api.getMessage).toHaveBeenLastCalledWith('INBOX', 11));
+    fireEvent.keyDown(window, { key: 'k' });
+    await waitFor(() => expect(api.getMessage).toHaveBeenLastCalledWith('INBOX', 12));
+    // typing in the search box is not a shortcut
+    fireEvent.keyDown(screen.getByLabelText('Search mail'), { key: '#' });
+    expect(api.deleteMessages).not.toHaveBeenCalled();
+    fireEvent.keyDown(window, { key: '#' });
+    await waitFor(() => expect(api.deleteMessages).toHaveBeenCalledWith('INBOX', [12], false));
   });
 });

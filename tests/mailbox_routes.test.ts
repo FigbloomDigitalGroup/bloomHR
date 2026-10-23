@@ -41,6 +41,15 @@ const state = vi.hoisted(() => ({
   smtpRejected: [] as string[],
   appended: [] as { path: string; raw: string; flags: string[] }[],
   appendError: null as Record<string, unknown> | null,
+  // managing mail (PR 3): what the server supports, and what was asked of it
+  capabilities: new Set<string>(['UIDPLUS', 'MOVE']),
+  unflagged: [] as { uid: string; flags: string[] }[],
+  moves: [] as { uid: string; to: string }[],
+  deletes: [] as string[],
+  searches: [] as Record<string, any>[],
+  searchResult: null as number[] | null,
+  statuses: [] as { path: string; query: Record<string, unknown> }[],
+  unseen: 4,
 }));
 
 vi.mock('@supabase/supabase-js', () => {
@@ -131,9 +140,17 @@ vi.mock('imapflow', () => ({
       if (path !== 'INBOX' && !state.folders.some((f) => f.path === path)) throw Object.assign(new Error('NO Mailbox does not exist'), { responseStatus: 'NO' });
       return { path, exists: state.messages.length };
     }
-    async *fetch(range: string, query: Record<string, unknown>) {
+    get capabilities() {
+      return new Map([...state.capabilities].map((c) => [c, true]));
+    }
+    async *fetch(range: string, query: Record<string, unknown>, opts: { uid?: boolean } = {}) {
       state.fetchRanges.push(range);
       state.fetchQueries.push(query);
+      if (opts.uid) {
+        const uids = range.split(',').map(Number);
+        for (const m of state.messages) if (uids.includes(m.uid)) yield { ...m, source: undefined };
+        return;
+      }
       const [from, to] = range.split(':').map(Number);
       for (const m of state.messages) if (m.seq >= from && m.seq <= to) yield { ...m, source: undefined };
     }
@@ -147,6 +164,27 @@ vi.mock('imapflow', () => ({
     async messageFlagsAdd(uid: string, flags: string[]) {
       state.flagged.push({ uid, flags });
       return true;
+    }
+    async messageFlagsRemove(uid: string, flags: string[]) {
+      state.unflagged.push({ uid, flags });
+      return true;
+    }
+    async messageMove(uid: string, to: string) {
+      state.moves.push({ uid, to });
+      return { path: 'x', destination: to };
+    }
+    async messageDelete(uid: string) {
+      state.deletes.push(uid);
+      return true;
+    }
+    async search(query: Record<string, any>) {
+      state.searches.push(query);
+      if (query.deleted) return state.messages.filter((m) => m.flags.has('\\Deleted')).map((m) => m.uid);
+      return state.searchResult ?? state.messages.map((m) => m.uid);
+    }
+    async status(path: string, query: Record<string, unknown>) {
+      state.statuses.push({ path, query });
+      return { path, unseen: state.unseen };
     }
     async download(uid: string, part: string, options: Record<string, unknown>) {
       state.downloads.push({ uid, part, options });
@@ -278,6 +316,14 @@ beforeEach(() => {
   state.smtpRejected = [];
   state.appended = [];
   state.appendError = null;
+  state.capabilities = new Set(['UIDPLUS', 'MOVE']);
+  state.unflagged = [];
+  state.moves = [];
+  state.deletes = [];
+  state.searches = [];
+  state.searchResult = null;
+  state.statuses = [];
+  state.unseen = 4;
   state.parsed = {
     subject: 'Your payslip',
     from: { value: [{ name: 'Payroll', address: 'payroll@client.co.ke' }] },
@@ -867,5 +913,280 @@ describe('sending', () => {
       expect([secret, all.includes(secret)]).toEqual([secret, false]);
     }
     expect(state.smtpOptions.every((o) => o.logger === false && o.debug === false)).toBe(true);
+  });
+});
+
+describe('managing mail', () => {
+  const post = (path: string, body: Row, token = 'hr-id') => call('POST', path, token, body);
+  const get = (path: string, token = 'hr-id') => call('GET', path, token);
+
+  beforeEach(async () => {
+    await connect('hr-id', { password: 'hr-pass' });
+    await connect('admin-id', { password: 'admin-pass' });
+    state.imapOptions = [];
+    state.logouts = 0;
+    state.opened = [];
+  });
+
+  it('needs a session, the module and a connected mailbox; never touches IMAP otherwise', async () => {
+    const calls: [string, string, Row | undefined][] = [
+      ['POST', '/flags', { folder: 'INBOX', uids: [101], seen: true }],
+      ['POST', '/move', { folder: 'INBOX', uids: [101], to: 'Projects' }],
+      ['POST', '/delete', { folder: 'INBOX', uids: [101] }],
+      ['GET', '/search?q=pay', undefined],
+      ['GET', '/unread', undefined],
+    ];
+    for (const [method, path, body] of calls) {
+      expect([path, (await call(method, path, null, body)).status]).toEqual([path, 401]);
+      expect([path, (await call(method, path, 'staff-id', body)).status]).toEqual([path, 403]);
+    }
+    state.tables.user_mailboxes = state.tables.user_mailboxes.filter((r) => r.user_id !== 'hr-id');
+    expect((await post('/flags', { folder: 'INBOX', uids: [101], seen: true })).status).toBe(404);
+    // the badge: not connected is an answer, not an error, and no mail server is asked
+    expect(await (await get('/unread')).json()).toEqual({ connected: false, unread: 0 });
+    expect(state.imapOptions).toHaveLength(0);
+    expect(Object.keys(state.budget).filter((k) => k.startsWith('mailbox-manage'))).toEqual([]);
+  });
+
+  it('acts on your own mailbox only, whatever the request says', async () => {
+    await post('/flags', { folder: 'INBOX', uids: [101], seen: true, user_id: 'admin-id', email: 'admin@a.co' });
+    await get('/unread?user_id=admin-id');
+    expect(state.imapOptions.map((o) => o.auth)).toEqual([
+      { user: 'hr@a.co', pass: 'hr-pass' },
+      { user: 'hr@a.co', pass: 'hr-pass' },
+    ]);
+  });
+
+  it('flags: read / unread and flag / unflag, by uid, in a folder opened for writing', async () => {
+    const res = await post('/flags', { folder: 'INBOX', uids: [101, 102, 101], seen: true, flagged: false });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, folder: 'INBOX', uids: [101, 102], seen: true, flagged: false });
+    expect(state.opened).toEqual([{ path: 'INBOX', readOnly: false }]);
+    expect(state.flagged).toEqual([{ uid: '101,102', flags: ['\\Seen'] }]);
+    expect(state.unflagged).toEqual([{ uid: '101,102', flags: ['\\Flagged'] }]);
+    await post('/flags', { folder: 'INBOX', uids: [103], seen: false });
+    expect(state.unflagged.at(-1)).toEqual({ uid: '103', flags: ['\\Seen'] });
+    await post('/flags', { folder: 'INBOX', uids: [103], flagged: true });
+    expect(state.flagged.at(-1)).toEqual({ uid: '103', flags: ['\\Flagged'] });
+    // nothing to change, or not a yes/no
+    expect((await post('/flags', { folder: 'INBOX', uids: [103] })).status).toBe(400);
+    expect((await post('/flags', { folder: 'INBOX', uids: [103], seen: 'yes' })).status).toBe(400);
+    expect(state.logouts).toBe(3);
+  });
+
+  it('checks the uids and the folder: 1 to 200 real ids, a folder name without line breaks', async () => {
+    const bad: Row[] = [
+      { folder: 'INBOX', uids: [] },
+      { folder: 'INBOX', uids: '101' },
+      { folder: 'INBOX', uids: ['1:*'] },
+      { folder: 'INBOX', uids: [0] },
+      { folder: 'INBOX', uids: [-1] },
+      { folder: 'INBOX', uids: ['101,102'] },
+      { folder: 'INBOX', uids: [4294967296] },
+      { folder: 'INBOX', uids: Array.from({ length: 201 }, (_, i) => i + 1) },
+      { folder: 'INBOX\r\nA1 DELETE INBOX', uids: [101] },
+      { folder: 'x'.repeat(513), uids: [101] },
+      { folder: 42, uids: [101] },
+    ];
+    for (const body of bad) {
+      expect([body, (await post('/flags', { ...body, seen: true })).status]).toEqual([body, 400]);
+      expect([body, (await post('/delete', body)).status]).toEqual([body, 400]);
+      expect([body, (await post('/move', { ...body, to: 'Projects' })).status]).toEqual([body, 400]);
+    }
+    const res = await post('/flags', { folder: 'INBOX', uids: Array.from({ length: 201 }, (_, i) => i + 1), seen: true });
+    expect((await res.json()).error).toBe('Choose at most 200 emails at a time');
+    expect(state.imapOptions).toHaveLength(0);
+    expect((await post('/flags', { folder: 'INBOX', uids: Array.from({ length: 200 }, (_, i) => i + 1), seen: true })).status).toBe(200);
+    expect(state.imapOptions).toHaveLength(1);
+    // a folder that isn't there
+    expect((await post('/flags', { folder: 'Gone', uids: [101], seen: true })).status).toBe(404);
+  });
+
+  it('move: only to an existing folder from your own list that holds mail', async () => {
+    let res = await post('/move', { folder: 'INBOX', uids: [101, 102], to: 'Projects' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, folder: 'INBOX', to: 'Projects', uids: [101, 102] });
+    expect(state.moves).toEqual([{ uid: '101,102', to: 'Projects' }]);
+    for (const to of ['Nowhere', '[Gmail]', '', 'Projects\r\n']) {
+      res = await post('/move', { folder: 'INBOX', uids: [101], to });
+      expect([to, res.status]).toEqual([to, 400]);
+    }
+    res = await post('/move', { folder: 'INBOX', uids: [101], to: 'Nowhere' });
+    expect((await res.json()).error).toBe("That folder isn't in your mailbox. Refresh.");
+    expect((await post('/move', { folder: 'INBOX', uids: [101], to: 'INBOX' })).status).toBe(400);
+    expect(state.moves).toHaveLength(1);
+  });
+
+  it('delete: to the folder marked \\Trash, never permanently from anywhere else', async () => {
+    let res = await post('/delete', { folder: 'INBOX', uids: [101] });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, folder: 'INBOX', uids: [101], permanent: false, trash: 'Trash' });
+    expect(state.moves).toEqual([{ uid: '101', to: 'Trash' }]);
+    // asking for permanent outside Trash is refused, and nothing happens
+    res = await post('/delete', { folder: 'INBOX', uids: [101], permanent: true });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/permanently only from Trash/);
+    expect((await post('/delete', { folder: 'INBOX', uids: [101], permanent: 'yes' })).status).toBe(400);
+    expect(state.deletes).toHaveLength(0);
+    expect(state.moves).toHaveLength(1);
+  });
+
+  it('delete in Trash: permanent only with permanent: true, removing only those uids', async () => {
+    let res = await post('/delete', { folder: 'Trash', uids: [101] });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/deleting them here is permanent/);
+    expect(state.deletes).toHaveLength(0);
+    res = await post('/delete', { folder: 'Trash', uids: [101, 102], permanent: true });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, folder: 'Trash', uids: [101, 102], permanent: true, trash: 'Trash' });
+    expect(state.deletes).toEqual(['101,102']);
+    expect(state.moves).toHaveLength(0);
+  });
+
+  it('without UIDPLUS, removes for good only when no other email is already marked deleted', async () => {
+    state.capabilities = new Set();
+    state.messages[2].flags = new Set(['\\Deleted']); // uid 103: someone else's pending delete
+    let res = await post('/delete', { folder: 'Trash', uids: [101], permanent: true });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/other emails in this folder are already marked deleted/);
+    // a server without MOVE moves by copy and removal: the same check
+    res = await post('/delete', { folder: 'INBOX', uids: [101] });
+    expect(res.status).toBe(409);
+    expect(state.deletes).toHaveLength(0);
+    expect(state.moves).toHaveLength(0);
+    res = await post('/delete', { folder: 'Trash', uids: [101, 103], permanent: true });
+    expect(res.status).toBe(200);
+    expect(state.deletes).toEqual(['101,103']);
+  });
+
+  it('Trash found by name when not marked (Trash, INBOX.Trash, Deleted Items); none found: refused, nothing deleted', async () => {
+    const plain = (path: string) => ({ path, name: path, flags: new Set(), delimiter: '.' });
+    const cases: [string[], string][] = [
+      [['INBOX', 'INBOX.Sent', 'INBOX.Trash'], 'INBOX.Trash'],
+      [['INBOX', 'Deleted Items'], 'Deleted Items'],
+      [['INBOX', 'Deleted Items', 'Trash'], 'Trash'],
+    ];
+    for (const [names, expected] of cases) {
+      state.folders = names.map(plain);
+      state.moves = [];
+      const res = await post('/delete', { folder: 'INBOX', uids: [101] });
+      expect(await res.json()).toMatchObject({ permanent: false, trash: expected });
+      expect(state.moves).toEqual([{ uid: '101', to: expected }]);
+    }
+    state.folders = [plain('INBOX'), plain('INBOX.Sent')];
+    state.moves = [];
+    const res = await post('/delete', { folder: 'INBOX', uids: [101] });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/^Your mailbox has no Trash folder, so nothing was deleted/);
+    expect((await post('/delete', { folder: 'INBOX', uids: [101], permanent: true })).status).toBe(400);
+    expect(state.moves).toHaveLength(0);
+    expect(state.deletes).toHaveLength(0);
+  });
+
+  it('search: subject, from, to or text, plus unread, attachments and dates, in one folder, read-only', async () => {
+    const res = await get('/search?folder=Projects&q=payslip&unread=1&attachments=1&since=2026-10-01&before=2026-10-15');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(state.opened).toEqual([{ path: 'Projects', readOnly: true }]);
+    expect(state.searches).toEqual([
+      {
+        or: [{ subject: 'payslip' }, { from: 'payslip' }, { to: 'payslip' }, { body: 'payslip' }],
+        seen: false,
+        header: { 'content-type': 'multipart/mixed' },
+        since: new Date('2026-10-01T00:00:00Z'),
+        before: new Date('2026-10-16T00:00:00Z'),
+      },
+    ]);
+    const body = await res.json();
+    expect(body).toMatchObject({ folder: 'Projects', q: 'payslip', unread: true, attachments: true, since: '2026-10-01', before: '2026-10-15', page: 1, total: 3, capped: false, has_more: false });
+    // newest first, the list's own shape
+    expect(body.messages.map((m: Row) => m.uid)).toEqual([103, 102, 101]);
+    expect(body.messages[0]).toMatchObject({ subject: 'Subject 3', seen: true, flagged: true });
+    expect(state.fetchQueries.some((q) => q.source)).toBe(false);
+    // the default folder is the Inbox, and words alone are enough
+    await get('/search?q=lunch');
+    expect(state.opened.at(-1)).toEqual({ path: 'INBOX', readOnly: true });
+    expect(state.searches.at(-1)).toEqual({ or: [{ subject: 'lunch' }, { from: 'lunch' }, { to: 'lunch' }, { body: 'lunch' }] });
+  });
+
+  it('search: checked input, and nothing searched without a criterion', async () => {
+    const bad = ['', 'q=', 'q=%20%20', `q=${'x'.repeat(201)}`, 'q=a&since=2026-13-01', 'q=a&before=yesterday', 'q=a&since=2026-10-10&before=2026-10-01', 'q=a&page=0', 'q=a&folder=IN%0D%0ABOX'];
+    for (const qs of bad) {
+      expect([qs, (await get(`/search?${qs}`)).status]).toEqual([qs, 400]);
+    }
+    expect(state.searches).toHaveLength(0);
+    expect(state.imapOptions).toHaveLength(0);
+    // a filter alone is a search
+    expect((await get('/search?unread=1')).status).toBe(200);
+    expect(state.searches).toEqual([{ seen: false }]);
+  });
+
+  it('search: at most 500 results, newest first, 50 a page, only the page fetched', async () => {
+    state.messages = Array.from({ length: 600 }, (_, i) => msg(i + 1));
+    state.searchResult = state.messages.map((m) => m.uid);
+    let body = await (await get('/search?q=x')).json();
+    expect(body).toMatchObject({ total: 500, capped: true, has_more: true, page: 1, page_size: 50 });
+    expect(body.messages).toHaveLength(50);
+    expect(body.messages[0].uid).toBe(700);
+    expect(state.fetchRanges.at(-1)!.split(',')).toHaveLength(50);
+    body = await (await get('/search?q=x&page=10')).json();
+    expect(body.has_more).toBe(false);
+    expect(body.messages.at(-1).uid).toBe(201);
+    // past the end: nothing fetched
+    state.fetchRanges = [];
+    body = await (await get('/search?q=x&page=11')).json();
+    expect(body.messages).toEqual([]);
+    expect(state.fetchRanges).toEqual([]);
+  });
+
+  it('unread: STATUS UNSEEN on INBOX, without opening a folder', async () => {
+    const res = await get('/unread');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(await res.json()).toEqual({ connected: true, unread: 4 });
+    expect(state.statuses).toEqual([{ path: 'INBOX', query: { unseen: true } }]);
+    expect(state.opened).toEqual([]);
+    expect(state.fetchQueries).toEqual([]);
+    expect(state.logouts).toBe(1);
+  });
+
+  it('per-person limits: 300 changes, 60 searches and 90 unread checks an hour, before any mail server is asked', async () => {
+    expect((await post('/flags', { folder: 'INBOX', uids: [101], seen: true })).status).toBe(200);
+    expect(state.budget['mailbox-manage:default:hr-id']).toBe(1);
+    state.budget['mailbox-manage:default:hr-id'] = 300;
+    state.budget['mailbox-manage:search:hr-id'] = 60;
+    state.budget['mailbox-manage:unread:hr-id'] = 90;
+    state.imapOptions = [];
+    const calls: [string, string, Row | undefined][] = [
+      ['POST', '/flags', { folder: 'INBOX', uids: [101], seen: true }],
+      ['POST', '/move', { folder: 'INBOX', uids: [101], to: 'Projects' }],
+      ['POST', '/delete', { folder: 'INBOX', uids: [101] }],
+      ['GET', '/search?q=pay', undefined],
+      ['GET', '/unread', undefined],
+    ];
+    for (const [method, path, body] of calls) {
+      const res = await call(method, path, 'hr-id', body);
+      expect([path, res.status]).toEqual([path, 429]);
+      expect((await res.json()).error).toMatch(/Wait a while and try again/);
+    }
+    expect(state.imapOptions).toHaveLength(0);
+    // someone else's budget is their own
+    expect((await call('GET', '/unread', 'admin-id')).status).toBe(200);
+  });
+
+  it('never logs subjects, addresses, search words or passwords', async () => {
+    await post('/flags', { folder: 'INBOX', uids: [101], seen: true });
+    await post('/move', { folder: 'INBOX', uids: [101], to: 'Projects' });
+    await post('/delete', { folder: 'INBOX', uids: [101] });
+    await post('/delete', { folder: 'Trash', uids: [101], permanent: true });
+    await get('/search?q=SECRET-WORDS&since=2026-10-01');
+    await get('/unread');
+    state.connectError = { code: 'ETIMEDOUT' };
+    await get('/search?q=SECRET-WORDS');
+    await get('/unread');
+    const all = logged.join('\n');
+    for (const secret of ['SECRET', 'hr-pass', 'hr@a.co', 'sender1@client.co.ke', 'Subject 1', 'mary@a.co']) {
+      expect([secret, all.includes(secret)]).toEqual([secret, false]);
+    }
   });
 });

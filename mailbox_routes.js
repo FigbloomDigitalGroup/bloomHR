@@ -23,6 +23,9 @@
 //   GET    /api/mailbox/message?folder=&uid=    one email: headers, text, html, attachments; marks it read
 //   GET    /api/mailbox/attachment?folder=&uid=&part=   the file, as a download
 //   POST   /api/mailbox/send                    send from your own mailbox (PR 2 of 3; see "sending" below)
+//   POST   /api/mailbox/flags | move | delete   read/unread, flag, move, delete (PR 3 of 3; see "managing mail" below)
+//   GET    /api/mailbox/search?folder=&q=       search one folder, newest first
+//   GET    /api/mailbox/unread                  INBOX's unread count, for the sidebar badge
 import crypto from "node:crypto";
 import express from "express";
 import dns from "node:dns";
@@ -984,6 +987,261 @@ router.post(
         let message = sentFolder ? "Sent." : "Sent, but couldn't save a copy to Sent.";
         if (rejected.length) message += ` Your mail server refused ${rejected.join(", ")}.`;
         res.json({ ok: true, saved_to_sent: Boolean(sentFolder), sent_folder: sentFolder, rejected, message });
+    })
+);
+
+// ---------------------------------------------------------------------------------------------
+// managing mail (FIG-1205, PR 3 of 3)
+// ---------------------------------------------------------------------------------------------
+//
+//   POST /api/mailbox/flags    { folder, uids, seen?, flagged? }   mark read / unread, flag / unflag
+//   POST /api/mailbox/move     { folder, uids, to }                to an existing folder from the account's own list
+//   POST /api/mailbox/delete   { folder, uids, permanent? }        to Trash; permanently only in Trash, and only with
+//                                                                  permanent: true (the screen asks first)
+//   GET  /api/mailbox/search?folder=&q=&unread=1&attachments=1&since=YYYY-MM-DD&before=YYYY-MM-DD&page=
+//                                                                  one folder, newest first, 50 a page, 500 at most
+//   GET  /api/mailbox/unread                                       INBOX's unread count (STATUS UNSEEN), for the badge
+//
+// Up to 200 emails at a time, by uid, in one folder. Trash is the folder the server marks \Trash, else one called
+// Trash (INBOX.Trash on cPanel), else Deleted Items. With no Trash, nothing is deleted: never permanent by surprise.
+// Removing an email for good ("EXPUNGE") removes only the ones asked for: with UIDPLUS by uid; without it, only when
+// no other email in the folder is already marked deleted (a plain EXPUNGE would take those too). Moving on a server
+// without MOVE is a copy and such a removal, so the same check applies.
+//
+// Per-person limits (shared across servers through take_rate_limit): changes 300 an hour, searches 60 an hour, the
+// unread count 90 an hour (the badge asks at most every 2 minutes, from one tab at a time).
+
+export const MAX_UIDS = 200;
+export const MAX_SEARCH_RESULTS = 500;
+export const MAX_QUERY_CHARS = 200;
+export const MANAGE_LIMITS = {
+    default: { limit: 300, windowMs: HOUR },
+    search: { limit: 60, windowMs: HOUR },
+    unread: { limit: 90, windowMs: HOUR },
+};
+const takeManageBudget = createSharedBudget("mailbox-manage", MANAGE_LIMITS);
+
+const TOO_MANY = {
+    default: "You've made a lot of changes to your mail in the last hour. Wait a while and try again.",
+    search: "You've searched a lot in the last hour. Wait a while and try again.",
+    unread: "Too many checks for new mail. Wait a while and try again.",
+};
+
+/** Runs `fn` in the caller's own mailbox, after taking one from their `kind` budget (only when connected). */
+async function withManagedMailbox(caller, kind, fn) {
+    const box = await loadMailbox(caller);
+    if (!box) throw new HttpError(404, NOT_CONNECTED);
+    if (!(await takeManageBudget(caller, kind, 1))) throw new HttpError(429, TOO_MANY[kind]);
+    return withMailbox(caller, fn, box);
+}
+
+/** The emails to act on: 1 to 200 uids, each checked, without repeats. */
+export function asUids(v) {
+    if (!Array.isArray(v) || v.length === 0) throw new HttpError(400, "Choose at least one email");
+    if (v.length > MAX_UIDS) throw new HttpError(400, `Choose at most ${MAX_UIDS} emails at a time`);
+    return [...new Set(v.map(asUid))];
+}
+
+const asOptionalBool = (v, what) => {
+    if (v === undefined || v === null) return undefined;
+    if (typeof v !== "boolean") throw new HttpError(400, `Invalid ${what}`);
+    return v;
+};
+
+const selectable = (folders) => (folders || []).filter((f) => !(f.flags instanceof Set ? f.flags : new Set(f.flags || [])).has("\\Noselect"));
+
+const TRASH_NAMES = ["trash", "inbox.trash", "inbox/trash", "deleted items", "inbox.deleted items", "inbox/deleted items", "deleted messages", "inbox.deleted messages"];
+
+/** The Trash folder: the one the server marks \Trash, else Trash (INBOX.Trash on cPanel), else Deleted Items, or null. */
+export function findTrashFolder(folders) {
+    const usable = selectable(folders);
+    const special = usable.find((f) => f.specialUse === "\\Trash");
+    if (special) return special.path;
+    for (const name of TRASH_NAMES) {
+        const hit = usable.find((f) => String(f.path).toLowerCase() === name);
+        if (hit) return hit.path;
+    }
+    return null;
+}
+
+const NO_TRASH = "Your mailbox has no Trash folder, so nothing was deleted. Create a folder called Trash (in your webmail), then try again.";
+const UNSAFE_EXPUNGE =
+    "Your mail server can't remove only these emails: other emails in this folder are already marked deleted and would go too. Empty the folder's deleted emails in your webmail first.";
+
+const hasCapability = (client, name) => Boolean(client.capabilities?.has?.(name));
+
+/**
+ * Whether removing `uids` for good removes only them. With UIDPLUS, by uid (yes). Without, a plain EXPUNGE removes
+ * every email marked deleted in the folder: only when those are all among `uids`.
+ */
+async function onlyTheseExpunge(client, uids) {
+    if (hasCapability(client, "UIDPLUS")) return true;
+    const marked = (await client.search({ deleted: true }, { uid: true })) || [];
+    const asked = new Set(uids.map(String));
+    return marked.every((uid) => asked.has(String(uid)));
+}
+
+router.post(
+    "/flags",
+    handler(async (req, res, caller) => {
+        const b = req.body || {};
+        const folder = asFolder(b.folder);
+        const uids = asUids(b.uids);
+        const seen = asOptionalBool(b.seen, "read state");
+        const flagged = asOptionalBool(b.flagged, "flag");
+        if (seen === undefined && flagged === undefined) throw new HttpError(400, "Nothing to change");
+        await withManagedMailbox(caller, "default", async (client) => {
+            await client.mailboxOpen(folder);
+            const range = uids.join(",");
+            const change = async (flag, on) => {
+                if (on === undefined) return;
+                const ok = on ? await client.messageFlagsAdd(range, [flag], { uid: true }) : await client.messageFlagsRemove(range, [flag], { uid: true });
+                if (ok === false) throw new HttpError(502, "Your mail server didn't accept the change. Try again.");
+            };
+            await change("\\Seen", seen);
+            await change("\\Flagged", flagged);
+        });
+        res.json({ ok: true, folder, uids: uids.map(Number), ...(seen !== undefined ? { seen } : {}), ...(flagged !== undefined ? { flagged } : {}) });
+    })
+);
+
+/** Moves `uids` from the open folder to `to`; refuses when the removal from the source would take other emails too. */
+async function moveUids(client, uids, to) {
+    if (!hasCapability(client, "MOVE") && !(await onlyTheseExpunge(client, uids))) throw new HttpError(409, UNSAFE_EXPUNGE);
+    const moved = await client.messageMove(uids.join(","), to, { uid: true });
+    if (!moved) throw new HttpError(502, "Your mail server didn't move the emails. Try again.");
+}
+
+router.post(
+    "/move",
+    handler(async (req, res, caller) => {
+        const b = req.body || {};
+        const folder = asFolder(b.folder);
+        const uids = asUids(b.uids);
+        if (typeof b.to !== "string" || !b.to) throw new HttpError(400, "Choose a folder to move to");
+        const to = asFolder(b.to);
+        if (to === folder) throw new HttpError(400, "The emails are already in that folder");
+        await withManagedMailbox(caller, "default", async (client) => {
+            // only a folder from the account's own list, that can hold mail
+            if (!selectable(await client.list()).some((f) => f.path === to)) throw new HttpError(400, "That folder isn't in your mailbox. Refresh.");
+            await client.mailboxOpen(folder);
+            await moveUids(client, uids, to);
+        });
+        res.json({ ok: true, folder, to, uids: uids.map(Number) });
+    })
+);
+
+router.post(
+    "/delete",
+    handler(async (req, res, caller) => {
+        const b = req.body || {};
+        const folder = asFolder(b.folder);
+        const uids = asUids(b.uids);
+        if (b.permanent !== undefined && b.permanent !== null && typeof b.permanent !== "boolean") throw new HttpError(400, "Invalid request");
+        const permanent = b.permanent === true;
+        const result = await withManagedMailbox(caller, "default", async (client) => {
+            const trash = findTrashFolder(await client.list());
+            if (folder !== trash) {
+                if (permanent) throw new HttpError(400, "Emails are deleted permanently only from Trash. Delete them to Trash first.");
+                if (!trash) throw new HttpError(409, NO_TRASH);
+                await client.mailboxOpen(folder);
+                await moveUids(client, uids, trash);
+                return { permanent: false, trash };
+            }
+            if (!permanent) throw new HttpError(400, "These emails are in Trash: deleting them here is permanent. Confirm to delete them permanently.");
+            await client.mailboxOpen(folder);
+            if (!(await onlyTheseExpunge(client, uids))) throw new HttpError(409, UNSAFE_EXPUNGE);
+            // \Deleted on these uids, then UID EXPUNGE of these uids (imapflow)
+            if (!(await client.messageDelete(uids.join(","), { uid: true }))) throw new HttpError(502, "Your mail server didn't delete the emails. Try again.");
+            return { permanent: true, trash };
+        });
+        res.json({ ok: true, folder, uids: uids.map(Number), permanent: result.permanent, trash: result.trash });
+    })
+);
+
+const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+const asDay = (v, what) => {
+    if (v === undefined || v === "") return null;
+    const m = DAY.exec(String(v));
+    const d = m ? new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))) : null;
+    if (!d || d.toISOString().slice(0, 10) !== String(v)) throw new HttpError(400, `Invalid ${what} date`);
+    return d;
+};
+const asFlag = (v) => v === "1" || v === "true";
+
+/** The search from the query string: the IMAP SEARCH object, checked. */
+export function asSearch(query) {
+    const raw = query.q === undefined ? "" : typeof query.q === "string" ? query.q : null;
+    if (raw === null) throw new HttpError(400, "Invalid search");
+    const q = raw.replace(CONTROL, " ").trim();
+    if (q.length > MAX_QUERY_CHARS) throw new HttpError(400, `Search for at most ${MAX_QUERY_CHARS} characters`);
+    const since = asDay(query.since, "from");
+    const before = asDay(query.before, "to");
+    if (since && before && since > before) throw new HttpError(400, "The from date is after the to date");
+    const unread = asFlag(query.unread);
+    const attachments = asFlag(query.attachments);
+    if (!q && !unread && !attachments && !since && !before) throw new HttpError(400, "Type something to search for");
+
+    const search = {};
+    // the words in the subject, the sender, the recipients or the text
+    if (q) search.or = [{ subject: q }, { from: q }, { to: q }, { body: q }];
+    if (unread) search.seen = false;
+    // IMAP has no "has attachments": an email with files is (almost always) multipart/mixed
+    if (attachments) search.header = { "content-type": "multipart/mixed" };
+    if (since) search.since = since;
+    // "to" is inclusive: before the next day
+    if (before) search.before = new Date(before.getTime() + 24 * 60 * 60 * 1000);
+    return { search, echo: { q, unread, attachments, since: since ? query.since : null, before: before ? query.before : null } };
+}
+
+router.get(
+    "/search",
+    handler(async (req, res, caller) => {
+        const folder = asFolder(req.query.folder);
+        const page = asPage(req.query.page);
+        const { search, echo } = asSearch(req.query);
+        const result = await withManagedMailbox(caller, "search", async (client) => {
+            await client.mailboxOpen(folder, { readOnly: true });
+            const found = ((await client.search(search, { uid: true })) || []).map(Number).filter((n) => n > 0);
+            // newest first (uids grow as mail arrives), at most 500
+            found.sort((a, b) => b - a);
+            const capped = found.length > MAX_SEARCH_RESULTS;
+            const kept = found.slice(0, MAX_SEARCH_RESULTS);
+            const pageUids = kept.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+            const messages = [];
+            if (pageUids.length) {
+                for await (const msg of client.fetch(pageUids.join(","), { uid: true, flags: true, envelope: true, bodyStructure: true, size: true, internalDate: true }, { uid: true })) {
+                    messages.push(listEntry(msg));
+                }
+            }
+            messages.sort((a, b) => b.uid - a.uid);
+            return { total: kept.length, capped, messages };
+        });
+        res.set("Cache-Control", "no-store");
+        res.json({
+            folder,
+            ...echo,
+            page,
+            page_size: PAGE_SIZE,
+            total: result.total,
+            capped: result.capped,
+            has_more: page * PAGE_SIZE < result.total,
+            messages: result.messages,
+        });
+    })
+);
+
+router.get(
+    "/unread",
+    handler(async (_req, res, caller) => {
+        res.set("Cache-Control", "no-store");
+        const box = await loadMailbox(caller);
+        // not connected: no mail server to ask (the badge stops asking)
+        if (!box) return res.json({ connected: false, unread: 0 });
+        if (!(await takeManageBudget(caller, "unread", 1))) throw new HttpError(429, TOO_MANY.unread);
+        // STATUS, without opening the folder: the cheapest question IMAP has
+        const status = await withMailbox(caller, (client) => client.status("INBOX", { unseen: true }), box);
+        res.json({ connected: true, unread: Number(status?.unseen) || 0 });
     })
 );
 

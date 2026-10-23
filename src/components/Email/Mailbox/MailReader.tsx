@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Download, Forward, Paperclip, Reply, ReplyAll } from 'lucide-react';
+import { ArrowLeft, Download, Forward, MailOpen, Paperclip, Reply, ReplyAll, Star, Trash2 } from 'lucide-react';
 import { Button } from '../../UI';
-import { downloadAttachment, type MailAttachment, type MailMessage, type MailPerson } from '../../../lib/mailboxApi';
+import { downloadAttachment, type MailAttachment, type MailFolder, type MailMessage, type MailPerson } from '../../../lib/mailboxApi';
 import { fileSize } from '../../../lib/mailCompose';
 import MailBody from './MailBody';
 
@@ -21,8 +21,32 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** The reading pane: who, when, the subject, the attachments to download, the body, and Reply / Reply all / Forward. */
-export default function MailReader({ message, onBack, onRespond }: { message: MailMessage; onBack?: () => void; onRespond?: (mode: ReplyMode) => void }) {
+/** What can be done to the open email (PR 3): flag, mark unread, move, delete. */
+export interface ReaderActions {
+  onToggleFlag: () => void;
+  onMarkUnread: () => void;
+  onDelete: () => void;
+  /** the folders it can be moved to (not the one it's in) */
+  moveTargets: MailFolder[];
+  onMove: (to: string) => void;
+  busy?: boolean;
+}
+
+/**
+ * The reading pane: who, when, the subject, the attachments to download, the body, Reply / Reply all / Forward, and
+ * flag, mark unread, move and delete.
+ */
+export default function MailReader({
+  message,
+  onBack,
+  onRespond,
+  actions,
+}: {
+  message: MailMessage;
+  onBack?: () => void;
+  onRespond?: (mode: ReplyMode) => void;
+  actions?: ReaderActions;
+}) {
   const [downloading, setDownloading] = useState('');
 
   const download = async (a: MailAttachment) => {
@@ -45,7 +69,22 @@ export default function MailReader({ message, onBack, onRespond }: { message: Ma
           </Button>
         </div>
       )}
-      <h2 className="text-[16px] font-bold text-ink break-words">{message.subject || '(no subject)'}</h2>
+      <div className="flex items-start gap-2">
+        <h2 className="flex-1 min-w-0 text-[16px] font-bold text-ink break-words">{message.subject || '(no subject)'}</h2>
+        {actions && (
+          <button
+            type="button"
+            onClick={actions.onToggleFlag}
+            disabled={actions.busy}
+            aria-pressed={message.flagged}
+            aria-label={message.flagged ? 'Unflag' : 'Flag'}
+            title={message.flagged ? 'Unflag' : 'Flag'}
+            className="shrink-0 p-1 rounded-tile hover:bg-secondary disabled:opacity-50"
+          >
+            <Star className={`w-4 h-4 ${message.flagged ? 'fill-current text-status-warning' : 'text-muted-foreground'}`} aria-hidden />
+          </button>
+        )}
+      </div>
       <div className="mt-2 space-y-0.5">
         <Row label="From" value={people(message.from)} />
         <Row label="To" value={people(message.to)} />
@@ -62,6 +101,32 @@ export default function MailReader({ message, onBack, onRespond }: { message: Ma
           </Button>
           <Button variant="secondary" icon={<Forward className="w-4 h-4" />} onClick={() => onRespond('forward')}>
             Forward
+          </Button>
+        </div>
+      )}
+      {actions && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Button variant="ghost" icon={<MailOpen className="w-4 h-4" />} onClick={actions.onMarkUnread} disabled={actions.busy}>
+            Mark unread
+          </Button>
+          {actions.moveTargets.length > 0 && (
+            <select
+              className="rounded-tile border border-border bg-white px-2 py-1.5 text-[12px] text-ink"
+              aria-label="Move this email to"
+              value=""
+              disabled={actions.busy}
+              onChange={(e) => e.target.value && actions.onMove(e.target.value)}
+            >
+              <option value="">Move to…</option>
+              {actions.moveTargets.map((f) => (
+                <option key={f.path} value={f.path}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <Button variant="ghost" icon={<Trash2 className="w-4 h-4" />} onClick={actions.onDelete} disabled={actions.busy}>
+            Delete
           </Button>
         </div>
       )}
