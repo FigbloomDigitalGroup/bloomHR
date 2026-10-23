@@ -1,4 +1,4 @@
-// mailbox_routes.js - each person's own mailbox, read inside the app (FIG-1205, PR 1 of 3: reading).
+// mailbox_routes.js - each person's own mailbox, read and sent from inside the app (FIG-1205: PR 1 reading, PR 2 sending).
 //
 // A person with the "My mailbox" module connects their own mailbox (e.g. mary@company.com on the company's cPanel) and
 // reads it here. Every request is on its own (Vercel keeps nothing between requests): it signs the caller in, loads
@@ -22,12 +22,16 @@
 //   GET    /api/mailbox/messages?folder=&page=  50 per page, newest first
 //   GET    /api/mailbox/message?folder=&uid=    one email: headers, text, html, attachments; marks it read
 //   GET    /api/mailbox/attachment?folder=&uid=&part=   the file, as a download
+//   POST   /api/mailbox/send                    send from your own mailbox (PR 2 of 3; see "sending" below)
+import crypto from "node:crypto";
 import express from "express";
 import dns from "node:dns";
 import net from "node:net";
 import { pipeline } from "node:stream/promises";
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
+import nodemailer from "nodemailer";
+import MailComposer from "nodemailer/lib/mail-composer/index.js";
 import { authenticate, HttpError, admin } from "./admin_routes.js";
 import { callerHasModule, createSharedBudget } from "./authz.js";
 import { EMAIL_RE, SMTP_PORTS, asMailHost, decryptSecret, encryptSecret, isNonPublicResolved, loadMailServer } from "./company_mail_server.js";
@@ -278,9 +282,9 @@ async function recordOutcome(box, error) {
     if (dbError) console.error("[mailbox] could not record the last connection:", dbError.code || "error");
 }
 
-/** Runs `fn(client, box)` logged in to the caller's own mailbox, and always logs out. */
-async function withMailbox(caller, fn) {
-    const box = await loadMailbox(caller);
+/** Runs `fn(client, box)` logged in to the caller's own mailbox (`loaded`, or read now), and always logs out. */
+async function withMailbox(caller, fn, loaded) {
+    const box = loaded || (await loadMailbox(caller));
     if (!box) throw new HttpError(404, NOT_CONNECTED);
     const password = decryptSecret(box.password_encrypted, mailboxBinding(caller.id, caller.tenantId), UNREADABLE);
     let client;
@@ -434,6 +438,9 @@ router.post(
             return res.json({ ok: false, message: err.message });
         }
         await logout(client);
+        // reading works: now sending (the same login, on the outgoing server)
+        const smtp = await checkSmtp(row, password);
+        if (!smtp.ok) return res.json({ ok: false, message: `Reading works, but sending doesn't: ${smtp.message}` });
         res.json({ ok: true, message: `Connected to ${row.imap_host}. Your mailbox is ready.` });
     })
 );
@@ -460,7 +467,8 @@ router.put(
             if (MISSING_TABLE.includes(String(error.code))) throw new HttpError(503, "Mailboxes are not set up on this system yet (database update pending)");
             throw new HttpError(500, "Could not save your mailbox");
         }
-        res.json({ account: publicMailbox(saved) });
+        // reading is what connecting needs; whether sending works is reported alongside, so it can be fixed here
+        res.json({ account: publicMailbox(saved), smtp: await checkSmtp(row, password) });
     })
 );
 
@@ -599,6 +607,383 @@ router.get(
             });
             await pipeline(download.content, res);
         });
+    })
+);
+
+// ---------------------------------------------------------------------------------------------
+// sending (FIG-1205, PR 2 of 3)
+// ---------------------------------------------------------------------------------------------
+//
+// POST /api/mailbox/send, JSON:
+//   { to, cc, bcc: [ "a@b.co" | { name, address } ],   at least one, 50 in all
+//     subject, text, html,                              text and html up to 256 KB each
+//     attachments: [{ filename, content_type, data }],  data in base64; 3 MB in all (see below)
+//     reply: { folder, uid },                           replying: threaded (In-Reply-To, References) from the original
+//     forward: { folder, uid, parts: ["2", ...] } }     forwarding: those attachments, fetched here from the original
+// -> { ok, saved_to_sent, sent_folder, rejected, message }
+//
+// JSON with base64 rather than multipart: the API has no multipart parser (and no new dependency is wanted), and
+// Vercel refuses any request body over 4.5 MB. Base64 grows files by a third, so 3 MB of files is about 4 MB on the
+// wire, leaving room for the text. Attachments being forwarded never pass through the browser: they are read from the
+// original email here, so they count only towards the 20 MB limit for the whole email.
+//
+// The From is always the mailbox's own address (never anything in the request), named with the person's name in the
+// app. It goes out through their own outgoing server with their own login, and a copy (Bcc kept, marked read) is put in
+// their Sent folder: the folder the server marks \Sent, else one called Sent (INBOX.Sent on cPanel). If that copy can't
+// be saved, the email has still gone, and the answer says so. 30 sends an hour per person.
+
+export const MAX_RECIPIENTS = 50;
+export const MAX_UPLOAD_BYTES = 3 * 1024 * 1024;
+export const MAX_SEND_BYTES = 20 * 1024 * 1024;
+export const MAX_BODY_CHARS = 256 * 1024;
+export const MAX_ATTACHMENTS = 20;
+export const SENDS_PER_HOUR = 30;
+const takeSendBudget = createSharedBudget("mailbox-send", { default: { limit: SENDS_PER_HOUR, windowMs: HOUR } });
+
+const MB = (bytes) => `${Math.round(bytes / (1024 * 1024))} MB`;
+const CONTROL = /[\u0000-\u001f\u007f]+/g;
+const CONTENT_TYPE = /^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}\/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$/i;
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+
+const LABELS = { to: "To", cc: "Cc", bcc: "Bcc" };
+
+/** One list of recipients, checked: [{ name, address }]. */
+function asRecipients(value, field) {
+    if (value === undefined || value === null || value === "") return [];
+    const list = Array.isArray(value) ? value : [value];
+    if (list.length > MAX_RECIPIENTS) throw new HttpError(400, `Send to at most ${MAX_RECIPIENTS} people at once`);
+    return list.map((item) => {
+        const raw = typeof item === "string" ? { address: item } : item && typeof item === "object" ? item : {};
+        const address = typeof raw.address === "string" ? raw.address.trim() : "";
+        if (!address || address.length > 254 || !EMAIL_RE.test(address)) {
+            const shown = address ? `"${address.replace(CONTROL, "").slice(0, 80)}"` : "An empty address";
+            throw new HttpError(400, `${shown} in ${LABELS[field]} is not a valid email address`);
+        }
+        const name = typeof raw.name === "string" ? raw.name.replace(CONTROL, " ").trim().slice(0, 100) : "";
+        return { name, address };
+    });
+}
+
+const asBody = (v, what) => {
+    if (v === undefined || v === null) return "";
+    if (typeof v !== "string") throw new HttpError(400, `Invalid ${what}`);
+    if (v.length > MAX_BODY_CHARS) throw new HttpError(413, "The message is too long to send from here.");
+    return v;
+};
+
+/** A file name for an attachment: no paths or control characters. */
+export const attachmentName = (name) =>
+    String(name || "")
+        .replace(CONTROL, "")
+        .replace(/[\\/]+/g, "_")
+        .replace(/^[.\s]+/, "")
+        .trim()
+        .slice(0, 150) || "attachment";
+
+const asSource = (v, what) => {
+    if (!v || typeof v !== "object") throw new HttpError(400, `Invalid ${what}`);
+    return { folder: asFolder(v.folder), uid: asUid(v.uid) };
+};
+
+/** The body of a send, checked, with the uploaded files decoded. */
+export function asSendInput(body) {
+    const b = body && typeof body === "object" ? body : {};
+    const to = asRecipients(b.to, "to");
+    const cc = asRecipients(b.cc, "cc");
+    const bcc = asRecipients(b.bcc, "bcc");
+    const everyone = [...to, ...cc, ...bcc];
+    if (!everyone.length) throw new HttpError(400, "Add at least one recipient");
+    if (everyone.length > MAX_RECIPIENTS) throw new HttpError(400, `Send to at most ${MAX_RECIPIENTS} people at once`);
+
+    if (b.subject !== undefined && b.subject !== null && typeof b.subject !== "string") throw new HttpError(400, "Invalid subject");
+    const subject = String(b.subject ?? "").replace(CONTROL, " ").trim().slice(0, 900);
+    const text = asBody(b.text, "message");
+    const html = asBody(b.html, "message");
+
+    const files = b.attachments === undefined || b.attachments === null ? [] : b.attachments;
+    if (!Array.isArray(files)) throw new HttpError(400, "Invalid attachments");
+    let uploaded = 0;
+    const attachments = files.map((f) => {
+        if (!f || typeof f !== "object" || typeof f.data !== "string" || f.data.length > MAX_UPLOAD_BYTES * 2 || !BASE64.test(f.data)) {
+            throw new HttpError(400, "An attachment could not be read. Attach it again.");
+        }
+        const content = Buffer.from(f.data, "base64");
+        uploaded += content.length;
+        if (uploaded > MAX_UPLOAD_BYTES) throw new HttpError(413, `Attachments are too large: up to ${MB(MAX_UPLOAD_BYTES)} of files can be added at once.`);
+        const type = typeof f.content_type === "string" && CONTENT_TYPE.test(f.content_type) ? f.content_type.toLowerCase() : "application/octet-stream";
+        return { filename: attachmentName(f.filename), contentType: type, content };
+    });
+
+    const reply = b.reply ? asSource(b.reply, "reply") : null;
+    let forward = null;
+    if (b.forward) {
+        forward = asSource(b.forward, "forward");
+        const parts = b.forward.parts === undefined ? [] : b.forward.parts;
+        if (!Array.isArray(parts)) throw new HttpError(400, "Invalid attachment");
+        forward.parts = [...new Set(parts.map(asPart))];
+    }
+    if (reply && forward) throw new HttpError(400, "Reply or forward, not both");
+    if (attachments.length + (forward?.parts.length || 0) > MAX_ATTACHMENTS) throw new HttpError(400, `Attach at most ${MAX_ATTACHMENTS} files`);
+
+    return { to, cc, bcc, subject, text, html, attachments, uploaded, reply, forward };
+}
+
+/** Message-ID and References of an email, from its raw header lines: the ids only. */
+export function threadHeaders(raw) {
+    const headers = String(raw || "").replace(/\r?\n[ \t]+/g, " ");
+    const ids = (name) => {
+        const line = new RegExp(`^${name}:(.*)$`, "im").exec(headers);
+        return line ? line[1].match(/<[^<>\s"]{1,250}>/g) || [] : [];
+    };
+    return { messageId: ids("message-id")[0] || null, references: ids("references") };
+}
+
+/** In-Reply-To and References for a reply to `original`: the original's chain plus the original (the last 20). */
+export function replyThreading(original) {
+    if (!original.messageId) return {};
+    const chain = [...original.references.filter((id) => id !== original.messageId), original.messageId].slice(-20);
+    return { inReplyTo: original.messageId, references: chain };
+}
+
+/** The person's name in the app, for the From line ("" when there is none). */
+async function displayName(caller) {
+    const { data } = await admin.from("user_profiles").select("full_name").eq("user_id", caller.id).eq("tenant_id", caller.tenantId).maybeSingle();
+    return typeof data?.full_name === "string" ? data.full_name.replace(CONTROL, " ").trim().slice(0, 100) : "";
+}
+
+const smtpHostOf = (box) => box.smtp_host || box.imap_host;
+const smtpPortOf = (box) => Number(box.smtp_port) || 465;
+
+/**
+ * Logs in to the person's outgoing server (their login: cPanel uses the same one for both) at the address that was
+ * checked, with the name kept for the certificate. 465: SSL/TLS from the start; 587, 25, 2525: STARTTLS, required.
+ */
+export function mailboxTransport(box, password, address) {
+    const port = smtpPortOf(box);
+    return nodemailer.createTransport({
+        host: address,
+        port,
+        secure: port === 465,
+        requireTLS: port !== 465, // never send the password unencrypted
+        auth: { user: box.username, pass: password },
+        tls: { servername: smtpHostOf(box), minVersion: "TLSv1.2" },
+        connectionTimeout: 10_000,
+        greetingTimeout: 10_000,
+        socketTimeout: 30_000,
+        logger: false,
+        debug: false,
+    });
+}
+
+const smtpErrorCode = (err) => `${String(err?.code || err?.name || "error")}${err?.responseCode ? ` ${err.responseCode}` : ""}`;
+
+/** What went wrong sending, in plain words. Never the server's reply (it can quote the login or addresses). */
+export function describeSendError(err, box) {
+    if (err instanceof HttpError) return err.message;
+    const host = smtpHostOf(box);
+    const code = String(err?.code || "");
+    const reply = Number(err?.responseCode) || 0;
+    if (code === "EAUTH" || reply === 535 || reply === 534) {
+        return "Your mail server refused your password for sending. If you changed your email password, enter the new one under Change server settings.";
+    }
+    if (reply === 552 || reply === 523) return "This email is too large for your mail server. Remove some attachments and try again.";
+    if (code === "EENVELOPE") {
+        const refused = Array.isArray(err?.rejected) ? err.rejected.filter((a) => typeof a === "string") : [];
+        return refused.length
+            ? `Your mail server refused to send to ${refused.slice(0, 5).join(", ")}${refused.length > 5 ? " and others" : ""}. Check the address${refused.length > 1 ? "es" : ""}.`
+            : "Your mail server would not send this email from or to these addresses.";
+    }
+    if (["ENOTFOUND", "EAI_AGAIN", "EDNS"].includes(code)) return `Can't find an outgoing mail server called ${host}. Check it under Change server settings.`;
+    if (code === "ETLS" || /CERT|TLS|SSL|ALTNAME|SELF_SIGNED|UNABLE_TO_VERIFY/i.test(code)) {
+        return `The secure connection to ${host} failed. Try the other outgoing port (465 or 587) under Change server settings.`;
+    }
+    if (["ECONNECTION", "ETIMEDOUT", "ESOCKET", "ECONNREFUSED", "ECONNRESET", "EHOSTUNREACH", "ENETUNREACH"].includes(code)) {
+        return `Can't reach ${host} on port ${smtpPortOf(box)} to send. Check the outgoing server and port under Change server settings.`;
+    }
+    if (reply === 550 || reply === 553 || reply === 554) return "Your mail server refused this email (it may look like spam to it, or sending to these people isn't allowed).";
+    return "Your mail server didn't accept the email. Try again in a moment.";
+}
+
+const sendStatus = (err) => {
+    const code = String(err?.code || "");
+    const reply = Number(err?.responseCode) || 0;
+    if (reply === 552 || reply === 523) return 413;
+    if (code === "EAUTH" || reply === 535 || reply === 534 || code === "EENVELOPE" || reply === 550 || reply === 553 || reply === 554) return 400;
+    return 502;
+};
+
+const closeTransport = (transport) => {
+    try {
+        transport?.close();
+    } catch {
+        // already closed
+    }
+};
+
+/** Whether sending works with these settings: { ok, message }. Used when connecting. */
+async function checkSmtp(box, password) {
+    let transport;
+    try {
+        if (!SMTP_PORTS.includes(smtpPortOf(box))) throw new HttpError(400, `The outgoing mail port must be one of ${SMTP_PORTS.join(", ")}`);
+        transport = mailboxTransport(box, password, await resolvePublicAddress(smtpHostOf(box)));
+        await transport.verify();
+        return { ok: true, message: `Sending works through ${smtpHostOf(box)}.` };
+    } catch (err) {
+        if (!(err instanceof HttpError)) console.error("[mailbox] outgoing check failed:", smtpErrorCode(err));
+        return { ok: false, message: describeSendError(err, box) };
+    } finally {
+        closeTransport(transport);
+    }
+}
+
+const SENT_NAMES = ["sent", "inbox.sent", "inbox/sent", "sent items", "sent messages", "inbox.sent items", "inbox.sent messages"];
+
+/** The Sent folder: the one the server marks \Sent, else the first called Sent (INBOX.Sent on cPanel), or null. */
+export function findSentFolder(folders) {
+    const usable = (folders || []).filter((f) => !(f.flags instanceof Set ? f.flags : new Set(f.flags || [])).has("\\Noselect"));
+    const special = usable.find((f) => f.specialUse === "\\Sent");
+    if (special) return special.path;
+    for (const name of SENT_NAMES) {
+        const hit = usable.find((f) => String(f.path).toLowerCase() === name);
+        if (hit) return hit.path;
+    }
+    return null;
+}
+
+const TOO_LARGE = `The attachments are too large to send (over ${MB(MAX_SEND_BYTES)} in all).`;
+
+/** Reads one part of an email into memory, up to `limit` bytes (an HttpError(413) past it). */
+async function readPart(client, uid, node, part, limit) {
+    if (partSize(node) > limit) throw new HttpError(413, TOO_LARGE);
+    const download = await client.download(uid, part, { uid: true, maxBytes: limit + 1 });
+    if (!download?.content) throw new HttpError(404, "An attachment you're forwarding isn't there any more. Refresh.");
+    const chunks = [];
+    let size = 0;
+    for await (const chunk of download.content) {
+        size += chunk.length;
+        if (size > limit) throw new HttpError(413, TOO_LARGE);
+        chunks.push(chunk);
+    }
+    return {
+        filename: attachmentName(download.meta?.filename || filenameOf(node) || `attachment-${part}`),
+        contentType: CONTENT_TYPE.test(String(node.type || "")) ? String(node.type).toLowerCase() : "application/octet-stream",
+        content: Buffer.concat(chunks),
+    };
+}
+
+const domainOf = (address) => String(address).split("@")[1] || "localhost";
+
+/** The original's threading headers (replying) or the files being forwarded, read from the mailbox. */
+async function readSource(client, input) {
+    const source = input.reply || input.forward;
+    if (!source) return { threading: {}, forwarded: [] };
+    // opened for writing only when replying, to mark the original answered
+    await client.mailboxOpen(source.folder, { readOnly: !input.reply });
+    if (input.reply) {
+        const original = await client.fetchOne(source.uid, { uid: true, headers: ["message-id", "references"] }, { uid: true });
+        if (!original) throw new HttpError(404, "The email you're replying to isn't there any more. Refresh.");
+        return { threading: replyThreading(threadHeaders(original.headers)), forwarded: [] };
+    }
+    const forwarded = [];
+    if (!input.forward.parts.length) return { threading: {}, forwarded };
+    const meta = await client.fetchOne(source.uid, { uid: true, bodyStructure: true }, { uid: true });
+    if (!meta) throw new HttpError(404, "The email you're forwarding isn't there any more. Refresh.");
+    let room = MAX_SEND_BYTES - input.uploaded;
+    for (const part of input.forward.parts) {
+        const node = findPart(meta.bodyStructure, part);
+        if (!node) throw new HttpError(404, "An attachment you're forwarding isn't there any more. Refresh.");
+        const file = await readPart(client, source.uid, node, part, room);
+        room -= file.content.length;
+        forwarded.push(file);
+    }
+    return { threading: {}, forwarded };
+}
+
+router.post(
+    "/send",
+    handler(async (req, res, caller) => {
+        const input = asSendInput(req.body);
+        const box = await loadMailbox(caller);
+        if (!box) throw new HttpError(404, NOT_CONNECTED);
+        if (!SMTP_PORTS.includes(smtpPortOf(box))) {
+            throw new HttpError(400, `The outgoing mail port must be one of ${SMTP_PORTS.join(", ")}. Change it under Change server settings.`);
+        }
+        // the outgoing server is checked before anything connects: refused when it is (or resolves to) our own machine
+        // or a private network, and the address checked is the one connected to
+        const smtpAddress = await resolvePublicAddress(asMailHost(smtpHostOf(box), "Your outgoing mail server's name is not valid. Change it under Change server settings."));
+        if (!(await takeSendBudget(caller, "default", 1))) {
+            throw new HttpError(429, `You've sent ${SENDS_PER_HOUR} emails from here in the last hour. Wait a while and try again.`);
+        }
+        const name = await displayName(caller).catch(() => "");
+
+        const { sentFolder, rejected } = await withMailbox(
+            caller,
+            async (client, mailbox) => {
+                const password = decryptSecret(mailbox.password_encrypted, mailboxBinding(caller.id, caller.tenantId), UNREADABLE);
+                const { threading, forwarded } = await readSource(client, input);
+
+                const mail = {
+                    from: { name, address: mailbox.email },
+                    to: input.to,
+                    cc: input.cc,
+                    bcc: input.bcc,
+                    subject: input.subject,
+                    text: input.text || (input.html ? undefined : ""),
+                    html: input.html || undefined,
+                    attachments: [...input.attachments, ...forwarded],
+                    messageId: `<${crypto.randomUUID()}@${domainOf(mailbox.email)}>`,
+                    date: new Date(),
+                    ...threading,
+                    // only what is given here goes in: the mailer reads no files or web addresses
+                    disableFileAccess: true,
+                    disableUrlAccess: true,
+                };
+
+                // the copy for Sent, built before sending (the mailer may change what it is given), with the Bcc kept
+                let raw = null;
+                try {
+                    const node = new MailComposer({ ...mail }).compile();
+                    node.keepBcc = true;
+                    raw = await node.build();
+                } catch (err) {
+                    console.error("[mailbox] could not build the Sent copy:", smtpErrorCode(err));
+                }
+
+                const transport = mailboxTransport(mailbox, password, smtpAddress);
+                let info;
+                try {
+                    info = await transport.sendMail({ ...mail });
+                } catch (err) {
+                    console.error("[mailbox] send failed:", smtpErrorCode(err));
+                    throw new HttpError(sendStatus(err), describeSendError(err, mailbox));
+                } finally {
+                    closeTransport(transport);
+                }
+
+                // sent: nothing below may turn this into an error (the person would send it again)
+                let saved = null;
+                try {
+                    const path = raw && findSentFolder(await client.list());
+                    if (path && (await client.append(path, raw, ["\\Seen"], mail.date))) saved = path;
+                } catch (err) {
+                    console.error("[mailbox] could not save to Sent:", errorCode(err));
+                }
+                if (input.reply) {
+                    try {
+                        await client.messageFlagsAdd(input.reply.uid, ["\\Answered"], { uid: true });
+                    } catch {
+                        // a read-only folder: it just isn't marked answered
+                    }
+                }
+                const refused = Array.isArray(info?.rejected) ? info.rejected.map((a) => (typeof a === "string" ? a : a?.address)).filter(Boolean) : [];
+                return { sentFolder: saved, rejected: refused };
+            },
+            box
+        );
+
+        let message = sentFolder ? "Sent." : "Sent, but couldn't save a copy to Sent.";
+        if (rejected.length) message += ` Your mail server refused ${rejected.join(", ")}.`;
+        res.json({ ok: true, saved_to_sent: Boolean(sentFolder), sent_folder: sentFolder, rejected, message });
     })
 );
 

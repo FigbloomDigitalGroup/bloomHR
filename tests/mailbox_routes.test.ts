@@ -13,7 +13,7 @@ const TENANT = 'tenant-a';
 const OTHER_TENANT = 'tenant-b';
 
 type Row = Record<string, any>;
-type FakeMessage = { seq: number; uid: number; flags: Set<string>; envelope: Row; bodyStructure: Row; size: number; source: string };
+type FakeMessage = { seq: number; uid: number; flags: Set<string>; envelope: Row; bodyStructure: Row; size: number; source: string; headers?: string };
 
 const state = vi.hoisted(() => ({
   tables: {} as Record<string, Record<string, any>[]>,
@@ -31,6 +31,16 @@ const state = vi.hoisted(() => ({
   logouts: 0,
   parsed: {} as Record<string, unknown>,
   downloads: [] as { uid: string; part: string; options: Record<string, unknown> }[],
+  // the shared rate limit (take_rate_limit): units used per bucket
+  budget: {} as Record<string, number>,
+  // the fake outgoing server (nodemailer) and the Sent copies (IMAP APPEND)
+  smtpOptions: [] as Record<string, any>[],
+  sent: [] as Record<string, any>[],
+  smtpError: null as Record<string, unknown> | null,
+  verifyError: null as Record<string, unknown> | null,
+  smtpRejected: [] as string[],
+  appended: [] as { path: string; raw: string; flags: string[] }[],
+  appendError: null as Record<string, unknown> | null,
 }));
 
 vi.mock('@supabase/supabase-js', () => {
@@ -72,8 +82,13 @@ vi.mock('@supabase/supabase-js', () => {
     return b;
   };
   const client = {
-    rpc: async (fn: string) => {
-      if (fn === 'take_rate_limit') return { data: true, error: null };
+    rpc: async (fn: string, args: Record<string, any>) => {
+      if (fn === 'take_rate_limit') {
+        const used = (state.budget[args.p_bucket] || 0) + args.p_cost;
+        if (used > args.p_limit) return { data: false, error: null };
+        state.budget[args.p_bucket] = used;
+        return { data: true, error: null };
+      }
       throw new Error(`unexpected rpc ${fn}`);
     },
     // the bearer token is the caller's user id in these tests
@@ -126,6 +141,7 @@ vi.mock('imapflow', () => ({
       state.fetchQueries.push(query);
       const m = state.messages.find((x) => String(x.uid) === uid);
       if (!m) return false;
+      if (query.headers) return { uid: m.uid, headers: Buffer.from(m.headers || '') };
       return query.source ? { uid: m.uid, source: Buffer.from(m.source) } : { ...m, source: undefined };
     }
     async messageFlagsAdd(uid: string, flags: string[]) {
@@ -136,6 +152,11 @@ vi.mock('imapflow', () => ({
       state.downloads.push({ uid, part, options });
       return { meta: { filename: 'pay"slip/../Oct\r\n.pdf', contentType: 'text/html' }, content: Readable.from([Buffer.from('%PDF-1.4 file')]) };
     }
+    async append(path: string, raw: Buffer, flags: string[]) {
+      if (state.appendError) throw Object.assign(new Error('NO append failed'), state.appendError);
+      state.appended.push({ path, raw: raw.toString(), flags });
+      return { destination: path, uid: 1 };
+    }
     async logout() {
       state.logouts += 1;
     }
@@ -144,6 +165,27 @@ vi.mock('imapflow', () => ({
 }));
 
 vi.mock('mailparser', () => ({ simpleParser: async () => state.parsed }));
+
+// the outgoing server; the Sent copy is still built by the real MailComposer (nodemailer/lib/mail-composer)
+vi.mock('nodemailer', () => ({
+  default: {
+    createTransport: (opts: Record<string, any>) => {
+      state.smtpOptions.push(opts);
+      return {
+        verify: async () => {
+          if (state.verifyError) throw Object.assign(new Error(`535 auth failed for ${opts.auth.user} ${opts.auth.pass}`), state.verifyError);
+          return true;
+        },
+        sendMail: async (mail: Record<string, any>) => {
+          if (state.smtpError) throw Object.assign(new Error(`550 refused ${JSON.stringify(mail.to)} ${opts.auth.pass}`), state.smtpError);
+          state.sent.push(mail);
+          return { messageId: mail.messageId, accepted: [], rejected: state.smtpRejected };
+        },
+        close() {},
+      };
+    },
+  },
+}));
 
 process.env.SUPABASE_URL = 'http://fake';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake-service-key';
@@ -157,7 +199,7 @@ beforeAll(async () => {
   const express = (await import('express')).default;
   const router = (await import('../mailbox_routes.js')).default;
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' })); // as app.js
   app.use('/api/mailbox', router);
   server = createServer(app);
   await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -202,7 +244,7 @@ beforeEach(() => {
   ];
   state.authUsers = users.map(([n]) => ({ id: `${n}-id`, email: `${n}@a.co` }));
   state.tables = {
-    user_profiles: users.map(([n, role, tenant]) => ({ user_id: `${n}-id`, role, account_status: 'ACTIVE', tenant_id: tenant })),
+    user_profiles: users.map(([n, role, tenant]) => ({ user_id: `${n}-id`, role, account_status: 'ACTIVE', tenant_id: tenant, full_name: `${n.toUpperCase()} Person` })),
     role_permissions: [
       { tenant_id: TENANT, role_name: 'HR', permissions: ['email-portal', 'mailbox'] },
       { tenant_id: TENANT, role_name: 'STAFF', permissions: ['email-portal'] },
@@ -228,6 +270,14 @@ beforeEach(() => {
   state.flagged = [];
   state.logouts = 0;
   state.downloads = [];
+  state.budget = {};
+  state.smtpOptions = [];
+  state.sent = [];
+  state.smtpError = null;
+  state.verifyError = null;
+  state.smtpRejected = [];
+  state.appended = [];
+  state.appendError = null;
   state.parsed = {
     subject: 'Your payslip',
     from: { value: [{ name: 'Payroll', address: 'payroll@client.co.ke' }] },
@@ -561,5 +611,261 @@ describe('encryption', () => {
     expect(() => decryptPassword(stored, 't1')).toThrow(/can't be read/);
     // two encryptions of the same password differ
     expect(encryptSecret('hunter2', mailboxBinding('u1', 't1'))).not.toBe(stored);
+  });
+});
+
+describe('checking sending when connecting', () => {
+  it('Test also logs in to the outgoing server (same login, checked address, name kept for TLS)', async () => {
+    let body = await (await call('POST', '/test', 'hr-id', { email: 'hr@a.co', imap_host: 'mail.a.co', password: 'hunter2', smtp_port: 587 })).json();
+    expect(body).toEqual({ ok: true, message: 'Connected to mail.a.co. Your mailbox is ready.' });
+    expect(state.smtpOptions[0]).toMatchObject({
+      host: '203.0.113.10',
+      port: 587,
+      secure: false,
+      requireTLS: true,
+      auth: { user: 'hr@a.co', pass: 'hunter2' },
+      tls: { servername: 'mail.a.co' },
+      logger: false,
+    });
+    state.verifyError = { code: 'EAUTH', responseCode: 535 };
+    body = await (await call('POST', '/test', 'hr-id', { email: 'hr@a.co', imap_host: 'mail.a.co', password: 'hunter2' })).json();
+    expect(body.ok).toBe(false);
+    expect(body.message).toMatch(/^Reading works, but sending doesn't: Your mail server refused your password for sending/);
+  });
+
+  it('connecting saves when reading works and says whether sending does', async () => {
+    state.verifyError = { code: 'ECONNECTION' };
+    const res = await connect('hr-id');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.account.email).toBe('hr@a.co');
+    expect(body.smtp).toEqual({ ok: false, message: "Can't reach mail.a.co on port 465 to send. Check the outgoing server and port under Change server settings." });
+    expect(state.tables.user_mailboxes).toHaveLength(1);
+  });
+
+  it('changing only the outgoing server keeps the saved password', async () => {
+    await connect('hr-id');
+    const res = await call('PUT', '/account', 'hr-id', { email: 'hr@a.co', imap_host: 'mail.a.co', smtp_host: 'mail.a.co', smtp_port: 587 });
+    expect(res.status).toBe(200);
+    expect(state.tables.user_mailboxes[0].smtp_port).toBe(587);
+    expect(state.smtpOptions.at(-1)!.auth).toEqual({ user: 'hr@a.co', pass: 'hunter2' });
+  });
+});
+
+describe('sending', () => {
+  const send = (body: Row, token = 'hr-id') => call('POST', '/send', token, body);
+  const raw = () => state.appended[0]?.raw || '';
+
+  beforeEach(async () => {
+    await connect('hr-id');
+    state.imapOptions = [];
+    state.smtpOptions = [];
+    state.logouts = 0;
+    state.messages[1].headers = 'Message-ID: <m1@client>\r\nReferences: <r0@client>\r\n <r1@client>\r\nSubject: SECRET subject\r\n';
+  });
+
+  it('needs a session, the module and a connected mailbox', async () => {
+    expect((await send({ to: ['x@b.co'] }, 'nobody')).status).toBe(401);
+    expect((await send({ to: ['x@b.co'] }, 'staff-id')).status).toBe(403);
+    const res = await send({ to: ['x@b.co'] }, 'admin-id');
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toBe('Connect your mailbox first');
+    expect(state.sent).toHaveLength(0);
+  });
+
+  it('sends from your own mailbox only: your address, your name, your login, whatever the request says', async () => {
+    await connect('admin-id', { password: 'admin-pass' });
+    state.imapOptions = [];
+    state.smtpOptions = [];
+    state.logouts = 0;
+    const res = await send({ to: [{ name: 'Joe', address: 'joe@client.co.ke' }], subject: 'Hello', text: 'SECRET-BODY hi', from: 'admin@a.co', user_id: 'admin-id', headers: { Bcc: 'x@evil.co' } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, saved_to_sent: true, sent_folder: 'Sent', rejected: [], message: 'Sent.' });
+    expect(state.smtpOptions).toHaveLength(1);
+    expect(state.smtpOptions[0]).toMatchObject({ host: '203.0.113.10', port: 465, secure: true, auth: { user: 'hr@a.co', pass: 'hunter2' }, tls: { servername: 'mail.a.co' } });
+    expect(state.imapOptions.map((o) => o.auth)).toEqual([{ user: 'hr@a.co', pass: 'hunter2' }]);
+    const [mail] = state.sent;
+    expect(mail.from).toEqual({ name: 'HR Person', address: 'hr@a.co' });
+    expect(mail.to).toEqual([{ name: 'Joe', address: 'joe@client.co.ke' }]);
+    expect(mail.headers).toBeUndefined();
+    expect(mail).toMatchObject({ subject: 'Hello', text: 'SECRET-BODY hi', disableFileAccess: true, disableUrlAccess: true });
+    expect(mail.messageId).toMatch(/^<[0-9a-f-]{36}@a\.co>$/);
+    expect(raw()).toMatch(/^From: HR Person <hr@a\.co>$/m);
+    expect(raw()).not.toMatch(/admin|evil/);
+    expect(state.logouts).toBe(1);
+  });
+
+  it('checks the recipients: valid addresses, at least one, at most 50 in all', async () => {
+    let res = await send({ to: ['joe@client.co.ke', 'not-an-address'] });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('"not-an-address" in To is not a valid email address');
+    res = await send({ to: ['joe@client.co.ke'], bcc: ['a@b.co\r\nBcc: x@evil.co'] });
+    expect(res.status).toBe(400);
+    res = await send({ subject: 'nobody' });
+    expect((await res.json()).error).toBe('Add at least one recipient');
+    const many = Array.from({ length: 30 }, (_, i) => `p${i}@client.co.ke`);
+    res = await send({ to: many, cc: many.slice(0, 21) });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('Send to at most 50 people at once');
+    expect((await send({ to: many, cc: many.slice(0, 20) })).status).toBe(200);
+    expect(state.sent).toHaveLength(1);
+    expect(state.imapOptions).toHaveLength(1);
+  });
+
+  it('a reply is threaded from the original (In-Reply-To, References) and marks it answered', async () => {
+    const res = await send({ to: ['payroll@client.co.ke'], subject: 'Re: Your payslip', text: 'Thanks', reply: { folder: 'INBOX', uid: 102 } });
+    expect(res.status).toBe(200);
+    const [mail] = state.sent;
+    expect(mail.inReplyTo).toBe('<m1@client>');
+    expect(mail.references).toEqual(['<r0@client>', '<r1@client>', '<m1@client>']);
+    expect(raw()).toMatch(/^In-Reply-To: <m1@client>$/m);
+    expect(raw()).toMatch(/^References: <r0@client> <r1@client> <m1@client>$/m);
+    expect(state.opened).toEqual([{ path: 'INBOX', readOnly: false }]);
+    expect(state.flagged).toEqual([{ uid: '102', flags: ['\\Answered'] }]);
+    // an original that is gone: nothing is sent
+    expect((await send({ to: ['payroll@client.co.ke'], reply: { folder: 'INBOX', uid: 999 } })).status).toBe(404);
+    expect((await send({ to: ['payroll@client.co.ke'], reply: { folder: 'INBOX', uid: 'abc' } })).status).toBe(400);
+    expect(state.sent).toHaveLength(1);
+  });
+
+  it('a forward takes the attachments from the original on the server, read-only', async () => {
+    const res = await send({ to: ['joe@client.co.ke'], subject: 'Fwd: Your payslip', text: '---------- Forwarded message ---------', forward: { folder: 'INBOX', uid: 102, parts: ['2'] } });
+    expect(res.status).toBe(200);
+    expect(state.opened).toEqual([{ path: 'INBOX', readOnly: true }]);
+    expect(state.downloads).toEqual([{ uid: '102', part: '2', options: { uid: true, maxBytes: 20 * 1024 * 1024 + 1 } }]);
+    const [mail] = state.sent;
+    expect(mail.attachments).toHaveLength(1);
+    expect(mail.attachments[0].filename).toBe('pay"slip_.._Oct.pdf');
+    expect(mail.attachments[0].contentType).toBe('application/pdf');
+    expect(mail.attachments[0].content.toString()).toBe('%PDF-1.4 file');
+    expect(state.flagged).toHaveLength(0);
+    // a part that is not in the email
+    expect((await send({ to: ['joe@client.co.ke'], forward: { folder: 'INBOX', uid: 102, parts: ['9'] } })).status).toBe(404);
+    expect((await send({ to: ['joe@client.co.ke'], forward: { folder: 'INBOX', uid: 102, parts: ['../1'] } })).status).toBe(400);
+    expect(state.sent).toHaveLength(1);
+  });
+
+  it('attaches uploaded files (base64), with safe names', async () => {
+    const res = await send({
+      to: ['joe@client.co.ke'],
+      attachments: [{ filename: '../../etc/passwd\r\n.txt', content_type: 'text/plain', data: Buffer.from('hello file').toString('base64') }],
+    });
+    expect(res.status).toBe(200);
+    const [file] = state.sent[0].attachments;
+    expect(file).toMatchObject({ filename: '_.._etc_passwd.txt', contentType: 'text/plain' });
+    expect(file.content.toString()).toBe('hello file');
+    expect((await send({ to: ['joe@client.co.ke'], attachments: [{ filename: 'x', data: 'not base64!' }] })).status).toBe(400);
+  });
+
+  it('caps the size: 3 MB of uploads, 20 MB in all with forwarded files, 256 KB of text', async () => {
+    const big = Buffer.alloc(3 * 1024 * 1024 + 1).toString('base64');
+    let res = await send({ to: ['joe@client.co.ke'], attachments: [{ filename: 'big.bin', data: big }] });
+    expect(res.status).toBe(413);
+    expect((await res.json()).error).toMatch(/up to 3 MB/);
+    state.messages[1].bodyStructure = { type: 'multipart/mixed', childNodes: [{ part: '1', type: 'text/html', size: 300 }, { ...PDF_PART, size: 28 * 1024 * 1024 }] };
+    res = await send({ to: ['joe@client.co.ke'], forward: { folder: 'INBOX', uid: 102, parts: ['2'] } });
+    expect(res.status).toBe(413);
+    expect((await res.json()).error).toMatch(/over 20 MB/);
+    expect(state.downloads).toHaveLength(0);
+    expect((await send({ to: ['joe@client.co.ke'], text: 'x'.repeat(256 * 1024 + 1) })).status).toBe(413);
+    expect(state.sent).toHaveLength(0);
+  });
+
+  it('saves the copy (Bcc kept, marked read) to the folder marked \\Sent, else INBOX.Sent', async () => {
+    state.folders = state.folders.map((f) => (f.path === 'Sent' ? { ...f, path: 'Sent Items', name: 'Sent Items' } : f));
+    await send({ to: ['joe@client.co.ke'], bcc: ['boss@a.co'], subject: 'Hi' });
+    expect(state.appended[0]).toMatchObject({ path: 'Sent Items', flags: ['\\Seen'] });
+    expect(raw()).toMatch(/^Bcc: boss@a\.co$/m);
+    // the copy is the same email: the same Message-ID
+    expect(raw()).toContain(`Message-ID: ${state.sent[0].messageId}`);
+
+    // no special use (older cPanel): INBOX.Sent
+    state.appended = [];
+    state.folders = [
+      { path: 'INBOX', name: 'INBOX', flags: new Set(), delimiter: '.' },
+      { path: 'INBOX.Drafts', name: 'Drafts', flags: new Set(), delimiter: '.' },
+      { path: 'INBOX.Sent', name: 'Sent', flags: new Set(), delimiter: '.' },
+    ];
+    const body = await (await send({ to: ['joe@client.co.ke'] })).json();
+    expect(body.sent_folder).toBe('INBOX.Sent');
+    expect(state.appended[0].path).toBe('INBOX.Sent');
+  });
+
+  it('sent but not saved: no Sent folder, or the save failed, says so (and is not an error)', async () => {
+    state.folders = state.folders.filter((f) => f.path !== 'Sent');
+    let res = await send({ to: ['joe@client.co.ke'] });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, saved_to_sent: false, sent_folder: null, message: "Sent, but couldn't save a copy to Sent." });
+    state.folders.push({ path: 'Sent', name: 'Sent', specialUse: '\\Sent', flags: new Set(), delimiter: '/' });
+    state.appendError = { responseStatus: 'NO', code: 'OVERQUOTA' };
+    res = await send({ to: ['joe@client.co.ke'] });
+    expect(res.status).toBe(200);
+    expect((await res.json()).message).toBe("Sent, but couldn't save a copy to Sent.");
+    expect(state.sent).toHaveLength(2);
+  });
+
+  it('plain errors from the outgoing server, and nothing saved to Sent when it was not sent', async () => {
+    state.smtpError = { code: 'EAUTH', responseCode: 535 };
+    let res = await send({ to: ['joe@client.co.ke'] });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/^Your mail server refused your password for sending/);
+    state.smtpError = { code: 'EENVELOPE', responseCode: 550, rejected: ['joe@client.co.ke'] };
+    res = await send({ to: ['joe@client.co.ke'] });
+    expect((await res.json()).error).toBe('Your mail server refused to send to joe@client.co.ke. Check the address.');
+    state.smtpError = { code: 'EMESSAGE', responseCode: 552 };
+    res = await send({ to: ['joe@client.co.ke'] });
+    expect(res.status).toBe(413);
+    expect((await res.json()).error).toMatch(/too large for your mail server/);
+    expect(state.appended).toHaveLength(0);
+    // some refused, the rest sent
+    state.smtpError = null;
+    state.smtpRejected = ['gone@client.co.ke'];
+    const body = await (await send({ to: ['joe@client.co.ke', 'gone@client.co.ke'] })).json();
+    expect(body).toMatchObject({ ok: true, rejected: ['gone@client.co.ke'], message: 'Sent. Your mail server refused gone@client.co.ke.' });
+  });
+
+  it('refuses an outgoing server on a private network or a port outside the list, before connecting', async () => {
+    state.dns['mail.internal.co'] = [{ address: '10.1.2.3', family: 4 }];
+    state.tables.user_mailboxes[0].smtp_host = 'mail.internal.co';
+    let res = await send({ to: ['joe@client.co.ke'] });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('mail.internal.co is not a public mail server');
+    state.tables.user_mailboxes[0].smtp_host = '127.0.0.1';
+    expect((await send({ to: ['joe@client.co.ke'] })).status).toBe(400);
+    state.tables.user_mailboxes[0].smtp_host = 'mail.a.co';
+    state.tables.user_mailboxes[0].smtp_port = 8080;
+    res = await send({ to: ['joe@client.co.ke'] });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/outgoing mail port must be one of 25, 465, 587, 2525/);
+    expect(state.imapOptions).toHaveLength(0);
+    expect(state.smtpOptions).toHaveLength(0);
+  });
+
+  it('30 sends an hour per person', async () => {
+    expect((await send({ to: ['joe@client.co.ke'] })).status).toBe(200);
+    expect(state.budget['mailbox-send:default:hr-id']).toBe(1);
+    state.budget['mailbox-send:default:hr-id'] = 30;
+    const res = await send({ to: ['joe@client.co.ke'] });
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toMatch(/30 emails from here in the last hour/);
+    expect(state.sent).toHaveLength(1);
+  });
+
+  it('never logs contents, addresses, subjects or passwords while sending', async () => {
+    await send({ to: ['joe@client.co.ke'], bcc: ['boss@a.co'], subject: 'SECRET subject', text: 'SECRET-BODY', reply: { folder: 'INBOX', uid: 102 } });
+    state.appendError = { code: 'NOSPACE' };
+    await send({ to: ['joe@client.co.ke'], subject: 'SECRET subject', text: 'SECRET-BODY' });
+    state.smtpError = { code: 'EENVELOPE', rejected: ['joe@client.co.ke'] };
+    await send({ to: ['joe@client.co.ke'], subject: 'SECRET subject', text: 'SECRET-BODY' });
+    state.smtpError = { code: 'EAUTH' };
+    await send({ to: ['joe@client.co.ke'], subject: 'SECRET subject', text: 'SECRET-BODY', forward: { folder: 'INBOX', uid: 102, parts: ['2'] } });
+    state.verifyError = { code: 'EAUTH' };
+    await call('POST', '/test', 'hr-id', { email: 'hr@a.co', imap_host: 'mail.a.co', password: 'hunter2' });
+    const all = logged.join('\n');
+    expect(all).toContain('[mailbox] send failed: EAUTH');
+    for (const secret of ['SECRET', 'hunter2', 'hr@a.co', 'joe@client.co.ke', 'boss@a.co', 'payslip', 'HR Person']) {
+      expect([secret, all.includes(secret)]).toEqual([secret, false]);
+    }
+    expect(state.smtpOptions.every((o) => o.logger === false && o.debug === false)).toBe(true);
   });
 });
