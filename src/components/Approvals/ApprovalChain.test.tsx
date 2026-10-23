@@ -104,6 +104,33 @@ describe('Approval chain', () => {
     render(<ApprovalChain chain={chain()} compact />);
     expect(screen.getByRole('list', { name: 'Approval chain' }).textContent).toBe('Line manager→HR→CTO');
     expect(screen.getByText('Waiting on HR')).toBeTruthy();
+    // still pending: the step already approved isn't summarised
+    expect(screen.queryByText(/Approved by/)).toBeNull();
+  });
+
+  it('the compact form says who rejected or approved a finished request, and why', () => {
+    const rejected = chain({
+      status: 'rejected',
+      steps: [
+        step(1, 'Leave approver', 'rejected', { actor_name: 'Ian Duncan', comment: 'short staffed', acted_at: '2026-10-23T10:00:00Z' }),
+        step(2, 'Operations', 'not_reached'),
+      ],
+    });
+    const { unmount } = render(<ApprovalChain chain={rejected} compact />);
+    expect(screen.getByText(/^Rejected by Ian Duncan/)).toBeTruthy();
+    expect(screen.getByText('“short staffed”')).toBeTruthy();
+    unmount();
+
+    const approved = chain({
+      status: 'approved',
+      steps: [
+        step(1, 'Leave approver', 'approved', { actor_name: 'Ian Duncan' }),
+        step(2, 'Operations', 'approved', { actor_name: 'Zilpar Okoth', acted_as: 'admin' }),
+      ],
+    });
+    render(<ApprovalChain chain={approved} compact />);
+    expect(screen.getByText(/^Approved by Zilpar Okoth \(admin\)/)).toBeTruthy();
+    expect(screen.queryByText(/Ian Duncan/)).toBeNull();
   });
 
   it('shows nothing without a chain', () => {
