@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Ban, Banknote, CalendarClock, Check, CheckCircle2, HandCoins, Hourglass, Plus, RefreshCw, Wallet, X } from 'lucide-react';
+import { Ban, CalendarClock, Check, HandCoins, Hourglass, Plus, RefreshCw, Wallet, X } from 'lucide-react';
 import { Button, Card, EmployeePicker, EmptyState, Modal, PageHeader, StatCard, TabBar } from '../UI';
 import LoanSchedule, { LoanBalance, LoanStatusPill } from './LoanSchedule';
 import LoanSettingsCard from './LoanSettingsCard';
 import ApprovalChain from '../Approvals/ApprovalChain';
 import { loadApprovalChains, type ApprovalChain as Chain } from '../../lib/approvals';
-import { DemoTag } from '../SalaryAdvance/PayAdvanceModal';
-import { confirmDialog, noticeDialog } from '../../lib/confirmDialog';
-import { IN_APP_PAYMENTS, PAYMENTS_DEMO } from '../../lib/inAppPayments';
+import RecordPaymentLink from '../Payments/RecordPaymentLink';
+import { confirmDialog } from '../../lib/confirmDialog';
 import { usePermissions } from '../../hooks/usePermissions';
 import {
   DEFAULT_LOAN_SETTINGS,
@@ -35,20 +34,18 @@ import {
   loadLoanProducts,
   loadLoanSettings,
   loadSchedules,
-  markLoanDisbursed,
   type EmployeeLoan,
 } from '../../lib/loansApi';
 import type { LoanInstalment, LoanRepayment } from '../../lib/loans';
 import { LoaderBlock } from '../UI/FigbloomLoader';
 
-// HR's loans page: decide on requests, set up a loan for an employee, record that finance paid it out, and follow
+// HR's loans page: decide on requests, set up a loan for an employee, send it to finance to pay out, and follow
 // each loan's schedule and balance. Payroll takes the instalments once a loan is marked disbursed.
 //
 //   * A request goes through the company's loan approvals (Settings > Approval workflows): Approve and Decline decide
 //     the step it is waiting on, for whoever may decide it; the chain shows under it.
-//   * "Mark as disbursed" is the real step: finance paid the loan outside the app, and marking it is what starts the
-//     payroll deductions.
-//   * "Pay out (demo)" only appears for demos (PAYMENTS_DEMO while IN_APP_PAYMENTS is off). Nothing is sent or saved.
+//   * An approved loan is paid out from Payments to make: finance pays it outside the app and records it there with its
+//     reference, which marks it disbursed and starts the payroll deductions.
 
 type Tab = 'requests' | 'approved' | 'active' | 'closed' | 'settings';
 
@@ -61,8 +58,6 @@ const TAB_OF: Record<EmployeeLoan['status'], Exclude<Tab, 'settings'>> = {
   rejected: 'closed',
   cancelled: 'closed',
 };
-
-const showDemoPay = PAYMENTS_DEMO && !IN_APP_PAYMENTS;
 
 const inputClass =
   'w-full px-3 py-2 text-[13px] border border-border rounded-tile bg-white focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand';
@@ -194,28 +189,6 @@ export default function LoansAdmin() {
     if (await act(loan, () => declineLoan(chain.request_id, comment), `Declined ${loan.employee_name}'s loan`)) setDeclining(null);
   };
 
-  const markDisbursed = async (loan: EmployeeLoan) => {
-    const ok = await confirmDialog({
-      title: 'Mark as disbursed?',
-      message: `Record that finance has paid ${loan.employee_name} ${formatKsh(loan.principal)} outside the app. This does not send any money. Payroll takes ${formatKsh(loan.monthly_instalment ?? 0)} a month from ${periodLabel(loan.start_period < currentPeriod() ? currentPeriod() : loan.start_period)}.`,
-      confirmLabel: 'Mark as disbursed',
-    });
-    if (ok) await act(loan, () => markLoanDisbursed(loan.id), `Marked ${loan.employee_name}'s loan as disbursed. Payroll will take the instalments.`);
-  };
-
-  const demoPay = async (loan: EmployeeLoan) => {
-    const ok = await confirmDialog({
-      title: 'Pay out loan (demo)',
-      message: `Pay ${formatKsh(loan.principal)} to ${loan.employee_name}? Demo mode: no money moves and nothing is saved.`,
-      confirmLabel: `Pay ${formatKsh(loan.principal)}`,
-    });
-    if (!ok) return;
-    await noticeDialog({
-      title: 'Demo payment shown',
-      message: `${formatKsh(loan.principal)} shown as sent to ${loan.employee_name}. Nothing was sent: use Mark as disbursed once finance has paid it.`,
-    });
-  };
-
   const cancel = async (loan: EmployeeLoan) => {
     const ok = await confirmDialog({
       title: 'Cancel this loan?',
@@ -329,7 +302,6 @@ export default function LoansAdmin() {
           onChange={(id) => setTab(id as Tab)}
         />
         <div className="flex items-center gap-2">
-          {showDemoPay && tab === 'approved' && <DemoTag />}
           <Button variant="secondary" onClick={() => void load()} disabled={loading} icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />}>
             Refresh
           </Button>
@@ -436,22 +408,7 @@ export default function LoansAdmin() {
                       </>
                     )}
                     {canManage && loan.status === 'approved' && (
-                      <>
-                        {showDemoPay && (
-                          <Button onClick={() => void demoPay(loan)} disabled={busy} icon={<Banknote className="w-3.5 h-3.5" />} title="Demo: nothing is sent">
-                            Pay out (demo)
-                          </Button>
-                        )}
-                        <Button
-                          variant={showDemoPay ? 'secondary' : 'primary'}
-                          onClick={() => void markDisbursed(loan)}
-                          disabled={busy}
-                          icon={<CheckCircle2 className="w-3.5 h-3.5" />}
-                          title="Finance paid it outside the app"
-                        >
-                          Mark as disbursed
-                        </Button>
-                      </>
+                      <RecordPaymentLink />
                     )}
                     {canManage && ['requested', 'approved'].includes(loan.status) && (
                       <Button variant="ghost" onClick={() => void cancel(loan)} disabled={busy} icon={<Ban className="w-3.5 h-3.5" />}>

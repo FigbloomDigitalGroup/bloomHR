@@ -78,6 +78,46 @@ describe('payroll deduction', () => {
   });
 });
 
+describe('catching up a part payroll missed', () => {
+  const slip = (pay_period: string, amount: number, employee_number = 'E1') => ({ employee_number, pay_period, amount });
+
+  it('an advance recorded paid after its month was approved comes off the next payroll', () => {
+    // October's payslip was approved before the payment was recorded, so it took nothing
+    const taken = [slip('2026-09', 0), slip('2026-10', 0)];
+    expect(advanceDeductionFor([paid()], 'E1', '2026-11', taken)).toBe(9000);
+    // once November took it, nothing more
+    expect(advanceDeductionFor([paid()], 'E1', '2026-12', [...taken, slip('2026-11', 9000)])).toBe(0);
+  });
+
+  it('nothing extra when each month took its part', () => {
+    const rows = [paid({ repayment_months: 3 })];
+    const taken = [slip('2026-10', 3000), slip('2026-11', 3000)];
+    expect(advanceDeductionFor(rows, 'E1', '2026-12', taken)).toBe(3000);
+    expect(advanceDeductionFor(rows, 'E1', '2027-01', [...taken, slip('2026-12', 3000)])).toBe(0);
+  });
+
+  it('a missed part is added to the month’s own part', () => {
+    const rows = [paid({ repayment_months: 3 })];
+    expect(advanceDeductionFor(rows, 'E1', '2026-11', [slip('2026-10', 0)])).toBe(6000);
+  });
+
+  it('a month with no payslip counts as missed, once the person has an approved payslip', () => {
+    const rows = [paid({ repayment_months: 3 })];
+    expect(advanceDeductionFor(rows, 'E1', '2026-12', [slip('2026-10', 3000)])).toBe(6000);
+  });
+
+  it('months before the first approved payslip in the app are not charged again', () => {
+    // paid outside the app before payroll moved in; payroll first ran in December
+    expect(advanceDeductionFor([paid({ repayment_months: 3 })], 'E1', '2027-01', [slip('2026-12', 0)])).toBe(3000);
+    expect(advanceDeductionFor([paid()], 'E1', '2027-01', [])).toBe(0);
+  });
+
+  it('only the person’s own payslips before this month count', () => {
+    const taken = [slip('2026-10', 9000, 'E2'), slip('2026-11', 9000)];
+    expect(advanceDeductionFor([paid()], 'E1', '2026-11', taken)).toBe(0);
+  });
+});
+
 describe('progress and stages', () => {
   it('counts parts of past months as repaid', () => {
     const row = paid({ repayment_months: 3 });

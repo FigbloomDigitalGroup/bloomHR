@@ -7,6 +7,9 @@ import { paymentKind, paymentMethodLabel } from './paymentMethods';
 // asked for, in full (as payroll has always done). An advance spread over N months comes off in N equal parts,
 // starting that same month; the last part takes any rounding so the parts add up to the amount exactly.
 // Payroll only takes back advances that are paid (status 'paid' and payment_processed 'true').
+// A part that an approved payslip did not take (the advance was recorded paid after that month's payroll, or the
+// person had no payslip that month) comes off the next payroll, counted from the person's first approved payslip
+// (earlier months were paid outside the app).
 
 /** The most a person may ask for, as a share of their basic salary (the company's long-standing rule). */
 export const ADVANCE_LIMIT_SHARE = 0.2;
@@ -94,20 +97,36 @@ export const repaymentSchedule = (amount: number, months: number, startPeriod: s
 /** An advance's own schedule. */
 export const advanceSchedule = (row: AdvanceRow) => repaymentSchedule(advanceAmount(row), repaymentMonths(row), advancePeriod(row.time_added));
 
+/** What one approved payslip took back for advances (salary_history.advance_deduction). */
+export interface AdvanceTaken {
+  employee_number: string;
+  pay_period: string;
+  amount: number;
+}
+
 /**
- * What payroll takes from an employee's pay for `period` (YYYY-MM), from the paid advances payroll loaded.
- * Without a period every advance counts in full, as before.
+ * What payroll takes from an employee's pay for `period` (YYYY-MM), from the paid advances payroll loaded: this
+ * month's parts, plus earlier parts that approved payslips did not take (`taken`, the person's approved payslips
+ * before `period`), from their first approved payslip on. Without a period every advance counts in full, as before.
  */
-export const advanceDeductionFor = (advances: AdvanceRow[], employeeNumber: unknown, period: string | null | undefined): number => {
+export const advanceDeductionFor = (
+  advances: AdvanceRow[],
+  employeeNumber: unknown,
+  period: string | null | undefined,
+  taken: AdvanceTaken[] = [],
+): number => {
   if (!employeeNumber) return 0;
-  return advances
-    // loose equality: employee numbers come as text or numbers
-    .filter((adv) => adv['Employee Number'] == employeeNumber)
-    .reduce((sum, adv) => {
-      if (!period) return sum + advanceAmount(adv);
-      const part = advanceSchedule(adv).find((i) => i.period === period);
-      return sum + (part ? part.amount : 0);
-    }, 0);
+  // loose equality: employee numbers come as text or numbers
+  const own = advances.filter((adv) => adv['Employee Number'] == employeeNumber);
+  if (!period) return own.reduce((sum, adv) => sum + advanceAmount(adv), 0);
+  const parts = own.flatMap(advanceSchedule);
+  const due = parts.filter((i) => i.period === period).reduce((s, i) => s + i.amount, 0);
+  const before = taken.filter((t) => String(t.employee_number) === String(employeeNumber) && t.pay_period < period);
+  if (before.length === 0) return round2(due);
+  const from = before.reduce((min, t) => (t.pay_period < min ? t.pay_period : min), before[0].pay_period);
+  const owed = parts.filter((i) => i.period >= from && i.period < period).reduce((s, i) => s + i.amount, 0);
+  const took = before.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  return round2(due + Math.max(0, owed - took));
 };
 
 export const isPaid = (row: AdvanceRow) => {
