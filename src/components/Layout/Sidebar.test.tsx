@@ -306,12 +306,12 @@ describe('HR requests waiting on the person', () => {
     expect(item('HR Lifecycle').textContent).toBe('HR Lifecycle1');
     expect(item('Onboarding').textContent).toBe('Onboarding3');
     expect(item('Overtime').textContent).toBe('Overtime4');
-    expect(work.calls.at(-1)).toEqual({ attendance: true, exits: true, onboarding: true, overtime: true });
+    expect(work.calls.at(-1)).toEqual({ attendance: true, exits: true, onboarding: true, overtime: true, signups: false });
   });
 
   it('asks only for what the person may decide', () => {
     perms.granted = ['team-work'];
     sidebar();
-    expect(work.calls.at(-1)).toEqual({ attendance: true, exits: false, onboarding: false, overtime: true });
+    expect(work.calls.at(-1)).toEqual({ attendance: true, exits: false, onboarding: false, overtime: true, signups: false });
   });
 });

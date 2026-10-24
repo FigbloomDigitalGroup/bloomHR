@@ -135,6 +135,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
     exits: !permissionsLoading && hasPermission('approve-exits'),
     onboarding: !permissionsLoading && hasPermission('employees'),
     overtime: !permissionsLoading && hasAnyPermission(['payroll', 'work-records', 'casual-overtime', 'team-work']),
+    signups: !permissionsLoading && hasPermission('adminconfirm'),
   });
 
   // Badge on "Time Off" (FIG-575): count of pending leave applications that

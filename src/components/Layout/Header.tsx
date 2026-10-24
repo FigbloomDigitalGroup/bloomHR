@@ -1,11 +1,17 @@
 import { useEffect, useState, useRef } from 'react';
 import { AccessibilityButton } from '../Accessibility/AccessibilityModal';
-import { Bell, X, Trash2, CheckCircle, UserPlus, Calendar, MapPin, ChevronDown, AlertTriangle, Clock, HelpCircle, Menu } from 'lucide-react';
+import { Bell, X, Trash2, CheckCircle, MapPin, ChevronDown, AlertTriangle, Clock, HelpCircle, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'react-hot-toast';
-import { useHRNotifications, fetchAdminHRNotifications, markAdminNotificationRead, type HRNotification } from '../../hooks/useHRNotifications';
+import {
+  useHRNotifications,
+  fetchAdminHRNotifications,
+  markAdminNotificationsRead,
+  clearAdminNotifications,
+  type HRNotification,
+} from '../../hooks/useHRNotifications';
 import { usePermissions } from '../../hooks/usePermissions';
 import { adminNotificationTarget } from '../../lib/notificationLinks';
 import ScreenSearch from './ScreenSearch';
@@ -32,9 +38,12 @@ interface HeaderProps {
   menuOpen?: boolean;
 }
 
+// The bell holds the notifications stored for the company (hr_notifications) that the person can see. Read and
+// cleared are each person's own (hr_notification_reads), so they stay that way across reloads and other admins
+// still see theirs. New leave applications and staff sign-ups are counted on their sidebar items instead.
 interface NotificationItem {
   id: string;
-  type: 'staff' | 'leave' | 'hr';
+  type: 'hr';
   title: string;
   message: string;
   timestamp: Date;
@@ -45,9 +54,6 @@ interface NotificationItem {
 }
 
 interface NotificationState {
-  staff: number;
-  leave: number;
-  hr: number;
   lastUpdated: Date | null;
   items: NotificationItem[];
 }
@@ -132,14 +138,10 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
   // shows this person as online in Teams on every page, not only while the chat is open
   useOnlinePeople();
   const [notifications, setNotifications] = useState<NotificationState>({
-    staff: 0,
-    leave: 0,
-    hr: 0,
     lastUpdated: null,
     items: []
   });
   const { checkAndNotify } = useHRNotifications();
-  const [showNotificationDot, setShowNotificationDot] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
   const locationRef = useRef<HTMLDivElement>(null);
@@ -162,86 +164,21 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
   useBackToClose(sidebarOpen, () => setSidebarOpen(false));
   useExitGuard(atHome, goHome);
 
-  // Create notification item helper
-  const createNotificationItem = (type: 'staff' | 'leave', data: any): NotificationItem => {
-    const timestamp = new Date(data.created_at || data.time_added || new Date());
-
-    if (type === 'staff') {
-      return {
-        id: `staff-${data.id || Date.now()}`,
-        type: 'staff',
-        title: 'New Staff Signup Request',
-        message: `A new staff member has requested to join. Email: ${data.email || 'Unknown'}`,
-        timestamp,
-        isRead: false
-      };
-    } else {
-      return {
-        id: `leave-${data.id || Date.now()}`,
-        type: 'leave',
-        title: 'New Leave Application',
-        message: `Leave application submitted by ${data.name || 'Employee'}`,
-        timestamp,
-        isRead: false
-      };
-    }
-  };
-
-  // Fetch notification counts
+  // the person's bell: what they haven't cleared, newest first, with their own read state
   const fetchNotificationCounts = async () => {
     try {
-      const yesterday = new Date(Date.now() - 86400000).toISOString();
-
-      // Fetch staff requests
-      const { data: staffData, count: staffCount } = await supabase
-        .from('staff_signup_requests')
-        .select('*', { count: 'exact' })
-        .gt('created_at', yesterday)
-        .order('created_at', { ascending: false });
-
-      // Fetch leave applications
-      const { data: leaveData, count: leaveCount } = await supabase
-        .from('leave_application')
-        .select('*', { count: 'exact' })
-        .gt('time_added', yesterday)
-        .order('time_added', { ascending: false });
-
-      // Create notification items
-      const staffItems = (staffData || []).map(item => createNotificationItem('staff', item));
-      const leaveItems = (leaveData || []).map(item => createNotificationItem('leave', item));
-
-      // Fetch HR lifecycle notifications
       const hrNotifs = await fetchAdminHRNotifications();
-      const hrItems: NotificationItem[] = hrNotifs.map((n: HRNotification) => ({
+      const items: NotificationItem[] = hrNotifs.map((n: HRNotification) => ({
         id: `hr-${n.id}`,
         type: 'hr' as const,
         title: n.title,
         message: n.message,
         timestamp: new Date(n.created_at),
-        isRead: false,
+        isRead: n.is_read === true,
         hrId: n.id,
         hr: { notification_type: n.notification_type, title: n.title, message: n.message },
       }));
-
-      const allItems = [...staffItems, ...leaveItems, ...hrItems].sort((a, b) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      );
-
-      setNotifications(prev => {
-        const newCounts = {
-          staff: staffCount || 0,
-          leave: leaveCount || 0,
-          hr: hrNotifs.length,
-          lastUpdated: new Date(),
-          items: allItems
-        };
-
-        if ((staffCount || 0) > prev.staff || (leaveCount || 0) > prev.leave || hrNotifs.length > prev.hr) {
-          setShowNotificationDot(true);
-        }
-
-        return newCounts;
-      });
+      setNotifications({ lastUpdated: new Date(), items });
     } catch (error) {
       console.error('Error fetching notification counts:', error);
     }
@@ -258,54 +195,26 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
 
   // Setup real-time subscriptions for notifications
   useEffect(() => {
-    const handleStaffUpdate = (payload: any) => {
-      const newItem = createNotificationItem('staff', payload.new);
-      setNotifications(prev => ({
-        ...prev,
-        staff: prev.staff + 1,
-        lastUpdated: new Date(),
-        items: [newItem, ...prev.items]
-      }));
-      setShowNotificationDot(true);
-      toast.success('New staff signup request received');
-    };
-
-    const handleLeaveUpdate = (payload: any) => {
-      const newItem = createNotificationItem('leave', payload.new);
-      setNotifications(prev => ({
-        ...prev,
-        leave: prev.leave + 1,
-        lastUpdated: new Date(),
-        items: [newItem, ...prev.items]
-      }));
-      setShowNotificationDot(true);
-      toast.success('New leave application received');
-    };
+    // a new notification for the company: the bell reloads (what the person may see is the database's to say)
+    const bellChannel = supabase
+      .channel('hr_notifications_bell')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'hr_notifications' }, () => {
+        void fetchNotificationCounts();
+      })
+      .subscribe();
 
     const staffChannel = supabase
       .channel('staff_signup_notifications')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'staff_signup_requests'
-        },
-        handleStaffUpdate
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'staff_signup_requests' }, () => {
+        toast.success('New staff signup request received');
+      })
       .subscribe();
 
     const leaveChannel = supabase
       .channel('leave_application_notifications')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'leave_application'
-        },
-        handleLeaveUpdate
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'leave_application' }, () => {
+        toast.success('New leave application received');
+      })
       .subscribe();
 
     // Initial fetches
@@ -317,6 +226,7 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
     const interval = setInterval(fetchNotificationCounts, 300000);
 
     return () => {
+      supabase.removeChannel(bellChannel);
       supabase.removeChannel(staffChannel);
       supabase.removeChannel(leaveChannel);
       clearInterval(interval);
@@ -336,67 +246,52 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
   }, [navigate]);
 
   const handleBellClick = () => {
-    setShowNotificationDot(false);
     setSidebarOpen(true);
   };
 
   const handleNotificationClick = (notification: NotificationItem) => {
-    // Mark as read
+    // read, for this person
     setNotifications(prev => ({
       ...prev,
       items: prev.items.map(item =>
         item.id === notification.id ? { ...item, isRead: true } : item
       )
     }));
+    if (notification.hrId && !notification.isRead) void markAdminNotificationsRead([notification.hrId]);
 
-    // Navigate based on type (in place of the panel's history entry, so Back does not land on the closed panel)
+    // the screen it is about (one they may open), or their own staff portal section; else it is only marked read
+    // (in place of the panel's history entry, so Back does not land on the closed panel)
     const replace = onOverlayEntry();
-    if (notification.type === 'staff') {
-      navigate('/adminconfirm', { replace });
-      setNotifications(prev => ({ ...prev, staff: Math.max(0, prev.staff - 1) }));
-    } else if (notification.type === 'leave') {
-      navigate('/leaves', { replace });
-      setNotifications(prev => ({ ...prev, leave: Math.max(0, prev.leave - 1) }));
-    } else if (notification.type === 'hr') {
-      if (notification.hrId) markAdminNotificationRead(notification.hrId);
-      // the screen it is about (one they may open), or their own staff portal section; else it is only marked read
-      const target = notification.hr ? adminNotificationTarget(notification.hr, hasPermission) : null;
-      if (target) navigate(target, { replace });
-      setNotifications(prev => ({ ...prev, hr: Math.max(0, prev.hr - 1) }));
-    }
+    const target = notification.hr ? adminNotificationTarget(notification.hr, hasPermission) : null;
+    if (target) navigate(target, { replace });
 
     setSidebarOpen(false);
   };
 
+  const idsOf = (items: NotificationItem[]) => items.map((i) => i.hrId).filter((id): id is number => typeof id === 'number');
+
+  const handleMarkAllRead = () => {
+    const unread = notifications.items.filter((item) => !item.isRead);
+    setNotifications(prev => ({ ...prev, items: prev.items.map(item => ({ ...item, isRead: true })) }));
+    void markAdminNotificationsRead(idsOf(unread));
+    toast.success('All notifications marked as read');
+  };
+
   const handleClearAll = () => {
-    setNotifications(prev => ({
-      ...prev,
-      staff: 0,
-      leave: 0,
-      hr: 0,
-      items: []
-    }));
+    const all = notifications.items;
+    setNotifications(prev => ({ ...prev, items: [] }));
+    void clearAdminNotifications(idsOf(all));
     toast.success('All notifications cleared');
   };
 
   const handleRemoveNotification = (notificationId: string) => {
-    setNotifications(prev => {
-      const itemToRemove = prev.items.find(item => item.id === notificationId);
-      const newItems = prev.items.filter(item => item.id !== notificationId);
-
-      const newState = {
-        ...prev,
-        items: newItems,
-        staff: itemToRemove?.type === 'staff' ? Math.max(0, prev.staff - 1) : prev.staff,
-        leave: itemToRemove?.type === 'leave' ? Math.max(0, prev.leave - 1) : prev.leave
-      };
-
-      return newState;
-    });
+    const item = notifications.items.find((i) => i.id === notificationId);
+    setNotifications(prev => ({ ...prev, items: prev.items.filter(i => i.id !== notificationId) }));
+    if (item) void clearAdminNotifications(idsOf([item]));
   };
 
-  const totalNotifications = notifications.staff + notifications.leave + notifications.hr;
   const unreadItems = notifications.items.filter(item => !item.isRead);
+  const totalNotifications = unreadItems.length;
 
   return (
     <>
@@ -521,7 +416,7 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
             onClick={handleBellClick}
           >
             <Bell className="w-[15px] h-[15px] stroke-[1.8px]" />
-            {showNotificationDot && totalNotifications > 0 && (
+            {totalNotifications > 0 && (
               <span className="absolute top-[5px] right-[6px] w-1.5 h-1.5 rounded-full bg-orange border-[1.5px] border-white"></span>
             )}
           </motion.button>
@@ -564,11 +459,22 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
                     )}
                   </div>
                   <div className="flex items-center space-x-2">
+                    {unreadItems.length > 0 && (
+                      <button
+                        onClick={handleMarkAllRead}
+                        className="text-gray-500 hover:text-brand transition-colors rounded-lg p-1 hover:bg-gray-100"
+                        title="Mark all as read"
+                        aria-label="Mark all as read"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                      </button>
+                    )}
                     {notifications.items.length > 0 && (
                       <button
                         onClick={handleClearAll}
                         className="text-gray-500 hover:text-red-500 transition-colors rounded-lg p-1 hover:bg-gray-100"
                         title="Clear all notifications"
+                        aria-label="Clear all notifications"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -598,12 +504,7 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
                         key={notification.id}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors relative ${!notification.isRead
-                            ? notification.type === 'hr'
-                              ? 'bg-amber-50 border-l-4 border-l-amber-500'
-                              : 'bg-blue-50 border-l-4 border-l-blue-500'
-                            : ''
-                          }`}
+                        className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors relative ${!notification.isRead ? 'bg-amber-50 border-l-4 border-l-amber-500' : ''}`}
                         onClick={() => handleNotificationClick(notification)}
                       >
                         <button
@@ -611,25 +512,16 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
                             e.stopPropagation();
                             handleRemoveNotification(notification.id);
                           }}
+                          aria-label="Clear this notification"
+                          title="Clear"
                           className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg p-1 hover:bg-gray-100"
                         >
                           <X className="w-4 h-4" />
                         </button>
 
                         <div className="flex items-start space-x-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${notification.type === 'staff'
-                              ? 'bg-green-100 text-green-600'
-                              : notification.type === 'hr'
-                                ? 'bg-amber-100 text-amber-600'
-                                : 'bg-blue-100 text-blue-600'
-                            }`}>
-                            {notification.type === 'staff' ? (
-                              <UserPlus className="w-4 h-4" />
-                            ) : notification.type === 'hr' ? (
-                              <Clock className="w-4 h-4" />
-                            ) : (
-                              <Calendar className="w-4 h-4" />
-                            )}
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-amber-100 text-amber-600">
+                            <Clock className="w-4 h-4" />
                           </div>
 
                           <div className="flex-1 min-w-0">
@@ -639,7 +531,7 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
                             <p className="text-xs text-gray-600 mt-1 line-clamp-2" style={{ fontFamily: "'Poppins', sans-serif" }}>
                               {notification.message}
                             </p>
-                            {notification.type === 'hr' && (
+                            {notification.hr && (
                               <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-medium text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
                                 <AlertTriangle className="w-2.5 h-2.5" /> HR Lifecycle
                               </span>
@@ -650,7 +542,7 @@ export default function Header({ selectedTown, onTownChange, selectedRegion, onR
                           </div>
 
                           {!notification.isRead && (
-                            <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-2 ${notification.type === 'hr' ? 'bg-amber-500' : 'bg-blue-500'}`}></div>
+                            <div className="w-2 h-2 rounded-full flex-shrink-0 mt-2 bg-amber-500"></div>
                           )}
                         </div>
                       </motion.div>

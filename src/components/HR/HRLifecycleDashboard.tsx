@@ -94,8 +94,9 @@ export default function HRLifecycleDashboard() {
     }, []);
 
     const loadHRNotifications = useCallback(async () => {
+        // the alerts this person hasn't read yet (dismissing one marks it read for them)
         const notifs = await fetchAdminHRNotifications();
-        setHrNotifications(notifs);
+        setHrNotifications(notifs.filter((n) => !n.is_read));
     }, []);
 
     const dismissNotification = async (id: number) => {
