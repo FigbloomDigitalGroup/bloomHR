@@ -1,10 +1,10 @@
 import { supabase } from './supabase';
 import { fetchAll, IN_LIST_SIZE, chunks } from './fetchAll';
 import { requireUpdatedRows } from './requireUpdated';
-import type { AdvanceRow, PayeeRecord } from './salaryAdvance';
+import type { AdvanceRow, AdvanceTaken, PayeeRecord } from './salaryAdvance';
 
-// Reading and saving salary advances for the staff request screen and the approver queue. Nothing here pays anyone:
-// "Mark as paid" records that finance paid the advance outside the app, which is what makes payroll take it back.
+// Reading and saving salary advances for the staff request screen, the approver queue and payroll. Nothing here pays
+// anyone: finance pays outside the app and records it in Payments to make, which is what makes payroll take it back.
 
 const NOT_SAVED = 'The request was not saved: you do not have permission to change it, or it no longer exists.';
 
@@ -92,6 +92,51 @@ export async function loadAdvanceQueue(): Promise<AdvanceRow[]> {
     .order('time_added', { ascending: false })
     .order('id', { ascending: false })
     .range(from, to));
+}
+
+const APPROVED = ['approved', 'paid'];
+
+/**
+ * What these people's approved payslips took back for advances, month by month, for payroll to catch up on parts it
+ * missed. A payslip counts once its country of the run is approved (payroll_run_countries), or the run is when it has
+ * no countries; payslips of draft runs and those outside any run don't.
+ */
+export async function loadAdvancesTaken(employeeNumbers: string[]): Promise<AdvanceTaken[]> {
+  const unique = [...new Set(employeeNumbers.map(String).filter(Boolean))];
+  if (unique.length === 0) return [];
+  const [runs, countries] = await Promise.all([
+    supabase.from('payroll_runs').select('id, status'),
+    supabase.from('payroll_run_countries').select('run_id, country, status'),
+  ]);
+  if (runs.error) throw runs.error;
+  const runApproved = new Map((runs.data ?? []).map((r) => [String(r.id), APPROVED.includes(String(r.status))]));
+  const byCountry = new Map<string, boolean>();
+  const runsWithCountries = new Set<string>();
+  // a database without payroll_run_countries yet: the runs' own status
+  for (const c of countries.error ? [] : countries.data ?? []) {
+    runsWithCountries.add(String(c.run_id));
+    byCountry.set(`${c.run_id}|${String(c.country ?? '').toLowerCase()}`, APPROVED.includes(String(c.status)));
+  }
+  const out: AdvanceTaken[] = [];
+  for (const part of chunks(unique, IN_LIST_SIZE)) {
+    const rows = await fetchAll<{ employee_id: string; pay_period: string; advance_deduction: number | string | null; run_id: string | null; country: string | null }>(
+      (from, to) =>
+        supabase
+          .from('salary_history')
+          .select('id, employee_id, pay_period, advance_deduction, run_id, country')
+          .in('employee_id', part)
+          .order('id')
+          .range(from, to),
+    );
+    for (const r of rows) {
+      if (!r.run_id || !r.pay_period) continue;
+      const run = String(r.run_id);
+      const approved = runsWithCountries.has(run) ? byCountry.get(`${run}|${String(r.country ?? '').toLowerCase()}`) : runApproved.get(run);
+      if (!approved) continue;
+      out.push({ employee_number: String(r.employee_id), pay_period: r.pay_period, amount: Number(r.advance_deduction) || 0 });
+    }
+  }
+  return out;
 }
 
 /** Payment details of the people in the queue, by employee number. */

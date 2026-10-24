@@ -80,7 +80,8 @@ import { isCasual } from "../../lib/casualPay";
 import { nitaTotal } from "../../lib/nitaLevy";
 
 const withoutCasuals = <T extends Record<string, unknown>>(rows: T[] | null | undefined): T[] => (rows ?? []).filter((e) => !isCasual(e));
-import { advanceDeductionFor } from "../../lib/salaryAdvance";
+import { advanceDeductionFor, type AdvanceTaken } from "../../lib/salaryAdvance";
+import { loadAdvancesTaken } from "../../lib/salaryAdvanceApi";
 import { loadCompanyIdentity } from "../../lib/companyProfile";
 import { useNavigate } from "react-router-dom";
 import { deductionsForPeriod, loadDeductionSetup } from "../../lib/voluntaryDeductions";
@@ -316,6 +317,8 @@ export default function PayrollDashboard() {
   const [smsSendingStatus] = useState({});
   // Add this with your other state declarations
   const [salaryAdvances, setSalaryAdvances] = useState<any[]>([]);
+  // what approved payslips already took back, so a part payroll missed comes off the next run
+  const [advancesTaken, setAdvancesTaken] = useState<AdvanceTaken[]>([]);
   const [currentView, setCurrentView] = useState("dashboard");
 
   // Statutory override state
@@ -358,6 +361,13 @@ export default function PayrollDashboard() {
 
         console.log(`Loaded ${data?.length || 0} salary advances for payroll`);
         setSalaryAdvances(data || []);
+        // without it, each month's own parts are still taken (no catching up)
+        setAdvancesTaken(
+          await loadAdvancesTaken((data || []).map((a: any) => String(a["Employee Number"] ?? ""))).catch((err) => {
+            console.warn("Failed to load advance deductions already taken:", err?.message);
+            return [];
+          }),
+        );
       } catch (error: any) {
         console.warn("Failed to load salary advances:", error.message);
         setSalaryAdvances([]);
@@ -368,9 +378,10 @@ export default function PayrollDashboard() {
   }, []); // Empty dependency array = runs once when component mounts
 
   // What comes off this pay for advances (no database call): a one-month advance in full in the month it was asked
-  // for, an advance spread over N months in N parts from that month (src/lib/salaryAdvance.ts)
+  // for, an advance spread over N months in N parts from that month, plus any part an approved payslip missed
+  // (src/lib/salaryAdvance.ts)
   const calculateAdvanceDeduction = (employeeNumber: any, period: any) =>
-    advanceDeductionFor(salaryAdvances, employeeNumber, period);
+    advanceDeductionFor(salaryAdvances, employeeNumber, period, advancesTaken);
   // Enhanced SMS notification functions
   const sendPayslipNotification = async (employee: any) => {
     if (!employee.employeeNu) {
