@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import { fetchAll, IN_LIST_SIZE, chunks } from './fetchAll';
 import { requireUpdatedRows } from './requireUpdated';
-import type { AdvanceRow, AdvanceTaken, PayeeRecord } from './salaryAdvance';
+import { MAX_REPAYMENT_MONTHS, REPAYMENT_MONTHS_LIMIT, type AdvanceRow, type AdvanceTaken, type PayeeRecord } from './salaryAdvance';
 
 // Reading and saving salary advances for the staff request screen, the approver queue and payroll. Nothing here pays
 // anyone: finance pays outside the app and records it in Payments to make, which is what makes payroll take it back.
@@ -36,14 +36,44 @@ export async function loadMyEmployee(): Promise<MyEmployee | null> {
   };
 }
 
-/** Whether the company has advance requests open, and the message to show when they are not. */
-export async function loadAdvanceWindow(): Promise<{ open: boolean; message: string }> {
-  const { data } = await supabase.from('salary_advance_settings').select('applications_active, custom_message').eq('id', 1).maybeSingle();
+export interface AdvanceWindow {
+  open: boolean;
+  message: string;
+  /** the longest repayment the company allows */
+  maxMonths: number;
+}
+
+/**
+ * Whether the company has advance requests open, the message to show when they are not, and the longest repayment
+ * it allows (salary_advance_terms(), which staff may call: they can't read the settings table).
+ */
+export async function loadAdvanceWindow(): Promise<AdvanceWindow> {
+  const { data } = await supabase.rpc('salary_advance_terms');
+  const terms = (Array.isArray(data) ? data[0] : data) as
+    | { applications_active: boolean | null; custom_message: string | null; max_repayment_months: number | null }
+    | null
+    | undefined;
+  const months = Math.floor(Number(terms?.max_repayment_months));
   return {
-    // no settings row: requests are open
-    open: data ? data.applications_active !== false : true,
-    message: data?.custom_message || 'Salary advance requests are closed for now. They reopen at the start of next month.',
+    // no settings: requests are open
+    open: terms ? terms.applications_active !== false : true,
+    message: terms?.custom_message || 'Salary advance requests are closed for now. They reopen at the start of next month.',
+    maxMonths: months >= 1 && months <= REPAYMENT_MONTHS_LIMIT ? months : MAX_REPAYMENT_MONTHS,
   };
+}
+
+/** The longest repayment the company allows (for the settings screen). */
+export async function loadMaxRepaymentMonths(): Promise<number> {
+  const { data, error } = await supabase.from('salary_advance_settings').select('max_repayment_months').eq('id', 1).maybeSingle();
+  if (error) throw error;
+  return Number(data?.max_repayment_months) || MAX_REPAYMENT_MONTHS;
+}
+
+export async function saveMaxRepaymentMonths(months: number): Promise<void> {
+  const { error } = await supabase
+    .from('salary_advance_settings')
+    .upsert({ id: 1, max_repayment_months: months, updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,id' });
+  if (error) throw error;
 }
 
 export async function loadMyAdvances(employeeNumber: string): Promise<AdvanceRow[]> {

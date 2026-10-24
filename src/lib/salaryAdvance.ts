@@ -14,8 +14,11 @@ import { paymentKind, paymentMethodLabel } from './paymentMethods';
 /** The most a person may ask for, as a share of their basic salary (the company's long-standing rule). */
 export const ADVANCE_LIMIT_SHARE = 0.2;
 
-/** The repayment choices offered: one month, or spread over up to this many. The database allows up to 12. */
+/** The longest repayment offered when the company has not set its own (salary_advance_settings, 1 to 12). */
 export const MAX_REPAYMENT_MONTHS = 6;
+
+/** The most months a company may allow (the database's limit). */
+export const REPAYMENT_MONTHS_LIMIT = 12;
 
 /** The shortest reason accepted. */
 export const MIN_REASON_LENGTH = 10;
@@ -204,14 +207,18 @@ export interface AdvanceRequestInput {
 }
 
 /** What is wrong with a request, by field; empty when it may be sent. */
-export const validateAdvanceRequest = (input: AdvanceRequestInput, maxAmount: number): Partial<Record<keyof AdvanceRequestInput, string>> => {
+export const validateAdvanceRequest = (
+  input: AdvanceRequestInput,
+  maxAmount: number,
+  maxMonths = MAX_REPAYMENT_MONTHS,
+): Partial<Record<keyof AdvanceRequestInput, string>> => {
   const errors: Partial<Record<keyof AdvanceRequestInput, string>> = {};
   const amount = Number(input.amount);
   if (!text(input.amount) || !Number.isFinite(amount) || amount <= 0) errors.amount = 'Enter the amount you need.';
   else if (amount > maxAmount) errors.amount = `The most you can ask for is ${formatKsh(maxAmount)} (${ADVANCE_LIMIT_SHARE * 100}% of your basic salary).`;
   if (text(input.reason).length < MIN_REASON_LENGTH) errors.reason = `Tell us why in a few words (at least ${MIN_REASON_LENGTH} characters).`;
-  if (!Number.isInteger(input.months) || input.months < 1 || input.months > MAX_REPAYMENT_MONTHS) {
-    errors.months = `Choose between 1 and ${MAX_REPAYMENT_MONTHS} months.`;
+  if (!Number.isInteger(input.months) || input.months < 1 || input.months > maxMonths) {
+    errors.months = maxMonths === 1 ? 'Advances here are repaid in one month.' : `Choose between 1 and ${maxMonths} months.`;
   }
   return errors;
 };

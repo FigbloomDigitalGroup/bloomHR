@@ -5,7 +5,6 @@ import { Button, Card, EmptyState, PageHeader } from '../UI';
 import AdvanceTimeline, { AdvanceStagePill, RepaymentSummary } from './AdvanceTimeline';
 import {
   ADVANCE_LIMIT_SHARE,
-  MAX_REPAYMENT_MONTHS,
   addMonths,
   advanceAmount,
   advancePeriod,
@@ -19,7 +18,15 @@ import {
   type AdvanceRequestInput,
   type AdvanceRow,
 } from '../../lib/salaryAdvance';
-import { loadAdvanceWindow, loadMyAdvances, loadMyEmployee, requestAdvance, watchMyAdvances, type MyEmployee } from '../../lib/salaryAdvanceApi';
+import {
+  loadAdvanceWindow,
+  loadMyAdvances,
+  loadMyEmployee,
+  requestAdvance,
+  watchMyAdvances,
+  type AdvanceWindow,
+  type MyEmployee,
+} from '../../lib/salaryAdvanceApi';
 import { LoaderBlock } from '../UI/FigbloomLoader';
 
 // Staff portal: ask for a salary advance and follow it from request to repaid.
@@ -29,7 +36,7 @@ const inputClass =
 
 export default function AdvanceRequest() {
   const [employee, setEmployee] = useState<MyEmployee | null>(null);
-  const [advanceWindow, setAdvanceWindow] = useState<{ open: boolean; message: string }>({ open: true, message: '' });
+  const [advanceWindow, setAdvanceWindow] = useState<AdvanceWindow>({ open: true, message: '', maxMonths: 1 });
   const [advances, setAdvances] = useState<AdvanceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<AdvanceRequestInput>({ amount: '', reason: '', months: 1 });
@@ -74,7 +81,9 @@ export default function AdvanceRequest() {
   }, [employee, refresh]);
 
   const maxAmount = maxAdvanceFor(employee?.basicSalary);
-  const errors = validateAdvanceRequest(form, maxAmount);
+  // the company's longest repayment; at 1 there is nothing to choose
+  const maxMonths = advanceWindow.maxMonths;
+  const errors = validateAdvanceRequest(form, maxAmount, maxMonths);
   const thisMonth = currentPeriod();
   // one request a month; a declined one does not count
   const requestedThisMonth = advances.some(
@@ -181,7 +190,7 @@ export default function AdvanceRequest() {
 
               <fieldset>
                 <legend className="block text-[12px] font-semibold text-ink mb-1.5">Pay it back</legend>
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className={`grid gap-2 ${maxMonths > 1 ? 'sm:grid-cols-2' : ''}`}>
                   <label className={`flex items-start gap-2 p-3 rounded-tile border cursor-pointer ${form.months === 1 ? 'border-brand bg-brand/5' : 'border-border'}`}>
                     <input
                       type="radio"
@@ -196,32 +205,34 @@ export default function AdvanceRequest() {
                       <span className="text-muted-foreground">All of it off {periodLabel(thisMonth)} pay</span>
                     </span>
                   </label>
-                  <label className={`flex items-start gap-2 p-3 rounded-tile border cursor-pointer ${form.months > 1 ? 'border-brand bg-brand/5' : 'border-border'}`}>
-                    <input
-                      type="radio"
-                      name="advance-repayment"
-                      checked={form.months > 1}
-                      onChange={() => setForm({ ...form, months: form.months > 1 ? form.months : 2 })}
-                      disabled={!!blocked}
-                      className="mt-0.5 accent-[rgb(var(--brand))]"
-                    />
-                    <span className="text-[12.5px] flex-1">
-                      <span className="font-semibold text-ink block">Spread over months</span>
-                      <select
-                        aria-label="Number of months"
-                        value={form.months > 1 ? form.months : 2}
-                        onChange={(e) => setForm({ ...form, months: Number(e.target.value) })}
-                        disabled={!!blocked || form.months === 1}
-                        className="mt-1 px-2 py-1 text-[12px] border border-border rounded-tile bg-white disabled:bg-secondary"
-                      >
-                        {Array.from({ length: MAX_REPAYMENT_MONTHS - 1 }, (_, i) => i + 2).map((n) => (
-                          <option key={n} value={n}>
-                            {n} months
-                          </option>
-                        ))}
-                      </select>
-                    </span>
-                  </label>
+                  {maxMonths > 1 && (
+                    <label className={`flex items-start gap-2 p-3 rounded-tile border cursor-pointer ${form.months > 1 ? 'border-brand bg-brand/5' : 'border-border'}`}>
+                      <input
+                        type="radio"
+                        name="advance-repayment"
+                        checked={form.months > 1}
+                        onChange={() => setForm({ ...form, months: form.months > 1 ? form.months : 2 })}
+                        disabled={!!blocked}
+                        className="mt-0.5 accent-[rgb(var(--brand))]"
+                      />
+                      <span className="text-[12.5px] flex-1">
+                        <span className="font-semibold text-ink block">Spread over months</span>
+                        <select
+                          aria-label="Number of months"
+                          value={form.months > 1 ? form.months : 2}
+                          onChange={(e) => setForm({ ...form, months: Number(e.target.value) })}
+                          disabled={!!blocked || form.months === 1}
+                          className="mt-1 px-2 py-1 text-[12px] border border-border rounded-tile bg-white disabled:bg-secondary"
+                        >
+                          {Array.from({ length: maxMonths - 1 }, (_, i) => i + 2).map((n) => (
+                            <option key={n} value={n}>
+                              {n} months
+                            </option>
+                          ))}
+                        </select>
+                      </span>
+                    </label>
+                  )}
                 </div>
                 {showError('months')}
                 {amount > 0 && !errors.amount && schedule.length > 0 && (

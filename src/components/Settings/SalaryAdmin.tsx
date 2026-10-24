@@ -19,6 +19,7 @@ import ModuleGate from '../ProtectedRoutes/ModuleGate';
 import { usePermissions } from '../../hooks/usePermissions';
 import { salaryWorkflowRole } from '../../lib/salaryWorkflowRole';
 import AdvanceApplicationManager from './staffSetting';
+import AdvanceRepaymentSetting from '../SalaryAdvance/AdvanceRepaymentSetting';
 import SearchableDropdown from '../UI/SearchableDropdown';
 import TransactionStatusChecker from './TransactionStatusChecker';
 import { fetchTrustedRole } from '../../lib/trustedRole';
@@ -5637,7 +5638,10 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         {activeTab === 'requests' ? (
           <AdvanceQueue canDecide={isAdminOrChecker} onChanged={fetchApplications} />
         ) : activeTab === 'settings' ? (
-          <AdvanceApplicationManager />
+          <div className="space-y-4">
+            <AdvanceRepaymentSetting />
+            <AdvanceApplicationManager />
+          </div>
         ) : activeTab === 'callbacks' ? (
           <MpesaCallbacks filterType="payments" />
         ) : activeTab === 'transaction_status' ? (

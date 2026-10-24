@@ -20,7 +20,7 @@ const lastMonth = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 
 beforeEach(() => {
   vi.clearAllMocks();
   mocked.loadMyEmployee.mockResolvedValue(ME);
-  mocked.loadAdvanceWindow.mockResolvedValue({ open: true, message: '' });
+  mocked.loadAdvanceWindow.mockResolvedValue({ open: true, message: '', maxMonths: 6 });
   mocked.loadMyAdvances.mockResolvedValue([]);
   mocked.requestAdvance.mockResolvedValue(undefined);
 });
@@ -61,8 +61,27 @@ describe('asking for an advance', () => {
     await vi.waitFor(() => expect(mocked.requestAdvance).toHaveBeenCalledWith(ME, { amount: 9000, reason: 'School fees for next term', months: 3 }));
   });
 
+  it('offers no more months than the company allows', async () => {
+    mocked.loadAdvanceWindow.mockResolvedValue({ open: true, message: '', maxMonths: 3 });
+    render(<AdvanceRequest />);
+    await screen.findByText('KSh 10,000');
+    const options = Array.from((screen.getByLabelText('Number of months') as HTMLSelectElement).options).map((o) => o.value);
+    expect(options).toEqual(['2', '3']);
+  });
+
+  it('at one month, there is nothing to spread: the request is repaid in one month', async () => {
+    mocked.loadAdvanceWindow.mockResolvedValue({ open: true, message: '', maxMonths: 1 });
+    render(<AdvanceRequest />);
+    await screen.findByText('KSh 10,000');
+    expect(screen.queryByLabelText(/Spread over months/)).toBeNull();
+    fireEvent.change(amount(), { target: { value: '8000' } });
+    fireEvent.change(reason(), { target: { value: 'Emergencies at home' } });
+    fireEvent.click(screen.getByRole('button', { name: /Send request/ }));
+    await vi.waitFor(() => expect(mocked.requestAdvance).toHaveBeenCalledWith(ME, { amount: 8000, reason: 'Emergencies at home', months: 1 }));
+  });
+
   it('cannot ask while requests are closed', async () => {
-    mocked.loadAdvanceWindow.mockResolvedValue({ open: false, message: 'Closed until the 1st.' });
+    mocked.loadAdvanceWindow.mockResolvedValue({ open: false, message: 'Closed until the 1st.', maxMonths: 6 });
     render(<AdvanceRequest />);
     expect(await screen.findByText('Closed until the 1st.')).toBeTruthy();
     expect((screen.getByRole('button', { name: /Send request/ }) as HTMLButtonElement).disabled).toBe(true);
