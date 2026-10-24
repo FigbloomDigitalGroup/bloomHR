@@ -9,7 +9,6 @@ vi.mock('../../lib/loansApi', () => ({
   loadSchedules: vi.fn(),
   approveLoan: vi.fn(),
   declineLoan: vi.fn(),
-  markLoanDisbursed: vi.fn(),
   cancelLoan: vi.fn(),
   createLoan: vi.fn(),
   saveLoanSettings: vi.fn(),
@@ -42,6 +41,11 @@ vi.mock('../../hooks/usePermissions', () => ({
       loading: false,
     };
   },
+}));
+const navigate = vi.fn();
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router-dom')>()),
+  useNavigate: () => navigate,
 }));
 vi.mock('../UI/EmployeePicker', () => ({
   default: ({ onChange }: { onChange: (e: { employeeNumber: string } | null) => void }) => (
@@ -93,7 +97,7 @@ beforeEach(() => {
     schedules: { d1: loanSchedule(12000, 0, 3, 'flat', currentPeriod()) },
     repayments: { d1: [{ loan_id: 'd1', pay_period: addMonths(currentPeriod(), -1), amount: 4000 }] },
   });
-  for (const f of [mocked.declineLoan, mocked.markLoanDisbursed, mocked.cancelLoan]) f.mockResolvedValue(undefined);
+  for (const f of [mocked.declineLoan, mocked.cancelLoan]) f.mockResolvedValue(undefined);
   mocked.approveLoan.mockResolvedValue('approved');
   mocked.createLoan.mockResolvedValue('approved');
   vi.stubGlobal('confirm', vi.fn(() => true));
@@ -137,13 +141,22 @@ describe('the loans page', () => {
     await vi.waitFor(() => expect(mocked.declineLoan).toHaveBeenCalledWith('q1', 'A loan is still being repaid'));
   });
 
-  it('marks an approved loan disbursed, after asking', async () => {
+  it('an approved loan is paid out from Payments to make, by finance', async () => {
+    perms.modules = [...HR_MODULES, 'payments'];
     render(<LoansAdmin />);
     await screen.findByTestId('loan-r1');
     fireEvent.click(screen.getByText('To pay out (1)'));
-    fireEvent.click(within(screen.getByTestId('loan-a1')).getByRole('button', { name: 'Mark as disbursed' }));
-    await vi.waitFor(() => expect(mocked.markLoanDisbursed).toHaveBeenCalledWith('a1'));
-    expect(vi.mocked(window.confirm).mock.calls[0][0]).toMatch(/does not send any money/);
+    const card = screen.getByTestId('loan-a1');
+    expect(within(card).queryByRole('button', { name: /Mark as disbursed|Pay out/ })).toBeNull();
+    fireEvent.click(within(card).getByRole('button', { name: 'Record payment' }));
+    expect(navigate).toHaveBeenCalledWith('/payments');
+  });
+
+  it('HR without the payments module is told finance pays the loan out', async () => {
+    render(<LoansAdmin />);
+    await screen.findByTestId('loan-r1');
+    fireEvent.click(screen.getByText('To pay out (1)'));
+    expect(within(screen.getByTestId('loan-a1')).getByText(/Waiting for finance to pay it/)).toBeTruthy();
   });
 
   it('shows a repaying loan’s schedule and balance', async () => {
