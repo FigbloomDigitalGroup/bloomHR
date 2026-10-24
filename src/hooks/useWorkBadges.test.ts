@@ -31,7 +31,7 @@ import { loadWorkBadges } from './useWorkBadges';
 const all = { attendance: true, exits: true, onboarding: true, overtime: true };
 
 beforeEach(() => {
-  db.counts = { employee_exits: 1, employees: 3, overtime_entries: 4 };
+  db.counts = { employee_exits: 1, employees: 3, overtime_entries: 4, staff_signup_requests: 5 };
   db.scans = [{ can_decide: true }, { can_decide: false }, { can_decide: true }];
   db.asked = [];
   db.filters = [];
@@ -39,12 +39,19 @@ beforeEach(() => {
 
 describe('work badges', () => {
   it('counts what waits on the person', async () => {
-    expect(await loadWorkBadges(all)).toEqual({ attendance: 2, 'hr-lifecycle': 1, onboarding: 3, overtime: 4 });
+    expect(await loadWorkBadges({ ...all, signups: true })).toEqual({
+      attendance: 2,
+      'hr-lifecycle': 1,
+      onboarding: 3,
+      overtime: 4,
+      'email admin': 5,
+    });
     expect(db.filters).toEqual(
       expect.arrayContaining([
         ['employee_exits', 'status', 'requested'],
         ['employees', 'onboarding_status', 'submitted'],
         ['overtime_entries', 'status', 'submitted'],
+        ['staff_signup_requests', 'status', 'pending'],
       ]),
     );
   });
@@ -60,6 +67,7 @@ describe('work badges', () => {
       'hr-lifecycle': 0,
       onboarding: 3,
       overtime: 0,
+      'email admin': 0,
     });
     expect(db.asked).toEqual(['employees']);
   });
