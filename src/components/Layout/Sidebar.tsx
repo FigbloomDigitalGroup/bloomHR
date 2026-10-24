@@ -47,6 +47,7 @@ import { SearchInput } from '../UI';
 import { onOverlayEntry } from '../../hooks/useBackToClose';
 import { useMailboxUnread } from '../../hooks/useMailboxUnread';
 import { useMoneyBadges } from '../../hooks/useMoneyBadges';
+import { useWorkBadges } from '../../hooks/useWorkBadges';
 
 // The menu, grouped (src/lib/sidebarMenu.ts, shared with the Roles screen's preview), with an icon per entry. Who
 // sees each entry is decided by its path in routeModules.ts (the modules of the person's role, FIG-827), the same list
@@ -120,7 +121,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
   const [searchQuery, setSearchQuery] = useState('');
 
   // Use permissions hook for dynamic access control
-  const { hasPermission, roleName, loading: permissionsLoading } = usePermissions();
+  const { hasPermission, hasAnyPermission, roleName, loading: permissionsLoading } = usePermissions();
   // the final approvers (HR administration; administrators) count every pending request, others only their team's
   const seesAllLeave = !permissionsLoading && hasPermission('hr-admin');
   const { data: myPreferences } = useMyPreferences(user?.email);
@@ -128,6 +129,13 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
   const mailboxUnread = useMailboxUnread(!permissionsLoading && hasPermission('mailbox'), user?.email);
   // advances, loans, expenses and payments waiting on this person (their approval step, or finance's payments)
   const moneyBadges = useMoneyBadges(user?.email, !permissionsLoading && hasPermission('payments'));
+  // missed scans, exits, onboarding reviews and overtime waiting on this person, for the items they may act on
+  const workBadges = useWorkBadges(user?.email, {
+    attendance: !permissionsLoading && hasAnyPermission(['employees', 'hr-lifecycle', 'team-work']),
+    exits: !permissionsLoading && hasPermission('approve-exits'),
+    onboarding: !permissionsLoading && hasPermission('employees'),
+    overtime: !permissionsLoading && hasAnyPermission(['payroll', 'work-records', 'casual-overtime', 'team-work']),
+  });
 
   // Badge on "Time Off" (FIG-575): count of pending leave applications that
   // need action from the logged-in user specifically - not a global count,
@@ -371,13 +379,13 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
                     item.label.toLowerCase().includes(searchQuery.toLowerCase())
                   ).map((item) => {
                     const isActive = currentPath.startsWith(item.path);
-                    // pending leave on "Time Off", new mail on "Email Portal", money waiting on this person
+                    // pending leave on "Time Off", new mail on "Email Portal", requests waiting on this person
                     const badge =
                       item.id === 'leaves'
                         ? pendingLeaveCount
                         : item.id === 'email-portal'
                           ? mailboxUnread
-                          : moneyBadges[item.id as keyof typeof moneyBadges] ?? 0;
+                          : (moneyBadges[item.id as keyof typeof moneyBadges] ?? workBadges[item.id as keyof typeof workBadges] ?? 0);
                     const badgeLabel =
                       item.id === 'email-portal' ? `${badge} unread` : item.id === 'payments' ? `${badge} to pay or approve` : `${badge} pending`;
 
