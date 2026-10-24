@@ -18,6 +18,14 @@ vi.mock('../../hooks/useMailboxUnread', () => ({
     return enabled ? mail.unread : 0;
   },
 }));
+// money waiting on the person (its counting is tested in useMoneyBadges.test.ts)
+const money = vi.hoisted(() => ({ badges: {} as Record<string, number>, calls: [] as [string | undefined, boolean][] }));
+vi.mock('../../hooks/useMoneyBadges', () => ({
+  useMoneyBadges: (who: string | undefined, paysOut: boolean) => {
+    money.calls.push([who, paysOut]);
+    return money.badges;
+  },
+}));
 vi.mock('../../hooks/useMyPreferences', () => ({
   useMyPreferences: () => ({ data: null }),
 }));
@@ -227,5 +235,41 @@ describe('new mail on Email Portal', () => {
     sidebar();
     expect(portal().textContent).toBe('Email Portal');
     expect(mail.calls.every(([enabled]) => enabled === false)).toBe(true);
+  });
+});
+
+describe('money waiting on the person', () => {
+  const sidebar = () =>
+    render(
+      <MemoryRouter>
+        <Sidebar user={{ email: 'ops@co.com', role: 'HR' }} isCollapsed={false} onToggle={() => {}} />
+      </MemoryRouter>,
+    );
+  const item = (label: string) => screen.getByText(label).closest('button') as HTMLElement;
+  beforeEach(() => {
+    setWidth(1280);
+    money.badges = {};
+    money.calls = [];
+  });
+  afterEach(() => {
+    perms.granted = null;
+  });
+
+  it('counts advances, loans and payments on their items', () => {
+    perms.granted = ['salaryadmin', 'loans', 'payments'];
+    money.badges = { advanced: 1, loans: 2, payments: 3 };
+    sidebar();
+    expect(item('Salary Advance').textContent).toBe('Salary Advance1');
+    expect(within(item('Salary Advance')).getByTitle('1 pending')).toBeTruthy();
+    expect(item('Loans').textContent).toBe('Loans2');
+    expect(within(item('Payments to make')).getByTitle('3 to pay or approve')).toBeTruthy();
+    expect(money.calls.at(-1)).toEqual(['ops@co.com', true]);
+  });
+
+  it('nothing at 0, and payments to make are counted only for finance', () => {
+    perms.granted = ['salaryadmin'];
+    sidebar();
+    expect(item('Salary Advance').textContent).toBe('Salary Advance');
+    expect(money.calls.every(([, paysOut]) => paysOut === false)).toBe(true);
   });
 });
