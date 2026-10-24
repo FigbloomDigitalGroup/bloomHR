@@ -26,6 +26,13 @@ vi.mock('../../hooks/useMoneyBadges', () => ({
     return money.badges;
   },
 }));
+const work = vi.hoisted(() => ({ badges: {} as Record<string, number>, calls: [] as Record<string, boolean>[] }));
+vi.mock('../../hooks/useWorkBadges', () => ({
+  useWorkBadges: (_who: string | undefined, access: Record<string, boolean>) => {
+    work.calls.push(access);
+    return work.badges;
+  },
+}));
 vi.mock('../../hooks/useMyPreferences', () => ({
   useMyPreferences: () => ({ data: null }),
 }));
@@ -271,5 +278,40 @@ describe('money waiting on the person', () => {
     sidebar();
     expect(item('Salary Advance').textContent).toBe('Salary Advance');
     expect(money.calls.every(([, paysOut]) => paysOut === false)).toBe(true);
+  });
+});
+
+describe('HR requests waiting on the person', () => {
+  const sidebar = () =>
+    render(
+      <MemoryRouter>
+        <Sidebar user={{ email: 'hr@co.com', role: 'HR' }} isCollapsed={false} onToggle={() => {}} />
+      </MemoryRouter>,
+    );
+  const item = (label: string) => screen.getByText(label).closest('button') as HTMLElement;
+  beforeEach(() => {
+    setWidth(1280);
+    work.badges = {};
+    work.calls = [];
+  });
+  afterEach(() => {
+    perms.granted = null;
+  });
+
+  it('counts missed scans, exits, onboarding reviews and overtime on their items', () => {
+    perms.granted = ['employees', 'hr-lifecycle', 'approve-exits', 'payroll'];
+    work.badges = { attendance: 2, 'hr-lifecycle': 1, onboarding: 3, overtime: 4 };
+    sidebar();
+    expect(item('Attendance').textContent).toBe('Attendance2');
+    expect(item('HR Lifecycle').textContent).toBe('HR Lifecycle1');
+    expect(item('Onboarding').textContent).toBe('Onboarding3');
+    expect(item('Overtime').textContent).toBe('Overtime4');
+    expect(work.calls.at(-1)).toEqual({ attendance: true, exits: true, onboarding: true, overtime: true });
+  });
+
+  it('asks only for what the person may decide', () => {
+    perms.granted = ['team-work'];
+    sidebar();
+    expect(work.calls.at(-1)).toEqual({ attendance: true, exits: false, onboarding: false, overtime: true });
   });
 });
