@@ -183,3 +183,19 @@ describe('payee check', () => {
     expect(accountNameMatches('Jane Otieno', base)).toBe(false);
   });
 });
+
+describe('the company’s longest repayment', () => {
+  const ok = { amount: '5000', reason: 'School fees for next term' };
+  it('refuses more months than the company allows', () => {
+    expect(validateAdvanceRequest({ ...ok, months: 4 }, 10000, 3).months).toBe('Choose between 1 and 3 months.');
+    expect(validateAdvanceRequest({ ...ok, months: 3 }, 10000, 3).months).toBeUndefined();
+  });
+  it('at one month, says so', () => {
+    expect(validateAdvanceRequest({ ...ok, months: 2 }, 10000, 1).months).toBe('Advances here are repaid in one month.');
+    expect(validateAdvanceRequest({ ...ok, months: 1 }, 10000, 1).months).toBeUndefined();
+  });
+  it('without a company setting, up to six', () => {
+    expect(validateAdvanceRequest({ ...ok, months: 6 }, 10000).months).toBeUndefined();
+    expect(validateAdvanceRequest({ ...ok, months: 7 }, 10000).months).toBeDefined();
+  });
+});
