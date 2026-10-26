@@ -3,6 +3,7 @@ import { sendEmailViaServer } from './emailApi';
 import { queueInvitations } from './inviteQueue';
 import { startOnboardingByEmail } from './onboarding';
 import { formatKsh } from './jobGroups';
+import { loadCompanyProfile } from './companyProfile';
 import type { StatusTone } from '../components/UI';
 
 // Offer letters (FIG-831, migration 20261016300000). HR writes an offer from one of the company's templates; the
@@ -104,6 +105,18 @@ export interface LetterBranding {
   letterhead_footer_url?: string | null;
 }
 
+/** The company's look on a letter, from its company profile ("Your company" when it has none or can't be read). */
+export async function loadBranding(): Promise<LetterBranding> {
+  const p = await loadCompanyProfile().catch(() => null);
+  if (!p) return { name: 'Your company' };
+  return {
+    name: p.company_name, logo_url: p.logo_url, tagline: p.tagline, primary_color: p.primary_color, secondary_color: p.secondary_color,
+    address_line1: p.address_line1, address_line2: p.address_line2, city: p.city, postal_code: p.postal_code, country: p.country,
+    phone: p.official_phone, email: p.official_email, website: p.website,
+    letterhead_header_url: p.letterhead_header_url, letterhead_footer_url: p.letterhead_footer_url,
+  };
+}
+
 /** What the candidate's page shows (offer_by_token). */
 export interface PublicOffer {
   title: string;
@@ -184,8 +197,8 @@ export function fillPlaceholders(text: string, values: Record<string, string>): 
 }
 
 /** Placeholders in the text that are not known (shown as a warning in the editor). */
-export function unknownPlaceholders(text: string): string[] {
-  const known = new Set(OFFER_PLACEHOLDERS.map((p) => p.key));
+export function unknownPlaceholders(text: string, placeholders: { key: string }[] = OFFER_PLACEHOLDERS): string[] {
+  const known = new Set(placeholders.map((p) => p.key));
   const found = [...text.matchAll(/\{\{\s*([a-z_]+)\s*\}\}/gi)].map((m) => m[1].toLowerCase());
   return [...new Set(found.filter((k) => !known.has(k)))];
 }
@@ -450,20 +463,26 @@ export async function imagesLoaded(element: HTMLElement, timeoutMs = 10000) {
   clearTimeout(timer);
 }
 
+const letterPdfOptions = (filename: string) => ({
+  margin: 0.5,
+  filename,
+  image: { type: 'jpeg', quality: 0.98 },
+  html2canvas: { scale: 2, useCORS: true, windowWidth: 900 },
+  jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
+});
+
 /** Downloads the element (the rendered letter) as an A4 PDF, as payslips are. */
 export async function downloadLetterPdf(element: HTMLElement, filename: string) {
   await imagesLoaded(element);
   const { default: html2pdf } = await import('html2pdf.js');
-  await html2pdf()
-    .from(element)
-    .set({
-      margin: 0.5,
-      filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, windowWidth: 900 },
-      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' },
-    })
-    .save();
+  await html2pdf().from(element).set(letterPdfOptions(filename)).save();
+}
+
+/** The element (the rendered letter) as an A4 PDF file, to attach to an email or keep. */
+export async function letterPdfBlob(element: HTMLElement): Promise<Blob> {
+  await imagesLoaded(element);
+  const { default: html2pdf } = await import('html2pdf.js');
+  return html2pdf().from(element).set(letterPdfOptions('letter.pdf')).outputPdf('blob');
 }
 
 /** A file name for the letter: offer-jane-wanjiku.pdf */

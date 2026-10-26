@@ -7,7 +7,6 @@ import FigbloomLoader from '../UI/FigbloomLoader';
 import OfferEditor, { Field, inputClass } from './OfferEditor';
 import OfferLetter from './OfferLetter';
 import OfferTemplatesModal from './OfferTemplatesModal';
-import { loadCompanyProfile } from '../../lib/companyProfile';
 import { formatKsh } from '../../lib/jobGroups';
 import {
   OFFER_STATUSES,
@@ -25,6 +24,7 @@ import {
   fillPlaceholders,
   letterDate,
   letterFileName,
+  loadBranding,
   loadOfferJobGroups,
   loadOfferTemplates,
   loadOffers,
@@ -39,17 +39,6 @@ import { confirmDialog } from '../../lib/confirmDialog';
 // Offers (FIG-831): HR (Employees or Recruitment) writes offers to candidates, sends them by email with a private
 // link, and sees each answer. An accepted offer becomes an employee with "Add as employee". Opened from the sidebar,
 // the Onboarding page, or with ?application=<id>&name=&email=&job= to start an offer from a job application.
-
-export async function loadBranding(): Promise<LetterBranding> {
-  const p = await loadCompanyProfile().catch(() => null);
-  if (!p) return { name: 'Your company' };
-  return {
-    name: p.company_name, logo_url: p.logo_url, tagline: p.tagline, primary_color: p.primary_color, secondary_color: p.secondary_color,
-    address_line1: p.address_line1, address_line2: p.address_line2, city: p.city, postal_code: p.postal_code, country: p.country,
-    phone: p.official_phone, email: p.official_email, website: p.website,
-    letterhead_header_url: p.letterhead_header_url, letterhead_footer_url: p.letterhead_footer_url,
-  };
-}
 
 export const tellSendOutcome = (outcome: SendOutcome) => {
   if (outcome.status === 'sent') toast.success(`Offer sent to ${outcome.email}`);

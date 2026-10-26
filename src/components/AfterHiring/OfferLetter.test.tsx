@@ -54,6 +54,27 @@ describe('OfferLetter letterhead', () => {
   });
 });
 
+describe('the signature', () => {
+  const text = 'Dear Jane,\n\nYours sincerely,\n\n{{signature}}\nMary Hr\nHR Officer';
+
+  it('a {{signature}} line is the drawn signature, between the sign-off and the name', () => {
+    render(<OfferLetter branding={BRANDING} title="Letter" text={text} signature="data:image/png;base64,AAA" />);
+    const letter = within(screen.getByTestId('offer-letter'));
+    expect((letter.getByTestId('letter-signature') as HTMLImageElement).src).toBe('data:image/png;base64,AAA');
+    expect(letter.getByText('Mary Hr')).toBeTruthy();
+    expect(letter.getByText('HR Officer')).toBeTruthy();
+    expect(letter.queryByText(/\{\{signature\}\}/)).toBeNull();
+  });
+
+  it('without a signature the line is left as space to sign by hand', () => {
+    render(<OfferLetter branding={BRANDING} title="Letter" text={text} />);
+    const letter = within(screen.getByTestId('offer-letter'));
+    expect(letter.queryByTestId('letter-signature')).toBeNull();
+    expect(letter.queryByText(/\{\{signature\}\}/)).toBeNull();
+    expect(letter.getByText('Mary Hr')).toBeTruthy();
+  });
+});
+
 describe('imagesLoaded (before the PDF is made)', () => {
   it('waits for images still loading, and gives up after the timeout', async () => {
     const box = document.createElement('div');
