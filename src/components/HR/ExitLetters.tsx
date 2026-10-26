@@ -5,6 +5,7 @@ import { Button, Card, Modal } from '../UI';
 import OfferLetter from '../AfterHiring/OfferLetter';
 import { Field, inputClass } from '../AfterHiring/OfferEditor';
 import LetterTemplatesModal from '../AfterHiring/LetterTemplatesModal';
+import LetterheadPicker from '../AfterHiring/LetterheadPicker';
 import MySignature from '../Signature/MySignature';
 import { formatDay, parseDay } from '../../lib/contract';
 import { fillPlaceholders, letterPdfBlob, loadBranding, unknownPlaceholders, type LetterBranding } from '../../lib/offers';
@@ -205,6 +206,8 @@ function ExitLetterComposer({ exit, onClose, onDone }: ComposerProps) {
               <MySignature bare onChange={setSignature} />
               {!usesSignature && <p className="mt-1 mb-0 text-[11px] text-subtle">This text has no {'{{signature}}'} line, so the signature is not shown.</p>}
             </div>
+
+            <LetterheadPicker branding={branding} onChange={setBranding} />
           </div>
 
           <div className="min-w-0">

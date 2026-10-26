@@ -3,7 +3,8 @@ import { sendEmailViaServer } from './emailApi';
 import { queueInvitations } from './inviteQueue';
 import { startOnboardingByEmail } from './onboarding';
 import { formatKsh } from './jobGroups';
-import { loadCompanyProfile } from './companyProfile';
+import { loadCompanyIdentity, loadCompanyProfile } from './companyProfile';
+import { companyApi } from './companyApi';
 import type { StatusTone } from '../components/UI';
 
 // Offer letters (FIG-831, migration 20261016300000). HR writes an offer from one of the company's templates; the
@@ -110,12 +111,23 @@ export interface LetterBranding {
   letterhead_footer_url?: string | null;
 }
 
-/** The company's look on a letter, from its company profile ("Your company" when it has none or can't be read). */
+/**
+ * The company's name when its profile has none: the name in the old logo settings, else the name the company was
+ * created with (as the candidate's page does). "Your company" only when none can be read.
+ */
+async function fallbackCompanyName(): Promise<string> {
+  const identity = await loadCompanyIdentity().catch(() => null);
+  if (identity?.company_name?.trim()) return identity.company_name.trim();
+  const companies = await companyApi.myCompanies().catch(() => [] as { name: string; is_current: boolean }[]);
+  return companies.find((c) => c.is_current)?.name?.trim() || 'Your company';
+}
+
+/** The company's look on a letter, from its company profile; the name falls back as above. */
 export async function loadBranding(): Promise<LetterBranding> {
   const p = await loadCompanyProfile().catch(() => null);
-  if (!p) return { name: 'Your company' };
+  if (!p) return { name: await fallbackCompanyName() };
   return {
-    name: p.company_name, logo_url: p.logo_url, tagline: p.tagline, primary_color: p.primary_color, secondary_color: p.secondary_color,
+    name: p.company_name?.trim() || (await fallbackCompanyName()), logo_url: p.logo_url, tagline: p.tagline, primary_color: p.primary_color, secondary_color: p.secondary_color,
     address_line1: p.address_line1, address_line2: p.address_line2, city: p.city, postal_code: p.postal_code, country: p.country,
     phone: p.official_phone, email: p.official_email, website: p.website,
     letterhead_header_url: p.letterhead_header_url, letterhead_footer_url: p.letterhead_footer_url,
