@@ -7,6 +7,10 @@ import FigbloomLoader from '../UI/FigbloomLoader';
 import OfferEditor, { Field, inputClass } from './OfferEditor';
 import OfferLetter from './OfferLetter';
 import OfferTemplatesModal from './OfferTemplatesModal';
+import { renderLetterPdf } from './letterPdf';
+import { loadMySignature } from '../../lib/signatures';
+import { loadLetterSender, type LetterSender } from '../../lib/exitLetters';
+import { archiveDocument, loadDocumentsFor } from '../../lib/generatedDocuments';
 import { formatKsh } from '../../lib/jobGroups';
 import {
   OFFER_STATUSES,
@@ -19,11 +23,11 @@ import {
   type OfferTemplate,
   addOfferAsEmployee,
   deleteOffer,
-  downloadLetterPdf,
   effectiveStatus,
   fillPlaceholders,
   letterDate,
   letterFileName,
+  letterPdfBlob,
   loadBranding,
   loadOfferJobGroups,
   loadOfferTemplates,
@@ -44,6 +48,50 @@ export const tellSendOutcome = (outcome: SendOutcome) => {
   if (outcome.status === 'sent') toast.success(`Offer sent to ${outcome.email}`);
   else toast.error(`The offer is sent but the email did not go out (${outcome.reason}). Send them this link: ${outcome.link}`, { duration: 20000 });
 };
+
+/** The letter as shown for an offer: its signature (or, on a draft, the sender's own), and the candidate's once accepted. */
+function letterProps(offer: Offer, branding: LetterBranding, groups: OfferJobGroup[], mySignature: string | null) {
+  const group = groups.find((g) => g.id === offer.job_group_id);
+  const values = offerValues(offer, { companyName: branding.name, jobGroup: group?.name ?? null, offerDate: offer.sent_at });
+  return {
+    branding,
+    title: fillPlaceholders(offer.title, values),
+    text: fillPlaceholders(offer.body, values),
+    date: offer.sent_at,
+    signature: offer.status === 'draft' ? mySignature : offer.signature ?? null,
+    acceptance: offer.status === 'accepted'
+      ? { name: [offer.candidate_first_name, offer.candidate_last_name].filter(Boolean).join(' '), signature: offer.candidate_signature ?? null, date: offer.responded_at }
+      : null,
+  };
+}
+
+/** Keeps a copy of the letter in the archive of generated documents; a failure is told, never blocks the offer. */
+async function keepOfferCopy(offer: Offer, pdf: Blob, kind: 'offer_letter' | 'offer_acceptance', emailedTo: string[] = []) {
+  try {
+    await archiveDocument({
+      kind,
+      title: `${kind === 'offer_acceptance' ? 'Accepted offer' : 'Offer'}: ${[offer.candidate_first_name, offer.candidate_last_name].filter(Boolean).join(' ')}, ${offer.job_title}`,
+      referenceId: offer.id,
+      pdf,
+      emailedTo,
+    });
+  } catch (err) {
+    toast.error(`The letter was not kept in the archive: ${(err as Error).message}`);
+  }
+}
+
+/** Sends the offer signed by the sender, then keeps a copy of the letter that went out. */
+async function sendSigned(offer: Offer, branding: LetterBranding, groups: OfferJobGroup[], signer: { signature: string | null; name: string }) {
+  const outcome = await sendOffer(offer, branding, signer);
+  tellSendOutcome(outcome);
+  const sent: Offer = { ...offer, status: 'sent', sent_at: new Date().toISOString(), signature: signer.signature, signed_by: signer.name };
+  try {
+    const pdf = await renderLetterPdf(letterProps(sent, branding, groups, signer.signature));
+    await keepOfferCopy(sent, pdf, 'offer_letter', outcome.status === 'sent' ? [outcome.email] : []);
+  } catch (err) {
+    toast.error(`The letter was not kept in the archive: ${(err as Error).message}`);
+  }
+}
 
 function AddEmployeeModal({ offer, onClose, onAdded }: { offer: Offer; onClose: () => void; onAdded: () => void }) {
   const [workEmail, setWorkEmail] = useState('');
@@ -81,10 +129,12 @@ function AddEmployeeModal({ offer, onClose, onAdded }: { offer: Offer; onClose: 
   );
 }
 
-function OfferDetails({ offer, branding, groups, onClose, onEdit, onChanged }: {
+function OfferDetails({ offer, branding, groups, mySignature, sender, onClose, onEdit, onChanged }: {
   offer: Offer;
   branding: LetterBranding;
   groups: OfferJobGroup[];
+  mySignature: string | null;
+  sender: LetterSender;
   onClose: () => void;
   onEdit: () => void;
   onChanged: () => void;
@@ -94,8 +144,25 @@ function OfferDetails({ offer, branding, groups, onClose, onEdit, onChanged }: {
   const [adding, setAdding] = useState(false);
   const navigate = useNavigate();
   const status = effectiveStatus(offer);
-  const group = groups.find((g) => g.id === offer.job_group_id);
-  const values = offerValues(offer, { companyName: branding.name, jobGroup: group?.name ?? null, offerDate: offer.sent_at });
+  const letter = letterProps(offer, branding, groups, mySignature);
+
+  // an accepted offer: keep the letter as the candidate signed it, once
+  const accepted = offer.status === 'accepted' && Boolean(offer.candidate_signature);
+  useEffect(() => {
+    if (!accepted) return;
+    let live = true;
+    loadDocumentsFor(offer.id)
+      .then(async (docs) => {
+        if (!live || docs.some((d) => d.kind === 'offer_acceptance') || !letterRef.current) return;
+        await keepOfferCopy(offer, await letterPdfBlob(letterRef.current), 'offer_acceptance');
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+    // once per offer
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offer.id, accepted]);
 
   const act = async (what: string, fn: () => Promise<void>) => {
     setBusy(what);
@@ -113,7 +180,14 @@ function OfferDetails({ offer, branding, groups, onClose, onEdit, onChanged }: {
     if (!letterRef.current) return;
     setBusy('pdf');
     try {
-      await downloadLetterPdf(letterRef.current, letterFileName(offer.candidate_first_name, offer.candidate_last_name));
+      const pdf = await letterPdfBlob(letterRef.current);
+      const url = URL.createObjectURL(pdf);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = letterFileName(offer.candidate_first_name, offer.candidate_last_name);
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      await keepOfferCopy(offer, pdf, offer.status === 'accepted' ? 'offer_acceptance' : 'offer_letter');
     } catch (err) {
       toast.error((err as Error).message || 'The PDF was not made');
     } finally {
@@ -139,7 +213,7 @@ function OfferDetails({ offer, branding, groups, onClose, onEdit, onChanged }: {
         <p className="mt-2 rounded-lg bg-green-tint px-3 py-2 text-sm text-ink">Added as an employee. Follow their onboarding on the Onboarding page.</p>
       )}
       <div className="bg-secondary rounded-xl p-2 sm:p-4 mt-3 overflow-x-auto">
-        <OfferLetter ref={letterRef} branding={branding} title={fillPlaceholders(offer.title, values)} text={fillPlaceholders(offer.body, values)} date={offer.sent_at} />
+        <OfferLetter ref={letterRef} {...letter} />
       </div>
       <div className="mt-4 flex flex-wrap justify-end gap-2">
         <Button variant="secondary" onClick={() => void pdf()} disabled={busy !== null} icon={spin('pdf', <Download className="h-4 w-4" />)}>Download PDF</Button>
@@ -160,7 +234,7 @@ function OfferDetails({ offer, branding, groups, onClose, onEdit, onChanged }: {
         )}
         {(offer.status === 'draft' || status === 'sent') && (
           <Button disabled={busy !== null} icon={spin('send', <Send className="h-4 w-4" />)}
-            onClick={() => void act('send', async () => tellSendOutcome(await sendOffer(offer, branding)))}>
+            onClick={() => void act('send', () => sendSigned(offer, branding, groups, { signature: mySignature, name: sender.name }))}>
             {offer.status === 'draft' ? 'Send' : 'Send again'}
           </Button>
         )}
@@ -189,6 +263,9 @@ export default function OffersPage() {
   const [editing, setEditing] = useState<{ offer: Offer | null; initial?: Partial<OfferFields> } | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
   const [settingTemplates, setSettingTemplates] = useState(false);
+  // who sends: their drawn signature goes on the offers they send
+  const [mySignature, setMySignature] = useState<string | null>(null);
+  const [sender, setSender] = useState<LetterSender>({ name: '', title: '' });
 
   const load = useCallback(() => {
     loadOffers().then(setOffers, (err) => {
@@ -202,6 +279,8 @@ export default function OffersPage() {
     loadOfferTemplates().then(setTemplates, () => setTemplates([]));
     loadOfferJobGroups().then(setGroups);
     loadBranding().then(setBranding);
+    loadMySignature().then(setMySignature, () => setMySignature(null));
+    loadLetterSender().then(setSender, () => undefined);
   }, [load]);
 
   // started from a job application
@@ -238,7 +317,7 @@ export default function OffersPage() {
 
   const save = async (fields: OfferFields, send: boolean) => {
     const saved = await saveOffer(editing?.offer?.id ?? null, fields);
-    if (send) tellSendOutcome(await sendOffer(saved, branding));
+    if (send) await sendSigned(saved, branding, groups, { signature: mySignature, name: sender.name });
     else toast.success('Draft saved');
     setEditing(null);
     setViewing(saved.id);
@@ -296,10 +375,10 @@ export default function OffersPage() {
 
       {editing && (
         <OfferEditor offer={editing.offer} initial={editing.initial} templates={templates} groups={groups} branding={branding}
-          onClose={() => setEditing(null)} onSave={save} />
+          onClose={() => setEditing(null)} onSave={save} signature={mySignature} onSignature={setMySignature} />
       )}
       {viewed && !editing && (
-        <OfferDetails offer={viewed} branding={branding} groups={groups} onClose={() => setViewing(null)}
+        <OfferDetails offer={viewed} branding={branding} groups={groups} mySignature={mySignature} sender={sender} onClose={() => setViewing(null)}
           onEdit={() => setEditing({ offer: viewed })} onChanged={load} />
       )}
       {settingTemplates && (
