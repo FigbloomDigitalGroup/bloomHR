@@ -375,7 +375,7 @@ export default function OffersPage() {
 
       {editing && (
         <OfferEditor offer={editing.offer} initial={editing.initial} templates={templates} groups={groups} branding={branding}
-          onClose={() => setEditing(null)} onSave={save} signature={mySignature} onSignature={setMySignature} />
+          onClose={() => setEditing(null)} onSave={save} signature={mySignature} onSignature={setMySignature} onBranding={setBranding} />
       )}
       {viewed && !editing && (
         <OfferDetails offer={viewed} branding={branding} groups={groups} mySignature={mySignature} sender={sender} onClose={() => setViewing(null)}

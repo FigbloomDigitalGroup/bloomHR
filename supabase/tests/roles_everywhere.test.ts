@@ -330,8 +330,8 @@ describe('exits (approve-exits)', () => {
     for (const k of ['CHK', 'MGR', 'REG', 'OPS', 'STF']) {
       expect([k, await refusal(IDS[k], STF)]).toEqual([k, 'Only HR or an administrator can approve or decline an exit']);
     }
-    // someone else can approve, so not the person who started it
-    expect(await refusal(HR1, HR1)).toBe('You started this exit, so another HR person or an administrator must approve it');
+    // the person who started it may decide it too (20261026400000: an exit HR starts is HR's decision)
+    expect(await refusal(HR1, HR1)).toBeNull();
     expect(await refusal(HR1, HR1, 'declined')).toBeNull();
   });
 
@@ -341,18 +341,6 @@ describe('exits (approve-exits)', () => {
     expect(await refusal(CU2, STF)).toBeNull();
     await setModules(ADM, r, []);
     expect(await refusal(CU2, STF)).toBe('Only HR or an administrator can approve or decline an exit');
-  });
-
-  it('"another approver" counts a custom role holding approve-exits, not one without', async () => {
-    // tenant C: one HR person, and CX with a custom role
-    const r = (await one<{ id: string; role_key: string }>(
-      `insert into company_roles (tenant_id, name, base_role, is_system, role_key)
-       values ($1, 'Approvers', 'MANAGER', false, 'CR_00000000000000000000000000000000') returning id, role_key`, [C]));
-    await rows(`insert into role_permissions (tenant_id, role_name, permissions) values ($1, $2, array['approve-exits'])`, [C, r.role_key]);
-    await rows(`update memberships set company_role_id = $1 where user_id = $2 and tenant_id = $3`, [r.id, CX, C]);
-    expect(await refusal(CHR, CHR)).toBe('You started this exit, so another HR person or an administrator must approve it');
-    await rows(`update role_permissions set permissions = '{}' where tenant_id = $1 and role_name = $2`, [C, r.role_key]);
-    expect(await refusal(CHR, CHR)).toBeNull(); // nobody else can, so they may
   });
 });
 

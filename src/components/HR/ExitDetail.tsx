@@ -463,7 +463,7 @@ export default function ExitDetail({ exitId, onBack, onChanged }: { exitId: stri
           <div className="mt-4 border-t border-border pt-4">
             <label htmlFor="decision-note" className="block text-xs font-semibold text-ink mb-1">Note (needed to decline)</label>
             <textarea id="decision-note" rows={2} className={`${input} resize-none`} value={note} onChange={(e) => setNote(e.target.value)} />
-            <p className="mt-1 mb-2 text-[11px] text-subtle">HR or an administrator approves; not the person who started it, when someone else can.</p>
+            <p className="mt-1 mb-2 text-[11px] text-subtle">HR or an administrator approves (anyone with Approve exits).</p>
             <div className="flex flex-wrap gap-2">
               <Button disabled={busy} onClick={() => act(() => decideExit(exit.id, 'approved', note), 'Exit approved')}>Approve</Button>
               <Button variant="secondary" disabled={busy || !note.trim()} onClick={() => act(() => decideExit(exit.id, 'declined', note), 'Exit declined')}>Decline</Button>

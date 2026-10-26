@@ -3,6 +3,7 @@ import { Loader2, Save, Send } from 'lucide-react';
 import { Button, Modal } from '../UI';
 import OfferLetter from './OfferLetter';
 import MySignature from '../Signature/MySignature';
+import LetterheadPicker from './LetterheadPicker';
 import { formatKsh } from '../../lib/jobGroups';
 import {
   OFFER_PLACEHOLDERS,
@@ -50,11 +51,13 @@ interface OfferEditorProps {
   /** the sender's drawn signature, shown where the letter says {{signature}} and kept on the offer when it is sent */
   signature?: string | null;
   onSignature?: (signature: string | null) => void;
+  /** the letterhead changed from this screen */
+  onBranding?: (branding: LetterBranding) => void;
 }
 
 const amount = (v: string) => (v.trim() === '' ? 0 : Number(v));
 
-export default function OfferEditor({ offer, initial, templates, groups, branding, onClose, onSave, signature, onSignature }: OfferEditorProps) {
+export default function OfferEditor({ offer, initial, templates, groups, branding, onClose, onSave, signature, onSignature, onBranding }: OfferEditorProps) {
   const [fields, setFields] = useState<OfferFields>(() => {
     if (offer) {
       const {
@@ -216,6 +219,7 @@ export default function OfferEditor({ offer, initial, templates, groups, brandin
                 )}
               </div>
             )}
+            {onBranding && <LetterheadPicker branding={branding} onChange={onBranding} />}
           </fieldset>
         </div>
 

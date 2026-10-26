@@ -96,16 +96,27 @@ export async function loadLetterRecipient(employeeNumber: string): Promise<Lette
   };
 }
 
-/** The signed-in person's name and job title from their employee record, else their account name. */
+/**
+ * The signed-in person's name and job title from their employee record; else the name on their account (their user
+ * profile, then their sign-up details); the start of their email only when there is no name anywhere.
+ */
 export async function loadLetterSender(): Promise<LetterSender> {
   const { data: auth } = await supabase.auth.getUser();
   const user = auth.user;
-  const fallback = text(user?.user_metadata?.full_name) || text(user?.email?.split('@')[0]);
-  if (!user?.email) return { name: fallback, title: '' };
-  const { data } = await supabase.from('employees').select('"First Name", "Last Name", "Job Title"').eq('"Work Email"', user.email).maybeSingle();
-  const r = (data ?? {}) as Record<string, unknown>;
-  const name = [text(r['First Name']), text(r['Last Name'])].filter(Boolean).join(' ');
-  return { name: name || fallback, title: text(r['Job Title']) };
+  if (!user) return { name: '', title: '' };
+  const [{ data: employee }, { data: profile }] = await Promise.all([
+    user.email
+      ? supabase.from('employees').select('"First Name", "Last Name", "Job Title"').eq('"Work Email"', user.email).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.from('user_profiles').select('full_name').eq('user_id', user.id).maybeSingle(),
+  ]);
+  const r = (employee ?? {}) as Record<string, unknown>;
+  const name =
+    [text(r['First Name']), text(r['Last Name'])].filter(Boolean).join(' ') ||
+    text((profile as { full_name?: unknown } | null)?.full_name) ||
+    text(user.user_metadata?.full_name) ||
+    text(user.email?.split('@')[0]);
+  return { name, title: text(r['Job Title']) };
 }
 
 export async function loadExitLetterTemplates(): Promise<ExitLetterTemplate[]> {
