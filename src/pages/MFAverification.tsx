@@ -134,7 +134,7 @@ export default function MFAVerification() {
           <h2 className="text-3xl font-bold text-gray-900">Check your {method === 'sms' ? 'phone' : 'email'}</h2>
           <p className="text-gray-500 text-xs font-medium" role="status" aria-live="polite">
             {destination
-              ? <>We {where} a 6-digit code to <span className="font-bold text-gray-900 break-all">{destination}</span>. It expires in 10 minutes.</>
+              ? <>We {where} a 6-digit code to <span className="font-bold text-gray-900 break-all">{destination}</span>. It expires in 60 minutes.</>
               : sending ? 'Sending your code...' : 'Enter the 6-digit code we sent you.'}
           </p>
         </div>
