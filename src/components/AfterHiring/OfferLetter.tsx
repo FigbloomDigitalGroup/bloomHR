@@ -13,11 +13,35 @@ interface OfferLetterProps {
   text: string;
   /** the letter's date (when it was sent; today for a draft) */
   date?: string | null;
+  /** the sender's drawn signature (an image URL), drawn where a line of the text is {{signature}} */
+  signature?: string | null;
 }
 
 const hex = (c: string | null | undefined, fallback: string) => (c && /^#[0-9A-Fa-f]{6}$/.test(c) ? c : fallback);
+const SIGNATURE_LINE = /^\s*\{\{\s*signature\s*\}\}\s*$/i;
 
-const OfferLetter = forwardRef<HTMLDivElement, OfferLetterProps>(function OfferLetter({ branding, title, text, date }, ref) {
+/** A paragraph's lines, with a {{signature}} line drawn as the signature (or left as space to sign by hand). */
+function Paragraph({ text, signature }: { text: string; signature?: string | null }) {
+  const lines = text.split('\n');
+  if (!lines.some((l) => SIGNATURE_LINE.test(l))) return <p className="mb-4 whitespace-pre-line">{text}</p>;
+  return (
+    <p className="mb-4">
+      {lines.map((line, i) =>
+        SIGNATURE_LINE.test(line) ? (
+          signature ? (
+            <img key={i} src={signature} alt="Signature" className="block h-16 w-auto max-w-[240px] object-contain my-1" data-testid="letter-signature" />
+          ) : (
+            <span key={i} className="block h-12" />
+          )
+        ) : (
+          <span key={i} className="block">{line}</span>
+        )
+      )}
+    </p>
+  );
+}
+
+const OfferLetter = forwardRef<HTMLDivElement, OfferLetterProps>(function OfferLetter({ branding, title, text, date, signature }, ref) {
   const primary = hex(branding.primary_color, DEFAULT_PRIMARY_COLOR);
   const secondary = hex(branding.secondary_color, DEFAULT_SECONDARY_COLOR);
   const address = [branding.address_line1, branding.address_line2, [branding.city, branding.postal_code].filter(Boolean).join(' '), branding.country]
@@ -62,7 +86,7 @@ const OfferLetter = forwardRef<HTMLDivElement, OfferLetterProps>(function OfferL
         <p className="text-right text-[13px] text-[#6b7280] mb-6">{letterDate(date ?? new Date().toISOString())}</p>
         <h1 className="text-[17px] font-bold mb-5" style={{ color: primary }}>{title}</h1>
         {paragraphs.map((p, i) => (
-          <p key={i} className="mb-4 whitespace-pre-line">{p}</p>
+          <Paragraph key={i} text={p} signature={signature} />
         ))}
       </div>
       {branding.letterhead_footer_url ? (

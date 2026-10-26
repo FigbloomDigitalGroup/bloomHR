@@ -4,6 +4,7 @@ const saveMyTheme = vi.hoisted(() => vi.fn());
 vi.mock('../../lib/preferences', () => ({ saveMyTheme }));
 vi.mock('./ProfilePicture', () => ({ default: () => null }));
 vi.mock('./EmailNotifications', () => ({ default: () => null }));
+vi.mock('../Signature/MySignature', () => ({ default: () => null }));
 
 import Appearance from './Appearance';
 import { loadStoredTheme, resetTheme } from '../../theme/applyTheme';

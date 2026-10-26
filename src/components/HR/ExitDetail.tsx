@@ -29,6 +29,7 @@ import {
   type FinalDuesRecord,
 } from '../../lib/exits';
 import { LoaderBlock } from '../UI/FigbloomLoader';
+import ExitLetters from './ExitLetters';
 
 export const STATUS_TONE: Record<ExitStatus, StatusTone> = {
   requested: 'warning',
@@ -366,7 +367,7 @@ function FinalDues({ exit, dues, onSaved }: { exit: ExitRecord; dues: FinalDuesR
   );
 }
 
-/** One exit, for HR: decide it, clear them, interview them, settle their final dues, and complete it. */
+/** One exit, for HR: decide it, send their letter, clear them, interview them, settle their final dues, and complete it. */
 export default function ExitDetail({ exitId, onBack, onChanged }: { exitId: string; onBack: () => void; onChanged?: () => void }) {
   const [exit, setExit] = useState<ExitRecord | null>(null);
   const [items, setItems] = useState<ClearanceItem[]>([]);
@@ -488,6 +489,7 @@ export default function ExitDetail({ exitId, onBack, onChanged }: { exitId: stri
 
       {exit.status !== 'requested' && exit.status !== 'declined' && exit.status !== 'cancelled' && (
         <>
+          <ExitLetters exit={exit} />
           <Checklist exit={exit} items={items} onChanged={load} />
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
             <Interview exit={exit} interview={interview} onSaved={load} />

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../../lib/privateFiles', () => ({ openPrivateFile: vi.fn() }));
+vi.mock('./ExitLetters', () => ({ default: () => <div data-testid="exit-letters" /> }));
 vi.mock('../../lib/exits', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/exits')>();
   return {
