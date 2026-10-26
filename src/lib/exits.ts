@@ -184,10 +184,13 @@ export interface NewExit {
   letter_path?: string | null;
 }
 
+/** Starts an exit; one HR (Approve exits) starts for someone else comes back already approved (20261026400000). */
 export async function startExit(exit: NewExit): Promise<ExitRecord> {
-  const { data, error } = await supabase.from('employee_exits').insert(exit).select(EXIT_COLUMNS).single();
-  if (error) fail(error, 'Could not start the exit.');
-  return data as ExitRecord;
+  const { data, error } = await supabase.from('employee_exits').insert(exit).select('id').single();
+  if (error || !data) fail(error, 'Could not start the exit.');
+  const { data: row, error: readError } = await supabase.from('employee_exits').select(EXIT_COLUMNS).eq('id', (data as { id: string }).id).single();
+  if (readError || !row) fail(readError, 'Could not start the exit.');
+  return row as ExitRecord;
 }
 
 export async function updateExit(id: string, changes: Partial<Pick<ExitRecord, 'reason' | 'reason_category' | 'last_working_day' | 'notice_days' | 'notice_pay' | 'notice_given_on'>>) {
