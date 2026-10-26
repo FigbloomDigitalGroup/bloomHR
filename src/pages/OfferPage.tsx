@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Download, Loader2, XCircle } from 'lucide-react';
 import OfferLetter from '../components/AfterHiring/OfferLetter';
+import SignaturePad from '../components/Signature/SignaturePad';
 import {
   type OfferStatus,
   type PublicOffer,
@@ -16,8 +17,8 @@ import {
 import FigbloomLoader from '../components/UI/FigbloomLoader';
 
 // The page an offer email links to (/offer?token=...). Anyone with the link sees that one offer, and nothing else:
-// the letter on the company's letterhead, a PDF of it, and (while it is open) Accept or Decline with an optional
-// reason. No sign-in: the link itself, sent to the candidate, is the proof.
+// the letter on the company's letterhead, a PDF of it, and (while it is open) Accept, signed with a drawn signature, or
+// Decline with an optional reason. No sign-in: the link itself, sent to the candidate, is the proof.
 
 const DONE: Partial<Record<OfferStatus, string>> = {
   accepted: 'You accepted this offer. The company will be in touch about your first day.',
@@ -32,6 +33,7 @@ export default function OfferPage() {
   const [offer, setOffer] = useState<PublicOffer | null | undefined>(undefined);
   const [problem, setProblem] = useState<string | null>(null);
   const [declining, setDeclining] = useState(false);
+  const [signing, setSigning] = useState(false);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState<'accept' | 'decline' | 'pdf' | null>(null);
   const letterRef = useRef<HTMLDivElement>(null);
@@ -75,13 +77,24 @@ export default function OfferPage() {
   const values = offerValues(offer, { companyName: offer.company.name, jobGroup: offer.job_group, offerDate: offer.sent_at });
   const open = offer.status === 'sent';
 
-  const answer = async (accept: boolean) => {
+  const blobToDataUrl = (blob: Blob) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error('Your signature could not be read. Draw it again.'));
+      reader.readAsDataURL(blob);
+    });
+
+  // accepting needs their drawn signature (from the pad); declining doesn't
+  const answer = async (accept: boolean, signaturePng?: Blob) => {
     setBusy(accept ? 'accept' : 'decline');
     setProblem(null);
     try {
-      const status = await respondToOffer(token, accept, accept ? undefined : reason);
-      setOffer({ ...offer, status, responded_at: new Date().toISOString() });
+      const signature = accept && signaturePng ? await blobToDataUrl(signaturePng) : null;
+      const status = await respondToOffer(token, accept, accept ? undefined : reason, signature);
+      setOffer({ ...offer, status, responded_at: new Date().toISOString(), candidate_signature: signature });
       setDeclining(false);
+      setSigning(false);
     } catch (err) {
       setProblem((err as Error).message);
     } finally {
@@ -106,7 +119,10 @@ export default function OfferPage() {
     <div className="min-h-screen bg-page py-6 px-3 sm:px-6">
       <div className="max-w-[760px] mx-auto space-y-4">
         <OfferLetter ref={letterRef} branding={offer.company} title={fillPlaceholders(offer.title, values)}
-          text={fillPlaceholders(offer.body, values)} date={offer.sent_at} />
+          text={fillPlaceholders(offer.body, values)} date={offer.sent_at} signature={offer.signature}
+          acceptance={offer.status === 'accepted'
+            ? { name: values.candidate_name, signature: offer.candidate_signature ?? null, date: offer.responded_at }
+            : null} />
 
         <div className="bg-white border border-border rounded-xl p-4 space-y-3">
           {DONE[offer.status] && (
@@ -115,8 +131,19 @@ export default function OfferPage() {
               {DONE[offer.status]}
             </p>
           )}
-          {open && !declining && (
+          {open && !declining && !signing && (
             <p className="text-sm text-ink">Please reply by <strong>{letterDate(offer.expiry_date)}</strong>.</p>
+          )}
+          {open && signing && (
+            <div>
+              <p className="text-sm text-ink mb-2">Sign below to accept the offer. Your signature goes on the letter.</p>
+              <SignaturePad
+                busy={busy === 'accept'}
+                saveLabel="Sign and accept"
+                onCancel={() => setSigning(false)}
+                onSave={(png) => answer(true, png)}
+              />
+            </div>
           )}
           {open && declining && (
             <label className="block">
@@ -131,15 +158,15 @@ export default function OfferPage() {
               className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg border border-border bg-white text-sm font-semibold text-ink disabled:opacity-50">
               {busy === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download PDF
             </button>
-            {open && !declining && (
+            {open && !declining && !signing && (
               <>
                 <button type="button" onClick={() => setDeclining(true)} disabled={busy !== null}
                   className="px-3.5 py-2 rounded-lg border border-border bg-white text-sm font-semibold text-ink disabled:opacity-50">
                   Decline
                 </button>
-                <button type="button" onClick={() => void answer(true)} disabled={busy !== null} style={{ background: color }}
+                <button type="button" onClick={() => setSigning(true)} disabled={busy !== null} style={{ background: color }}
                   className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50">
-                  {busy === 'accept' && <Loader2 className="h-4 w-4 animate-spin" />} Accept offer
+                  Accept offer
                 </button>
               </>
             )}

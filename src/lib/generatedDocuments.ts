@@ -21,6 +21,8 @@ export interface GeneratedDocument {
 
 export const DOCUMENT_KIND_LABELS: Record<string, string> = {
   exit_letter: 'Exit letter',
+  offer_letter: 'Offer letter',
+  offer_acceptance: 'Accepted offer',
 };
 
 const COLUMNS = 'id, kind, title, employee_number, reference_id, file_path, file_size, sha256, emailed_to, created_by, created_at';

@@ -68,6 +68,11 @@ export interface Offer extends OfferFields {
   decline_reason: string | null;
   employee_id: string | null;
   created_at: string;
+  /** the sender's drawn signature (a PNG data: URL) and name, kept when it was sent (20261026200000) */
+  signature?: string | null;
+  signed_by?: string | null;
+  /** the candidate's drawn signature, kept when they accepted */
+  candidate_signature?: string | null;
 }
 
 /** A job group with the pay in force today (offer_job_groups). */
@@ -134,6 +139,9 @@ export interface PublicOffer {
   sent_at: string | null;
   status: OfferStatus;
   responded_at: string | null;
+  signature?: string | null;
+  signed_by?: string | null;
+  candidate_signature?: string | null;
   company: LetterBranding;
 }
 
@@ -150,6 +158,7 @@ export const OFFER_PLACEHOLDERS: { key: string; label: string }[] = [
   { key: 'company_name', label: 'Company name' },
   { key: 'expiry_date', label: 'Reply-by date' },
   { key: 'offer_date', label: 'Date of the letter' },
+  { key: 'signature', label: 'Your drawn signature (on its own line)' },
 ];
 
 const num = (v: unknown) => (v === null || v === undefined || v === '' ? 0 : Number(v));
@@ -328,8 +337,12 @@ export type SendOutcome = { status: 'sent'; email: string } | { status: 'not-ema
  * Sends (or sends again) the offer: the database makes a new link (the old one stops working) and marks it sent, then
  * the link is emailed to the candidate. If the email fails the offer is still sent; the link is returned to share.
  */
-export async function sendOffer(offer: Offer, branding: LetterBranding): Promise<SendOutcome> {
-  const { data, error } = await supabase.rpc('send_offer', { p_offer: offer.id });
+export async function sendOffer(offer: Offer, branding: LetterBranding, signer?: { signature: string | null; name: string }): Promise<SendOutcome> {
+  const { data, error } = await supabase.rpc('send_offer', {
+    p_offer: offer.id,
+    p_signature: signer?.signature ?? null,
+    p_signed_by: signer?.name || null,
+  });
   if (error) fail(error, 'The offer was not sent.');
   const link = offerLink(String(data));
   const email = offer.candidate_email ?? '';
@@ -440,9 +453,14 @@ export async function loadOfferByToken(token: string): Promise<PublicOffer | nul
   };
 }
 
-/** The candidate's answer. Returns the new status. */
-export async function respondToOffer(token: string, accept: boolean, reason?: string): Promise<OfferStatus> {
-  const { data, error } = await supabase.rpc('respond_to_offer', { p_token: token, p_accept: accept, p_reason: reason?.trim() || null });
+/** The candidate's answer (accepting, with their drawn signature). Returns the new status. */
+export async function respondToOffer(token: string, accept: boolean, reason?: string, signature?: string | null): Promise<OfferStatus> {
+  const { data, error } = await supabase.rpc('respond_to_offer', {
+    p_token: token,
+    p_accept: accept,
+    p_reason: reason?.trim() || null,
+    p_signature: accept ? signature ?? null : null,
+  });
   if (error) fail(error, 'Your answer was not saved.');
   return data as OfferStatus;
 }

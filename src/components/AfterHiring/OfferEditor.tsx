@@ -2,6 +2,7 @@ import { ReactNode, useMemo, useState } from 'react';
 import { Loader2, Save, Send } from 'lucide-react';
 import { Button, Modal } from '../UI';
 import OfferLetter from './OfferLetter';
+import MySignature from '../Signature/MySignature';
 import { formatKsh } from '../../lib/jobGroups';
 import {
   OFFER_PLACEHOLDERS,
@@ -46,14 +47,20 @@ interface OfferEditorProps {
   onClose: () => void;
   /** saved; `send` when HR chose Save and send */
   onSave: (fields: OfferFields, send: boolean) => Promise<void>;
+  /** the sender's drawn signature, shown where the letter says {{signature}} and kept on the offer when it is sent */
+  signature?: string | null;
+  onSignature?: (signature: string | null) => void;
 }
 
 const amount = (v: string) => (v.trim() === '' ? 0 : Number(v));
 
-export default function OfferEditor({ offer, initial, templates, groups, branding, onClose, onSave }: OfferEditorProps) {
+export default function OfferEditor({ offer, initial, templates, groups, branding, onClose, onSave, signature, onSignature }: OfferEditorProps) {
   const [fields, setFields] = useState<OfferFields>(() => {
     if (offer) {
-      const { id: _id, status: _s, sent_at: _a, viewed_at: _v, responded_at: _r, decline_reason: _d, employee_id: _e, created_at: _c, ...rest } = offer;
+      const {
+        id: _id, status: _s, sent_at: _a, viewed_at: _v, responded_at: _r, decline_reason: _d, employee_id: _e, created_at: _c,
+        signature: _sig, signed_by: _sb, candidate_signature: _cs, ...rest
+      } = offer;
       return rest;
     }
     const template = templates.find((t) => t.is_default && t.active) ?? templates.find((t) => t.active) ?? null;
@@ -200,13 +207,22 @@ export default function OfferEditor({ offer, initial, templates, groups, brandin
             {unknown.length > 0 && (
               <p className="text-xs text-orange-text-alt">Not a known placeholder: {unknown.map((k) => `{{${k}}}`).join(', ')}</p>
             )}
+            {onSignature && (
+              <div>
+                <p className="text-xs font-medium text-ink mb-1">Your signature</p>
+                <MySignature bare onChange={onSignature} />
+                {!/\{\{\s*signature\s*\}\}/i.test(fields.body) && (
+                  <p className="mt-1 mb-0 text-[11px] text-subtle">Add a {'{{signature}}'} line to the text to sign the letter.</p>
+                )}
+              </div>
+            )}
           </fieldset>
         </div>
 
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Preview</p>
           <div className="bg-secondary rounded-xl p-2 sm:p-4 overflow-x-auto">
-            <OfferLetter branding={branding} title={title} text={text} />
+            <OfferLetter branding={branding} title={title} text={text} signature={signature} />
           </div>
         </div>
       </div>
