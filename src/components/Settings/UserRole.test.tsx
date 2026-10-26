@@ -13,6 +13,7 @@ vi.mock('../../lib/staffEmployee', () => ({ assertEmployeeForStaffLogin: async (
 vi.mock('./EmployeeNumbering', () => ({ default: () => null }));
 vi.mock('./ApprovalWorkflows', () => ({ default: () => null }));
 vi.mock('./TwoStepSignIn', () => ({ default: () => null }));
+vi.mock('./StaySignedIn', () => ({ default: () => null }));
 vi.mock('./MyTwoStep', () => ({ default: () => null }));
 vi.mock('./CareersSettings', () => ({ default: () => null }));
 vi.mock('../Loans/LoanSettingsCard', () => ({ default: () => null }));

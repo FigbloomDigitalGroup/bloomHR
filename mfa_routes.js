@@ -1,7 +1,7 @@
 // mfa_routes.js - two-step sign-in codes, made and checked on the server (FIG-834, FIG-658).
 //
 // The browser used to make the code, store it and check it itself, so it could read or skip it. Now:
-//   * the server makes a random 6-digit code, keeps only a keyed hash of it (10 minutes, 5 tries, used once) and sends
+//   * the server makes a random 6-digit code, keeps only a keyed hash of it (60 minutes, 5 tries, used once) and sends
 //     it to the caller's own login email or, where the company chose SMS, their registered MFA number;
 //   * the code is tied to this sign-in: the user and the session id in their (verified) login token. Nobody can check
 //     a code sent to someone else, and a code from another sign-in does not count;
@@ -25,10 +25,9 @@ dotenv.config({ path: process.env.ENV_FILE || ".env" });
 
 const router = express.Router();
 
-const CODE_TTL_SECONDS = 10 * 60;
+const CODE_TTL_SECONDS = 60 * 60; // an hour: slow emails and switching tabs while waiting (user feedback, Oct 26)
 const MAX_ATTEMPTS = 5;
 const RESEND_COOLDOWN_SECONDS = 30;
-const PASS_HOURS = 12; // a passed sign-in is trusted this long, then asks again
 const MINUTE = 60 * 1000;
 
 // Budgets shared by every server instance (take_rate_limit): one send per 30 seconds, 5 sends per 15 minutes, and 20
@@ -253,7 +252,8 @@ router.post(
       p_session: sessionId,
       p_code_hash: hashCode(caller.id, sessionId, code),
       p_max_attempts: MAX_ATTEMPTS,
-      p_pass_hours: PASS_HOURS,
+      // a passed sign-in is trusted as long as the company keeps people signed in (at least 12 hours)
+      p_pass_hours: null,
     });
     if (error) throw new HttpError(500, "Could not check the code");
     const { outcome, attempts_left: attemptsLeft } = (Array.isArray(data) ? data[0] : data) || {};

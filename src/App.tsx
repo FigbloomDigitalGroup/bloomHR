@@ -23,7 +23,8 @@ import { useCompanySwitching } from './hooks/useMyCompanies';
 import { useMobileNav } from './components/Layout/useMobileNav';
 import { isStaleChunkError, reloadOnceForStaleChunk } from './lib/staleChunk';
 import { welcomeMessage } from './lib/welcome';
-import { IDLE_WARNING_MS, idleState, lastActivity, markActivity } from './lib/idleLogout';
+import { FALLBACK_IDLE_TIMEOUT_MS, IDLE_WARNING_MS, idleState, lastActivity, markActivity } from './lib/idleLogout';
+import { loadStaySignedIn } from './lib/mfaApi';
 import { isHiddenModule } from './lib/hiddenModules';
 import { usesStaffPortal } from './lib/routeModules';
 
@@ -321,6 +322,20 @@ function App() {
   // Sign out after a spell away from every tab (see lib/idleLogout): activity in any tab is written to shared storage,
   // and each tab checks how long it has been since, so one idle tab no longer signs out someone working in another
   const watchIdle = !shouldExcludeFromInactivityTimer();
+  // how long is the company's "stay signed in" setting, read once per person signed in (the old 30 minutes until then)
+  const idleTimeoutRef = useRef(FALLBACK_IDLE_TIMEOUT_MS);
+  const idleUserId = session?.user?.id;
+  useEffect(() => {
+    idleTimeoutRef.current = FALLBACK_IDLE_TIMEOUT_MS;
+    if (!idleUserId) return;
+    let live = true;
+    loadStaySignedIn().then((s) => {
+      if (live && s?.minutes) idleTimeoutRef.current = s.minutes * 60 * 1000;
+    });
+    return () => {
+      live = false;
+    };
+  }, [idleUserId]);
   // the session object changes on each token refresh; that must not restart the watch and count as activity
   const autoLogoutRef = useRef(handleAutoLogout);
   autoLogoutRef.current = handleAutoLogout;
@@ -343,7 +358,7 @@ function App() {
     markActivity(lastActivityWriteRef.current);
 
     const check = () => {
-      const state = idleState(Date.now(), lastActivity());
+      const state = idleState(Date.now(), lastActivity(), idleTimeoutRef.current);
       if (state === 'expired') {
         autoLogoutRef.current();
       } else if (state === 'warn') {

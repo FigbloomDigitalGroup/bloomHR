@@ -26,6 +26,8 @@ const state = vi.hoisted(() => ({
   personal: {} as Record<string, { enabled: boolean; method: string }>,
   codes: [] as Code[],
   passes: [] as { user_id: string; session_id: string }[],
+  // the pass length the server asked for (null: the company's stay-signed-in setting)
+  passHours: [] as unknown[],
   budgets: new Map<string, number>(),
   emails: [] as Record<string, any>[],
   emailError: null as unknown,
@@ -108,6 +110,7 @@ vi.mock('@supabase/supabase-js', () => {
         if (c.code_hash === a.p_code_hash) {
           c.used = true;
           state.passes.push({ user_id: a.p_user, session_id: a.p_session });
+          state.passHours.push(a.p_pass_hours);
           return out('ok', a.p_max_attempts - c.attempts);
         }
         const left = a.p_max_attempts - c.attempts;
@@ -195,6 +198,7 @@ beforeEach(() => {
   state.personal = {};
   state.codes = [];
   state.passes = [];
+  state.passHours = [];
   state.budgets = new Map();
   state.emails = [];
   state.emailError = null;
@@ -232,6 +236,11 @@ describe('POST /send', () => {
     expect(JSON.stringify(state.codes)).not.toContain(code);
     expect(state.codes[0]).toMatchObject({ user_id: ADMIN, session_id: 's1', method: 'email' });
     expect(JSON.stringify(body)).not.toContain(code);
+    // a code lasts an hour (slow emails, switching tabs while waiting), and the email says so
+    const minutesLeft = (Date.parse(state.codes[0].expires_at) - Date.now()) / 60000;
+    expect(minutesLeft).toBeGreaterThan(59);
+    expect(minutesLeft).toBeLessThanOrEqual(60);
+    expect(mail.text).toContain('expires in 60 minutes');
   });
 
   it('reuses the code already sent on a page reload, and sends a new one on resend after the cooldown', async () => {
@@ -313,6 +322,7 @@ describe('POST /verify', () => {
     expect(ok.status).toBe(200);
     expect(await ok.json()).toEqual({ verified: true });
     expect(state.passes).toEqual([{ user_id: ADMIN, session_id: 's1' }]);
+    expect(state.passHours).toEqual([null]); // as long as the company keeps people signed in
     const again = await post('/verify', jwt(ADMIN, 's1'), { code });
     expect(again.status).toBe(400);
     expect((await again.json()).reason).toBe('none');
