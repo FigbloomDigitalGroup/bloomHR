@@ -1,30 +1,55 @@
-import toast from 'react-hot-toast';
 // ChatArea.tsx
-import { Hash, MoreVertical, Search, Users, Bell, BellOff, Video, Phone, Home, User, Settings } from "lucide-react";
+import { Hash, MoreVertical, Search, Users, Bell, BellOff, Home } from "lucide-react";
 import { Button } from "./ui/button";
 import { SidebarTrigger } from "./ui/sidebar";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SearchDialog } from "./SearchDialog";
 import { MembersDialog } from "./MembersDialog";
 import { EmployeeProfile } from "./EmployeeProfile";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
-import type { Channel, DirectMessage, Employee, Message } from "../chat/types/types";
+import type { Channel, DirectMessage, Employee, Message, ReactionRow } from "../chat/types/types";
 
 interface ChatAreaProps {
   channel: Channel | DirectMessage;
   messages: Message[];
   currentUserId: string;
   employees: Employee[];
-  onSendMessage: (content: string) => void;
+  /** resolves false when nothing was sent, so the draft stays */
+  onSendMessage: (content: string, files: File[], replyTo?: Message | null) => Promise<boolean> | boolean | void;
   onToggleMute: (channelId: string) => void;
   isMuted?: boolean;
+  reactionRows?: ReactionRow[];
+  peopleNames?: Record<string, string>;
+  onReact?: (messageId: string, emoji: string) => void;
+  onEditMessage?: (messageId: string, content: string) => Promise<boolean>;
+  onDeleteMessage?: (message: Message) => void;
 }
 
-export function ChatArea({ channel, messages, currentUserId, onSendMessage, onToggleMute, employees = [], isMuted = false }: ChatAreaProps) {
+export function ChatArea({
+  channel,
+  messages,
+  currentUserId,
+  onSendMessage,
+  onToggleMute,
+  employees = [],
+  isMuted = false,
+  reactionRows = [],
+  peopleNames = {},
+  onReact,
+  onEditMessage,
+  onDeleteMessage,
+}: ChatAreaProps) {
   const [showSearch, setShowSearch] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
+  // the message being answered; a reply belongs to its chat, so switching chats drops it
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  useEffect(() => setReplyingTo(null), [channel.id]);
+  // ...and to a message that is still there
+  useEffect(() => {
+    if (replyingTo && !messages.some((m) => m.id === replyingTo.id)) setReplyingTo(null);
+  }, [messages, replyingTo]);
 
   const handleSearch = () => {
     setShowSearch(true);
@@ -38,24 +63,8 @@ export function ChatArea({ channel, messages, currentUserId, onSendMessage, onTo
     onToggleMute(channel.id);
   };
 
-  const handleVideoCall = () => {
-    toast('Video calls are coming soon.');
-  };
-
-  const handleVoiceCall = () => {
-    toast('Voice calls are coming soon.');
-  };
-
   const handleNavigateHome = () => {
     window.location.href = "/";
-  };
-
-  const handleViewProfile = () => {
-    toast('Profiles in chat are coming soon.');
-  };
-
-  const handleSettings = () => {
-    toast('Chat settings are coming soon.');
   };
 
   return (
@@ -107,17 +116,8 @@ export function ChatArea({ channel, messages, currentUserId, onSendMessage, onTo
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            {/* On phones only mute and the menu stay in the header; call, search and members move into the menu */}
-            {channel.type === 'direct_message' && (
-              <>
-                <Button variant="ghost" size="icon" onClick={handleVoiceCall} className="hidden sm:inline-flex text-gray-500 hover:text-brand hover:bg-green-tint">
-                  <Phone className="h-5 w-5" />
-                </Button>
-                <Button variant="ghost" size="icon" onClick={handleVideoCall} className="hidden sm:inline-flex text-gray-500 hover:text-brand hover:bg-green-tint">
-                  <Video className="h-5 w-5" />
-                </Button>
-              </>
-            )}
+            {/* On phones only mute and the menu stay in the header; search and members move into the menu.
+                The person's card (their picture, left) has their phone number and email. */}
             <Button
               variant="ghost"
               size="icon"
@@ -129,35 +129,23 @@ export function ChatArea({ channel, messages, currentUserId, onSendMessage, onTo
             >
               {isMuted ? <BellOff className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleSearch} className="hidden sm:inline-flex text-gray-500 hover:text-green-600 hover:bg-green-50">
+            <Button variant="ghost" size="icon" onClick={handleSearch} aria-label="Search this chat" className="hidden sm:inline-flex text-gray-500 hover:text-green-600 hover:bg-green-50">
               <Search className="h-5 w-5" />
             </Button>
             {channel.type === 'channel' && (
-              <Button variant="ghost" size="icon" onClick={handleShowUsers} className="hidden sm:inline-flex text-gray-500 hover:text-brand hover:bg-green-tint">
+              <Button variant="ghost" size="icon" onClick={handleShowUsers} aria-label="Members" className="hidden sm:inline-flex text-gray-500 hover:text-brand hover:bg-green-tint">
                 <Users className="h-5 w-5" />
               </Button>
             )}
-            
+
             {/* Three Dots Dropdown Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-gray-500 hover:text-gray-700 hover:bg-gray-100">
+                <Button variant="ghost" size="icon" aria-label="More" className="text-gray-500 hover:text-gray-700 hover:bg-gray-100">
                   <MoreVertical className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                {channel.type === 'direct_message' && (
-                  <>
-                    <DropdownMenuItem onClick={handleVoiceCall} className="sm:hidden">
-                      <Phone className="h-4 w-4 mr-2" />
-                      Voice call
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleVideoCall} className="sm:hidden">
-                      <Video className="h-4 w-4 mr-2" />
-                      Video call
-                    </DropdownMenuItem>
-                  </>
-                )}
                 <DropdownMenuItem onClick={handleSearch} className="sm:hidden">
                   <Search className="h-4 w-4 mr-2" />
                   Search
@@ -172,28 +160,33 @@ export function ChatArea({ channel, messages, currentUserId, onSendMessage, onTo
                   <Home className="h-4 w-4 mr-2" />
                   Go to Home
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleViewProfile}>
-                  <User className="h-4 w-4 mr-2" />
-                  View Profile
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleSettings}>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </header>
 
         {/* Messages */}
-        <MessageList messages={messages} channel={channel} currentUserId={currentUserId} />
+        <MessageList
+          messages={messages}
+          channel={channel}
+          currentUserId={currentUserId}
+          reactionRows={reactionRows}
+          peopleNames={peopleNames}
+          onReact={onReact}
+          onReply={setReplyingTo}
+          onEdit={onEditMessage}
+          onDelete={onDeleteMessage}
+        />
 
         {/* Input */}
-        <MessageInput 
+        <MessageInput
           channelName={channel.name}
           onSendMessage={onSendMessage}
-          disabled={isMuted} 
+          disabled={isMuted}
           employees={employees}
+          replyingTo={replyingTo}
+          onCancelReply={() => setReplyingTo(null)}
+          currentUserId={currentUserId}
         />
       </div>
 

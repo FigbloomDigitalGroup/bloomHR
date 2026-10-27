@@ -27,3 +27,6 @@ export const DM_PREFIX = 'dm-';
 export const isDirectMessageId = (id: string): boolean => id.startsWith(DM_PREFIX);
 export const realChannelId = (id: string): string => (isDirectMessageId(id) ? id.slice(DM_PREFIX.length) : id);
 export const directMessageId = (conversationId: string): string => `${DM_PREFIX}${conversationId}`;
+
+/** Placeholder messages that exist only in the browser (the welcome line, a channel message that failed to save). */
+export const isLocalOnlyMessage = (id: string): boolean => id.startsWith('welcome-') || id.startsWith('mock-');
