@@ -111,13 +111,11 @@ const UserProfileDropdown = ({
       </button>
       )}
 
-      {/* Dropdown positioned above the button since it's at bottom of sidebar */}
+      {/* floats over the page below the header, so opening it never pushes the header taller */}
       {isOpen && (
         <div
           ref={dropdownRef}
-          className={compact
-            ? 'absolute right-0 top-full mt-2 w-56 max-w-[calc(100vw-2rem)] z-50 bg-white rounded-lg shadow-xl border border-gray-200'
-            : ' bg-white rounded-lg shadow-xl border border-gray-200  min-w-full'}
+          className={`absolute right-0 top-full mt-2 max-w-[calc(100vw-2rem)] z-50 bg-white rounded-lg shadow-xl border border-gray-200 ${compact ? 'w-56' : 'w-56 min-w-full'}`}
         >
 
           {setActiveTab && (
