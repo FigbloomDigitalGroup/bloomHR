@@ -1,7 +1,8 @@
 // @vitest-environment node
 //
 // 20261015600000: salary advances carry how many months they are repaid over (1 by default, as every advance before
-// it) and who marked them paid. Staff may ask for a spread advance of their own; access is otherwise unchanged.
+// it) and who marked them paid; access is otherwise unchanged. Since 20261027700000 a new advance is repaid in full on
+// the next payday, so it can't be spread (salary_advance_next_payday.test.ts).
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { PGlite } from '@electric-sql/pglite';
 import { asUser, bootDb, bootLiveDb } from './db';
@@ -51,14 +52,14 @@ describe('salary advance repayment months', () => {
     expect(rows).toEqual([{ repayment_months: 1, paid_by: null }]);
   }, 120000);
 
-  it('staff may ask for their own advance spread over months', async () => {
+  it('staff may ask for their own advance, repaid in one month', async () => {
     await asUser(db, STAFF, async () => {
-      const r = await attempt(`insert into salary_advance ("Employee Number", "Amount Requested", repayment_months, status)
-        values ('E-ME', 6000, 3, 'Pending')`);
+      const r = await attempt(`insert into salary_advance ("Employee Number", "Amount Requested", status)
+        values ('E-ME', 6000, 'Pending')`);
       expect(r).toEqual({ ok: true });
     });
     const { rows } = await db.query<{ repayment_months: number }>(`select repayment_months from salary_advance where "Employee Number" = 'E-ME'`);
-    expect(rows).toEqual([{ repayment_months: 3 }]);
+    expect(rows).toEqual([{ repayment_months: 1 }]);
   });
 
   it('only between 1 and 12 months', async () => {
@@ -92,7 +93,7 @@ describe('salary advance repayment months', () => {
       expect((await db.query(`update salary_advance set repayment_months = 1 where "Employee Number" = 'E-ME' returning id`)).rows).toHaveLength(0);
     });
     const { rows } = await db.query(`select status, payment_processed, paid_by_email, repayment_months from salary_advance where "Employee Number" = 'E-ME'`);
-    expect(rows).toEqual([{ status: 'paid', payment_processed: 'true', paid_by_email: 'payer@a.co', repayment_months: 3 }]);
+    expect(rows).toEqual([{ status: 'paid', payment_processed: 'true', paid_by_email: 'payer@a.co', repayment_months: 1 }]);
   });
 
   it('staff cannot change their own request (no update policy for them)', async () => {

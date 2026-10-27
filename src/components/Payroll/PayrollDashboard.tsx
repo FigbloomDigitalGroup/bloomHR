@@ -377,8 +377,8 @@ export default function PayrollDashboard() {
     fetchAllSalaryAdvances();
   }, []); // Empty dependency array = runs once when component mounts
 
-  // What comes off this pay for advances (no database call): a one-month advance in full in the month it was asked
-  // for, an advance spread over N months in N parts from that month, plus any part an approved payslip missed
+  // What comes off this pay for advances (no database call): an advance in full in the month it was asked for, plus
+  // any an approved payslip missed (paid after that payroll), and the parts of older advances spread over months
   // (src/lib/salaryAdvance.ts)
   const calculateAdvanceDeduction = (employeeNumber: any, period: any) =>
     advanceDeductionFor(salaryAdvances, employeeNumber, period, advancesTaken);

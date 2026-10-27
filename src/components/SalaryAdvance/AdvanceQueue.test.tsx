@@ -24,6 +24,7 @@ vi.mock('../../lib/approvals', async (importOriginal) => ({
   decideApproval: vi.fn(async () => 'approved'),
   loadApprovalChains: vi.fn(async () => chains.value),
 }));
+vi.mock('./ApplyForSomeone', () => ({ default: ({ open }: { open: boolean }) => (open ? <div role="dialog" aria-label="Apply for someone" /> : null) }));
 // the real client must never be reached from the queue (it goes through salaryAdvanceApi)
 vi.mock('../../lib/supabase', () => ({ supabase: new Proxy({}, { get: () => { throw new Error('supabase used'); } }) }));
 
@@ -125,5 +126,22 @@ describe('the advance queue', () => {
     render(<AdvanceQueue canDecide={false} />);
     await screen.findByText('Jane Wanjiru');
     expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+  });
+});
+
+describe('applying for someone', () => {
+  it('those who decide get Apply for someone; a request made for a person says who applied', async () => {
+    mocked.loadAdvanceQueue.mockResolvedValue([{ ...ROWS[0], requested_by_email: 'hr@acme.co' }]);
+    show();
+    expect(await screen.findByText('Applied on their behalf by hr@acme.co')).toBeTruthy();
+    expect(within(card('p1')).getByText('repaid in full on the next pay')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Apply for someone/ }));
+    expect(screen.getByRole('dialog', { name: 'Apply for someone' })).toBeTruthy();
+  });
+
+  it('those who only see the queue do not', async () => {
+    render(<AdvanceQueue canDecide={false} />);
+    await screen.findByText('Jane Wanjiru');
+    expect(screen.queryByRole('button', { name: /Apply for someone/ })).toBeNull();
   });
 });

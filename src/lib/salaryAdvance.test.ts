@@ -5,8 +5,8 @@ import {
   advanceDeductionFor,
   advanceStage,
   checkPayee,
-  maxAdvanceFor,
   queueTab,
+  repaymentNote,
   repaymentProgress,
   repaymentSchedule,
   validateAdvanceRequest,
@@ -145,15 +145,34 @@ describe('progress and stages', () => {
 });
 
 describe('request validation', () => {
-  it('limits the amount to 20% of basic salary', () => {
-    expect(maxAdvanceFor('50000')).toBe(10000);
-    expect(validateAdvanceRequest({ amount: '10001', reason: 'School fees for term', months: 1 }, 10000).amount).toMatch(/KSh 10,000/);
-    expect(validateAdvanceRequest({ amount: '10000', reason: 'School fees for term', months: 2 }, 10000)).toEqual({});
+  it('has no limit on the amount', () => {
+    expect(validateAdvanceRequest({ amount: '250000', reason: 'School fees for term' })).toEqual({});
   });
 
-  it('needs an amount, a reason and 1-6 months', () => {
-    const e = validateAdvanceRequest({ amount: '', reason: 'short', months: 7 }, 10000);
-    expect(Object.keys(e).sort()).toEqual(['amount', 'months', 'reason']);
+  it('needs an amount above nothing and a reason', () => {
+    const e = validateAdvanceRequest({ amount: '', reason: 'short' });
+    expect(Object.keys(e).sort()).toEqual(['amount', 'reason']);
+    expect(validateAdvanceRequest({ amount: '0', reason: 'School fees for term' }).amount).toBe('Enter the amount needed.');
+  });
+
+  it('says it comes off the next pay in full', () => {
+    expect(repaymentNote(30000, '2026-10')).toBe(
+      'KSh 30,000 comes off the next pay in full: October 2026, or the month after if that payroll has already been approved.',
+    );
+  });
+});
+
+describe('repaid in full on the next payday', () => {
+  const advance = (over: Partial<AdvanceRow> = {}) => paid({ 'Amount Requested': 80000, time_added: '2026-10-05T09:00:00Z', ...over });
+  it('the whole amount comes off the pay of the month it was asked for', () => {
+    expect(advanceDeductionFor([advance()], 'E1', '2026-10')).toBe(80000);
+    expect(advanceDeductionFor([advance()], 'E1', '2026-11')).toBe(0);
+  });
+  it('paid after that payroll was approved, it all comes off the next one', () => {
+    const taken = [{ employee_number: 'E1', pay_period: '2026-10', amount: 0 }];
+    expect(advanceDeductionFor([advance()], 'E1', '2026-11', taken)).toBe(80000);
+    // and not again once it has been taken
+    expect(advanceDeductionFor([advance()], 'E1', '2026-12', [...taken, { employee_number: 'E1', pay_period: '2026-11', amount: 80000 }])).toBe(0);
   });
 });
 
@@ -181,21 +200,5 @@ describe('payee check', () => {
     expect(accountNameMatches('Jane W. Wanjiru', { 'First Name': 'Jane', 'Middle Name': 'W', 'Last Name': 'Wanjiru' })).toBe(true);
     expect(accountNameMatches('Jane Wanjiru Kamau', base)).toBe(true);
     expect(accountNameMatches('Jane Otieno', base)).toBe(false);
-  });
-});
-
-describe('the company’s longest repayment', () => {
-  const ok = { amount: '5000', reason: 'School fees for next term' };
-  it('refuses more months than the company allows', () => {
-    expect(validateAdvanceRequest({ ...ok, months: 4 }, 10000, 3).months).toBe('Choose between 1 and 3 months.');
-    expect(validateAdvanceRequest({ ...ok, months: 3 }, 10000, 3).months).toBeUndefined();
-  });
-  it('at one month, says so', () => {
-    expect(validateAdvanceRequest({ ...ok, months: 2 }, 10000, 1).months).toBe('Advances here are repaid in one month.');
-    expect(validateAdvanceRequest({ ...ok, months: 1 }, 10000, 1).months).toBeUndefined();
-  });
-  it('without a company setting, up to six', () => {
-    expect(validateAdvanceRequest({ ...ok, months: 6 }, 10000).months).toBeUndefined();
-    expect(validateAdvanceRequest({ ...ok, months: 7 }, 10000).months).toBeDefined();
   });
 });
