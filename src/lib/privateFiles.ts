@@ -14,6 +14,7 @@ export type PrivateBucket =
   | 'employee-contracts'
   | 'leave-documents'
   | 'task-attachments'
+  | 'chat-attachments'
   | 'work-files'
   | 'signatures'
   | 'generated-documents';
