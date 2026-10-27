@@ -143,6 +143,12 @@ export async function loadPeriods(): Promise<KpiPeriod[]> {
   return (data ?? []) as KpiPeriod[];
 }
 
+/** The review period covering today, started (the current quarter, open) when there is none: HR or a manager. */
+export async function startCurrentPeriod(): Promise<void> {
+  const { error } = await supabase.rpc('start_current_kpi_period');
+  if (error) fail(error);
+}
+
 export async function savePeriod(id: string | null, fields: KpiPeriodInput): Promise<void> {
   const row = { ...fields, name: fields.name.trim() };
   const { error } = id ? await supabase.from('kpi_periods').update(row).eq('id', id) : await supabase.from('kpi_periods').insert(row);

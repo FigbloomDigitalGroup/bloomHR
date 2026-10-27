@@ -38,14 +38,14 @@ interface Props {
   departments?: Department[];
 }
 
-const BLANK: KpiInput = {
+export const BLANK: KpiInput = {
   name: '', description: '', unit: 'number', direction: 'higher_is_better', default_target: null, default_weight: 0,
   frequency: 'quarterly', category: null, measure: 'manual',
 };
 
 const fromTemplate = (t: KpiTemplate): KpiInput => ({ ...t, measure: t.measure ?? 'manual' });
 
-function KpiForm({ initial, onCancel, onSave, busy }: { initial: KpiInput; onCancel: () => void; onSave: (k: KpiInput) => void; busy: boolean }) {
+export function KpiForm({ initial, onCancel, onSave, busy }: { initial: KpiInput; onCancel: () => void; onSave: (k: KpiInput) => void; busy: boolean }) {
   const [form, setForm] = useState({
     ...initial,
     description: initial.description ?? '',
