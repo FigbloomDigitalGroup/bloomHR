@@ -69,6 +69,7 @@ export default function StaffIdCardDialog({ employeeId, open, onClose }: { emplo
             card={card}
             branding={branding}
             settings={settings}
+            onCardChange={setCard}
             actions={
               <>
                 <Button variant="secondary" onClick={reissue} disabled={reissuing} icon={<RefreshCw className="w-3.5 h-3.5" />}>

@@ -10,6 +10,7 @@ const api = vi.hoisted(() => ({
   regenerateStaffIdCard: vi.fn(),
   loadCardSettings: vi.fn(),
   saveCardSettings: vi.fn(),
+  setStaffIdCardPhotoFraming: vi.fn(),
 }));
 vi.mock('../../lib/staffIdCards', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../lib/staffIdCards')>()), ...api }));
 vi.mock('../../lib/offers', () => ({ loadBranding: () => Promise.resolve({ name: 'Acme Ltd', primary_color: '#0F766E' }) }));
@@ -54,6 +55,52 @@ describe('My ID card (staff portal)', () => {
     api.loadMyStaffIdCard.mockResolvedValue(null);
     render(<MyIdCard />);
     expect(await screen.findByText('No ID card yet')).toBeTruthy();
+  });
+});
+
+describe('adjusting the photo', () => {
+  const photoX = (container: HTMLElement) => Number(container.querySelector('[data-card-image="photo"]')!.getAttribute('x'));
+
+  it('moves and zooms the photo in its hexagon, shows it on the card as it moves, and saves it', async () => {
+    api.loadMyStaffIdCard.mockResolvedValue({ ...card, photo_url: 'https://cdn/e1.png' });
+    api.setStaffIdCardPhotoFraming.mockResolvedValue(undefined);
+    const { container } = render(<MyIdCard />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Adjust photo' }));
+    const before = photoX(container);
+
+    fireEvent.change(screen.getByLabelText('Zoom'), { target: { value: '2' } });
+    fireEvent.keyDown(screen.getByRole('application'), { key: 'ArrowRight' });
+    expect(photoX(container)).toBeLessThan(before); // the card shows it moved: more of the right of the photo
+    expect(screen.queryByRole('button', { name: 'Download PNG' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.setStaffIdCardPhotoFraming).toHaveBeenCalled());
+    const [id, f] = api.setStaffIdCardPhotoFraming.mock.calls[0];
+    expect(id).toBe('e1');
+    expect(f.zoom).toBe(2);
+    expect(f.x).toBeCloseTo(0.52);
+    expect(f.y).toBeCloseTo(0.5);
+    // back to the buttons, the card keeping the new position
+    expect(await screen.findByRole('button', { name: 'Download PNG' })).toBeTruthy();
+    expect(photoX(container)).toBeLessThan(before);
+  });
+
+  it('Cancel puts the photo back, and a card without a photo has nothing to adjust', async () => {
+    api.loadMyStaffIdCard.mockResolvedValue({ ...card, photo_url: 'https://cdn/e1.png' });
+    const { container, unmount } = render(<MyIdCard />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Adjust photo' }));
+    const before = photoX(container);
+    fireEvent.change(screen.getByLabelText('Zoom'), { target: { value: '3' } });
+    expect(photoX(container)).not.toBe(before);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(photoX(container)).toBe(before);
+    expect(api.setStaffIdCardPhotoFraming).not.toHaveBeenCalled();
+    unmount();
+
+    api.loadMyStaffIdCard.mockResolvedValue(card);
+    render(<MyIdCard />);
+    await screen.findByRole('button', { name: 'Download PNG' });
+    expect(screen.queryByRole('button', { name: 'Adjust photo' })).toBeNull();
   });
 });
 

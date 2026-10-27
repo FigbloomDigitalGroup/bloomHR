@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { code128Bars } from '../../lib/code128';
 import { DEFAULT_PRIMARY_COLOR, DEFAULT_SECONDARY_COLOR } from '../../lib/companyProfile';
@@ -10,9 +10,11 @@ import {
   cardDate,
   cardExpiry,
   formatCardDate,
+  framingOf,
   fullName,
   initials,
   nameParts,
+  placePhoto,
   verifyUrl,
 } from '../../lib/staffIdCards';
 
@@ -52,11 +54,27 @@ const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0
 const fit = (chars: number, width: number, max: number, min = 14) => Math.max(min, Math.min(max, width / (Math.max(chars, 1) * 0.56)));
 
 /** A pointy-topped hexagon's corners around (cx, cy). */
-const hexagon = (cx: number, cy: number, r: number) =>
+export const hexagon = (cx: number, cy: number, r: number) =>
   Array.from({ length: 6 }, (_, i) => {
     const a = (Math.PI / 3) * i - Math.PI / 2;
     return `${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`;
   }).join(' ');
+
+/** A photo's own size once it has loaded (null until then, or when it can't be loaded), to place it in the hexagon. */
+export function useImageSize(url: string | null): { w: number; h: number } | null {
+  const [size, setSize] = useState<{ url: string; w: number; h: number } | null>(null);
+  useEffect(() => {
+    if (!url) return;
+    let live = true;
+    const img = new Image();
+    img.onload = () => live && img.naturalWidth > 0 && setSize({ url, w: img.naturalWidth, h: img.naturalHeight });
+    img.src = url;
+    return () => {
+      live = false;
+    };
+  }, [url]);
+  return size && size.url === url ? { w: size.w, h: size.h } : null;
+}
 
 /** An id usable inside url(#...) (React's ids contain colons). */
 const useSvgId = (prefix: string) => `${prefix}-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
@@ -131,6 +149,9 @@ export function StaffIdCardFront({ card, branding, settings, width, className }:
   const barX = (CARD_W - barcode.width * unit) / 2;
   const hexR = 118;
   const hexY = 318;
+  // the photo covers the hexagon's square, moved and zoomed as framed (Adjust photo)
+  const photoSize = useImageSize(card.photo_url);
+  const photo = placePhoto(photoSize, framingOf(card), CARD_W / 2, hexY, hexR * 2);
 
   return (
     <Svg label={`Staff ID card of ${fullName(card)}, front`} width={width} className={className}>
@@ -162,7 +183,7 @@ export function StaffIdCardFront({ card, branding, settings, width, className }:
           </clipPath>
           <image
             href={card.photo_url}
-            x={CARD_W / 2 - hexR} y={hexY - hexR} width={hexR * 2} height={hexR * 2}
+            x={photo.x} y={photo.y} width={photo.width} height={photo.height}
             preserveAspectRatio="xMidYMid slice"
             clipPath={`url(#${photoClip})`}
             crossOrigin="anonymous"

@@ -32,7 +32,7 @@ export default function MyIdCard() {
       ) : card === null ? (
         <EmptyState icon={<IdCard className="w-6 h-6" />} title="No ID card yet" description="Your login is not linked to an employee record in this company. Ask HR." />
       ) : (
-        <StaffIdCardViewer card={card} branding={branding} settings={settings} />
+        <StaffIdCardViewer card={card} branding={branding} settings={settings} onCardChange={setCard} />
       )}
     </div>
   );

@@ -15,7 +15,9 @@ const HR = '00000000-0000-0000-0000-00000000f001';
 const S1 = '00000000-0000-0000-0000-00000000f002';
 const S2 = '00000000-0000-0000-0000-00000000f003';
 const HRB = '00000000-0000-0000-0000-00000000f004';
-const MIGRATION = readFileSync(join(__dirname, '..', 'migrations', '20261027400000_staff_id_cards.sql'), 'utf8');
+// the module's part of the migration (its card functions were remade with more columns by 20261027600000)
+const MIGRATION = readFileSync(join(__dirname, '..', 'migrations', '20261027400000_staff_id_cards.sql'), 'utf8')
+  .match(/do \$\$\s*begin\s*perform public\.seed_module_once[\s\S]*?end \$\$;/)![0];
 
 let db: PGlite;
 const rows = async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) => (await db.query<T>(sql, params)).rows;
