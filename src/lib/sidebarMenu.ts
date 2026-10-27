@@ -185,6 +185,8 @@ export const STAFF_PORTAL_MENU: PortalMenuGroup[] = [
         ],
       },
       { id: 'contract', label: 'Contracts' },
+      // the staff ID card ("job card"), to show on the phone or print (migration 20261027400000)
+      { id: 'id-card', label: 'My ID card', keywords: ['job card', 'staff id', 'badge', 'qr'] },
       // resigning starts at the bottom of Profile (behind a confirmation), so searching for it finds Profile
       { id: 'details', label: 'Profile', keywords: ['resign', 'resignation', 'leaving'] },
       { id: 'biodata', label: 'Bio Data' },

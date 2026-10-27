@@ -12,6 +12,7 @@ import {
   UserCircle as PhUserCircle,
   CalendarBlank as PhCalendarBlank,
   File as PhFile,
+  IdentificationCard as PhIdentificationCard,
   Upload as PhUpload,
   Palette as PhPalette,
   Phone as PhPhone,
@@ -64,6 +65,7 @@ import PasswordResetModal from './PasswordRestModal';
 import MyDocumentsPage from '../Onboarding/MyDocumentsPage';
 import Appearance from '../Settings/Appearance';
 import MyContract from './MyContract';
+import MyIdCard from './MyIdCard';
 import MyResignation from './MyResignation';
 import MyOvertime from './MyOvertime';
 import MyTeam from './MyTeam';
@@ -920,6 +922,7 @@ const STAFF_ICONS: Record<string, any> = {
   'first-weeks': PhListChecks,
   leave: PhCalendarBlank,
   contract: PhFile,
+  'id-card': PhIdentificationCard,
   details: PhUserCircle,
   biodata: PhBriefcase,
   documents: PhUpload,
@@ -1627,6 +1630,7 @@ const StaffPortal = () => {
                 <StaffCompany section={activeTab} onSectionChange={setActiveTab} employeeNumber={employeeNumber} onOpenTask={openTask} />
               )}
               {activeTab === 'contract' && <MyContract />}
+              {activeTab === 'id-card' && <MyIdCard />}
               {activeTab === 'resignation' && <MyResignation />}
               {activeTab === 'details' && <Profile onOpenResignation={() => setActiveTab('resignation')} />}
               {activeTab === 'documents' && <MyDocumentsPage />}
