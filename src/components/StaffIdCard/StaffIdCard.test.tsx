@@ -3,7 +3,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import StaffIdCard, { StaffIdCardBack, StaffIdCardFront } from './StaffIdCard';
 import { wrapText } from './cardText';
 import { code128Bars, encodeCode128 } from '../../lib/code128';
-import { cardExpiry, initials, parseRecordDate, type StaffIdCardData, DEFAULT_CARD_SETTINGS } from '../../lib/staffIdCards';
+import { CENTRED, cardExpiry, framingOf, initials, parseRecordDate, placePhoto, type StaffIdCardData, DEFAULT_CARD_SETTINGS } from '../../lib/staffIdCards';
 import { sheetPages } from '../../lib/staffIdCardExport';
 
 // The staff ID card (20261027400000): portrait, front and back, in the company's colours; the details, the photo or
@@ -131,5 +131,29 @@ describe('what the card works out', () => {
     expect(pages[2]).toEqual(['F9', null, null]);
     expect(pages[3]).toEqual([null, null, 'B9']);
     expect(sheetPages([{ front: 'F', back: 'B' }])).toEqual([['F', 'B']]);
+  });
+});
+
+describe('placing the photo in the hexagon', () => {
+  it('centred, it covers the hexagon; framed, the chosen point sits in the middle, never leaving a gap', () => {
+    // a landscape photo, 400 x 200, in a 240 square centred on (270, 318)
+    const wide = { w: 400, h: 200 };
+    const c = placePhoto(wide, CENTRED, 270, 318, 240);
+    expect([c.width, c.height, c.x, c.y]).toEqual([480, 240, 30, 198]);
+    // its left third in the middle
+    const left = placePhoto(wide, { x: 1 / 3, y: 0.5, zoom: 1 }, 270, 318, 240);
+    expect(left.x).toBeCloseTo(110);
+    // as far left as it goes: the photo's left edge stops at the hexagon's
+    const edge = placePhoto(wide, { x: 0, y: 0, zoom: 1 }, 270, 318, 240);
+    expect([edge.x, edge.y]).toEqual([150, 198]);
+    expect(edge.framing.x).toBeCloseTo(0.25);
+    // zoomed in, it moves up and down too
+    const zoomed = placePhoto(wide, { x: 0.5, y: 0.25, zoom: 2 }, 270, 318, 240);
+    expect([zoomed.width, zoomed.height, zoomed.y]).toEqual([960, 480, 198]);
+  });
+
+  it('reads the framing from the card, centred when missing or out of range', () => {
+    expect(framingOf({})).toEqual(CENTRED);
+    expect(framingOf({ photo_x: '0.25', photo_y: 2, photo_zoom: '0.5' })).toEqual({ x: 0.25, y: 1, zoom: 1 });
   });
 });

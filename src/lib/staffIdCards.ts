@@ -26,6 +26,10 @@ export interface StaffIdCardData {
   is_active: boolean;
   token: string;
   issued_at: string;
+  /** how the photo sits in the hexagon (20261027600000); centred when missing or set for an earlier photo */
+  photo_x?: number | string | null;
+  photo_y?: number | string | null;
+  photo_zoom?: number | string | null;
 }
 
 /** What the company has chosen for its cards (staff_id_card_settings); a company with no row gets the defaults. */
@@ -79,6 +83,14 @@ export async function regenerateStaffIdCard(employeeId: string): Promise<{ token
   return row;
 }
 
+/** Moves or zooms the photo on a card (the card holder their own, the module anyone's). The photo itself is unchanged. */
+export async function setStaffIdCardPhotoFraming(employeeId: string, framing: PhotoFraming): Promise<void> {
+  const { error } = await supabase.rpc('set_staff_id_card_photo_framing', {
+    p_employee_id: employeeId, p_x: framing.x, p_y: framing.y, p_zoom: framing.zoom,
+  });
+  if (error) fail(error, 'The photo position was not saved.');
+}
+
 /** The public check behind the QR code; null when the card is unknown or has been reissued. */
 export async function verifyStaffIdCard(token: string): Promise<VerifiedCard | null> {
   const { data, error } = await supabase.rpc('verify_staff_id_card', { p_token: token });
@@ -128,6 +140,52 @@ export const fullName = (card: Pick<StaffIdCardData, 'first_name' | 'middle_name
   const { first, rest } = nameParts(card);
   return [first, rest].filter(Boolean).join(' ');
 };
+
+/** Which point of the photo sits in the middle of the hexagon (0 to 1 across and down), and the zoom (1 to 4). */
+export interface PhotoFraming {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
+export const CENTRED: PhotoFraming = { x: 0.5, y: 0.5, zoom: 1 };
+
+const between = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+const num = (v: number | string | null | undefined, fallback: number) => {
+  const n = Number(v);
+  return v === null || v === undefined || v === '' || !Number.isFinite(n) ? fallback : n;
+};
+
+export function framingOf(card: Pick<StaffIdCardData, 'photo_x' | 'photo_y' | 'photo_zoom'>): PhotoFraming {
+  return {
+    x: between(num(card.photo_x, 0.5), 0, 1),
+    y: between(num(card.photo_y, 0.5), 0, 1),
+    zoom: between(num(card.photo_zoom, 1), 1, 4),
+  };
+}
+
+/**
+ * Where to draw a photo of `natural` size (null while it loads: taken as square) so that it covers a `size` square
+ * centred on (cx, cy), zoomed, with the framing's point in the middle. The photo never leaves a gap: near an edge it
+ * stops, and `framing` is that reachable point.
+ */
+export function placePhoto(
+  natural: { w: number; h: number } | null,
+  framing: PhotoFraming,
+  cx: number,
+  cy: number,
+  size: number,
+): { x: number; y: number; width: number; height: number; framing: PhotoFraming } {
+  const w = natural?.w || 1;
+  const h = natural?.h || 1;
+  const zoom = between(framing.zoom, 1, 4);
+  const scale = Math.max(size / w, size / h) * zoom;
+  const width = w * scale;
+  const height = h * scale;
+  const x = between(cx - framing.x * width, cx + size / 2 - width, cx - size / 2);
+  const y = between(cy - framing.y * height, cy + size / 2 - height, cy - size / 2);
+  return { x, y, width, height, framing: { x: (cx - x) / width, y: (cy - y) / height, zoom } };
+}
 
 /** Up to two letters for when there is no photo: first and last name. */
 export function initials(card: Pick<StaffIdCardData, 'first_name' | 'last_name'>): string {
