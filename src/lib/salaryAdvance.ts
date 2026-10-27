@@ -4,13 +4,16 @@ import { paymentKind, paymentMethodLabel } from './paymentMethods';
 // Salary advances: what a request needs, how payroll takes it back, and where each request stands.
 //
 // An advance is paid once and taken back in full on the next payday: the pay of the month it was asked for, or, when
-// that payroll was approved before the advance was paid, the next one. There is no limit on the amount; the
-// approvers decide. (Advances asked for before 20261027700000 could be spread over N months: those still come off in
+// that payroll was approved before the advance was paid, the next one. A request is at most 30% of the person's basic
+// salary (checked by the database too, 20261027800000). (Advances asked for before 20261027700000 could be spread over N months: those still come off in
 // N equal parts from the month they were asked for, the last part taking any rounding.)
 // Payroll only takes back advances that are paid (status 'paid' and payment_processed 'true').
 // A part that an approved payslip did not take (the advance was recorded paid after that month's payroll, or the
 // person had no payslip that month) comes off the next payroll, counted from the person's first approved payslip
 // (earlier months were paid outside the app).
+
+/** The most a person may ask for, as a share of their basic salary (the company's rule). */
+export const ADVANCE_LIMIT_SHARE = 0.3;
 
 /** The shortest reason accepted. */
 export const MIN_REASON_LENGTH = 10;
@@ -196,11 +199,20 @@ export interface AdvanceRequestInput {
   reason: string;
 }
 
-/** What is wrong with a request, by field; empty when it may be sent. Any amount above nothing may be asked for. */
-export const validateAdvanceRequest = (input: AdvanceRequestInput): Partial<Record<keyof AdvanceRequestInput, string>> => {
+/** The most this person may ask for: 30% of their basic salary, in whole shillings. */
+export const maxAdvanceFor = (basicSalary: unknown) =>
+  Math.floor((parseFloat(String(basicSalary ?? '').replace(/[^0-9.]/g, '')) || 0) * ADVANCE_LIMIT_SHARE);
+
+/** What is wrong with a request, by field; empty when it may be sent. */
+export const validateAdvanceRequest = (
+  input: AdvanceRequestInput,
+  maxAmount: number,
+): Partial<Record<keyof AdvanceRequestInput, string>> => {
   const errors: Partial<Record<keyof AdvanceRequestInput, string>> = {};
   const amount = Number(input.amount);
   if (!text(input.amount) || !Number.isFinite(amount) || amount <= 0) errors.amount = 'Enter the amount needed.';
+  else if (maxAmount <= 0) errors.amount = 'No basic salary is on the employee record, so no advance can be given. Ask HR to add it.';
+  else if (amount > maxAmount) errors.amount = `The most that can be asked for is ${formatKsh(maxAmount)} (${ADVANCE_LIMIT_SHARE * 100}% of the basic salary).`;
   if (text(input.reason).length < MIN_REASON_LENGTH) errors.reason = `Say why in a few words (at least ${MIN_REASON_LENGTH} characters).`;
   return errors;
 };

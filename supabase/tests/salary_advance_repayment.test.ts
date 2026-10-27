@@ -32,7 +32,7 @@ beforeAll(async () => {
       ('${STAFF}', 'me@a.co', 'STAFF', '${A}'), ('${PAYER}', 'payer@a.co', 'CHECKER', '${A}'), ('${OTHER_ADMIN}', 'admin@b.co', 'ADMIN', '${B}');
     insert into role_permissions (role_name, permissions, tenant_id) values
       ('STAFF', array['dashboard'], '${A}'), ('CHECKER', array['salaryadmin'], '${A}');
-    insert into employees ("Employee Number", "First Name", "Work Email", tenant_id) values ('E-ME', 'Me', 'me@a.co', '${A}');
+    insert into employees ("Employee Number", "First Name", "Work Email", "Basic Salary", tenant_id) values ('E-ME', 'Me', 'me@a.co', 50000, '${A}');
   `);
 }, 120000);
 
