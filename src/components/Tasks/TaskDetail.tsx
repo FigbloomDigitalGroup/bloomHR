@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Paperclip, Plus, Trash2, X } from 'lucide-react';
+import { Paperclip, Plus, Save, Trash2, X } from 'lucide-react';
 import { Button, Modal, TabBar } from '../UI';
 import EmployeePicker from '../UI/EmployeePicker';
 import {
@@ -32,9 +32,45 @@ interface TaskDetailProps {
   onCreateSubtask: (parent: Task, title: string) => Promise<void>;
 }
 
+/** The fields edited in the window, kept until Save. */
+interface Edits {
+  title: string;
+  description: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assignee_number: string | null;
+  due_date: string | null;
+  project_id: string;
+  labels: string[];
+}
+const editsOf = (t: Task): Edits => ({
+  title: t.title, description: t.description ?? '', status: t.status, priority: t.priority, assignee_number: t.assignee_number,
+  due_date: t.due_date, project_id: t.project_id, labels: t.labels,
+});
+const sameValue = (a: Edits[keyof Edits], b: Edits[keyof Edits]) => (Array.isArray(a) && Array.isArray(b) ? [...a].sort().join() === [...b].sort().join() : a === b);
+
+/** What Save sends: only the fields that differ from the task. */
+function changesFrom(task: Task, e: Edits): TaskChange {
+  const out: TaskChange = {};
+  const title = e.title.trim();
+  if (title !== task.title) out.title = title;
+  const description = e.description.trim() || null;
+  if (description !== ((task.description ?? '').trim() || null)) out.description = description;
+  if (e.status !== task.status) out.status = e.status;
+  if (e.priority !== task.priority) out.priority = e.priority;
+  if (e.assignee_number !== task.assignee_number) out.assignee_number = e.assignee_number;
+  if ((e.due_date || null) !== task.due_date) out.due_date = e.due_date || null;
+  if (e.project_id !== task.project_id) out.project_id = e.project_id;
+  return out;
+}
+
 const when = (iso: string) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
-/** Everything about one task: its fields, sub-tasks, comments (with @mentions), activity and files. */
+/**
+ * Everything about one task: its fields, sub-tasks, comments (with @mentions), activity and files. Changes to the
+ * fields wait for Save (or Ctrl+S); closing with unsaved changes asks first. Sub-tasks, comments and files are saved as
+ * they are added.
+ */
 export default function TaskDetail(props: TaskDetailProps) {
   const { task, viewer } = props;
   const project = props.projects.find((p) => p.id === task.project_id) ?? null;
@@ -53,8 +89,8 @@ export default function TaskDetail(props: TaskDetailProps) {
     };
   }, [task.id, viewer.oversees, editable]);
 
-  const [title, setTitle] = useState(task.title);
-  const [description, setDescription] = useState(task.description ?? '');
+  const [edits, setEdits] = useState<Edits>(() => editsOf(task));
+  const [saving, setSaving] = useState(false);
   const [tab, setTab] = useState<'comments' | 'activity'>('comments');
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [activity, setActivity] = useState<TaskActivity[]>([]);
@@ -65,10 +101,23 @@ export default function TaskDetail(props: TaskDetailProps) {
   const [subtask, setSubtask] = useState('');
   const [uploading, setUploading] = useState(false);
 
+  // the task changed underneath (saved here, or reloaded): fields not being edited follow it, edits in progress stay
+  const shown = useRef(task);
   useEffect(() => {
-    setTitle(task.title);
-    setDescription(task.description ?? '');
-  }, [task.id, task.title, task.description]);
+    const before = editsOf(shown.current);
+    const after = editsOf(task);
+    shown.current = task;
+    setEdits((cur) => {
+      const next: Record<string, Edits[keyof Edits]> = { ...cur };
+      for (const k of Object.keys(after) as (keyof Edits)[]) if (sameValue(cur[k], before[k])) next[k] = after[k];
+      return next as unknown as Edits;
+    });
+  }, [task]);
+
+  const set = (patch: Partial<Edits>) => setEdits((cur) => ({ ...cur, ...patch }));
+  const changes = useMemo(() => changesFrom(task, edits), [task, edits]);
+  const labelsChanged = !sameValue(edits.labels, task.labels);
+  const dirty = Object.keys(changes).length > 0 || labelsChanged;
 
   const refresh = useCallback(async () => {
     try {
@@ -85,24 +134,35 @@ export default function TaskDetail(props: TaskDetailProps) {
     void refresh();
   }, [refresh, task.updated_at]);
 
-  const save = async (change: TaskChange) => {
-    try {
-      props.onChanged(await updateTask(task.id, change));
-    } catch (e) {
-      toast.error((e as Error).message);
+  const save = async () => {
+    if (!dirty || saving) return;
+    if (!edits.title.trim()) {
+      toast.error('Give the task a title');
+      return;
     }
-  };
-
-  const toggleLabel = async (id: string) => {
-    const next = task.labels.includes(id) ? task.labels.filter((l) => l !== id) : [...task.labels, id];
+    setSaving(true);
     try {
-      await setTaskLabels(task.id, next, task.labels);
-      props.onChanged({ ...task, labels: next });
+      const saved = Object.keys(changes).length ? await updateTask(task.id, changes) : task;
+      if (labelsChanged) await setTaskLabels(task.id, edits.labels, task.labels);
+      props.onChanged({ ...saved, labels: edits.labels });
+      toast.success('Saved');
       void refresh();
     } catch (e) {
       toast.error((e as Error).message);
+    } finally {
+      setSaving(false);
     }
   };
+
+  // leaving with unsaved changes (closing, or opening another task) asks first
+  const leave = async (go: () => void) => {
+    if (dirty && !(await confirmDialog({
+      title: 'Discard your changes?', message: 'You have changes to this task that are not saved.', confirmLabel: 'Discard', tone: 'danger',
+    }))) return;
+    go();
+  };
+
+  const toggleLabel = (id: string) => set({ labels: edits.labels.includes(id) ? edits.labels.filter((l) => l !== id) : [...edits.labels, id] });
 
   const post = async () => {
     const body = draft.trim();
@@ -136,18 +196,26 @@ export default function TaskDetail(props: TaskDetailProps) {
   const parent = task.parent_id ? props.allTasks.find((t) => t.id === task.parent_id) : null;
 
   return (
-    <Modal open onClose={props.onClose} size="5xl" title={`${task.key} ${task.title}`} hideTitle className="bg-white rounded-2xl shadow-xl p-0">
+    <Modal open onClose={() => void leave(props.onClose)} size="5xl" title={`${task.key} ${task.title}`} hideTitle className="bg-white rounded-2xl shadow-xl p-0">
+      <div
+        onKeyDown={(e) => {
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+            e.preventDefault();
+            void save();
+          }
+        }}
+      >
       <div className="flex items-center gap-2 px-5 py-3 border-b border-border text-xs text-muted-foreground">
         <span className="font-mono">{task.key}</span>
         {project && <span>· {project.name}</span>}
         {parent && (
-          <button type="button" className="hover:underline" onClick={() => props.onOpen(parent)}>· sub-task of {parent.key}</button>
+          <button type="button" className="hover:underline" onClick={() => void leave(() => props.onOpen(parent))}>· sub-task of {parent.key}</button>
         )}
         <span className="ml-auto flex items-center gap-1">
           {deletable && (
             <button type="button" onClick={remove} className="p-1.5 rounded-md hover:bg-secondary" aria-label="Delete task"><Trash2 size={14} /></button>
           )}
-          <button type="button" onClick={props.onClose} className="p-1.5 rounded-md hover:bg-secondary" aria-label="Close"><X size={14} /></button>
+          <button type="button" onClick={() => void leave(props.onClose)} className="p-1.5 rounded-md hover:bg-secondary" aria-label="Close"><X size={14} /></button>
         </span>
       </div>
 
@@ -161,20 +229,18 @@ export default function TaskDetail(props: TaskDetailProps) {
         <div className="flex-1 min-w-0 p-5 flex flex-col gap-4">
           <input
             aria-label="Title"
-            value={title}
+            value={edits.title}
             disabled={!editable}
-            onChange={(e) => setTitle(e.target.value)}
-            onBlur={() => title.trim() && title.trim() !== task.title && save({ title: title.trim() })}
+            onChange={(e) => set({ title: e.target.value })}
             className="w-full text-lg font-semibold text-ink bg-transparent outline-none border-b border-transparent focus:border-brand disabled:text-ink"
           />
           <textarea
             aria-label="Description"
-            value={description}
+            value={edits.description}
             disabled={!editable}
             placeholder={editable ? 'Add a description...' : 'No description'}
             rows={5}
-            onChange={(e) => setDescription(e.target.value)}
-            onBlur={() => description !== (task.description ?? '') && save({ description: description.trim() || null })}
+            onChange={(e) => set({ description: e.target.value })}
             className={`${fieldClass} resize-y whitespace-pre-wrap`}
           />
 
@@ -190,7 +256,7 @@ export default function TaskDetail(props: TaskDetailProps) {
             <ul className="flex flex-col gap-1">
               {children.map((c) => (
                 <li key={c.id}>
-                  <button type="button" onClick={() => props.onOpen(c)} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-secondary text-left">
+                  <button type="button" onClick={() => void leave(() => props.onOpen(c))} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-secondary text-left">
                     <StatusIcon status={c.status} />
                     <span className="font-mono text-[10px] text-muted-foreground">{c.key}</span>
                     <span className="flex-1 text-xs text-ink truncate">{c.title}</span>
@@ -288,13 +354,13 @@ export default function TaskDetail(props: TaskDetailProps) {
         <aside className="md:w-64 shrink-0 border-t md:border-t-0 md:border-l border-border p-5 flex flex-col gap-3 bg-secondary/30">
           <div>
             <label className={labelClass} htmlFor="task-status">Status</label>
-            <select id="task-status" className={fieldClass} value={task.status} disabled={!editable} onChange={(e) => save({ status: e.target.value as TaskStatus })}>
+            <select id="task-status" className={fieldClass} value={edits.status} disabled={!editable} onChange={(e) => set({ status: e.target.value as TaskStatus })}>
               {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </div>
           <div>
             <label className={labelClass} htmlFor="task-priority">Priority</label>
-            <select id="task-priority" className={fieldClass} value={task.priority} disabled={!editable} onChange={(e) => save({ priority: e.target.value as TaskPriority })}>
+            <select id="task-priority" className={fieldClass} value={edits.priority} disabled={!editable} onChange={(e) => set({ priority: e.target.value as TaskPriority })}>
               {PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
             </select>
           </div>
@@ -303,24 +369,26 @@ export default function TaskDetail(props: TaskDetailProps) {
           ) : (
             <EmployeePicker
               label="Assignee"
-              value={task.assignee_number}
+              value={edits.assignee_number}
               disabled={!editable}
-              onChange={(e) => save({ assignee_number: e?.employeeNumber ?? null })}
-              fallbackLabel={task.assignee_number ? props.nameOf(task.assignee_number) : undefined}
+              onChange={(e) => set({ assignee_number: e?.employeeNumber ?? null })}
+              fallbackLabel={edits.assignee_number ? props.nameOf(edits.assignee_number) : undefined}
+              // a Personal task is the creator's own
+              allowedNumbers={project?.personal ? (task.creator_number ? [task.creator_number] : []) : undefined}
             />
           )}
           <div>
             <label className={labelClass} htmlFor="task-due">Due date</label>
-            <input id="task-due" type="date" className={fieldClass} value={task.due_date ?? ''} disabled={!editable} onChange={(e) => save({ due_date: e.target.value || null })} />
+            <input id="task-due" type="date" className={fieldClass} value={edits.due_date ?? ''} disabled={!editable} onChange={(e) => set({ due_date: e.target.value || null })} />
           </div>
           <div>
             <label className={labelClass} htmlFor="task-project">Project</label>
             <select
               id="task-project"
               className={fieldClass}
-              value={task.project_id}
+              value={edits.project_id}
               disabled={!editable || !!task.parent_id}
-              onChange={(e) => save({ project_id: e.target.value })}
+              onChange={(e) => set({ project_id: e.target.value })}
             >
               {props.projects.filter((p) => !p.archived || p.id === task.project_id).map((p) => <option key={p.id} value={p.id}>{p.name} ({p.key})</option>)}
             </select>
@@ -330,7 +398,7 @@ export default function TaskDetail(props: TaskDetailProps) {
             {props.labels.length === 0 && <p className="text-[11px] text-muted-foreground">No labels yet.</p>}
             <div className="flex flex-wrap gap-1">
               {props.labels.map((l) => {
-                const on = task.labels.includes(l.id);
+                const on = edits.labels.includes(l.id);
                 return (
                   <button
                     key={l.id}
@@ -415,6 +483,15 @@ export default function TaskDetail(props: TaskDetailProps) {
             {task.completed_at ? ` · done ${when(task.completed_at)}` : ''}
           </p>
         </aside>
+      </div>
+
+      {editable && !readOnly && (
+        <div className="sticky bottom-0 flex flex-wrap items-center justify-end gap-2 px-5 py-3 border-t border-border bg-white rounded-b-2xl">
+          <span className="mr-auto text-[11px] text-muted-foreground" role="status">{dirty ? 'Unsaved changes' : 'All changes saved'}</span>
+          {dirty && <Button variant="secondary" onClick={() => setEdits(editsOf(task))} disabled={saving}>Discard</Button>}
+          <Button icon={<Save size={14} />} onClick={() => void save()} disabled={!dirty || saving}>{saving ? 'Saving...' : 'Save'}</Button>
+        </div>
+      )}
       </div>
     </Modal>
   );
