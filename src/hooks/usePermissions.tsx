@@ -88,6 +88,10 @@ export function usePermissions(): UsePermissionsReturn {
     const query = useQuery({
         queryKey: queryKeys.myPermissions,
         queryFn: loadMyPermissions,
+        // changes arrive live (livePermissions.ts); coming back to the tab after a while also checks, in case the
+        // live connection dropped
+        staleTime: 60 * 1000,
+        refetchOnWindowFocus: true,
     });
 
     // A different person signing in (or out) must never see the previous person's permissions
