@@ -40,9 +40,9 @@ describe('repaid in full on the next payday', () => {
       values ('E-AMINA', 6000, 2, 'Pending')`)).toMatch(/repaid in full on the next payday/);
   });
 
-  it('any amount may be asked for: far more than 20% of basic salary', async () => {
+  it('a request of their own: nobody applied on their behalf', async () => {
     const [a] = await as<Advance>(STAFF, `insert into salary_advance ("Employee Number", "Amount Requested", status)
-      values ('E-ME', 100000, 'Pending') returning id, requested_by, requested_by_email`);
+      values ('E-ME', 12000, 'Pending') returning id, requested_by, requested_by_email`);
     // asked for themselves: nobody applied on their behalf
     expect(a).toMatchObject({ requested_by: null, requested_by_email: null });
   });
@@ -53,7 +53,7 @@ describe('applying on someone’s behalf', () => {
 
   it('the salary advance screen applies for a person: who applied is recorded, and it starts on that person’s chain', async () => {
     [{ id }] = await as<Advance>(HR, `insert into salary_advance ("Employee Number", "Full Name", "Amount Requested", status)
-      values ('E-AMINA', 'Amina', 50000, 'Pending') returning id`);
+      values ('E-AMINA', 'Amina', 9000, 'Pending') returning id`);
     const [a] = await rows<Advance & { status: string; repayment_months: number }>(
       `select requested_by, requested_by_email, status, repayment_months from salary_advance where id = $1`, [id]);
     expect(a).toEqual({ requested_by: HR, requested_by_email: 'hr@a.co', status: 'Pending', repayment_months: 1 });
@@ -82,5 +82,22 @@ describe('applying on someone’s behalf', () => {
   it('staff still cannot apply for someone else', async () => {
     expect(await fails(STAFF, `insert into salary_advance ("Employee Number", "Amount Requested", status)
       values ('E-AMINA', 500, 'Pending')`)).toMatch(/row-level security/);
+  });
+});
+
+describe('at most 30% of basic salary (20261027800000)', () => {
+  it('for staff and for someone applying on their behalf alike, from the employee record', async () => {
+    // E-ME's basic is 40,000: up to 12,000; what the request says the basic is doesn't count
+    expect(await fails(STAFF, `insert into salary_advance ("Employee Number", "Amount Requested", "Basic Salary", status)
+      values ('E-ME', 12001, '900000', 'Pending')`)).toMatch(/most that can be asked for is KSh 12,000 \(30% of the basic salary\)/);
+    // E-AMINA's is 30,000: up to 9,000
+    expect(await fails(HR, `insert into salary_advance ("Employee Number", "Amount Requested", status)
+      values ('E-AMINA', 9001, 'Pending')`)).toMatch(/KSh 9,000/);
+  });
+
+  it('nothing without a basic salary on the record', async () => {
+    await rows(`insert into employees ("Employee Number", "First Name", tenant_id) values ('E-NOPAY', 'Nopay', '${A}')`);
+    expect(await fails(HR, `insert into salary_advance ("Employee Number", "Amount Requested", status)
+      values ('E-NOPAY', 100, 'Pending')`)).toMatch(/No basic salary/);
   });
 });

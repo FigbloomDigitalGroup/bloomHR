@@ -30,24 +30,34 @@ const amount = () => screen.getByLabelText('Amount (KSh)');
 const reason = () => screen.getByLabelText('Reason');
 
 describe('asking for an advance', () => {
-  it('has no limit: any amount is sent, to come off the next pay in full', async () => {
+  it('shows the 30% limit and blocks an amount over it', async () => {
     render(<AdvanceRequest />);
-    await screen.findByText('The whole amount comes off your next pay.');
-    expect(screen.queryByText(/20%/)).toBeNull();
-    fireEvent.change(amount(), { target: { value: '120000' } });
+    expect(await screen.findByText('KSh 15,000')).toBeTruthy();
+    expect(screen.getByText(/30% of your basic/)).toBeTruthy();
+    fireEvent.change(amount(), { target: { value: '15001' } });
+    expect(screen.getByRole('alert').textContent).toBe('The most that can be asked for is KSh 15,000 (30% of the basic salary).');
+    fireEvent.change(reason(), { target: { value: 'School fees for next term' } });
+    fireEvent.click(screen.getByRole('button', { name: /Send request/ }));
+    expect(mocked.requestAdvance).not.toHaveBeenCalled();
+  });
+
+  it('sends up to the limit, to come off the next pay in full', async () => {
+    render(<AdvanceRequest />);
+    await screen.findByText('KSh 15,000');
+    fireEvent.change(amount(), { target: { value: '15000' } });
     expect(screen.queryByRole('alert')).toBeNull();
-    expect(screen.getByTestId('advance-plan').textContent).toMatch(/^KSh 120,000 comes off the next pay in full/);
+    expect(screen.getByTestId('advance-plan').textContent).toMatch(/^KSh 15,000 comes off the next pay in full/);
     // nothing to spread it over
     expect(screen.queryByLabelText(/Spread over months/)).toBeNull();
     expect(screen.queryByLabelText('Number of months')).toBeNull();
     fireEvent.change(reason(), { target: { value: 'School fees for next term' } });
     fireEvent.click(screen.getByRole('button', { name: /Send request/ }));
-    await vi.waitFor(() => expect(mocked.requestAdvance).toHaveBeenCalledWith(ME, { amount: 120000, reason: 'School fees for next term' }));
+    await vi.waitFor(() => expect(mocked.requestAdvance).toHaveBeenCalledWith(ME, { amount: 15000, reason: 'School fees for next term' }));
   });
 
   it('needs a reason', async () => {
     render(<AdvanceRequest />);
-    await screen.findByText('The whole amount comes off your next pay.');
+    await screen.findByText('KSh 15,000');
     fireEvent.change(amount(), { target: { value: '5000' } });
     fireEvent.click(screen.getByRole('button', { name: /Send request/ }));
     expect((await screen.findByRole('alert')).textContent).toMatch(/at least 10 characters/);

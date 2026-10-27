@@ -5,6 +5,7 @@ import {
   advanceDeductionFor,
   advanceStage,
   checkPayee,
+  maxAdvanceFor,
   queueTab,
   repaymentNote,
   repaymentProgress,
@@ -145,14 +146,20 @@ describe('progress and stages', () => {
 });
 
 describe('request validation', () => {
-  it('has no limit on the amount', () => {
-    expect(validateAdvanceRequest({ amount: '250000', reason: 'School fees for term' })).toEqual({});
+  it('limits the amount to 30% of basic salary', () => {
+    expect(maxAdvanceFor('50000')).toBe(15000);
+    expect(maxAdvanceFor('KSh 45,555')).toBe(13666);
+    expect(validateAdvanceRequest({ amount: '15000', reason: 'School fees for term' }, 15000)).toEqual({});
+    expect(validateAdvanceRequest({ amount: '15001', reason: 'School fees for term' }, 15000).amount).toBe(
+      'The most that can be asked for is KSh 15,000 (30% of the basic salary).',
+    );
+    expect(validateAdvanceRequest({ amount: '100', reason: 'School fees for term' }, 0).amount).toMatch(/No basic salary/);
   });
 
   it('needs an amount above nothing and a reason', () => {
-    const e = validateAdvanceRequest({ amount: '', reason: 'short' });
+    const e = validateAdvanceRequest({ amount: '', reason: 'short' }, 15000);
     expect(Object.keys(e).sort()).toEqual(['amount', 'reason']);
-    expect(validateAdvanceRequest({ amount: '0', reason: 'School fees for term' }).amount).toBe('Enter the amount needed.');
+    expect(validateAdvanceRequest({ amount: '0', reason: 'School fees for term' }, 15000).amount).toBe('Enter the amount needed.');
   });
 
   it('says it comes off the next pay in full', () => {
