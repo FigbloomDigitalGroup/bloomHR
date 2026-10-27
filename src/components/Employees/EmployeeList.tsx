@@ -12,11 +12,15 @@ import {
   X,
   Save,
   UsersRound,
-  Network
+  Network,
+  IdCard,
+  Printer
 } from 'lucide-react';
 import DuplicateCheckModal from './DuplicateCheckModal';
 import BulkEditModal from './BulkEditModal';
 import BulkTerminateModal from './BulkTerminateModal';
+import StaffIdCardsPrintDialog from '../StaffIdCard/StaffIdCardsPrintDialog';
+import { STAFF_ID_CARDS_MODULE } from '../../lib/staffIdCards';
 import { TownProps } from '../../types/supabase';
 import { supabase } from '../../lib/supabase';
 import { fetchAllResult } from '../../lib/fetchAll';
@@ -95,10 +99,12 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
     profileScore(profileItems(employee as unknown as Record<string, unknown>, emergencyContacts ? emergencyContacts.has(String(employee['Employee Number'])) : null));
 
   // Bulk Edit State
-  const [selectionAction, setSelectionAction] = useState<'relocate' | 'terminate' | null>(null);
+  const [selectionAction, setSelectionAction] = useState<'relocate' | 'terminate' | 'id-cards' | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
   const [showBulkTerminateModal, setShowBulkTerminateModal] = useState(false);
+  // printing staff ID cards for the ticked employees or a department (the staff-id-cards module)
+  const [showIdCardsDialog, setShowIdCardsDialog] = useState(false);
 
   // Single-employee terminate confirmation (hands off to HR Lifecycle)
   const [terminateTarget, setTerminateTarget] = useState<Employee | null>(null);
@@ -381,7 +387,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
         {renderPillSelect(['all', ...ONBOARDING_STATUSES.map((s) => STATUS_LABELS[s])], selectedOnboarding, setSelectedOnboarding, 'Onboarding: all', 'Filter by onboarding')}
 
         {selectionAction ? (
-          <ModuleGate anyOf={['hr-admin', 'approve-exits']}>
+          <ModuleGate anyOf={['hr-admin', 'approve-exits', STAFF_ID_CARDS_MODULE]}>
             <Button
               variant="secondary"
               onClick={() => {
@@ -395,16 +401,23 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
             <Button variant="ghost" onClick={handleSelectAllOnPage}>
               Toggle Page
             </Button>
-            <Button
-              disabled={selectedIds.length === 0}
-              onClick={() => {
-                if (selectionAction === 'relocate') setShowBulkEditModal(true);
-                if (selectionAction === 'terminate') setShowBulkTerminateModal(true);
-              }}
-              icon={<Save className="w-3.5 h-3.5" />}
-            >
-              Update ({selectedIds.length})
-            </Button>
+            {selectionAction === 'id-cards' ? (
+              // a whole department can be chosen in the dialog, so it opens with nobody ticked too
+              <Button onClick={() => setShowIdCardsDialog(true)} icon={<Printer className="w-3.5 h-3.5" />}>
+                Print ID cards ({selectedIds.length})
+              </Button>
+            ) : (
+              <Button
+                disabled={selectedIds.length === 0}
+                onClick={() => {
+                  if (selectionAction === 'relocate') setShowBulkEditModal(true);
+                  if (selectionAction === 'terminate') setShowBulkTerminateModal(true);
+                }}
+                icon={<Save className="w-3.5 h-3.5" />}
+              >
+                Update ({selectedIds.length})
+              </Button>
+            )}
           </ModuleGate>
         ) : (
           <>
@@ -426,6 +439,11 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
             <ModuleGate anyOf={['hr-admin']}>
               <Button variant="secondary" onClick={() => setSelectionAction('relocate')} icon={<Building2 className="w-3.5 h-3.5" />}>
                 Relocate
+              </Button>
+            </ModuleGate>
+            <ModuleGate anyOf={[STAFF_ID_CARDS_MODULE]}>
+              <Button variant="secondary" onClick={() => setSelectionAction('id-cards')} icon={<IdCard className="w-3.5 h-3.5" />}>
+                ID cards
               </Button>
             </ModuleGate>
             <ModuleGate anyOf={['approve-exits']}>
@@ -691,6 +709,15 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
           setSelectionAction(null);
         }}
       />
+
+      {showIdCardsDialog && (
+        <StaffIdCardsPrintDialog
+          open
+          onClose={() => setShowIdCardsDialog(false)}
+          employees={employees.map((e) => ({ id: String(e.id ?? ''), number: e['Employee Number'], department: e['Job Level'] ?? '' }))}
+          selectedNumbers={selectedIds}
+        />
+      )}
 
       <BulkTerminateModal
         isOpen={showBulkTerminateModal}

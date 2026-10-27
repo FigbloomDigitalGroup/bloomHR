@@ -43,15 +43,20 @@ const missing = missingConfig(import.meta.env);
 // framed on the company's own website.
 const CareersPage = lazy(() => import('./pages/CareersPage'));
 const isCareersPage = /^\/careers\/[^/]+/.test(window.location.pathname);
+// The check behind a staff ID card's QR code (/verify/<token>, migration 20261027400000) stands alone the same way:
+// whoever scans a card is not signed in to the company's app.
+const VerifyStaffIdPage = lazy(() => import('./pages/VerifyStaffIdPage'));
+const isVerifyPage = /^\/verify\/[^/]+/.test(window.location.pathname);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  isCareersPage ? (
+  isCareersPage || isVerifyPage ? (
     <React.StrictMode>
       <BrowserRouter>
         <Suspense fallback={null}>
           <Routes>
             <Route path="/careers/:slug" element={<CareersPage />} />
             <Route path="/careers/:slug/jobs/:jobId" element={<CareersPage />} />
+            <Route path="/verify/:token" element={<VerifyStaffIdPage />} />
           </Routes>
         </Suspense>
       </BrowserRouter>

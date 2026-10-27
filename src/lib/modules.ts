@@ -23,6 +23,8 @@
 // their own mailbox in the app.
 // payments (20261025400000_payments_to_make.sql) was given once to administrators and every role holding payroll, the
 // people who paid until then; requisitions to HR.
+// staff-id-cards (20261027400000_staff_id_cards.sql) was given once to ADMIN and HR: view, print and reissue anyone's
+// staff ID card (everyone sees their own without it).
 // (custom roles based on those roles got them too). Administrators always have every module.
 
 export type ModuleArea = 'overview' | 'workspace' | 'people' | 'time' | 'performance' | 'pay' | 'system';
@@ -69,6 +71,7 @@ export const MODULES: ModuleInfo[] = [
   { id: 'recruitment', name: 'Recruitment', area: 'people', explain: 'Job openings, candidates and offers' },
   { id: 'training', name: 'Training', area: 'people', explain: 'Upload and assign training videos' },
   { id: 'hr-lifecycle', name: 'HR Lifecycle', area: 'people', explain: 'Contracts, probation, employment status, suspensions and the HR Lifecycle screen' },
+  { id: 'staff-id-cards', name: 'Staff ID cards', area: 'people', explain: 'View, print and reissue anyone’s staff ID card, and choose what the cards show' },
   { id: 'approve-exits', name: 'Approve exits', area: 'people', explain: 'Approve or decline an employee’s exit, and open HR Lifecycle to do it' },
   { id: 'adminconfirm', name: 'Email Admin', area: 'people', explain: 'Approve staff who sign up for the staff portal' },
   { id: 'phone-approvals', name: 'Approvals', area: 'people', explain: 'Approve phone and device changes' },

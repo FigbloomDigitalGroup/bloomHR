@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { X, Save, ArrowLeft, Plus, AlertCircle, Users, Check, PencilLine, Trash2 } from 'lucide-react';
+import { X, Save, ArrowLeft, Plus, AlertCircle, Users, Check, PencilLine, Trash2, IdCard } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
@@ -39,6 +39,8 @@ import { activeTitleNames, useJobTitles } from '../../hooks/useJobTitles';
 import { confirmDialog } from '../../lib/confirmDialog';
 import { LoaderBlock } from '../UI/FigbloomLoader';
 import WorkArrangementField from '../Attendance/WorkArrangementField';
+import StaffIdCardDialog from '../StaffIdCard/StaffIdCardDialog';
+import { STAFF_ID_CARDS_MODULE } from '../../lib/staffIdCards';
 import type { WorkArrangement } from '../../lib/attendance';
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'SHIF Number'?: string | null;
@@ -125,6 +127,8 @@ const EditEmployeePage = () => {
   const jobGroups = useJobGroups();
   const jobTitles = useJobTitles();
   const [deleting, setDeleting] = useState(false);
+  // the employee's staff ID card (the staff-id-cards module)
+  const [showIdCard, setShowIdCard] = useState(false);
 
   const [employee, setEmployee] = useState<Partial<Employee>>({});
   // the "Reports to" picker works by employee number; reports_to_id is what is saved
@@ -688,6 +692,15 @@ const EditEmployeePage = () => {
             </>
           ) : (
             <>
+              <ModuleGate anyOf={[STAFF_ID_CARDS_MODULE]}>
+                <GlowButton
+                  onClick={() => setShowIdCard(true)}
+                  icon={IdCard}
+                  className="mr-2 bg-white hover:bg-gray-50 text-gray-800 border border-gray-300"
+                >
+                  View / print ID card
+                </GlowButton>
+              </ModuleGate>
               <ModuleGate anyOf={['hr-admin']}>
                 <GlowButton
                   onClick={() => setDeleting(true)}
@@ -707,6 +720,9 @@ const EditEmployeePage = () => {
                 </GlowButton>
               </ModuleGate>
             </>
+          )}
+          {showIdCard && employee.id && (
+            <StaffIdCardDialog employeeId={String(employee.id)} open onClose={() => setShowIdCard(false)} />
           )}
           {deleting && employee.id && (
             <DeleteEmployeeModal employeeId={String(employee.id)} isAdmin={mayRemoveLogin} onClose={() => setDeleting(false)} />
