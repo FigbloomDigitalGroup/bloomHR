@@ -4,16 +4,12 @@ import { HandCoins, Lock } from 'lucide-react';
 import { Button, Card, EmptyState, PageHeader } from '../UI';
 import AdvanceTimeline, { AdvanceStagePill, RepaymentSummary } from './AdvanceTimeline';
 import {
-  ADVANCE_LIMIT_SHARE,
-  addMonths,
   advanceAmount,
   advancePeriod,
   currentPeriod,
   formatKsh,
-  maxAdvanceFor,
-  periodLabel,
   repaymentMonths,
-  repaymentSchedule,
+  repaymentNote,
   validateAdvanceRequest,
   type AdvanceRequestInput,
   type AdvanceRow,
@@ -36,10 +32,10 @@ const inputClass =
 
 export default function AdvanceRequest() {
   const [employee, setEmployee] = useState<MyEmployee | null>(null);
-  const [advanceWindow, setAdvanceWindow] = useState<AdvanceWindow>({ open: true, message: '', maxMonths: 1 });
+  const [advanceWindow, setAdvanceWindow] = useState<AdvanceWindow>({ open: true, message: '' });
   const [advances, setAdvances] = useState<AdvanceRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState<AdvanceRequestInput>({ amount: '', reason: '', months: 1 });
+  const [form, setForm] = useState<AdvanceRequestInput>({ amount: '', reason: '' });
   const [triedSubmit, setTriedSubmit] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -80,10 +76,7 @@ export default function AdvanceRequest() {
     });
   }, [employee, refresh]);
 
-  const maxAmount = maxAdvanceFor(employee?.basicSalary);
-  // the company's longest repayment; at 1 there is nothing to choose
-  const maxMonths = advanceWindow.maxMonths;
-  const errors = validateAdvanceRequest(form, maxAmount, maxMonths);
+  const errors = validateAdvanceRequest(form);
   const thisMonth = currentPeriod();
   // one request a month; a declined one does not count
   const requestedThisMonth = advances.some(
@@ -100,7 +93,6 @@ export default function AdvanceRequest() {
           : null;
 
   const amount = Number(form.amount) || 0;
-  const schedule = repaymentSchedule(amount, form.months, thisMonth);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,9 +100,9 @@ export default function AdvanceRequest() {
     if (blocked || !employee || Object.keys(errors).length > 0) return;
     setSaving(true);
     try {
-      await requestAdvance(employee, { amount, reason: form.reason, months: form.months });
+      await requestAdvance(employee, { amount, reason: form.reason });
       toast.success('Your advance request was sent for approval');
-      setForm({ amount: '', reason: '', months: 1 });
+      setForm({ amount: '', reason: '' });
       setTriedSubmit(false);
       await refresh(employee);
     } catch (error) {
@@ -156,7 +148,6 @@ export default function AdvanceRequest() {
                   type="number"
                   inputMode="numeric"
                   min={1}
-                  max={maxAmount}
                   value={form.amount}
                   onChange={(e) => setForm({ ...form, amount: e.target.value })}
                   disabled={!!blocked}
@@ -166,8 +157,7 @@ export default function AdvanceRequest() {
                   placeholder="0"
                 />
                 <p id="advance-amount-hint" className="mt-1 text-[11.5px] text-muted-foreground">
-                  You can ask for up to <strong className="text-ink">{formatKsh(maxAmount)}</strong> ({ADVANCE_LIMIT_SHARE * 100}% of your basic
-                  salary of {formatKsh(parseFloat(employee?.basicSalary ?? '') || 0)}).
+                  The whole amount comes off your next pay.
                 </p>
                 {showError('amount')}
               </div>
@@ -188,61 +178,11 @@ export default function AdvanceRequest() {
                 {showError('reason')}
               </div>
 
-              <fieldset>
-                <legend className="block text-[12px] font-semibold text-ink mb-1.5">Pay it back</legend>
-                <div className={`grid gap-2 ${maxMonths > 1 ? 'sm:grid-cols-2' : ''}`}>
-                  <label className={`flex items-start gap-2 p-3 rounded-tile border cursor-pointer ${form.months === 1 ? 'border-brand bg-brand/5' : 'border-border'}`}>
-                    <input
-                      type="radio"
-                      name="advance-repayment"
-                      checked={form.months === 1}
-                      onChange={() => setForm({ ...form, months: 1 })}
-                      disabled={!!blocked}
-                      className="mt-0.5 accent-[rgb(var(--brand))]"
-                    />
-                    <span className="text-[12.5px]">
-                      <span className="font-semibold text-ink block">In one month</span>
-                      <span className="text-muted-foreground">All of it off {periodLabel(thisMonth)} pay</span>
-                    </span>
-                  </label>
-                  {maxMonths > 1 && (
-                    <label className={`flex items-start gap-2 p-3 rounded-tile border cursor-pointer ${form.months > 1 ? 'border-brand bg-brand/5' : 'border-border'}`}>
-                      <input
-                        type="radio"
-                        name="advance-repayment"
-                        checked={form.months > 1}
-                        onChange={() => setForm({ ...form, months: form.months > 1 ? form.months : 2 })}
-                        disabled={!!blocked}
-                        className="mt-0.5 accent-[rgb(var(--brand))]"
-                      />
-                      <span className="text-[12.5px] flex-1">
-                        <span className="font-semibold text-ink block">Spread over months</span>
-                        <select
-                          aria-label="Number of months"
-                          value={form.months > 1 ? form.months : 2}
-                          onChange={(e) => setForm({ ...form, months: Number(e.target.value) })}
-                          disabled={!!blocked || form.months === 1}
-                          className="mt-1 px-2 py-1 text-[12px] border border-border rounded-tile bg-white disabled:bg-secondary"
-                        >
-                          {Array.from({ length: maxMonths - 1 }, (_, i) => i + 2).map((n) => (
-                            <option key={n} value={n}>
-                              {n} months
-                            </option>
-                          ))}
-                        </select>
-                      </span>
-                    </label>
-                  )}
-                </div>
-                {showError('months')}
-                {amount > 0 && !errors.amount && schedule.length > 0 && (
-                  <p className="mt-2 text-[11.5px] text-muted-foreground" data-testid="advance-plan">
-                    {form.months === 1
-                      ? `${formatKsh(amount)} comes off your ${periodLabel(thisMonth)} pay.`
-                      : `${formatKsh(schedule[0].amount)} a month comes off your pay from ${periodLabel(thisMonth)} to ${periodLabel(addMonths(thisMonth, form.months - 1))}.`}
-                  </p>
-                )}
-              </fieldset>
+              {amount > 0 && !errors.amount && (
+                <p className="text-[11.5px] text-muted-foreground" data-testid="advance-plan">
+                  {repaymentNote(amount, thisMonth)}
+                </p>
+              )}
 
               <Button type="submit" disabled={!!blocked || saving} icon={<HandCoins className="w-4 h-4" />} className="w-full sm:w-auto justify-center">
                 {saving ? 'Sending...' : 'Send request'}
@@ -268,7 +208,7 @@ export default function AdvanceRequest() {
                         <div className="text-[11.5px] text-muted-foreground">
                           Asked {a.time_added ? new Date(a.time_added).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
                           {' · '}
-                          {repaymentMonths(a) === 1 ? 'repaid in one month' : `repaid over ${repaymentMonths(a)} months`}
+                          {repaymentMonths(a) === 1 ? 'repaid in full on the next pay' : `repaid over ${repaymentMonths(a)} months`}
                         </div>
                       </div>
                       <AdvanceStagePill row={a} />

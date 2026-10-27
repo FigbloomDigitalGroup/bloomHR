@@ -1,7 +1,8 @@
 import { supabase } from './supabase';
 import { fetchAll, IN_LIST_SIZE, chunks } from './fetchAll';
 import { requireUpdatedRows } from './requireUpdated';
-import { MAX_REPAYMENT_MONTHS, REPAYMENT_MONTHS_LIMIT, type AdvanceRow, type AdvanceTaken, type PayeeRecord } from './salaryAdvance';
+import type { AdvanceRow, AdvanceTaken, PayeeRecord } from './salaryAdvance';
+import { decideApproval, loadApprovalChains } from './approvals';
 
 // Reading and saving salary advances for the staff request screen, the approver queue and payroll. Nothing here pays
 // anyone: finance pays outside the app and records it in Payments to make, which is what makes payroll take it back.
@@ -16,64 +17,52 @@ export interface MyEmployee {
   terminated: boolean;
 }
 
+const EMPLOYEE_COLUMNS = '"Employee Number", "First Name", "Last Name", "Office", "Basic Salary", "Termination Date"';
+
+const asMyEmployee = (data: Record<string, unknown>): MyEmployee => ({
+  employeeNumber: String(data['Employee Number'] ?? ''),
+  fullName: [data['First Name'], data['Last Name']].filter(Boolean).join(' '),
+  office: String(data['Office'] ?? ''),
+  basicSalary: String(data['Basic Salary'] ?? '0'),
+  terminated: Boolean(data['Termination Date']),
+});
+
 /** The signed-in staff member's employee record (matched on Work Email, as the rest of the portal does). */
 export async function loadMyEmployee(): Promise<MyEmployee | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.email) return null;
-  const { data, error } = await supabase
-    .from('employees')
-    .select('"Employee Number", "First Name", "Last Name", "Office", "Basic Salary", "Termination Date"')
-    .eq('"Work Email"', user.email)
-    .maybeSingle();
+  const { data, error } = await supabase.from('employees').select(EMPLOYEE_COLUMNS).eq('"Work Email"', user.email).maybeSingle();
   if (error) throw error;
-  if (!data) return null;
-  return {
-    employeeNumber: String(data['Employee Number'] ?? ''),
-    fullName: [data['First Name'], data['Last Name']].filter(Boolean).join(' '),
-    office: data['Office'] ?? '',
-    basicSalary: String(data['Basic Salary'] ?? '0'),
-    terminated: Boolean(data['Termination Date']),
-  };
+  return data ? asMyEmployee(data) : null;
+}
+
+/** Someone's employee record, for applying for an advance on their behalf. */
+export async function loadEmployeeForAdvance(employeeNumber: string): Promise<MyEmployee | null> {
+  const { data, error } = await supabase.from('employees').select(EMPLOYEE_COLUMNS).eq('"Employee Number"', employeeNumber).maybeSingle();
+  if (error) throw error;
+  return data ? asMyEmployee(data) : null;
 }
 
 export interface AdvanceWindow {
   open: boolean;
   message: string;
-  /** the longest repayment the company allows */
-  maxMonths: number;
 }
 
 /**
- * Whether the company has advance requests open, the message to show when they are not, and the longest repayment
- * it allows (salary_advance_terms(), which staff may call: they can't read the settings table).
+ * Whether the company has advance requests open, and the message to show when they are not (salary_advance_terms(),
+ * which staff may call: they can't read the settings table).
  */
 export async function loadAdvanceWindow(): Promise<AdvanceWindow> {
   const { data } = await supabase.rpc('salary_advance_terms');
   const terms = (Array.isArray(data) ? data[0] : data) as
-    | { applications_active: boolean | null; custom_message: string | null; max_repayment_months: number | null }
+    | { applications_active: boolean | null; custom_message: string | null }
     | null
     | undefined;
-  const months = Math.floor(Number(terms?.max_repayment_months));
   return {
     // no settings: requests are open
     open: terms ? terms.applications_active !== false : true,
     message: terms?.custom_message || 'Salary advance requests are closed for now. They reopen at the start of next month.',
-    maxMonths: months >= 1 && months <= REPAYMENT_MONTHS_LIMIT ? months : MAX_REPAYMENT_MONTHS,
   };
-}
-
-/** The longest repayment the company allows (for the settings screen). */
-export async function loadMaxRepaymentMonths(): Promise<number> {
-  const { data, error } = await supabase.from('salary_advance_settings').select('max_repayment_months').eq('id', 1).maybeSingle();
-  if (error) throw error;
-  return Number(data?.max_repayment_months) || MAX_REPAYMENT_MONTHS;
-}
-
-export async function saveMaxRepaymentMonths(months: number): Promise<void> {
-  const { error } = await supabase
-    .from('salary_advance_settings')
-    .upsert({ id: 1, max_repayment_months: months, updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,id' });
-  if (error) throw error;
 }
 
 export async function loadMyAdvances(employeeNumber: string): Promise<AdvanceRow[]> {
@@ -97,21 +86,46 @@ export function watchMyAdvances(employeeNumber: string, onChange: () => void): (
   };
 }
 
-export async function requestAdvance(employee: MyEmployee, input: { amount: number; reason: string; months: number }) {
-  const { error } = await supabase.from('salary_advance').insert([{
-    'Employee Number': employee.employeeNumber,
-    'Full Name': employee.fullName,
-    'Office Branch': employee.office,
-    'Basic Salary': employee.basicSalary,
-    'Amount Requested': input.amount,
-    'Net Salary': String((parseFloat(employee.basicSalary) || 0) - input.amount),
-    'Reason for Advance': input.reason.trim(),
-    // one month is the column's default; leaving it out keeps one-month requests working on a database without it
-    ...(input.months > 1 ? { repayment_months: input.months } : {}),
-    status: 'Pending',
-    time_added: new Date().toISOString(),
-  }]);
+const advanceRow = (employee: MyEmployee, input: { amount: number; reason: string }) => ({
+  'Employee Number': employee.employeeNumber,
+  'Full Name': employee.fullName,
+  'Office Branch': employee.office,
+  'Basic Salary': employee.basicSalary,
+  'Amount Requested': input.amount,
+  'Net Salary': String((parseFloat(employee.basicSalary) || 0) - input.amount),
+  'Reason for Advance': input.reason.trim(),
+  // repaid in full on the next payday: repayment_months keeps its default of 1
+  time_added: new Date().toISOString(),
+});
+
+export async function requestAdvance(employee: MyEmployee, input: { amount: number; reason: string }) {
+  const { error } = await supabase.from('salary_advance').insert([{ ...advanceRow(employee, input), status: 'Pending' }]);
   if (error) throw error;
+}
+
+/** Where a request applied for on someone's behalf stands once saved. */
+export type AppliedStatus = 'approved' | 'pending' | 'your-step-approved';
+
+/**
+ * An admin applies for an advance on someone's behalf (the salary advance screen); the database records who applied.
+ * It starts on the company's approval chain like any request. With `approveNow`, the admin then approves the step it
+ * waits on when they may decide it: the advance is approved when that was the last step, or goes on to the next one.
+ */
+export async function requestAdvanceFor(
+  employee: MyEmployee,
+  input: { amount: number; reason: string; approveNow: boolean },
+): Promise<AppliedStatus> {
+  const { data, error } = await supabase
+    .from('salary_advance')
+    .insert([{ ...advanceRow(employee, input), status: 'Pending' }])
+    .select('id')
+    .single();
+  if (error) throw error;
+  if (!input.approveNow || !data?.id) return 'pending';
+  const chain = (await loadApprovalChains('salary_advance', [String(data.id)]))[String(data.id)];
+  if (!chain?.can_approve) return 'pending';
+  const status = await decideApproval(chain.request_id, 'approved', 'Applied for on their behalf');
+  return status === 'approved' ? 'approved' : 'your-step-approved';
 }
 
 /** Every request the approver may see (the database limits it to their company and access). */

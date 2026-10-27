@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Check, HandCoins, RefreshCw, X } from 'lucide-react';
+import { Check, HandCoins, RefreshCw, UserPlus, X } from 'lucide-react';
 import { Button, Card, EmptyState, Modal, TabBar } from '../UI';
 import AdvanceTimeline, { AdvanceStagePill, RepaymentSummary } from './AdvanceTimeline';
 import RecordPaymentLink from '../Payments/RecordPaymentLink';
+import ApplyForSomeone from './ApplyForSomeone';
 import { saveFailureMessage } from '../../lib/requireUpdated';
 import { advanceAmount, formatKsh, queueTab, repaymentMonths, type AdvanceRow, type QueueTab } from '../../lib/salaryAdvance';
 import { approveAdvance, declineAdvance, loadAdvanceQueue } from '../../lib/salaryAdvanceApi';
@@ -16,6 +17,8 @@ import { decideApproval, loadApprovalChains, type ApprovalChain as Chain } from 
 //   * A request goes through the company's salary advance approvals (Settings > Approval workflows): Approve and
 //     Decline decide the step it is waiting on, for whoever may decide it, and the chain shows under it. A request
 //     with no chain (made before chains) is decided directly, by those who may decide.
+//   * Those who may decide can also apply for someone (Apply for someone): a request made on a person's behalf goes
+//     through the same approvals, and the card says who applied.
 //   * An approved advance is paid from Payments to make: finance pays it outside the app (bank or M-Pesa) and records
 //     it there with its reference, which marks it paid and makes payroll take it back.
 
@@ -45,6 +48,7 @@ export default function AdvanceQueue({ canDecide, onChanged }: AdvanceQueueProps
   const [declining, setDeclining] = useState<AdvanceRow | null>(null);
   const [declineReason, setDeclineReason] = useState('');
   const [declineTried, setDeclineTried] = useState(false);
+  const [applying, setApplying] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -112,6 +116,11 @@ export default function AdvanceQueue({ canDecide, onChanged }: AdvanceQueueProps
           onChange={(id) => setTab(id as QueueTab)}
         />
         <div className="flex items-center gap-2">
+          {canDecide && (
+            <Button onClick={() => setApplying(true)} icon={<UserPlus className="w-3.5 h-3.5" />}>
+              Apply for someone
+            </Button>
+          )}
           <Button variant="secondary" onClick={load} disabled={loading} icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />}>
             Refresh
           </Button>
@@ -155,10 +164,13 @@ export default function AdvanceQueue({ canDecide, onChanged }: AdvanceQueueProps
                       <div className="text-[11.5px] text-muted-foreground">
                         {row['Employee Number']} · asked {dateText(row.time_added)}
                       </div>
+                      {row.requested_by_email && (
+                        <div className="text-[11px] text-muted-foreground">Applied on their behalf by {row.requested_by_email}</div>
+                      )}
                     </div>
                     <div className="text-right">
                       <div className="text-[15px] font-bold text-ink">{formatKsh(advanceAmount(row))}</div>
-                      <div className="text-[11px] text-muted-foreground">{months === 1 ? 'repaid in one month' : `over ${months} months`}</div>
+                      <div className="text-[11px] text-muted-foreground">{months === 1 ? 'repaid in full on the next pay' : `over ${months} months`}</div>
                     </div>
                   </div>
 
@@ -235,6 +247,15 @@ export default function AdvanceQueue({ canDecide, onChanged }: AdvanceQueueProps
           })}
         </ul>
       )}
+
+      <ApplyForSomeone
+        open={applying}
+        onClose={() => setApplying(false)}
+        onSaved={() => {
+          load();
+          onChanged?.();
+        }}
+      />
 
       <Modal open={!!declining} onClose={() => setDeclining(null)} title="Decline advance" size="md">
         {declining && (
