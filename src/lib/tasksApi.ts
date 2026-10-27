@@ -36,7 +36,7 @@ export async function taskConcernsMe(taskId: string): Promise<boolean> {
   return data === true;
 }
 
-const PROJECT_COLUMNS = 'id, key, name, description, department_id, lead_number, archived, created_by';
+const PROJECT_COLUMNS = 'id, key, name, description, department_id, lead_number, archived, created_by, personal';
 
 export async function loadProjects(): Promise<TaskProject[]> {
   const { data, error } = await supabase.from('task_projects').select(PROJECT_COLUMNS).order('name');

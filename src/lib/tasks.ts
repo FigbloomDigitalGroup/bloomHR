@@ -48,6 +48,8 @@ export interface TaskProject {
   lead_number: string | null;
   archived: boolean;
   created_by: string | null;
+  /** the company's Personal project: anyone adds their own tasks there, and only they (with their supervisor and HR) see them */
+  personal?: boolean;
 }
 
 export interface TaskLabel {

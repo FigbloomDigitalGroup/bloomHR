@@ -73,7 +73,8 @@ export default function TemplatesPanel({ projects, nameOf, onTasksMade }: Props)
   };
 
   const set = (patch: Partial<TemplateInput>) => setEditing((cur) => (cur ? { ...cur, input: { ...cur.input, ...patch } } : cur));
-  const active = projects.filter((p) => !p.archived);
+  // not the Personal project: its tasks are each person's own, and a recurring task goes to others
+  const active = projects.filter((p) => !p.archived && !p.personal);
 
   return (
     <div className="flex flex-col gap-3">
