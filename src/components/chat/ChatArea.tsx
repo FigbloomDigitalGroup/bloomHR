@@ -182,7 +182,6 @@ export function ChatArea({
         <MessageInput
           channelName={channel.name}
           onSendMessage={onSendMessage}
-          disabled={isMuted}
           employees={employees}
           replyingTo={replyingTo}
           onCancelReply={() => setReplyingTo(null)}
