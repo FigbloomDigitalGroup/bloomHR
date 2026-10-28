@@ -19,6 +19,8 @@ export interface JobGroup {
   house_allowance: number | null;
   travel_allowance: number | null;
   other_allowances: number | null;
+  /** the monthly per diem the group gets (a reimbursement on the payroll page, not taxed) */
+  per_diem: number | null;
   /** when the next rate starts, if one is set for later */
   next_effective_from: string | null;
 }
@@ -31,6 +33,7 @@ export interface JobGroupRateInput {
   house_allowance: number;
   travel_allowance: number;
   other_allowances: number;
+  per_diem: number;
 }
 
 const num = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));
@@ -48,6 +51,7 @@ export async function loadJobGroups(): Promise<JobGroup[] | null> {
     house_allowance: num(r.house_allowance),
     travel_allowance: num(r.travel_allowance),
     other_allowances: num(r.other_allowances),
+    per_diem: num(r.per_diem),
   }));
 }
 
@@ -78,7 +82,7 @@ export async function saveJobGroupRate(groupId: string, rate: JobGroupRateInput)
 /** What is wrong with a rate, or null. */
 export function rateError(rate: JobGroupRateInput, band: boolean): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(rate.effective_from)) return 'Choose the date the amounts start';
-  const amounts = [rate.basic_salary, rate.basic_min, rate.basic_max, rate.house_allowance, rate.travel_allowance, rate.other_allowances];
+  const amounts = [rate.basic_salary, rate.basic_min, rate.basic_max, rate.house_allowance, rate.travel_allowance, rate.other_allowances, rate.per_diem];
   if (amounts.some((a) => a !== null && (!Number.isFinite(a) || a < 0))) return 'Amounts must be 0 or more';
   if (band) {
     if (rate.basic_min === null || rate.basic_max === null) return 'Give the lowest and highest basic salary';

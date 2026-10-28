@@ -83,7 +83,7 @@ describe('PayrollExportsPanel', () => {
     expect(totals.textContent).toContain('Employer only, 1 employee');
     fireEvent.click(screen.getAllByRole('button', { name: /Download CSV/ })[4]); // Kenya: P10, SHA, NSSF, housing levy, NITA, then payments
     expect(saved.files.map((f) => f.name)).toEqual(['nita-levy-2026-10.csv']);
-    expect(await readBlob(saved.files[0].blob)).toBe(['PAYROLL NUMBER,EMPLOYEE NAME,ID NO,KRA PIN,NITA NO,LEVY', 'PR-00001,Amina Wanjiru,,A012345678Z,,50.00', ''].join(String.fromCharCode(13, 10)));
+    expect(await readBlob(saved.files[0].blob)).toBe(['EMPLOYEE NUMBER,EMPLOYEE NAME,ID NO,KRA PIN,NITA NO,LEVY', 'E1,Amina Wanjiru,,A012345678Z,,50.00', ''].join(String.fromCharCode(13, 10)));
   });
 
   it('downloads a CSV named after the file and month', async () => {
@@ -137,5 +137,17 @@ describe('PayrollExportsPanel', () => {
     expect(await screen.findByText('Paid from Equity account 0123456789')).toBeTruthy();
     fireEvent.click(screen.getAllByRole('button', { name: /Download CSV/ })[7]);
     expect(saved.files.map((f) => f.name)).toEqual(['equity-eazzy-biz-2026-10.csv']);
+  });
+
+  it('a draft month: the returns to check, marked draft and named -draft, with no payment files; the P10 button still waits for approval', async () => {
+    const draft = { id: 'r1', pay_period: '2026-10', status: 'draft' } as never;
+    render(<PayrollExportsPanel run={draft} />);
+    expect(await screen.findByTestId('draft-Kenya')).toBeTruthy();
+    expect(screen.getAllByText('NSSF').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Bulk payments in/)).toBeNull();
+    expect(screen.getAllByRole('button', { name: /Download CSV/ })).toHaveLength(5); // P10, SHA, NSSF, housing levy, NITA
+    fireEvent.click(screen.getAllByRole('button', { name: /Download CSV/ })[2]);
+    expect(saved.files.map((f) => f.name)).toEqual(['nssf-2026-10-draft.csv']);
+    await expect(downloadP10(draft)).rejects.toThrow(/not approved/);
   });
 });

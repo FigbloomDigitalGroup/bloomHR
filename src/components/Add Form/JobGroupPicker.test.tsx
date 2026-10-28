@@ -7,7 +7,7 @@ import { JobGroup, lockedPayFields } from '../../lib/jobGroups';
 
 const FIXED: JobGroup = {
   id: 'g1', code: 'JG5', name: 'Senior officers', active: true, employee_count: 1, effective_from: '2026-01-01',
-  basic_salary: 55000, basic_min: null, basic_max: null, house_allowance: 11000, travel_allowance: 5000, other_allowances: 1000,
+  basic_salary: 55000, basic_min: null, basic_max: null, house_allowance: 11000, travel_allowance: 5000, other_allowances: 1000, per_diem: 0,
   next_effective_from: null,
 };
 const BAND: JobGroup = { ...FIXED, id: 'g2', code: 'BAND', name: 'BAND', basic_salary: null, basic_min: 30000, basic_max: 40000, house_allowance: 2000 };

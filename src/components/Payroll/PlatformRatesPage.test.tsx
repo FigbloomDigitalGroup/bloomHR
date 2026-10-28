@@ -60,8 +60,8 @@ describe('the platform rates screen', () => {
     fireEvent.change(field('From'), { target: { value: '2027-07-01' } });
     fireEvent.change(field('Source'), { target: { value: 'Finance Act 2027' } });
     const preview = await screen.findByRole('table', { name: 'Preview' });
-    // 100,000 basic: the levy 1,005 -> 1,340
-    expect(within(preview).getByText('KSh 1,005 → KSh 1,340')).toBeTruthy();
+    // 100,000 basic (no per diem share since October 2026): the levy 1,500 -> 2,000
+    expect(within(preview).getByText('KSh 1,500 → KSh 2,000')).toBeTruthy();
     expect(within(preview).getAllByRole('row')).toHaveLength(4);
     // another salary
     fireEvent.change(field('Another salary'), { target: { value: '250000' } });

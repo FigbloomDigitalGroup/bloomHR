@@ -93,8 +93,8 @@ describe('the WHT report on the Run tab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Download WHT report CSV' }));
     expect(saved.files.map((f) => f.name)).toEqual(['kra-wht-2026-10.csv']);
     const csv = await readBlob(saved.files[0].blob);
-    expect(csv.split('\r\n')[0]).toBe('PIN of withholdee,Name of withholdee,Payroll number,Pay period,Nature of transaction,Gross amount,WHT rate (%),WHT amount,Withheld at payouts,Withheld at month end');
-    expect(csv.split('\r\n')[1]).toBe('A012345678Z,Chege Contract,PR-7,2026-10,Contractual fees,10000.00,3.00,300.00,150.00,150.00');
+    expect(csv.split('\r\n')[0]).toBe('PIN of withholdee,Name of withholdee,Employee number,Pay period,Nature of transaction,Gross amount,WHT rate (%),WHT amount,Withheld at payouts,Withheld at month end');
+    expect(csv.split('\r\n')[1]).toBe('A012345678Z,Chege Contract,C1,2026-10,Contractual fees,10000.00,3.00,300.00,150.00,150.00');
   });
 
   it('downloads it as Excel too', () => {
