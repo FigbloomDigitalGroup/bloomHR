@@ -189,9 +189,10 @@ describe('the new modules', () => {
   });
 
   it('a company missing a system role row gets one holding just the new modules; CHECKER with Performance gets kpi-admin', async () => {
-    // (requisitions comes from a later migration, 20261025400000_payments_to_make.sql, given to HR)
+    // (requisitions comes from a later migration, 20261025400000_payments_to_make.sql, given to HR, and staff-id-cards
+    // from 20261027400000_staff_id_cards.sql)
     expect(await modulesOf(C, 'HR')).toEqual(
-      ['approve-exits', 'casual-overtime', 'chat-channels', 'employee-edit', 'hr-admin', 'kpi-admin', 'loans', 'requisitions', 'task-oversight']);
+      ['approve-exits', 'casual-overtime', 'chat-channels', 'employee-edit', 'hr-admin', 'kpi-admin', 'loans', 'requisitions', 'staff-id-cards', 'task-oversight']);
     expect(await modulesOf(C, 'MANAGER')).toEqual(['chat-channels', 'employee-edit', 'team-work']);
     expect(await modulesOf(C, 'REGIONAL')).toEqual(['employee-edit']);
     expect(await modulesOf(C, 'ADMIN')).toBeNull(); // administrators have every module anyway
@@ -202,7 +203,7 @@ describe('the new modules', () => {
   it('custom roles that existed before get the modules of their base role', async () => {
     const mods = async (k: string) => modulesOf(A, before[k].role_key);
     expect(await mods('oldHr')).toEqual(
-      ['approve-exits', 'casual-overtime', 'chat-channels', 'employee-edit', 'employees', 'hr-admin', 'kpi-admin', 'loans', 'requisitions', 'task-oversight']);
+      ['approve-exits', 'casual-overtime', 'chat-channels', 'employee-edit', 'employees', 'hr-admin', 'kpi-admin', 'loans', 'requisitions', 'staff-id-cards', 'task-oversight']);
     expect(await mods('oldMgr')).toEqual(['chat-channels', 'employee-edit', 'leaves', 'team-work']);
     // the old KPI rule: Performance, not MANAGER/REGIONAL (reopen-leave comes from a later migration,
     // 20261023000000_leave_reopen.sql, given to OPERATIONS-based roles)
@@ -211,8 +212,8 @@ describe('the new modules', () => {
     expect(await mods('oldStaff')).toEqual(['kpi-admin', 'performance']);
     expect(await mods('oldReg')).toEqual(['employee-edit', 'performance']); // REGIONAL never managed KPIs
     // (payslip-design comes from a later migration, 20261021600000_payslip_details.sql, given to ADMIN-based roles too, as
-    // do payments and requisitions, 20261025400000_payments_to_make.sql)
-    expect(await mods('oldAdmin')).toEqual(['dashboard', 'payments', 'payslip-design', 'requisitions', 'task-oversight']);
+    // do payments and requisitions, 20261025400000_payments_to_make.sql, and staff-id-cards, 20261027400000_staff_id_cards.sql)
+    expect(await mods('oldAdmin')).toEqual(['dashboard', 'payments', 'payslip-design', 'requisitions', 'staff-id-cards', 'task-oversight']);
   });
 
   it('a company created later copies them from the default company', async () => {
