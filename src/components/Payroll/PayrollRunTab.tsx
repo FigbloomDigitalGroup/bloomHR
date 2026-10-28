@@ -552,6 +552,11 @@ export default function PayrollRunTab({
   /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- a payroll row from PayrollDashboard */
   const amount = (record: any, n: number) => ksh(n, currencyOf(record));
   const totalsList = currencyTotals ?? [];
+  // the same list until the payslips change: a new one each render made the minimum wage check report again, which
+  // re-rendered the payroll page, for ever (the page hung and links to other pages never opened)
+  // (finalFilteredRecords is a new list each render; payrollRecords, when given, is kept)
+  const minimumWageSource = payrollRecords ?? finalFilteredRecords;
+  const localPayslips = React.useMemo(() => minimumWageSource.map(localPayslip), [minimumWageSource]);
 
   // the table's columns: each deduction on its own (as in the P10), then the reimbursements typed in after them
   const statutory = statutoryColumnsFor(finalFilteredRecords);
@@ -610,7 +615,7 @@ export default function PayrollRunTab({
       {!approved && payPeriod && (
         <MinimumWageWarning
           // the minimum wage is the local currency's: a USD payslip is checked on its local figures (FIG-906)
-          payslips={(payrollRecords ?? finalFilteredRecords).map(localPayslip)}
+          payslips={localPayslips}
           employees={onPayroll}
           payPeriod={payPeriod}
           periodLabel={periodLabel}
