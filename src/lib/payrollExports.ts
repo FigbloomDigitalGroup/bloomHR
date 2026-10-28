@@ -4,7 +4,7 @@ import { employeeInputs, statutoryFor } from './statutoryCalc';
 import { nonTaxableEarningsOf, pensionableAdjustmentOf } from './earnings';
 import { isValidIdNumber, isValidKraPin, isValidNssfNumber, isValidOnboardingPhone, isValidShaNumber } from './onboardingValidation';
 
-// Upload files built from a month's approved payroll run: the KRA PAYE (iTax P10), SHA and NSSF returns, and the
+// Upload files built from a month's approved payroll run: the KRA PAYE (iTax P10), SHIF (SHA) and NSSF returns, and the
 // bulk-payment files for M-Pesa and the bank. Each row joins a payslip (the amounts payroll saved) with the employee's
 // record (who they are and where they are paid). Column names are the portals' own (docs/ONBOARDING.md).
 
@@ -12,6 +12,12 @@ type Payslip = Record<string, unknown>;
 export type Rates = Record<string, unknown>;
 
 const text = (value: unknown) => (value === null || value === undefined ? '' : String(value).trim());
+
+/**
+ * The employee's own number in the company (FBL-000015), in the returns' payroll number column: finance files them by
+ * the employee number, not the separate "Payroll Number" field.
+ */
+export const employeeNumberOf = (e: EmployeeRecord, payslip: { employee_id?: unknown }) => text(e['Employee Number']) || text(payslip.employee_id);
 const num = (value: unknown) => {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -58,9 +64,9 @@ export const P10_HEADERS = [
   'Mortgage Intrest', 'AHL', 'Taxable pay', 'Personal relief', 'Insuarance relief', 'Paye', 'Self assessed paye',
 ] as const;
 
-export const SHA_HEADERS = ['PAYROLL NUMBER', 'FIRSTNAME', 'LASTNAME', 'IDENTITY TYPE', 'ID NO', 'KRA PIN', 'NHIF NO', 'CONTRIBUTION AMOUNT', 'PHONE'] as const;
+export const SHA_HEADERS = ['EMPLOYEE NUMBER', 'FIRSTNAME', 'LASTNAME', 'IDENTITY TYPE', 'ID NO', 'KRA PIN', 'NHIF NO', 'CONTRIBUTION AMOUNT', 'PHONE'] as const;
 
-export const NSSF_HEADERS = ['PAYROLL NUMBER', 'SURNAME', 'OTHER NAMES', 'ID NO', 'KRA PIN', 'NSSF NO', 'GROSS PAY', 'VOLUNTARY'] as const;
+export const NSSF_HEADERS = ['EMPLOYEE NUMBER', 'SURNAME', 'OTHER NAMES', 'ID NO', 'KRA PIN', 'NSSF NO', 'GROSS PAY', 'VOLUNTARY'] as const;
 
 export const MPESA_HEADERS = ['Phone Number', 'Name', 'Amount', 'Reference', 'Payroll Number'] as const;
 
@@ -164,7 +170,7 @@ export function shaFile(payslips: Payslip[], employees: EmployeeRecord[]): Expor
   return {
     headers: SHA_HEADERS,
     rows: ls.map(({ payslip, employee: e }) => [
-      text(e['Payroll Number']), text(e['First Name']), text(e['Last Name']), text(e['Type of Identification']), text(e['ID Number']),
+      employeeNumberOf(e, payslip), text(e['First Name']), text(e['Last Name']), text(e['Type of Identification']), text(e['ID Number']),
       text(e['Tax PIN']), shaNumber(e), amount(num(payslip.nhif_deduction)), text(e['Mobile Number']),
     ]),
     problems: problemsOf(ls, (e) =>
@@ -185,7 +191,7 @@ export function nssfFile(payslips: Payslip[], employees: EmployeeRecord[]): Expo
   return {
     headers: NSSF_HEADERS,
     rows: ls.map(({ payslip, employee: e }) => [
-      text(e['Payroll Number']), text(e['Last Name']), [e['First Name'], e['Middle Name']].map(text).filter(Boolean).join(' '),
+      employeeNumberOf(e, payslip), text(e['Last Name']), [e['First Name'], e['Middle Name']].map(text).filter(Boolean).join(' '),
       text(e['ID Number']), text(e['Tax PIN']), text(e['NSSF Number']), amount(pensionablePayOf(payslip)), amount(num(e['nssf_voluntary_contribution'])),
     ]),
     problems: problemsOf(ls, (e) =>
@@ -201,14 +207,14 @@ export function nssfFile(payslips: Payslip[], employees: EmployeeRecord[]): Expo
 
 // The employer's NITA training levy (FIG-898): one row per person the levy is paid for (payslips with a levy; not
 // casual workers or contractors), for the NITA levy return. Not taken from pay.
-export const NITA_HEADERS = ['PAYROLL NUMBER', 'EMPLOYEE NAME', 'ID NO', 'KRA PIN', 'NITA NO', 'LEVY'] as const;
+export const NITA_HEADERS = ['EMPLOYEE NUMBER', 'EMPLOYEE NAME', 'ID NO', 'KRA PIN', 'NITA NO', 'LEVY'] as const;
 
 export function nitaFile(payslips: Payslip[], employees: EmployeeRecord[]): ExportFile {
   const ls = lines(payslips.filter((p) => num(p.nita_levy) > 0), employees);
   return {
     headers: NITA_HEADERS,
     rows: ls.map(({ payslip, employee: e }) => [
-      text(e['Payroll Number']), fullName(e) || text(payslip.employee_name), text(e['ID Number']), text(e['Tax PIN']), text(e['NITA']),
+      employeeNumberOf(e, payslip), fullName(e) || text(payslip.employee_name), text(e['ID Number']), text(e['Tax PIN']), text(e['NITA']),
       amount(num(payslip.nita_levy)),
     ]),
     // the levy is paid per employer, so a missing NITA number on an employee is not a problem for the return
@@ -220,7 +226,7 @@ export function nitaFile(payslips: Payslip[], employees: EmployeeRecord[]): Expo
 // from the month's payslips: their PIN, the month's gross, the rate and the tax (what payouts already withheld during
 // the month and what the month end withheld are both part of it, shown apart so finance can match the payments).
 export const WHT_HEADERS = [
-  'PIN of withholdee', 'Name of withholdee', 'Payroll number', 'Pay period', 'Nature of transaction', 'Gross amount',
+  'PIN of withholdee', 'Name of withholdee', 'Employee number', 'Pay period', 'Nature of transaction', 'Gross amount',
   'WHT rate (%)', 'WHT amount', 'Withheld at payouts', 'Withheld at month end',
 ] as const;
 
@@ -232,7 +238,7 @@ export function whtFile(payslips: Payslip[], employees: EmployeeRecord[], payPer
       const wht = num(payslip.wht_tax);
       const atPayouts = Math.min(wht, num(payslip.wht_withheld));
       return [
-        text(e['Tax PIN']), fullName(e) || text(payslip.employee_name), text(e['Payroll Number']) || text(payslip.employee_id), payPeriod,
+        text(e['Tax PIN']), fullName(e) || text(payslip.employee_name), employeeNumberOf(e, payslip), payPeriod,
         text(e['wht_category']) === 'professional' ? 'Professional / management fees' : 'Contractual fees',
         amount(num(payslip.gross_pay)), amount(num(payslip.wht_rate) * 100), amount(wht), amount(atPayouts), amount(wht - atPayouts),
       ];
