@@ -38,6 +38,9 @@ export interface PayslipRunInfo {
   status: string;
   approvedAt: string | null;
   paidAt: string | null;
+  /** the approver's drawn signature (a PNG data: URL) and name, kept when the country was approved */
+  approvedSignature?: string | null;
+  approvedBy?: string | null;
 }
 
 export interface PayslipExtras {
@@ -144,10 +147,23 @@ export async function loadPayslipRun(record: Payslip): Promise<PayslipRunInfo | 
   const employee = text(record.employee_id);
   const period = text(record.pay_period);
   if (!employee || !period) return null;
-  const { data, error } = await supabase.rpc('payslip_run_details', { p_employee: employee, p_pay_period: period });
+  const [{ data, error }, signed] = await Promise.all([
+    supabase.rpc('payslip_run_details', { p_employee: employee, p_pay_period: period }),
+    // the approver's signature (migration 20261028200000); none when it isn't there yet
+    Promise.resolve(supabase.rpc('payslip_run_signature', { p_employee: employee, p_pay_period: period })).catch(() => ({ data: null })),
+  ]);
   const row = (Array.isArray(data) ? data[0] : data) as { run_id?: string; status?: string; approved_at?: string | null; paid_at?: string | null } | undefined;
+  const sig = (Array.isArray(signed.data) ? signed.data[0] : signed.data) as { approved_signature?: string | null; approved_signer?: string | null } | null | undefined;
   if (error || !row?.run_id) return null;
-  return { runId: row.run_id, ref: runRef(row.run_id, period), status: text(row.status), approvedAt: row.approved_at ?? null, paidAt: row.paid_at ?? null };
+  return {
+    runId: row.run_id,
+    ref: runRef(row.run_id, period),
+    status: text(row.status),
+    approvedAt: row.approved_at ?? null,
+    paidAt: row.paid_at ?? null,
+    approvedSignature: orNull(sig?.approved_signature),
+    approvedBy: orNull(sig?.approved_signer),
+  };
 }
 
 /** The employee's numbers for the payslip, from their record (the payslip's own branch and position first). */

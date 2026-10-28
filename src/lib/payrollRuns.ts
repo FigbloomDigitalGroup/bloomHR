@@ -65,11 +65,23 @@ export const getRunCountries = async (runId: string): Promise<PayrollRunCountry[
 
 /**
  * Approves (draft -> approved), reopens (approved -> draft) or marks paid (approved -> paid) several countries of the
- * run at once. Returns the countries that changed (a country not in the starting status is left alone).
+ * run at once. Returns the countries that changed (a country not in the starting status is left alone). Approving keeps
+ * the approver's signature and name with each country, for its payslips (migration 20261028200000).
  */
-export const setCountriesStatus = async (runId: string, countries: string[], status: PayrollRunStatus): Promise<string[]> => {
+export const setCountriesStatus = async (
+  runId: string,
+  countries: string[],
+  status: PayrollRunStatus,
+  signer?: { signature: string | null; name: string } | null,
+): Promise<string[]> => {
   if (countries.length === 0) return [];
-  const { data, error } = await supabase.rpc('set_payroll_countries_status', { p_run: runId, p_countries: countries, p_status: status });
+  const { data, error } = await supabase.rpc('set_payroll_countries_status', {
+    p_run: runId,
+    p_countries: countries,
+    p_status: status,
+    p_signature: status === 'approved' ? signer?.signature ?? null : null,
+    p_signer: status === 'approved' ? signer?.name || null : null,
+  });
   if (error) throw error;
   return (data ?? []) as string[];
 };
