@@ -10,6 +10,7 @@ import { DEFAULT_DESIGN, employerTaxLabel, type PayslipDesign, type PayslipEmplo
 import { payslipCountry, type PayslipExtras } from '../../lib/payslipExtras';
 import { PayslipSettlementBlock, WorkEarningLines, netPayLabel } from './PayslipSettlement';
 import LocalStatutorySection from './LocalStatutorySection';
+import { reimbursementItemsOf } from '../../lib/reimbursements';
 
 // The payslip (FIG-814): ONE layout for the admin payslip, the staff portal, the downloaded PDF and the emailed PDF
 // (payslipPdf.tsx renders this same component off screen). It only draws: the figures come from the payslip and its
@@ -211,7 +212,8 @@ export function PayslipDocument({ record, companyInfo, id, extras, design: desig
               ))}
               {/* the month's piece rate work and contract jobs (FIG-812) */}
               <WorkEarningLines record={record} />
-              {isKenya && (
+              {/* the per diem share of basic salary (until September 2026; per diem is a reimbursement since) */}
+              {isKenya && Number(record.per_diem) > 0 && (
                 <div className="flex justify-between bg-gray-50 p-1 border border-gray-200 mt-2">
                   <span>Per diem</span>
                   <span className="font-bold">{fmt(Number(record.per_diem) || 0)}</span>
@@ -287,6 +289,17 @@ export function PayslipDocument({ record, companyInfo, id, extras, design: desig
             <span className="font-bold">Total deductions</span>
             <span className="font-bold">{fmt(Number(record.total_deductions) || 0)}</span>
           </div>
+          {/* per diem, mileage... paid back on top, not taxed (typed in on the payroll page) */}
+          {reimbursementItemsOf(record).length > 0 && (
+            <div className="border-b border-gray-300 pb-2 mb-3 space-y-1 text-sm text-black" data-testid="payslip-reimbursements">
+              {reimbursementItemsOf(record).map((l, i) => (
+                <div key={`${l.name}-${i}`} className="flex justify-between">
+                  <span>{l.name} <span className="text-gray-500 text-xs">(reimbursement, not taxed)</span></span>
+                  <span className="font-semibold">{fmt(l.amount)}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="flex justify-between items-center text-lg text-black mt-2">
             <span className="font-bold" style={heading}>{netPayLabel(record)}</span>
             <span className="font-bold border-b-[3px] border-gray-400 border-double pb-0.5">{fmtRound(Number(record.net_pay) || 0)}</span>

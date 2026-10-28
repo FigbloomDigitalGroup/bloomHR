@@ -3,16 +3,20 @@ import jsPDF from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
 import { payslipOvertimePay, round2 } from './overtimePay';
 import { currencyOf, currencySymbol } from './payroll/currency';
+import { afterDeductionsOf, reimbursementNamesFor, reimbursementOf } from './reimbursements';
 
 // The month's payroll register as a PDF (A4 landscape): one row per payslip with the statutory columns, and the
 // totals at the foot. Built from the rows the payroll page already shows, so it matches the screen. The last column
 // is the employer's NITA training levy (FIG-898): an employer cost, after net pay, not part of the deductions. With
 // workers paid by work on it, the settlement columns too (FIG-812).
+//
+// In finance's names, as on the payroll page (Oct 28): the pay before deductions is Basic pay (the payslip's gross pay;
+// Basic salary is the salary alone), Gross pay is what is left after deductions, then the reimbursements typed in on
+// the payroll page (per diem, mileage...), and Net pay is Gross pay plus them. "No." is the employee number.
 
 /** The figures of one payslip row the register prints (the payroll page's records have these fields). */
 export interface PayrollRegisterRow {
   employee_id?: string | number | null;
-  employeeNu?: string | null;
   employee_name?: string | null;
   department?: string | null;
   branch?: string | null;
@@ -53,6 +57,9 @@ export interface PayrollRegisterRow {
   /** paid in USD (FIG-906): the month's rate and the country's currency */
   fx_rate?: number | string | null;
   local_currency?: string | null;
+  /** per diem, mileage and other reimbursements (lib/reimbursements), and their total (part of net_pay) */
+  reimbursement_items?: unknown;
+  reimbursements?: number | null;
 }
 
 /** " at 1 USD = 129 KES" for a USD group of the register (FIG-906); "" otherwise. */
@@ -98,7 +105,7 @@ function ugandaRegister(rows: PayrollRegisterRow[]) {
     const lst = num(r.lst_deduction);
     const wht = num(r.wht_tax);
     return {
-      number: String(r.employeeNu || r.employee_id || ''),
+      number: String(r.employee_id || ''),
       name: String(r.employee_name || ''),
       department: String((r.department === 'Branch Staff' ? r.branch : r.department) || ''),
       amounts: [
@@ -131,7 +138,7 @@ function tanzaniaRegister(rows: PayrollRegisterRow[]) {
     const heslb = num(r.heslb_deduction);
     const wht = num(r.wht_tax);
     return {
-      number: String(r.employeeNu || r.employee_id || ''),
+      number: String(r.employee_id || ''),
       name: String(r.employee_name || ''),
       department: String((r.department === 'Branch Staff' ? r.branch : r.department) || ''),
       amounts: [
@@ -146,10 +153,24 @@ function tanzaniaRegister(rows: PayrollRegisterRow[]) {
   return { columns, lines, totals };
 }
 
-/** The register's figures per row, in REGISTER_COLUMNS order (amounts as numbers), and the totals. */
+/** The register's figures per row (amounts as numbers) and the totals, with finance's column names (see the top). */
 export function registerFigures(rows: PayrollRegisterRow[], country = 'Kenya') {
-  if (country === 'Tanzania') return tanzaniaRegister(rows);
-  if (country === 'Uganda') return ugandaRegister(rows);
+  const base = country === 'Tanzania' ? tanzaniaRegister(rows) : country === 'Uganda' ? ugandaRegister(rows) : kenyaRegister(rows);
+  const renamed = base.columns.map((c) => (c === 'Basic' ? 'Basic salary' : c === 'Gross pay' ? 'Basic pay' : c));
+  // Gross pay (after deductions) and the reimbursements go just before Net pay
+  const names = reimbursementNamesFor([], rows);
+  const at = renamed.indexOf('Net pay');
+  const columns: readonly string[] = [...renamed.slice(0, at), 'Gross pay', ...names, ...renamed.slice(at)];
+  const lines = base.lines.map((l, i) => {
+    const r = rows[i];
+    const added = [afterDeductionsOf(r), ...names.map((n) => reimbursementOf(r, n))];
+    return { ...l, amounts: [...l.amounts.slice(0, at - 3), ...added, ...l.amounts.slice(at - 3)] };
+  });
+  const totals = lines.reduce((sum, l) => sum.map((s, i) => s + l.amounts[i]), Array(columns.length - 3).fill(0) as number[]);
+  return { columns, lines, totals };
+}
+
+function kenyaRegister(rows: PayrollRegisterRow[]) {
   const withWork = rows.some(settlesWork);
   const columns: readonly string[] = withWork ? WORK_REGISTER_COLUMNS : REGISTER_COLUMNS;
   const lines = rows.map((r) => {
@@ -163,7 +184,7 @@ export function registerFigures(rows: PayrollRegisterRow[], country = 'Kenya') {
     const levy = num(r.housing_levy);
     const total = num(r.total_deductions);
     const who = {
-      number: String(r.employeeNu || r.employee_id || ''),
+      number: String(r.employee_id || ''),
       name: String(r.employee_name || ''),
       department: String((r.department === 'Branch Staff' ? r.branch : r.department) || ''),
     };
@@ -244,7 +265,8 @@ export function payrollRegisterPdf(rows: PayrollRegisterRow[], { periodLabel, co
       body: lines.map((l) => [l.number, l.name, l.department, ...l.amounts.map(money)]),
       foot: [['', several ? `${g.country} total (${currencySymbol(g.currency)})` : 'Total', '', ...totals.map(money)]],
       showFoot: 'lastPage',
-      styles: { fontSize: columns.length > REGISTER_COLUMNS.length ? 6 : 7, cellPadding: columns.length > REGISTER_COLUMNS.length ? 2 : 3 },
+      // (the plain register is REGISTER_COLUMNS with Gross pay after deductions; anything wider is set smaller)
+      styles: { fontSize: columns.length > REGISTER_COLUMNS.length + 1 ? 6 : 7, cellPadding: columns.length > REGISTER_COLUMNS.length + 1 ? 2 : 3 },
       headStyles: { fillColor: [31, 41, 55] },
       footStyles: { fillColor: [243, 244, 246], textColor: [17, 24, 39], fontStyle: 'bold' },
       columnStyles: Object.fromEntries(columns.slice(3).map((_, i) => [i + 3, { halign: 'right' }])),
