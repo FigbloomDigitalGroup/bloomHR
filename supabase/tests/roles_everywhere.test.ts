@@ -189,8 +189,8 @@ describe('the new modules', () => {
   });
 
   it('a company missing a system role row gets one holding just the new modules; CHECKER with Performance gets kpi-admin', async () => {
-    // (requisitions comes from a later migration, 20261025400000_payments_to_make.sql, given to HR; so does
-    // staff-id-cards, 20261027400000_staff_id_cards.sql, given to ADMIN and HR)
+    // (requisitions comes from a later migration, 20261025400000_payments_to_make.sql, given to HR, and staff-id-cards
+    // from 20261027400000_staff_id_cards.sql)
     expect(await modulesOf(C, 'HR')).toEqual(
       ['approve-exits', 'casual-overtime', 'chat-channels', 'employee-edit', 'hr-admin', 'kpi-admin', 'loans', 'requisitions', 'staff-id-cards', 'task-oversight']);
     expect(await modulesOf(C, 'MANAGER')).toEqual(['chat-channels', 'employee-edit', 'team-work']);

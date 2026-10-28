@@ -5,6 +5,7 @@ import type { EarningItem } from './earnings';
 import type { LeaveItem } from './leavePay';
 import type { OvertimeItem } from './overtimePay';
 import type { WorkLine } from './workSettlement';
+import type { ReimbursementItem } from './reimbursements';
 
 export interface SalaryHistoryRecord {
     employee_id: string;
@@ -36,6 +37,9 @@ export interface SalaryHistoryRecord {
     deduction_items?: DeductionItem[];
     /** bonuses, commissions and incentives on this payslip, itemised (their total is commission + bonus) */
     earning_items?: EarningItem[];
+    /** per diem, mileage and other reimbursements typed in on the payroll page, and their total (part of net_pay) */
+    reimbursement_items?: ReimbursementItem[];
+    reimbursements?: number;
     /** unpaid and half-pay leave taken off gross pay this month (FIG-880), and its lines */
     leave_deduction?: number;
     leave_items?: LeaveItem[];

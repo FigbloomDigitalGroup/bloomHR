@@ -91,11 +91,12 @@ describe('cash pay leaves out the per diem, as payroll and finance’s returns d
   });
 });
 
-describe('SHA and NSSF', () => {
-  it('SHA: names apart, identity, numbers, the contribution and phone', () => {
+describe('SHIF (SHA) and NSSF', () => {
+  it('SHIF: the employee number (not the payroll number), names apart, identity, numbers, the contribution and phone', () => {
     const file = shaFile([payslip('E1')], [amina]);
     expect(file.headers).toBe(SHA_HEADERS);
-    expect(file.rows).toEqual([['PR-00001', 'Amina', 'Wanjiru', 'National ID', '28123456', 'A012345678Z', 'CR1234567', '5500.00', '0712345678']]);
+    expect(file.headers[0]).toBe('EMPLOYEE NUMBER');
+    expect(file.rows).toEqual([['E1', 'Amina', 'Wanjiru', 'National ID', '28123456', 'A012345678Z', 'CR1234567', '5500.00', '0712345678']]);
   });
 
   it('SHA: an older record keeps its health number in NHIF Number', () => {
@@ -107,7 +108,7 @@ describe('SHA and NSSF', () => {
   it('NSSF: surname, other names, gross pay and the voluntary contribution', () => {
     const file = nssfFile([payslip('E1')], [amina]);
     expect(file.headers).toBe(NSSF_HEADERS);
-    expect(file.rows).toEqual([['PR-00001', 'Wanjiru', 'Amina Njeri', '28123456', 'A012345678Z', '2012345678', '200000.00', '1000.00']]);
+    expect(file.rows).toEqual([['E1', 'Wanjiru', 'Amina Njeri', '28123456', 'A012345678Z', '2012345678', '200000.00', '1000.00']]);
   });
 
   it('NSSF: lists missing numbers', () => {
@@ -234,7 +235,7 @@ describe('NITA levy and the month\'s amounts to pay (FIG-898)', () => {
 
   it('the NITA file lists only payslips with a levy', () => {
     const f = nitaFile(payslips, employees as never);
-    expect(f.rows).toEqual([['PR-1', 'Amina W', '12345678', 'A012345678Z', 'N-77', '50.00']]);
+    expect(f.rows).toEqual([['E1', 'Amina W', '12345678', 'A012345678Z', 'N-77', '50.00']]);
   });
 
   it('totals PAYE, SHIF, both shares of NSSF and the housing levy, and the employer\'s NITA levy', () => {

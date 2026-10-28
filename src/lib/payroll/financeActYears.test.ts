@@ -21,7 +21,10 @@ const sdlOf = (lines: { label: string; amount: number }[]) => lines.find((l) => 
 
 describe('the dated rows', () => {
   it("give today's rates exactly as the engines' fixtures (so the golden payslips are on the real rows)", () => {
-    expect(kenya('2026-10-31')).toEqual(KENYA_RATES);
+    // except the per diem share of basic: none by default from October 2026 (typed in as a reimbursement since); the
+    // golden payslips keep 33%, as a company's own rate
+    expect(kenya('2026-10-31')).toEqual({ ...KENYA_RATES, per_diem_rate: 0 });
+    expect(kenya('2026-09-30').per_diem_rate).toBe(0.33);
     expect(tanzania('2026-10-31')).toEqual(TANZANIA_RATES);
     expect(uganda('2026-10-31')).toEqual(UGANDA_RATES);
   });
@@ -32,7 +35,7 @@ describe('the dated rows', () => {
       { tenant_id: 'co-1', country: 'Kenya', code: 'per_diem_rate', value: 0, bands: null, effective_from: '2026-01-01', effective_to: null },
     ];
     expect(ratesOn(rows, '2026-10-31', 'Kenya', 'co-1').per_diem_rate).toBe(0);
-    expect(ratesOn(rows, '2026-10-31', 'Kenya', 'co-2').per_diem_rate).toBe(0.33);
+    expect(ratesOn(rows, '2026-09-30', 'Kenya', 'co-2').per_diem_rate).toBe(0.33);
     expect(ratesOn(rows, '2025-12-31', 'Kenya', 'co-1').per_diem_rate).toBe(0.33);
   });
 });

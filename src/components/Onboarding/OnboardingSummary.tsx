@@ -62,7 +62,7 @@ export default function OnboardingSummary({ record, showPay = true }: { record: 
           ['Identity type', text(e['Type of Identification'])],
           ['ID / passport number', text(e['ID Number'])],
           ['KRA PIN', text(e['Tax PIN'])],
-          ['SHA number', text(e['SHIF Number'])],
+          ['SHIF number', text(e['SHIF Number'])],
           ['NSSF number', text(e['NSSF Number'])],
           ['Residency', text(e['kra_residency'])],
           ['Person with disability', yesNo(e['is_pwd'])],
