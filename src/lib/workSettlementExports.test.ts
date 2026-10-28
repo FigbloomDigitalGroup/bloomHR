@@ -37,9 +37,17 @@ describe('the statutory returns', () => {
   });
 });
 
+// the register's columns in finance's names (lib/payrollPdf): Basic salary, Basic pay, and Gross pay (after deductions)
+// just before Net pay
+const inFinanceNames = (columns: readonly string[]) => {
+  const renamed = columns.map((c) => (c === 'Basic' ? 'Basic salary' : c === 'Gross pay' ? 'Basic pay' : c));
+  const at = renamed.indexOf('Net pay');
+  return [...renamed.slice(0, at), 'Gross pay', ...renamed.slice(at)];
+};
+
 describe('the payroll register', () => {
   it('keeps its columns when no one is paid for work', () => {
-    expect(registerFigures([payslips[0]]).columns).toBe(REGISTER_COLUMNS);
+    expect(registerFigures([payslips[0]]).columns).toEqual(inFinanceNames(REGISTER_COLUMNS));
   });
 
   it('adds work, WHT, paid during the month and arrears when someone is', () => {
@@ -47,11 +55,11 @@ describe('the payroll register', () => {
       nssf_deduction: 1800, housing_levy: 450, total_deductions: 3806.25, paid_out: 17700, arrears_brought_forward: 100,
       arrears_carried_forward: 0, net_pay: 8393.75, work_settlement: true };
     const { columns, lines, totals } = registerFigures([work, payslips[1]]);
-    expect(columns).toBe(WORK_REGISTER_COLUMNS);
-    expect(lines[0].amounts).toEqual([0, 0, 0, 30000, 0, 30000, 731.25, 825, 1800, 450, 0, 0, 17700, 100, 0, 8393.75, 0]);
+    expect(columns).toEqual(inFinanceNames(WORK_REGISTER_COLUMNS));
+    expect(lines[0].amounts).toEqual([0, 0, 0, 30000, 0, 30000, 731.25, 825, 1800, 450, 0, 0, 17700, 100, 0, 8393.75, 8393.75, 0]);
     // the contractor: WHT in its own column, not in other deductions
     expect(lines[1].amounts[10]).toBe(300);
     expect(lines[1].amounts[11]).toBe(0);
-    expect(totals).toHaveLength(WORK_REGISTER_COLUMNS.length - 3);
+    expect(totals).toHaveLength(WORK_REGISTER_COLUMNS.length + 1 - 3);
   });
 });

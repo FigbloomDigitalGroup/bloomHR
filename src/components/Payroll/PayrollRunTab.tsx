@@ -12,8 +12,10 @@ import {
   FolderDown,
   Loader,
   MapPin,
+  Plus,
   Send,
   Wallet,
+  X,
   XCircle,
 } from "lucide-react";
 import { Card, SearchInput, TableScroll } from "../UI";
@@ -42,6 +44,8 @@ import { currencyOf, moneyRounded } from "../../lib/payroll/currency";
 import { countryPayslipLines } from "../../lib/payroll/countries";
 import { localPayslip } from "../../lib/payroll/usdPay";
 import LocalStatutorySection from "./LocalStatutorySection";
+import { type ReimbursementType, afterDeductionsOf, parseReimbursement, reimbursementItemsOf, reimbursementNamesFor, reimbursementOf } from "../../lib/reimbursements";
+import { runRowFigures, runTotalsByCurrency, statutoryColumnsFor } from "../../lib/payrollRunColumns";
 
 // The Run tab: the month's payroll run (start, recalculate, approve, mark paid), the returns check, and the list of
 // employees on the payroll with their pay. The figures are worked out by PayrollDashboard; this only shows them.
@@ -91,6 +95,8 @@ interface PayrollRunTabProps {
   };
   /** the month's NITA training levy, paid by the employer on top of pay (FIG-898) */
   nitaLevy?: { total: number; employees: number };
+  /** per diem, mileage and the company's other reimbursement columns, typed in for each row (lib/reimbursements) */
+  reimbursements?: RunReimbursements;
   /** every payslip of the month, whatever the filters (the piece rate settlement summary and WHT report, FIG-812) */
   payrollRecords?: any[];
   /** the month, 'YYYY-MM' */
@@ -142,7 +148,119 @@ interface PayrollRunTabProps {
   };
 }
 
+export interface RunReimbursements {
+  /** the company's columns, in order */
+  columns: ReimbursementType[];
+  /** the row's amounts can be typed in (the month isn't started, or its country is still a draft) */
+  canEdit: (record: any) => boolean;
+  /** saves one amount (0 clears it); false when it wasn't saved */
+  onSet: (record: any, type: ReimbursementType, amount: number) => Promise<boolean>;
+  onAddColumn: (name: string) => Promise<boolean>;
+  onRemoveColumn: (type: ReimbursementType) => void;
+}
+
 const ksh = (n: number, currency = "KES") => moneyRounded(n, currency);
+
+/** One reimbursement amount, typed in: saved when the box loses focus or on Enter, put back on Escape. */
+function ReimbursementInput({ value, label, onSave }: { value: number; label: string; onSave: (amount: number) => Promise<boolean> }) {
+  const shown = value ? String(value) : "";
+  const [text, setText] = React.useState(shown);
+  const [saving, setSaving] = React.useState(false);
+  React.useEffect(() => setText(shown), [shown]);
+  const save = async () => {
+    const amount = parseReimbursement(text);
+    if (amount === null) {
+      toast.error(`${label}: type an amount, like 1500`);
+      setText(shown);
+      return;
+    }
+    if (amount === value) {
+      setText(shown);
+      return;
+    }
+    setSaving(true);
+    if (!(await onSave(amount))) setText(shown);
+    setSaving(false);
+  };
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      aria-label={label}
+      value={text}
+      placeholder="0"
+      disabled={saving}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={save}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+        if (e.key === "Escape") {
+          // put back what was saved, then leave the box (blur saves nothing: it matches)
+          const box = e.currentTarget;
+          setText(shown);
+          setTimeout(() => box.blur());
+        }
+      }}
+      className="w-20 rounded-md border border-border bg-white px-1.5 py-1 text-right text-xs text-ink placeholder:text-subtle focus:border-brand focus:outline-none disabled:opacity-50"
+    />
+  );
+}
+
+/** "+ Column": names a new reimbursement column (Fuel, Airtime...) in place. */
+function AddReimbursementColumn({ onAdd }: { onAdd: (name: string) => Promise<boolean> }) {
+  const [open, setOpen] = React.useState(false);
+  const [name, setName] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title="Add a reimbursement column (not taxed, added to net pay)"
+        className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-border px-1.5 py-0.5 text-[10px] font-semibold normal-case text-muted-foreground hover:border-brand hover:text-brand"
+      >
+        <Plus className="w-3 h-3" />
+        Column
+      </button>
+    );
+  }
+  const add = async () => {
+    if (!name.trim()) {
+      setOpen(false);
+      return;
+    }
+    setBusy(true);
+    if (await onAdd(name)) {
+      setName("");
+      setOpen(false);
+    }
+    setBusy(false);
+  };
+  return (
+    <form
+      className="flex items-center justify-end gap-1 normal-case"
+      onSubmit={(e) => {
+        e.preventDefault();
+        add();
+      }}
+    >
+      <input
+        autoFocus
+        aria-label="New column name"
+        value={name}
+        maxLength={40}
+        placeholder="e.g. Fuel"
+        disabled={busy}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
+        className="w-24 rounded-md border border-border bg-white px-1.5 py-1 text-xs font-normal text-ink focus:border-brand focus:outline-none"
+      />
+      <button type="submit" disabled={busy} className="rounded-md bg-brand px-2 py-1 text-[10px] font-bold text-white disabled:opacity-50">
+        Add
+      </button>
+    </form>
+  );
+}
 
 /** One employee's pay, line by line, in the payslip's currency: shown when their row is opened. */
 function PayBreakdown({ record }: { record: any }) {
@@ -174,7 +292,8 @@ function PayBreakdown({ record }: { record: any }) {
           <React.Fragment key={`${l.name}-${i}`}>{line(l.name, l.amount)}</React.Fragment>
         ))}
         <WorkEarningLines record={record} amountClassName="" />
-        {!country && line("Per diem", record.per_diem || 0)}
+        {/* the per diem share of basic salary, on payslips from before per diem was typed in as a reimbursement */}
+        {!country && Number(record.per_diem) > 0 && line("Per diem (share of basic, not taxed)", record.per_diem)}
       </div>
       <div className="space-y-1.5">
         <h4 className="text-[10px] font-bold uppercase text-subtle">Statutory deductions</h4>
@@ -209,6 +328,18 @@ function PayBreakdown({ record }: { record: any }) {
           <span>Total deductions</span>
           <span className="whitespace-nowrap text-status-danger">{ksh(record.total_deductions)}</span>
         </div>
+        {reimbursementItemsOf(record).length > 0 && (
+          <>
+            {line("Gross pay (after deductions)", afterDeductionsOf(record))}
+            {reimbursementItemsOf(record).map((l, i) => (
+              <React.Fragment key={`reimbursement-${l.name}-${i}`}>{line(`${l.name} (not taxed)`, l.amount, "text-status-success")}</React.Fragment>
+            ))}
+            <div className="flex justify-between gap-3 pt-1.5 border-t border-border font-bold">
+              <span>Net pay</span>
+              <span className="whitespace-nowrap text-brand-dark">{ksh(record.net_pay)}</span>
+            </div>
+          </>
+        )}
       </div>
       {/* a month of piece rate work or contract jobs: from the month's net pay to what is paid now (FIG-812) */}
       <div className="sm:col-span-3 empty:hidden">
@@ -266,6 +397,7 @@ export default function PayrollRunTab({
   currentItems,
   totals: { totalGrossPay, totalDeductions, totalNetPay },
   nitaLevy,
+  reimbursements,
   payrollRecords,
   payPeriod,
   companyBranches,
@@ -399,7 +531,8 @@ export default function PayrollRunTab({
   const subline = (record: any) => {
     const b = branchOfRecord(record);
     return [
-      record.employeeNu || record.employee_id,
+      // the employee number (employeeNu is the phone number)
+      record.employee_id,
       record.position,
       b ? `${b.name} (${b.country})` : record.department === "Branch Staff" ? record.branch : record.department,
     ]
@@ -419,6 +552,33 @@ export default function PayrollRunTab({
   /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- a payroll row from PayrollDashboard */
   const amount = (record: any, n: number) => ksh(n, currencyOf(record));
   const totalsList = currencyTotals ?? [];
+
+  // the table's columns: each deduction on its own (as in the P10), then the reimbursements typed in after them
+  const statutory = statutoryColumnsFor(finalFilteredRecords);
+  const reimbursementTypes = reimbursements?.columns ?? [];
+  // a column a saved payslip still pays after it was removed shows too (read only), so every row adds up
+  const reimbursementNames = reimbursementNamesFor(reimbursementTypes.map((t) => t.name), finalFilteredRecords);
+  const typeNamed = new Map(reimbursementTypes.map((t) => [t.name, t]));
+  const columnTotals = runTotalsByCurrency(finalFilteredRecords, statutory, reimbursementNames);
+  // employee, basic pay, the deductions, other deductions, gross pay, the reimbursements (+ "Column"), net pay, actions
+  const columnCount = 6 + statutory.length + reimbursementNames.length + (reimbursements ? 1 : 0);
+  const th = "px-3 py-2.5 text-right whitespace-nowrap";
+  const td = "px-3 py-3 text-right whitespace-nowrap";
+  const tint = "bg-green-tint/40";
+
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- a payroll row from PayrollDashboard */
+  const reimbursementCell = (record: any, name: string) => {
+    const type = typeNamed.get(name);
+    const value = reimbursementOf(record, name);
+    if (!type || !reimbursements?.canEdit(record)) return value ? amount(record, value) : <span className="text-subtle">-</span>;
+    return (
+      <ReimbursementInput
+        value={value}
+        label={`${name} for ${record.employee_name || record.employee_id}`}
+        onSave={(n) => reimbursements.onSet(record, type, n)}
+      />
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -492,13 +652,13 @@ export default function PayrollRunTab({
               {currencyTotals ? (
                 <>
                   Net pay <span className="font-bold text-brand-dark" data-testid="net-totals"><CurrencyTotalsText totals={totalsList} field="net" /></span>
-                  <span className="mx-1.5">·</span>Gross <CurrencyTotalsText totals={totalsList} field="gross" />
+                  <span className="mx-1.5">·</span>Basic pay <CurrencyTotalsText totals={totalsList} field="gross" />
                   <span className="mx-1.5">·</span>Deductions <CurrencyTotalsText totals={totalsList} field="deductions" />
                 </>
               ) : (
                 <>
                   Net pay <span className="font-bold text-brand-dark">{ksh(totalNetPay)}</span>
-                  <span className="mx-1.5">·</span>Gross {ksh(totalGrossPay)}
+                  <span className="mx-1.5">·</span>Basic pay {ksh(totalGrossPay)}
                   <span className="mx-1.5">·</span>Deductions {ksh(totalDeductions)}
                 </>
               )}
@@ -625,13 +785,24 @@ export default function PayrollRunTab({
                     </div>
                     <div className="text-right shrink-0">
                       <div className="text-xs font-bold text-brand-dark whitespace-nowrap">{amount(record, record.net_pay)}</div>
-                      <div className="text-[10px] text-subtle whitespace-nowrap">of {amount(record, record.gross_pay)}</div>
+                      <div className="text-[10px] text-subtle whitespace-nowrap">basic {amount(record, record.gross_pay)}</div>
                     </div>
                   </div>
                   <div className="mt-2 pl-6">{rowActions(record, index)}</div>
                   {expandedRows.has(record.id) && (
                     <div className="mt-3 ml-6 p-3 rounded-xl bg-background">
                       <PayBreakdown record={record} />
+                      {reimbursements?.canEdit(record) && reimbursementTypes.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-border space-y-1.5">
+                          <h4 className="text-[10px] font-bold uppercase text-subtle">Reimbursements (not taxed, added to net pay)</h4>
+                          {reimbursementTypes.map((t) => (
+                            <div key={t.id} className="flex items-center justify-between gap-3 text-xs">
+                              <span className="text-muted-foreground">{t.name}</span>
+                              {reimbursementCell(record, t.name)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </li>
@@ -645,61 +816,113 @@ export default function PayrollRunTab({
                   <thead className="border-b border-border">
                     <tr className="text-left text-[10px] font-bold uppercase text-subtle">
                       <th className="px-4 py-2.5">Employee</th>
-                      <th className="px-4 py-2.5 text-right">Gross pay</th>
-                      <th className="px-4 py-2.5 text-right">Deductions</th>
-                      <th className="px-4 py-2.5 text-right">Net pay</th>
+                      <th className={th}>Basic pay</th>
+                      {statutory.map((c) => (
+                        <th key={c.key} className={th}>{c.label}</th>
+                      ))}
+                      <th className={th}>Other deductions</th>
+                      <th className={th} title="Basic pay less deductions">Gross pay</th>
+                      {reimbursementNames.map((name) => {
+                        const type = typeNamed.get(name);
+                        return (
+                          <th
+                            key={name}
+                            className={`${th} ${tint}`}
+                            title={
+                              type?.from_job_group
+                                ? "Each employee's job group per diem (set on Job groups); type to change one person's for this month. Not taxed: added to net pay"
+                                : "Not taxed: added to net pay after deductions"
+                            }
+                          >
+                            <span className="inline-flex items-center gap-1">
+                              {name}
+                              {type && reimbursements && (
+                                <button
+                                  type="button"
+                                  aria-label={`Remove the ${name} column`}
+                                  onClick={() => reimbursements.onRemoveColumn(type)}
+                                  className="text-subtle hover:text-status-danger"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </span>
+                          </th>
+                        );
+                      })}
+                      {reimbursements && (
+                        <th className={`${th} ${tint}`}>
+                          <AddReimbursementColumn onAdd={reimbursements.onAddColumn} />
+                        </th>
+                      )}
+                      <th className={th}>Net pay</th>
                       <th className="px-4 py-2.5 pl-6"><span className="sr-only">Actions</span></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {currentItems.map((record, index) => (
-                      <React.Fragment key={record.id}>
-                        <tr className="border-b border-[#F1F5F2] hover:bg-background transition-colors text-ink">
-                          <td className="px-4 py-3">
-                            <div className="flex items-start gap-2">
-                              {expandButton(record)}
-                              <div className="min-w-0">
-                                <div className="font-bold">{record.employee_name}{editedBadge(record)}{countryFlag(record)}</div>
-                                <div className="text-[10px] text-subtle">{subline(record)}</div>
+                    {currentItems.map((record, index) => {
+                      const f = runRowFigures(record, statutory, reimbursementNames);
+                      return (
+                        <React.Fragment key={record.id}>
+                          <tr className="border-b border-[#F1F5F2] hover:bg-background transition-colors text-ink">
+                            <td className="px-4 py-3">
+                              <div className="flex items-start gap-2">
+                                {expandButton(record)}
+                                <div className="min-w-0">
+                                  <div className="font-bold">{record.employee_name}{editedBadge(record)}{countryFlag(record)}</div>
+                                  <div className="text-[10px] text-subtle">{subline(record)}</div>
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-right whitespace-nowrap">{amount(record, record.gross_pay)}</td>
-                          <td className="px-4 py-3 text-right whitespace-nowrap text-muted-foreground">{amount(record, record.total_deductions)}</td>
-                          <td className="px-4 py-3 text-right whitespace-nowrap font-bold text-brand-dark">{amount(record, record.net_pay)}</td>
-                          <td className="px-4 py-3 pl-6">{rowActions(record, index)}</td>
-                        </tr>
-                        {expandedRows.has(record.id) && (
-                          <tr className="bg-background">
-                            <td colSpan={5} className="px-4 py-4 border-b border-border">
-                              <PayBreakdown record={record} />
                             </td>
+                            <td className={td}>{amount(record, f.basic)}</td>
+                            {f.deductions.map((n, i) => (
+                              <td key={statutory[i].key} className={`${td} text-muted-foreground`}>{amount(record, n)}</td>
+                            ))}
+                            <td className={`${td} text-muted-foreground`}>{amount(record, f.other)}</td>
+                            <td className={td}>{amount(record, f.gross)}</td>
+                            {reimbursementNames.map((name) => (
+                              <td key={name} className={`${td} ${tint}`}>{reimbursementCell(record, name)}</td>
+                            ))}
+                            {reimbursements && <td className={tint} />}
+                            <td className={`${td} font-bold text-brand-dark`}>{amount(record, f.net)}</td>
+                            <td className="px-4 py-3 pl-6">{rowActions(record, index)}</td>
                           </tr>
-                        )}
-                      </React.Fragment>
-                    ))}
+                          {expandedRows.has(record.id) && (
+                            <tr className="bg-background">
+                              <td colSpan={columnCount} className="px-4 py-4 border-b border-border">
+                                <PayBreakdown record={record} />
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </tbody>
                   <tfoot>
-                    {currencyTotals && totalsList.length > 1 ? (
-                      // a total per currency, never one sum across currencies
-                      totalsList.map((t) => (
-                        <tr key={t.currency} className="bg-background text-ink font-bold" data-testid={`total-${t.currency}`}>
-                          <td className="px-4 py-3">Total {t.currency} · {t.count} {t.count === 1 ? "employee" : "employees"}</td>
-                          <td className="px-4 py-3 text-right whitespace-nowrap">{ksh(t.gross, t.currency)}</td>
-                          <td className="px-4 py-3 text-right whitespace-nowrap">{ksh(t.deductions, t.currency)}</td>
-                          <td className="px-4 py-3 text-right whitespace-nowrap text-brand-dark">{ksh(t.net, t.currency)}</td>
-                          <td />
-                        </tr>
-                      ))
-                    ) : (
-                      <tr className="bg-background text-ink font-bold">
-                        <td className="px-4 py-3">Total · {count} {count === 1 ? "employee" : "employees"}</td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">{ksh(currencyTotals ? totalsList[0]?.gross ?? 0 : totalGrossPay, totalsList[0]?.currency)}</td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">{ksh(currencyTotals ? totalsList[0]?.deductions ?? 0 : totalDeductions, totalsList[0]?.currency)}</td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap text-brand-dark">{ksh(currencyTotals ? totalsList[0]?.net ?? 0 : totalNetPay, totalsList[0]?.currency)}</td>
+                    {/* a total per currency, never one sum across currencies */}
+                    {columnTotals.map((t) => (
+                      <tr
+                        key={t.currency}
+                        className="bg-background text-ink font-bold"
+                        data-testid={columnTotals.length > 1 ? `total-${t.currency}` : undefined}
+                      >
+                        <td className="px-4 py-3">
+                          {columnTotals.length > 1 ? `Total ${t.currency}` : "Total"} · {t.count} {t.count === 1 ? "employee" : "employees"}
+                        </td>
+                        <td className={td}>{ksh(t.figures.basic, t.currency)}</td>
+                        {t.figures.deductions.map((n, i) => (
+                          <td key={statutory[i].key} className={td}>{ksh(n, t.currency)}</td>
+                        ))}
+                        <td className={td}>{ksh(t.figures.other, t.currency)}</td>
+                        <td className={td}>{ksh(t.figures.gross, t.currency)}</td>
+                        {t.figures.reimbursements.map((n, i) => (
+                          <td key={reimbursementNames[i]} className={`${td} ${tint}`}>{ksh(n, t.currency)}</td>
+                        ))}
+                        {reimbursements && <td className={tint} />}
+                        <td className={`${td} text-brand-dark`}>{ksh(t.figures.net, t.currency)}</td>
                         <td />
                       </tr>
-                    )}
+                    ))}
                   </tfoot>
                 </table>
               </TableScroll>

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 const toasts = vi.hoisted(() => ({ error: [] as string[] }));
 vi.mock('react-hot-toast', () => ({ default: { error: (m: string) => toasts.error.push(m), success: () => {} } }));
@@ -51,7 +51,25 @@ describe('PayrollRunTab', () => {
     expect(screen.getByText(/Employees on payroll/)).toBeTruthy();
     expect(screen.getAllByText('Amina Wanjiru').length).toBeGreaterThan(0);
     expect(screen.getByText(/Total · 1 employee/)).toBeTruthy();
-    expect(screen.queryByText('Housing levy')).toBeNull();
+    // (the housing levy is a column, never a summary card)
+    expect(screen.getAllByText('Housing levy').every((el) => el.closest('th'))).toBe(true);
+  });
+
+  it("shows each deduction in its own column, in finance's names: basic pay, gross pay after deductions, net pay", () => {
+    render(<PayrollRunTab {...props()} />);
+    const table = screen.getByRole('table');
+    const headers = within(table).getAllByRole('columnheader').map((th) => th.textContent?.trim());
+    expect(headers).toEqual(['Employee', 'Basic pay', 'PAYE', 'NSSF', 'SHIF', 'Housing levy', 'Other deductions', 'Gross pay', 'Net pay', 'Actions']);
+    const row = within(table).getAllByRole('row')[1];
+    expect(within(row).getAllByRole('cell').slice(1, 9).map((td) => td.textContent)).toEqual([
+      'KSh 80,000', 'KSh 12,000', 'KSh 2,160', 'KSh 2,200', 'KSh 1,200', 'KSh 0', 'KSh 62,440', 'KSh 62,440',
+    ]);
+  });
+
+  it('shows the employee number under the name, never the phone number', () => {
+    render(<PayrollRunTab {...props()} currentItems={[{ ...record, employeeNu: '0712345678' }]} />);
+    expect(screen.queryByText(/0712345678/)).toBeNull();
+    expect(screen.getAllByText(/^E1 · Accountant/).length).toBeGreaterThan(0);
   });
 
   it('shows Pay all and Pay before approval, and says to approve first when clicked', () => {
@@ -150,5 +168,57 @@ describe('PayrollRunTab: one run for every country (FIG-905 stage 2)', () => {
     expect(screen.getByTestId('total-TZS').textContent).toContain('TSh 800,000');
     expect(screen.getAllByText('TSh 800,000').length).toBeGreaterThan(0);
     expect(screen.queryByText(/862,440/)).toBeNull();
+  });
+});
+
+describe('PayrollRunTab reimbursements', () => {
+  const types = [
+    { id: 'pd', name: 'Per diem', position: 1, active: true },
+    { id: 'mi', name: 'Mileage', position: 2, active: true },
+  ];
+  const paid = { ...record, reimbursement_items: [{ name: 'Mileage', amount: 1500 }], reimbursements: 1500, net_pay: 63940 };
+  const reimbursements = (over: Record<string, unknown> = {}) => ({
+    columns: types, canEdit: () => true, onSet: vi.fn(async () => true), onAddColumn: vi.fn(async () => true), onRemoveColumn: vi.fn(), ...over,
+  });
+
+  it('adds a column per reimbursement after gross pay: net pay = gross pay + reimbursements', () => {
+    render(<PayrollRunTab {...props()} finalFilteredRecords={[paid]} currentItems={[paid]} reimbursements={reimbursements()} />);
+    const table = screen.getByRole('table');
+    const headers = within(table).getAllByRole('columnheader').map((th) => th.textContent?.trim());
+    expect(headers.slice(7, 11)).toEqual(['Gross pay', 'Per diem', 'Mileage', 'Column']);
+    expect((screen.getByLabelText('Mileage for Amina Wanjiru') as HTMLInputElement).value).toBe('1500');
+    expect((screen.getByLabelText('Per diem for Amina Wanjiru') as HTMLInputElement).value).toBe('');
+    const total = within(table).getAllByRole('row').at(-1) as HTMLElement;
+    expect(total.textContent).toContain('KSh 62,440');
+    expect(total.textContent).toContain('KSh 1,500');
+    expect(total.textContent).toContain('KSh 63,940');
+  });
+
+  it('saves a typed amount when the box is left, and refuses text that is not an amount', async () => {
+    const r = reimbursements();
+    render(<PayrollRunTab {...props()} reimbursements={r} />);
+    const box = screen.getByLabelText('Per diem for Amina Wanjiru') as HTMLInputElement;
+    fireEvent.change(box, { target: { value: '2,500' } });
+    fireEvent.blur(box);
+    await waitFor(() => expect(r.onSet).toHaveBeenCalledWith(record, types[0], 2500));
+    fireEvent.change(box, { target: { value: 'abc' } });
+    fireEvent.blur(box);
+    expect(toasts.error).toEqual(['Per diem for Amina Wanjiru: type an amount, like 1500']);
+    expect(r.onSet).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the amounts read only once the month is approved', () => {
+    render(<PayrollRunTab {...props()} finalFilteredRecords={[paid]} currentItems={[paid]} reimbursements={reimbursements({ canEdit: () => false })} />);
+    expect(screen.queryByLabelText('Mileage for Amina Wanjiru')).toBeNull();
+    expect(screen.getAllByText('KSh 1,500').length).toBeGreaterThan(0);
+  });
+
+  it('adds a column by name', async () => {
+    const r = reimbursements();
+    render(<PayrollRunTab {...props()} reimbursements={r} />);
+    fireEvent.click(screen.getByRole('button', { name: /Column/ }));
+    fireEvent.change(screen.getByLabelText('New column name'), { target: { value: 'Fuel' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(r.onAddColumn).toHaveBeenCalledWith('Fuel'));
   });
 });
