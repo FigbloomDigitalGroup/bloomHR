@@ -49,6 +49,23 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('MinimumWageWarning', () => {
+  it('reports the counts once, not again when re-rendered with a new list of the same payslips (that looped and hung the page)', async () => {
+    const onShortfalls = vi.fn();
+    const view = (list: typeof payslips) => (
+      <MemoryRouter>
+        <MinimumWageWarning payslips={list} employees={employees} payPeriod="2026-10" periodLabel="October 2026" onShortfalls={onShortfalls} />
+      </MemoryRouter>
+    );
+    const { rerender } = render(view(payslips));
+    await waitFor(() => expect(onShortfalls).toHaveBeenCalledWith(new Map([['Kenya', 2]])));
+    const before = onShortfalls.mock.calls.length;
+    for (let i = 0; i < 5; i++) rerender(view(payslips.map((p) => ({ ...p }))));
+    expect(onShortfalls.mock.calls.length).toBe(before);
+    // a real change is still reported
+    rerender(view(payslips.map((p) => (p.employee_id === 'E2' ? { ...p, basic_salary: 10000 } : p))));
+    await waitFor(() => expect(onShortfalls).toHaveBeenLastCalledWith(new Map([['Kenya', 3]])));
+  });
+
   it('lists who is paid below the minimum, with country, pay, minimum and shortfall, and links to the employee', async () => {
     show();
     expect(await screen.findByText('2 people are paid below the minimum wage for October 2026')).toBeTruthy();
