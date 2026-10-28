@@ -349,7 +349,7 @@ export default function OnboardingForm() {
           <SelectField label="Identity type" required value={values['Type of Identification']} options={IDENTITY_TYPES} onChange={set('Type of Identification')} />
           <TextField label="ID / passport number" required value={values['ID Number']} onChange={set('ID Number')} error={problemOf('ID Number')} />
           <TextField label={taxNumberLabel(country)} required value={values['Tax PIN']} onChange={set('Tax PIN')} error={problemOf('Tax PIN')} placeholder={taxNumberPlaceholder(country)} />
-          {askSha && <TextField label="SHA number" required value={values['SHIF Number']} onChange={set('SHIF Number')} error={problemOf('SHIF Number')} />}
+          {askSha && <TextField label="SHIF number" required value={values['SHIF Number']} onChange={set('SHIF Number')} error={problemOf('SHIF Number')} />}
           <TextField label="NSSF number" required value={values['NSSF Number']} onChange={set('NSSF Number')} error={problemOf('NSSF Number')} />
           <SelectField label="Residency (for tax)" required value={values['kra_residency']} options={RESIDENCY_OPTIONS} onChange={set('kra_residency')} />
         </Section>

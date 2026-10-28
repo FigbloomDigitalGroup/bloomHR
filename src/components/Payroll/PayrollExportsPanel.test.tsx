@@ -83,7 +83,7 @@ describe('PayrollExportsPanel', () => {
     expect(totals.textContent).toContain('Employer only, 1 employee');
     fireEvent.click(screen.getAllByRole('button', { name: /Download CSV/ })[4]); // Kenya: P10, SHA, NSSF, housing levy, NITA, then payments
     expect(saved.files.map((f) => f.name)).toEqual(['nita-levy-2026-10.csv']);
-    expect(await readBlob(saved.files[0].blob)).toBe(['PAYROLL NUMBER,EMPLOYEE NAME,ID NO,KRA PIN,NITA NO,LEVY', 'PR-00001,Amina Wanjiru,,A012345678Z,,50.00', ''].join(String.fromCharCode(13, 10)));
+    expect(await readBlob(saved.files[0].blob)).toBe(['EMPLOYEE NUMBER,EMPLOYEE NAME,ID NO,KRA PIN,NITA NO,LEVY', 'E1,Amina Wanjiru,,A012345678Z,,50.00', ''].join(String.fromCharCode(13, 10)));
   });
 
   it('downloads a CSV named after the file and month', async () => {

@@ -31,7 +31,7 @@ const primary = `${button} bg-brand text-white hover:bg-brand-dark`;
 const secondary = `${button} border border-border bg-white text-ink hover:bg-secondary`;
 const label = 'block text-[10px] font-bold uppercase text-subtle mb-1';
 
-/** Who is missing a KRA PIN, NSSF or SHA number, or payment details, and a spreadsheet to fill the gaps in bulk. */
+/** Who is missing a KRA PIN, NSSF or SHIF number, or payment details, and a spreadsheet to fill the gaps in bulk. */
 export default function MissingPayrollDetailsModal({ employees, onClose, onChanged, draftNotice }: MissingPayrollDetailsModalProps) {
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState('');
@@ -95,7 +95,7 @@ export default function MissingPayrollDetailsModal({ employees, onClose, onChang
           <div>
             <h2 className="text-sm font-semibold text-gray-800">Missing payroll details</h2>
             <p className="text-[11px] text-muted-foreground">
-              KRA PIN, NSSF and SHA numbers, and bank or M-Pesa details, needed to pay staff and file returns.
+              KRA PIN, NSSF and SHIF numbers, and bank or M-Pesa details, needed to pay staff and file returns.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -118,7 +118,7 @@ export default function MissingPayrollDetailsModal({ employees, onClose, onChang
           {missing.length === 0 ? (
             <div className="flex items-center gap-2 rounded-xl border border-border p-4 text-xs text-ink">
               <CheckCircle2 className="w-4 h-4 text-brand" />
-              Every employee has their KRA PIN, NSSF and SHA numbers and payment details.
+              Every employee has their KRA PIN, NSSF and SHIF numbers and payment details.
             </div>
           ) : (
             <section>

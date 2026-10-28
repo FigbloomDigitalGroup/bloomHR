@@ -22,7 +22,7 @@ describe('the WHT report', () => {
     const f = whtFile(payslips, employees, '2026-10');
     expect(f.headers).toBe(WHT_HEADERS);
     expect(f.rows).toEqual([
-      ['A098765432B', 'Chege Contract', 'PR-7', '2026-10', 'Contractual fees', '10000.00', '3.00', '300.00', '150.00', '150.00'],
+      ['A098765432B', 'Chege Contract', 'C1', '2026-10', 'Contractual fees', '10000.00', '3.00', '300.00', '150.00', '150.00'],
       ['', 'Grace Consult', 'C2', '2026-10', 'Professional / management fees', '8000.00', '5.00', '400.00', '0.00', '400.00'],
     ]);
     expect(f.problems).toEqual([{ name: 'Grace Consult', employeeNumber: 'C2', missing: ['KRA PIN'] }]);
