@@ -201,7 +201,7 @@ function ReimbursementInput({ value, label, onSave }: { value: number; label: st
           setTimeout(() => box.blur());
         }
       }}
-      className="w-20 rounded-md border border-border bg-white px-1.5 py-1 text-right text-xs text-ink placeholder:text-subtle focus:border-brand focus:outline-none disabled:opacity-50"
+      className="w-[4.5rem] rounded-md border border-border bg-white px-1.5 py-1 text-right text-xs text-ink placeholder:text-subtle focus:border-brand focus:outline-none disabled:opacity-50"
     />
   );
 }
@@ -565,6 +565,11 @@ export default function PayrollRunTab({
   const th = "px-3 py-2.5 text-right whitespace-nowrap";
   const td = "px-3 py-3 text-right whitespace-nowrap";
   const tint = "bg-green-tint/40";
+  // subtle lines between every row and column (thin and light, so the figures stay what stands out)
+  const grid =
+    "[&_th]:border [&_td]:border [&_th]:border-[#E8ECE9] [&_td]:border-[#E8ECE9] [&_tr>*:first-child]:border-l-0 [&_tr>*:last-child]:border-r-0 [&_thead_th]:border-t-0";
+  // the employee column stays on the left while the table scrolls sideways
+  const pinned = "sticky left-0 z-10 min-w-[220px] shadow-[1px_0_0_0_theme(colors.border)]";
 
   /* eslint-disable-next-line @typescript-eslint/no-explicit-any -- a payroll row from PayrollDashboard */
   const reimbursementCell = (record: any, name: string) => {
@@ -773,8 +778,8 @@ export default function PayrollRunTab({
           </div>
         ) : (
           <>
-            {/* phones: one stacked row per person */}
-            <ul className="sm:hidden divide-y divide-border">
+            {/* phones and tablets: one stacked row per person (the table has too many columns for them) */}
+            <ul className="lg:hidden divide-y divide-border">
               {currentItems.map((record, index) => (
                 <li key={record.id} className="px-4 py-3">
                   <div className="flex items-start gap-2">
@@ -809,13 +814,13 @@ export default function PayrollRunTab({
               ))}
             </ul>
 
-            {/* wider screens: the table, with the month's totals at the foot */}
-            <div className="hidden sm:block">
+            {/* laptops and wider: the table, with the month's totals at the foot; the names stay in view when it scrolls */}
+            <div className="hidden lg:block">
               <TableScroll>
-                <table className="min-w-full text-xs">
+                <table className={`min-w-full text-xs border-collapse ${grid}`}>
                   <thead className="border-b border-border">
                     <tr className="text-left text-[10px] font-bold uppercase text-subtle">
-                      <th className="px-4 py-2.5">Employee</th>
+                      <th className={`px-4 py-2.5 ${pinned} bg-white`}>Employee</th>
                       <th className={th}>Basic pay</th>
                       {statutory.map((c) => (
                         <th key={c.key} className={th}>{c.label}</th>
@@ -864,13 +869,13 @@ export default function PayrollRunTab({
                       const f = runRowFigures(record, statutory, reimbursementNames);
                       return (
                         <React.Fragment key={record.id}>
-                          <tr className="border-b border-[#F1F5F2] hover:bg-background transition-colors text-ink">
-                            <td className="px-4 py-3">
+                          <tr className="group hover:bg-background transition-colors text-ink">
+                            <td className={`px-4 py-3 ${pinned} bg-white group-hover:bg-background`}>
                               <div className="flex items-start gap-2">
                                 {expandButton(record)}
                                 <div className="min-w-0">
-                                  <div className="font-bold">{record.employee_name}{editedBadge(record)}{countryFlag(record)}</div>
-                                  <div className="text-[10px] text-subtle">{subline(record)}</div>
+                                  <div className="font-bold whitespace-nowrap">{record.employee_name}{editedBadge(record)}{countryFlag(record)}</div>
+                                  <div className="text-[10px] text-subtle truncate max-w-[200px]" title={subline(record)}>{subline(record)}</div>
                                 </div>
                               </div>
                             </td>
@@ -906,7 +911,7 @@ export default function PayrollRunTab({
                         className="bg-background text-ink font-bold"
                         data-testid={columnTotals.length > 1 ? `total-${t.currency}` : undefined}
                       >
-                        <td className="px-4 py-3">
+                        <td className={`px-4 py-3 whitespace-nowrap ${pinned} bg-background`}>
                           {columnTotals.length > 1 ? `Total ${t.currency}` : "Total"} · {t.count} {t.count === 1 ? "employee" : "employees"}
                         </td>
                         <td className={td}>{ksh(t.figures.basic, t.currency)}</td>
