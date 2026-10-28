@@ -39,7 +39,7 @@ function Visual({ id }: { id: Outcome['id'] }) {
       );
     case 'visibility':
       return (
-        <PhotoCard photo="team" ratio="4 / 3" sizes="(min-width: 1024px) 640px, 92vw" className="shadow-[0_40px_90px_-48px_rgba(14,38,25,0.6)]">
+        <PhotoCard photo="team" ratio="4 / 3" sizes="(min-width: 1800px) 810px, (min-width: 1536px) 725px, (min-width: 1024px) 640px, 92vw" className="shadow-[0_40px_90px_-48px_rgba(14,38,25,0.6)]">
           <FloatingCard className="bottom-4 left-4 right-4 sm:right-auto">
             <OutcomesCard />
           </FloatingCard>

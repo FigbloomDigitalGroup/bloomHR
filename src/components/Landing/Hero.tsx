@@ -33,7 +33,7 @@ export default function Hero() {
           </p>
           <h1
             id="hero-title"
-            className="lp-rise m-0 mt-6 text-[clamp(2.6rem,1.3rem+5.4vw,5rem)] font-semibold leading-[1] tracking-[-0.04em] text-ink lg:text-[3.75rem] xl:text-[4.5rem] min-[1440px]:text-[5rem]"
+            className="lp-rise m-0 mt-6 text-[clamp(2.6rem,1.3rem+5.4vw,5rem)] font-semibold leading-[1] tracking-[-0.04em] text-ink lg:text-[3.75rem] xl:text-[4.5rem] min-[1440px]:text-[5rem] min-[1800px]:text-[5.75rem]"
             style={delay(80)}
           >
             {HERO.lead} <span className="font-light text-ink/55">{HERO.tail}</span>
@@ -67,14 +67,14 @@ export default function Hero() {
         </div>
 
         {/* the product: a photograph at the back, the dashboard in front, and two notices; the face stays clear of the dashboard */}
-        <div className="relative mx-auto w-full max-w-[620px] lg:h-[600px] lg:max-w-none">
+        <div className="relative mx-auto w-full max-w-[620px] lg:h-[600px] lg:max-w-none min-[1536px]:h-[640px] min-[1800px]:h-[680px]">
           <div className="lp-rise ml-auto w-[94%] lg:absolute lg:right-0 lg:top-0 lg:ml-0 lg:w-[60%]" style={delay(200)}>
             <div className="lp-parallax">
               <PhotoCard
                 photo="hero"
                 eager
                 ratio={null}
-                sizes="(min-width: 1024px) 380px, 92vw"
+                sizes="(min-width: 1800px) 480px, (min-width: 1536px) 430px, (min-width: 1024px) 380px, 92vw"
                 className="aspect-[4/3] shadow-[0_44px_90px_-44px_rgba(14,38,25,0.65)] lg:aspect-[4/5]"
               />
             </div>

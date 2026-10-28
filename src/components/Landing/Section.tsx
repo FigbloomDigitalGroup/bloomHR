@@ -29,9 +29,13 @@ export function Section({ id, labelledBy, tone = 'page', className = '', childre
   );
 }
 
-/** The page's width: wide enough for the product, with a gutter that never drops below 20px. */
+/**
+ * The page's width: wide enough for the product, with a gutter that never drops below 20px. It grows on large screens
+ * (1400px from 1536px of screen, 1560px from 1800px) so a big monitor is not left with wide empty margins. The photo
+ * `sizes` hints and the hero's height follow these widths: change them together.
+ */
 export function Container({ className = '', children }: { className?: string; children: ReactNode }) {
-  return <div className={`mx-auto w-full max-w-[1240px] px-5 sm:px-8 ${className}`}>{children}</div>;
+  return <div className={`mx-auto w-full max-w-[1240px] px-5 sm:px-8 min-[1536px]:max-w-[1400px] min-[1800px]:max-w-[1560px] ${className}`}>{children}</div>;
 }
 
 interface HeadingProps {

@@ -73,7 +73,7 @@ function Preview({ id }: { id: PreviewKey }) {
       );
     case 'hiring':
       return (
-        <PhotoCard photo="interview" ratio="4 / 3" sizes="(min-width: 1024px) 640px, 92vw" className="shadow-[0_40px_90px_-48px_rgba(14,38,25,0.6)]">
+        <PhotoCard photo="interview" ratio="4 / 3" sizes="(min-width: 1800px) 810px, (min-width: 1536px) 725px, (min-width: 1024px) 640px, 92vw" className="shadow-[0_40px_90px_-48px_rgba(14,38,25,0.6)]">
           <FloatingCard className="right-4 top-4 hidden sm:block">
             <PipelineCard />
           </FloatingCard>

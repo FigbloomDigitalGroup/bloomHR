@@ -68,6 +68,14 @@ overflow follow their own width instead, with container queries in `src/index.cs
 1100px, the Sign in and Create buttons from 640px, the wordmark under 340px) and the dashboard in the first screen
 (`.lp-cq`). When you add a row that cannot wrap (a button, a table, a fixed-width card), check it at 150% text.
 
+## Large screens
+
+The content width (`Container` in `src/components/Landing/Section.tsx`) is 1240px, 1400px from 1536px of screen and
+1560px from 1800px, so a 1920px monitor has about 210px of margin instead of 340px. The hero's height, its heading size
+and the photos' `sizes` hints follow those widths: when you change one, change the others (a `sizes` hint that is too
+small makes the browser pick a file that is too small, and the photo goes soft). Checked at 1536, 1920 and 2560px; at
+2560px the margins are still about 530px each.
+
 ## Photos
 
 Five photographs in `src/assets/landing/`, resized into small JPEGs that the build fingerprints, so they cache for good:
