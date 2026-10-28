@@ -21,7 +21,7 @@ import JobGroupsPage from './JobGroups';
 
 const G1: JobGroup = {
   id: 'g1', code: 'JG5', name: 'Senior officers', active: true, employee_count: 12, effective_from: '2026-01-01',
-  basic_salary: 55000, basic_min: null, basic_max: null, house_allowance: 11000, travel_allowance: 5000, other_allowances: 1000,
+  basic_salary: 55000, basic_min: null, basic_max: null, house_allowance: 11000, travel_allowance: 5000, other_allowances: 1000, per_diem: 0,
   next_effective_from: null,
 };
 const OLD: JobGroup = {
@@ -60,13 +60,15 @@ describe('Job groups page', () => {
     fireEvent.change(within(dialog).getByLabelText(/^Name/), { target: { value: 'Managers' } });
     fireEvent.change(within(dialog).getByLabelText(/^Basic salary/), { target: { value: '80000' } });
     fireEvent.change(within(dialog).getByLabelText(/House allowance/), { target: { value: '15000' } });
+    // the job level's monthly per diem (a reimbursement on the payroll page)
+    fireEvent.change(within(dialog).getByLabelText(/^Per diem/), { target: { value: '6000' } });
     fireEvent.change(within(dialog).getByLabelText(/Amounts start on/), { target: { value: '2026-11-01' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(saveJobGroupRate).toHaveBeenCalled());
     expect(saveJobGroup).toHaveBeenCalledWith(null, { code: 'JG6', name: 'Managers' });
     expect(saveJobGroupRate).toHaveBeenCalledWith('new-id', {
       effective_from: '2026-11-01', basic_salary: 80000, basic_min: null, basic_max: null,
-      house_allowance: 15000, travel_allowance: 0, other_allowances: 0,
+      house_allowance: 15000, travel_allowance: 0, other_allowances: 0, per_diem: 6000,
     });
   });
 

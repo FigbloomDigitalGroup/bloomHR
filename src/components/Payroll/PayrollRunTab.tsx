@@ -825,7 +825,15 @@ export default function PayrollRunTab({
                       {reimbursementNames.map((name) => {
                         const type = typeNamed.get(name);
                         return (
-                          <th key={name} className={`${th} ${tint}`} title="Not taxed: added to net pay after deductions">
+                          <th
+                            key={name}
+                            className={`${th} ${tint}`}
+                            title={
+                              type?.from_job_group
+                                ? "Each employee's job group per diem (set on Job groups); type to change one person's for this month. Not taxed: added to net pay"
+                                : "Not taxed: added to net pay after deductions"
+                            }
+                          >
                             <span className="inline-flex items-center gap-1">
                               {name}
                               {type && reimbursements && (

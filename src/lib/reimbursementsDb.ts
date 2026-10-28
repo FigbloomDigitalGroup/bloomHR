@@ -1,26 +1,27 @@
 import { supabase } from './supabase';
 import { fetchAll } from './fetchAll';
-import type { EmployeeReimbursement, ReimbursementType } from './reimbursements';
+import type { EmployeeReimbursement, JobGroupPerDiem, ReimbursementType } from './reimbursements';
 
 // The database side of reimbursements (lib/reimbursements): the company's columns, each employee's amounts for a
 // month, and the draft run's saved payslip when an amount changes.
 
-const TYPE_COLUMNS = 'id, name, position, active';
+const TYPE_COLUMNS = 'id, name, position, active, from_job_group';
 
-const missingTable = (err: { code?: string } | null | undefined) => ['42P01', 'PGRST205'].includes(err?.code ?? '');
+// (a table or column the migration adds, before it is applied)
+const missingTable = (err: { code?: string } | null | undefined) => ['42P01', 'PGRST205', '42703', 'PGRST204'].includes(err?.code ?? '');
 
 /** The company's columns (paused ones too) and every amount entered for the month (none before the migration). */
 export const loadReimbursements = async (period: string) => {
   try {
     return await loadMonth(period);
   } catch (err) {
-    if (missingTable(err as { code?: string })) return { types: [] as ReimbursementType[], rows: [] as EmployeeReimbursement[] };
+    if (missingTable(err as { code?: string })) return { types: [] as ReimbursementType[], rows: [] as EmployeeReimbursement[], groupRates: [] as JobGroupPerDiem[] };
     throw err;
   }
 };
 
 const loadMonth = async (period: string) => {
-  const [types, rows] = await Promise.all([
+  const [types, rows, groupRates] = await Promise.all([
     supabase.from('reimbursement_types').select(TYPE_COLUMNS).order('position').order('name'),
     fetchAll<EmployeeReimbursement>((from, to) =>
       supabase
@@ -30,9 +31,17 @@ const loadMonth = async (period: string) => {
         .order('id')
         .range(from, to)
     ),
+    // every job group's per diem from each date (lib/reimbursements jobGroupPerDiems picks the month's)
+    fetchAll<JobGroupPerDiem>((from, to) =>
+      supabase.from('job_group_rates').select('job_group_id, effective_from, per_diem').order('id').range(from, to)
+    ),
   ]);
   if (types.error) throw types.error;
-  return { types: (types.data ?? []) as ReimbursementType[], rows: rows.map((r) => ({ ...r, amount: Number(r.amount) || 0 })) };
+  return {
+    types: (types.data ?? []) as ReimbursementType[],
+    rows: rows.map((r) => ({ ...r, amount: Number(r.amount) || 0 })),
+    groupRates: groupRates.map((r) => ({ ...r, per_diem: Number(r.per_diem) || 0 })),
+  };
 };
 
 /** Adds a column at the end, or brings back a removed one of the same name. */
@@ -56,10 +65,13 @@ export const removeReimbursementType = async (id: string) => {
   if (error) throw error;
 };
 
-/** Sets one employee's amount for a column and month; 0 clears it. */
-export const setEmployeeReimbursement = async (input: { employeeNumber: string; typeId: string; period: string; amount: number }) => {
+/**
+ * Sets one employee's amount for a column and month, or removes it (lib/reimbursements reimbursementToSave: the job
+ * group's amount, if any, then applies).
+ */
+export const setEmployeeReimbursement = async (input: { employeeNumber: string; typeId: string; period: string; amount: number | null }) => {
   const { error } =
-    input.amount > 0
+    input.amount !== null
       ? await supabase.from('employee_reimbursements').upsert(
           { employee_number: input.employeeNumber, reimbursement_type_id: input.typeId, pay_period: input.period, amount: input.amount },
           { onConflict: 'tenant_id,employee_number,reimbursement_type_id,pay_period' },

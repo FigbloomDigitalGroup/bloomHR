@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   afterDeductionsOf,
+  jobGroupPerDiems,
+  reimbursementToSave,
   parseReimbursement,
   reimbursementColumns,
   reimbursementItemsOf,
@@ -42,6 +44,47 @@ describe('reimbursements', () => {
     const again = withReimbursements(once, [{ name: 'Mileage', amount: 800 }]);
     expect(again).toMatchObject({ reimbursement_items: [{ name: 'Mileage', amount: 800 }], reimbursements: 800, net_pay: 62240 });
     expect(withReimbursements(again, [])).toMatchObject({ reimbursement_items: [], reimbursements: 0, net_pay: 61440 });
+  });
+
+  it("fills the per diem column with each employee's job group amount for the month, unless one was typed in", () => {
+    const withGroup = types.map((t) => (t.id === 'pd' ? { ...t, from_job_group: true } : t));
+    const rates = [
+      { job_group_id: 'mgr', effective_from: '2026-01-01', per_diem: 8000 },
+      { job_group_id: 'mgr', effective_from: '2026-10-15', per_diem: 10000 },
+      { job_group_id: 'mgr', effective_from: '2026-11-01', per_diem: 12000 },
+      { job_group_id: 'ops', effective_from: '2026-01-01', per_diem: 0 },
+    ];
+    const staff = [
+      { employeeNumber: 'E1', jobGroupId: 'mgr' },
+      { employeeNumber: 'E2', jobGroupId: 'mgr' },
+      { employeeNumber: 'E3', jobGroupId: 'mgr' },
+      { employeeNumber: 'E4', jobGroupId: 'ops' },
+      { employeeNumber: 'E5', jobGroupId: null },
+    ];
+    // the amount in force on the month's last day; none for a group at 0 or no group
+    const group = jobGroupPerDiems(rates, staff, '2026-10');
+    expect([...group]).toEqual([['E1', 10000], ['E2', 10000], ['E3', 10000]]);
+    expect(jobGroupPerDiems(rates, staff, '2026-09').get('E1')).toBe(8000);
+    const typed = [
+      { id: '1', employee_number: 'E2', reimbursement_type_id: 'pd', pay_period: '2026-10', amount: 4000 },
+      { id: '2', employee_number: 'E3', reimbursement_type_id: 'pd', pay_period: '2026-10', amount: 0 },
+      { id: '3', employee_number: 'E4', reimbursement_type_id: 'pd', pay_period: '2026-10', amount: 1500 },
+    ];
+    const byEmployee = reimbursementsForPeriod(withGroup, typed, '2026-10', group);
+    expect(byEmployee.get('E1')).toEqual([{ name: 'Per diem', amount: 10000 }]);
+    expect(byEmployee.get('E2')).toEqual([{ name: 'Per diem', amount: 4000 }]);
+    expect(byEmployee.has('E3')).toBe(false);
+    expect(byEmployee.get('E4')).toEqual([{ name: 'Per diem', amount: 1500 }]);
+    // only the job group column is filled from the groups
+    expect(reimbursementsForPeriod(types, [], '2026-10', group).size).toBe(0);
+  });
+
+  it("saves what is typed, keeps 0 over a job group's amount, and removes the group's amount typed again", () => {
+    expect(reimbursementToSave(4000, 10000)).toEqual({ save: 4000 });
+    expect(reimbursementToSave(0, 10000)).toEqual({ save: 0 });
+    expect(reimbursementToSave(10000, 10000)).toEqual({ remove: true });
+    expect(reimbursementToSave(0, 0)).toEqual({ remove: true });
+    expect(reimbursementToSave(1500, 0)).toEqual({ save: 1500 });
   });
 
   it('sets or clears one column, keeping the others in column order', () => {

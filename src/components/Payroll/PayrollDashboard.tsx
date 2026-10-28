@@ -89,8 +89,11 @@ import { loadPayrollLoans } from "../../lib/loansApi";
 import { earningsForPeriod } from "../../lib/earnings";
 import {
   type EmployeeReimbursement,
+  type JobGroupPerDiem,
   type ReimbursementType,
+  jobGroupPerDiems,
   reimbursementColumns,
+  reimbursementToSave,
   reimbursementsForPeriod,
   withReimbursement,
   withReimbursements,
@@ -1258,7 +1261,7 @@ export default function PayrollDashboard() {
   }, [actualPeriod, runVersion]);
 
   // per diem, mileage and the company's other reimbursement columns, and this month's amounts (lib/reimbursements)
-  const [reimbursementSetup, setReimbursementSetup] = useState<{ period: string; types: ReimbursementType[]; rows: EmployeeReimbursement[] } | null>(null);
+  const [reimbursementSetup, setReimbursementSetup] = useState<{ period: string; types: ReimbursementType[]; rows: EmployeeReimbursement[]; groupRates: JobGroupPerDiem[] } | null>(null);
   const [reimbursementsVersion, setReimbursementsVersion] = useState(0);
   useEffect(() => {
     let cancelled = false;
@@ -1273,10 +1276,25 @@ export default function PayrollDashboard() {
     () => (reimbursementSetup && reimbursementSetup.period === actualPeriod ? reimbursementColumns(reimbursementSetup.types) : []),
     [reimbursementSetup, actualPeriod],
   );
+  // each employee's job group per diem this month (the company's amount per job level)
+  const groupPerDiems = useMemo(
+    () =>
+      reimbursementSetup && reimbursementSetup.period === actualPeriod
+        ? jobGroupPerDiems(
+            reimbursementSetup.groupRates,
+            employees.map((e: any) => ({ employeeNumber: e["Employee Number"], jobGroupId: e.job_group_id })),
+            actualPeriod,
+          )
+        : new Map<string, number>(),
+    [reimbursementSetup, actualPeriod, employees],
+  );
   // null until this month's are loaded: a run is never saved without them
   const reimbursementsByEmployee = useMemo(
-    () => (reimbursementSetup && reimbursementSetup.period === actualPeriod ? reimbursementsForPeriod(reimbursementSetup.types, reimbursementSetup.rows, actualPeriod) : null),
-    [reimbursementSetup, actualPeriod],
+    () =>
+      reimbursementSetup && reimbursementSetup.period === actualPeriod
+        ? reimbursementsForPeriod(reimbursementSetup.types, reimbursementSetup.rows, actualPeriod, groupPerDiems)
+        : null,
+    [reimbursementSetup, actualPeriod, groupPerDiems],
   );
 
   const runLoading = runPeriod !== actualPeriod;
@@ -1551,15 +1569,17 @@ export default function PayrollDashboard() {
   const handleSetReimbursement = async (record: any, type: ReimbursementType, amount: number) => {
     const period = actualPeriod;
     const employeeNumber = record.employee_id;
+    // in the job group column, the group's amount again removes what was typed (the group's amount then applies)
+    const action = reimbursementToSave(amount, type.from_job_group ? groupPerDiems.get(employeeNumber) ?? 0 : 0);
     try {
-      await setEmployeeReimbursement({ employeeNumber, typeId: type.id, period, amount });
+      await setEmployeeReimbursement({ employeeNumber, typeId: type.id, period, amount: "save" in action ? action.save : null });
       setReimbursementSetup((prev) =>
         prev && prev.period === period
           ? {
               ...prev,
               rows: [
                 ...prev.rows.filter((r) => !(r.employee_number === employeeNumber && r.reimbursement_type_id === type.id)),
-                ...(amount > 0 ? [{ id: `${employeeNumber}:${type.id}`, employee_number: employeeNumber, reimbursement_type_id: type.id, pay_period: period, amount }] : []),
+                ...("save" in action ? [{ id: `${employeeNumber}:${type.id}`, employee_number: employeeNumber, reimbursement_type_id: type.id, pay_period: period, amount: action.save }] : []),
               ],
             }
           : prev,

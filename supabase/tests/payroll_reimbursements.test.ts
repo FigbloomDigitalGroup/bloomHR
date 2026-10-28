@@ -35,8 +35,11 @@ beforeAll(async () => {
 describe('the starting columns', () => {
   it('every company has Per diem and Mileage, a company created later too', async () => {
     for (const tenant of [A, B]) {
-      const types = await rows<{ name: string; active: boolean }>(`select name, active from reimbursement_types where tenant_id = '${tenant}' order by position`);
-      expect(types).toEqual([{ name: 'Per diem', active: true }, { name: 'Mileage', active: true }]);
+      const types = await rows<{ name: string; active: boolean; from_job_group: boolean }>(
+        `select name, active, from_job_group from reimbursement_types where tenant_id = '${tenant}' order by position`
+      );
+      // per diem is filled from each employee's job group
+      expect(types).toEqual([{ name: 'Per diem', active: true, from_job_group: true }, { name: 'Mileage', active: true, from_job_group: false }]);
     }
   });
 
@@ -75,10 +78,11 @@ describe('columns and amounts', () => {
     expect((await rows<{ amount: string }>(`select amount from employee_reimbursements where reimbursement_type_id = ${typeOf('Per diem')}`)).map((r) => Number(r.amount))).toEqual([3500]);
   });
 
-  it('refuses a column name twice (ignoring case), empty names, zero amounts and months not like YYYY-MM', async () => {
+  it('refuses a column name twice (ignoring case), empty names, a second job group column, negative amounts and months not like YYYY-MM', async () => {
     await expect(pay(() => db.exec(`insert into reimbursement_types (name) values (' mileage ')`))).rejects.toThrow(/duplicate|unique/i);
     await expect(pay(() => db.exec(`insert into reimbursement_types (name) values ('  ')`))).rejects.toThrow(/check/i);
-    for (const bad of [`'E2', ${typeOf('Mileage')}, '2026-10', 0`, `'E2', ${typeOf('Mileage')}, 'Oct', 100`]) {
+    await expect(pay(() => db.exec(`insert into reimbursement_types (name, from_job_group) values ('Allowance', true)`))).rejects.toThrow(/duplicate|unique/i);
+    for (const bad of [`'E2', ${typeOf('Mileage')}, '2026-10', -1`, `'E2', ${typeOf('Mileage')}, 'Oct', 100`]) {
       await expect(pay(() => db.exec(`insert into employee_reimbursements (employee_number, reimbursement_type_id, pay_period, amount) values (${bad})`))).rejects.toThrow(/check/i);
     }
   });
@@ -108,6 +112,31 @@ describe('columns and amounts', () => {
       `select column_name, column_default from information_schema.columns where table_name = 'salary_history' and column_name in ('reimbursement_items', 'reimbursements') order by column_name`
     );
     expect(cols.map((c) => c.column_name)).toEqual(['reimbursement_items', 'reimbursements']);
+  });
+});
+
+describe("each job group's per diem", () => {
+  it('is a dated amount on the group, 0 unless set, shown on the job groups screen', async () => {
+    await pay(() =>
+      db.exec(`
+        insert into job_groups (code, name) values ('MGR', 'Managers');
+        insert into job_group_rates (job_group_id, effective_from, basic_salary, per_diem)
+          select id, '2026-01-01', 150000, 10000 from job_groups where code = 'MGR';
+        insert into job_groups (code, name) values ('OPS', 'Operations');
+        insert into job_group_rates (job_group_id, effective_from, basic_salary)
+          select id, '2026-01-01', 40000 from job_groups where code = 'OPS';
+      `)
+    );
+    const overview = await pay(() => rows<{ code: string; per_diem: string }>(`select code, per_diem from job_groups_overview() where code in ('MGR', 'OPS') order by code`));
+    expect(overview.map((r) => [r.code, Number(r.per_diem)])).toEqual([['MGR', 10000], ['OPS', 0]]);
+    await expect(pay(() => db.exec(`update job_group_rates set per_diem = -5`))).rejects.toThrow(/check/i);
+  });
+
+  it("an amount typed in for the month replaces it; 0 means none that month", async () => {
+    await pay(() =>
+      db.exec(`insert into employee_reimbursements (employee_number, reimbursement_type_id, pay_period, amount) values ('E2', ${typeOf('Per diem')}, '2026-10', 0)`)
+    );
+    expect((await rows<{ amount: string }>(`select amount from employee_reimbursements where employee_number = 'E2'`)).map((r) => Number(r.amount))).toEqual([0]);
   });
 });
 

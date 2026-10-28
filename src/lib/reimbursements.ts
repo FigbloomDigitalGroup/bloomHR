@@ -4,6 +4,10 @@
  * earned: never taxed, never part of gross pay or the pay NSSF, SHIF and the housing levy are worked out on, and added
  * to net pay after deductions. Pure: the database calls are in reimbursementsDb.
  *
+ * Per diem is the company's own amount per job level: each job group's monthly per diem (job_group_rates.per_diem)
+ * fills the Per diem column (the column with from_job_group) for everyone in the group every month. An amount typed in
+ * for an employee replaces it for that month; 0 typed in means none that month.
+ *
  * The payroll page's columns (finance's names): Basic pay is the payslip's gross_pay, Gross pay is what is left after
  * deductions, and Net pay is that plus the reimbursements (the payslip's net_pay, what is paid).
  */
@@ -13,6 +17,16 @@ export interface ReimbursementType {
   position: number;
   /** a removed column is paused: it isn't shown or paid until it is added back */
   active: boolean;
+  /** filled every month with the employee's job group's per diem (the Per diem column) */
+  from_job_group?: boolean;
+}
+
+/** A job group's per diem from a date (job_group_rates) */
+export interface JobGroupPerDiem {
+  job_group_id: string;
+  /** 'YYYY-MM-DD' */
+  effective_from: string;
+  per_diem: number;
 }
 
 export interface EmployeeReimbursement {
@@ -37,20 +51,69 @@ const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : N
 export const reimbursementColumns = (types: ReimbursementType[]) =>
   types.filter((t) => t.active).sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
 
-/** Each employee's reimbursements for the pay period, by employee number, in column order (paused columns left out). */
-export const reimbursementsForPeriod = (types: ReimbursementType[], rows: EmployeeReimbursement[], period: string) => {
-  const columns = reimbursementColumns(types);
-  const result = new Map<string, ReimbursementItem[]>();
-  for (const type of columns) {
-    for (const r of rows) {
-      if (r.reimbursement_type_id !== type.id || r.pay_period !== period || !(num(r.amount) > 0)) continue;
-      const items = result.get(r.employee_number) ?? [];
-      items.push({ name: type.name, amount: round2(num(r.amount)) });
-      result.set(r.employee_number, items);
-    }
+/** The last day of a pay period ('YYYY-MM' -> 'YYYY-MM-DD'). */
+const lastDayOf = (period: string) => {
+  const [y, m] = period.split('-').map(Number);
+  return `${period}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`;
+};
+
+/**
+ * Each employee's job group per diem for the pay period, by employee number: their group's amount in force on the
+ * month's last day (left out when it is 0 or the employee has no group).
+ */
+export const jobGroupPerDiems = (
+  rates: JobGroupPerDiem[],
+  employees: { employeeNumber: string; jobGroupId: string | null | undefined }[],
+  period: string,
+) => {
+  const day = lastDayOf(period);
+  const byGroup = new Map<string, JobGroupPerDiem>();
+  for (const r of rates) {
+    if (r.effective_from > day) continue;
+    const current = byGroup.get(r.job_group_id);
+    if (!current || r.effective_from > current.effective_from) byGroup.set(r.job_group_id, r);
+  }
+  const result = new Map<string, number>();
+  for (const e of employees) {
+    const amount = e.jobGroupId ? round2(num(byGroup.get(e.jobGroupId)?.per_diem)) : 0;
+    if (amount > 0 && e.employeeNumber) result.set(e.employeeNumber, amount);
   }
   return result;
 };
+
+/**
+ * Each employee's reimbursements for the pay period, by employee number, in column order (paused columns left out):
+ * what was typed in, and in the job group column the group's per diem unless something was typed in for the month.
+ */
+export const reimbursementsForPeriod = (
+  types: ReimbursementType[],
+  rows: EmployeeReimbursement[],
+  period: string,
+  groupAmounts: Map<string, number> = new Map(),
+) => {
+  const columns = reimbursementColumns(types);
+  const result = new Map<string, ReimbursementItem[]>();
+  const add = (employee: string, name: string, amount: number) => {
+    if (!(amount > 0)) return;
+    const items = result.get(employee) ?? [];
+    items.push({ name, amount: round2(amount) });
+    result.set(employee, items);
+  };
+  for (const type of columns) {
+    const typed = new Map(rows.filter((r) => r.reimbursement_type_id === type.id && r.pay_period === period).map((r) => [r.employee_number, num(r.amount)]));
+    const employees = type.from_job_group ? new Set([...typed.keys(), ...groupAmounts.keys()]) : new Set(typed.keys());
+    for (const employee of employees) add(employee, type.name, typed.get(employee) ?? groupAmounts.get(employee) ?? 0);
+  }
+  return result;
+};
+
+/**
+ * What to save when an amount is typed in: the amount; nothing (delete) when it is 0 with nothing else to replace, or
+ * when it is the job group's amount again (the group's amount then applies, and follows its changes); or 0 kept, to
+ * replace the job group's amount with none for the month.
+ */
+export const reimbursementToSave = (amount: number, groupAmount: number): { save: number } | { remove: true } =>
+  amount === groupAmount || (amount === 0 && !(groupAmount > 0)) ? { remove: true } : { save: amount };
 
 /** A payslip's reimbursements (none on payslips saved before them). */
 export const reimbursementItemsOf = (payslip: { reimbursement_items?: unknown }): ReimbursementItem[] =>
