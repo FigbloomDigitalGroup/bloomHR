@@ -18,13 +18,14 @@ import { reimbursementItemsOf } from '../../lib/reimbursements';
 // loadPayslipExtras, loaded before. Sections, top to bottom:
 //
 //   employer (letterhead or logo, name, address and contacts, tax number) · employee (name, number, position,
-//   department, job group, branch, country; tax number, NSSF, SHA in Kenya, ID; payment details) · earnings (and
+//   tax number, department, job group, branch, country; NSSF, SHA in Kenya, ID and payment details when shown) · earnings (and
 //   taxable benefits) · deductions (before tax / tax / after tax) · taxable pay and reliefs · month-end settlement ·
 //   local statutory figures of a USD payslip · net pay · employer contributions · year to date · footer (run, pay date,
-//   computer generated).
+//   computer generated). The authorised signatory is whoever approved the payslip's country of the run: their drawn
+//   signature and name, kept with it then (migration 20261028200000).
 //
 // The company's design (lib/payslipDesign) picks the letterhead, contacts, footer, heading colour, and whether employer
-// contributions, the year to date, bank details and the leave balance show. Statutory deductions and net pay always do.
+// contributions, the year to date, payment details, NSSF/SHA/ID numbers and the leave balance show. Statutory deductions and net pay always do.
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- a payroll row or saved payslip (untyped rows) */
 interface Props {
@@ -92,6 +93,8 @@ export function PayslipDocument({ record, companyInfo, id, extras, design: desig
   const ytd = extras?.ytd;
   const dash = '—';
   const method = record.payment_method || 'M-Pesa';
+  // NSSF/SHA/ID numbers and payment details sit beside the employee's details, each when the design shows it
+  const sideBox = design.show_statutory_numbers || design.show_bank_details;
 
   const groupLines = (title: string, lines: GroupLine[], testId: string) =>
     lines.length > 0 && (
@@ -143,12 +146,13 @@ export function PayslipDocument({ record, companyInfo, id, extras, design: desig
 
       <div className="p-4 sm:p-6">
         {/* employee */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6" data-testid="payslip-employee">
+        <div className={`grid grid-cols-1 ${sideBox ? 'sm:grid-cols-2' : ''} gap-4 sm:gap-6 mb-6`} data-testid="payslip-employee">
           <div className="border border-gray-300 p-4">
             <h3 className="font-bold border-b border-gray-300 pb-2 mb-3 text-gray-900 text-sm" style={heading}>Employee information</h3>
-            <div className="space-y-1.5 text-black">
+            <div className={`text-black ${sideBox ? 'space-y-1.5' : 'grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1.5'}`}>
               <Row label="Full name:" value={record.employee_name || record['Employee Name'] || 'N/A'} />
               <Row label="Employee no:" value={record.employee_id || record['Employee ID'] || 'N/A'} />
+              <Row label={`${employeeTaxLabel(country)}:`} value={employee?.taxNumber || dash} testId="employee-tax-number" />
               <Row label="Position:" value={employee?.position || record.position || 'N/A'} />
               <Row label="Department:" value={employee?.department || record.department || 'N/A'} />
               <Row label="Job group:" value={employee?.jobGroup || record.jobGroup || 'N/A'} />
@@ -156,26 +160,35 @@ export function PayslipDocument({ record, companyInfo, id, extras, design: desig
               <Row label="Country:" value={country} />
             </div>
           </div>
-          <div className="border border-gray-300 p-4">
-            <h3 className="font-bold border-b border-gray-300 pb-2 mb-3 text-gray-900 text-sm" style={heading}>Tax and social security</h3>
-            <div className="space-y-1.5 text-black">
-              <Row label={`${employeeTaxLabel(country)}:`} value={employee?.taxNumber || dash} testId="employee-tax-number" />
-              <Row label="NSSF number:" value={employee?.nssfNumber || dash} />
-              {isKenya && <Row label="SHA number:" value={employee?.shaNumber || dash} testId="employee-sha-number" />}
-              <Row label={`${idNumberLabel(country)}:`} value={employee?.idNumber || record.employeeNat || dash} />
-            </div>
-            <h3 className="font-bold border-b border-gray-300 pb-2 mb-3 mt-4 text-gray-900 text-sm" style={heading}>Payment details</h3>
-            <div className="space-y-1.5 text-black" data-testid="payslip-payment">
-              <Row label="Method:" value={method} />
-              {design.show_bank_details && record.payment_method === 'Bank Transfer' && (
+          {sideBox && (
+            <div className="border border-gray-300 p-4">
+              {design.show_statutory_numbers && (
                 <>
-                  <Row label="Bank:" value={record.bank_name || 'N/A'} />
-                  <Row label="Account:" value={record.account_number || 'N/A'} />
+                  <h3 className="font-bold border-b border-gray-300 pb-2 mb-3 text-gray-900 text-sm" style={heading}>Social security</h3>
+                  <div className="space-y-1.5 text-black mb-4" data-testid="payslip-statutory-numbers">
+                    <Row label="NSSF number:" value={employee?.nssfNumber || dash} />
+                    {isKenya && <Row label="SHA number:" value={employee?.shaNumber || dash} testId="employee-sha-number" />}
+                    <Row label={`${idNumberLabel(country)}:`} value={employee?.idNumber || record.employeeNat || dash} />
+                  </div>
                 </>
               )}
-              {design.show_bank_details && record.payment_method === 'M-Pesa' && <Row label="M-Pesa no:" value={record.employeeNu || 'N/A'} />}
+              {design.show_bank_details && (
+                <>
+                  <h3 className="font-bold border-b border-gray-300 pb-2 mb-3 text-gray-900 text-sm" style={heading}>Payment details</h3>
+                  <div className="space-y-1.5 text-black" data-testid="payslip-payment">
+                    <Row label="Method:" value={method} />
+                    {record.payment_method === 'Bank Transfer' && (
+                      <>
+                        <Row label="Bank:" value={record.bank_name || 'N/A'} />
+                        <Row label="Account:" value={record.account_number || 'N/A'} />
+                      </>
+                    )}
+                    {record.payment_method === 'M-Pesa' && <Row label="M-Pesa no:" value={record.employeeNu || 'N/A'} />}
+                  </div>
+                </>
+              )}
             </div>
-          </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
@@ -368,14 +381,21 @@ export function PayslipDocument({ record, companyInfo, id, extras, design: desig
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-4 text-center text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-4 text-center text-xs items-end">
           <div className="p-2 pt-8">
             <div className="border-t border-gray-300 pt-2 font-bold text-gray-800">Employee signature</div>
             <div className="text-gray-500 mt-1">Date: ________________________</div>
           </div>
-          <div className="p-2 pt-8">
+          {/* the approver's signature, kept when their country of the run was approved */}
+          <div className={`p-2 ${run?.approvedSignature ? '' : 'pt-8'}`} data-testid="payslip-signatory">
+            {run?.approvedSignature && (
+              <img src={run.approvedSignature} alt="Signature" className="h-12 max-w-[200px] mx-auto object-contain" data-testid="payslip-signature" />
+            )}
             <div className="border-t border-gray-300 pt-2 font-bold text-gray-800">Authorized signatory</div>
-            <div className="text-gray-500 mt-1">Date: ________________________</div>
+            {run?.approvedBy && <div className="text-gray-700 mt-1">{run.approvedBy}</div>}
+            <div className="text-gray-500 mt-1">
+              Date: {run?.approvedSignature && run.approvedAt ? dateText(run.approvedAt) : '________________________'}
+            </div>
           </div>
         </div>
 

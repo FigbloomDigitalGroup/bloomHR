@@ -93,8 +93,11 @@ describe('Payslip design', () => {
     await waitFor(() => expect(preview().getByTestId('employer-contributions')).toBeTruthy());
     fireEvent.click(screen.getByRole('checkbox', { name: 'Employer contributions' }));
     expect(preview().queryByTestId('employer-contributions')).toBeNull();
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Bank and M-Pesa details' }));
-    expect(within(preview().getByTestId('payslip-payment')).queryByText('Bank:')).toBeNull();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Payment details' }));
+    expect(preview().queryByTestId('payslip-payment')).toBeNull();
+    expect(preview().queryByTestId('payslip-statutory-numbers')).toBeNull();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'NSSF, SHA and ID numbers' }));
+    expect(preview().getByTestId('payslip-statutory-numbers')).toBeTruthy();
     fireEvent.change(screen.getByPlaceholderText(/This payslip is confidential/), { target: { value: 'Queries: pay@acme.co' } });
     expect(preview().getByTestId('payslip-footer').textContent).toContain('Queries: pay@acme.co');
     fireEvent.change(screen.getByRole('textbox', { name: 'Phone' }), { target: { value: '+254 711 111111' } });

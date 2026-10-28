@@ -150,6 +150,8 @@ import PlatformRatesBanner from "./PlatformRatesBanner";
 import UgandaLstSettings from "./UgandaLstSettings";
 import PayrollFilesTab from "./PayrollFilesTab";
 import PayrollHistoryTab from "./PayrollHistoryTab";
+import { loadMySignature } from "../../lib/signatures";
+import { loadLetterSender } from "../../lib/exitLetters";
 
 // The payroll page: a month picker and seven tabs (Run, Employees' pay, Deductions, Earnings, Rates, Files, History). This shell
 // works out the month's figures and owns the run, the shared state and the pop-ups; each tab only shows its part.
@@ -1520,11 +1522,17 @@ export default function PayrollDashboard() {
   };
 
   /** Approves, reopens or marks paid some of the run's countries in one go (FIG-905). */
-  const changeCountries = async (countries: string[], status: PayrollRunStatus, question: DialogOptions, done: string) => {
+  const changeCountries = async (
+    countries: string[],
+    status: PayrollRunStatus,
+    question: DialogOptions,
+    done: string,
+    signer?: { signature: string | null; name: string } | null,
+  ) => {
     if (!monthRun || countries.length === 0 || !(await confirmDialog(question))) return;
     setRunBusy(true);
     try {
-      const changed = await setCountriesStatus(monthRun.id, countries, status);
+      const changed = await setCountriesStatus(monthRun.id, countries, status, signer);
       if (changed.length === 0) throw new Error("Nothing changed: reload and try again.");
       toast.success(done);
       setRunVersion((v) => v + 1);
@@ -1693,8 +1701,13 @@ export default function PayrollDashboard() {
   const listOf = (cs: string[]) => cs.join(", ");
   const currencyTotals = useMemo(() => totalsByCurrency(finalFilteredRecords), [finalFilteredRecords]);
 
-  const approveCountries = (countries: string[]) => {
+  const approveCountries = async (countries: string[]) => {
     const ready = readiness.filter((r) => countries.includes(r.country));
+    // the approver signs the payslips: their drawn signature (Settings > Appearance) and name
+    const [signature, sender] = await Promise.all([
+      loadMySignature().catch(() => null),
+      loadLetterSender().catch(() => ({ name: "", title: "" })),
+    ]);
     return changeCountries(
       countries,
       "approved",
@@ -1713,6 +1726,9 @@ export default function PayrollDashboard() {
           readiness.some((r) => r.state === "blocked" || r.state === "waiting")
             ? "Countries that aren't ready stay as they are and can be approved later."
             : "",
+          signature
+            ? "Your signature will be on the payslips as the authorised signatory."
+            : "You haven't drawn a signature, so the payslips' signatory line will be blank. Draw one in Settings > Appearance first if they should carry it.",
           "Payslips will be locked and staff will be able to see them.",
         ]
           .filter(Boolean)
@@ -1720,6 +1736,7 @@ export default function PayrollDashboard() {
         confirmLabel: "Approve payroll",
       },
       `Payroll for ${periodLabel} approved for ${listOf(countries)}. Staff there can now see their payslips.`,
+      { signature, name: sender.name },
     );
   };
 
