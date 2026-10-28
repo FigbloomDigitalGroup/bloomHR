@@ -2,10 +2,11 @@ import { Download, FileText, FolderDown } from 'lucide-react';
 import { Card, EmptyState } from '../UI';
 import type { PayrollRun, PayrollRunCountry } from '../../lib/payrollRuns';
 import { ApprovedRunPanels } from './RunPayActions';
+import PayrollExportsPanel from './PayrollExportsPanel';
 
 // The Files tab: grouped by country (FIG-905), each approved country's statutory returns (Kenya: KRA P10, SHA, NSSF,
 // housing levy, NITA) and its bulk-payment files in its currency (the exports panel), plus the P9 tax card and the
-// payroll table export.
+// payroll table export. A started month that isn't approved yet has its returns as drafts, to check before approving.
 
 interface PayrollFilesTabProps {
   periodLabel: string;
@@ -27,12 +28,14 @@ export default function PayrollFilesTab({ periodLabel, run, runCountries, onOpen
     <div className="space-y-4">
       {run && filed ? (
         <ApprovedRunPanels run={run} runCountries={runCountries} />
+      ) : run ? (
+        <PayrollExportsPanel run={run} runCountries={runCountries} />
       ) : (
         <Card>
           <EmptyState
             icon={<FolderDown className="w-5 h-5" />}
-            title={`Approve payroll for ${periodLabel} first`}
-            description="Each country’s returns and bank files are made from its approved payslips."
+            title={`Start payroll for ${periodLabel} first`}
+            description="The returns are made from the month’s payslips: press Start on the Run tab (no approval needed to download drafts)."
             action={
               <button type="button" onClick={onGoToRun} className={tool}>
                 Go to Run
