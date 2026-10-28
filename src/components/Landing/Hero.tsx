@@ -71,7 +71,7 @@ export default function Hero() {
           <div className="lp-rise ml-auto w-[94%] lg:absolute lg:right-0 lg:top-0 lg:ml-0 lg:w-[60%]" style={delay(200)}>
             <div className="lp-parallax">
               <PhotoCard
-                photo="office"
+                photo="hero"
                 eager
                 ratio={null}
                 sizes="(min-width: 1024px) 380px, 92vw"

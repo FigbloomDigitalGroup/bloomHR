@@ -70,9 +70,23 @@ overflow follow their own width instead, with container queries in `src/index.cs
 
 ## Photos
 
-Four photographs in `src/assets/landing/` (640, 1080 and, for the first, 1600 pixels wide). Imports are fingerprinted by
-the build, so they cache for good. The people are illustrations, not customers, and the footer says so. The full-size
-originals are kept outside the repository.
+Five photographs in `src/assets/landing/`, resized into small JPEGs that the build fingerprints, so they cache for good:
+`hero` (a 4:5 portrait, 480, 720 and 960 pixels wide), `office` (640, 1080, 1600), `interview`, `team` and `lounge`
+(640 and 1080). They are listed in `src/components/Landing/photos.ts` with their alt text and crop. The people are not
+customers or staff, and the footer says so. The full-size originals are kept outside the repository
+(`..\bloomHR-design-source\landing-photos`); never put them in `public/`, which is published as it is.
+
+- `hero` and `interview` are stock photographs from Pexels, added 2026-10-28. The [Pexels licence](https://www.pexels.com/license/)
+  allows free commercial use with no credit, but the people must never be shown as backing Figbloom (so: no captions, and
+  the footer's "illustrative" line stays), and Pexels does not promise that releases exist for the people shown. Credits
+  for the record: `hero`, Edmond Dantes (Pexels 8547399); `interview`, Tima Miroshnichenko (Pexels 5439375).
+- `office` (the closing section), `team` and `lounge` are AI-generated, and the right to use them is still unconfirmed.
+  `public/og-image.jpg` (the share image) also uses the AI `office` photograph.
+- `hero` is the original with its top cut away. The dashboard in the first screen covers the lower part of that photo,
+  so the face has to sit high in the frame; with the full picture the dashboard hid his mouth at 1440 pixels. Check any
+  replacement at 320, 768, 1024 and 1440 pixels and at 150% text.
+- In the hiring tab on a phone, the Recruitment card is as tall as the photo and covers almost all of it. It did so with
+  the earlier photo too, and has not been changed.
 
 ## Privacy Policy and Terms
 

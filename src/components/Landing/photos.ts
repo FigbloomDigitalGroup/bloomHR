@@ -1,3 +1,6 @@
+import hero480 from '../../assets/landing/hero-desk-480.jpg';
+import hero720 from '../../assets/landing/hero-desk-720.jpg';
+import hero960 from '../../assets/landing/hero-desk-960.jpg';
 import office640 from '../../assets/landing/office-laptop-640.jpg';
 import office1080 from '../../assets/landing/office-laptop-1080.jpg';
 import office1600 from '../../assets/landing/office-laptop-1600.jpg';
@@ -8,9 +11,14 @@ import team1080 from '../../assets/landing/team-review-1080.jpg';
 import lounge640 from '../../assets/landing/phone-lounge-640.jpg';
 import lounge1080 from '../../assets/landing/phone-lounge-1080.jpg';
 
-// The landing page's photographs. They are illustrations: the people are not customers or staff and are never captioned
-// as such (the footer says so). Each is resized into small JPEGs here in src/assets so the build fingerprints them;
-// `position` keeps the faces in frame when a tile crops the photo. Alt text says what is in the picture, nothing more.
+// The landing page's photographs. The people are not customers or staff and are never captioned as such (the footer says
+// so). `hero` and `interview` are stock photographs from Pexels (free for commercial use, no credit required, but never
+// to suggest the people back Figbloom; credits are in docs/LANDING_PAGE.md); `office`, `team` and `lounge` are
+// AI-generated. Each is resized into small JPEGs here in src/assets so the build fingerprints them; `position` keeps the
+// faces in frame when a tile crops the photo. Alt text says what is in the picture, nothing more.
+//
+// `hero` is a 4:5 portrait with the top of the original cut away: the dashboard in the first screen covers the lower part
+// of this photo, so the face has to sit high in the frame. Its position keeps it high in the 4:3 frame on small screens.
 
 export interface Photo {
   src: string;
@@ -22,6 +30,14 @@ export interface Photo {
 }
 
 export const PHOTOS = {
+  hero: {
+    src: hero720,
+    srcSet: `${hero480} 480w, ${hero720} 720w, ${hero960} 960w`,
+    width: 960,
+    height: 1200,
+    alt: 'A man in a peach sweater types on a laptop at a wooden desk in a bright open office.',
+    position: '50% 20%',
+  },
   office: {
     src: office1080,
     srcSet: `${office640} 640w, ${office1080} 1080w, ${office1600} 1600w`,
@@ -35,8 +51,8 @@ export const PHOTOS = {
     srcSet: `${interview640} 640w, ${interview1080} 1080w`,
     width: 1080,
     height: 720,
-    alt: 'A man in glasses talks with a colleague across a desk, with a city skyline behind them.',
-    position: '36% 38%',
+    alt: 'A man in glasses and a grey blazer reads a document on a clipboard across a desk from a colleague, with plants and dried pampas grass beside them.',
+    position: '60% 40%',
   },
   team: {
     src: team1080,
