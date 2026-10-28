@@ -27,7 +27,7 @@ export default function FinalCta() {
           </div>
         </div>
         <div data-reveal style={{ '--lp-delay': '120ms' } as CSSProperties}>
-          <PhotoCard photo="office" repeat ratio="4 / 3" sizes="(min-width: 1024px) 560px, 92vw" className="shadow-[0_44px_90px_-40px_rgba(0,0,0,0.65)]">
+          <PhotoCard photo="office" ratio="4 / 3" sizes="(min-width: 1800px) 710px, (min-width: 1536px) 630px, (min-width: 1024px) 560px, 92vw" className="shadow-[0_44px_90px_-40px_rgba(0,0,0,0.65)]">
             <FloatingCard className="bottom-4 right-4 hidden sm:block">
               <ModuleListCard />
             </FloatingCard>
