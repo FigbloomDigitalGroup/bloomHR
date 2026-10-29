@@ -21,10 +21,26 @@ function securityTemplate(overrides: Partial<AccountSettings> = {}) {
 }
 
 describe('AccountSecurityStack', () => {
+  it("lets the organization trail write every account's logs, and only from this account's trails", () => {
+    const t = securityTemplate();
+    t.hasResourceProperties('AWS::S3::BucketPolicy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Sid: 'CloudTrailOrganizationWrite',
+            Action: 's3:PutObject',
+            Condition: Match.objectLike({ ArnLike: { 'aws:SourceArn': Match.anyValue() } }),
+          }),
+        ]),
+      },
+    });
+  });
+
   it('logs every Region to a private, retained, validated trail', () => {
     const t = securityTemplate();
     t.hasResourceProperties('AWS::CloudTrail::Trail', {
       IsMultiRegionTrail: true,
+      IsOrganizationTrail: true,
       IncludeGlobalServiceEvents: true,
       EnableLogFileValidation: true,
     });
