@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { ArrowRight, CircleNotch } from '@phosphor-icons/react';
 import { MfaError, sendMfaCode, verifyMfaCode, type TwoStepMethod } from '../lib/mfaApi';
 import AuthLayout from '../components/Auth/AuthLayout';
+import { authButtonPrimary, authHeading, authLabel, authLink, authQuietLink, authSubtitle } from '../components/Auth/authStyles';
 
 // Two-step sign-in (FIG-834, FIG-658). The server makes the code, sends it (by email, or SMS where the company chose
 // it) and checks it; a right code is recorded against this sign-in on the server, which is what lets the app in. This
@@ -131,10 +132,10 @@ export default function MFAVerification() {
     <AuthLayout>
       <div className="space-y-8">
         <div className="space-y-2">
-          <h2 className="text-3xl font-bold text-gray-900">Check your {method === 'sms' ? 'phone' : 'email'}</h2>
-          <p className="text-gray-500 text-xs font-medium" role="status" aria-live="polite">
+          <h2 className={authHeading}>Check your {method === 'sms' ? 'phone' : 'email'}</h2>
+          <p className={authSubtitle} role="status" aria-live="polite">
             {destination
-              ? <>We {where} a 6-digit code to <span className="font-bold text-gray-900 break-all">{destination}</span>. It expires in 60 minutes.</>
+              ? <>We {where} a 6-digit code to <span className="font-semibold text-ink break-all">{destination}</span>. It expires in 60 minutes.</>
               : sending ? 'Sending your code...' : 'Enter the 6-digit code we sent you.'}
           </p>
         </div>
@@ -147,7 +148,7 @@ export default function MFAVerification() {
           }}
         >
           <fieldset className="space-y-1.5">
-            <legend className="text-xs font-bold text-gray-500 ml-1 mb-1.5">Sign-in code</legend>
+            <legend className={`${authLabel} mb-1.5`}>Sign-in code</legend>
             <div className="flex justify-between gap-2">
               {codes.map((digit, index) => (
                 <input
@@ -164,7 +165,7 @@ export default function MFAVerification() {
                   onKeyDown={(e) => onKeyDown(index, e)}
                   autoFocus={index === 0}
                   disabled={busy || needsNewCode}
-                  className="w-full min-w-0 h-14 text-center text-xl font-bold text-gray-900 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 hover:border-gray-300 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full min-w-0 h-14 text-center text-xl font-semibold text-ink bg-white border border-gray-200 rounded-tile focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 hover:border-gray-300 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 />
               ))}
             </div>
@@ -178,7 +179,7 @@ export default function MFAVerification() {
           <button
             type="submit"
             disabled={busy || needsNewCode || codes.some((c) => c === '')}
-            className="w-full flex justify-center items-center gap-2 py-4 px-4 rounded-lg text-xs font-bold text-white shadow-lg transition-all bg-gray-900 hover:bg-gray-800 shadow-gray-900/20 disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed"
+            className={authButtonPrimary}
           >
             {verifying ? (
               <>
@@ -195,14 +196,14 @@ export default function MFAVerification() {
         </form>
 
         <div className="flex flex-col-reverse sm:flex-row sm:justify-between items-center gap-3 pt-6 border-t border-gray-100">
-          <button type="button" onClick={() => void backToLogin()} className="text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors">
+          <button type="button" onClick={() => void backToLogin()} className={authQuietLink}>
             Back to sign in
           </button>
           <button
             type="button"
             onClick={() => void send(true)}
             disabled={sending || cooldown > 0}
-            className="text-xs font-bold text-gray-900 underline decoration-gray-200 underline-offset-4 disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed"
+            className={`text-[13px] ${authLink} disabled:text-gray-400 disabled:no-underline disabled:cursor-not-allowed`}
           >
             {sending ? 'Sending...' : cooldown > 0 ? `Send a new code in ${cooldown}s` : 'Send a new code'}
           </button>
