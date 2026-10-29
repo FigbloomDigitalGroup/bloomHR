@@ -160,6 +160,8 @@ const EditEmployeePage = () => {
   });
   const [activeTab, setActiveTab] = useState('personal');
   const [emergencyContact, setEmergencyContact] = useState<EmergencyContact>({ name: '', relationship: '', phone: '', email: '' });
+  // next of kin: an onboarding essential, so HR can type it in for someone who never sends their form
+  const [nextOfKin, setNextOfKin] = useState({ name: '', relationship: '', phone: '' });
   const [dependents, setDependents] = useState<Dependent[]>([]);
   const [statutoryDeductions, setStatutoryDeductions] = useState<StatutoryDeduction[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -192,6 +194,12 @@ const EditEmployeePage = () => {
           .limit(1)
           .single();
 
+        const { data: kin } = await supabase
+          .from('next_of_kin')
+          .select('full_name, relationship, phone_number')
+          .eq('Employee Number', id)
+          .maybeSingle();
+
         // Fetch dependents
         const { data: deps } = await supabase
           .from('dependents')
@@ -220,6 +228,8 @@ const EditEmployeePage = () => {
 
         // older records say "Mobile Money" or "MPESA": show (and save) the spelling payroll and payslips match
         setEmployee(empData.payment_method ? { ...empData, payment_method: paymentMethodOption(empData.payment_method) } : empData);
+
+        setNextOfKin({ name: kin?.full_name ?? '', relationship: kin?.relationship ?? '', phone: kin?.phone_number ?? '' });
 
         // Set single emergency contact
         setEmergencyContact(
@@ -546,6 +556,20 @@ const EditEmployeePage = () => {
           .eq('Employee Number', id);
 
         if (deleteContactsError) throw deleteContactsError;
+      }
+
+      // next of kin: saved when named, never removed here (the employee's own entry may hold more than this form shows)
+      if (nextOfKin.name.trim()) {
+        const { error: kinError } = await supabase
+          .from('next_of_kin')
+          .upsert({
+            "Employee Number": id,
+            full_name: nextOfKin.name.trim(),
+            relationship: nextOfKin.relationship.trim(),
+            phone_number: nextOfKin.phone.trim()
+          }, { onConflict: 'tenant_id,Employee Number' });
+
+        if (kinError) throw kinError;
       }
 
       // Update dependents
@@ -1537,6 +1561,55 @@ const EditEmployeePage = () => {
                     {errors['emergencyContactEmail'] && (
                       <p className="mt-1 text-xs text-red-500">{errors['emergencyContactEmail']}</p>
                     )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8">
+                <SectionHeader
+                  title="Next of Kin"
+                  icon={Users}
+                />
+              </div>
+              <p className="text-gray-600 mb-6">Needed to approve onboarding in most companies</p>
+
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-medium text-gray-700 mb-1">Full Name</label>
+                    <input
+                      type="text"
+                      aria-label="Next of kin full name"
+                      value={nextOfKin.name}
+                      onChange={(e) => setNextOfKin(prev => ({ ...prev, name: e.target.value }))}
+                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm`}
+                      placeholder="Full Name"
+                      disabled={!isEditMode}
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-gray-700 mb-1">Relationship</label>
+                    <input
+                      type="text"
+                      aria-label="Next of kin relationship"
+                      value={nextOfKin.relationship}
+                      onChange={(e) => setNextOfKin(prev => ({ ...prev, relationship: e.target.value }))}
+                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm`}
+                      placeholder="Relationship"
+                      disabled={!isEditMode}
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-gray-700 mb-1">Phone Number</label>
+                    <input
+                      type="tel"
+                      aria-label="Next of kin phone number"
+                      value={nextOfKin.phone}
+                      onChange={(e) => setNextOfKin(prev => ({ ...prev, phone: e.target.value }))}
+                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm`}
+                      placeholder="Phone Number"
+                      disabled={!isEditMode}
+                    />
                   </div>
                 </div>
               </div>

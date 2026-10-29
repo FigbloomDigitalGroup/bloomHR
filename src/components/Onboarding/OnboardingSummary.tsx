@@ -90,7 +90,7 @@ export default function OnboardingSummary({ record, showPay = true }: { record: 
         <Group
           title="Employment and pay (entered by HR)"
           rows={[
-            ['Payroll number', text(e['Payroll Number'])],
+            ['Employee number', text(e['Employee Number'])],
             ['Position', text(e['Job Title'])],
             ['Type of employee (KRA)', text(e['kra_employee_type'])],
             ['Basic salary', money(e['Basic Salary'])],
