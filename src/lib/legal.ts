@@ -5,7 +5,7 @@
 // Everything only the company can know is a [[PLACEHOLDER]]. The pages stay switched off (src/lib/legalGate.ts) until
 // someone fills every placeholder in and sets LEGAL_REVIEWED to true; legal.test.ts refuses true while any are left.
 
-import { SITE } from './landing';
+import { PRICING, SITE, kes } from './landing';
 
 export interface LegalSection {
   heading: string;
@@ -190,7 +190,11 @@ export const TERMS: LegalDocument = {
     },
     {
       heading: 'Fees',
-      paragraphs: ['[[PRICING AND PAYMENT TERMS, OR "AGREED SEPARATELY IN WRITING"]]'],
+      paragraphs: [
+        // the amounts are the owner's decision of 2026-10-29, shown on the landing page (PRICING in landing.ts)
+        `The fee is ${kes(PRICING.monthly)} a month for the company, plus ${kes(PRICING.perEmployee)} a month for each active employee.`,
+        '[[PAYMENT TERMS: HOW AND WHEN THE FEE IS INVOICED, DUE DATE, VAT AND OTHER TAXES, LATE PAYMENT, WHAT COUNTS AS AN ACTIVE EMPLOYEE, AND NOTICE OF A CHANGE IN THE FEE]]',
+      ],
     },
     {
       heading: 'Intellectual property',

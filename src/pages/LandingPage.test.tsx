@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import LandingPage from './LandingPage';
-import { FEATURES, HERO, ROLES, SEO, SITE, WHY } from '../lib/landing';
+import { FEATURES, HERO, PRICING, PRICING_QUESTION, ROLES, SEO, SITE, STEPS, WHY } from '../lib/landing';
 
 // jsdom has no matchMedia, IntersectionObserver or scrollIntoView: the page uses all three, and must work without them
 beforeEach(() => {
@@ -352,5 +352,93 @@ describe('less motion', () => {
     const { container } = render(<LandingPage />);
     expect(container.querySelectorAll('[data-reveal-state="pending"]')).toHaveLength(0);
     expect(screen.getByRole('heading', { level: 1 })).toBeTruthy();
+  });
+});
+
+describe('how it works', () => {
+  const steps = (container: HTMLElement) => Array.from(container.querySelectorAll<HTMLElement>('#how li[data-step]'));
+
+  it('lists the four steps in order, each with its words on the page whatever the motion', () => {
+    const { container } = render(<LandingPage />);
+    const how = screen.getByRole('region', { name: /four steps/ });
+    const items = within(how).getAllByRole('listitem');
+    expect(items).toHaveLength(STEPS.length);
+    STEPS.forEach((step, index) => {
+      expect(items[index].textContent).toContain(step.title);
+      expect(items[index].textContent).toContain(step.text.text);
+    });
+    expect(steps(container)).toHaveLength(STEPS.length);
+  });
+
+  it('waits for each step to come into view, and dims it until then', () => {
+    const { container } = render(<LandingPage />);
+    expect(steps(container).map((li) => li.dataset.lit)).toEqual(['off', 'off', 'off', 'off']);
+  });
+
+  it('shows every step finished for a visitor who wants less motion, and where nothing can tell what is on screen', () => {
+    window.localStorage.setItem('figbloom.a11y', JSON.stringify({ textScale: 1, bold: false, contrast: false, reduceMotion: true }));
+    const calm = render(<LandingPage />);
+    expect(steps(calm.container).every((li) => li.dataset.lit === undefined)).toBe(true);
+    calm.unmount();
+    window.localStorage.clear();
+
+    vi.stubGlobal('IntersectionObserver', undefined);
+    const blind = render(<LandingPage />);
+    expect(steps(blind.container).every((li) => li.dataset.lit === undefined)).toBe(true);
+  });
+
+  it('keeps the little pictures out of a screen reader: the steps already say it all', () => {
+    const { container } = render(<LandingPage />);
+    for (const li of steps(container)) {
+      const picture = li.querySelector('[data-spot]');
+      expect(picture?.querySelector('[aria-hidden="true"]'), li.textContent ?? '').toBeTruthy();
+    }
+  });
+});
+
+describe('the price', () => {
+  it('has a section of its own, with a link to it in the header', () => {
+    render(<LandingPage />);
+    const pricing = screen.getByRole('region', { name: PRICING.title });
+    expect(pricing.id).toBe('pricing');
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name: 'Pricing' }));
+    expect(window.location.hash).toBe('#pricing');
+    expect(document.activeElement).toBe(pricing);
+  });
+
+  it('shows the two amounts the owner set, and nothing else in money', () => {
+    render(<LandingPage />);
+    const pricing = screen.getByRole('region', { name: PRICING.title });
+    expect(within(pricing).getByText('10,000')).toBeTruthy();
+    expect(within(pricing).getByText('250')).toBeTruthy();
+    expect(pricing.textContent).toContain(PRICING.monthlyNote);
+    expect(pricing.textContent).toContain(PRICING.perEmployeeNote);
+    // (the text of neighbouring elements runs together, so an amount is read as thousands in groups of three)
+    const amounts = (pricing.textContent ?? '').match(/KES\s?\d{1,3}(,\d{3})*/g) ?? [];
+    expect(amounts.length).toBeGreaterThan(0);
+    for (const amount of amounts) expect(['KES 16,250', 'KES 10,000', 'KES 6,250', 'KES 250'], amount).toContain(amount);
+  });
+
+  it('works out a month for any headcount, and says it aloud', () => {
+    render(<LandingPage />);
+    const slider = screen.getByRole('slider', { name: PRICING.estimate });
+    expect(slider.getAttribute('aria-valuetext')).toBe('25 active employees, KES 16,250 a month');
+
+    fireEvent.change(slider, { target: { value: '1' } });
+    expect(slider.getAttribute('aria-valuetext')).toBe('1 active employee, KES 10,250 a month');
+
+    fireEvent.change(slider, { target: { value: '100' } });
+    expect(slider.getAttribute('aria-valuetext')).toBe('100 active employees, KES 35,000 a month');
+    const pricing = screen.getByRole('region', { name: PRICING.title });
+    // the figure that runs is hidden from a screen reader, which is given the finished one
+    expect(within(pricing).getByText('KES 35,000', { selector: '.sr-only' })).toBeTruthy();
+    expect(within(pricing).getByText('KES 25,000')).toBeTruthy();
+  });
+
+  it('is stated again under the questions', () => {
+    render(<LandingPage />);
+    const ask = screen.getByRole('button', { name: PRICING_QUESTION.q });
+    fireEvent.click(ask);
+    expect(screen.getByText(PRICING_QUESTION.a)).toBeTruthy();
   });
 });

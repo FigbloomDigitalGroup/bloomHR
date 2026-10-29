@@ -1,4 +1,7 @@
+import { useRef } from 'react';
 import BrandMark from '../BrandMark';
+import { useLanding } from '../context';
+import { useSeen, useTween } from '../hooks';
 import { PAYSLIP_SAMPLE as P, type SampleLine } from './payslipSample';
 import { PreviewFrame, SampleTag } from './parts';
 
@@ -24,9 +27,14 @@ function Lines({ title, lines }: { title: string; lines: SampleLine[] }) {
 }
 
 export default function PayslipPreview({ className = '' }: { className?: string }) {
+  const { reduce } = useLanding();
+  const slip = useRef<HTMLDivElement>(null);
+  // the net pay runs up to its figure the first time the payslip is on screen; the label for screen readers has the real one
+  const seen = useSeen(slip, reduce);
+  const net = useTween(seen ? P.net : 0, reduce, 1300);
   return (
     <PreviewFrame label={`Sample payslip for a fictional employee: gross pay ${money(P.gross)}, deductions ${money(P.totalDeductions)}, net pay ${money(P.net)} ${P.currency}.`} className={className}>
-      <div className="rounded-card bg-white p-5 text-ink shadow-[0_40px_90px_-40px_rgba(0,0,0,0.55)] sm:p-6">
+      <div ref={slip} className="rounded-card bg-white p-5 text-ink shadow-[0_40px_90px_-40px_rgba(0,0,0,0.55)] sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <span className="grid h-9 w-9 place-items-center rounded-tile bg-brand text-white">
@@ -64,7 +72,7 @@ export default function PayslipPreview({ className = '' }: { className?: string 
         </div>
         <div className="mt-3 flex items-baseline justify-between gap-3 rounded-tile bg-brand px-4 py-3 text-white">
           <span className="text-[12.5px] font-semibold">Net pay ({P.currency})</span>
-          <span className="font-mono text-[20px] font-semibold tabular-nums">{money(P.net)}</span>
+          <span className="font-mono text-[20px] font-semibold tabular-nums">{money(net)}</span>
         </div>
       </div>
     </PreviewFrame>
