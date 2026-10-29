@@ -469,6 +469,28 @@ html:has(.lp) { scroll-padding-top: calc(5rem * var(--ui-zoom, 1)); }
 @container (max-width: 439px) { .lp-dash-aside { display: none; } }
 @container (max-width: 327px) { .lp-dash-stats { grid-template-columns: minmax(0, 1fr); } }
 
+/* the first screen: a wash of the brand's forest green (top right, behind the product) and orange (bottom left, behind the
+   buttons) over a tint that fades to the page colour. Both colours are the theme's own, so a different palette follows. */
+.lp-hero-wash {
+  background:
+    radial-gradient(58% 52% at 88% 10%, rgb(var(--brand) / 0.14), transparent 72%),
+    radial-gradient(44% 48% at 6% 92%, rgb(var(--highlight) / 0.13), transparent 74%),
+    linear-gradient(180deg, rgb(var(--tint) / 0.8) 0%, rgb(var(--page)) 80%);
+}
+/* gradient lettering: plain brand green wherever the browser cannot clip a background to text, and in forced colours */
+.lp-grad-text { color: rgb(var(--brand)); }
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .lp-grad-text {
+    background-image: linear-gradient(95deg, rgb(var(--brand)) 0%, rgb(46 125 80) 100%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+  }
+}
+@media (forced-colors: active) { .lp-grad-text { background: none; -webkit-text-fill-color: currentColor; color: inherit; } }
+/* the little dot in the first pill sends out one ring, once */
+.lp-ping { position: relative; }
+.lp-ping::after { content: ''; position: absolute; inset: 0; border-radius: 9999px; background: rgb(var(--highlight)); opacity: 0; animation: lp-ping 1.5s var(--lp-ease) 1s backwards; }
+@keyframes lp-ping { from { transform: scale(1); opacity: 0.55; } to { transform: scale(5); opacity: 0; } }
+
 /* the hero photo drifts up a little as the page scrolls: only where the browser can do it without a script */
 @keyframes lp-parallax { to { transform: translate3d(0, -44px, 0); } }
 @supports (animation-timeline: scroll()) {
@@ -549,6 +571,7 @@ html:has(.lp) { scroll-padding-top: calc(5rem * var(--ui-zoom, 1)); }
 /* less motion, from the operating system or from the app's own switch: everything simply is where it ends up */
 @media (prefers-reduced-motion: reduce) {
   .lp-rise, .lp-float, .lp-swap, .lp-open, .lp-pop { animation: none; }
+  .lp-ping::after { animation: none; }
   .lp [data-reveal-state] { opacity: 1; transform: none; transition: none; }
   .lp [data-reveal-state] .lp-zoom { transform: none; transition: none; }
   .lp-btn, .lp-btn-arrow, .lp-tab, .lp .transition-transform { transition: none; }
@@ -563,6 +586,7 @@ html:has(.lp) { scroll-padding-top: calc(5rem * var(--ui-zoom, 1)); }
   .lp-reach-down[data-next='off'] { transform: none; }
 }
 html[data-a11y-reduce-motion] .lp-rise, html[data-a11y-reduce-motion] .lp-float, html[data-a11y-reduce-motion] .lp-swap, html[data-a11y-reduce-motion] .lp-open, html[data-a11y-reduce-motion] .lp-pop { animation: none !important; }
+html[data-a11y-reduce-motion] .lp-ping::after { animation: none !important; }
 html[data-a11y-reduce-motion] .lp [data-reveal-state] { opacity: 1 !important; transform: none !important; }
 html[data-a11y-reduce-motion] .lp [data-reveal-state] .lp-zoom { transform: none !important; transition: none !important; }
 html[data-a11y-reduce-motion] .lp-btn:hover, html[data-a11y-reduce-motion] .lp-btn:active, html[data-a11y-reduce-motion] .lp-btn:hover .lp-btn-arrow { transform: none; }

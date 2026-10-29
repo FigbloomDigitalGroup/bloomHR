@@ -120,6 +120,15 @@ and the photos' `sizes` hints follow those widths: when you change one, change t
 small makes the browser pick a file that is too small, and the photo goes soft). Checked at 1536, 1920 and 2560px; at
 2560px the margins are still about 530px each.
 
+## The first screen
+
+Three layers of colour, all from the theme's own variables so a different palette follows: a wash of forest green (top
+right, behind the product) and orange (bottom left, behind the buttons) over a tint that fades to the page colour
+(`.lp-hero-wash` in `src/index.css`); the headline's light tail in a green gradient (`.lp-grad-text`: plain brand green
+where a browser cannot clip a background to text, and in forced-colours mode, and it ends on a green that keeps 4.5:1
+against the page, so do not run it into orange or a lighter green); and the "HR and payroll software" pill with a hairline
+that runs from green to orange, a soft lift, and one ring sent out by its dot (`.lp-ping`, once).
+
 ## Photos
 
 Five photographs in `src/assets/landing/`, resized into small JPEGs that the build fingerprints, so they cache for good:
