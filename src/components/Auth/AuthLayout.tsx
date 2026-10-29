@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { AccessibilityButton } from '../Accessibility/AccessibilityModal';
+import BrandMark from '../Landing/BrandMark';
 
-// The sign-in screens' frame (sign in, two-step code): the brand panel with the photo on the left on wide screens,
-// the form on white on the right. One place, so every sign-in step looks the same.
+// The sign-in screens' frame (sign in, two-step code, create or join a company, new password): a brand panel with the photo
+// on the left on wide screens, the form on the right. One place, so every step looks the same, and looks like the public
+// landing page: forest green over the photo, the mark drawn large behind, the landing page's type and buttons (authStyles.ts).
+// Only the look follows the landing page. The words on this panel are the sign-in page's own, kept as the owner had them.
 
 /** the brand panel's photo; replace the file to change it everywhere */
 export const AUTH_PHOTO = '/auth-team.jpg';
@@ -17,59 +20,64 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         <AccessibilityButton />
       </div>
       {/* Left side - Visual & Brand */}
-      <div className="hidden lg:flex lg:w-[45%] relative overflow-hidden bg-gray-900">
-        <div className="absolute inset-0 z-0">
-          <img src={AUTH_PHOTO} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: PHOTO_FOCUS }} />
-          {/* a light wash over the whole photo, then dark at the top for the logo and at the bottom for the words */}
-          <div className="absolute inset-0 bg-black/25" />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent via-35% to-black/90" />
+      <div className="relative hidden overflow-hidden bg-brand lg:flex lg:w-[45%]">
+        <div aria-hidden="true" className="absolute inset-0 z-0">
+          <img src={AUTH_PHOTO} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: PHOTO_FOCUS }} />
+          {/* the photo keeps its own colours under a hint of the brand's green; green only deepens at the top, behind the logo, and
+              across the lower part, behind the words */}
+          <div className="absolute inset-0 bg-brand/15" />
+          <div className="absolute inset-x-0 top-0 h-1/4 bg-gradient-to-b from-brand/70 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-brand/90 via-brand/65 via-50% to-transparent" />
+          {/* a warm glow low on the left, the brand's orange, and the mark drawn large like on the landing page's dark bands */}
+          <div className="absolute -bottom-48 -left-48 h-[560px] w-[560px] rounded-full bg-[radial-gradient(closest-side,rgb(var(--highlight)/0.2),transparent)]" />
+          <BrandMark outline className="absolute -right-64 -top-24 h-[560px] w-[560px] text-white/[0.1]" />
         </div>
 
-        <div className="relative z-10 w-full flex flex-col justify-between p-12 xl:p-16">
+        <div className="relative z-10 flex w-full flex-col justify-between p-12 xl:p-16">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center shadow-lg shadow-black/20">
-              <img src="/bloom-mark.png" alt="Company Logo" className="w-6 h-6 object-contain brightness-0 invert" />
-            </div>
-            <span className="text-white font-semibold text-2xl tracking-tight">Figbloom<span className="font-light text-white/80">HR</span></span>
+            <BrandMark className="h-9 w-9 text-white" />
+            <span className="text-2xl font-semibold tracking-[-0.02em] text-white">
+              Figbloom<span className="font-light text-white/70">HR</span>
+            </span>
           </div>
 
           <div className="mt-auto space-y-6 pb-8">
             <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
-              <h1 className="text-4xl xl:text-5xl font-semibold text-white leading-tight">
+              <h1 className="m-0 text-4xl font-semibold leading-[1.05] tracking-[-0.035em] text-white xl:text-5xl">
                 Automate Your <br />
-                <span className="text-white/70">Payroll & HR Workflows</span>
+                <span className="font-light text-white/70">Payroll & HR Workflows</span>
               </h1>
-              <p className="mt-4 text-white/75 text-xs max-w-md">
+              <p className="mt-4 max-w-md text-xs text-white/75">
                 Manage staff records, automate compensation, and handle branch operations with a single, unified business dashboard.
               </p>
             </motion.div>
 
             <div className="flex gap-12 pt-4">
               <div className="flex flex-col">
-                <span className="text-white font-bold text-2xl">99.9%</span>
-                <span className="text-white/60 text-xs uppercase tracking-widest font-bold">Uptime</span>
+                <span className="text-2xl font-bold text-white">99.9%</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-white/60">Uptime</span>
               </div>
               <div className="flex flex-col">
-                <span className="text-white font-bold text-2xl">24/7</span>
-                <span className="text-white/60 text-xs uppercase tracking-widest font-bold">Support</span>
+                <span className="text-2xl font-bold text-white">24/7</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-white/60">Support</span>
               </div>
             </div>
           </div>
 
-          <div className="text-white text-xs font-light">© 2026 Figbloom HR · Business edition</div>
+          <div className="text-xs font-light text-white/80">© 2026 Figbloom HR · Business edition</div>
         </div>
       </div>
 
-      {/* Right side - the form */}
-      <div className="w-full lg:w-[55%] flex items-center justify-center p-6 lg:p-12 relative bg-white">
+      {/* Right side - the form, on white with a faint wash of the brand's tint in the corner, as on the landing page */}
+      <div className="relative flex w-full items-center justify-center bg-white bg-[radial-gradient(70%_55%_at_100%_0%,rgb(var(--tint)/0.7),transparent_70%)] p-6 lg:w-[55%] lg:p-12">
         <div className="w-full max-w-[440px]">
           {/* Mobile Logo */}
-          <div className="lg:hidden text-center mb-10">
-            <div className="inline-flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
-                <img src="/bloom-mark.png" alt="Logo" className="w-5 h-5 object-contain brightness-0 invert" />
-              </div>
-              <span className="text-2xl font-semibold text-gray-900 tracking-tight">Figbloom<span className="font-light text-gray-500">HR</span></span>
+          <div className="mb-10 text-center lg:hidden">
+            <div className="inline-flex items-center gap-2.5">
+              <BrandMark className="h-9 w-9 text-brand" />
+              <span className="text-2xl font-semibold tracking-[-0.02em] text-ink">
+                Figbloom<span className="font-light text-ink/60">HR</span>
+              </span>
             </div>
           </div>
           {children}

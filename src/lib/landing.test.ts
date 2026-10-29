@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BUILT_IN, FAQ, HERO, LINKS, OUTCOMES, PAYROLL, SEO, SITE, WHY, allCopy, allFacts } from './landing';
+import { BUILT_IN, FAQ, HERO, LINKS, OUTCOMES, PAYROLL, PRICING, PRICING_QUESTION, SEO, SITE, WHY, allCopy, allFacts, group, kes } from './landing';
 
 // The landing page may only say what the product does. These tests keep it that way: every claim names the files that
 // show it (and the files must exist), and the words the owner ruled out cannot come back.
@@ -32,7 +32,8 @@ describe('what the landing page must never say', () => {
     ['an uptime or support-hours promise', /99\.9|24\s?\/\s?7|uptime|\bSLA\b|support hours/i],
     ['a certification or registration', /SOC\s?2|ISO\s?27001|certified|ODPC|penetration test/i],
     ['a statutory guarantee', /compliant|compliance|guarantee|accurate/i],
-    ['a price, plan or trial', /free trial|no credit card|per employee|per month|\bpricing (starts|from)\b|\bKES\s?\d/i],
+    // the one price the owner set is allowed (see the pricing tests below); a trial, a tier or a "from" price is not
+    ['a free trial, a plan or tier, or a "from" price', /free trial|no credit card|\bpricing (starts|from)\b|\bstarting (at|from)\b|\b(starter|enterprise|tiers?|plans)\b|\bfree (plan|forever|tier)\b/i],
     ['social proof that does not exist', /trusted by|testimonial|case stud|our customers|loved by|\d[\d,]*\+?\s+(customers|companies|clients|employees paid)/i],
     ['paying salaries from the app', /pay[^.]{0,40}\bfrom (the|inside the) app|pays? (your )?(staff|employees|salaries) (in|from) (the )?(app|figbloom)|send(s)? (your )?salar/i],
     ['the hidden Expenses module', /expense/i],
@@ -57,6 +58,40 @@ describe('what the landing page must never say', () => {
     expect(PAYROLL.steps.some((step) => /doesn't send the money/i.test(step.text.text))).toBe(true);
     const pay = FAQ.find((item) => /pay our staff/i.test(item.q));
     expect(pay?.a.text.startsWith('No.')).toBe(true);
+  });
+});
+
+// The owner set one price on 2026-10-29. Nothing in the product backs it (the app has no billing), so these tests are the
+// guard: the figures are the decided ones, they are the only amounts of money the page names, and the questions agree.
+describe('the price', () => {
+  it('is the one the owner set: KES 10,000 a month, plus KES 250 a month for each active employee', () => {
+    expect(PRICING.currency).toBe('KES');
+    expect(PRICING.monthly).toBe(10000);
+    expect(PRICING.perEmployee).toBe(250);
+  });
+
+  it('is the only amount of money the page names', () => {
+    const allowed = new Set([kes(PRICING.monthly), kes(PRICING.perEmployee)]);
+    const named = allCopy().flatMap((text) => text.match(/\bKES\s?[\d,]+(\.\d+)?/g) ?? []);
+    expect(named.length).toBeGreaterThan(0);
+    for (const amount of named) expect(allowed, amount).toContain(amount.replace(/\s+/, ' '));
+  });
+
+  it('is stated in full when someone asks what it costs', () => {
+    expect(PRICING_QUESTION.q).toMatch(/cost/i);
+    expect(PRICING_QUESTION.a).toContain(kes(PRICING.monthly));
+    expect(PRICING_QUESTION.a).toContain(kes(PRICING.perEmployee));
+    expect(PRICING_QUESTION.a).toMatch(/active employee/);
+  });
+
+  it('writes thousands with commas whatever the browser, and the slider starts inside its range', () => {
+    expect(group(10000)).toBe('10,000');
+    expect(group(250)).toBe('250');
+    expect(group(1234567)).toBe('1,234,567');
+    expect(kes(16250)).toBe('KES 16,250');
+    expect(PRICING.min).toBeGreaterThanOrEqual(1);
+    expect(PRICING.start).toBeGreaterThanOrEqual(PRICING.min);
+    expect(PRICING.start).toBeLessThanOrEqual(PRICING.max);
   });
 });
 
@@ -86,7 +121,8 @@ describe('contact and search text', () => {
   it('uses one address, in the link and in every sentence that gives it', () => {
     expect(LINKS.mail.startsWith(`mailto:${SITE.email}`)).toBe(true);
     const addresses = allCopy().flatMap((text) => text.match(/[\w.+-]+@[\w-]+\.[\w.]+/g) ?? []);
-    expect(new Set(addresses)).toEqual(new Set([SITE.email]));
+    // no sentence has to give it (the Talk to us section shows it), but any that does gives this one
+    for (const address of addresses) expect(address).toBe(SITE.email);
   });
 
   it('keeps the title and description a search result shows within their limits', () => {

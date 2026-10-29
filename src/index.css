@@ -389,7 +389,8 @@ html[data-page="dark"] .fb-loader { --fb-green: rgb(255 255 255); }
 
 /* ---------- Public landing page (pages/LandingPage.tsx, components/Landing) ---------- */
 /* One easing, a few durations (180ms for controls, 300ms for swaps, 600 to 800ms for entrances) and 70 to 90ms between
-   neighbours, so everything on the page moves alike. Only transform and opacity animate. Nothing loops. */
+   neighbours, so everything on the page moves alike. Transform and opacity animate, and the colour of a few small things
+   (a step's circle, a tick). Each motion plays once, on arrival or on a touch; nothing loops. */
 .lp { --lp-ease: cubic-bezier(0.16, 1, 0.3, 1); color-scheme: light; }
 
 .lp-skip { position: fixed; left: 12px; top: -72px; z-index: 100; padding: 12px 18px; border-radius: 12px; background: rgb(var(--brand)); color: #fff; font-weight: 600; transition: top .15s ease; }
@@ -405,12 +406,12 @@ html:has(.lp) { scroll-padding-top: calc(5rem * var(--ui-zoom, 1)); }
 .lp-header[data-scrolled='true'] { background: rgb(var(--surface) / 0.88); border-bottom-color: rgb(var(--line)); box-shadow: 0 12px 32px -26px rgba(22, 32, 26, 0.4); backdrop-filter: blur(16px) saturate(1.5); -webkit-backdrop-filter: blur(16px) saturate(1.5); }
 /* What the bar shows follows the bar's own width, not the screen's: with larger text (CSS zoom on #root) the screen's media
    queries still say "wide" while the bar has little room. The Sign in and Create buttons need about 640px, the full menu about
-   1100px; below that the phone menu holds what the bar cannot. (A browser without container queries gets the phone menu at
+   1160px (five links and the buttons need just over 1100px of bar, side gutters included); below that the phone menu holds what the bar cannot. (A browser without container queries gets the phone menu at
    every width, which works.) These sit after the utilities, so they win over the display a utility gives the same element. */
 .lp-bar { container-type: inline-size; }
 .lp-bar-nav, .lp-bar-actions { display: none; }
 @container (min-width: 640px) { .lp-bar-actions { display: inline-flex; } .lp-bar-panel-actions { display: none; } }
-@container (min-width: 1100px) { .lp-bar-nav { display: flex; } .lp-bar-burger, .lp-bar-panel { display: none; } }
+@container (min-width: 1160px) { .lp-bar-nav { display: flex; } .lp-bar-burger, .lp-bar-panel { display: none; } }
 /* a phone with the largest text leaves under 340px: the mark alone (the link still says "FigbloomHR, back to the top") */
 @container (max-width: 339px) { .lp-bar-word { display: none; } }
 /* Controls live in the components layer, so a utility on the same element (hidden, sm:inline-flex, !min-h-11) still wins
@@ -468,6 +469,28 @@ html:has(.lp) { scroll-padding-top: calc(5rem * var(--ui-zoom, 1)); }
 @container (max-width: 439px) { .lp-dash-aside { display: none; } }
 @container (max-width: 327px) { .lp-dash-stats { grid-template-columns: minmax(0, 1fr); } }
 
+/* the first screen: a wash of the brand's forest green (top right, behind the product) and orange (bottom left, behind the
+   buttons) over a tint that fades to the page colour. Both colours are the theme's own, so a different palette follows. */
+.lp-hero-wash {
+  background:
+    radial-gradient(58% 52% at 88% 10%, rgb(var(--brand) / 0.14), transparent 72%),
+    radial-gradient(44% 48% at 6% 92%, rgb(var(--highlight) / 0.13), transparent 74%),
+    linear-gradient(180deg, rgb(var(--tint) / 0.8) 0%, rgb(var(--page)) 80%);
+}
+/* gradient lettering: plain brand green wherever the browser cannot clip a background to text, and in forced colours */
+.lp-grad-text { color: rgb(var(--brand)); }
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .lp-grad-text {
+    background-image: linear-gradient(95deg, rgb(var(--brand)) 0%, rgb(46 125 80) 100%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+  }
+}
+@media (forced-colors: active) { .lp-grad-text { background: none; -webkit-text-fill-color: currentColor; color: inherit; } }
+/* the little dot in the first pill sends out one ring, once */
+.lp-ping { position: relative; }
+.lp-ping::after { content: ''; position: absolute; inset: 0; border-radius: 9999px; background: rgb(var(--highlight)); opacity: 0; animation: lp-ping 1.5s var(--lp-ease) 1s backwards; }
+@keyframes lp-ping { from { transform: scale(1); opacity: 0.55; } to { transform: scale(5); opacity: 0; } }
+
 /* the hero photo drifts up a little as the page scrolls: only where the browser can do it without a script */
 @keyframes lp-parallax { to { transform: translate3d(0, -44px, 0); } }
 @supports (animation-timeline: scroll()) {
@@ -476,13 +499,101 @@ html:has(.lp) { scroll-padding-top: calc(5rem * var(--ui-zoom, 1)); }
   }
 }
 
+/* How it works (HowItWorks.tsx): the steps light one after another as they come into view. The page sets data-lit on a step
+   only while it is animating, "off" until its turn and "on" after; a step without it is simply finished, so the rest of
+   these rules never apply for a visitor who asks for less motion or has no IntersectionObserver. The base style of every
+   piece is its finished look, and the "off" rules take it back to the start. */
+.lp-step[data-lit] .lp-dot { transition: background-color .5s ease, color .5s ease; }
+.lp-step[data-lit='off'] .lp-dot { background-color: rgb(var(--page)); color: rgb(var(--brand)); }
+.lp-step[data-lit='on'] .lp-dot { animation: lp-ring 1.1s var(--lp-ease); }
+@keyframes lp-ring { from { box-shadow: 0 0 0 0 rgb(var(--brand) / 0.4); } to { box-shadow: 0 0 0 16px rgb(var(--brand) / 0); } }
+.lp-step[data-lit] .lp-step-body { transition: opacity .7s var(--lp-ease), transform .7s var(--lp-ease); }
+.lp-step[data-lit='off'] .lp-step-body { opacity: 0.4; transform: translate3d(0, 10px, 0); }
+.lp-reach, .lp-reach-down { transition: transform .9s var(--lp-ease); }
+.lp-reach-down[data-next='off'] { transform: scaleY(0); }
+/* the little picture of each step: lines arrive, a name is typed (a wipe in as many steps as it has letters), a pending
+   chip gives way to an approved one, ticks fill in. --d is how long after the step lights each one starts. */
+.lp-step[data-lit='off'] .lp-s { opacity: 0; }
+.lp-step[data-lit='on'] .lp-s { animation: lp-arrive .6s var(--lp-ease) var(--d, 0s) backwards; }
+@keyframes lp-arrive { from { opacity: 0; transform: translate3d(0, 8px, 0) scale(0.97); } }
+.lp-step[data-lit='off'] .lp-wipe { clip-path: inset(0 100% 0 0); }
+.lp-step[data-lit='on'] .lp-wipe { animation: lp-wipe 1s steps(var(--n, 16), end) var(--d, 0s) backwards; }
+@keyframes lp-wipe { from { clip-path: inset(0 100% 0 0); } }
+.lp-flip-out { opacity: 0; }
+.lp-step[data-lit='on'] .lp-flip-out { animation: lp-flip-out .35s ease var(--d, 0s) backwards; }
+@keyframes lp-flip-out { from { opacity: 1; } to { opacity: 0; } }
+.lp-step[data-lit='on'] .lp-flip-in { animation: lp-flip-in .4s var(--lp-ease) var(--d, 0s) backwards; }
+@keyframes lp-flip-in { from { opacity: 0; transform: translate3d(0, 6px, 0); } }
+.lp-step[data-lit='off'] .lp-tick { transform: scale(0.6); background-color: transparent; color: transparent; box-shadow: inset 0 0 0 1.5px rgb(var(--line-strong)); }
+.lp-step[data-lit='on'] .lp-tick { animation: lp-tick .5s var(--lp-ease) var(--d, 0s) backwards; }
+@keyframes lp-tick { from { transform: scale(0.6); background-color: transparent; color: transparent; box-shadow: inset 0 0 0 1.5px rgb(var(--line-strong)); } }
+
+/* the price estimator: a slider in the brand's colours, and a bar that shows the company's share of the total */
+.lp-range { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 44px; margin: 0; background: transparent; cursor: pointer; border-radius: 12px; }
+.lp-range:focus-visible { outline: 2px solid rgb(var(--brand)); outline-offset: 4px; }
+.lp-range::-webkit-slider-runnable-track { height: 6px; border-radius: 9999px; background: linear-gradient(to right, rgb(var(--brand)) var(--fill, 0%), rgb(var(--line)) var(--fill, 0%)); }
+.lp-range::-moz-range-track { height: 6px; border-radius: 9999px; background: rgb(var(--line)); }
+.lp-range::-moz-range-progress { height: 6px; border-radius: 9999px; background: rgb(var(--brand)); }
+.lp-range::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; margin-top: -9px; border-radius: 9999px; background: #fff; border: 2px solid rgb(var(--brand)); box-shadow: 0 6px 14px -4px rgba(23, 64, 42, 0.5); transition: transform .18s var(--lp-ease); }
+.lp-range::-moz-range-thumb { width: 20px; height: 20px; border-radius: 9999px; background: #fff; border: 2px solid rgb(var(--brand)); box-shadow: 0 6px 14px -4px rgba(23, 64, 42, 0.5); }
+.lp-range:hover::-webkit-slider-thumb { transform: scale(1.1); }
+.lp-range:active::-webkit-slider-thumb { transform: scale(1.18); }
+.lp-bar-fill { transition: transform .45s var(--lp-ease); }
+
+/* a soft light follows the mouse across an element marked data-spot (hooks.ts, useSpotlight): only where there is a mouse */
+.lp [data-spot] { position: relative; isolation: isolate; }
+@media (hover: hover) and (pointer: fine) {
+  .lp [data-spot]::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; opacity: 0; background: radial-gradient(360px circle at var(--mx, 50%) var(--my, 50%), rgb(var(--brand) / 0.09), transparent 65%); transition: opacity .35s ease; }
+  .lp [data-spot]:hover::before { opacity: 1; }
+}
+
+/* the main button gives a light sweep when the mouse arrives */
+@layer components {
+  .lp-btn-primary { position: relative; overflow: hidden; isolation: isolate; }
+  @media (hover: hover) and (pointer: fine) {
+    .lp-btn-primary::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.22) 50%, transparent 65%); transform: translateX(-120%); transition: transform .8s var(--lp-ease); }
+    .lp-btn-primary:hover::after { transform: translateX(120%); }
+  }
+}
+
+/* a photograph settles into its frame as it is revealed (it starts a little large) */
+.lp [data-reveal-state='pending'] .lp-zoom { transform: scale(1.09); }
+.lp [data-reveal-state='shown'] .lp-zoom { transform: none; transition: transform 1.6s var(--lp-ease) var(--lp-delay, 0s); }
+
+/* the big outline marks drift and turn a little as their section passes: only where the browser can do it without a script */
+@keyframes lp-drift { from { translate: 0 70px; rotate: -5deg; } to { translate: 0 -70px; rotate: 5deg; } }
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    html:not([data-a11y-reduce-motion]) .lp-drift { animation: lp-drift linear both; animation-timeline: view(); }
+  }
+}
+
 /* less motion, from the operating system or from the app's own switch: everything simply is where it ends up */
 @media (prefers-reduced-motion: reduce) {
   .lp-rise, .lp-float, .lp-swap, .lp-open, .lp-pop { animation: none; }
+  .lp-ping::after { animation: none; }
   .lp [data-reveal-state] { opacity: 1; transform: none; transition: none; }
+  .lp [data-reveal-state] .lp-zoom { transform: none; transition: none; }
   .lp-btn, .lp-btn-arrow, .lp-tab, .lp .transition-transform { transition: none; }
   .lp-btn:hover, .lp-btn:active, .lp-btn:hover .lp-btn-arrow { transform: none; }
+  .lp-btn-primary::after, .lp [data-spot]::before { display: none; }
+  .lp-dot, .lp-step-body, .lp-reach, .lp-reach-down, .lp-bar-fill, .lp-range::-webkit-slider-thumb { transition: none; }
+  .lp-step[data-lit] .lp-dot, .lp-step[data-lit] .lp-s, .lp-step[data-lit] .lp-wipe, .lp-step[data-lit] .lp-flip-in, .lp-step[data-lit] .lp-flip-out, .lp-step[data-lit] .lp-tick { animation: none; }
+  .lp-step[data-lit='off'] .lp-dot { background-color: rgb(var(--brand)); color: #fff; }
+  .lp-step[data-lit='off'] .lp-step-body, .lp-step[data-lit='off'] .lp-s { opacity: 1; transform: none; }
+  .lp-step[data-lit='off'] .lp-wipe { clip-path: none; }
+  .lp-step[data-lit='off'] .lp-tick { transform: none; background-color: rgb(var(--brand)); color: #fff; box-shadow: none; }
+  .lp-reach-down[data-next='off'] { transform: none; }
 }
 html[data-a11y-reduce-motion] .lp-rise, html[data-a11y-reduce-motion] .lp-float, html[data-a11y-reduce-motion] .lp-swap, html[data-a11y-reduce-motion] .lp-open, html[data-a11y-reduce-motion] .lp-pop { animation: none !important; }
+html[data-a11y-reduce-motion] .lp-ping::after { animation: none !important; }
 html[data-a11y-reduce-motion] .lp [data-reveal-state] { opacity: 1 !important; transform: none !important; }
+html[data-a11y-reduce-motion] .lp [data-reveal-state] .lp-zoom { transform: none !important; transition: none !important; }
 html[data-a11y-reduce-motion] .lp-btn:hover, html[data-a11y-reduce-motion] .lp-btn:active, html[data-a11y-reduce-motion] .lp-btn:hover .lp-btn-arrow { transform: none; }
+html[data-a11y-reduce-motion] .lp-btn-primary::after, html[data-a11y-reduce-motion] .lp [data-spot]::before { display: none; }
+html[data-a11y-reduce-motion] .lp-step[data-lit] .lp-dot, html[data-a11y-reduce-motion] .lp-step[data-lit] .lp-s, html[data-a11y-reduce-motion] .lp-step[data-lit] .lp-wipe, html[data-a11y-reduce-motion] .lp-step[data-lit] .lp-flip-in, html[data-a11y-reduce-motion] .lp-step[data-lit] .lp-flip-out, html[data-a11y-reduce-motion] .lp-step[data-lit] .lp-tick { animation: none !important; }
+html[data-a11y-reduce-motion] .lp-step[data-lit='off'] .lp-dot { background-color: rgb(var(--brand)) !important; color: #fff !important; }
+html[data-a11y-reduce-motion] .lp-step[data-lit='off'] .lp-step-body, html[data-a11y-reduce-motion] .lp-step[data-lit='off'] .lp-s { opacity: 1 !important; transform: none !important; }
+html[data-a11y-reduce-motion] .lp-step[data-lit='off'] .lp-wipe { clip-path: none !important; }
+html[data-a11y-reduce-motion] .lp-step[data-lit='off'] .lp-tick { transform: none !important; background-color: rgb(var(--brand)) !important; color: #fff !important; box-shadow: none !important; }
+html[data-a11y-reduce-motion] .lp-reach-down[data-next='off'] { transform: none !important; }

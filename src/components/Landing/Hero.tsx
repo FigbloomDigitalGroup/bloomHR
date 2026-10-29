@@ -21,22 +21,29 @@ export default function Hero() {
   return (
     <Section id="top" labelledBy="hero-title" className="pb-16 pt-28 sm:pb-20 sm:pt-32 lg:pb-28 lg:pt-36">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+        <div className="lp-hero-wash absolute inset-0" />
         <div className="absolute -right-48 -top-48 h-[760px] w-[760px] rounded-full bg-[radial-gradient(closest-side,rgb(var(--tint)),transparent)]" />
         <BrandMark outline className="absolute -right-36 top-4 hidden h-[640px] w-[640px] text-brand/[0.1] lg:block" />
       </div>
 
       <Container className="relative grid items-center gap-14 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:gap-6">
         <div>
-          <p className="lp-rise m-0 inline-flex items-center gap-2 rounded-pill border border-border bg-white/80 px-3.5 py-1.5 text-[12.5px] font-semibold text-ink backdrop-blur" style={delay(0)}>
-            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-orange" />
-            {HERO.eyebrow}
+          {/* a hairline that runs from forest green to orange around the pill, a soft lift under it, and one ring from the dot */}
+          <p
+            className="lp-rise m-0 inline-flex rounded-pill bg-[linear-gradient(110deg,rgb(var(--brand)/0.5),rgb(var(--line))_48%,rgb(var(--highlight)/0.75))] p-px shadow-[0_12px_30px_-14px_rgba(23,64,42,0.55)]"
+            style={delay(0)}
+          >
+            <span className="inline-flex items-center gap-2.5 rounded-pill bg-white/95 px-4 py-2 text-[13px] font-semibold text-ink backdrop-blur">
+              <span aria-hidden="true" className="lp-ping h-1.5 w-1.5 rounded-full bg-orange" />
+              {HERO.eyebrow}
+            </span>
           </p>
           <h1
             id="hero-title"
             className="lp-rise m-0 mt-6 text-[clamp(2.6rem,1.3rem+5.4vw,5rem)] font-semibold leading-[1] tracking-[-0.04em] text-ink lg:text-[3.75rem] xl:text-[4.5rem] min-[1440px]:text-[5rem] min-[1800px]:text-[5.75rem]"
             style={delay(80)}
           >
-            {HERO.lead} <span className="font-light text-ink/55">{HERO.tail}</span>
+            {HERO.lead} <span className="lp-grad-text font-light">{HERO.tail}</span>
           </h1>
           <p className="lp-rise m-0 mt-6 max-w-[30rem] text-[clamp(1.05rem,1rem+0.3vw,1.2rem)] leading-relaxed text-gray-600" style={delay(160)}>
             <span className="font-semibold text-ink">{HERO.problem}</span> {HERO.text}

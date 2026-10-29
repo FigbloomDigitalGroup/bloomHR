@@ -11,7 +11,7 @@ import { ModuleListCard } from './previews/Cards';
 export default function FinalCta() {
   return (
     <Section labelledBy="final-title" tone="brand" className="py-20 sm:py-28">
-      <BrandMark outline className="pointer-events-none absolute -left-40 top-1/2 h-[760px] w-[760px] -translate-y-1/2 text-white/[0.07]" />
+      <BrandMark outline className="lp-drift pointer-events-none absolute -left-40 top-1/2 h-[760px] w-[760px] -translate-y-1/2 text-white/[0.07]" />
       <Container className="relative grid items-center gap-12 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-16">
         <div data-reveal>
           <h2 id="final-title" className="m-0 text-[clamp(2.2rem,1.2rem+4vw,4.4rem)] font-semibold leading-[1.02] tracking-[-0.035em]">

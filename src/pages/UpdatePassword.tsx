@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import ShowPasswordButton from '../components/UI/ShowPasswordButton';
 import { Check, X, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import AuthShell, { AuthButton } from '../components/Company/AuthShell';
+import { authInput, authInputOpen, authLabel } from '../components/Auth/authStyles';
 import { LoaderBlock } from '../components/UI/FigbloomLoader';
 
 /** How long to wait for the sign-in client to read a link before deciding it did not work. */
@@ -277,13 +278,13 @@ const UpdatePasswordPage = ({ waitMs = LINK_WAIT_MS }: { waitMs?: number }) => {
             </div>
           ) : (
             <form onSubmit={sendNewLink} className="space-y-3">
-              <label htmlFor="resend-email" className="block text-xs font-bold text-gray-500 ml-1">Your email</label>
+              <label htmlFor="resend-email" className={`block ${authLabel}`}>Your email</label>
               <input
                 id="resend-email"
                 type="email"
                 placeholder="name@company.com"
                 autoComplete="email"
-                className="block w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:border-gray-900 focus:ring-gray-900"
+                className={authInputOpen}
                 value={resendEmail}
                 onChange={(e) => setResendEmail(e.target.value)}
                 required
@@ -304,20 +305,20 @@ const UpdatePasswordPage = ({ waitMs = LINK_WAIT_MS }: { waitMs?: number }) => {
 
   const allMet = Object.values(passwordStrength).every(v => v);
   const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
-  const input = 'block w-full px-4 py-3 pr-11 bg-gray-50 border rounded-lg text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 transition-all hover:border-gray-300';
+  const input = `${authInput} bg-white pr-11 hover:border-gray-300`;
 
   return (
     <AuthShell title="Set a new password" subtitle="Choose a strong password for your account.">
       <form onSubmit={handlePasswordUpdate} className="space-y-6">
         <div className="space-y-1.5">
-          <label htmlFor="new-password" className="block text-xs font-bold text-gray-500 ml-1">New password</label>
+          <label htmlFor="new-password" className={`block ${authLabel}`}>New password</label>
           <div className="relative">
             <input
               id="new-password"
               type={showPassword ? 'text' : 'password'}
               placeholder="Enter new password"
               autoComplete="new-password"
-              className={`${input} border-gray-200 focus:border-gray-900 focus:ring-gray-900`}
+              className={input}
               value={password}
               autoFocus
               onChange={(e) => { setPassword(e.target.value); validate(e.target.value); }}
@@ -339,7 +340,7 @@ const UpdatePasswordPage = ({ waitMs = LINK_WAIT_MS }: { waitMs?: number }) => {
         )}
 
         <div className="space-y-1.5">
-          <label htmlFor="confirm-password" className="block text-xs font-bold text-gray-500 ml-1">Confirm password</label>
+          <label htmlFor="confirm-password" className={`block ${authLabel}`}>Confirm password</label>
           <div className="relative">
             <input
               id="confirm-password"
@@ -348,10 +349,10 @@ const UpdatePasswordPage = ({ waitMs = LINK_WAIT_MS }: { waitMs?: number }) => {
               autoComplete="new-password"
               className={`${input} ${
                 passwordsMatch
-                  ? 'border-green-400 focus:border-green-600 focus:ring-green-600'
+                  ? 'border-green-400 focus:border-green-600 focus:ring-green-600/20'
                   : confirmPassword && !passwordsMatch
                     ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                    : 'border-gray-200 focus:border-gray-900 focus:ring-gray-900'
+                    : ''
               }`}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}

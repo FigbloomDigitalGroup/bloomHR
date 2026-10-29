@@ -17,6 +17,7 @@ export default function Why() {
               key={point.title}
               className="grid gap-x-16 gap-y-3 border-t border-border py-7 last:border-b sm:py-9 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]"
               data-reveal
+              data-spot
               style={{ '--lp-delay': `${index * 70}ms` } as CSSProperties}
             >
               <h3 className="m-0 flex items-baseline gap-4 text-[clamp(1.35rem,1.05rem+1vw,1.9rem)] font-semibold leading-tight tracking-[-0.025em]">
