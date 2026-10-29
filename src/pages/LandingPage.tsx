@@ -6,12 +6,13 @@ import Faq from '../components/Landing/Faq';
 import Features from '../components/Landing/Features';
 import FinalCta from '../components/Landing/FinalCta';
 import Hero from '../components/Landing/Hero';
-import { jumpTo, useReduceMotion, useRevealOnScroll } from '../components/Landing/hooks';
+import { jumpTo, useReduceMotion, useRevealOnScroll, useSpotlight } from '../components/Landing/hooks';
 import HowItWorks from '../components/Landing/HowItWorks';
 import LandingFooter from '../components/Landing/LandingFooter';
 import LandingHeader from '../components/Landing/LandingHeader';
 import Outcomes from '../components/Landing/Outcomes';
 import PayrollBand from '../components/Landing/PayrollBand';
+import Pricing from '../components/Landing/Pricing';
 import Roles from '../components/Landing/Roles';
 import TalkToUs from '../components/Landing/TalkToUs';
 import { Security } from '../components/Landing/Trust';
@@ -49,6 +50,7 @@ export default function LandingPage() {
   const root = useRef<HTMLDivElement>(null);
   useDocumentHead();
   useRevealOnScroll(root, reduce);
+  useSpotlight(root, reduce);
 
   // the page is drawn after the browser has looked for "#faq" and found nothing: go there now
   useEffect(() => {
@@ -75,6 +77,7 @@ export default function LandingPage() {
           <HowItWorks />
           <Roles />
           <Security />
+          <Pricing />
           <TalkToUs />
           <Faq />
           <FinalCta />

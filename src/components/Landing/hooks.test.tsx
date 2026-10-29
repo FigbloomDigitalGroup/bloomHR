@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { act, cleanup, render, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { A11Y_CHANGED } from '../../lib/a11y';
-import { useReduceMotion, useRevealOnScroll, useScrolled } from './hooks';
+import { useReduceMotion, useRevealOnScroll, useScrolled, useSeen, useSpotlight, useStepSequence, useTween } from './hooks';
 
 // jsdom has no layout, no IntersectionObserver and no matchMedia: these tests give the hooks stand-ins and play the
 // browser's part, so what they do when the browser speaks can be checked.
@@ -192,5 +192,235 @@ describe('asking for less motion', () => {
   it('works in a browser with no matchMedia at all', () => {
     const { result } = renderHook(() => useReduceMotion());
     expect(result.current).toBe(false);
+  });
+});
+
+describe('lighting steps one after another', () => {
+  function Steps({ reduce }: { reduce: boolean }) {
+    const root = useRef<HTMLOListElement>(null);
+    const { lit, live } = useStepSequence(root, 3, reduce, 800);
+    return (
+      <ol ref={root} data-testid="list" data-lit={lit} data-live={String(live)}>
+        {[0, 1, 2].map((i) => (
+          <li key={i} data-step={i} data-testid={`step${i}`} />
+        ))}
+      </ol>
+    );
+  }
+  const lit = (el: HTMLElement) => Number(el.dataset.lit);
+  const arrive = (get: (id: string) => HTMLElement, ...indexes: number[]) =>
+    act(() => watchers[0].callback(indexes.map((i) => ({ isIntersecting: true, target: get(`step${i}`) }))));
+  const wait = (ms: number) => act(() => void vi.advanceTimersByTime(ms));
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('starts with nothing lit, then lights steps that arrive together in turn', () => {
+    const { getByTestId } = render(<Steps reduce={false} />);
+    const list = getByTestId('list');
+    expect(lit(list)).toBe(0);
+    expect(list.dataset.live).toBe('true');
+
+    arrive(getByTestId, 0, 1, 2);
+    expect(lit(list)).toBe(0);
+    wait(250);
+    expect(lit(list)).toBe(1);
+    wait(799);
+    expect(lit(list)).toBe(1);
+    wait(1);
+    expect(lit(list)).toBe(2);
+    wait(800);
+    expect(lit(list)).toBe(3);
+    wait(5000);
+    expect(lit(list)).toBe(3);
+  });
+
+  it('never lights a step before the one ahead of it, however early it arrives', () => {
+    const { getByTestId } = render(<Steps reduce={false} />);
+    const list = getByTestId('list');
+    arrive(getByTestId, 2);
+    wait(5000);
+    expect(lit(list)).toBe(0);
+    arrive(getByTestId, 0);
+    wait(250);
+    expect(lit(list)).toBe(1);
+    wait(5000);
+    expect(lit(list)).toBe(1);
+    arrive(getByTestId, 1);
+    wait(800);
+    expect(lit(list)).toBe(2);
+    wait(800);
+    expect(lit(list)).toBe(3);
+  });
+
+  it('stops watching and waiting when the page goes', () => {
+    const { getByTestId, unmount } = render(<Steps reduce={false} />);
+    arrive(getByTestId, 0);
+    unmount();
+    expect(watchers[0].disconnected).toBe(true);
+    expect(() => wait(5000)).not.toThrow();
+  });
+
+  it('lights every step at once, and watches nothing, when the visitor wants less motion', () => {
+    const { getByTestId } = render(<Steps reduce />);
+    expect(lit(getByTestId('list'))).toBe(3);
+    expect(getByTestId('list').dataset.live).toBe('false');
+    expect(watchers).toHaveLength(0);
+  });
+
+  it('lights every step where there is no IntersectionObserver', () => {
+    vi.stubGlobal('IntersectionObserver', undefined);
+    const { getByTestId } = render(<Steps reduce={false} />);
+    expect(lit(getByTestId('list'))).toBe(3);
+    expect(getByTestId('list').dataset.live).toBe('false');
+  });
+});
+
+describe('knowing that something has been on screen', () => {
+  function Mark({ reduce }: { reduce: boolean }) {
+    const ref = useRef<HTMLDivElement>(null);
+    return <div ref={ref} data-testid="mark" data-seen={String(useSeen(ref, reduce))} />;
+  }
+
+  it('turns true when it arrives, and watches no more', () => {
+    const { getByTestId } = render(<Mark reduce={false} />);
+    expect(getByTestId('mark').dataset.seen).toBe('false');
+    act(() => watchers[0].callback([{ isIntersecting: false, target: getByTestId('mark') }]));
+    expect(getByTestId('mark').dataset.seen).toBe('false');
+    act(() => watchers[0].callback([{ isIntersecting: true, target: getByTestId('mark') }]));
+    expect(getByTestId('mark').dataset.seen).toBe('true');
+    expect(watchers[0].disconnected).toBe(true);
+  });
+
+  it('is true from the start when the visitor wants less motion or the browser cannot tell', () => {
+    expect(render(<Mark reduce />).getByTestId('mark').dataset.seen).toBe('true');
+    cleanup();
+    vi.stubGlobal('IntersectionObserver', undefined);
+    expect(render(<Mark reduce={false} />).getByTestId('mark').dataset.seen).toBe('true');
+  });
+});
+
+describe('a number that runs to its target', () => {
+  let frames: ((now: number) => void)[] = [];
+  let clock = 0;
+  const tick = (to: number) =>
+    act(() => {
+      clock = to;
+      const pending = frames;
+      frames = [];
+      pending.forEach((fn) => fn(to));
+    });
+
+  beforeEach(() => {
+    frames = [];
+    clock = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => clock);
+    vi.stubGlobal('requestAnimationFrame', (fn: (now: number) => void) => frames.push(fn));
+    vi.stubGlobal('cancelAnimationFrame', () => {
+      frames = [];
+    });
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('starts on its target, runs to a new one, and ends exactly on it', () => {
+    const { result, rerender } = renderHook(({ target }) => useTween(target, false, 400), { initialProps: { target: 100 } });
+    expect(result.current).toBe(100);
+
+    rerender({ target: 200 });
+    tick(0);
+    expect(result.current).toBe(100);
+    tick(200);
+    expect(result.current).toBeGreaterThan(150);
+    expect(result.current).toBeLessThan(200);
+    tick(400);
+    expect(result.current).toBe(200);
+    tick(800);
+    expect(result.current).toBe(200);
+  });
+
+  it('turns round from where it is when the target changes in mid-run', () => {
+    const { result, rerender } = renderHook(({ target }) => useTween(target, false, 400), { initialProps: { target: 0 } });
+    rerender({ target: 100 });
+    tick(0);
+    tick(200);
+    expect(result.current).toBeGreaterThan(0);
+    rerender({ target: 0 });
+    tick(200);
+    tick(600);
+    expect(result.current).toBe(0);
+  });
+
+  it('is simply the target when the visitor wants less motion', () => {
+    const { result, rerender } = renderHook(({ target }) => useTween(target, true), { initialProps: { target: 100 } });
+    rerender({ target: 300 });
+    expect(result.current).toBe(300);
+    expect(frames).toHaveLength(0);
+  });
+});
+
+describe('a light that follows the mouse', () => {
+  function Card({ reduce }: { reduce: boolean }) {
+    const root = useRef<HTMLDivElement>(null);
+    useSpotlight(root, reduce);
+    return (
+      <div ref={root}>
+        <div data-spot data-testid="card">
+          <span data-testid="inner">text</span>
+        </div>
+        <p data-testid="plain">no light here</p>
+      </div>
+    );
+  }
+  const move = (el: Element, pointerType: string, x = 30, y = 20) => {
+    const event = new Event('pointermove', { bubbles: true });
+    Object.assign(event, { pointerType, clientX: x, clientY: y });
+    act(() => void el.dispatchEvent(event));
+  };
+
+  beforeEach(() => {
+    vi.stubGlobal('requestAnimationFrame', (fn: () => void) => {
+      fn();
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+    placeElements(() => 5);
+  });
+
+  it('puts the light where the mouse is, measured from the card and also from something inside it', () => {
+    const { getByTestId } = render(<Card reduce={false} />);
+    move(getByTestId('inner'), 'mouse');
+    // the stand-in layout puts every box at left 0, top 5
+    expect(getByTestId('card').style.getPropertyValue('--mx')).toBe('30px');
+    expect(getByTestId('card').style.getPropertyValue('--my')).toBe('15px');
+  });
+
+  it('divides by the page zoom, so larger text does not push the light off the pointer', () => {
+    const { getByTestId } = render(<Card reduce={false} />);
+    const card = getByTestId('card');
+    // drawn 100 wide but laid out 50 wide: the page is zoomed to 200%
+    card.getBoundingClientRect = () => ({ top: 0, left: 10, width: 100, height: 100, right: 110, bottom: 100, x: 10, y: 0, toJSON: () => ({}) }) as DOMRect;
+    Object.defineProperty(card, 'offsetWidth', { value: 50, configurable: true });
+    move(card, 'mouse', 50, 40);
+    expect(card.style.getPropertyValue('--mx')).toBe('20px');
+    expect(card.style.getPropertyValue('--my')).toBe('20px');
+  });
+
+  it('ignores a finger and a pen, anything that is not a card, and a visitor who wants less motion', () => {
+    const { getByTestId, unmount } = render(<Card reduce={false} />);
+    move(getByTestId('inner'), 'touch');
+    move(getByTestId('inner'), 'pen');
+    move(getByTestId('plain'), 'mouse');
+    expect(getByTestId('card').style.getPropertyValue('--mx')).toBe('');
+    unmount();
+
+    const calm = render(<Card reduce />);
+    move(calm.getByTestId('inner'), 'mouse');
+    expect(calm.getByTestId('card').style.getPropertyValue('--mx')).toBe('');
   });
 });

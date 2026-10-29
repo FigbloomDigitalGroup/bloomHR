@@ -24,9 +24,9 @@ export function SampleTag({ className = '' }: { className?: string }) {
 }
 
 /** The surface every preview sits on: the app's card, with a soft lift. */
-export function Panel({ className = '', children }: { className?: string; children: ReactNode }) {
+export function Panel({ className = '', spot = false, children }: { className?: string; /** a soft light follows the mouse across it (useSpotlight) */ spot?: boolean; children: ReactNode }) {
   return (
-    <div className={`rounded-card border border-border bg-white shadow-[0_1px_0_rgba(22,32,26,0.04),0_22px_48px_-28px_rgba(22,32,26,0.35)] ${className}`}>{children}</div>
+    <div data-spot={spot || undefined} className={`rounded-card border border-border bg-white shadow-[0_1px_0_rgba(22,32,26,0.04),0_22px_48px_-28px_rgba(22,32,26,0.35)] ${className}`}>{children}</div>
   );
 }
 

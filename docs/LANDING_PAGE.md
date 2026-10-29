@@ -22,8 +22,9 @@ query or hash, so they still reach the app.
 
 All the words are in `src/lib/landing.ts`. Every sentence about what the product does is a `Fact`: the sentence and the
 files that show it. `src/lib/landing.test.ts` opens those files, and refuses wording the owner ruled out (uptime or
-certification claims, "compliant", prices or trials, paying salaries from the app, made-up numbers, and more). If a
-feature is renamed or removed, the test fails and the sentence has to be looked at.
+certification claims, "compliant", a free trial, plans or tiers, any amount of money but the one price (below), paying
+salaries from the app, made-up numbers, and more). If a feature is renamed or removed, the test fails and the sentence
+has to be looked at.
 
 Product screens on the page are drawn from the app's own components and menu text, with made-up people, labelled
 "Sample data". The sample payslip's figures come from the Kenyan payroll engine and are re-checked by
@@ -60,12 +61,55 @@ A visitor wants three things: what problem this solves, what it offers, and why 
   gain real proof (named customers who agree to it, a measured result, a certificate), add it as data with its source
   and the test list can be adjusted on purpose.
 
+### Pricing
+
+One price, set by the owner on 2026-10-29: **KES 10,000 a month for the company, plus KES 250 a month for each active
+employee** (read as a monthly base plus a monthly rate per head; if the owner meant something else, change `PRICING` in
+`src/lib/landing.ts`). It is data, not a claim about the product, so it has no evidence files. The Pricing section
+(`Pricing.tsx`) shows the two figures and a slider to try a headcount (1 to 500 only because a slider needs an end; it is
+not a limit on companies), the "What does it cost?" answer repeats them, and the Terms' Fees section (`legal.ts`) states
+them for the lawyer. All three read `PRICING`, so there is one place to change. `landing.test.ts` pins the figures and fails
+if the page names any other amount, a free trial, a plan or a tier.
+
+What the page does **not** say, because nobody has decided it: whether VAT is included, what counts as an "active
+employee", how and when the fee is invoiced, any minimum term, a free trial. The app has no billing (`tenants.plan` is only
+a label, and new companies are labelled `trial`), so nothing is charged by the app: someone invoices by hand. The Terms keep
+a `[[PAYMENT TERMS ...]]` placeholder for these.
+
+## Motion
+
+Everything that moves is decoration: the words and pictures are on the page without it. Each motion plays once, on arrival
+or on a touch, and nothing loops (the rule is written at the top of the landing section of `src/index.css`). A visitor who
+asks for less motion (the operating system setting or the app's own Accessibility switch), a browser without
+`IntersectionObserver`, or a page without scripts gets every piece in its finished state: the hooks in
+`src/components/Landing/hooks.ts` return the finished state, and the CSS keeps a matching fallback for both switches.
+
+- **Entrances.** Anything marked `data-reveal` fades and lifts when it scrolls into view (`useRevealOnScroll`). Photographs
+  also settle from slightly large (`.lp-zoom`, inside a revealing element).
+- **How it works** (`HowItWorks.tsx`). The four steps light one after another as they come into view
+  (`useStepSequence`): the circle fills, the line runs on to it, and a small picture of the step draws itself (a name
+  typed, branches placed, people approved, the month ticked off). Steps that arrive together play in turn; on a phone each
+  lights as it is reached, never before the one ahead. Unlit steps are only dimmed. A step carries `data-lit="on|off"` only
+  while the page is animating; without it the step is finished. The pictures are made-up names labelled "Sample data".
+- **Pricing.** The total runs to its new figure when the slider moves (`useTween`), and the bar shows the company's share.
+  Screen readers get the finished figure and the slider's own value text, not the running number.
+- **Payslip.** Net pay runs up to its figure the first time the payslip is on screen (`useSeen`, `useTween`); the label for
+  screen readers always has the real one.
+- **Light under the mouse.** Rows and cards marked `data-spot` get a soft glow that follows a real mouse (`useSpotlight`;
+  not a finger or a pen). The position is divided by the page zoom, or larger text would put it off the pointer.
+- **Small ones.** The main button sweeps a light across on hover; the big outline marks in the payroll band and the closing
+  section drift as their section passes (CSS scroll timelines, where the browser has them); the hero photograph rises a
+  little as the page scrolls.
+
+When you add motion: animate transform and opacity (colour only on something tiny), play it once, give it a finished state
+that needs no script, and check it with Reduce motion on.
+
 ## Larger text
 
 The Accessibility button sets a text size by zooming the whole page (CSS `zoom`), and the screen's media queries (`md:`,
 `lg:`) do not notice: a 1280px screen at 150% text has 853px of room but still says "wide". So the parts that must not
 overflow follow their own width instead, with container queries in `src/index.css`: the top bar (`.lp-bar`: full menu from
-1100px, the Sign in and Create buttons from 640px, the wordmark under 340px) and the dashboard in the first screen
+1160px, the Sign in and Create buttons from 640px, the wordmark under 340px) and the dashboard in the first screen
 (`.lp-cq`). When you add a row that cannot wrap (a button, a table, a fixed-width card), check it at 150% text.
 
 ## Large screens
@@ -102,7 +146,7 @@ Drafts for a lawyer, in `src/lib/legal.ts`. Everything only the company knows is
 and the data the policy names were re-checked against the code on 2026-10-28 (third-party hosts, environment variables,
 the mailbox feature, the M-Pesa and bank payout code). Hosting in Frankfurt (Supabase eu-central-1) comes from FIG-836;
 nothing in the repository sets it, nor the region of the Vercel functions. To go live: fill in
-every placeholder, get them approved, set `LEGAL_REVIEWED` to `true` in `src/lib/legalGate.ts` (a test refuses `true` while
+every placeholder (the Fees section already carries the decided price, with the payment terms left open), get them approved, set `LEGAL_REVIEWED` to `true` in `src/lib/legalGate.ts` (a test refuses `true` while
 any placeholder is left), and add both pages to `public/sitemap.xml`. Until then `/privacy` and `/terms` do not exist and the
 footer shows no legal links.
 

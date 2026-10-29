@@ -45,7 +45,7 @@ export default function PhotoCard({ photo, sizes, eager = false, ratio, repeat =
           loading={eager ? 'eager' : 'lazy'}
           decoding="async"
           onError={() => setFailed(true)}
-          className="absolute inset-0 h-full w-full object-cover"
+          className="lp-zoom absolute inset-0 h-full w-full object-cover"
           style={{ objectPosition: p.position }}
           {...priority}
         />

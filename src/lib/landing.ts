@@ -17,7 +17,8 @@
 //     the thing really is Kenyan (PAYE, SHIF, NSSF, KRA files, P9). Tanzania and Uganda payroll rests on unreviewed
 //     assumptions, and a country without an engine is "waiting for its rules" (src/lib/payroll/countries/index.ts)
 //   - uptime, support hours, where data is hosted, SOC 2, ISO, ODPC, penetration tests: nothing in the repo backs them
-//   - prices, plans, a free trial: none exist (tenants.plan is only a label)
+//   - a free trial, other prices, plans or tiers: the owner set one price (PRICING, 2026-10-29) and nothing else exists
+//     (tenants.plan is only a label, and the app has no billing)
 //   - customers, logos, testimonials, numbers of companies or staff: none are published
 //   - "the best", "leading", "number one", "faster than ...": no customers, benchmarks or reviews back a ranking, so the page
 //     lists what Figbloom is built around (WHY) and lets the visitor check it
@@ -61,6 +62,7 @@ export const NAV = {
     { id: 'why', label: 'Why Figbloom' },
     { id: 'how', label: 'How it works' },
     { id: 'roles', label: "Who it's for" },
+    { id: 'pricing', label: 'Pricing' },
     { id: 'faq', label: 'FAQ' },
   ],
 } as const;
@@ -402,10 +404,34 @@ export const SECURITY = {
   ],
 } as const;
 
+// Set by the owner on 2026-10-29: KES 10,000 a month for the company, plus KES 250 a month for each active employee.
+// Not a claim about the product, so it has no evidence files; landing.test.ts pins the figures and refuses any other
+// amount, plan or trial. The app has no billing and tenants.plan is only a label, so nothing here is charged by the app.
+// The Terms (src/lib/legal.ts) carry the same figures for the lawyer: change both together.
+export const PRICING = {
+  eyebrow: 'Pricing',
+  title: 'Priced by the month, and by the person.',
+  currency: 'KES',
+  monthly: 10000,
+  perEmployee: 250,
+  monthlyNote: 'a month, for your company',
+  perEmployeeNote: 'a month, for each active employee',
+  estimate: 'Active employees',
+  perMonth: 'a month',
+  // the range of the estimator: not a limit on how many employees a company can have
+  min: 1,
+  max: 500,
+  start: 25,
+} as const;
+
+/** 16250 becomes "16,250": written out here so the page reads the same in every browser and locale. */
+export const group = (n: number): string => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+export const kes = (n: number): string => `${PRICING.currency} ${group(n)}`;
+
 export const TALK = {
-  eyebrow: 'Pricing and set-up',
+  eyebrow: 'Set-up',
   title: 'Talk to us.',
-  text: 'Pricing, set-up or moving from spreadsheets? Write to us.',
+  text: 'Set-up, or moving from spreadsheets? Write to us.',
 } as const;
 
 export interface Question {
@@ -458,10 +484,10 @@ export const FAQ: Question[] = [
   },
 ];
 
-// Not a claim about the product, so it has no evidence: prices and set-up are a conversation, not a published fact.
+// Not a claim about the product, so it has no evidence: it repeats PRICING, the owner's decision.
 export const PRICING_QUESTION = {
   q: 'What does it cost?',
-  a: `Write to ${SITE.email} and we will talk it through.`,
+  a: `${kes(PRICING.monthly)} a month, plus ${kes(PRICING.perEmployee)} a month for each active employee.`,
 } as const;
 
 export const FINAL = {
@@ -484,7 +510,7 @@ export function allCopy(): string[] {
       for (const [key, inner] of entries) if (key !== 'evidence' && key !== 'id') walk(inner);
     }
   };
-  [SEO, CTA, NAV, HERO, BUILT_IN, OUTCOMES, WHY, FEATURES, ALSO, PAYROLL, STEPS, ROLES, SECURITY, TALK, FAQ, PRICING_QUESTION, FINAL, FOOTER].forEach(walk);
+  [SEO, CTA, NAV, HERO, BUILT_IN, OUTCOMES, WHY, FEATURES, ALSO, PAYROLL, STEPS, ROLES, SECURITY, PRICING, TALK, FAQ, PRICING_QUESTION, FINAL, FOOTER].forEach(walk);
   return out;
 }
 

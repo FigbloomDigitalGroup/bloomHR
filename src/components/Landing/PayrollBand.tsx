@@ -10,7 +10,7 @@ import PayslipPreview from './previews/PayslipPreview';
 export default function PayrollBand() {
   return (
     <Section id="payroll" labelledBy="payroll-title" tone="brand" className="py-20 sm:py-28">
-      <BrandMark outline className="pointer-events-none absolute -left-44 -top-36 h-[640px] w-[640px] text-white/[0.07]" />
+      <BrandMark outline className="lp-drift pointer-events-none absolute -left-44 -top-36 h-[640px] w-[640px] text-white/[0.07]" />
       <Container className="relative grid items-center gap-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] lg:gap-20">
         <div>
           <SectionHeading dark id="payroll-title" eyebrow={PAYROLL.eyebrow} title={PAYROLL.title} text={PAYROLL.text} />
