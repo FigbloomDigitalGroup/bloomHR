@@ -18,6 +18,7 @@ import MFAVerification from './pages/MFAverification';
 import { landingTarget, useCompanyProfile, withProfileRole } from './hooks/useCompanyProfile';
 import { syncThemeWithAccount } from './lib/preferences';
 import CompanyGate from './components/Company/CompanyGate';
+import CompanyStatusGate from './components/Company/CompanyStatusGate';
 import FigbloomLoader from './components/UI/FigbloomLoader';
 import { useCompanySwitching } from './hooks/useMyCompanies';
 import { useMobileNav } from './components/Layout/useMobileNav';
@@ -37,6 +38,7 @@ const LoanRequestsAdmin = lazy(() => import('./components/Settings/StaffLoan'));
 const PayrollDashboard = lazy(() => import('./components/Payroll/PayrollDashboard'));
 const PayslipDesignPage = lazy(() => import('./components/Payroll/PayslipDesignPage'));
 const PlatformRatesPage = lazy(() => import('./components/Payroll/PlatformRatesPage'));
+const OrganisationsPage = lazy(() => import('./components/Platform/OrganisationsPage'));
 const StaffSignupRequests = lazy(() => import('./pages/admin'));
 const StaffPortalLanding = lazy(() => import('./components/staff portal/StaffPortal'));
 const RecruitmentDashboard = lazy(() => import('./components/Recruitment/RecruitmentDashboard'));
@@ -944,7 +946,7 @@ function App() {
                   // someone who belongs to no company yet must set one up, not be shown a staff portal
                   <NoCompany email={session.user.email ?? ''} />
                 ) : companyState.status === 'ready' ? (
-                  <CompanyGate userId={session.user.id}><StaffPortalLanding /></CompanyGate>
+                  <CompanyStatusGate userId={session.user.id}><CompanyGate userId={session.user.id}><StaffPortalLanding /></CompanyGate></CompanyStatusGate>
                 ) : companyState.status === 'error' ? (
                   <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-center px-4">
                     <p className="text-sm text-gray-700">We could not load your account: {companyState.message}</p>
@@ -965,7 +967,7 @@ function App() {
                 !session ? (
                   <Login onLoginSuccess={handleLoginSuccess} />
                 ) : companyState.status === 'ready' ? (
-                  <CompanyGate userId={session.user.id}><OnboardingPrint /></CompanyGate>
+                  <CompanyStatusGate userId={session.user.id}><CompanyGate userId={session.user.id}><OnboardingPrint /></CompanyGate></CompanyStatusGate>
                 ) : (
                   <WorkspaceLoader />
                 )
@@ -989,11 +991,11 @@ function App() {
                 ) : companyState.status === 'loading' ? (
                   <WorkspaceLoader />
                 ) : usesStaffPortal(user.role) ? (
-                  <CompanyGate userId={session.user.id}>
+                  <CompanyStatusGate userId={session.user.id}><CompanyGate userId={session.user.id}>
                     <StaffPortalLanding />
-                  </CompanyGate>
+                  </CompanyGate></CompanyStatusGate>
                 ) : (
-                  <CompanyGate userId={session.user.id}>
+                  <CompanyStatusGate userId={session.user.id}><CompanyGate userId={session.user.id}>
                   <div className="flex flex-col min-h-screen bg-page">
                     <div className="relative flex flex-1 min-h-0 w-full overflow-x-hidden">
                       <Sidebar
@@ -1077,6 +1079,7 @@ function App() {
                                 {gate('/settings/payslip-design', <PayslipDesignPage />)}
                                 {/* Figbloom platform admins only: the page checks, and the database refuses anyone else (FIG-813) */}
                                 {gate('/platform/rates', <PlatformRatesPage />)}
+                                {gate('/platform/organisations', <OrganisationsPage />)}
                                 {gate('/settings', <UserRolesSettings />)}
                                 {/* everyone in the company reads it; Settings changes it */}
                                 {gate('/settings/company', <CompanyProfilePage />)}
@@ -1121,7 +1124,7 @@ function App() {
                       </div>
                     </div>
                   </div>
-                  </CompanyGate>
+                  </CompanyGate></CompanyStatusGate>
                 )
               }
             />

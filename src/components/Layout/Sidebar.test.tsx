@@ -33,6 +33,9 @@ vi.mock('../../hooks/useWorkBadges', () => ({
     return work.badges;
   },
 }));
+// Figbloom platform admins see the Platform menu (is_platform_admin() is tested in supabase/tests)
+const platform = vi.hoisted(() => ({ admin: false }));
+vi.mock('../../lib/platformRates', () => ({ isPlatformAdmin: () => Promise.resolve(platform.admin) }));
 vi.mock('../../hooks/useMyPreferences', () => ({
   useMyPreferences: () => ({ data: null }),
 }));
@@ -189,6 +192,34 @@ describe('Job groups in the menu', () => {
     perms.granted = ['dashboard', 'leaves'];
     sidebar();
     expect(screen.queryByText('Job groups')).toBeNull();
+  });
+});
+
+describe('the Platform menu', () => {
+  const sidebar = () =>
+    render(
+      <MemoryRouter>
+        <Sidebar user={{ email: 'ops@figbloom.org', role: 'ADMIN' }} isCollapsed={false} onToggle={() => {}} />
+      </MemoryRouter>,
+    );
+  afterEach(() => {
+    platform.admin = false;
+  });
+
+  it('shows Organisations and Platform rates to platform admins', async () => {
+    setWidth(1280);
+    platform.admin = true;
+    sidebar();
+    expect(await screen.findByText('Organisations')).toBeTruthy();
+    expect(screen.getByText('Platform rates')).toBeTruthy();
+  });
+
+  it('is hidden from everyone else, administrators included', async () => {
+    setWidth(1280);
+    sidebar();
+    await act(async () => {});
+    expect(screen.queryByText('Organisations')).toBeNull();
+    expect(screen.queryByText('Platform rates')).toBeNull();
   });
 });
 
