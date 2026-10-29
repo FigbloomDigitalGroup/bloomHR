@@ -1,6 +1,8 @@
 // Settings for the Figbloom AWS account. Change these through a PR, then run `npm run diff` and `cdk deploy`.
 
 export const ACCOUNT_ID = '852845752791';
+// The AWS Organization this (management) account runs. Its trail covers every account in it: staging, prod, ...
+export const ORGANIZATION_ID = 'o-7n7zn7ftfn';
 
 // eu-west-1 (Ireland) keeps data in the EU, which is what the ODPC registration says.
 export const REGION = 'eu-west-1';
