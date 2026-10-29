@@ -30,7 +30,12 @@ export default function bootApp(): void {
   forgetAccountOnSignInOut(queryClient); // a new sign-in never sees the last one's permissions or companies
   refreshPermissionsOnRoleChange(queryClient); // a role changed by an admin shows without a refresh
   forgetFormDraftsOnSignOut(); // unsaved personal details typed in this tab go with the person who typed them
-  const missing = missingConfig(import.meta.env);
+  // Name each setting: handing over the whole env object makes Vite write every VITE_ value, secrets included, into
+  // the public JavaScript.
+  const missing = missingConfig({
+    VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
+    VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
+  });
   const isCareersPage = /^\/careers\/[^/]+/.test(window.location.pathname);
   const isVerifyPage = /^\/verify\/[^/]+/.test(window.location.pathname);
 

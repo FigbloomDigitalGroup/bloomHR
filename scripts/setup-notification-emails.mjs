@@ -25,7 +25,7 @@ const fail = (message) => {
 
 const url = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").replace(/\/+$/, "");
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const resendKey = process.env.RESEND_API_KEY || process.env.VITE_RESEND_API_KEY || "";
+const resendKey = process.env.RESEND_API_KEY || ""; // never a VITE_ name: those end up in the public site
 const from = process.env.EMAIL_FROM || process.env.SMTP_FROM || "";
 const appUrl = (process.argv[2] || process.env.APP_URL || "").replace(/\/+$/, "");
 
