@@ -23,11 +23,11 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <div className="relative hidden overflow-hidden bg-brand lg:flex lg:w-[45%]">
         <div aria-hidden="true" className="absolute inset-0 z-0">
           <img src={AUTH_PHOTO} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: PHOTO_FOCUS }} />
-          {/* the photo keeps its own colours under a hint of the brand's green; green only deepens at the top, behind the logo, and
-              across the lower part, behind the words */}
-          <div className="absolute inset-0 bg-brand/15" />
-          <div className="absolute inset-x-0 top-0 h-1/4 bg-gradient-to-b from-brand/70 to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-brand/90 via-brand/65 via-50% to-transparent" />
+          {/* the photo keeps its own colours under a hint of the brand's green; green only deepens a little at the top, behind the
+              logo, and across the lower part, behind the words, just enough to keep the white type readable */}
+          <div className="absolute inset-0 bg-brand/5" />
+          <div className="absolute inset-x-0 top-0 h-1/5 bg-gradient-to-b from-brand/45 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-brand/65 via-brand/35 via-55% to-transparent" />
           {/* a warm glow low on the left, the brand's orange, and the mark drawn large like on the landing page's dark bands */}
           <div className="absolute -bottom-48 -left-48 h-[560px] w-[560px] rounded-full bg-[radial-gradient(closest-side,rgb(var(--highlight)/0.2),transparent)]" />
           <BrandMark outline className="absolute -right-64 -top-24 h-[560px] w-[560px] text-white/[0.1]" />
