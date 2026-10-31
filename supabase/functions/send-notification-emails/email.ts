@@ -54,6 +54,20 @@ export function appOrigin(appUrl: string): string {
   }
 }
 
+/**
+ * Platform emails (migration 20261029100000_platform_organisations.sql) are written in the database, which doesn't know
+ * the app's address: their links are paths ("/platform/organisations"). This puts the app's address in front of them.
+ * Without an https APP_URL the paths stay as they are.
+ */
+export function withAppLinks(html: string, appUrl: string): string {
+  const origin = appOrigin(appUrl);
+  if (!origin) return html;
+  return html.replace(/href="\/(?!\/)/g, `href="${origin}/`);
+}
+
+/** Queued emails from the platform itself (not a company's own email): their links point at the app. */
+export const isPlatformEmail = (purpose: string | null | undefined) => typeof purpose === 'string' && purpose.startsWith('platform-');
+
 /** The page an HR alert is handled on: the one all the items share, else the app's start page. */
 export const HR_PAGES: Record<string, string> = {
   leave_recommended: '/leaves',

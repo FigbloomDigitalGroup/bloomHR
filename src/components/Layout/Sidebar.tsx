@@ -40,7 +40,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import bloomMark from '../../../public/bloom-mark.png';
 import { usePermissions } from '../../hooks/usePermissions';
 import { inMenu } from '../../lib/routeModules';
-import { SIDEBAR_MENU } from '../../lib/sidebarMenu';
+import { PLATFORM_MENU, SIDEBAR_MENU } from '../../lib/sidebarMenu';
+import { isPlatformAdmin } from '../../lib/platformRates';
 import { supabase } from '../../lib/supabase';
 import { IN_LIST_SIZE, chunks, fetchAll } from '../../lib/fetchAll';
 import { SearchInput } from '../UI';
@@ -96,11 +97,17 @@ const ICONS: Record<string, LucideIcon> = {
   'audit-trail': History,
   'role-permissions': ShieldHalf,
   appearance: Palette,
+  'platform-organisations': Building2,
+  'platform-rates': Landmark,
 };
-const menuGroups = SIDEBAR_MENU.map((group) => ({
+const withIcons = (group: typeof PLATFORM_MENU) => ({
   title: group.title,
   items: group.items.map((item) => ({ ...item, icon: ICONS[item.id] ?? LayoutGrid })),
-}));
+  platform: group === PLATFORM_MENU,
+});
+const menuGroups = SIDEBAR_MENU.map(withIcons);
+// Figbloom's own pages: only for platform admins (the pages check too, and the database refuses anyone else)
+const platformGroup = withIcons(PLATFORM_MENU);
 
 
 interface SidebarProps {
@@ -146,6 +153,22 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
   // Leave Approver/Alternate Approver (FIG-573) and it hasn't been
   // recommended yet - i.e. genuinely waiting on them.
   const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
+  const [platformAdmin, setPlatformAdmin] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    if (!user?.email) {
+      setPlatformAdmin(false);
+      return;
+    }
+    Promise.resolve()
+      .then(isPlatformAdmin)
+      .then((ok) => live && setPlatformAdmin(ok))
+      .catch(() => live && setPlatformAdmin(false));
+    return () => {
+      live = false;
+    };
+  }, [user?.email]);
 
   useEffect(() => {
     if (!user?.email) {
@@ -354,7 +377,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
         {/* Scrollable Navigation */}
         <div className="relative z-10 flex-1 overflow-y-auto px-3 pb-4 sidebar-scroll hover:overflow-y-auto overflow-hidden">
           <div className="space-y-6">
-            {menuGroups.map((group) => (
+            {(platformAdmin ? [...menuGroups, platformGroup] : menuGroups).map((group) => (
               <div key={group.title}>
                 {/* Section Header */}
                 <AnimatePresence>
@@ -376,7 +399,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
                 <div className="space-y-1">
                   {group.items.filter(item =>
                     // while permissions load every entry shows (no blank sidebar flash), then only those the role gives
-                    (permissionsLoading ? inMenu(item.path, () => true) : inMenu(item.path, hasPermission)) &&
+                    (group.platform || (permissionsLoading ? inMenu(item.path, () => true) : inMenu(item.path, hasPermission))) &&
                     item.label.toLowerCase().includes(searchQuery.toLowerCase())
                   ).map((item) => {
                     const isActive = currentPath.startsWith(item.path);
