@@ -14,14 +14,17 @@ import OrganisationsPage from '../Platform/OrganisationsPage';
 import PlatformRatesPage from '../Payroll/PlatformRatesPage';
 import StaffPage from '../Platform/StaffPage';
 import SchoolsPage from '../Platform/SchoolsPage';
+import OverviewPage from '../Platform/OverviewPage';
 import ConsoleLayout from './ConsoleLayout';
+import { ConsoleBadgesContext, type ConsoleBadge, type ConsoleBadges } from './consoleBadges';
 
 // The Figbloom console (src/lib/console.ts): what App shows on console.figbloom.org instead of the company app. Only
 // signing in, two-step sign-in and Figbloom's own pages: no company is loaded, so a platform admin who is staff in their
 // company, or in no company at all, gets the same console. is_platform_admin() decides who gets in; the database
 // refuses anyone else on every platform call anyway.
 
-const HOME = '/platform/organisations';
+// the console's home: every product at a glance
+const HOME = '/platform/overview';
 
 const Loader = () => <FigbloomLoader fullScreen />;
 
@@ -94,6 +97,14 @@ export default function ConsoleApp() {
     };
   }, [userId, known, cleared, pathname]);
 
+  // the menu's count badges, published by the pages that load those numbers anyway (consoleBadges.ts)
+  const [badges, setBadges] = useState<ConsoleBadges>({});
+  const publishBadge = useCallback((path: string, badge: ConsoleBadge | null) => {
+    setBadges((prev) =>
+      prev[path]?.count === badge?.count && prev[path]?.label === badge?.label ? prev : { ...prev, [path]: badge ?? undefined }
+    );
+  }, []);
+
   const signOut = useCallback(async () => {
     sessionStorage.removeItem('isMFAProcess');
     sessionStorage.removeItem('mfaCompleted');
@@ -115,8 +126,10 @@ export default function ConsoleApp() {
   if (!access.admin) return <NoConsoleAccess email={email} onSignOut={() => void signOut()} />;
 
   return (
-    <ConsoleLayout email={email} role={access.role} onSignOut={() => void signOut()}>
+    <ConsoleBadgesContext.Provider value={publishBadge}>
+    <ConsoleLayout email={email} role={access.role} badges={badges} onSignOut={() => void signOut()}>
       <Routes>
+        <Route path="/platform/overview" element={<OverviewPage />} />
         <Route path="/platform/organisations" element={<OrganisationsPage />} />
         <Route path="/platform/rates" element={<PlatformRatesPage />} />
         <Route path="/platform/schools" element={<SchoolsPage />} />
@@ -124,5 +137,6 @@ export default function ConsoleApp() {
         <Route path="*" element={<Navigate to={HOME} replace />} />
       </Routes>
     </ConsoleLayout>
+    </ConsoleBadgesContext.Provider>
   );
 }

@@ -63,6 +63,30 @@ export async function setSchoolStatus(id: string, status: SchoolStatusChange, re
   return result.school ?? null;
 }
 
+/** The statuses a school can be suspended from (not onboarding or setup_stalled); a suspended one is reactivated. */
+export const SUSPENDABLE_STATUSES = ['active', 'trial', 'overdue'];
+
+/** What the console offers for a school in this status: suspend, reactivate, or nothing. */
+export function schoolAction(status: string): SchoolStatusChange | null {
+  if (SUSPENDABLE_STATUSES.includes(status)) return 'suspended';
+  if (status === 'suspended') return 'active';
+  return null;
+}
+
+/**
+ * The message for a refused suspend or reactivate. Schools answers 422 status_not_settable when it doesn't allow that
+ * change from the school's status (trial and overdue, until Schools is updated): said plainly, with Schools' words.
+ */
+export function statusChangeError(err: unknown, school: Pick<School, 'name' | 'status'>, to: SchoolStatusChange): string {
+  if (err instanceof ApiError && err.code === 'status_not_settable') {
+    const what = to === 'suspended' ? 'suspended' : 'reactivated';
+    return `Figbloom Schools doesn't allow ${school.name} to be ${what} while it is ${statusLabel(school.status).toLowerCase()}.${
+      err.message ? ` (${err.message})` : ''
+    }`;
+  }
+  return err instanceof Error && err.message ? err.message : 'The school was not changed.';
+}
+
 export interface SchoolTotals {
   schools: number;
   active: number;
