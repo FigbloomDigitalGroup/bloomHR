@@ -13,7 +13,7 @@ import type { ConsoleBadges } from './consoleBadges';
 // The frame of the Figbloom console (src/lib/console.ts): Figbloom's own pages, without a company's sidebar, header
 // or company switcher. It follows Figbloom Schools' platform console (ConsoleShell there): a forest-green sidebar (the
 // app's shell tokens: --shell is that green) with the Figbloom mark, "PLATFORM CONSOLE" and a collapse chevron; items
-// with icons, the active one a white pill, count badges in orange; the account at the bottom. Here: Overview, then one
+// with icons, the active one a white pill, neutral count badges; the account at the bottom. Here: Overview, then one
 // collapsible section per product, then Staff and the account. On a desktop it folds down to icons; on a phone it is a
 // drawer behind a menu button (the company app's useMobileNav, which closes it on navigation and on the phone's Back).
 // Folded sections and the folded sidebar are remembered in this browser.
@@ -26,10 +26,8 @@ export interface ConsoleNavItem {
 
 export interface ConsoleNavGroup {
   product: string;
-  /** the product's mark: an icon on a small coloured square */
+  /** the product's icon, drawn like the page icons */
   icon: LucideIcon;
-  /** Tailwind classes for the mark (background and icon colour) */
-  mark: string;
   items: ConsoleNavItem[];
 }
 
@@ -40,7 +38,6 @@ const CONSOLE_NAV: ConsoleNavGroup[] = [
   {
     product: 'Figbloom HR',
     icon: Briefcase,
-    mark: 'bg-orange text-white',
     items: [
       { label: 'Organisations', path: '/platform/organisations', icon: Building2 },
       { label: 'Statutory rates', path: '/platform/rates', icon: Percent },
@@ -49,7 +46,6 @@ const CONSOLE_NAV: ConsoleNavGroup[] = [
   {
     product: 'Figbloom Schools',
     icon: GraduationCap,
-    mark: 'bg-shell-active text-shell-active-fg',
     items: [{ label: 'Schools', path: '/platform/schools', icon: School }],
   },
 ];
@@ -167,17 +163,23 @@ export default function ConsoleLayout({ email, role, onSignOut, children, badges
           } ${isActive ? 'bg-shell-active text-shell-active-fg font-semibold' : 'text-shell-fg/75 hover:bg-shell-fg/10 hover:text-shell-fg'}`
         }
       >
-        <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
-        <span className={collapsed ? 'sr-only' : 'flex-1 truncate'}>{item.label}</span>
-        {badge && (
+        {({ isActive }) => (
           <>
-            <span
-              className={`rounded-full bg-orange px-1.5 font-mono text-[10px] leading-[16px] text-white ${collapsed ? 'absolute top-1 right-1' : ''}`}
-              aria-hidden="true"
-            >
-              {badge.count}
-            </span>
-            <span className="sr-only">({badge.label})</span>
+            <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+            <span className={collapsed ? 'sr-only' : 'flex-1 truncate'}>{item.label}</span>
+            {badge && (
+              <>
+                <span
+                  className={`rounded-full px-1.5 font-mono text-[10px] font-semibold leading-[16px] ${
+                    isActive ? 'bg-shell-active-fg text-shell-active' : 'bg-shell-fg/15 text-shell-fg'
+                  } ${collapsed ? 'absolute top-1 right-1' : ''}`}
+                  aria-hidden="true"
+                >
+                  {badge.count}
+                </span>
+                <span className="sr-only">({badge.label})</span>
+              </>
+            )}
           </>
         )}
       </NavLink>
@@ -221,9 +223,9 @@ export default function ConsoleLayout({ email, role, onSignOut, children, badges
       >
         {/* the Figbloom mark, the console's name, and the collapse chevron */}
         <div className={`flex min-h-[34px] shrink-0 items-center gap-3 px-0.5 pb-2 ${collapsed ? 'flex-col' : ''}`}>
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-white p-1">
-            <img src={bloomMark} alt="Figbloom" className="h-full w-full object-contain" />
-          </span>
+          {/* the company app's sidebar mark (bloom-mark.png is white on transparent): shell-logo makes it white on a
+              dark sidebar and dark on a light one (src/index.css, set by the theme), so it follows any theme */}
+          <img src={bloomMark} alt="Figbloom" className="h-8 w-8 shrink-0 object-contain shell-logo" />
           {!collapsed && (
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[14.5px] font-semibold tracking-tight">Figbloom</span>
@@ -272,16 +274,14 @@ export default function ConsoleLayout({ email, role, onSignOut, children, badges
                     aria-controls={listId}
                     className="mb-0.5 flex w-full items-center gap-2 rounded-md px-2.5 py-1 text-left hover:bg-shell-fg/5"
                   >
-                    <span className={`grid h-4 w-4 shrink-0 place-items-center rounded ${group.mark}`} aria-hidden="true">
-                      <Mark className="h-2.5 w-2.5" />
-                    </span>
+                    <Mark className="h-3.5 w-3.5 shrink-0 text-shell-fg/55" aria-hidden="true" />
                     <span className="flex-1 truncate font-mono text-[9.5px] uppercase tracking-[0.1em] text-shell-fg/55">{group.product}</span>
                     <ChevronDown className={`h-3 w-3 text-shell-fg/40 transition-transform ${isFolded ? '-rotate-90' : ''}`} aria-hidden="true" />
                   </button>
                 )}
                 {labelled && collapsed && (
-                  <span className={`mx-auto mb-1 grid h-4 w-4 place-items-center rounded ${group.mark}`} title={group.product} aria-hidden="true">
-                    <Mark className="h-2.5 w-2.5" />
+                  <span className="mx-auto mb-1 flex justify-center text-shell-fg/55" title={group.product} aria-hidden="true">
+                    <Mark className="h-3.5 w-3.5" />
                   </span>
                 )}
                 <ul id={listId} className="space-y-0.5" hidden={isFolded}>
