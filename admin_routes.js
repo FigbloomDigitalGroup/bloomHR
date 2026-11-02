@@ -58,7 +58,9 @@ const banDuration = (status) => (status === "ACTIVE" ? "none" : status === "SUSP
 // user_metadata is user-editable, so it is never trusted for authorization. Every query below
 // runs with the service-role key (no RLS), so tenant isolation is enforced here, in code: each
 // handler is scoped to caller.tenantId (docs/MULTI_TENANCY_RFC.md, section 4).
-async function authenticate(req) {
+// A company Figbloom has not approved (pending, rejected) or has suspended can't act through the API either
+// (migration 20261029100000_platform_organisations.sql); `anyCompanyStatus` is for signing in itself (two-step codes).
+async function authenticate(req, { anyCompanyStatus = false } = {}) {
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
   if (!token) throw new HttpError(401, "Missing bearer token");
@@ -68,12 +70,16 @@ async function authenticate(req) {
 
   const { data: profile, error: profileError } = await admin
     .from("user_profiles")
-    .select("role, account_status, tenant_id, company_role_id")
+    .select("role, account_status, tenant_id, company_role_id, tenants(status)")
     .eq("user_id", data.user.id)
     .maybeSingle();
   if (profileError) throw new HttpError(500, "Could not verify caller role");
   if (!profile || !profile.tenant_id || (profile.account_status && profile.account_status !== "ACTIVE")) {
     throw new HttpError(403, "Forbidden");
+  }
+  const companyStatus = profile.tenants?.status;
+  if (!anyCompanyStatus && companyStatus && companyStatus !== "active") {
+    throw new HttpError(403, companyStatus === "pending" ? "Your company is waiting for approval" : "Your company is not active");
   }
   return {
     id: data.user.id,

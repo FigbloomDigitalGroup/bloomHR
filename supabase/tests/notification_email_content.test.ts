@@ -1,7 +1,8 @@
 // The notification email the send-notification-emails Edge Function sends (FIG-771).
 import { describe, expect, it } from 'vitest';
 import {
-  chatDigestHtml, chatDigestSubject, chatLink, describeChat, hrAlertHtml, hrAlertLink, hrAlertSubject, htmlFor, subjectFor,
+  chatDigestHtml, chatDigestSubject, chatLink, describeChat, hrAlertHtml, hrAlertLink, hrAlertSubject, htmlFor, isPlatformEmail, subjectFor,
+  withAppLinks,
 } from '../functions/send-notification-emails/email';
 
 const item = (title: string, message = 'x') => ({ type: 'document_rejected', title, message, at: '2026-10-13T10:00:00Z' });
@@ -69,5 +70,23 @@ describe('the unread chat digest email (FIG-890)', () => {
     expect(html).toContain('Hi,');
     expect(html).toContain('&lt;b&gt;x&lt;/b&gt;');
     expect(html).toContain('href="https://x.co/teams"');
+  });
+});
+
+describe("the platform's own emails (migration 20261029100000)", () => {
+  it('link to the app: paths get the app address in front, full links stay', () => {
+    const html = '<a href="/platform/organisations">Open</a> <a href="https://x.co/a">x</a> <a href="//cdn.x">c</a>';
+    expect(withAppLinks(html, 'https://hr.figbloom.org/staff')).toBe(
+      '<a href="https://hr.figbloom.org/platform/organisations">Open</a> <a href="https://x.co/a">x</a> <a href="//cdn.x">c</a>'
+    );
+    // no https APP_URL: left as it is
+    expect(withAppLinks(html, '')).toBe(html);
+  });
+
+  it('are told apart by their purpose', () => {
+    expect(isPlatformEmail('platform-new-company')).toBe(true);
+    expect(isPlatformEmail('platform-company-approved')).toBe(true);
+    expect(isPlatformEmail('email-portal')).toBe(false);
+    expect(isPlatformEmail(null)).toBe(false);
   });
 });

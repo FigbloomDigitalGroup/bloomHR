@@ -95,6 +95,16 @@ export const SIDEBAR_MENU: SidebarMenuGroup[] = [
   },
 ];
 
+// Figbloom's own pages, shown in the sidebar only to platform admins (is_platform_admin()). Not part of SIDEBAR_MENU:
+// they are not a company's modules, so the Roles screen's preview never shows them.
+export const PLATFORM_MENU: SidebarMenuGroup = {
+  title: 'Platform',
+  items: [
+    { id: 'platform-organisations', label: 'Organisations', path: '/platform/organisations' },
+    { id: 'platform-rates', label: 'Platform rates', path: '/platform/rates' },
+  ],
+};
+
 // The staff portal's menu, without its icons (StaffPortal.tsx adds those). Staff (base role STAFF, and the company
 // roles based on it) always get these; the portal does not hide entries by module. Inside Tasks, the modules decide
 // the extras (Manage projects, See every task).

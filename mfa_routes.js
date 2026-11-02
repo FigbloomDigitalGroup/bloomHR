@@ -110,7 +110,8 @@ export function codeEmail({ code, company, minutes = CODE_TTL_SECONDS / 60 }) {
 const handler = (fn) => async (req, res) => {
   try {
     if (!admin) throw new HttpError(500, "Sign-in codes are not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
-    const caller = await authenticate(req);
+    // signing in works whatever the company's status (the app then shows a waiting screen)
+    const caller = await authenticate(req, { anyCompanyStatus: true });
     const sessionId = sessionIdOf(req);
     if (!sessionId) throw new HttpError(401, "Sign in again to get a code");
     await fn(req, res, caller, sessionId);

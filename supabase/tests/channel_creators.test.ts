@@ -28,6 +28,8 @@ const create = (as: string, name: string, extra = '') =>
 
 beforeAll(async () => {
   db = await bootLiveDb();
+  // new companies open straight away here (approving them is tested in platform_organisations.test.ts)
+  await db.exec(`update platform_settings set auto_approve_companies = true`);
   await db.exec(`
     delete from channels;
     insert into auth.users (id, email) values
