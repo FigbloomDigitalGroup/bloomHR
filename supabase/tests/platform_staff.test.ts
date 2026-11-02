@@ -74,7 +74,7 @@ describe('adding a platform admin', () => {
     const [{ r }] = await asService(() =>
       rows<{ r: { user_id: string; email: string; added: boolean } }>(`select grant_platform_admin_as('${OPS}', ' new.person@figbloom.ORG ', 'Support') r`)
     );
-    expect(r).toEqual({ user_id: NEWBIE, email: 'new.person@figbloom.org', added: true });
+    expect(r).toEqual({ user_id: NEWBIE, email: 'new.person@figbloom.org', added: true, role: 'viewer' }); // the default role (20261103100000_platform_roles.sql)
     const log = (await changes()).filter((c) => c.user_id === NEWBIE);
     expect(log).toEqual([{ user_id: NEWBIE, email: 'New.Person@Figbloom.org', action: 'added', note: 'Support', changed_by: OPS }]);
     const [again] = await asService(() => rows<{ r: { added: boolean } }>(`select grant_platform_admin_as('${OPS}', 'new.person@figbloom.org') r`));
@@ -97,7 +97,7 @@ describe('adding a platform admin', () => {
   });
 
   it('nobody calls the internal helpers', async () => {
-    await expect(as(OPS, `select platform_admin_add('${OTHER}', null, '${OPS}')`)).rejects.toThrow(/permission denied/);
+    await expect(as(OPS, `select platform_admin_add('${OTHER}', null, '${OPS}', 'viewer')`)).rejects.toThrow(/permission denied/);
     await expect(as(OPS, `select platform_admin_remove('${STAFF_OPS}', null, '${OPS}')`)).rejects.toThrow(/permission denied/);
   });
 });

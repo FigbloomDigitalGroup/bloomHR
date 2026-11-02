@@ -40,16 +40,29 @@ changed.
 
 ## 2. Who can enter a change: platform admins
 
-Only a **platform admin** can change the platform defaults (the rows with no company). Being a company's ADMIN does
+Only a **platform admin** with the **owner** or **admin** role can change the platform defaults (the rows with no company). Being a company's ADMIN does
 not make someone a platform admin. A platform admin is a row in `platform_admins`, and the table starts empty.
 
-To add the first one, run this in the Supabase SQL editor (or with the service role):
+To add the first one, run this in the Supabase SQL editor (or with the service role). Added from there without a role, they are an **owner**:
 
 ```sql
 select public.grant_platform_admin((select id from auth.users where email = 'mikesuperadmin@figbloom.org'), 'Figbloom payroll ops');
 ```
 
-After that, a platform admin can add or remove others on the console's Staff page (console.figbloom.org/platform/staff), or with `grant_platform_admin` and `revoke_platform_admin`. Every add and remove is logged in `platform_admin_changes`; a signed-in admin cannot remove themselves or the last platform admin.
+After that, owners and admins add, remove and change the roles of others on the console's Staff page
+(console.figbloom.org/platform/staff), or with `grant_platform_admin(user, note, role)`, `revoke_platform_admin` and
+`set_platform_admin_role(user, role, reason)`. Roles (migration 20261103100000_platform_roles.sql):
+
+| role | sees everything | suspends / reactivates companies | approves / rejects companies, auto-approve, statutory rates | manages staff |
+|---|---|---|---|---|
+| owner | yes | yes | yes | yes |
+| admin | yes | yes | yes | yes, but never makes, removes or demotes an owner |
+| support | yes | yes | no | no |
+| viewer | yes | no | no | no |
+
+Every add, remove and role change is logged in `platform_admin_changes`. A signed-in admin cannot remove themselves, and
+the last owner cannot be removed or given another role. The SQL editor (no signed-in user) can still do anything, for
+example `select public.set_platform_admin_role((select id from auth.users where email = '...'), 'owner', 'recovery');`.
 Nobody can write to `platform_admins` directly.
 
 ## 3. Entering a change

@@ -7,6 +7,7 @@ type AuthListener = (event: string, session: unknown) => void;
 const state = vi.hoisted(() => ({
   session: null as unknown,
   admin: true,
+  role: 'owner' as import('../../lib/platformRoles').PlatformRole,
   mfa: false,
   listeners: [] as ((event: string, session: unknown) => void)[],
   rpc: vi.fn(),
@@ -34,6 +35,10 @@ vi.mock('../../lib/platformRates', async (importOriginal) => ({
   isPlatformAdmin: () => Promise.resolve(state.admin),
   platformRows: () => Promise.resolve([]),
   latestApprovedMonth: () => Promise.resolve(null),
+}));
+vi.mock('../../lib/platformRoles', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/platformRoles')>()),
+  myPlatformRole: () => Promise.resolve(state.admin ? state.role : null),
 }));
 vi.mock('../../lib/platformOrganisations', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/platformOrganisations')>()),
@@ -67,6 +72,7 @@ afterEach(cleanup);
 beforeEach(() => {
   state.session = null;
   state.admin = true;
+  state.role = 'owner';
   state.mfa = false;
   state.listeners = [];
   state.rpc.mockReset().mockImplementation((name: string) =>
@@ -142,6 +148,16 @@ describe('the Figbloom console', () => {
     // still one product: its name stays hidden
     expect(screen.queryByText('Figbloom HR')).toBeNull();
     expect(state.from).not.toHaveBeenCalled();
+  });
+
+  it('shows the signed-in person\'s role next to their email', async () => {
+    state.session = signedIn();
+    state.role = 'support';
+    renderAt('/platform/staff');
+    await screen.findByRole('heading', { name: 'Staff' });
+    const banner = screen.getByRole('banner');
+    expect(within(banner).getByText('ops@figbloom.org')).toBeTruthy();
+    expect(within(banner).getByTitle('Your console role').textContent).toBe('Support');
   });
 
   it('sends any other address to Organisations', async () => {

@@ -4,6 +4,7 @@ import type { Organisation, OrganisationTotals } from '../../lib/platformOrganis
 
 const api = vi.hoisted(() => ({
   admin: true,
+  role: 'owner' as import('../../lib/platformRoles').PlatformRole,
   list: [] as Organisation[],
   totals: null as OrganisationTotals | null,
   decisions: [] as unknown[][],
@@ -11,7 +12,10 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('../../lib/platformRates', () => ({ isPlatformAdmin: () => Promise.resolve(api.admin) }));
+vi.mock('../../lib/platformRoles', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/platformRoles')>()),
+  myPlatformRole: () => Promise.resolve(api.admin ? api.role : null),
+}));
 vi.mock('../../lib/platformOrganisations', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/platformOrganisations')>()),
   listOrganisations: () => Promise.resolve(api.list),
@@ -37,6 +41,7 @@ const org = (name: string, status: Organisation['status'], extra: Partial<Organi
 afterEach(cleanup);
 beforeEach(() => {
   api.admin = true;
+  api.role = 'owner';
   api.list = [
     org('Acme Ltd', 'pending', { owner_name: 'Amina Otieno' }),
     org('Beta Co', 'active', { employees: 42, users: 5, payroll_runs: 7, last_activity: '2026-10-28T09:00:00Z' }),
@@ -129,5 +134,38 @@ describe('the organisations page', () => {
     fireEvent.click(box);
     await waitFor(() => expect(api.auto).toEqual([true]));
     await waitFor(() => expect((screen.getByLabelText(/Approve new companies automatically/) as HTMLInputElement).checked).toBe(true));
+  });
+});
+
+describe('the organisations page: console roles', () => {
+  it('an admin approves, rejects, suspends and switches auto-approve', async () => {
+    api.role = 'admin';
+    render(<OrganisationsPage />);
+    const acme = await rowOf('Acme Ltd');
+    expect(within(acme).getByText('Approve')).toBeTruthy();
+    expect(within(acme).getByText('Reject')).toBeTruthy();
+    expect(within(await rowOf('Beta Co')).getByText('Suspend')).toBeTruthy();
+    expect(((await screen.findByLabelText(/Approve new companies automatically/)) as HTMLInputElement).disabled).toBe(false);
+  });
+
+  it('support suspends and reactivates, but cannot approve, reject or switch auto-approve', async () => {
+    api.role = 'support';
+    render(<OrganisationsPage />);
+    const acme = await rowOf('Acme Ltd');
+    expect(within(acme).queryByText('Approve')).toBeNull();
+    expect(within(acme).queryByText('Reject')).toBeNull();
+    expect(within(await rowOf('Beta Co')).getByText('Suspend')).toBeTruthy();
+    expect(within(await rowOf('Gamma Farms')).getByText('Reactivate')).toBeTruthy();
+    const box = (await screen.findByLabelText(/Approve new companies automatically/)) as HTMLInputElement;
+    expect(box.disabled).toBe(true);
+    expect(screen.getByText('Only owners and admins change this.')).toBeTruthy();
+  });
+
+  it('a viewer sees every company but no actions', async () => {
+    api.role = 'viewer';
+    render(<OrganisationsPage />);
+    await rowOf('Acme Ltd');
+    for (const action of ['Approve', 'Reject', 'Suspend', 'Reactivate']) expect(screen.queryByText(action)).toBeNull();
+    expect(((await screen.findByLabelText(/Approve new companies automatically/)) as HTMLInputElement).disabled).toBe(true);
   });
 });

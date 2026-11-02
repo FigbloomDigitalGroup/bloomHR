@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Button } from '../UI';
+import { ROLE_LABELS, type PlatformRole } from '../../lib/platformRoles';
 
 // The frame of the Figbloom console (src/lib/console.ts): Figbloom's own pages, without a company's sidebar, header
 // or company switcher.
@@ -28,11 +29,13 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
 
 interface ConsoleLayoutProps {
   email: string;
+  /** the signed-in person's console role, shown next to their email */
+  role?: PlatformRole | null;
   onSignOut: () => void;
   children: ReactNode;
 }
 
-export default function ConsoleLayout({ email, onSignOut, children }: ConsoleLayoutProps) {
+export default function ConsoleLayout({ email, role, onSignOut, children }: ConsoleLayoutProps) {
   return (
     <div className="min-h-screen flex flex-col bg-page">
       <header className="bg-white border-b border-border">
@@ -61,6 +64,11 @@ export default function ConsoleLayout({ email, onSignOut, children }: ConsoleLay
               ))}
             </nav>
             <span className="text-xs text-muted-foreground truncate">{email}</span>
+            {role && (
+              <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-ink" title="Your console role">
+                {ROLE_LABELS[role]}
+              </span>
+            )}
             <Button variant="secondary" onClick={onSignOut}>
               Sign out
             </Button>

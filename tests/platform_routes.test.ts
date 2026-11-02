@@ -69,15 +69,20 @@ vi.mock('@supabase/supabase-js', () => {
     // grant_platform_admin_as(), as the migration behaves
     rpc: async (fn: string, args: Row) => {
       if (fn !== 'grant_platform_admin_as') return { data: null, error: { message: `unexpected ${fn}` } };
-      if (!state.platform_admins.some((a) => a.user_id === args.p_by)) {
-        return { data: null, error: { code: '42501', message: 'Only a platform admin can add a platform admin' } };
+      const by = state.platform_admins.find((a) => a.user_id === args.p_by);
+      if (!by || !['owner', 'admin'].includes(String(by.role))) {
+        return { data: null, error: { code: '42501', message: 'Only a platform admin can add a platform admin (owners and admins)' } };
+      }
+      if (args.p_role === 'owner' && by.role !== 'owner') {
+        return { data: null, error: { code: '42501', message: 'Only an owner can make someone an owner' } };
       }
       const userId = state.logins.get(String(args.p_email));
       if (!userId) return { data: null, error: { code: 'P0002', message: 'No login with this email' } };
       state.grants.push(args);
-      const added = !state.platform_admins.some((a) => a.user_id === userId);
-      if (added) state.platform_admins.push({ user_id: userId });
-      return { data: { user_id: userId, email: args.p_email, added }, error: null };
+      const existing = state.platform_admins.find((a) => a.user_id === userId);
+      if (!existing) state.platform_admins.push({ user_id: userId, role: args.p_role });
+      // an existing admin keeps their role
+      return { data: { user_id: userId, email: args.p_email, added: !existing, role: existing?.role ?? args.p_role }, error: null };
     },
   };
   return { createClient: () => client };
@@ -107,8 +112,17 @@ beforeEach(() => {
     { id: 'ops', email: 'ops@figbloom.org' }, // platform admin, no company
     { id: 'admin-a', email: 'admin@a.co' }, // a company's administrator, not a platform admin
     { id: 'busy', email: 'busy@figbloom.org' }, // a platform admin for the rate limit
+    { id: 'adm', email: 'adm@figbloom.org' }, // console roles: an admin
+    { id: 'sup', email: 'sup@figbloom.org' }, // ...support
+    { id: 'view', email: 'view@figbloom.org' }, // ...and a viewer
   ];
-  state.platform_admins = [{ user_id: 'ops' }, { user_id: 'busy' }];
+  state.platform_admins = [
+    { user_id: 'ops', role: 'owner' },
+    { user_id: 'busy', role: 'owner' },
+    { user_id: 'adm', role: 'admin' },
+    { user_id: 'sup', role: 'support' },
+    { user_id: 'view', role: 'viewer' },
+  ];
   state.logins = new Map([
     ['ops@figbloom.org', 'ops'],
     ['admin@a.co', 'admin-a'],
@@ -151,7 +165,7 @@ describe('POST /api/platform/staff/invite', () => {
     const res = await invite('ops', { email: ' Sam@Figbloom.org ', note: ' Support lead ' }, { origin: 'https://console-staging.figbloom.org' });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      ok: true, email: 'sam@figbloom.org', userId: 'new-3', origin: 'https://console-staging.figbloom.org',
+      ok: true, email: 'sam@figbloom.org', userId: 'new-3', role: 'viewer', origin: 'https://console-staging.figbloom.org',
       result: 'invited', invited: true, notified: false, alreadyAdmin: false,
     });
     // Supabase sends the invitation itself: nothing from here
@@ -159,17 +173,17 @@ describe('POST /api/platform/staff/invite', () => {
     expect(state.invites).toEqual([
       { email: 'sam@figbloom.org', options: { redirectTo: 'https://console-staging.figbloom.org/update-password' } },
     ]);
-    expect(state.grants).toEqual([{ p_by: 'ops', p_email: 'sam@figbloom.org', p_note: 'Support lead' }]);
+    expect(state.grants).toEqual([{ p_by: 'ops', p_email: 'sam@figbloom.org', p_note: 'Support lead', p_role: 'viewer' }]);
   });
 
   it('adds someone who already has a login and emails them that they now have console access', async () => {
     const res = await invite('ops', { email: 'mary@figbloom.org', note: 'Payroll <lead>' }, { origin: 'https://console-staging.figbloom.org' });
     expect(await res.json()).toEqual({
-      ok: true, email: 'mary@figbloom.org', userId: 'mary', origin: 'https://console-staging.figbloom.org',
+      ok: true, email: 'mary@figbloom.org', userId: 'mary', role: 'viewer', origin: 'https://console-staging.figbloom.org',
       result: 'notified', invited: false, notified: true, alreadyAdmin: false,
     });
     expect(state.invites).toEqual([]);
-    expect(state.grants).toEqual([{ p_by: 'ops', p_email: 'mary@figbloom.org', p_note: 'Payroll <lead>' }]);
+    expect(state.grants).toEqual([{ p_by: 'ops', p_email: 'mary@figbloom.org', p_note: 'Payroll <lead>', p_role: 'viewer' }]);
     expect(state.sends).toHaveLength(1);
     const mail = state.sends[0] as Mail;
     expect(mail.to).toBe('mary@figbloom.org');
@@ -232,7 +246,7 @@ describe('POST /api/platform/staff/invite', () => {
     state.inviteError = { status: 422, message: 'A user with this email address has already been registered' };
     const res = await invite('ops', { email: 'late@figbloom.org' });
     expect(await res.json()).toMatchObject({ ok: true, email: 'late@figbloom.org', userId: 'late', result: 'notified', invited: false });
-    expect(state.grants).toEqual([{ p_by: 'ops', p_email: 'late@figbloom.org', p_note: null }]);
+    expect(state.grants).toEqual([{ p_by: 'ops', p_email: 'late@figbloom.org', p_note: null, p_role: 'viewer' }]);
   });
 
   it('reports a failed invitation without adding anyone', async () => {
@@ -257,6 +271,63 @@ describe('POST /api/platform/staff/invite', () => {
     for (let i = 0; i < 21; i++) statuses.push((await invite('busy', { email: 'mary@figbloom.org' })).status);
     expect(statuses.slice(0, 20).every((s) => s === 200)).toBe(true);
     expect(statuses[20]).toBe(429);
+  });
+});
+
+describe('POST /api/platform/staff/invite: console roles', () => {
+  it('support and viewers cannot invite anyone', async () => {
+    for (const as of ['sup', 'view']) {
+      const res = await invite(as, { email: 'sam@figbloom.org', role: 'viewer' });
+      expect(res.status).toBe(403);
+      expect((await res.json()).error).toBe('Only an owner or admin can invite platform admins');
+    }
+    expect(state.invites).toEqual([]);
+    expect(state.grants).toEqual([]);
+  });
+
+  it('an admin invites as admin, support or viewer', async () => {
+    for (const role of ['admin', 'support', 'viewer']) {
+      const res = await invite('adm', { email: `${role}.new@figbloom.org`, role });
+      expect(res.status).toBe(200);
+      expect((await res.json()).role).toBe(role);
+    }
+    expect(state.grants.map((g) => [g.p_by, g.p_role])).toEqual([['adm', 'admin'], ['adm', 'support'], ['adm', 'viewer']]);
+  });
+
+  it('an admin inviting someone as owner gets 403, and nothing is sent', async () => {
+    const res = await invite('adm', { email: 'sam@figbloom.org', role: 'owner' });
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toBe('Only an owner can make someone an owner');
+    expect(state.invites).toEqual([]);
+    expect(state.grants).toEqual([]);
+    expect(state.sends).toEqual([]);
+  });
+
+  it('an owner invites an owner', async () => {
+    const res = await invite('ops', { email: 'mary@figbloom.org', role: 'Owner' });
+    expect(await res.json()).toMatchObject({ result: 'notified', role: 'owner' });
+    expect(state.grants[0]).toMatchObject({ p_role: 'owner' });
+  });
+
+  it('the role defaults to viewer, and anything else is refused', async () => {
+    await invite('ops', { email: 'mary@figbloom.org' });
+    expect(state.grants[0]).toMatchObject({ p_role: 'viewer' });
+    for (const role of ['superuser', 7, ['owner']]) {
+      expect((await invite('ops', { email: 'x@figbloom.org', role })).status).toBe(400);
+    }
+  });
+
+  it('the notification email names the role', async () => {
+    await invite('ops', { email: 'mary@figbloom.org', role: 'support' });
+    const mail = state.sends[0] as Mail;
+    expect(mail.text).toContain('Your role: Support.');
+    expect(mail.html).toContain('<strong>Your role:</strong> Support');
+  });
+
+  it('inviting someone who already is an admin keeps their role and says which', async () => {
+    const res = await invite('ops', { email: 'ops@figbloom.org', role: 'viewer' });
+    expect(await res.json()).toMatchObject({ result: 'already_admin', role: 'owner' });
+    expect(state.platform_admins.find((a) => a.user_id === 'ops')?.role).toBe('owner');
   });
 });
 

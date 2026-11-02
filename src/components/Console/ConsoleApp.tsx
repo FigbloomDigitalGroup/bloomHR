@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { isPlatformAdmin } from '../../lib/platformRates';
+import { myPlatformRole, type PlatformRole } from '../../lib/platformRoles';
 import ConsoleLogin from './ConsoleLogin';
 import MFAVerification from '../../pages/MFAverification';
 import UpdatePasswordPage from '../../pages/UpdatePassword';
@@ -33,6 +34,8 @@ interface Access {
   userId: string;
   admin: boolean;
   mfa: boolean;
+  /** their console role (owner, admin, support, viewer), shown in the header */
+  role: PlatformRole | null;
 }
 
 function NoConsoleAccess({ email, onSignOut }: { email: string; onSignOut: () => void }) {
@@ -82,8 +85,8 @@ export default function ConsoleApp() {
     if (!userId || cleared || (known && pathname === '/mfa')) return;
     let live = true;
     setAccess(null);
-    void Promise.all([isPlatformAdmin(), mfaRequired()]).then(([admin, mfa]) => {
-      if (live) setAccess({ userId, admin, mfa });
+    void Promise.all([isPlatformAdmin(), mfaRequired(), myPlatformRole()]).then(([admin, mfa, role]) => {
+      if (live) setAccess({ userId, admin, mfa, role });
     });
     return () => {
       live = false;
@@ -111,7 +114,7 @@ export default function ConsoleApp() {
   if (!access.admin) return <NoConsoleAccess email={email} onSignOut={() => void signOut()} />;
 
   return (
-    <ConsoleLayout email={email} onSignOut={() => void signOut()}>
+    <ConsoleLayout email={email} role={access.role} onSignOut={() => void signOut()}>
       <Routes>
         <Route path="/platform/organisations" element={<OrganisationsPage />} />
         <Route path="/platform/rates" element={<PlatformRatesPage />} />
