@@ -65,6 +65,11 @@ describe('who sees the landing page', () => {
     expect(door({ switchedOff: true })).toBe('app');
     expect(door({ switchedOff: true, pathname: '/privacy', legalLive: true })).toBe('app');
   });
+
+  it('the Figbloom console has no landing page: every address there is the console', () => {
+    expect(door({ console: true })).toBe('app');
+    expect(door({ console: true, pathname: '/privacy', legalLive: true })).toBe('app');
+  });
 });
 
 describe('the legal pages', () => {

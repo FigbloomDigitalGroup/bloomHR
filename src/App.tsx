@@ -28,6 +28,7 @@ import { FALLBACK_IDLE_TIMEOUT_MS, IDLE_WARNING_MS, idleState, lastActivity, mar
 import { loadStaySignedIn } from './lib/mfaApi';
 import { isHiddenModule } from './lib/hiddenModules';
 import { usesStaffPortal } from './lib/routeModules';
+import { isConsoleHost } from './lib/console';
 
 // Route-level code splitting: each page is fetched when first visited.
 const AdminVideoUpload = lazy(() => import('./components/training/Training'));
@@ -98,6 +99,8 @@ const InvitePeople = lazy(() => import('./components/Settings/InvitePeople'));
 const ChatLayout = lazy(() => import('./components/chat/ChatLayout').then((m) => ({ default: m.ChatLayout })));
 // the staff portal's Video Conference, for admins, HR, managers... (rooms private to the company: lib/meetingRooms.ts)
 const VideoCalls = lazy(() => import('./components/staff portal/VideoConf'));
+// the Figbloom console, on its own addresses only (src/lib/console.ts)
+const ConsoleApp = lazy(() => import('./components/Console/ConsoleApp'));
 
 interface User {
   email: string;
@@ -129,6 +132,49 @@ const PageLoader = () => (
   <div className="flex min-h-[60vh] items-center justify-center">
     <FigbloomLoader label="Loading" />
   </div>
+);
+
+// the same toasts in the company app and the console
+const AppToaster = () => (
+  <Toaster
+    position="top-right"
+    containerStyle={{
+      top: 20,
+      right: 20,
+    }}
+    reverseOrder={false}
+    gutter={8}
+    toastOptions={{
+      duration: 4000,
+      style: {
+        background: '#1f2937',
+        color: '#fff',
+        border: '1px solid #374151',
+        borderRadius: '8px',
+        fontSize: '14px',
+      },
+      success: {
+        iconTheme: {
+          primary: '#10b981',
+          secondary: '#fff',
+        },
+        duration: 3000,
+      },
+      error: {
+        iconTheme: {
+          primary: '#ef4444',
+          secondary: '#fff',
+        },
+        duration: 5000,
+      },
+      loading: {
+        iconTheme: {
+          primary: '#3b82f6',
+          secondary: '#fff',
+        },
+      },
+    }}
+  />
 );
 
 class ErrorBoundaryClass extends React.Component<
@@ -188,7 +234,8 @@ const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
   return <ErrorBoundaryClass resetKey={pathname}>{children}</ErrorBoundaryClass>;
 };
 
-function App() {
+// The company app: sign-in, a company's screens and the staff portal (on every address but the console's)
+function WorkspaceApp() {
   // All hooks at the top level
   const [authUser, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -1078,6 +1125,7 @@ function App() {
                                 {gate('/payroll', <PayrollDashboard />)}
                                 {gate('/settings/payslip-design', <PayslipDesignPage />)}
                                 {/* Figbloom platform admins only: the page checks, and the database refuses anyone else (FIG-813) */}
+                                {/* also in the Figbloom console (src/lib/console.ts); these two go once it is live in production */}
                                 {gate('/platform/rates', <PlatformRatesPage />)}
                                 {gate('/platform/organisations', <OrganisationsPage />)}
                                 {gate('/settings', <UserRolesSettings />)}
@@ -1130,49 +1178,25 @@ function App() {
             />
           </Routes>
           </Suspense>
-          <Toaster
-            position="top-right"
-            containerStyle={{
-              top: 20,
-              right: 20,
-            }}
-            reverseOrder={false}
-            gutter={8}
-            toastOptions={{
-              duration: 4000,
-              style: {
-                background: '#1f2937',
-                color: '#fff',
-                border: '1px solid #374151',
-                borderRadius: '8px',
-                fontSize: '14px',
-              },
-              success: {
-                iconTheme: {
-                  primary: '#10b981',
-                  secondary: '#fff',
-                },
-                duration: 3000,
-              },
-              error: {
-                iconTheme: {
-                  primary: '#ef4444',
-                  secondary: '#fff',
-                },
-                duration: 5000,
-              },
-              loading: {
-                iconTheme: {
-                  primary: '#3b82f6',
-                  secondary: '#fff',
-                },
-              },
-            }}
-          />
+          <AppToaster />
         </div>
       </ErrorBoundary>
     </UserProvider>
   );
 }
 
-export default App;
+// The address decides which app this is: the Figbloom console (src/lib/console.ts) is a separate, small app for
+// platform admins, with no company in it; every other address gets the company app, exactly as before.
+export default function App() {
+  if (!isConsoleHost()) return <WorkspaceApp />;
+  return (
+    <ErrorBoundary>
+      <div className="min-h-screen bg-page overflow-x-hidden">
+        <Suspense fallback={<Loader />}>
+          <ConsoleApp />
+        </Suspense>
+        <AppToaster />
+      </div>
+    </ErrorBoundary>
+  );
+}

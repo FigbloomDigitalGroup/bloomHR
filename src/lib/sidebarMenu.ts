@@ -97,6 +97,8 @@ export const SIDEBAR_MENU: SidebarMenuGroup[] = [
 
 // Figbloom's own pages, shown in the sidebar only to platform admins (is_platform_admin()). Not part of SIDEBAR_MENU:
 // they are not a company's modules, so the Roles screen's preview never shows them.
+// The Figbloom console (console.figbloom.org, src/lib/console.ts) now has these pages without any company role; this
+// group stays in the company app until the console is live in production, then a follow-up removes it.
 export const PLATFORM_MENU: SidebarMenuGroup = {
   title: 'Platform',
   items: [
