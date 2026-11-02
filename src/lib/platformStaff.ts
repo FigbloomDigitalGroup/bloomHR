@@ -30,13 +30,45 @@ export interface PlatformAdminChange {
   changed_at: string;
 }
 
+/**
+ * What inviting did: invited (new login, Supabase emailed a link to set a password), notified (existing login, emailed
+ * that they now have console access), notify_failed (existing login, added, but that email failed) or already_admin
+ * (only the note was updated).
+ */
+export type InviteOutcome = 'invited' | 'notified' | 'notify_failed' | 'already_admin';
+
 export interface InviteResult {
   ok: true;
   email: string;
   userId: string | null;
-  /** a new login was created and emailed a link to set a password */
+  /** the console address they were sent to */
+  origin?: string;
+  result: InviteOutcome;
   invited: boolean;
+  notified: boolean;
   alreadyAdmin: boolean;
+  /** why the notification email failed (notify_failed) */
+  notifyError?: string;
+}
+
+/** The message to show for what inviting did. */
+export function inviteMessage(r: InviteResult): { tone: 'success' | 'warning'; text: string } {
+  const where = (r.origin || 'https://console.figbloom.org').replace(/^https:\/\//, '');
+  switch (r.result) {
+    case 'invited':
+      return { tone: 'success', text: `Invite sent to ${r.email}. They set a password from the email, then sign in here.` };
+    case 'notified':
+      return { tone: 'success', text: `${r.email} already had a login; we emailed them that they now have console access.` };
+    case 'notify_failed':
+      return {
+        tone: 'warning',
+        text: `${r.email} is now an admin, but the notification email failed${r.notifyError ? ` (${r.notifyError})` : ''}: they can sign in at ${where} with their usual password. Let them know yourself.`,
+      };
+    case 'already_admin':
+      return { tone: 'success', text: `${r.email} was already an admin; note updated.` };
+    default:
+      return { tone: 'success', text: `${r.email} is a platform admin.` };
+  }
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
