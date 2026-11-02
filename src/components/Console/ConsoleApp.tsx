@@ -52,6 +52,11 @@ export default function ConsoleApp() {
   const navigate = useNavigate();
   // undefined until the stored sign-in has been read
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+
+  // index.html names the company app; the console is a different place
+  useEffect(() => {
+    document.title = 'Figbloom console';
+  }, []);
   const [access, setAccess] = useState<Access | null>(null);
 
   useEffect(() => {

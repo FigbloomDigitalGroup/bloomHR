@@ -109,6 +109,9 @@ describe('the Figbloom console', () => {
     expect(await screen.findByRole('heading', { name: 'Organisations' })).toBeTruthy();
     expect(screen.getByTestId('path').textContent).toBe('/platform/organisations');
     expect(screen.getByText('ops@figbloom.org')).toBeTruthy();
+    expect(document.title).toBe('Figbloom console');
+    // one product so far: its name isn't shown as if it were the console's
+    expect(screen.queryByText('Figbloom HR')).toBeNull();
     expect(state.from).not.toHaveBeenCalled();
   });
 

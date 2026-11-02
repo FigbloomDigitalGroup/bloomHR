@@ -6,7 +6,8 @@ import { Button } from '../UI';
 // or company switcher.
 
 // Grouped by product: today the console sees only Figbloom HR (bloomHR's database); other products get their own
-// group when they join the platform (ERP design 2.1, 7.2).
+// group when they join the platform (ERP design 2.1, 7.2). The product's name shows only once there are two, so a
+// lone "Figbloom HR" doesn't read as the console's name.
 const NAV = [
   {
     product: 'Figbloom HR',
@@ -32,7 +33,9 @@ export default function ConsoleLayout({ email, onSignOut, children }: ConsoleLay
           <nav className="flex flex-wrap items-center gap-x-4 gap-y-1" aria-label="Console">
             {NAV.map((group) => (
               <div key={group.product} className="flex items-center gap-1">
-                <span className="pr-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{group.product}</span>
+                {NAV.length > 1 && (
+                  <span className="pr-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{group.product}</span>
+                )}
                 {group.items.map((item) => (
                   <NavLink
                     key={item.path}
