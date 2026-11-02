@@ -82,7 +82,13 @@ export async function apiRequest<T>(method: string, path: string, body?: unknown
 
   // Where no backend is deployed, the website itself answers (its home page, status 200): that is not JSON
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new ApiError((payload && payload.error) || `Request failed (${response.status})`, response.status, payload?.code);
+  if (!response.ok) {
+    // { error: "message", code? }, or { error: { code, message } } (the console's Schools routes, as Schools sends)
+    const error = payload?.error;
+    const message = typeof error === 'string' ? error : typeof error?.message === 'string' ? error.message : '';
+    const code = payload?.code ?? (typeof error?.code === 'string' ? error.code : undefined);
+    throw new ApiError(message || `Request failed (${response.status})`, response.status, code);
+  }
   if (payload === null || typeof payload !== 'object') throw new Error(BACKEND_UNAVAILABLE);
   return payload as T;
 }

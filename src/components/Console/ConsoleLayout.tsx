@@ -6,9 +6,9 @@ import { ROLE_LABELS, type PlatformRole } from '../../lib/platformRoles';
 // The frame of the Figbloom console (src/lib/console.ts): Figbloom's own pages, without a company's sidebar, header
 // or company switcher.
 
-// Grouped by product: today the console sees only Figbloom HR (bloomHR's database); other products get their own
-// group when they join the platform (ERP design 2.1, 7.2). The product's name shows only once there are two, so a
-// lone "Figbloom HR" doesn't read as the console's name.
+// Grouped by product: Figbloom HR (bloomHR's database) and Figbloom Schools (its own, through bloomHR's backend:
+// ERP/SCHOOLS_CONSOLE_CONTRACT.md); other products get their own group when they join the platform (ERP design 2.1,
+// 7.2). The product's name shows only when there are two or more, so a lone group doesn't read as the console's name.
 const NAV = [
   {
     product: 'Figbloom HR',
@@ -17,6 +17,7 @@ const NAV = [
       { label: 'Statutory rates', path: '/platform/rates' },
     ],
   },
+  { product: 'Figbloom Schools', items: [{ label: 'Schools', path: '/platform/schools' }] },
 ];
 
 // Figbloom's own, not one product's: shown apart from the product groups, next to who is signed in

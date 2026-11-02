@@ -50,6 +50,10 @@ vi.mock('../../lib/platformStaff', async (importOriginal) => ({
   listPlatformStaff: () => Promise.resolve([]),
   recentPlatformAdminChanges: () => Promise.resolve([]),
 }));
+vi.mock('../../lib/platformSchools', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/platformSchools')>()),
+  listSchools: () => Promise.resolve({ generated_at: '2026-11-02T10:00:00Z', schools: [] }),
+}));
 // the sign-in pages have tests of their own
 vi.mock('./ConsoleLogin', () => ({ default: () => <p>Sign-in form</p> }));
 vi.mock('../../pages/MFAverification', () => ({ default: () => <p>Two-step code form</p> }));
@@ -121,8 +125,10 @@ describe('the Figbloom console', () => {
     expect(screen.getByTestId('path').textContent).toBe('/platform/organisations');
     expect(screen.getByText('ops@figbloom.org')).toBeTruthy();
     expect(document.title).toBe('Figbloom console');
-    // one product so far: its name isn't shown as if it were the console's
-    expect(screen.queryByText('Figbloom HR')).toBeNull();
+    // two products: each group carries its product's name
+    const products = screen.getByRole('navigation', { name: 'Console' });
+    expect(within(products).getByText('Figbloom HR')).toBeTruthy();
+    expect(within(products).getByText('Figbloom Schools')).toBeTruthy();
     expect(state.from).not.toHaveBeenCalled();
   });
 
@@ -145,8 +151,17 @@ describe('the Figbloom console', () => {
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Figbloom' })).getByRole('link', { name: 'Staff' }));
     expect(await screen.findByRole('heading', { name: 'Staff' })).toBeTruthy();
     expect(screen.getByTestId('path').textContent).toBe('/platform/staff');
-    // still one product: its name stays hidden
-    expect(screen.queryByText('Figbloom HR')).toBeNull();
+    expect(state.from).not.toHaveBeenCalled();
+  });
+
+  it('opens Figbloom Schools > Schools from the product menu', async () => {
+    state.session = signedIn();
+    renderAt('/platform/organisations');
+    await screen.findByRole('heading', { name: 'Organisations' });
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Console' })).getByRole('link', { name: 'Schools' }));
+    expect(await screen.findByRole('heading', { name: 'Schools' })).toBeTruthy();
+    expect(screen.getByTestId('path').textContent).toBe('/platform/schools');
+    expect(await screen.findByText('No schools on Figbloom Schools yet.')).toBeTruthy();
     expect(state.from).not.toHaveBeenCalled();
   });
 

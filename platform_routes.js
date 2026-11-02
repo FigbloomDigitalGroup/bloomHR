@@ -23,6 +23,20 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const PLATFORM_ROLES = ["owner", "admin", "support", "viewer"];
 const ROLE_LABELS = { owner: "Owner", admin: "Admin", support: "Support", viewer: "Viewer" };
 const MANAGES_STAFF = ["owner", "admin"];
+
+// What each role may do: the same table as platform_role_allows() in that migration (and ROLE_PERMISSIONS in
+// src/lib/platformRoles.ts). For routes that act outside bloomHR's database, where no SQL function checks again.
+const ROLE_PERMISSIONS = {
+  owner: ["view", "suspend_companies", "approve_companies", "edit_rates", "manage_staff"],
+  admin: ["view", "suspend_companies", "approve_companies", "edit_rates", "manage_staff"],
+  support: ["view", "suspend_companies"],
+  viewer: ["view"],
+};
+
+/** Whether a console role allows a permission ('view', 'suspend_companies', ...); false with no role. */
+export function platformRoleAllows(role, permission) {
+  return !!role && Object.hasOwn(ROLE_PERMISSIONS, role) && ROLE_PERMISSIONS[role].includes(permission);
+}
 const MAX_NOTE = 500;
 const HOUR = 60 * 60 * 1000;
 
@@ -107,7 +121,7 @@ async function notifyNewAdmin({ to, inviter, origin, note, role }) {
 }
 
 /** The signed-in platform admin calling, or an HttpError. No company needed. */
-async function authenticatePlatformAdmin(req) {
+export async function authenticatePlatformAdmin(req) {
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
   if (!token) throw new HttpError(401, "Missing bearer token");
