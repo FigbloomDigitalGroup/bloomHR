@@ -18,6 +18,21 @@ const state = vi.hoisted(() => ({
   invites: [] as { email: string; options: Record<string, unknown> }[],
   inviteError: null as { status?: number; message: string } | null,
   grants: [] as Row[],
+  sends: [] as Record<string, unknown>[],
+  sendResult: { error: null } as { error: unknown },
+  sendThrows: false,
+}));
+
+vi.mock('resend', () => ({
+  Resend: class {
+    emails = {
+      send: async (msg: Record<string, unknown>) => {
+        if (state.sendThrows) throw new Error('network down');
+        state.sends.push(msg);
+        return state.sendResult;
+      },
+    };
+  },
 }));
 
 vi.mock('@supabase/supabase-js', () => {
@@ -102,7 +117,14 @@ beforeEach(() => {
   state.invites = [];
   state.inviteError = null;
   state.grants = [];
+  state.sends = [];
+  state.sendResult = { error: null };
+  state.sendThrows = false;
+  process.env.RESEND_API_KEY = 're_test';
+  process.env.SMTP_FROM = 'Figbloom <noreply@figbloom.org>';
 });
+
+type Mail = { to: string; from: string; subject: string; html: string; text: string };
 
 const invite = (as: string | null, body: unknown, headers: Record<string, string> = {}) =>
   fetch(`${base}/staff/invite`, {
@@ -128,23 +150,70 @@ describe('POST /api/platform/staff/invite', () => {
   it('creates a login for a new email, with a link back to the console it was asked from, and adds them as the caller', async () => {
     const res = await invite('ops', { email: ' Sam@Figbloom.org ', note: ' Support lead ' }, { origin: 'https://console-staging.figbloom.org' });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, email: 'sam@figbloom.org', userId: 'new-3', invited: true, alreadyAdmin: false });
+    expect(await res.json()).toEqual({
+      ok: true, email: 'sam@figbloom.org', userId: 'new-3', origin: 'https://console-staging.figbloom.org',
+      result: 'invited', invited: true, notified: false, alreadyAdmin: false,
+    });
+    // Supabase sends the invitation itself: nothing from here
+    expect(state.sends).toEqual([]);
     expect(state.invites).toEqual([
       { email: 'sam@figbloom.org', options: { redirectTo: 'https://console-staging.figbloom.org/update-password' } },
     ]);
     expect(state.grants).toEqual([{ p_by: 'ops', p_email: 'sam@figbloom.org', p_note: 'Support lead' }]);
   });
 
-  it('just adds someone who already has a login (no invitation email)', async () => {
-    const res = await invite('ops', { email: 'mary@figbloom.org' });
-    expect(await res.json()).toEqual({ ok: true, email: 'mary@figbloom.org', userId: 'mary', invited: false, alreadyAdmin: false });
+  it('adds someone who already has a login and emails them that they now have console access', async () => {
+    const res = await invite('ops', { email: 'mary@figbloom.org', note: 'Payroll <lead>' }, { origin: 'https://console-staging.figbloom.org' });
+    expect(await res.json()).toEqual({
+      ok: true, email: 'mary@figbloom.org', userId: 'mary', origin: 'https://console-staging.figbloom.org',
+      result: 'notified', invited: false, notified: true, alreadyAdmin: false,
+    });
     expect(state.invites).toEqual([]);
-    expect(state.grants).toEqual([{ p_by: 'ops', p_email: 'mary@figbloom.org', p_note: null }]);
+    expect(state.grants).toEqual([{ p_by: 'ops', p_email: 'mary@figbloom.org', p_note: 'Payroll <lead>' }]);
+    expect(state.sends).toHaveLength(1);
+    const mail = state.sends[0] as Mail;
+    expect(mail.to).toBe('mary@figbloom.org');
+    expect(mail.from).toBe('Figbloom <noreply@figbloom.org>');
+    expect(mail.text).toContain("You've been made a Figbloom platform admin by ops@figbloom.org.");
+    expect(mail.text).toContain('Sign in at https://console-staging.figbloom.org with your usual password.');
+    expect(mail.text).toContain('Note: Payroll <lead>');
+    // the note is escaped in the HTML
+    expect(mail.html).toContain('Payroll &lt;lead&gt;');
+    expect(mail.html).not.toContain('<lead>');
+    expect(mail.html).toContain('href="https://console-staging.figbloom.org"');
   });
 
-  it('says when they already are a platform admin', async () => {
-    const res = await invite('ops', { email: 'ops@figbloom.org' });
-    expect((await res.json()).alreadyAdmin).toBe(true);
+  it('leaves the note out of the email when there is none', async () => {
+    await invite('ops', { email: 'mary@figbloom.org' });
+    expect((state.sends[0] as Mail).text).not.toContain('Note:');
+  });
+
+  it('still adds them when the email is refused, and says so', async () => {
+    state.sendResult = { error: { name: 'validation_error', message: 'bad from' } };
+    const res = await invite('ops', { email: 'mary@figbloom.org' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, result: 'notify_failed', notified: false, notifyError: 'The email service refused the message' });
+    expect(state.platform_admins.some((a) => a.user_id === 'mary')).toBe(true);
+  });
+
+  it('still adds them when sending throws or email is not set up', async () => {
+    state.sendThrows = true;
+    expect(await (await invite('ops', { email: 'mary@figbloom.org' })).json()).toMatchObject({ result: 'notify_failed', notifyError: 'The email could not be sent' });
+    state.platform_admins = state.platform_admins.filter((a) => a.user_id !== 'mary');
+    state.sendThrows = false;
+    delete process.env.RESEND_API_KEY;
+    expect(await (await invite('ops', { email: 'mary@figbloom.org' })).json()).toMatchObject({
+      result: 'notify_failed', notifyError: 'Email is not set up (RESEND_API_KEY)',
+    });
+    expect(state.sends).toEqual([]);
+    expect(state.platform_admins.some((a) => a.user_id === 'mary')).toBe(true);
+  });
+
+  it('sends nothing when they already are a platform admin (only the note changes)', async () => {
+    const res = await invite('ops', { email: 'ops@figbloom.org', note: 'New note' });
+    expect(await res.json()).toMatchObject({ result: 'already_admin', alreadyAdmin: true, notified: false, invited: false });
+    expect(state.sends).toEqual([]);
+    expect(state.invites).toEqual([]);
   });
 
   it('sends the link to production for any other origin', async () => {
@@ -162,7 +231,7 @@ describe('POST /api/platform/staff/invite', () => {
   it('carries on when the login appeared in the meantime', async () => {
     state.inviteError = { status: 422, message: 'A user with this email address has already been registered' };
     const res = await invite('ops', { email: 'late@figbloom.org' });
-    expect(await res.json()).toEqual({ ok: true, email: 'late@figbloom.org', userId: 'late', invited: false, alreadyAdmin: false });
+    expect(await res.json()).toMatchObject({ ok: true, email: 'late@figbloom.org', userId: 'late', result: 'notified', invited: false });
     expect(state.grants).toEqual([{ p_by: 'ops', p_email: 'late@figbloom.org', p_note: null }]);
   });
 

@@ -51,7 +51,7 @@ beforeEach(() => {
     { id: 'c1', user_id: 'u-new', email: 'new@figbloom.org', action: 'added', note: 'Support', changed_by: ME, changed_by_email: 'ops@figbloom.org', changed_at: '2026-10-29T08:00:00Z' },
   ];
   api.invites = [];
-  api.inviteResult = { ok: true, email: 'sam@figbloom.org', userId: 'u-sam', invited: true, alreadyAdmin: false };
+  api.inviteResult = result('invited', 'sam@figbloom.org');
   api.inviteError = null;
   api.removals = [];
   api.toastSuccess.mockReset();
@@ -59,6 +59,11 @@ beforeEach(() => {
 });
 
 // the email also shows in the recent changes: the row is the one in the table
+const result = (outcome: InviteResult['result'], email: string, extra: Partial<InviteResult> = {}): InviteResult => ({
+  ok: true, email, userId: 'u-x', origin: 'https://console.figbloom.org', result: outcome, invited: outcome === 'invited',
+  notified: outcome === 'notified', alreadyAdmin: outcome === 'already_admin', ...extra,
+});
+
 const rowOf = async (email: string) =>
   (await screen.findAllByText(email)).map((e) => e.closest('tr')).find(Boolean) as HTMLElement;
 
@@ -135,21 +140,60 @@ describe('the Staff page', () => {
     fireEvent.change(screen.getByLabelText(/Note/), { target: { value: 'Support lead' } });
     fireEvent.click(invite);
     await waitFor(() => expect(api.invites).toEqual([['sam@figbloom.org', 'Support lead']]));
-    await waitFor(() => expect(api.toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/emailed a link to set their password/)));
+    await waitFor(() => expect(api.toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/^Invite sent to sam@figbloom.org/)));
     expect((screen.getByLabelText('Email') as HTMLInputElement).value).toBe('');
   });
 
-  it('says when the person already had a login, and shows a refusal plainly', async () => {
-    api.inviteResult = { ok: true, email: 'mary@figbloom.org', userId: 'u-mary', invited: false, alreadyAdmin: false };
+  const inviteAs = async (email: string) => {
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: email } });
+    fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
+  };
+
+  it('says the invite was sent to a new login, and keeps the message on the page', async () => {
     render(<StaffPage currentUserId={ME} />);
     await screen.findByText('ops@figbloom.org');
-    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'mary@figbloom.org' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
-    await waitFor(() => expect(api.toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/existing login/)));
+    await inviteAs('sam@figbloom.org');
+    expect((await screen.findByRole('status')).textContent).toMatch(/^Invite sent to sam@figbloom.org/);
+  });
 
+  it('says an existing login was emailed that they now have console access', async () => {
+    api.inviteResult = result('notified', 'mary@figbloom.org');
+    render(<StaffPage currentUserId={ME} />);
+    await screen.findByText('ops@figbloom.org');
+    await inviteAs('mary@figbloom.org');
+    await waitFor(() =>
+      expect(api.toastSuccess).toHaveBeenCalledWith('mary@figbloom.org already had a login; we emailed them that they now have console access.')
+    );
+    expect(screen.getByRole('status').textContent).toMatch(/now have console access/);
+  });
+
+  it('warns when the notification email failed, with where they can sign in', async () => {
+    api.inviteResult = result('notify_failed', 'mary@figbloom.org', { origin: 'https://console-staging.figbloom.org', notifyError: 'Email is not set up (RESEND_API_KEY)' });
+    render(<StaffPage currentUserId={ME} />);
+    await screen.findByText('ops@figbloom.org');
+    await inviteAs('mary@figbloom.org');
+    const status = await screen.findByRole('status');
+    expect(status.textContent).toMatch(/mary@figbloom.org is now an admin, but the notification email failed/);
+    expect(status.textContent).toMatch(/RESEND_API_KEY/);
+    expect(status.textContent).toMatch(/sign in at console-staging.figbloom.org with their usual password/);
+    expect(api.toastError).toHaveBeenCalledWith(expect.stringMatching(/notification email failed/), { duration: 10000 });
+    expect(api.toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it('says when they already were an admin and only the note changed', async () => {
+    api.inviteResult = result('already_admin', 'ops@figbloom.org');
+    render(<StaffPage currentUserId={ME} />);
+    await screen.findByText('ops@figbloom.org');
+    await inviteAs('ops@figbloom.org');
+    await waitFor(() => expect(api.toastSuccess).toHaveBeenCalledWith('ops@figbloom.org was already an admin; note updated.'));
+  });
+
+  it('shows a refusal plainly', async () => {
     api.inviteError = new Error('Only a Figbloom platform admin can do this');
-    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'x@figbloom.org' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
+    render(<StaffPage currentUserId={ME} />);
+    await screen.findByText('ops@figbloom.org');
+    await inviteAs('x@figbloom.org');
     await waitFor(() => expect(api.toastError).toHaveBeenCalledWith('Only a Figbloom platform admin can do this'));
+    expect(screen.queryByRole('status')).toBeNull();
   });
 });

@@ -5,7 +5,7 @@ import { Button, Card, Modal, PageHeader, StatusPill, TableScroll } from '../UI'
 import FigbloomLoader from '../UI/FigbloomLoader';
 import { isPlatformAdmin } from '../../lib/platformRates';
 import {
-  invitePlatformAdmin, isEmail, listPlatformStaff, recentPlatformAdminChanges, removePlatformAdmin,
+  invitePlatformAdmin, inviteMessage, isEmail, listPlatformStaff, recentPlatformAdminChanges, removePlatformAdmin,
   type PlatformAdminChange, type PlatformStaffMember,
 } from '../../lib/platformStaff';
 
@@ -30,6 +30,7 @@ export default function StaffPage({ currentUserId }: StaffPageProps) {
   const [email, setEmail] = useState('');
   const [note, setNote] = useState('');
   const [inviting, setInviting] = useState(false);
+  const [outcome, setOutcome] = useState<ReturnType<typeof inviteMessage> | null>(null);
   const [removing, setRemoving] = useState<PlatformStaffMember | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -61,17 +62,16 @@ export default function StaffPage({ currentUserId }: StaffPageProps) {
     setInviting(true);
     try {
       const r = await invitePlatformAdmin(email, note);
-      toast.success(
-        r.alreadyAdmin
-          ? `${r.email} is already a platform admin.`
-          : r.invited
-            ? `${r.email} is a platform admin. They were emailed a link to set their password.`
-            : `${r.email} is a platform admin. They sign in with their existing login.`
-      );
+      const message = inviteMessage(r);
+      // kept on the page too, so a failed notification isn't missed when the toast goes
+      setOutcome(message);
+      if (message.tone === 'warning') toast.error(message.text, { duration: 10000 });
+      else toast.success(message.text);
       setEmail('');
       setNote('');
       await load();
     } catch (err) {
+      setOutcome(null);
       toast.error(err instanceof Error ? err.message : 'The platform admin was not added.');
     } finally {
       setInviting(false);
@@ -191,6 +191,12 @@ export default function StaffPage({ currentUserId }: StaffPageProps) {
               {inviting ? 'Inviting…' : 'Invite'}
             </Button>
           </form>
+          {outcome && (
+            <p role="status"
+              className={`mt-3 rounded-tile px-3 py-2 text-xs ${outcome.tone === 'warning' ? 'bg-orange-tint-alt text-orange-text-alt' : 'bg-green-tint text-status-success'}`}>
+              {outcome.text}
+            </p>
+          )}
         </Card>
 
         <Card>

@@ -5,6 +5,7 @@
 // The database checks again: grant_platform_admin_as() refuses anyone who is not a platform admin
 // (migration 20261102100000_platform_staff.sql).
 import express from "express";
+import { Resend } from "resend";
 import { HttpError, admin } from "./admin_routes.js";
 import { createBudget } from "./authz.js";
 
@@ -37,6 +38,65 @@ export function consoleOrigin(origin) {
   return DEFAULT_CONSOLE_ORIGIN;
 }
 
+const escapeHtml = (value) =>
+  String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+/** The email telling someone who already has a login that they are now a platform admin. Everything inserted is escaped. */
+export function platformAdminEmail({ inviter, origin, note }) {
+  const by = inviter ? ` by ${inviter}` : "";
+  const subject = "You are now a Figbloom platform admin";
+  const text = [
+    `You've been made a Figbloom platform admin${by}.`,
+    ...(note ? ["", `Note: ${note}`] : []),
+    "",
+    `Sign in at ${origin} with your usual password.`,
+    "",
+    "If you were not expecting this, tell the person who added you.",
+  ].join("\n");
+  const html = `<!doctype html>
+<html>
+  <body style="margin:0;padding:24px;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#16201a;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center">
+      <table role="presentation" width="520" cellspacing="0" cellpadding="0" style="max-width:520px;background:#ffffff;border-radius:12px;padding:32px;">
+        <tr><td>
+          <p style="margin:0 0 16px;font-size:13px;font-weight:bold;color:#17402a;">Figbloom console</p>
+          <h1 style="margin:0 0 12px;font-size:20px;">You are now a platform admin</h1>
+          <p style="margin:0 0 16px;font-size:14px;line-height:1.5;">You've been made a Figbloom platform admin${escapeHtml(by)}.</p>
+          ${note ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.5;"><strong>Note:</strong> ${escapeHtml(note)}</p>` : ""}
+          <p style="margin:0 0 24px;"><a href="${escapeHtml(origin)}" style="display:inline-block;background:#17402a;color:#ffffff;text-decoration:none;font-weight:bold;font-size:14px;padding:12px 22px;border-radius:8px;">Sign in to the console</a></p>
+          <p style="margin:0;font-size:12px;color:#5f6b62;">Sign in at ${escapeHtml(origin)} with your usual password. If you were not expecting this, tell the person who added you.</p>
+        </td></tr>
+      </table>
+    </td></tr></table>
+  </body>
+</html>`;
+  return { subject, html, text };
+}
+
+/** Emails an existing login that they now have console access. Resolves { ok } or { ok: false, reason }; never throws. */
+async function notifyNewAdmin({ to, inviter, origin, note }) {
+  if (!process.env.RESEND_API_KEY) return { ok: false, reason: "Email is not set up (RESEND_API_KEY)" };
+  try {
+    const message = platformAdminEmail({ inviter, origin, note });
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const { error } = await resend.emails.send({
+      from: process.env.SMTP_FROM || "Figbloom HR <onboarding@resend.dev>",
+      to,
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
+    });
+    if (error) {
+      console.error("[platform] Resend rejected the notification:", error.name || "", error.message || "");
+      return { ok: false, reason: "The email service refused the message" };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error("[platform] notification failed:", err?.message || err);
+    return { ok: false, reason: "The email could not be sent" };
+  }
+}
+
 /** The signed-in platform admin calling, or an HttpError. No company needed. */
 async function authenticatePlatformAdmin(req) {
   const header = req.headers.authorization || "";
@@ -66,9 +126,13 @@ async function grantAs(caller, email, note) {
   return { data, error };
 }
 
-// POST /api/platform/staff/invite  { email, note? }  -> { ok, email, userId, invited, alreadyAdmin }
-// Makes the person with this email a platform admin. Without a login yet, Supabase Auth creates one and emails them a
-// link to set a password on the console (invited: true). With one, they are just added (invited: false).
+// POST /api/platform/staff/invite  { email, note? }
+//   -> { ok, email, userId, origin, result, invited, notified, alreadyAdmin, notifyError? }
+// Makes the person with this email a platform admin. `result` says what happened:
+//   invited        no login yet: Supabase Auth created one and emailed a link to set a password on the console
+//   notified       they had a login: added, and emailed here that they now have console access
+//   notify_failed  they had a login: added, but that email failed (notifyError says why); they can still sign in
+//   already_admin  they already were one: only the note was updated, nothing sent
 router.post("/staff/invite", async (req, res) => {
   try {
     if (!admin) throw new HttpError(500, "Admin API is not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)");
@@ -82,12 +146,11 @@ router.post("/staff/invite", async (req, res) => {
 
     if (!inviteBudget(caller.id, "default", 1)) throw new HttpError(429, "Too many invitations. Try again in an hour.");
 
+    const origin = consoleOrigin(req.headers.origin);
     let invited = false;
     let { data, error } = await grantAs(caller, email, note);
     if (error && noLogin(error)) {
-      const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-        redirectTo: `${consoleOrigin(req.headers.origin)}/update-password`,
-      });
+      const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo: `${origin}/update-password` });
       // someone created the login in the meantime: just add them
       if (inviteError && !alreadyRegistered(inviteError)) {
         console.error("[platform] invite failed:", inviteError.status || "", inviteError.message || "");
@@ -101,7 +164,29 @@ router.post("/staff/invite", async (req, res) => {
       throw error;
     }
 
-    res.json({ ok: true, email, userId: data?.user_id ?? null, invited, alreadyAdmin: data?.added === false });
+    const alreadyAdmin = data?.added === false;
+    let result = invited ? "invited" : alreadyAdmin ? "already_admin" : "notified";
+    let notifyError;
+    // Supabase sends an existing login nothing: tell them here. The grant stands whatever happens to this email.
+    if (result === "notified") {
+      const sent = await notifyNewAdmin({ to: email, inviter: caller.email, origin, note });
+      if (!sent.ok) {
+        result = "notify_failed";
+        notifyError = sent.reason;
+      }
+    }
+
+    res.json({
+      ok: true,
+      email,
+      userId: data?.user_id ?? null,
+      origin,
+      result,
+      invited,
+      notified: result === "notified",
+      alreadyAdmin,
+      ...(notifyError ? { notifyError } : {}),
+    });
   } catch (err) {
     const status = err instanceof HttpError ? err.status : 500;
     if (status >= 500 && !(err instanceof HttpError)) console.error("[platform]", err);
