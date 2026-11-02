@@ -236,12 +236,15 @@ describe('spreadsheet import', () => {
 describe('rates from a date', () => {
   it("work takes the rate in force on its day; a kind of work can be limited to dates", async () => {
     const weeding = `(select id from work_types where name = 'Weeding' and tenant_id = '${A}')`;
-    await as(PAY, `select set_work_rate(${weeding}, 40, current_date - 3)`);
-    const before = await insertEntry(PAY, `(employee_number, work_date, work_type_id, quantity) values ('W3', current_date - 5, ${weeding}, 1)`);
-    const after = await insertEntry(PAY, `(employee_number, work_date, work_type_id, quantity) values ('W3', current_date - 1, ${weeding}, 1)`);
+    // today and tomorrow: both always in an open month (the month before is approved above, so "5 days ago" broke
+    // the test in the first days of every month); tomorrow is the latest day work can be recorded for
+    await as(PAY, `select set_work_rate(${weeding}, 40, current_date + 1)`);
+    const before = await insertEntry(PAY, `(employee_number, work_date, work_type_id, quantity) values ('W3', current_date, ${weeding}, 1)`);
+    const after = await insertEntry(PAY, `(employee_number, work_date, work_type_id, quantity) values ('W3', current_date + 1, ${weeding}, 1)`);
     expect((await entry(before)).rate).toBe('35.00');
     expect((await entry(after)).rate).toBe('40.00');
-    expect((await rows<{ rate: string }>(`select rate from work_types where name = 'Weeding'`))[0].rate).toBe('40.00');
+    // the kind of work shows today's rate: the new one starts tomorrow
+    expect((await rows<{ rate: string }>(`select rate from work_types where name = 'Weeding'`))[0].rate).toBe('35.00');
     await expect(as(SUP, `select set_work_rate(${weeding}, 99, current_date)`)).rejects.toThrow(/Only payroll/);
 
     await as(PAY, `update work_types set effective_to = current_date - 10 where name = 'Weeding'`);
