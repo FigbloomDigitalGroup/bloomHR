@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
 type AuthListener = (event: string, session: unknown) => void;
@@ -39,6 +39,11 @@ vi.mock('../../lib/platformOrganisations', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/platformOrganisations')>()),
   listOrganisations: () => Promise.resolve([]),
   organisationTotals: () => Promise.resolve(null),
+}));
+vi.mock('../../lib/platformStaff', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/platformStaff')>()),
+  listPlatformStaff: () => Promise.resolve([]),
+  recentPlatformAdminChanges: () => Promise.resolve([]),
 }));
 // the sign-in pages have tests of their own
 vi.mock('./ConsoleLogin', () => ({ default: () => <p>Sign-in form</p> }));
@@ -122,6 +127,20 @@ describe('the Figbloom console', () => {
     expect(screen.queryByText(/staff portal/i)).toBeNull();
     fireEvent.click(screen.getByRole('link', { name: 'Organisations' }));
     expect(await screen.findByRole('heading', { name: 'Organisations' })).toBeTruthy();
+    expect(state.from).not.toHaveBeenCalled();
+  });
+
+  it('has a Staff page apart from the product menu, for a platform admin in no company', async () => {
+    state.session = signedIn();
+    renderAt('/platform/organisations');
+    await screen.findByRole('heading', { name: 'Organisations' });
+    const products = screen.getByRole('navigation', { name: 'Console' });
+    expect(within(products).queryByRole('link', { name: 'Staff' })).toBeNull();
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Figbloom' })).getByRole('link', { name: 'Staff' }));
+    expect(await screen.findByRole('heading', { name: 'Staff' })).toBeTruthy();
+    expect(screen.getByTestId('path').textContent).toBe('/platform/staff');
+    // still one product: its name stays hidden
+    expect(screen.queryByText('Figbloom HR')).toBeNull();
     expect(state.from).not.toHaveBeenCalled();
   });
 

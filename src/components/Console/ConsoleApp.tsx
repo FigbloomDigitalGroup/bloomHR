@@ -11,6 +11,7 @@ import AuthShell, { AuthButton } from '../Company/AuthShell';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import OrganisationsPage from '../Platform/OrganisationsPage';
 import PlatformRatesPage from '../Payroll/PlatformRatesPage';
+import StaffPage from '../Platform/StaffPage';
 import ConsoleLayout from './ConsoleLayout';
 
 // The Figbloom console (src/lib/console.ts): what App shows on console.figbloom.org instead of the company app. Only
@@ -114,6 +115,7 @@ export default function ConsoleApp() {
       <Routes>
         <Route path="/platform/organisations" element={<OrganisationsPage />} />
         <Route path="/platform/rates" element={<PlatformRatesPage />} />
+        <Route path="/platform/staff" element={<StaffPage currentUserId={session.user.id} />} />
         <Route path="*" element={<Navigate to={HOME} replace />} />
       </Routes>
     </ConsoleLayout>
