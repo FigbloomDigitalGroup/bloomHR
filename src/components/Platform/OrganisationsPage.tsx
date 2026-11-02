@@ -4,6 +4,8 @@ import { Activity, Building2, Clock, Copy, PauseCircle } from 'lucide-react';
 import { Button, Card, Modal, PageHeader, SearchInput, StatCard, StatusPill, TableScroll } from '../UI';
 import type { StatusTone } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
+import BarList from './BarList';
+import { useConsoleBadge } from '../Console/consoleBadges';
 import { myPlatformRole, roleCan, type PlatformRole } from '../../lib/platformRoles';
 import {
   COMPANY_STATUSES, STATUS_LABELS, actionsFor, filterOrganisations, listOrganisations, organisationTotals, setAutoApprove, setCompanyStatus,
@@ -62,6 +64,9 @@ export default function OrganisationsPage() {
     if (allowed) void load();
   }, [allowed, load]);
 
+  // the console menu's badge: companies waiting for approval
+  useConsoleBadge('/platform/organisations', totals ? totals.by_status.pending : null, (n) => `${n} waiting for approval`);
+
   const shown = useMemo(() => filterOrganisations(list ?? [], { status, search }), [list, status, search]);
 
   const copyId = async (org: Organisation) => {
@@ -117,8 +122,6 @@ export default function OrganisationsPage() {
     );
   }
 
-  const maxWeek = Math.max(1, ...(totals?.signups_by_week ?? []).map((w) => w.count));
-
   return (
     <div className="space-y-4">
       <PageHeader title="Organisations" subtitle="Every company using Figbloom HR: approve new ones, suspend or reactivate" />
@@ -137,20 +140,8 @@ export default function OrganisationsPage() {
           </div>
 
           <div className="grid gap-3 lg:grid-cols-[2fr_1fr]">
-            <Card>
-              <h2 className="text-sm font-semibold text-ink mb-3">New sign-ups per week</h2>
-              <ul className="space-y-1.5" aria-label="New sign-ups per week">
-                {totals.signups_by_week.map((w) => (
-                  <li key={w.week} className="flex items-center gap-3 text-xs">
-                    <span className="w-24 shrink-0 text-muted-foreground">Week of {weekLabel(w.week)}</span>
-                    <span className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
-                      <span className="block h-full bg-brand rounded-full" style={{ width: `${(w.count / maxWeek) * 100}%` }} />
-                    </span>
-                    <span className="w-6 text-right font-semibold text-ink">{w.count}</span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
+            <BarList title="New sign-ups per week" labelWidth="w-24" empty="No sign-ups in these weeks."
+              bars={totals.signups_by_week.map((w) => ({ key: w.week, label: `Week of ${weekLabel(w.week)}`, value: w.count }))} />
             <Card>
               <h2 className="text-sm font-semibold text-ink">Approving new companies</h2>
               <label className="mt-3 flex items-start gap-2 text-xs text-ink cursor-pointer">

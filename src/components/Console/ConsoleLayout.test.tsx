@@ -4,7 +4,8 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
 
-import ConsoleLayout, { type ConsoleNavGroup } from './ConsoleLayout';
+import { Building2, Briefcase } from 'lucide-react';
+import ConsoleLayout, { COLLAPSED_KEY, SECTIONS_KEY, type ConsoleNavGroup } from './ConsoleLayout';
 
 // jsdom has no matchMedia: the sidebar asks it (useMobileNav) whether this is a phone
 const setWidth = (width: number) => {
@@ -18,7 +19,10 @@ const setWidth = (width: number) => {
 };
 
 afterEach(cleanup);
-beforeEach(() => setWidth(1280));
+beforeEach(() => {
+  window.localStorage.clear();
+  setWidth(1280);
+});
 
 const Where = () => <p data-testid="path">{useLocation().pathname}</p>;
 const signOut = vi.fn();
@@ -57,7 +61,14 @@ describe('the console menu', () => {
     const aside = sidebar();
     expect(aside.getAttribute('data-state')).toBe('docked');
     expect(aside.getAttribute('role')).toBeNull();
-    expect(within(aside).getByText('Figbloom console')).toBeTruthy();
+    // as Figbloom Schools' console: the mark, "Figbloom" and PLATFORM CONSOLE
+    const logo = within(aside).getByRole('img', { name: 'Figbloom' });
+    // the company app's mark (white on transparent), coloured by the theme's shell-logo rule, with no tile behind it
+    expect(logo.getAttribute('src')).toContain('bloom-mark');
+    expect(logo.className).toContain('shell-logo');
+    expect((logo.parentElement as HTMLElement).className).not.toMatch(/bg-white/);
+    expect(within(aside).getByText('Figbloom')).toBeTruthy();
+    expect(within(aside).getByText('PLATFORM CONSOLE')).toBeTruthy();
     expect(within(screen.getByRole('main')).getByText('page')).toBeTruthy();
     expect(aside.contains(screen.getByRole('main'))).toBe(false);
   });
@@ -88,11 +99,129 @@ describe('the console menu', () => {
 
   it('hides the product label when there is only one product', () => {
     renderLayout('/platform/organisations', [
-      { product: 'Figbloom HR', items: [{ label: 'Organisations', path: '/platform/organisations' }] },
+      { product: 'Figbloom HR', icon: Briefcase, items: [{ label: 'Organisations', path: '/platform/organisations', icon: Building2 }] },
     ]);
     const products = screen.getByRole('navigation', { name: 'Console' });
     expect(within(products).queryByText('Figbloom HR')).toBeNull();
     expect(within(products).getByRole('link', { name: 'Organisations' })).toBeTruthy();
+    // nothing to fold either
+    expect(within(products).queryByRole('button')).toBeNull();
+  });
+
+  it('starts with the Overview, above the products', () => {
+    renderLayout('/platform/overview');
+    const links = within(screen.getByRole('navigation', { name: 'Console' })).getAllByRole('link');
+    expect(links.map((a) => a.textContent)).toEqual(['Overview', 'Organisations', 'Statutory rates', 'Schools']);
+    expect(links[0].getAttribute('href')).toBe('/platform/overview');
+    expect(links[0].getAttribute('aria-current')).toBe('page');
+  });
+
+  it('uses no orange and no coloured tiles: theme tokens only', () => {
+    render(
+      <MemoryRouter initialEntries={['/platform/overview']}>
+        <ConsoleLayout email="ops@figbloom.org" role="owner" onSignOut={signOut} badges={{ '/platform/schools': { count: 2, label: '2 need attention' } }}>
+          <p>page</p>
+        </ConsoleLayout>
+      </MemoryRouter>
+    );
+    expect(sidebar().innerHTML).not.toMatch(/orange/);
+    for (const product of ['Figbloom HR', 'Figbloom Schools']) {
+      const icon = screen.getByRole('button', { name: product }).querySelector('svg') as SVGElement;
+      expect(icon.getAttribute('class')).toContain('text-shell-fg');
+      expect(icon.parentElement?.tagName).toBe('BUTTON');
+    }
+  });
+
+  it('gives every page an icon, and every product a mark', () => {
+    renderLayout();
+    for (const link of within(sidebar()).getAllByRole('link')) expect(link.querySelector('svg')).not.toBeNull();
+    for (const product of ['Figbloom HR', 'Figbloom Schools']) {
+      expect(screen.getByRole('button', { name: product }).querySelector('svg')).not.toBeNull();
+    }
+  });
+
+  it('folds a product section, and remembers it in this browser', () => {
+    renderLayout();
+    const hr = screen.getByRole('button', { name: 'Figbloom HR' });
+    expect(hr.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(hr);
+    expect(hr.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('link', { name: 'Organisations' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Schools' })).toBeTruthy();
+    expect(JSON.parse(window.localStorage.getItem(SECTIONS_KEY) ?? '{}')).toEqual({ 'Figbloom HR': true });
+    cleanup();
+    renderLayout();
+    expect(screen.getByRole('button', { name: 'Figbloom HR' }).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('link', { name: 'Organisations' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Figbloom HR' }));
+    expect(screen.getByRole('link', { name: 'Organisations' })).toBeTruthy();
+  });
+
+  it('folds down to icons with names as tooltips, and remembers it', () => {
+    renderLayout('/platform/rates');
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
+    expect(sidebar().getAttribute('data-state')).toBe('collapsed');
+    expect(window.localStorage.getItem(COLLAPSED_KEY)).toBe('true');
+    const rates = screen.getByRole('link', { name: 'Statutory rates' });
+    expect(rates.getAttribute('title')).toBe('Statutory rates');
+    // the name stays for screen readers, visually hidden
+    expect(within(rates).getByText('Statutory rates').className).toContain('sr-only');
+    expect(rates.getAttribute('aria-current')).toBe('page');
+    // the account folds to its avatar and a Sign out icon, still named
+    expect(screen.getByRole('button', { name: 'Sign out' }).getAttribute('title')).toBe('Sign out');
+    cleanup();
+    renderLayout();
+    expect(sidebar().getAttribute('data-state')).toBe('collapsed');
+    const expand = screen.getByRole('button', { name: 'Expand sidebar' });
+    expect(expand.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(expand);
+    expect(sidebar().getAttribute('data-state')).toBe('docked');
+    expect(window.localStorage.getItem(COLLAPSED_KEY)).toBe('false');
+  });
+
+  it('still works when the browser blocks storage', () => {
+    const get = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    const set = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    try {
+      renderLayout();
+      fireEvent.click(screen.getByRole('button', { name: 'Figbloom HR' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
+      expect(sidebar().getAttribute('data-state')).toBe('collapsed');
+    } finally {
+      get.mockRestore();
+      set.mockRestore();
+    }
+  });
+
+  it('shows count badges, with what they count for screen readers', () => {
+    render(
+      <MemoryRouter initialEntries={['/platform/overview']}>
+        <ConsoleLayout email="ops@figbloom.org" role="owner" onSignOut={signOut}
+          badges={{ '/platform/organisations': { count: 3, label: '3 waiting for approval' }, '/platform/schools': undefined }}>
+          <p>page</p>
+        </ConsoleLayout>
+      </MemoryRouter>
+    );
+    const orgs = screen.getByRole('link', { name: 'Organisations (3 waiting for approval)' });
+    const count = within(orgs).getByText('3');
+    expect(count.getAttribute('aria-hidden')).toBe('true');
+    expect(count.className).toContain('bg-shell-fg/15');
+    expect(screen.getByRole('link', { name: 'Schools' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
+    expect(screen.getByRole('link', { name: 'Organisations (3 waiting for approval)' }).getAttribute('title')).toBe('Organisations (3 waiting for approval)');
+  });
+
+  it('shows the account as a card: initials, email, role and Sign out', () => {
+    renderLayout();
+    const account = screen.getByRole('group', { name: 'Signed in' });
+    expect(within(account).getByText('OP')).toBeTruthy();
+    expect(within(account).getByText('ops@figbloom.org')).toBeTruthy();
+    expect(within(account).getByText('Owner')).toBeTruthy();
+    expect(within(account).getByRole('button', { name: 'Sign out' })).toBeTruthy();
   });
 });
 
@@ -108,6 +237,15 @@ describe('the console menu on a phone', () => {
     expect(button.getAttribute('aria-expanded')).toBe('false');
     expect(button.getAttribute('aria-controls')).toBe('console-sidebar');
     await waitFor(() => expect(document.getElementById('console-sidebar')?.getAttribute('data-state')).toBe('closed'));
+  });
+
+  it('never folds to icons in the drawer, even when folded on the desktop', async () => {
+    window.localStorage.setItem(COLLAPSED_KEY, 'true');
+    renderLayout();
+    fireEvent.click(menuButton());
+    const drawer = await screen.findByRole('dialog', { name: 'Console menu' });
+    expect(within(drawer).getByRole('link', { name: 'Schools' }).textContent).toBe('Schools');
+    expect(within(drawer).queryByRole('button', { name: 'Collapse sidebar' })).toBeNull();
   });
 
   it('opens as a drawer, takes focus, and Escape closes it, giving focus back', async () => {

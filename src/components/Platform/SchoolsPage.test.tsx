@@ -62,7 +62,11 @@ beforeEach(() => {
   toast.error.mockReset();
 });
 
-const rowOf = async (name: string) => (await screen.findByText(name)).closest('tr') as HTMLElement;
+// a school's name also shows in the analytics (top schools, needs attention): its row is the one in the table
+const rowOf = async (name: string) =>
+  (await screen.findAllByText(name)).map((e) => e.closest('tr')).find(Boolean) as HTMLElement;
+// the schools table (names also show in the analytics above it)
+const inTable = () => within(screen.getByRole('table'));
 // a total: the figure under its label
 const stat = (label: string) => screen.getByText(label, { selector: 'div' }).nextElementSibling?.textContent;
 
@@ -117,22 +121,22 @@ describe('the schools page', () => {
     render(<SchoolsPage />);
     await rowOf('Kilimani Secondary');
     fireEvent.click(screen.getByRole('tab', { name: 'Suspended (1)' }));
-    expect(screen.queryByText('Kilimani Secondary')).toBeNull();
-    expect(screen.getByText('Lavington Primary')).toBeTruthy();
+    expect(inTable().queryByText('Kilimani Secondary')).toBeNull();
+    expect(inTable().getByText('Lavington Primary')).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: 'Archived (1)' }));
-    expect(screen.getByText('Ruiru Academy')).toBeTruthy();
-    expect(screen.queryByText('Lavington Primary')).toBeNull();
+    expect(inTable().getByText('Ruiru Academy')).toBeTruthy();
+    expect(inTable().queryByText('Lavington Primary')).toBeNull();
     fireEvent.click(screen.getByRole('tab', { name: 'All' }));
 
     const search = screen.getByPlaceholderText('Search by name, slug or ID');
     fireEvent.change(search, { target: { value: 'lavington' } });
-    expect(screen.getByText('Lavington Primary')).toBeTruthy();
-    expect(screen.queryByText('Kilimani Secondary')).toBeNull();
+    expect(inTable().getByText('Lavington Primary')).toBeTruthy();
+    expect(inTable().queryByText('Kilimani Secondary')).toBeNull();
     fireEvent.change(search, { target: { value: 'kilimani-sec' } });
-    expect(screen.getByText('Kilimani Secondary')).toBeTruthy();
+    expect(inTable().getByText('Kilimani Secondary')).toBeTruthy();
     fireEvent.change(search, { target: { value: 'C0FFEE' } });
-    expect(screen.getByText('Ruiru Academy')).toBeTruthy();
-    expect(screen.queryByText('Kilimani Secondary')).toBeNull();
+    expect(inTable().getByText('Ruiru Academy')).toBeTruthy();
+    expect(inTable().queryByText('Kilimani Secondary')).toBeNull();
     fireEvent.change(search, { target: { value: 'nothing like it' } });
     expect(screen.getByText('No schools match.')).toBeTruthy();
   });
@@ -199,7 +203,7 @@ describe('the schools page: suspending and reactivating', () => {
     expect(button.disabled).toBe(false);
     fireEvent.click(button);
     await waitFor(() => expect(api.changes).toEqual([['a2b3c4d5-0000-4000-8000-000000000001', 'active', '']]));
-    await waitFor(() => expect(within(screen.getByText('Lavington Primary').closest('tr') as HTMLElement).getByText('Active')).toBeTruthy());
+    await waitFor(async () => expect(within(await rowOf('Lavington Primary')).getByText('Active')).toBeTruthy());
   });
 
   it("shows Schools' refusal and keeps the dialog open", async () => {
@@ -231,8 +235,67 @@ describe('the schools page: suspending and reactivating', () => {
     api.role = 'viewer';
     render(<SchoolsPage />);
     await rowOf('Kilimani Secondary');
-    expect(screen.getByText('Lavington Primary')).toBeTruthy();
+    expect(inTable().getByText('Lavington Primary')).toBeTruthy();
     expect(screen.queryByText('Suspend')).toBeNull();
     expect(screen.queryByText('Reactivate')).toBeNull();
+  });
+});
+
+describe('the schools page: which statuses can be suspended', () => {
+  beforeEach(() => {
+    api.schools = ['active', 'trial', 'overdue', 'onboarding', 'setup_stalled', 'suspended'].map((st, i) =>
+      school(`School ${st}`, `0000000${i}-0000-4000-8000-000000000000`, st)
+    );
+  });
+
+  it('Suspend for active, trial and overdue; Reactivate for suspended; nothing for onboarding or setup_stalled', async () => {
+    render(<SchoolsPage />);
+    const actions = async (st: string) => {
+      const row = await rowOf(`School ${st}`);
+      return ['Suspend', 'Reactivate'].filter((a) => within(row).queryByText(a));
+    };
+    expect(await actions('active')).toEqual(['Suspend']);
+    expect(await actions('trial')).toEqual(['Suspend']);
+    expect(await actions('overdue')).toEqual(['Suspend']);
+    expect(await actions('onboarding')).toEqual([]);
+    expect(await actions('setup_stalled')).toEqual([]);
+    expect(await actions('suspended')).toEqual(['Reactivate']);
+  });
+
+  it("shows Schools' 422 status_not_settable cleanly, until Schools accepts it", async () => {
+    api.changeError = new ApiError('Status trial cannot be changed to suspended', 422, 'status_not_settable');
+    render(<SchoolsPage />);
+    fireEvent.click(within(await rowOf('School trial')).getByText('Suspend'));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText(/Why\?/), { target: { value: 'Trial abuse' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Suspend' }));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "Figbloom Schools doesn't allow School trial to be suspended while it is trial. (Status trial cannot be changed to suspended)"
+      )
+    );
+    expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+});
+
+describe('the schools page: analytics', () => {
+  it('shows the figures with a sub-line, the charts with labels and values, the top schools and what needs attention', async () => {
+    render(<SchoolsPage />);
+    await rowOf('Kilimani Secondary');
+    expect(screen.getByText('23 teachers', { exact: false }).textContent).toBe('23 teachers · 380 parents');
+    for (const title of ['New schools per week', 'Schools by status', 'Last sign-in']) {
+      expect(screen.getByRole('heading', { name: title })).toBeTruthy();
+    }
+    const byStatus = within(screen.getByRole('list', { name: 'Schools by status' })).getAllByRole('listitem');
+    expect(byStatus.map((li) => li.textContent)).toEqual(['Active1', 'Archived1', 'Suspended1']);
+    const activity = within(screen.getByRole('list', { name: 'Last sign-in' })).getAllByRole('listitem');
+    expect(activity.map((li) => li.textContent?.replace(/\d+$/, ''))).toEqual([
+      'Signed in within 7 days', 'Within 30 days', 'More than 30 days ago', 'Never signed in',
+    ]);
+    const top = within(screen.getByRole('list', { name: 'Top schools by students' })).getAllByRole('listitem');
+    expect(top.map((li) => li.textContent)).toEqual(['1.Kilimani Secondary412', '2.Lavington Primary100', '3.Ruiru Academy5']);
+    // Ruiru has no admin and nobody ever signed in; Lavington is suspended, so left out
+    const attention = within(screen.getByRole('list', { name: 'Needs attention' })).getAllByRole('listitem');
+    expect(attention.map((li) => li.textContent)).toEqual(['Ruiru AcademyNo admin · Nobody has ever signed in']);
   });
 });

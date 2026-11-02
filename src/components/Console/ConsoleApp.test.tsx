@@ -74,6 +74,7 @@ const renderAt = (path = '/') =>
 
 afterEach(cleanup);
 beforeEach(() => {
+  window.localStorage.clear();
   // a desktop screen: jsdom has no matchMedia, which the sidebar asks whether this is a phone
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1280 });
   window.matchMedia = ((query: string) => ({
@@ -112,7 +113,7 @@ describe('the Figbloom console', () => {
     state.session = signedIn();
     act(() => state.listeners.forEach((l) => l('SIGNED_IN', state.session)));
     expect((await screen.findAllByText('Figbloom console')).length).toBeGreaterThan(0);
-    await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/platform/organisations'));
+    await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/platform/overview'));
   });
 
   it('tells someone who is not a platform admin, by name, and lets them sign out', async () => {
@@ -126,11 +127,15 @@ describe('the Figbloom console', () => {
     await waitFor(() => expect(state.signOut).toHaveBeenCalledWith({ scope: 'local' }));
   });
 
-  it('opens Organisations for a platform admin in no company', async () => {
+  it('opens the Overview for a platform admin in no company', async () => {
     state.session = signedIn();
     renderAt('/');
-    expect(await screen.findByRole('heading', { name: 'Organisations' })).toBeTruthy();
-    expect(screen.getByTestId('path').textContent).toBe('/platform/organisations');
+    expect(await screen.findByRole('heading', { name: 'Overview' })).toBeTruthy();
+    expect(screen.getByTestId('path').textContent).toBe('/platform/overview');
+    // first in the menu, above the products
+    const menu = screen.getByRole('navigation', { name: 'Console' });
+    expect(within(menu).getAllByRole('link')[0].textContent).toBe('Overview');
+    expect(within(menu).getByRole('link', { name: 'Overview' }).getAttribute('aria-current')).toBe('page');
     expect(screen.getByText('ops@figbloom.org')).toBeTruthy();
     expect(document.title).toBe('Figbloom console');
     // two products: each group carries its product's name
@@ -183,10 +188,10 @@ describe('the Figbloom console', () => {
     expect(within(account).getByTitle('Your console role').textContent).toBe('Support');
   });
 
-  it('sends any other address to Organisations', async () => {
+  it('sends any other address to the Overview', async () => {
     state.session = signedIn();
     renderAt('/dashboard');
-    await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/platform/organisations'));
+    await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/platform/overview'));
   });
 
   it('asks for the two-step code first when the sign-in still needs one', async () => {

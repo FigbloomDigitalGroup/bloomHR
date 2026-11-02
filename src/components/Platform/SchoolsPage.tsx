@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { CheckCircle2, Copy, GraduationCap, PauseCircle, School as SchoolIcon } from 'lucide-react';
-import { Button, Card, Modal, PageHeader, SearchInput, StatCard, StatusPill, TableScroll } from '../UI';
+import { Copy } from 'lucide-react';
+import { Button, Card, Modal, PageHeader, SearchInput, StatusPill, TableScroll } from '../UI';
+import SchoolsAnalytics from './SchoolsAnalytics';
+import { useConsoleBadge } from '../Console/consoleBadges';
+import { schoolsNeedingAttention } from '../../lib/consoleAnalytics';
 import type { StatusTone } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import { myPlatformRole, roleCan, type PlatformRole } from '../../lib/platformRoles';
 import {
-  MAX_REASON, filterSchools, listSchools, schoolTotals, schoolsProblem, setSchoolStatus, statusFilters, statusLabel,
+  MAX_REASON, filterSchools, listSchools, schoolAction, schoolTotals, schoolsProblem, setSchoolStatus, statusChangeError,
+  statusFilters, statusLabel,
   type School, type SchoolStatusChange, type SchoolsProblem,
 } from '../../lib/platformSchools';
 
@@ -60,6 +64,9 @@ export default function SchoolsPage() {
   const schools = load && 'schools' in load ? load.schools : null;
   const totals = useMemo(() => (schools ? schoolTotals(schools) : null), [schools]);
   const tabs = useMemo(() => statusFilters(schools ?? []), [schools]);
+  // the console menu's badge: schools needing attention
+  const attention = useMemo(() => (schools ? schoolsNeedingAttention(schools).length : null), [schools]);
+  useConsoleBadge('/platform/schools', attention, (n) => `${n} need attention`);
   const shown = useMemo(() => filterSchools(schools ?? [], { status, search }), [schools, status, search]);
   const canSuspend = roleCan(role, 'suspend_companies');
 
@@ -90,7 +97,7 @@ export default function SchoolsPage() {
       if (updated && schools) setLoad({ schools: schools.map((s) => (s.id === updated.id ? updated : s)) });
       else await fetchSchools();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'The school was not changed.');
+      toast.error(statusChangeError(err, acting.school, acting.to));
     } finally {
       setBusy(false);
     }
@@ -143,14 +150,7 @@ export default function SchoolsPage() {
     <div className="space-y-4">
       {header}
 
-      {totals && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <StatCard label="Schools" value={totals.schools} icon={<SchoolIcon className="w-4 h-4" />} />
-          <StatCard label="Active" value={totals.active} icon={<CheckCircle2 className="w-4 h-4" />} tint="info" />
-          <StatCard label="Suspended" value={totals.suspended} icon={<PauseCircle className="w-4 h-4" />} tint="danger" />
-          <StatCard label="Students" value={totals.students.toLocaleString('en-KE')} icon={<GraduationCap className="w-4 h-4" />} tint="orange" />
-        </div>
-      )}
+      {totals && schools && <SchoolsAnalytics schools={schools} totals={totals} />}
 
       <Card>
         <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -214,12 +214,12 @@ export default function SchoolsPage() {
                       {s.status_reason && <span className="block mt-1 text-muted-foreground">{s.status_reason}</span>}
                     </td>
                     <td className="py-1.5 text-right whitespace-nowrap">
-                      {canSuspend && s.status === 'active' && (
+                      {canSuspend && schoolAction(s.status) === 'suspended' && (
                         <button type="button" onClick={() => open(s, 'suspended')} className="ml-3 font-semibold text-status-danger">
                           Suspend
                         </button>
                       )}
-                      {canSuspend && s.status === 'suspended' && (
+                      {canSuspend && schoolAction(s.status) === 'active' && (
                         <button type="button" onClick={() => open(s, 'active')} className="ml-3 font-semibold text-brand">
                           Reactivate
                         </button>
