@@ -1,4 +1,5 @@
 import { LEGAL_PATHS, LEGAL_REVIEWED } from './legalGate';
+import { isConsoleHost } from './console';
 
 // What opens at an address: the app, or the public landing page and legal pages. src/main.tsx asks before it loads
 // anything else, so a visitor who only wants the landing page never downloads the app (sign-in, the database client,
@@ -22,6 +23,8 @@ export interface FrontDoorInput {
   switchedOff: boolean;
   /** the Privacy Policy and Terms are approved (src/lib/legalGate.ts) */
   legalLive: boolean;
+  /** the Figbloom console's address (src/lib/console.ts): it has no landing page, every path is the console */
+  console?: boolean;
 }
 
 // a stored sign-in: the same test index.html makes to decide whether to show the loader
@@ -30,7 +33,7 @@ const STORED_SIGN_IN = /^sb-.*-auth-token$/;
 const MARKETING_PARAM = /^(utm_[a-z_]+|ref|gclid|fbclid)$/i;
 
 export function frontDoor(input: FrontDoorInput): FrontDoor {
-  if (input.switchedOff) return 'app';
+  if (input.switchedOff || input.console) return 'app';
   const path = input.pathname.replace(/\/+$/, '') || '/';
 
   if ((LEGAL_PATHS as readonly string[]).includes(path)) return input.legalLive ? 'legal' : 'app';
@@ -68,5 +71,6 @@ export function frontDoorFromWindow(): FrontDoor {
     standalone: installed,
     switchedOff: import.meta.env.VITE_LANDING_PAGE === 'off',
     legalLive: LEGAL_REVIEWED,
+    console: isConsoleHost(),
   });
 }
