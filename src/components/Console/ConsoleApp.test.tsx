@@ -74,6 +74,14 @@ const renderAt = (path = '/') =>
 
 afterEach(cleanup);
 beforeEach(() => {
+  // a desktop screen: jsdom has no matchMedia, which the sidebar asks whether this is a phone
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1280 });
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  })) as unknown as typeof window.matchMedia;
   state.session = null;
   state.admin = true;
   state.role = 'owner';
@@ -103,7 +111,7 @@ describe('the Figbloom console', () => {
     await screen.findByText('Sign-in form');
     state.session = signedIn();
     act(() => state.listeners.forEach((l) => l('SIGNED_IN', state.session)));
-    expect(await screen.findByText('Figbloom console')).toBeTruthy();
+    expect((await screen.findAllByText('Figbloom console')).length).toBeGreaterThan(0);
     await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/platform/organisations'));
   });
 
@@ -170,9 +178,9 @@ describe('the Figbloom console', () => {
     state.role = 'support';
     renderAt('/platform/staff');
     await screen.findByRole('heading', { name: 'Staff' });
-    const banner = screen.getByRole('banner');
-    expect(within(banner).getByText('ops@figbloom.org')).toBeTruthy();
-    expect(within(banner).getByTitle('Your console role').textContent).toBe('Support');
+    const account = within(screen.getByRole('complementary', { name: 'Console menu' })).getByRole('group', { name: 'Signed in' });
+    expect(within(account).getByText('ops@figbloom.org')).toBeTruthy();
+    expect(within(account).getByTitle('Your console role').textContent).toBe('Support');
   });
 
   it('sends any other address to Organisations', async () => {
