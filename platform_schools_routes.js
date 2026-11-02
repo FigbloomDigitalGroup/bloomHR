@@ -15,7 +15,7 @@ import express from "express";
 import { HttpError } from "./admin_routes.js";
 import { authenticatePlatformAdmin, platformRoleAllows } from "./platform_routes.js";
 
-export const SCHOOLS_TIMEOUT_MS = 8000;
+export const SCHOOLS_TIMEOUT_MS = 8 * 1000; // 8 seconds, as the contract says
 export const SCHOOL_STATUSES = ["suspended", "active"];
 export const MAX_REASON = 500;
 
