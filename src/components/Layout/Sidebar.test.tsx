@@ -206,12 +206,12 @@ describe('the Platform menu', () => {
     platform.admin = false;
   });
 
-  it('shows Organisations and Platform rates to platform admins', async () => {
+  it('shows Organisations and Statutory rates to platform admins', async () => {
     setWidth(1280);
     platform.admin = true;
     sidebar();
     expect(await screen.findByText('Organisations')).toBeTruthy();
-    expect(screen.getByText('Platform rates')).toBeTruthy();
+    expect(screen.getByText('Statutory rates')).toBeTruthy();
   });
 
   it('is hidden from everyone else, administrators included', async () => {
@@ -219,7 +219,7 @@ describe('the Platform menu', () => {
     sidebar();
     await act(async () => {});
     expect(screen.queryByText('Organisations')).toBeNull();
-    expect(screen.queryByText('Platform rates')).toBeNull();
+    expect(screen.queryByText('Statutory rates')).toBeNull();
   });
 });
 

@@ -41,7 +41,7 @@ vi.mock('../../lib/platformOrganisations', async (importOriginal) => ({
   organisationTotals: () => Promise.resolve(null),
 }));
 // the sign-in pages have tests of their own
-vi.mock('../../pages/Login', () => ({ default: () => <p>Sign-in form</p> }));
+vi.mock('./ConsoleLogin', () => ({ default: () => <p>Sign-in form</p> }));
 vi.mock('../../pages/MFAverification', () => ({ default: () => <p>Two-step code form</p> }));
 vi.mock('../../pages/UpdatePassword', () => ({ default: () => <p>New password form</p> }));
 
@@ -115,7 +115,7 @@ describe('the Figbloom console', () => {
   it('opens the platform pages for a platform admin who is staff in their company', async () => {
     state.session = signedIn('STAFF');
     renderAt('/platform/rates');
-    expect(await screen.findByRole('heading', { name: 'Platform rates' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Statutory rates' })).toBeTruthy();
     expect(screen.queryByText(/staff portal/i)).toBeNull();
     fireEvent.click(screen.getByRole('link', { name: 'Organisations' }));
     expect(await screen.findByRole('heading', { name: 'Organisations' })).toBeTruthy();

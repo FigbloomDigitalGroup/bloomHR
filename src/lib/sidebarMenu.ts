@@ -103,7 +103,7 @@ export const PLATFORM_MENU: SidebarMenuGroup = {
   title: 'Platform',
   items: [
     { id: 'platform-organisations', label: 'Organisations', path: '/platform/organisations' },
-    { id: 'platform-rates', label: 'Platform rates', path: '/platform/rates' },
+    { id: 'platform-rates', label: 'Statutory rates', path: '/platform/rates' },
   ],
 };
 
