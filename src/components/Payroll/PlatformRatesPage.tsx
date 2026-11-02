@@ -146,7 +146,7 @@ export default function PlatformRatesPage() {
   if (!allowed) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Platform rates" subtitle="The statutory rates every company starts from" />
+        <PageHeader title="Statutory rates" subtitle="The statutory rates every company starts from" />
         <Card>
           <p className="text-sm text-ink">Only Figbloom platform admins can change the platform rates.</p>
           <p className="text-xs text-muted-foreground mt-1">
@@ -167,7 +167,7 @@ export default function PlatformRatesPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Platform rates" subtitle="New statutory rates from a date, for every company (companies' own rates stay on top)" />
+      <PageHeader title="Statutory rates" subtitle="New statutory rates from a date, for every company (companies' own rates stay on top)" />
 
       <div className="flex gap-1" role="tablist" aria-label="Country">
         {supportedCountries().map((c) => (

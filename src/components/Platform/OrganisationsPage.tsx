@@ -95,7 +95,7 @@ export default function OrganisationsPage() {
   if (!allowed) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Organisations" subtitle="Every company on Figbloom HR" />
+        <PageHeader title="Organisations" subtitle="Every company using Figbloom HR" />
         <Card>
           <p className="text-sm text-ink">Only Figbloom platform admins can see and approve companies.</p>
         </Card>
@@ -107,7 +107,7 @@ export default function OrganisationsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Organisations" subtitle="Every company on Figbloom HR: approve new ones, suspend or reactivate" />
+      <PageHeader title="Organisations" subtitle="Every company using Figbloom HR: approve new ones, suspend or reactivate" />
 
       {totals && (
         <>

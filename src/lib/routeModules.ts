@@ -99,7 +99,7 @@ export const SCREENS: ScreenAccess[] = [
   // how payslips look (FIG-814): letterhead, contacts, footer, sections
   S('/settings/payslip-design', 'Payslip design', ['payslip-design']),
   // new statutory rates for every company (FIG-813): reached from the Rates tab by Figbloom platform admins only
-  sub('/platform/rates', 'Platform rates', [], { open: 'Figbloom platform admins: the page checks is_platform_admin and the database refuses anyone else' }),
+  sub('/platform/rates', 'Statutory rates', [], { open: 'Figbloom platform admins: the page checks is_platform_admin and the database refuses anyone else' }),
   // every company, approving new ones (migration 20261029100000): Figbloom platform admins only, from the sidebar's Platform group
   sub('/platform/organisations', 'Organisations', [], { open: 'Figbloom platform admins: the page checks is_platform_admin and the database refuses anyone else' }),
   S('/casual-workers', 'Casual workers', ['work-records', 'payroll', 'employees', 'casual-overtime', 'team-work']),

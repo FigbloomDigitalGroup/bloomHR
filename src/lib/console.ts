@@ -1,4 +1,4 @@
-// The Figbloom console (stage 1): Figbloom's own pages for platform admins (Organisations, Platform rates), served by
+// The Figbloom console (stage 1): Figbloom's own pages for platform admins (Figbloom HR: Organisations, Statutory rates), served by
 // this same app on hostnames of its own. There App shows only the console (src/components/Console/ConsoleApp.tsx): no
 // company, no staff portal, no company role. Who gets in is is_platform_admin(), and the database checks it again on
 // every platform call, so the hostname only decides which app is shown, never what anyone may do.

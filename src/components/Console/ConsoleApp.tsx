@@ -4,7 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { isPlatformAdmin } from '../../lib/platformRates';
-import Login from '../../pages/Login';
+import ConsoleLogin from './ConsoleLogin';
 import MFAVerification from '../../pages/MFAverification';
 import UpdatePasswordPage from '../../pages/UpdatePassword';
 import AuthShell, { AuthButton } from '../Company/AuthShell';
@@ -97,7 +97,7 @@ export default function ConsoleApp() {
   if (pathname === '/update-password') return <UpdatePasswordPage />;
   if (session === undefined) return <Loader />;
   // signing in moves on by itself: the session change above picks it up
-  if (!session) return <Login onLoginSuccess={() => undefined} />;
+  if (!session) return <ConsoleLogin />;
   if (!known || !access) return <Loader />;
   if (access.mfa) return pathname === '/mfa' ? <MFAVerification /> : <Navigate to="/mfa" replace />;
 
