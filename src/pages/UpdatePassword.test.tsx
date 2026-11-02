@@ -90,6 +90,13 @@ describe('UpdatePassword: token hash links', () => {
     await formShown();
     expect(auth.verifyOtp).toHaveBeenCalledWith({ token_hash: 'th1', type: 'recovery' });
   });
+
+  it('verifies an invitation link as an invite (a platform admin invited from the console sets a first password)', async () => {
+    auth.verifyOtp.mockResolvedValue({ data: { session }, error: null });
+    openAt('/update-password?token_hash=th2&type=invite');
+    await formShown();
+    expect(auth.verifyOtp).toHaveBeenCalledWith({ token_hash: 'th2', type: 'invite' });
+  });
 });
 
 describe('UpdatePassword: PKCE code links', () => {

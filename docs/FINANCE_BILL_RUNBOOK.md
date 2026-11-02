@@ -49,7 +49,7 @@ To add the first one, run this in the Supabase SQL editor (or with the service r
 select public.grant_platform_admin((select id from auth.users where email = 'mikesuperadmin@figbloom.org'), 'Figbloom payroll ops');
 ```
 
-After that, a platform admin can add or remove others with `grant_platform_admin` and `revoke_platform_admin`.
+After that, a platform admin can add or remove others on the console's Staff page (console.figbloom.org/platform/staff), or with `grant_platform_admin` and `revoke_platform_admin`. Every add and remove is logged in `platform_admin_changes`; a signed-in admin cannot remove themselves or the last platform admin.
 Nobody can write to `platform_admins` directly.
 
 ## 3. Entering a change

@@ -30,6 +30,7 @@ const readLinkParams = () => {
     errorCode: get('error_code'),
     errorDescription: get('error_description'),
     tokenHash: get('token_hash'),
+    type: get('type'),
     code: query.get('code'),
     accessToken: hash.get('access_token'),
     refreshToken: hash.get('refresh_token'),
@@ -147,8 +148,10 @@ const UpdatePasswordPage = ({ waitMs = LINK_WAIT_MS }: { waitMs?: number }) => {
 
       if (p.tokenHash) {
         const tokenHash = p.tokenHash;
+        // an invitation (a platform admin invited from the console's Staff page) sets its first password here too
+        const type = p.type === 'invite' ? 'invite' : 'recovery';
         const { data, error } = await once(`otp:${tokenHash}`, () =>
-          supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' }));
+          supabase.auth.verifyOtp({ token_hash: tokenHash, type }));
         if (!error && data.session) return valid();
         return invalid(error ? classify(error.code, error.message) : { kind: 'invalid' });
       }

@@ -18,6 +18,14 @@ const NAV = [
   },
 ];
 
+// Figbloom's own, not one product's: shown apart from the product groups, next to who is signed in
+const PLATFORM_NAV = [{ label: 'Staff', path: '/platform/staff' }];
+
+const linkClass = ({ isActive }: { isActive: boolean }) =>
+  `px-3 py-1.5 rounded-tile text-[12.5px] transition-colors ${
+    isActive ? 'bg-secondary text-ink font-semibold' : 'text-muted-foreground hover:text-ink'
+  }`;
+
 interface ConsoleLayoutProps {
   email: string;
   onSignOut: () => void;
@@ -37,15 +45,7 @@ export default function ConsoleLayout({ email, onSignOut, children }: ConsoleLay
                   <span className="pr-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{group.product}</span>
                 )}
                 {group.items.map((item) => (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    className={({ isActive }) =>
-                      `px-3 py-1.5 rounded-tile text-[12.5px] transition-colors ${
-                        isActive ? 'bg-secondary text-ink font-semibold' : 'text-muted-foreground hover:text-ink'
-                      }`
-                    }
-                  >
+                  <NavLink key={item.path} to={item.path} className={linkClass}>
                     {item.label}
                   </NavLink>
                 ))}
@@ -53,6 +53,13 @@ export default function ConsoleLayout({ email, onSignOut, children }: ConsoleLay
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-3 min-w-0">
+            <nav className="flex items-center gap-1" aria-label="Figbloom">
+              {PLATFORM_NAV.map((item) => (
+                <NavLink key={item.path} to={item.path} className={linkClass}>
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
             <span className="text-xs text-muted-foreground truncate">{email}</span>
             <Button variant="secondary" onClick={onSignOut}>
               Sign out
