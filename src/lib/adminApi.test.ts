@@ -58,3 +58,19 @@ describe('apiRequest for people without an account yet', () => {
     expect(err).toMatchObject({ message: 'You already have an account', status: 409, code: 'account_exists' });
   });
 });
+
+describe('apiRequest errors shaped { error: { code, message } } (the console\'s Schools routes)', () => {
+  it('reads the message and code from the error object', async () => {
+    const { apiRequest, ApiError } = await import('./adminApi');
+    respond(JSON.stringify({ error: { code: 'schools_not_connected', message: "Figbloom Schools isn't connected yet." } }), { status: 503 });
+    const err = await apiRequest('GET', '/platform/schools').catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err).toMatchObject({ message: "Figbloom Schools isn't connected yet.", status: 503, code: 'schools_not_connected' });
+  });
+
+  it('falls back to the status when the error object has no message', async () => {
+    const { apiRequest } = await import('./adminApi');
+    respond(JSON.stringify({ error: { code: 'x' } }), { status: 502 });
+    await expect(apiRequest('GET', '/platform/schools')).rejects.toThrow('Request failed (502)');
+  });
+});

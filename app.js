@@ -14,6 +14,7 @@ import iclockRouter from "./iclock_routes.js";
 import attendanceRouter from "./attendance_routes.js";
 import mailboxRouter from "./mailbox_routes.js";
 import platformRouter from "./platform_routes.js";
+import platformSchoolsRouter from "./platform_schools_routes.js";
 
 /**
  * @param {{ mpesaRouter?: import("express").Router, routes?: { path: string, router: import("express").Router }[] }} options
@@ -52,6 +53,8 @@ export function buildApp({ mpesaRouter, routes = [] } = {}) {
   app.use("/api/mailbox", mailboxRouter);
   // Figbloom's console (console.figbloom.org): platform admins, who may belong to no company
   app.use("/api/platform", platformRouter);
+  // ...and Figbloom Schools there, through Schools' own platform-schools function (ERP/SCHOOLS_CONSOLE_CONTRACT.md)
+  app.use("/api/platform/schools", platformSchoolsRouter);
   for (const { path, router } of routes) app.use(path, router);
 
   // anything else under /api is an API 404 in JSON, never the website's home page
