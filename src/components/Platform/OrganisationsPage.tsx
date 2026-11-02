@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Activity, Building2, Clock, PauseCircle } from 'lucide-react';
+import { Activity, Building2, Clock, Copy, PauseCircle } from 'lucide-react';
 import { Button, Card, Modal, PageHeader, SearchInput, StatCard, StatusPill, TableScroll } from '../UI';
 import type { StatusTone } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
@@ -58,6 +58,15 @@ export default function OrganisationsPage() {
   }, [allowed, load]);
 
   const shown = useMemo(() => filterOrganisations(list ?? [], { status, search }), [list, status, search]);
+
+  const copyId = async (org: Organisation) => {
+    try {
+      await navigator.clipboard.writeText(org.id);
+      toast.success(`${org.name}'s ID copied`);
+    } catch {
+      toast.error('Could not copy. Hover the ID to see it in full.');
+    }
+  };
 
   const open = (org: Organisation, action: CompanyAction) => {
     setReason('');
@@ -167,7 +176,7 @@ export default function OrganisationsPage() {
             ))}
           </div>
           <div className="ml-auto w-full sm:w-64">
-            <SearchInput placeholder="Search by company name" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <SearchInput placeholder="Search by name or ID" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </div>
 
@@ -195,7 +204,17 @@ export default function OrganisationsPage() {
               <tbody>
                 {shown.map((o) => (
                   <tr key={o.id} className="border-t border-border/60 align-top">
-                    <td className="py-1.5 pr-3 text-ink font-semibold">{o.name}</td>
+                    <td className="py-1.5 pr-3">
+                      <span className="block text-ink font-semibold">{o.name}</span>
+                      {/* the company's permanent ID, shortened; the button copies all of it */}
+                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <span title={o.id}>{o.slug} · {o.id.slice(0, 8)}</span>
+                        <button type="button" onClick={() => void copyId(o)} aria-label={`Copy ${o.name}'s ID`}
+                          className="p-0.5 rounded hover:text-ink">
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      </span>
+                    </td>
                     <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">{day(o.created_at)}</td>
                     <td className="py-1.5 pr-3 text-ink">
                       {o.owner_name && <span className="block">{o.owner_name}</span>}

@@ -38,6 +38,17 @@ describe('platform organisations', () => {
     expect(filterOrganisations(list, { status: 'pending', search: 'beta' })).toEqual([]);
   });
 
+  it('finds a company by its short name or the start of its ID', () => {
+    const twins = [
+      { ...org('Figbloom Digital Group', 'active'), id: '6f1c2a4e-3b7d-4c1e-9a55-2d8f0e7b9c10', slug: 'figbloom-digital-group' },
+      { ...org('Figbloom Digital Group', 'active'), id: 'a0b1c2d3-0000-4000-8000-000000000000', slug: 'figbloom-digital-group-2' },
+    ];
+    expect(filterOrganisations(twins, { status: 'all', search: '6F1C2A4E' }).map((o) => o.id)).toEqual([twins[0].id]);
+    expect(filterOrganisations(twins, { status: 'all', search: 'group-2' }).map((o) => o.id)).toEqual([twins[1].id]);
+    // an ID matches from its start only, so a short number doesn't hit every company
+    expect(filterOrganisations(twins, { status: 'all', search: '0000' })).toEqual([]);
+  });
+
   it('sends a decision with its reason, and shows the database refusal', async () => {
     rpc.reply = { data: 'rejected', error: null };
     expect(await setCompanyStatus('t1', 'reject', '  Not a business ')).toBe('rejected');

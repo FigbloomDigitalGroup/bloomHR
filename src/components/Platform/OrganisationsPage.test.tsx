@@ -80,9 +80,19 @@ describe('the organisations page', () => {
     expect(screen.queryByText('Beta Co')).toBeNull();
     expect(screen.getByText('Acme Ltd')).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: 'All' }));
-    fireEvent.change(screen.getByPlaceholderText('Search by company name'), { target: { value: 'gam' } });
+    fireEvent.change(screen.getByPlaceholderText('Search by name or ID'), { target: { value: 'gam' } });
     expect(screen.getByText('Gamma Farms')).toBeTruthy();
     expect(screen.queryByText('Acme Ltd')).toBeNull();
+  });
+
+  it("shows each company's short name and ID, and copies the full ID", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    render(<OrganisationsPage />);
+    const beta = await rowOf('Beta Co');
+    expect(within(beta).getByText('Beta Co · Beta Co')).toBeTruthy();
+    fireEvent.click(within(beta).getByRole('button', { name: "Copy Beta Co's ID" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('Beta Co'));
   });
 
   it('approves a waiting company', async () => {

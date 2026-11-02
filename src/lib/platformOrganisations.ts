@@ -121,6 +121,9 @@ export interface OrganisationFilter {
 
 /** The companies matching the status filter and the name search (case and spaces ignored). */
 export function filterOrganisations(list: Organisation[], { status, search }: OrganisationFilter): Organisation[] {
+  // by name, short name (slug) or ID, so a company named in a support message can be found however it was quoted
   const q = search.trim().toLowerCase();
-  return list.filter((o) => (status === 'all' || o.status === status) && (!q || o.name.toLowerCase().includes(q)));
+  const matches = (o: Organisation) =>
+    o.name.toLowerCase().includes(q) || o.slug.toLowerCase().includes(q) || o.id.toLowerCase().startsWith(q);
+  return list.filter((o) => (status === 'all' || o.status === status) && (!q || matches(o)));
 }
