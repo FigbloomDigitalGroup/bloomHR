@@ -1,15 +1,17 @@
 import { supabase } from './supabase';
 import { apiRequest } from './adminApi';
+import { ROLE_LABELS, type PlatformRole } from './platformRoles';
 
 // Figbloom's platform admins, for the console's Staff page (/platform/staff, migration 20261102100000_platform_staff.sql).
 // Listing, removing and the log come from SECURITY DEFINER functions that check is_platform_admin(). Inviting needs
 // the service key (it may create a login), so it goes through the backend (POST /api/platform/staff/invite,
-// platform_routes.js), which checks the caller is a platform admin too.
+// platform_routes.js), which checks the caller is a platform admin too. Roles: migration 20261103100000_platform_roles.sql.
 
 export interface PlatformStaffMember {
   user_id: string;
   email: string;
   note: string | null;
+  role: PlatformRole;
   added_by: string | null;
   added_by_email: string | null;
   added_at: string;
@@ -23,8 +25,10 @@ export interface PlatformAdminChange {
   id: string;
   user_id: string | null;
   email: string | null;
-  action: 'added' | 'removed';
+  action: 'added' | 'removed' | 'role_changed';
   note: string | null;
+  old_role: PlatformRole | null;
+  new_role: PlatformRole | null;
   changed_by: string | null;
   changed_by_email: string | null;
   changed_at: string;
@@ -41,6 +45,8 @@ export interface InviteResult {
   ok: true;
   email: string;
   userId: string | null;
+  /** their role now: for someone who already was an admin, the role they keep */
+  role?: PlatformRole;
   /** the console address they were sent to */
   origin?: string;
   result: InviteOutcome;
@@ -65,7 +71,10 @@ export function inviteMessage(r: InviteResult): { tone: 'success' | 'warning'; t
         text: `${r.email} is now an admin, but the notification email failed${r.notifyError ? ` (${r.notifyError})` : ''}: they can sign in at ${where} with their usual password. Let them know yourself.`,
       };
     case 'already_admin':
-      return { tone: 'success', text: `${r.email} was already an admin; note updated.` };
+      return {
+        tone: 'success',
+        text: `${r.email} was already an admin${r.role ? ` (${ROLE_LABELS[r.role]})` : ''}; note updated. Their role is unchanged: use Change role for that.`,
+      };
     default:
       return { tone: 'success', text: `${r.email} is a platform admin.` };
   }
@@ -102,7 +111,14 @@ export async function removePlatformAdmin(userId: string, reason: string): Promi
   if (error) fail(error, 'The platform admin was not removed.');
 }
 
-/** Makes the person with this email a platform admin, creating their login (and emailing them) if they have none. */
-export function invitePlatformAdmin(email: string, note: string): Promise<InviteResult> {
-  return apiRequest<InviteResult>('POST', '/platform/staff/invite', { email: email.trim(), note: note.trim() || null });
+/** Makes the person with this email a platform admin with this role, creating their login (and emailing them) if they have none. */
+export function invitePlatformAdmin(email: string, note: string, role: PlatformRole = 'viewer'): Promise<InviteResult> {
+  return apiRequest<InviteResult>('POST', '/platform/staff/invite', { email: email.trim(), note: note.trim() || null, role });
+}
+
+/** Changes a platform admin's role; a reason is needed. Returns the new role. */
+export async function setPlatformAdminRole(userId: string, role: PlatformRole, reason: string): Promise<PlatformRole> {
+  const { data, error } = await supabase.rpc('set_platform_admin_role', { p_user: userId, p_role: role, p_reason: reason.trim() });
+  if (error) fail(error, 'The role was not changed.');
+  return data as PlatformRole;
 }

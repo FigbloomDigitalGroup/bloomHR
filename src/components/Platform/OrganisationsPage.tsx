@@ -4,7 +4,7 @@ import { Activity, Building2, Clock, Copy, PauseCircle } from 'lucide-react';
 import { Button, Card, Modal, PageHeader, SearchInput, StatCard, StatusPill, TableScroll } from '../UI';
 import type { StatusTone } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
-import { isPlatformAdmin } from '../../lib/platformRates';
+import { myPlatformRole, roleCan, type PlatformRole } from '../../lib/platformRoles';
 import {
   COMPANY_STATUSES, STATUS_LABELS, actionsFor, filterOrganisations, listOrganisations, organisationTotals, setAutoApprove, setCompanyStatus,
   type CompanyAction, type CompanyStatus, type Organisation, type OrganisationTotals,
@@ -15,6 +15,9 @@ import {
 // The page checks is_platform_admin(), and the database refuses anyone else.
 
 const TONES: Record<CompanyStatus, StatusTone> = { pending: 'warning', active: 'success', rejected: 'danger', suspended: 'neutral' };
+
+// approving and rejecting are for owners and admins; suspending and reactivating for support too (the database checks)
+const actionPermission = (a: CompanyAction) => (a === 'approve' || a === 'reject' ? 'approve_companies' : 'suspend_companies');
 
 const ACTION_LABELS: Record<CompanyAction, string> = { approve: 'Approve', reject: 'Reject', suspend: 'Suspend', reactivate: 'Reactivate' };
 
@@ -29,7 +32,9 @@ const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-
 const weekLabel = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-KE', { day: 'numeric', month: 'short' });
 
 export default function OrganisationsPage() {
-  const [allowed, setAllowed] = useState<boolean | null>(null);
+  // undefined while loading; null when not a platform admin
+  const [role, setRole] = useState<PlatformRole | null | undefined>(undefined);
+  const allowed = role === undefined ? null : role !== null;
   const [list, setList] = useState<Organisation[] | null>(null);
   const [totals, setTotals] = useState<OrganisationTotals | null>(null);
   const [status, setStatus] = useState<CompanyStatus | 'all'>('all');
@@ -39,7 +44,7 @@ export default function OrganisationsPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    void isPlatformAdmin().then(setAllowed);
+    void myPlatformRole().then(setRole);
   }, []);
 
   const load = useCallback(async () => {
@@ -149,7 +154,8 @@ export default function OrganisationsPage() {
             <Card>
               <h2 className="text-sm font-semibold text-ink">Approving new companies</h2>
               <label className="mt-3 flex items-start gap-2 text-xs text-ink cursor-pointer">
-                <input type="checkbox" className="mt-0.5" checked={totals.auto_approve} onChange={() => void toggleAuto()} />
+                <input type="checkbox" className="mt-0.5" checked={totals.auto_approve} onChange={() => void toggleAuto()}
+                  disabled={!roleCan(role, 'approve_companies')} />
                 <span>
                   Approve new companies automatically
                   <span className="block text-muted-foreground mt-0.5">
@@ -159,6 +165,9 @@ export default function OrganisationsPage() {
                   </span>
                 </span>
               </label>
+              {!roleCan(role, 'approve_companies') && (
+                <p className="mt-2 text-[11.5px] text-muted-foreground">Only owners and admins change this.</p>
+              )}
             </Card>
           </div>
         </>
@@ -230,7 +239,7 @@ export default function OrganisationsPage() {
                     <td className="py-1.5 pr-3 text-right text-ink">{o.payroll_runs}</td>
                     <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">{o.last_activity ? day(o.last_activity) : 'Never'}</td>
                     <td className="py-1.5 text-right whitespace-nowrap">
-                      {actionsFor(o.status).map((a) => (
+                      {actionsFor(o.status).filter((a) => roleCan(role, actionPermission(a))).map((a) => (
                         <button key={a} type="button" onClick={() => open(o, a)}
                           className={`ml-3 font-semibold ${a === 'reject' || a === 'suspend' ? 'text-status-danger' : 'text-brand'}`}>
                           {ACTION_LABELS[a]}

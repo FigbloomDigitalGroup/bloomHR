@@ -4,6 +4,8 @@ import type { InviteResult, PlatformAdminChange, PlatformStaffMember } from '../
 
 const api = vi.hoisted(() => ({
   admin: true,
+  role: 'owner' as import('../../lib/platformRoles').PlatformRole,
+  roleChanges: [] as unknown[][],
   staff: [] as PlatformStaffMember[],
   changes: [] as PlatformAdminChange[],
   invites: [] as unknown[][],
@@ -15,7 +17,10 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
 vi.mock('react-hot-toast', () => ({ default: { success: (...a: unknown[]) => api.toastSuccess(...a), error: (...a: unknown[]) => api.toastError(...a) } }));
-vi.mock('../../lib/platformRates', () => ({ isPlatformAdmin: () => Promise.resolve(api.admin) }));
+vi.mock('../../lib/platformRoles', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/platformRoles')>()),
+  myPlatformRole: () => Promise.resolve(api.admin ? api.role : null),
+}));
 vi.mock('../../lib/platformStaff', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/platformStaff')>()),
   listPlatformStaff: () => Promise.resolve(api.staff),
@@ -23,6 +28,10 @@ vi.mock('../../lib/platformStaff', async (importOriginal) => ({
   invitePlatformAdmin: (...args: unknown[]) => {
     api.invites.push(args);
     return api.inviteError ? Promise.reject(api.inviteError) : Promise.resolve(api.inviteResult);
+  },
+  setPlatformAdminRole: (...args: unknown[]) => {
+    api.roleChanges.push(args);
+    return Promise.resolve(args[1]);
   },
   removePlatformAdmin: (...args: unknown[]) => {
     api.removals.push(args);
@@ -34,21 +43,23 @@ import StaffPage from './StaffPage';
 
 const ME = 'u-ops';
 const member = (user_id: string, email: string, extra: Partial<PlatformStaffMember> = {}): PlatformStaffMember => ({
-  user_id, email, note: null, added_by: null, added_by_email: null, added_at: '2026-10-21T08:00:00Z', last_sign_in_at: null,
+  user_id, email, note: null, role: 'viewer', added_by: null, added_by_email: null, added_at: '2026-10-21T08:00:00Z', last_sign_in_at: null,
   in_company: false, companies: 0, ...extra,
 });
 
 afterEach(cleanup);
 beforeEach(() => {
   api.admin = true;
+  api.role = 'owner';
+  api.roleChanges = [];
   api.staff = [
-    member(ME, 'ops@figbloom.org', { note: 'Figbloom ops', last_sign_in_at: '2026-11-01T08:00:00Z' }),
-    member('u-mary', 'mary@figbloom.org', { added_by: ME, added_by_email: 'ops@figbloom.org', in_company: true, companies: 1 }),
+    member(ME, 'ops@figbloom.org', { note: 'Figbloom ops', role: 'owner', last_sign_in_at: '2026-11-01T08:00:00Z' }),
+    member('u-mary', 'mary@figbloom.org', { role: 'support', added_by: ME, added_by_email: 'ops@figbloom.org', in_company: true, companies: 1 }),
     member('u-new', 'new@figbloom.org', { note: 'Support' }),
   ];
   api.changes = [
-    { id: 'c2', user_id: 'u-old', email: 'old@figbloom.org', action: 'removed', note: 'Left Figbloom', changed_by: ME, changed_by_email: 'ops@figbloom.org', changed_at: '2026-10-30T08:00:00Z' },
-    { id: 'c1', user_id: 'u-new', email: 'new@figbloom.org', action: 'added', note: 'Support', changed_by: ME, changed_by_email: 'ops@figbloom.org', changed_at: '2026-10-29T08:00:00Z' },
+    { id: 'c2', user_id: 'u-old', email: 'old@figbloom.org', action: 'removed', note: 'Left Figbloom', old_role: 'viewer', new_role: null, changed_by: ME, changed_by_email: 'ops@figbloom.org', changed_at: '2026-10-30T08:00:00Z' },
+    { id: 'c1', user_id: 'u-new', email: 'new@figbloom.org', action: 'added', note: 'Support', old_role: null, new_role: 'viewer', changed_by: ME, changed_by_email: 'ops@figbloom.org', changed_at: '2026-10-29T08:00:00Z' },
   ];
   api.invites = [];
   api.inviteResult = result('invited', 'sam@figbloom.org');
@@ -139,7 +150,7 @@ describe('the Staff page', () => {
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: ' sam@figbloom.org ' } });
     fireEvent.change(screen.getByLabelText(/Note/), { target: { value: 'Support lead' } });
     fireEvent.click(invite);
-    await waitFor(() => expect(api.invites).toEqual([['sam@figbloom.org', 'Support lead']]));
+    await waitFor(() => expect(api.invites).toEqual([['sam@figbloom.org', 'Support lead', 'viewer']]));
     await waitFor(() => expect(api.toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/^Invite sent to sam@figbloom.org/)));
     expect((screen.getByLabelText('Email') as HTMLInputElement).value).toBe('');
   });
@@ -185,7 +196,17 @@ describe('the Staff page', () => {
     render(<StaffPage currentUserId={ME} />);
     await screen.findByText('ops@figbloom.org');
     await inviteAs('ops@figbloom.org');
-    await waitFor(() => expect(api.toastSuccess).toHaveBeenCalledWith('ops@figbloom.org was already an admin; note updated.'));
+    await waitFor(() =>
+      expect(api.toastSuccess).toHaveBeenCalledWith('ops@figbloom.org was already an admin; note updated. Their role is unchanged: use Change role for that.')
+    );
+  });
+
+  it('names the role they keep when they already were an admin', async () => {
+    api.inviteResult = result('already_admin', 'mary@figbloom.org', { role: 'support' });
+    render(<StaffPage currentUserId={ME} />);
+    await screen.findByText('ops@figbloom.org');
+    await inviteAs('mary@figbloom.org');
+    await waitFor(() => expect(api.toastSuccess).toHaveBeenCalledWith(expect.stringMatching(/^mary@figbloom.org was already an admin \(Support\)/)));
   });
 
   it('shows a refusal plainly', async () => {
@@ -195,5 +216,95 @@ describe('the Staff page', () => {
     await inviteAs('x@figbloom.org');
     await waitFor(() => expect(api.toastError).toHaveBeenCalledWith('Only a Figbloom platform admin can do this'));
     expect(screen.queryByRole('status')).toBeNull();
+  });
+});
+
+describe('the Staff page: console roles', () => {
+  const roleOptions = () => screen.getAllByRole('radio').map((r) => (r as HTMLInputElement).value);
+
+  it('shows each person\'s role', async () => {
+    render(<StaffPage currentUserId={ME} />);
+    expect(within(await rowOf('ops@figbloom.org')).getByText('Owner')).toBeTruthy();
+    expect(within(await rowOf('mary@figbloom.org')).getByText('Support')).toBeTruthy();
+    expect(within(await rowOf('new@figbloom.org')).getByText('Viewer')).toBeTruthy();
+  });
+
+  it('an owner invites with any role, Viewer by default, each described', async () => {
+    render(<StaffPage currentUserId={ME} />);
+    await screen.findByText('ops@figbloom.org');
+    expect(roleOptions()).toEqual(['owner', 'admin', 'support', 'viewer']);
+    expect((screen.getByRole('radio', { name: /Viewer/ }) as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByText('Sees everything, changes nothing.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: /Owner/ }));
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'sam@figbloom.org' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
+    await waitFor(() => expect(api.invites).toEqual([['sam@figbloom.org', '', 'owner']]));
+  });
+
+  it('an admin never offers Owner, and cannot remove or change an owner', async () => {
+    api.role = 'admin';
+    api.staff = [
+      member('u-boss', 'boss@figbloom.org', { role: 'owner' }),
+      member(ME, 'ops@figbloom.org', { role: 'admin' }),
+      member('u-mary', 'mary@figbloom.org', { role: 'support' }),
+    ];
+    render(<StaffPage currentUserId={ME} />);
+    await screen.findByText('boss@figbloom.org');
+    expect(roleOptions()).toEqual(['admin', 'support', 'viewer']);
+    const boss = await rowOf('boss@figbloom.org');
+    expect(within(boss).queryByText('Remove')).toBeNull();
+    expect(within(boss).queryByText('Change role')).toBeNull();
+    const mary = await rowOf('mary@figbloom.org');
+    expect(within(mary).getByText('Remove')).toBeTruthy();
+    fireEvent.click(within(mary).getByText('Change role'));
+    const dialog = await screen.findByRole('dialog');
+    const options = within(dialog).getAllByRole('option').map((o) => (o as HTMLOptionElement).value);
+    expect(options).toEqual(['', 'admin', 'viewer']);
+  });
+
+  it('an admin may lower their own role, never remove themselves', async () => {
+    api.role = 'admin';
+    api.staff = [member(ME, 'ops@figbloom.org', { role: 'admin' }), member('u-boss', 'boss@figbloom.org', { role: 'owner' })];
+    render(<StaffPage currentUserId={ME} />);
+    const me = await rowOf('ops@figbloom.org');
+    expect(within(me).queryByText('Remove')).toBeNull();
+    fireEvent.click(within(me).getByText('Change role'));
+    const options = within(await screen.findByRole('dialog')).getAllByRole('option').map((o) => (o as HTMLOptionElement).value);
+    expect(options).toEqual(['', 'support', 'viewer']);
+  });
+
+  it('changes a role only with a new role and a reason', async () => {
+    render(<StaffPage currentUserId={ME} />);
+    fireEvent.click(within(await rowOf('mary@figbloom.org')).getByText('Change role'));
+    const dialog = await screen.findByRole('dialog');
+    const save = within(dialog).getByRole('button', { name: 'Change role' }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    fireEvent.change(within(dialog).getByLabelText('New role'), { target: { value: 'viewer' } });
+    expect(save.disabled).toBe(true);
+    fireEvent.change(within(dialog).getByLabelText(/Why\?/), { target: { value: 'Only needs to look' } });
+    fireEvent.click(save);
+    await waitFor(() => expect(api.roleChanges).toEqual([['u-mary', 'viewer', 'Only needs to look']]));
+  });
+
+  it('support and viewers see the staff and the changes, but cannot invite, remove or change roles', async () => {
+    for (const role of ['support', 'viewer'] as const) {
+      api.role = role;
+      render(<StaffPage currentUserId={ME} />);
+      await screen.findByText('mary@figbloom.org');
+      expect(screen.queryByRole('button', { name: 'Invite' })).toBeNull();
+      expect(screen.queryByText('Remove')).toBeNull();
+      expect(screen.queryByText('Change role')).toBeNull();
+      expect(screen.getByRole('list', { name: 'Recent changes' })).toBeTruthy();
+      cleanup();
+    }
+  });
+
+  it('describes role changes in the recent changes', async () => {
+    api.changes = [
+      { id: 'c3', user_id: 'u-mary', email: 'mary@figbloom.org', action: 'role_changed', note: 'Handles tickets', old_role: 'viewer', new_role: 'support', changed_by: ME, changed_by_email: 'ops@figbloom.org', changed_at: '2026-10-31T08:00:00Z' },
+    ];
+    render(<StaffPage currentUserId={ME} />);
+    const list = await screen.findByRole('list', { name: 'Recent changes' });
+    expect(within(list).getByRole('listitem').textContent).toMatch(/mary@figbloom.org changed from Viewer to Support by ops@figbloom.org/);
   });
 });

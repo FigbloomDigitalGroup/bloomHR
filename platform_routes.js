@@ -17,6 +17,12 @@ export const CONSOLE_HOSTNAMES = ["console.figbloom.org", "console-staging.figbl
 export const DEFAULT_CONSOLE_ORIGIN = "https://console.figbloom.org";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Console roles (migration 20261103100000_platform_roles.sql). Owners and admins manage staff; an admin never makes
+// anyone an owner. The database enforces the same in grant_platform_admin_as().
+export const PLATFORM_ROLES = ["owner", "admin", "support", "viewer"];
+const ROLE_LABELS = { owner: "Owner", admin: "Admin", support: "Support", viewer: "Viewer" };
+const MANAGES_STAFF = ["owner", "admin"];
 const MAX_NOTE = 500;
 const HOUR = 60 * 60 * 1000;
 
@@ -42,11 +48,13 @@ const escapeHtml = (value) =>
   String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 /** The email telling someone who already has a login that they are now a platform admin. Everything inserted is escaped. */
-export function platformAdminEmail({ inviter, origin, note }) {
+export function platformAdminEmail({ inviter, origin, note, role }) {
   const by = inviter ? ` by ${inviter}` : "";
+  const roleLabel = ROLE_LABELS[role] || "";
   const subject = "You are now a Figbloom platform admin";
   const text = [
     `You've been made a Figbloom platform admin${by}.`,
+    ...(roleLabel ? [`Your role: ${roleLabel}.`] : []),
     ...(note ? ["", `Note: ${note}`] : []),
     "",
     `Sign in at ${origin} with your usual password.`,
@@ -62,6 +70,7 @@ export function platformAdminEmail({ inviter, origin, note }) {
           <p style="margin:0 0 16px;font-size:13px;font-weight:bold;color:#17402a;">Figbloom console</p>
           <h1 style="margin:0 0 12px;font-size:20px;">You are now a platform admin</h1>
           <p style="margin:0 0 16px;font-size:14px;line-height:1.5;">You've been made a Figbloom platform admin${escapeHtml(by)}.</p>
+          ${roleLabel ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.5;"><strong>Your role:</strong> ${escapeHtml(roleLabel)}</p>` : ""}
           ${note ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.5;"><strong>Note:</strong> ${escapeHtml(note)}</p>` : ""}
           <p style="margin:0 0 24px;"><a href="${escapeHtml(origin)}" style="display:inline-block;background:#17402a;color:#ffffff;text-decoration:none;font-weight:bold;font-size:14px;padding:12px 22px;border-radius:8px;">Sign in to the console</a></p>
           <p style="margin:0;font-size:12px;color:#5f6b62;">Sign in at ${escapeHtml(origin)} with your usual password. If you were not expecting this, tell the person who added you.</p>
@@ -74,10 +83,10 @@ export function platformAdminEmail({ inviter, origin, note }) {
 }
 
 /** Emails an existing login that they now have console access. Resolves { ok } or { ok: false, reason }; never throws. */
-async function notifyNewAdmin({ to, inviter, origin, note }) {
+async function notifyNewAdmin({ to, inviter, origin, note, role }) {
   if (!process.env.RESEND_API_KEY) return { ok: false, reason: "Email is not set up (RESEND_API_KEY)" };
   try {
-    const message = platformAdminEmail({ inviter, origin, note });
+    const message = platformAdminEmail({ inviter, origin, note, role });
     const resend = new Resend(process.env.RESEND_API_KEY);
     const { error } = await resend.emails.send({
       from: process.env.SMTP_FROM || "Figbloom HR <onboarding@resend.dev>",
@@ -108,12 +117,12 @@ async function authenticatePlatformAdmin(req) {
 
   const { data: row, error: adminError } = await admin
     .from("platform_admins")
-    .select("user_id")
+    .select("user_id, role")
     .eq("user_id", data.user.id)
     .maybeSingle();
   if (adminError) throw new HttpError(500, "Could not verify the caller");
   if (!row) throw new HttpError(403, "Only a Figbloom platform admin can do this");
-  return { id: data.user.id, email: data.user.email };
+  return { id: data.user.id, email: data.user.email, role: row.role || null };
 }
 
 const noLogin = (error) => error?.code === "P0002" || /No login with this email/i.test(error?.message || "");
@@ -121,13 +130,14 @@ const alreadyRegistered = (error) =>
   error?.status === 422 || error?.code === "email_exists" || /already (been )?registered|already exists/i.test(error?.message || "");
 
 // grant_platform_admin_as(): adds the login with this email as a platform admin, logged as the caller
-async function grantAs(caller, email, note) {
-  const { data, error } = await admin.rpc("grant_platform_admin_as", { p_by: caller.id, p_email: email, p_note: note });
+async function grantAs(caller, email, note, role) {
+  const { data, error } = await admin.rpc("grant_platform_admin_as", { p_by: caller.id, p_email: email, p_note: note, p_role: role });
   return { data, error };
 }
 
-// POST /api/platform/staff/invite  { email, note? }
-//   -> { ok, email, userId, origin, result, invited, notified, alreadyAdmin, notifyError? }
+// POST /api/platform/staff/invite  { email, note?, role? }  (role: owner | admin | support | viewer, default viewer)
+//   -> { ok, email, userId, role, origin, result, invited, notified, alreadyAdmin, notifyError? }
+// The caller must be an owner or an admin; only an owner may invite an owner.
 // Makes the person with this email a platform admin. `result` says what happened:
 //   invited        no login yet: Supabase Auth created one and emailed a link to set a password on the console
 //   notified       they had a login: added, and emailed here that they now have console access
@@ -143,12 +153,20 @@ router.post("/staff/invite", async (req, res) => {
     const rawNote = req.body?.note;
     if (rawNote != null && typeof rawNote !== "string") throw new HttpError(400, "The note must be text");
     const note = (rawNote || "").trim().slice(0, MAX_NOTE) || null;
+    const rawRole = req.body?.role;
+    if (rawRole != null && (typeof rawRole !== "string" || !PLATFORM_ROLES.includes(rawRole.trim().toLowerCase()))) {
+      throw new HttpError(400, "Choose a role: owner, admin, support or viewer");
+    }
+    const role = rawRole ? rawRole.trim().toLowerCase() : "viewer";
+    // owners and admins manage staff; only an owner makes someone an owner
+    if (!MANAGES_STAFF.includes(caller.role)) throw new HttpError(403, "Only an owner or admin can invite platform admins");
+    if (role === "owner" && caller.role !== "owner") throw new HttpError(403, "Only an owner can make someone an owner");
 
     if (!inviteBudget(caller.id, "default", 1)) throw new HttpError(429, "Too many invitations. Try again in an hour.");
 
     const origin = consoleOrigin(req.headers.origin);
     let invited = false;
-    let { data, error } = await grantAs(caller, email, note);
+    let { data, error } = await grantAs(caller, email, note, role);
     if (error && noLogin(error)) {
       const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo: `${origin}/update-password` });
       // someone created the login in the meantime: just add them
@@ -157,10 +175,10 @@ router.post("/staff/invite", async (req, res) => {
         throw new HttpError(502, "The invitation could not be sent. Try again.");
       }
       invited = !inviteError;
-      ({ data, error } = await grantAs(caller, email, note));
+      ({ data, error } = await grantAs(caller, email, note, role));
     }
     if (error) {
-      if (error.code === "42501") throw new HttpError(403, "Only a Figbloom platform admin can do this");
+      if (error.code === "42501") throw new HttpError(403, error.message || "Only a Figbloom platform admin can do this");
       throw error;
     }
 
@@ -169,7 +187,7 @@ router.post("/staff/invite", async (req, res) => {
     let notifyError;
     // Supabase sends an existing login nothing: tell them here. The grant stands whatever happens to this email.
     if (result === "notified") {
-      const sent = await notifyNewAdmin({ to: email, inviter: caller.email, origin, note });
+      const sent = await notifyNewAdmin({ to: email, inviter: caller.email, origin, note, role: data?.role || role });
       if (!sent.ok) {
         result = "notify_failed";
         notifyError = sent.reason;
@@ -180,6 +198,8 @@ router.post("/staff/invite", async (req, res) => {
       ok: true,
       email,
       userId: data?.user_id ?? null,
+      // the role they have now: for someone who already was an admin, their existing role (never changed here)
+      role: data?.role || role,
       origin,
       result,
       invited,
