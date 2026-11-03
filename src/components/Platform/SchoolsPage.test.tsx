@@ -299,3 +299,17 @@ describe('the schools page: analytics', () => {
     expect(attention.map((li) => li.textContent)).toEqual(['Ruiru AcademyNo admin · Nobody has ever signed in']);
   });
 });
+
+describe('the schools page: opened from a school group', () => {
+  it('starts searched by ?q= (each school links here by its slug)', async () => {
+    window.history.replaceState(null, '', '/platform/schools?q=kilimani-secondary');
+    try {
+      render(<SchoolsPage />);
+      await rowOf('Kilimani Secondary');
+      expect((screen.getByPlaceholderText('Search by name, slug or ID') as HTMLInputElement).value).toBe('kilimani-secondary');
+      expect(inTable().queryByText('Lavington Primary')).toBeNull();
+    } finally {
+      window.history.replaceState(null, '', '/');
+    }
+  });
+});
