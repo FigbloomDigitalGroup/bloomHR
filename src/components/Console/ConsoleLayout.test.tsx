@@ -49,7 +49,8 @@ describe('the console menu', () => {
     expect(within(products).getByText('Figbloom Schools')).toBeTruthy();
     expect(within(hr).getByRole('link', { name: 'Organisations' }).getAttribute('href')).toBe('/platform/organisations');
     expect(within(hr).getByRole('link', { name: 'Statutory rates' }).getAttribute('href')).toBe('/platform/rates');
-    expect(within(schools).getAllByRole('link').map((a) => a.textContent)).toEqual(['Schools']);
+    expect(within(schools).getAllByRole('link').map((a) => a.textContent)).toEqual(['Schools', 'School groups']);
+    expect(within(schools).getByRole('link', { name: 'School groups' }).getAttribute('href')).toBe('/platform/school-groups');
     expect(within(schools).getByRole('link', { name: 'Schools' }).getAttribute('href')).toBe('/platform/schools');
     // Staff is Figbloom's own, apart from the products
     expect(within(products).queryByRole('link', { name: 'Staff' })).toBeNull();
@@ -111,7 +112,7 @@ describe('the console menu', () => {
   it('starts with the Overview, above the products', () => {
     renderLayout('/platform/overview');
     const links = within(screen.getByRole('navigation', { name: 'Console' })).getAllByRole('link');
-    expect(links.map((a) => a.textContent)).toEqual(['Overview', 'Organisations', 'Statutory rates', 'Schools']);
+    expect(links.map((a) => a.textContent)).toEqual(['Overview', 'Organisations', 'Statutory rates', 'Schools', 'School groups']);
     expect(links[0].getAttribute('href')).toBe('/platform/overview');
     expect(links[0].getAttribute('aria-current')).toBe('page');
   });

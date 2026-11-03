@@ -38,7 +38,14 @@ export default function SchoolsPage() {
   const allowed = role === undefined ? null : role !== null;
   const [load, setLoad] = useState<Load>(null);
   const [status, setStatus] = useState('all');
-  const [search, setSearch] = useState('');
+  // ?q= opens the page searched (the School groups page links each school here by its slug)
+  const [search, setSearch] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('q') ?? '';
+    } catch {
+      return '';
+    }
+  });
   const [acting, setActing] = useState<{ school: School; to: SchoolStatusChange } | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);

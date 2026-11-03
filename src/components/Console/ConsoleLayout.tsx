@@ -1,7 +1,7 @@
 import { ReactNode, useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  Briefcase, Building2, ChevronDown, ChevronLeft, ChevronRight, GraduationCap, LayoutDashboard, LogOut, Menu, Percent,
+  Briefcase, Building2, ChevronDown, ChevronLeft, ChevronRight, GraduationCap, LayoutDashboard, LogOut, Menu, Network, Percent,
   School, Users, X, type LucideIcon,
 } from 'lucide-react';
 import bloomMark from '../../../public/bloom-mark.png';
@@ -46,7 +46,10 @@ const CONSOLE_NAV: ConsoleNavGroup[] = [
   {
     product: 'Figbloom Schools',
     icon: GraduationCap,
-    items: [{ label: 'Schools', path: '/platform/schools', icon: School }],
+    items: [
+      { label: 'Schools', path: '/platform/schools', icon: School },
+      { label: 'School groups', path: '/platform/school-groups', icon: Network },
+    ],
   },
 ];
 
