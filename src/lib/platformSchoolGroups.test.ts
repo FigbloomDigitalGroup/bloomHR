@@ -31,6 +31,9 @@ describe('school groups', () => {
       'approve_companies', 'approve_companies', 'suspend_companies', 'suspend_companies',
     ]);
     expect(['approve', 'reject', 'suspend', 'reactivate'].map((a) => needsReason(a as never))).toEqual([false, true, true, false]);
+    // reactivating a rejected group overrides a rejection: Owner/Admin
+    expect(actionPermission('reactivate', 'suspended')).toBe('suspend_companies');
+    expect(actionPermission('reactivate', 'rejected')).toBe('approve_companies');
   });
 
   it("adds up a group's people from Figbloom Schools by school ID, ignoring schools it doesn't know", () => {

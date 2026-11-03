@@ -92,8 +92,13 @@ export function groupActions(status: string): GroupAction[] {
   }
 }
 
-/** The console permission an action needs: approving and rejecting are Owner/Admin; suspending and reactivating, Support too. */
-export const actionPermission = (a: GroupAction) => (a === 'approve' || a === 'reject' ? 'approve_companies' : 'suspend_companies');
+/**
+ * The console permission an action needs on a group in this status: approving and rejecting are Owner/Admin; suspending
+ * and reactivating, Support too, except reactivating a rejected group (it overrides a rejection), which is Owner/Admin.
+ * The backend checks the same.
+ */
+export const actionPermission = (a: GroupAction, status?: string) =>
+  a === 'approve' || a === 'reject' || (a === 'reactivate' && status === 'rejected') ? 'approve_companies' : 'suspend_companies';
 
 /** An action needs a reason: rejecting and suspending. */
 export const needsReason = (a: GroupAction) => a === 'reject' || a === 'suspend';

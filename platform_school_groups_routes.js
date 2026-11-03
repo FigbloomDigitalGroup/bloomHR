@@ -32,13 +32,14 @@ const CODE_RE = /^[a-z][a-z0-9_]{0,63}$/;
 /**
  * What the console may do to a group, the platform status it becomes, from which statuses, and the permission it needs:
  * approving and rejecting are Owner/Admin (approve_companies); suspending and reactivating are Support too
- * (suspend_companies). Checked against the group's current status here, so reactivate can't be used to approve.
+ * (suspend_companies), except reactivating a rejected group, which overrides a rejection and so is Owner/Admin
+ * (fromPermission). Checked against the group's current status here, so reactivate can't be used to approve.
  */
 export const ACTIONS = {
   approve: { to: "active", from: ["pending"], permission: "approve_companies", reason: false },
   reject: { to: "rejected", from: ["pending"], permission: "approve_companies", reason: true },
   suspend: { to: "suspended", from: ["active"], permission: "suspend_companies", reason: true },
-  reactivate: { to: "active", from: ["suspended", "rejected"], permission: "suspend_companies", reason: false },
+  reactivate: { to: "active", from: ["suspended", "rejected"], permission: "suspend_companies", reason: false, fromPermission: { rejected: "approve_companies" } },
 };
 
 class PlatformError extends Error {
@@ -281,6 +282,11 @@ export function createSchoolGroupsRouter({ timeoutMs = PLATFORM_TIMEOUT_MS } = {
       if (!group) throw new PlatformError(404, "organization_not_found", "No such school group.");
       if (!rule.from.includes(group.status)) {
         throw new PlatformError(409, "invalid_transition", `A ${group.status} school group can't be ${action === "reactivate" ? "reactivated" : `${action}d`}.`);
+      }
+      // reactivating a rejected group overrides an Owner's or Admin's rejection: Owner/Admin only
+      const needed = rule.fromPermission?.[group.status];
+      if (needed && !platformRoleAllows(caller.role, needed)) {
+        throw new PlatformError(403, "forbidden", "Only an owner or admin can reactivate a group that was not approved.");
       }
 
       const result = await callPlatform(

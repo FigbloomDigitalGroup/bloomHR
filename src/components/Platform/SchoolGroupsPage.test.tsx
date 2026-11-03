@@ -196,12 +196,22 @@ describe('the school groups page: decisions by role', () => {
     expect(await actionsOf('Empty Org')).toEqual(['Reactivate']);
   });
 
-  it('support suspends and reactivates, never approves or rejects', async () => {
+  it('support suspends and reactivates suspended groups, never approves, rejects or reactivates a rejected one', async () => {
     api.role = 'support';
     renderPage();
     expect(await actionsOf('Hillside Schools')).toEqual([]);
     expect(await actionsOf('Lakeview Trust')).toEqual(['Suspend']);
     expect(await actionsOf('Moi Group')).toEqual(['Reactivate']);
+    // Empty Org was rejected: reactivating it would override that, so only Owner/Admin see it
+    expect(await actionsOf('Empty Org')).toEqual([]);
+  });
+
+  it('an admin reactivates a rejected group', async () => {
+    api.role = 'admin';
+    renderPage();
+    fireEvent.click(within(await rowOf('Empty Org')).getByText('Reactivate'));
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Reactivate' }));
+    await waitFor(() => expect(api.decisions).toEqual([['g4', 'reactivate', '']]));
   });
 
   it('a viewer sees every group but decides nothing', async () => {

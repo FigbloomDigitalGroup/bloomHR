@@ -338,20 +338,27 @@ describe('POST /api/platform/school-groups/:id/status', () => {
     expect(posts()[0].body).toEqual({ status: 'rejected', reason: 'Not a real school', actor_email: 'adm@figbloom.org' });
   });
 
-  it('support suspends (with a reason) and reactivates, but cannot approve or reject', async () => {
+  it('support suspends (with a reason) and reactivates a suspended group, but cannot approve or reject', async () => {
     expect((await decide('sup', ACTIVE, 'suspend', 'Fees unpaid')).status).toBe(200);
     expect((await decide('sup', SUSPENDED, 'reactivate')).status).toBe(200);
-    expect((await decide('sup', REJECTED, 'reactivate')).status).toBe(200);
     expect(posts().map((c) => c.body)).toEqual([
       { status: 'suspended', reason: 'Fees unpaid', actor_email: 'sup@figbloom.org' },
-      { status: 'active', actor_email: 'sup@figbloom.org' },
       { status: 'active', actor_email: 'sup@figbloom.org' },
     ]);
     for (const action of ['approve', 'reject']) {
       const res = await decide('sup', PENDING, action, 'x');
       expect(res.status).toBe(403);
     }
-    expect(posts()).toHaveLength(3);
+    expect(posts()).toHaveLength(2);
+  });
+
+  it("support can't reactivate a rejected group (it would override a rejection); an admin or owner can", async () => {
+    const refused = await decide('sup', REJECTED, 'reactivate');
+    expect(refused.status).toBe(403);
+    expect((await refused.json()).error).toEqual({ code: 'forbidden', message: 'Only an owner or admin can reactivate a group that was not approved.' });
+    expect(posts()).toEqual([]);
+    expect((await decide('adm', REJECTED, 'reactivate')).status).toBe(200);
+    expect(posts().map((c) => c.body)).toEqual([{ status: 'active', actor_email: 'adm@figbloom.org' }]);
   });
 
   it('a viewer decides nothing', async () => {

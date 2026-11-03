@@ -97,7 +97,7 @@ export default function SchoolGroupsPage() {
   // the console menu's badge: groups waiting for approval
   useConsoleBadge('/platform/school-groups', totals ? totals.pending : null, (c) => `${c} waiting for approval`);
 
-  const can = (a: GroupAction) => roleCan(role, actionPermission(a));
+  const can = (a: GroupAction, status: string) => roleCan(role, actionPermission(a, status));
 
   const open = (group: SchoolGroup, action: GroupAction) => {
     setReason('');
@@ -269,7 +269,7 @@ export default function SchoolGroupsPage() {
                       {g.status_reason && <span className="block mt-1 text-muted-foreground">{g.status_reason}</span>}
                     </td>
                     <td className="py-1.5 text-right whitespace-nowrap">
-                      {groupActions(g.status).filter(can).map((a) => (
+                      {groupActions(g.status).filter((a) => can(a, g.status)).map((a) => (
                         <button key={a} type="button" onClick={() => open(g, a)}
                           className={`ml-3 font-semibold ${a === 'reject' || a === 'suspend' ? 'text-status-danger' : 'text-brand'}`}>
                           {LABELS[a]}
