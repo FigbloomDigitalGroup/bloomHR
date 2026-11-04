@@ -82,6 +82,8 @@ const kraPinRegex = /^[A-Z]{1}[0-9]{9}[A-Z]{1}$/;
 const nhifRegex = /^[0-9]{5,10}$/;
 const nssfRegex = /^[0-9]{9}$/;
 
+const isBlankContact = (c: EmergencyContact) => ![c.name, c.relationship, c.phone, c.email].some(v => v?.trim());
+
 const AddEmployeePage = () => {
   const navigate = useNavigate();
   // by the modules of the person's role (FIG-827): HR administration shows the salary section, and the basic salary
@@ -161,7 +163,7 @@ const AddEmployeePage = () => {
   const validateField = (name: string, value: string | number | null | undefined) => {
     let error = '';
 
-    if (typeof value === 'string' && !value.trim() && ['First Name', 'Last Name', 'Employee Type', 'Start Date', 'Job Title', 'Job Level', 'Work Email'].includes(name)) {
+    if (typeof value === 'string' && !value.trim() && ['First Name', 'Last Name', 'Employee Type', 'Start Date', 'Work Email'].includes(name)) {
       error = 'This field is required';
     } else {
       switch (name) {
@@ -254,8 +256,10 @@ const AddEmployeePage = () => {
       isValid = false;
     }
 
-    // Emergency contacts validation
+    // next of kin is the employee's to fill in during onboarding: a contact HR leaves blank is skipped, one they start
+    // must be complete
     emergencyContacts.forEach((contact, index) => {
+      if (isBlankContact(contact)) return;
       if (!contact.name) {
         newErrors[`emergencyContactName${index}`] = 'Name is required';
         isValid = false;
@@ -495,8 +499,9 @@ const AddEmployeePage = () => {
       if (!employeeId) throw new Error('Failed to get employee Number after creation');
       await ensureBranchListed(newEmployee.Branch, newEmployee.Town);
 
-      if (emergencyContacts.length > 0 && emergencyContacts[0].name) {
-        const contactsToInsert = emergencyContacts.map(contact => ({
+      const filledContacts = emergencyContacts.filter(contact => !isBlankContact(contact));
+      if (filledContacts.length > 0) {
+        const contactsToInsert = filledContacts.map(contact => ({
           "Employee Number": employeeId,
           full_name: contact.name,
           relationship: contact.relationship,
@@ -1064,7 +1069,6 @@ const AddEmployeePage = () => {
                       value={newEmployee['Personal Email'] || ''}
                       onChange={handleInputChange}
                       error={errors['Personal Email']}
-                      required
                     />
                     <FormField
                       label="Primary Mobile Number"
@@ -1073,7 +1077,6 @@ const AddEmployeePage = () => {
                       value={newEmployee['Mobile Number'] || ''}
                       onChange={handleInputChange}
                       error={errors['Mobile Number']}
-                      required
                       placeholder="e.g., +254712345678"
                     />
                     <FormField
@@ -1084,7 +1087,6 @@ const AddEmployeePage = () => {
                       onChange={handleInputChange}
                       error={errors['Work Mobile']}
                       placeholder="Optional work mobile"
-                      required
                     />
                     <FormField
                       label="Personal Mobile Number"
@@ -1281,7 +1283,7 @@ const AddEmployeePage = () => {
                   title="Emergency Contacts"
                   icon={AlertCircle}
                 />
-                <p className="text-gray-600 mb-6">Add at least one emergency contact for this employee</p>
+                <p className="text-gray-600 mb-6">Optional: the employee adds their own when they complete onboarding</p>
 
                 <div className="space-y-6">
                   {emergencyContacts.map((contact, index) => (
@@ -1306,7 +1308,7 @@ const AddEmployeePage = () => {
                             className="w-full h-11 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm"
                             placeholder="Full Name"
                             onBlur={() => {
-                              if (!contact.name) {
+                              if (!contact.name && !isBlankContact(contact)) {
                                 setErrors(prev => ({ ...prev, [`emergencyContactName${index}`]: 'Name is required' }));
                               } else {
                                 const newErrors = { ...errors };
@@ -1327,7 +1329,7 @@ const AddEmployeePage = () => {
                             className="w-full h-11 bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm"
                             placeholder="Relationship"
                             onBlur={() => {
-                              if (!contact.relationship) {
+                              if (!contact.relationship && !isBlankContact(contact)) {
                                 setErrors(prev => ({ ...prev, [`emergencyContactRelationship${index}`]: 'Relationship is required' }));
                               } else {
                                 const newErrors = { ...errors };
