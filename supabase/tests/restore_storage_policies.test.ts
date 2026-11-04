@@ -54,12 +54,12 @@ describe('a server whose storage came across without policies', () => {
 
   it('gets every storage policy back', async () => {
     await db.exec(MIGRATION);
-    expect(await policies()).toBe(45);
+    expect(await policies()).toBe(49);
   });
 
   it('can run again without changing anything', async () => {
     await db.exec(MIGRATION);
-    expect(await policies()).toBe(45);
+    expect(await policies()).toBe(49);
   });
 
   it('lets an employee upload an onboarding document to their own folder, and no one else’s', async () => {
@@ -83,5 +83,14 @@ describe('a server whose storage came across without policies', () => {
     await asUser(db, STAFF, async () => {
       await expect(upload('payslip-pdfs', `${A}/2026-10/EMP-002.pdf`)).rejects.toThrow(/row-level security/);
     });
+  });
+
+  it('lets a signed-in user upload a company logo, as on Cloud', async () => {
+    // these policies check auth.role(), which reads the role claim storage sets from the user's token (asUser doesn't)
+    await asUser(db, PAYROLL, async () => {
+      await db.exec(`select set_config('request.jwt.claim.role', 'authenticated', false)`);
+      await expect(upload('company-logo', '7d1f0c2e-logo.png')).resolves.toBeTruthy();
+    });
+    await db.exec(`select set_config('request.jwt.claim.role', '', false)`);
   });
 });

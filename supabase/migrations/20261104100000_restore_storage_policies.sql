@@ -7,7 +7,8 @@
 -- that was not made with the service key: onboarding documents ("new row violates row-level security policy"), the
 -- October payslip PDFs, profile pictures, chat attachments, signatures.
 --
--- Each policy is the latest version from the migration that last made it (named above it). Dropped and made again,
+-- Each policy is the latest version from the migration that last made it (named above it), then the four company-logo
+-- policies that only ever existed on Cloud: 49 in all, the same names as Cloud. Dropped and made again,
 -- so this changes nothing where the policies are already right (Supabase Cloud, a fresh database). Skipped where there
 -- is no storage schema (the test database).
 do $$
@@ -399,4 +400,21 @@ begin
     and (storage.foldername(objects.name))[1] = (select public.current_tenant_id())::text
     and owner = (select auth.uid())
     );
+
+  -- company logos: made in the Supabase Cloud dashboard, never in a migration; copied exactly as Cloud has them. Any
+  -- signed-in user may add, replace or remove a logo, since logos are saved under a random name with no company
+  -- folder (src/lib/companyProfile.ts); narrowing this to the company's own folder needs the app to save them there.
+  drop policy if exists "company-logo public read" on storage.objects;
+  create policy "company-logo public read" on storage.objects for select
+    using (bucket_id = 'company-logo');
+  drop policy if exists "company-logo authenticated insert" on storage.objects;
+  create policy "company-logo authenticated insert" on storage.objects for insert
+    with check (bucket_id = 'company-logo' and auth.role() = 'authenticated');
+  drop policy if exists "company-logo authenticated update" on storage.objects;
+  create policy "company-logo authenticated update" on storage.objects for update
+    using (bucket_id = 'company-logo' and auth.role() = 'authenticated')
+    with check (bucket_id = 'company-logo' and auth.role() = 'authenticated');
+  drop policy if exists "company-logo authenticated delete" on storage.objects;
+  create policy "company-logo authenticated delete" on storage.objects for delete
+    using (bucket_id = 'company-logo' and auth.role() = 'authenticated');
 end $$;
