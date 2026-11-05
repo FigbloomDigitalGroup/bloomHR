@@ -115,7 +115,7 @@ describe('PayrollExportsPanel', () => {
     await screen.findByText('KRA PAYE (P10)');
     fireEvent.click(screen.getAllByRole('button', { name: /missing details/ })[0]);
     await waitFor(() => expect(screen.getByText('Juma Otieno')).toBeTruthy());
-    expect(screen.getByText(/KRA PIN, Residency, Type of employee/)).toBeTruthy();
+    expect(screen.getByText(/KRA PIN, Residency, KRA tax status \(Primary or Secondary\)/)).toBeTruthy();
   });
 
   it('the P10 button saves the month’s P10 as CSV with each employee’s own KRA PIN', async () => {

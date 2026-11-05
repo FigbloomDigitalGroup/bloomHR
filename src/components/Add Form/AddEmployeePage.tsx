@@ -231,7 +231,7 @@ const AddEmployeePage = () => {
       isValid = false;
     }
     if (!newEmployee['Employee Type']) {
-      newErrors['Employee Type'] = 'Employee Type is required';
+      newErrors['Employee Type'] = 'Employment type is required';
       isValid = false;
     }
     if (!newEmployee['Start Date']) {
@@ -881,7 +881,7 @@ const AddEmployeePage = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <FormField
-                    label="Employee Type"
+                    label="Employment type"
                     name="Employee Type"
                     type="select"
                     value={newEmployee['Employee Type'] || ''}

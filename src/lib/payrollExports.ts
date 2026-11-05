@@ -158,7 +158,7 @@ export function p10File(payslips: Payslip[], employees: EmployeeRecord[], rates:
       need([
         ['KRA PIN', isValidKraPin(e['Tax PIN'])],
         ['Residency', Boolean(text(e['kra_residency']))],
-        ['Type of employee', Boolean(text(e['kra_employee_type']))],
+        ['KRA tax status (Primary or Secondary)', Boolean(text(e['kra_employee_type']))],
         ['Exemption certificate number', e['is_pwd'] !== true || Boolean(text(e['Disability Cert No']))],
       ])
     ),

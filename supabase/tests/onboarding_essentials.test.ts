@@ -121,7 +121,7 @@ describe('approving with the essentials', () => {
     expect(await submit(U.TWO)).toBe('Still missing: NSSF number');
     await db.exec(`update employees set "NSSF Number" = '2012345671' where "Employee Number" = 'E-TWO'`);
     expect(await submit(U.TWO)).toBe('');
-    expect(await approve('E-TWO')).toMatch(/^Still missing: Type of employee, Basic salary, Payment method$/);
+    expect(await approve('E-TWO')).toMatch(/^Still missing: KRA tax status \(Primary or Secondary\), Basic salary, Payment method$/);
     expect(await status('E-TWO')).toBe('submitted');
   });
 
@@ -142,7 +142,7 @@ describe('approving with the essentials', () => {
     expect(overview[0].essentials_missing).toEqual([]);
     expect(overview[0].followups).toContain('Referee');
     expect(overview[0].followups_overdue).toBe(0);
-    expect(overview[1].essentials_missing).toEqual(['Type of employee', 'Basic salary', 'Payment method']);
+    expect(overview[1].essentials_missing).toEqual(['KRA tax status (Primary or Secondary)', 'Basic salary', 'Payment method']);
   });
 });
 
@@ -341,6 +341,12 @@ describe('Tanzania and Uganda', () => {
     expect(await submit(U.UG)).toBe('');
     // the tax number is one essential whatever it is called
     expect((await rows<{ k: string }>(`select onboarding_item_key('TIN') k`))[0].k).toBe('tax_number');
+    // the KRA tax status is one item under its new label and its old one
+    expect((await rows<{ k: string }>(`select onboarding_item_key('KRA tax status (Primary or Secondary)') k`))[0].k)
+      .toBe('employee_type');
+    expect((await rows<{ k: string }>(`select onboarding_item_key('Tax status (Primary or Secondary)') k`))[0].k)
+      .toBe('employee_type');
+    expect((await rows<{ k: string }>(`select onboarding_item_key('Type of employee') k`))[0].k).toBe('employee_type');
   });
 });
 
@@ -369,7 +375,7 @@ describe('running the migration again', () => {
     expect(await rows(`select tenant_id, essential_items, reminder_every_days from company_onboarding_settings order by tenant_id`)).toEqual(before.settings);
     expect(await rows(`select employee_id, item, due_date from onboarding_followup_due_dates order by 1, 2`)).toEqual(before.due);
     expect(await rows(`select employee_id, reminded_on from onboarding_followup_reminders order by 1, 2`)).toEqual(before.reminders);
-    expect(await approve('E-TZ')).toMatch(/^Still missing: Position, Type of employee/);
+    expect(await approve('E-TZ')).toMatch(/^Still missing: Position, Tax status \(Primary or Secondary\)/);
     expect(await submit(U.STAFF)).toMatch(/already approved/);
   });
 });
