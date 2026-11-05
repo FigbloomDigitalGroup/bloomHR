@@ -120,6 +120,7 @@ const SuccessPage = () => {
           >
             <GlowButton
               onClick={() => navigate('/employees')}
+              variant="secondary"
               className="bg-gray-100 hover:bg-gray-200 text-gray-800"
             >
               Back to Employees

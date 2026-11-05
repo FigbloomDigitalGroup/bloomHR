@@ -73,7 +73,7 @@ describe('KRA P10', () => {
   it('lists who is missing what the return needs', () => {
     const file = p10File([payslip('E1'), payslip('E2')], [amina, juma], rates);
     expect(file.problems).toEqual([
-      { name: 'Juma Otieno', employeeNumber: 'E2', missing: ['KRA PIN', 'Residency', 'Type of employee', 'Exemption certificate number'] },
+      { name: 'Juma Otieno', employeeNumber: 'E2', missing: ['KRA PIN', 'Residency', 'KRA tax status (Primary or Secondary)', 'Exemption certificate number'] },
     ]);
   });
 });

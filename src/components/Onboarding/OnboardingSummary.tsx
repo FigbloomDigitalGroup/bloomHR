@@ -92,7 +92,7 @@ export default function OnboardingSummary({ record, showPay = true }: { record: 
           rows={[
             ['Employee number', text(e['Employee Number'])],
             ['Position', text(e['Job Title'])],
-            ['Type of employee (KRA)', text(e['kra_employee_type'])],
+            ['KRA tax status', text(e['kra_employee_type'])],
             ['Basic salary', money(e['Basic Salary'])],
             ['House allowance', money(e['house_allowance'])],
             ['Travel allowance', money(e['travel_allowance'])],

@@ -720,7 +720,8 @@ const EditEmployeePage = () => {
                 <GlowButton
                   onClick={() => setShowIdCard(true)}
                   icon={IdCard}
-                  className="mr-2 bg-white hover:bg-gray-50 text-gray-800 border border-gray-300"
+                  variant="secondary"
+                  className="mr-2 text-gray-800 border-gray-300"
                 >
                   View / print ID card
                 </GlowButton>
@@ -729,7 +730,8 @@ const EditEmployeePage = () => {
                 <GlowButton
                   onClick={() => setDeleting(true)}
                   icon={Trash2}
-                  className="mr-2 bg-white hover:bg-red-50 text-red-700 border border-red-200"
+                  variant="secondary"
+                  className="mr-2 hover:bg-red-50 text-red-700 border-red-200 hover:border-red-300"
                 >
                   Delete
                 </GlowButton>
@@ -1020,7 +1022,7 @@ const EditEmployeePage = () => {
                 />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
                   <FormField
-                    label="Employee Type"
+                    label="Employment type"
                     name="Employee Type"
                     type={isEditMode ? "select" : "text"}
                     value={employee['Employee Type'] || ''}
@@ -1392,6 +1394,7 @@ const EditEmployeePage = () => {
                     disabled={!isEditMode}
                     locked={lockedPayFields(jobGroups, employee as Record<string, unknown>)}
                     currency={payCurrency}
+                    country={payrollCountry}
                   />
                 </div>
               )}

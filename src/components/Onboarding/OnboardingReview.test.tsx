@@ -107,12 +107,12 @@ describe('OnboardingReview', () => {
 
   it('can’t approve while HR’s own part is missing, and says what it is', async () => {
     api.loadOnboardingForReview.mockResolvedValue({ employee: { id: '1' }, emergency: emptyContact(), nextOfKin: emptyContact(),
-      missing: { employee: [], employer: ['Type of employee'], documentsOutstanding: [], essentialsEmployee: [], essentialsEmployer: ['Type of employee'], followUps: [] },
+      missing: { employee: [], employer: ['KRA tax status (Primary or Secondary)'], documentsOutstanding: [], essentialsEmployee: [], essentialsEmployer: ['KRA tax status (Primary or Secondary)'], followUps: [] },
       history: [] });
     show();
     fireEvent.click(await screen.findByRole('button', { name: 'Review' }));
     const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByText('Type of employee')).toBeTruthy();
+    expect(await within(dialog).findByText('KRA tax status (Primary or Secondary)')).toBeTruthy();
     expect((within(dialog).getByRole('button', { name: /Approve/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 
