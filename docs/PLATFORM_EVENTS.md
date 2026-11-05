@@ -127,3 +127,42 @@ known (company, employee number, route, status; no payload, no token; a per-comp
 1. Apply the migration (`docs/DATABASE_CHANGES.md`), then merge.
 2. Deploy the backend with this change and the settings above.
 3. Set `MY_HR_API_ENABLED=true`; give Schools the URL `<HR API>/api/integrations/my-hr`.
+
+## Leave from Figbloom Schools (phase 2, step 2a)
+
+What bloomHR does in ERP/SCHOOLS_HR_LEAVE_CONTRACT.md section 2 (`my_hr_routes.js`, migration
+`20261108300000_my_hr_leave.sql`). Same switch, token, school link, rate limit and audit as "My HR" above. HR's own leave
+rules are used unchanged: types, balances, notice, most days, service months, once a month, documents, the approval
+workflow and its notifications.
+
+| Route | What it does |
+|---|---|
+| `GET leave/form` | `leave_types[]` (rules: `half_days`, `count_days`, `max_days_per_request`, `min_notice_days`, `earliest_start`, `one_per_month`, `available_from`, `document`, `balance`), `balances[]`, `approval_chain[]` (label, who it waits on, skipped) |
+| `POST leave/applications` | `{type_id, start_date, end_date, half_day?, reason (10+ characters), document?: {name, content_type, base64}}`. The document (PDF, Word, JPG, PNG, WebP, HEIC; up to 5 MB, else 413) goes to the private `leave-documents` bucket under `<company>/my-hr/`. Inserted as the staff portal does, checked by HR's applicant checks (`leave_application_check()`); a refusal is `422 leave_rules` with HR's message and `problems[]` (the document is removed again). `201 {application}` as in `GET leave` (plus `half_day`, `document_name`, `cancellable`). |
+| `POST leave/applications/:id/cancel` | The employee's own: while pending (its chain ends), or approved before it starts (days back to the balance). `404` not theirs, `409 not_cancellable` otherwise. |
+| `GET approvals` | The person as an approver: an HR login only through `external_logins` (`409 approver_not_linked`: "Open HR & Payroll once to connect your HR account"; `403 approver_no_access` when that login is no longer an active member). HR's "waiting on me" (`my_leave_approvals()`) as that login: employee, type, dates, days, half day, reason, step, chain so far, `document` / `followup_document` as `{name, url, expires_at}` links valid for 5 minutes. |
+| `POST approvals/:application_id/decide` | `{decision: "approve"\|"decline", comment?}`: HR's `decide_approval()` as that login (who may decide, alternates, admins, the reason a decline needs, the audit and the notifications are HR's). `403 not_your_approval`, `404`, `409 already_decided`, `422` (a decline without a reason; a balance that no longer covers it). |
+| `POST import/leave-history` | No person header. `{records: [{external_id, leave_type_name, start_date, end_date, days, status, source_id}], dry_run?}` (up to 5000). Approved records become approved applications (no chain, no notifications, no events), counted in balances by HR's balance trigger (HR counts the days with its work week and holidays; `schools_days` shows Schools' count). Idempotent on `(company, 'schools', source_id)`; unknown types go to "Imported from Schools" (not deducted); not approved: `skipped`; a person not linked: `not_linked`; refused by HR's balance: `refused`. A dry run tries each record and rolls it back. |
+
+**Acting as the approver.** `my_hr_leave_approvals()` / `my_hr_leave_decide()` call `my_hr_act_begin()`, which (in
+that one database transaction only) sets `request.jwt.claim.sub` / `request.jwt.claims` to the login, as PostgREST does
+for a signed-in user, so `auth.uid()`, `current_tenant_id()`, `current_employee_number()` and the role are that login's
+inside HR's own functions. When the login is currently working in another of its companies, it is switched into this one
+the way the one-click sign-in does (`platform_handoff_enter()`) and switched back before the transaction ends (an error
+rolls everything back). The login comes only from `external_logins`; the acting functions can't be called by anyone,
+the service role included, except through these two.
+
+**Events sent** (`platform_event_outbox`, sent like `hr.employee.left`): `hr.leave.approved` when an application of a
+Schools-mapped employee is finally approved; `hr.leave.cancelled` when an approved one stops being approved (cancelled,
+reopened, deleted); a change while approved (dates, half day, days, type) is `hr.leave.cancelled` (as it was) then
+`hr.leave.approved` (as it is), same `application_id`. Data: `application_id, external_id, employee_number, leave_type,
+start_date, end_date, half_day, days, status`. `leave_platform_events` keeps what the platform was last told, so each
+change is queued once and other edits send nothing.
+
+### Switching on
+
+1. Apply the migration (`docs/DATABASE_CHANGES.md`), then merge.
+2. Deploy the backend. Nothing new to set: `MY_HR_API_ENABLED` and the outbox settings above cover it.
+3. The platform subscribes `schools` to `hr.leave.approved` and `hr.leave.cancelled` (contract section 1).
+
+On Vercel a request body is limited to about 4.5 MB, so there a document can be about 3 MB (base64 adds a third).
