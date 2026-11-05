@@ -16,6 +16,8 @@ import mailboxRouter from "./mailbox_routes.js";
 import platformRouter from "./platform_routes.js";
 import platformSchoolsRouter from "./platform_schools_routes.js";
 import platformSchoolGroupsRouter from "./platform_school_groups_routes.js";
+import platformSchoolHrRouter from "./platform_school_hr_routes.js";
+import { createOutboxRouter, createPlatformEventsRouter } from "./platform_events_routes.js";
 
 /**
  * @param {{ mpesaRouter?: import("express").Router, routes?: { path: string, router: import("express").Router }[] }} options
@@ -32,6 +34,9 @@ export function buildApp({ mpesaRouter, routes = [] } = {}) {
   // door scanners call /iclock/... (vercel.json sends it here); they read their bodies as text themselves, so this
   // comes before the app-wide JSON parser and CORS (a scanner isn't a browser)
   app.use("/iclock", iclockRouter);
+  // the Figbloom platform's signed events (ERP/SCHOOLS_HR_PHASE1_CONTRACT.md): the signature covers the raw body, so
+  // this reads it itself, before the JSON parser; and it is a server calling, not a browser, so no CORS
+  app.use("/api/platform/events", createPlatformEventsRouter());
 
   // CORS_ORIGIN (comma separated) limits which sites may call the API; unset allows any, as before.
   const origins = (process.env.CORS_ORIGIN || "").split(",").map((o) => o.trim()).filter(Boolean);
@@ -52,12 +57,16 @@ export function buildApp({ mpesaRouter, routes = [] } = {}) {
   app.use("/api/attendance", attendanceRouter);
   // each person's own mailbox, read inside the app (FIG-1205)
   app.use("/api/mailbox", mailboxRouter);
+  // HR's own events for the platform, sent when pg_cron asks (x-cron-secret)
+  app.use("/api/platform/outbox", createOutboxRouter());
   // Figbloom's console (console.figbloom.org): platform admins, who may belong to no company
   app.use("/api/platform", platformRouter);
   // ...and Figbloom Schools there, through Schools' own platform-schools function (ERP/SCHOOLS_CONSOLE_CONTRACT.md)
   app.use("/api/platform/schools", platformSchoolsRouter);
   // ...and its school groups, decided on the Figbloom platform (ERP/CORE_PLATFORM_DESIGN.md 5.8)
   app.use("/api/platform/school-groups", platformSchoolGroupsRouter);
+  // ...and HR & Payroll switched on per school, on the platform (ERP/SCHOOLS_HR_PHASE1_CONTRACT.md)
+  app.use("/api/platform/school-hr", platformSchoolHrRouter);
   for (const { path, router } of routes) app.use(path, router);
 
   // anything else under /api is an API 404 in JSON, never the website's home page

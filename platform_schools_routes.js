@@ -48,7 +48,7 @@ const unavailable = (message = "Figbloom Schools didn't answer. Try again.") => 
  * setting to fix here, not the caller's session), so it is a 502. Anything else (unreachable, a timeout, 5xx, not
  * JSON) is a 502 schools_unavailable.
  */
-async function callSchools(body, timeoutMs) {
+export async function callSchools(body, timeoutMs) {
   const { url, secret } = schoolsSettings();
   let response;
   let payload;

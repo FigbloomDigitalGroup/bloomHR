@@ -6,6 +6,8 @@ import { Button, Card, Modal, PageHeader, SearchInput, StatusPill, TableScroll }
 import type { StatusTone } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import ConsoleStatRow, { ConsoleStat } from './ConsoleStat';
+import { SchoolHrCell } from './SchoolHr';
+import { useSchoolHr } from './useSchoolHr';
 import { useConsoleBadge } from '../Console/consoleBadges';
 import { myPlatformRole, roleCan, type PlatformRole } from '../../lib/platformRoles';
 import { listSchools, type School } from '../../lib/platformSchools';
@@ -19,6 +21,7 @@ import {
 // new group, suspend or reactivate one. A group's decision covers all its schools. The backend checks the console role
 // (Owner/Admin approve and reject; Support suspends and reactivates; Viewer views), and the platform records who decided.
 // Students, teachers and parents come from Figbloom Schools' own list, joined by school ID; without it, they show "—".
+// Each school shows its HR & Payroll state, switched on by Owners and Admins (SchoolHr.tsx).
 
 const TONES: Record<string, StatusTone> = { pending: 'warning', active: 'success', suspended: 'neutral', rejected: 'danger' };
 
@@ -98,6 +101,8 @@ export default function SchoolGroupsPage() {
   useConsoleBadge('/platform/school-groups', totals ? totals.pending : null, (c) => `${c} waiting for approval`);
 
   const can = (a: GroupAction, status: string) => roleCan(role, actionPermission(a, status));
+  const hr = useSchoolHr(!!allowed);
+  const canEnableHr = roleCan(role, 'approve_companies');
 
   const open = (group: SchoolGroup, action: GroupAction) => {
     setReason('');
@@ -248,17 +253,20 @@ export default function SchoolGroupsPage() {
                       {g.schools.length === 0 ? (
                         <span className="text-muted-foreground">—</span>
                       ) : (
-                        <span className="flex flex-wrap gap-x-2 gap-y-0.5">
+                        <ul className="space-y-1">
                           {g.schools.map((s) => {
                             const slug = s.local_slug ?? s.name;
                             return (
-                              <Link key={s.id} to={`/platform/schools?q=${encodeURIComponent(slug)}`} className="font-mono text-[11px] text-brand hover:underline"
-                                title={`${s.name} on the Schools page`}>
-                                {slug}
-                              </Link>
+                              <li key={s.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                <Link to={`/platform/schools?q=${encodeURIComponent(slug)}`} className="font-mono text-[11px] text-brand hover:underline"
+                                  title={`${s.name} on the Schools page`}>
+                                  {slug}
+                                </Link>
+                                <SchoolHrCell school={hr.byPlatformId.get(s.id)} data={hr} canEnable={canEnableHr} labelled />
+                              </li>
                             );
                           })}
-                        </span>
+                        </ul>
                       )}
                     </td>
                     <td className="py-1.5 pr-3 text-right text-ink tabular-nums">{g.tenant_count || g.schools.length}</td>

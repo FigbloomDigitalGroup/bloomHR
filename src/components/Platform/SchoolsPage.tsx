@@ -3,6 +3,8 @@ import toast from 'react-hot-toast';
 import { Copy } from 'lucide-react';
 import { Button, Card, Modal, PageHeader, SearchInput, StatusPill, TableScroll } from '../UI';
 import SchoolsAnalytics from './SchoolsAnalytics';
+import { SchoolHrCell } from './SchoolHr';
+import { useSchoolHr } from './useSchoolHr';
 import { useConsoleBadge } from '../Console/consoleBadges';
 import { schoolsNeedingAttention } from '../../lib/consoleAnalytics';
 import type { StatusTone } from '../UI';
@@ -16,7 +18,8 @@ import {
 
 // Every school on Figbloom Schools, for Figbloom's platform admins (ERP/SCHOOLS_CONSOLE_CONTRACT.md): the console
 // reads Schools through bloomHR's backend, which checks the console role; Schools itself suspends and reactivates.
-// Roles that can suspend companies (owner, admin, support) can suspend schools too.
+// Roles that can suspend companies (owner, admin, support) can suspend schools too. HR & Payroll is switched on per school
+// by roles that approve companies (owner, admin), on the Figbloom platform (SchoolHr.tsx).
 
 const TONES: Record<string, StatusTone> = { active: 'success', suspended: 'neutral' };
 
@@ -76,6 +79,8 @@ export default function SchoolsPage() {
   useConsoleBadge('/platform/schools', attention, (n) => `${n} need attention`);
   const shown = useMemo(() => filterSchools(schools ?? [], { status, search }), [schools, status, search]);
   const canSuspend = roleCan(role, 'suspend_companies');
+  const hr = useSchoolHr(!!allowed);
+  const canEnableHr = roleCan(role, 'approve_companies');
 
   const copyId = async (school: School) => {
     try {
@@ -193,6 +198,7 @@ export default function SchoolsPage() {
                   <th className="py-1 pr-3 font-medium text-right">Parents</th>
                   <th className="py-1 pr-3 font-medium" title="The latest sign-in of anyone in the school">Last activity</th>
                   <th className="py-1 pr-3 font-medium">Status</th>
+                  <th className="py-1 pr-3 font-medium" title="Figbloom HR for this school, switched on on the Figbloom platform">HR & Payroll</th>
                   <th />
                 </tr>
               </thead>
@@ -219,6 +225,9 @@ export default function SchoolsPage() {
                     <td className="py-1.5 pr-3">
                       <StatusPill label={statusLabel(s.status)} tone={TONES[s.status] ?? 'neutral'} />
                       {s.status_reason && <span className="block mt-1 text-muted-foreground">{s.status_reason}</span>}
+                    </td>
+                    <td className="py-1.5 pr-3">
+                      <SchoolHrCell school={hr.bySchoolsId.get(s.id)} data={hr} canEnable={canEnableHr} />
                     </td>
                     <td className="py-1.5 text-right whitespace-nowrap">
                       {canSuspend && schoolAction(s.status) === 'suspended' && (
