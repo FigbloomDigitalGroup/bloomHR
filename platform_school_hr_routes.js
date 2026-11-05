@@ -107,9 +107,9 @@ async function listSchoolHr(timeoutMs) {
 const MAX_ADMINS = 20; // as the platform accepts
 
 /**
- * The school's admins for HR to invite, from Figbloom Schools' own list (the console's platform-schools proxy). That
- * list gives one contact per school, admin_email ("the first school admin's email"), with no name: it is sent with the
- * role school_admin when it is a real address (not a login address Schools made up). Schools not connected, or the
+ * The school's admins for HR to invite, from Figbloom Schools' own list (the console's platform-schools proxy): its
+ * admins ([{ email, name, role }]) when it sends them, else its one contact, admin_email, as a school_admin. Only real
+ * addresses (not login addresses Schools made up), once each (any case), at most 20. Schools not connected, or the
  * school not in its list: nobody (HR's admins can then be invited from HR). Never throws.
  */
 export async function schoolAdmins(schoolsTenantId, timeoutMs) {
@@ -117,8 +117,22 @@ export async function schoolAdmins(schoolsTenantId, timeoutMs) {
   try {
     const list = await callSchools({ action: "list" }, timeoutMs);
     const school = (Array.isArray(list?.schools) ? list.schools : []).find((s) => s?.id === schoolsTenantId);
-    const emails = [school?.admin_email].map(realEmail).filter(Boolean);
-    return [...new Set(emails)].slice(0, MAX_ADMINS).map((email) => ({ email, name: null, role: "school_admin" }));
+    // Schools' admins list when it sends one (name and role too), else its one contact, admin_email
+    const given = Array.isArray(school?.admins)
+      ? school.admins.filter((x) => x && typeof x === "object")
+      : [{ email: school?.admin_email, name: null, role: "school_admin" }];
+    const seen = new Set();
+    const admins = [];
+    for (const x of given) {
+      const email = realEmail(x.email);
+      if (!email || seen.has(email)) continue;
+      seen.add(email);
+      const name = typeof x.name === "string" && x.name.trim() ? x.name.trim().slice(0, 200) : null;
+      const role = typeof x.role === "string" && x.role.trim() ? x.role.trim().slice(0, 50) : "school_admin";
+      admins.push({ email, name, role });
+      if (admins.length >= MAX_ADMINS) break;
+    }
+    return admins;
   } catch (err) {
     console.warn("[platform/school-hr] the school's admins couldn't be read from Schools:", err?.code || err?.message || err);
     return [];

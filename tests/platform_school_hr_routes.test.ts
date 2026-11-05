@@ -174,6 +174,29 @@ describe('Enable', () => {
     }]);
   });
 
+  it("uses Schools' admins list when it sends one: real emails only, once each, at most 20, with their names", async () => {
+    fake.schools = [{
+      id: 'school-off', name: 'Hillside Primary', admin_email: 'head@hillside.ac.ke',
+      admins: [
+        { email: 'Bursar@Hillside.ac.ke', name: ' Jane Bursar ', role: 'bursar' },
+        { email: 'bursar@hillside.ac.ke', name: 'Again', role: 'school_admin' },
+        { email: 'login42@hillside.figbloom.internal', name: 'Login', role: 'school_admin' },
+        { email: 'Head@hillside.ac.ke', name: 'Head Teacher', role: 'school_admin' },
+        ...Array.from({ length: 25 }, (_, i) => ({ email: `admin${i}@hillside.ac.ke`, name: null, role: 'school_admin' })),
+      ],
+    }];
+    await call('POST', `/${OFF}/enable`);
+    const [put] = fake.apiCalls.filter((c) => c.method === 'PUT');
+    const admins = put.body.admins as Row[];
+    expect(admins).toHaveLength(20);
+    expect(admins.slice(0, 3)).toEqual([
+      { email: 'bursar@hillside.ac.ke', name: 'Jane Bursar', role: 'bursar' },
+      { email: 'head@hillside.ac.ke', name: 'Head Teacher', role: 'school_admin' },
+      { email: 'admin0@hillside.ac.ke', name: null, role: 'school_admin' },
+    ]);
+    expect(new Set(admins.map((a) => a.email)).size).toBe(20);
+  });
+
   it('a made-up login email, or Schools not answering, sends no admins (HR & Payroll is still switched on)', async () => {
     await call('POST', `/${ENABLING}/enable`);
     fake.schoolsDown = true;
