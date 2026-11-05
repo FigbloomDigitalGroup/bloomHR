@@ -1,7 +1,11 @@
 import { supabase } from './supabase';
 import { fetchAll } from './fetchAll';
 import type { AbsencePayRow } from './absencePay';
-import type { AbsenceKind, AbsenceRecord, DisciplineAccess, DisciplineCounts, OverdueDocument, WarningDraft } from './leaveDiscipline';
+import {
+  DEFAULT_POSSIBLE_ABSENCE_SETTINGS,
+  type AbsenceKind, type AbsenceRecord, type DisciplineAccess, type DisciplineCounts, type OverdueDocument, type PossibleAbsence,
+  type PossibleAbsenceSettings, type WarningDraft,
+} from './leaveDiscipline';
 
 // Leave discipline (FIG-881), the database calls. Every rule (who may record, excuse, warn) is checked in the
 // database (supabase/migrations/20261018700000_leave_discipline.sql).
@@ -119,4 +123,44 @@ export async function loadMyAbsences(): Promise<Pick<AbsenceRecord, 'id' | 'kind
     throw new Error(error.message);
   }
   return data ?? [];
+}
+
+// ---------------------------------------------------------------------------------------------
+// possible absences (migration 20261106100000)
+// ---------------------------------------------------------------------------------------------
+
+/** The possible absences the signed-in user may see (HR: all; a supervisor: their team). Empty before the migration. */
+export async function loadPossibleAbsences(): Promise<PossibleAbsence[]> {
+  try {
+    const rows = await fetchAll<PossibleAbsence>((from, to) => supabase.rpc('possible_absences').range(from, to));
+    return rows.map((r) => ({ ...r, days: Number(r.days) || 0, absent_days: r.absent_days ?? [] }));
+  } catch (err) {
+    if (notThereYet(err)) return [];
+    throw err;
+  }
+}
+
+/** "Not an absence", with the reason. */
+export async function dismissPossibleAbsence(input: { employeeNumber: string; start: string; end: string; reason: string }) {
+  const { error } = await supabase.rpc('dismiss_possible_absence', {
+    p_employee: input.employeeNumber, p_start: input.start, p_end: input.end, p_reason: input.reason,
+  });
+  fail(error);
+}
+
+export async function loadPossibleAbsenceSettings(): Promise<PossibleAbsenceSettings> {
+  const { data, error } = await supabase.rpc('possible_absence_settings');
+  if (error) {
+    if (notThereYet(error)) return { ...DEFAULT_POSSIBLE_ABSENCE_SETTINGS };
+    throw new Error(error.message);
+  }
+  return { ...DEFAULT_POSSIBLE_ABSENCE_SETTINGS, ...((data ?? {}) as Partial<PossibleAbsenceSettings>) };
+}
+
+export async function savePossibleAbsenceSettings(s: Pick<PossibleAbsenceSettings, 'lookback_days' | 'notify_employees' | 'reply_working_days'>): Promise<PossibleAbsenceSettings> {
+  const { data, error } = await supabase.rpc('set_possible_absence_settings', {
+    p_lookback_days: s.lookback_days, p_notify_employees: s.notify_employees, p_reply_working_days: s.reply_working_days,
+  });
+  fail(error);
+  return { ...DEFAULT_POSSIBLE_ABSENCE_SETTINGS, ...((data ?? {}) as Partial<PossibleAbsenceSettings>) };
 }

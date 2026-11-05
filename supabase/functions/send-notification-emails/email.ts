@@ -84,6 +84,7 @@ export const HR_PAGES: Record<string, string> = {
   leave_document_overdue: '/leave-discipline',
   attendance_odd_hours: '/attendance',
   missed_scan_requested: '/attendance?tab=missed',
+  possible_absences: '/leave-discipline?tab=possible',
   payment_due: '/payments',
   requisition_requested: '/payments?tab=requisitions',
 };
@@ -106,6 +107,7 @@ export const STAFF_TABS: Record<string, string> = {
   incident_update: 'incident-report', task_assigned: 'tasks', exit_approved: 'resignation', exit_declined: 'resignation',
   contract_sent: 'contract', contract_sent_back: 'contract', contract_accepted: 'contract', contract_cancelled: 'contract',
   missed_scan_request: 'my-team', missed_scan_approved: 'home', missed_scan_declined: 'home',
+  possible_absence: 'home',
   payment_made: 'home', requisition_approved: 'home', requisition_rejected: 'home',
 };
 

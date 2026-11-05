@@ -1,10 +1,22 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Button, EmployeePicker, Modal } from '../UI';
-import { ABSENCE_KIND_LABEL, formatDateRange, workingDaysText, type AbsenceKind, type AbsenceRecord, type WarningDraft } from '../../lib/leaveDiscipline';
-import { excuseAbsence, issueDisciplineWarning, recordAbsence } from '../../lib/leaveDisciplineApi';
+import {
+  ABSENCE_KIND_LABEL, formatDateRange, possibleAbsenceText, workingDaysText,
+  type AbsenceKind, type AbsenceRecord, type PossibleAbsence, type WarningDraft,
+} from '../../lib/leaveDiscipline';
+import { dismissPossibleAbsence, excuseAbsence, issueDisciplineWarning, recordAbsence } from '../../lib/leaveDisciplineApi';
 
-// The three dialogs of Leave discipline (FIG-881): record an absence, excuse one, issue a warning.
+// The dialogs of Leave discipline (FIG-881): record an absence (by hand, or from a possible absence), excuse one,
+// issue a warning, dismiss a possible absence.
+
+/** A possible absence being recorded: the employee and the days, filled in. */
+export interface AbsencePrefill {
+  employeeNumber: string;
+  employeeName: string;
+  start: string;
+  end: string;
+}
 
 const input = 'w-full px-3 py-2 text-xs border border-border rounded-tile bg-white text-ink outline-none focus:border-brand';
 const labelClass = 'block text-[11px] font-semibold text-ink mb-1.5';
@@ -12,19 +24,21 @@ const today = () => new Date().toISOString().slice(0, 10);
 const errorText = (err: unknown) => (err instanceof Error ? err.message : 'Something went wrong. Please try again.');
 
 export function RecordAbsenceModal({
-  open, kind: initialKind, allowedNumbers, onClose, onSaved,
+  open, kind: initialKind, allowedNumbers, prefill, onClose, onSaved,
 }: {
   open: boolean;
   kind: AbsenceKind;
   /** only these employees (a supervisor's team); undefined for everyone */
   allowedNumbers?: string[];
+  /** from a possible absence: this employee and these days */
+  prefill?: AbsencePrefill;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [employee, setEmployee] = useState('');
+  const [employee, setEmployee] = useState(prefill?.employeeNumber ?? '');
   const [kind, setKind] = useState<AbsenceKind>(initialKind);
-  const [start, setStart] = useState(today());
-  const [end, setEnd] = useState(today());
+  const [start, setStart] = useState(prefill?.start ?? today());
+  const [end, setEnd] = useState(prefill?.end ?? today());
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -46,7 +60,14 @@ export function RecordAbsenceModal({
   return (
     <Modal open={open} onClose={onClose} title="Record an absence" closeOnBackdrop={!busy}>
       <div className="space-y-4 mt-4">
-        <EmployeePicker label="Employee" value={employee} allowedNumbers={allowedNumbers} onChange={(e) => setEmployee(e?.employeeNumber ?? '')} />
+        {prefill ? (
+          <p className="m-0 text-xs text-ink">
+            <span className={labelClass}>Employee</span>
+            <span className="font-semibold">{prefill.employeeName}</span> <span className="text-muted-foreground">{prefill.employeeNumber}</span>
+          </p>
+        ) : (
+          <EmployeePicker label="Employee" value={employee} allowedNumbers={allowedNumbers} onChange={(e) => setEmployee(e?.employeeNumber ?? '')} />
+        )}
         <fieldset className="m-0 p-0 border-0">
           <legend className={labelClass}>What happened</legend>
           <div className="space-y-1.5">
@@ -205,6 +226,51 @@ export function DisciplineWarningModal({
           <Button className="!bg-status-danger !border-status-danger" onClick={() => void send()} disabled={busy || !d.message.trim() || !d.type.trim()}>
             {busy ? 'Sending...' : 'Send warning'}
           </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+export function DismissPossibleAbsenceModal({
+  absence, onClose, onSaved,
+}: {
+  absence: PossibleAbsence | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  if (!absence) return null;
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      await dismissPossibleAbsence({ employeeNumber: absence.employee_number, start: absence.start_date, end: absence.end_date, reason: reason.trim() });
+      toast.success('Dismissed. These days will not come back on the list.');
+      setReason('');
+      onSaved();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title="Not an absence" closeOnBackdrop={!busy}>
+      <div className="space-y-4 mt-4">
+        <p className="m-0 text-xs text-ink">
+          {absence.employee_name}: {possibleAbsenceText(absence)}. Nothing is recorded and the employee is not told; the days are
+          taken off the list for good.
+        </p>
+        <label className="block">
+          <span className={labelClass}>Why is this not an absence? (required)</span>
+          <textarea className={`${input} resize-none`} rows={3} maxLength={2000} value={reason} onChange={(e) => setReason(e.target.value)} />
+        </label>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={() => void save()} disabled={busy || !reason.trim()}>{busy ? 'Saving...' : 'Dismiss'}</Button>
         </div>
       </div>
     </Modal>
