@@ -18,16 +18,15 @@
 import express from "express";
 import { HttpError } from "./admin_routes.js";
 import { authenticatePlatformAdmin, platformRoleAllows } from "./platform_routes.js";
+import { PLATFORM_TIMEOUT_MS, PlatformError, createPlatformClient } from "./platform_client.js";
 
-export const PLATFORM_TIMEOUT_MS = 8 * 1000;
+export { PLATFORM_TIMEOUT_MS } from "./platform_client.js";
 export const MAX_REASON = 500;
 export const SCOPE = "platform/console";
 const PAGE = 200; // the platform's largest page
 const MAX_PAGES = 10; // 2,000 groups: more than the console shows at once
-const TOKEN_MARGIN_MS = 60 * 1000; // a token is renewed a minute before it expires
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const CODE_RE = /^[a-z][a-z0-9_]{0,63}$/;
 
 /**
  * What the console may do to a group, the platform status it becomes, from which statuses, and the permission it needs:
@@ -42,139 +41,26 @@ export const ACTIONS = {
   reactivate: { to: "active", from: ["suspended", "rejected"], permission: "suspend_companies", reason: false, fromPermission: { rejected: "approve_companies" } },
 };
 
-class PlatformError extends Error {
-  constructor(status, code, message) {
-    super(message);
-    this.status = status;
-    this.code = code;
-  }
-}
-
 const AUTH_CODES = { 401: "unauthorized", 403: "forbidden", 500: "server_error" };
-const unavailable = (message = "The Figbloom platform didn't answer. Try again.") => new PlatformError(502, "platform_unavailable", message);
-
-/** The platform's settings, or 503 platform_not_connected. */
-function platformSettings() {
-  const read = (name) => String(process.env[name] || "").trim();
-  const apiUrl = read("PLATFORM_API_URL").replace(/\/+$/, "");
-  const tokenUrl = read("PLATFORM_TOKEN_URL");
-  const clientId = read("PLATFORM_CONSOLE_CLIENT_ID");
-  const clientSecret = read("PLATFORM_CONSOLE_CLIENT_SECRET");
-  if (!apiUrl || !tokenUrl || !clientId || !clientSecret) {
-    throw new PlatformError(503, "platform_not_connected", "The Figbloom platform isn't connected to the console yet.");
-  }
-  return { apiUrl, tokenUrl, clientId, clientSecret };
-}
 
 /** Whether Figbloom Schools applies the platform's decisions yet (SCHOOL_GROUP_DECISIONS_LIVE). */
 export const decisionsLive = () => /^(1|true|yes|on)$/i.test(String(process.env.SCHOOL_GROUP_DECISIONS_LIVE || "").trim());
 
-// ---- the console's access token (client credentials), kept until shortly before it expires
-
-let cached = null; // { key, token, expiresAt }
-let pending = null; // { key, promise }: one token request at a time
+// ---- the console's own client (client credentials, scope platform/console), shared with the Schools HR switch
+export const consoleClient = createPlatformClient({
+  clientIdEnv: "PLATFORM_CONSOLE_CLIENT_ID",
+  clientSecretEnv: "PLATFORM_CONSOLE_CLIENT_SECRET",
+  scope: SCOPE,
+  tag: "[platform/school-groups]",
+  who: "The console",
+  notConnected: "The Figbloom platform isn't connected to the console yet.",
+});
 
 /** Forgets the token (tests; and after the platform refuses it). */
-export function resetPlatformToken() {
-  cached = null;
-  pending = null;
-}
+export const resetPlatformToken = () => consoleClient.resetToken();
 
-async function requestToken(s, timeoutMs) {
-  let response;
-  let payload;
-  try {
-    response = await fetch(s.tokenUrl, {
-      method: "POST",
-      headers: {
-        "content-type": "application/x-www-form-urlencoded",
-        authorization: `Basic ${Buffer.from(`${s.clientId}:${s.clientSecret}`).toString("base64")}`,
-      },
-      body: new URLSearchParams({ grant_type: "client_credentials", scope: SCOPE }).toString(),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    payload = await response.json().catch(() => null);
-  } catch (err) {
-    console.error("[platform/school-groups] token request", err?.name === "TimeoutError" ? "timed out" : `failed (${err?.name || "error"})`);
-    throw unavailable("The console couldn't sign in to the Figbloom platform. Try again.");
-  }
-  if (!response.ok || typeof payload?.access_token !== "string" || !payload.access_token) {
-    // the status only: the answer may echo the client
-    console.error("[platform/school-groups] token request refused", response.status);
-    throw unavailable("The console couldn't sign in to the Figbloom platform. Check its settings.");
-  }
-  const seconds = Number(payload.expires_in) > 0 ? Number(payload.expires_in) : 3600;
-  return { token: payload.access_token, expiresAt: Date.now() + seconds * 1000 };
-}
-
-async function platformToken(s, timeoutMs) {
-  const key = `${s.tokenUrl}|${s.clientId}`;
-  if (cached && cached.key === key && Date.now() < cached.expiresAt - TOKEN_MARGIN_MS) return cached.token;
-  if (!pending || pending.key !== key) {
-    const promise = requestToken(s, timeoutMs).then(
-      (t) => {
-        cached = { key, ...t };
-        if (pending?.promise === promise) pending = null;
-        return t.token;
-      },
-      (err) => {
-        if (pending?.promise === promise) pending = null;
-        throw err;
-      }
-    );
-    pending = { key, promise };
-  }
-  return pending.promise;
-}
-
-/**
- * One call to the platform API. Resolves its JSON on 2xx. Its 4xx come back as a PlatformError with the same status,
- * code and message, except 401/403: those mean the console's own credential was refused (a setting to fix here, not the
- * caller's session), so after one retry with a new token they are a 502. Anything else (unreachable, a timeout, 5xx,
- * not JSON) is a 502 platform_unavailable.
- */
-async function callPlatform(method, path, body, timeoutMs, retried = false) {
-  const s = platformSettings();
-  const token = await platformToken(s, timeoutMs);
-  let response;
-  let payload;
-  try {
-    response = await fetch(`${s.apiUrl}${path}`, {
-      method,
-      headers: { authorization: `Bearer ${token}`, ...(body ? { "content-type": "application/json" } : {}) },
-      body: body ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    payload = await response.json().catch((err) => {
-      if (err?.name === "TimeoutError" || err?.name === "AbortError") throw err;
-      return null;
-    });
-  } catch (err) {
-    const timedOut = err?.name === "TimeoutError" || err?.name === "AbortError";
-    // the method and route only: never the request (its headers carry the token)
-    console.error("[platform/school-groups]", method, path.split("?")[0], timedOut ? "timed out" : `failed (${err?.name || "error"})`);
-    throw unavailable(timedOut ? "The Figbloom platform didn't answer in time. Try again." : undefined);
-  }
-
-  if (response.ok) {
-    if (payload === null || typeof payload !== "object") throw unavailable();
-    return payload;
-  }
-  if (response.status === 401 || response.status === 403) {
-    resetPlatformToken();
-    if (!retried) return callPlatform(method, path, body, timeoutMs, true);
-    console.error("[platform/school-groups] the platform refused the console's credential", response.status);
-    throw unavailable("The Figbloom platform refused the console's connection. Check its settings.");
-  }
-  if (response.status >= 400 && response.status < 500) {
-    const e = payload?.error;
-    const code = typeof e?.code === "string" && CODE_RE.test(e.code) ? e.code : "platform_error";
-    const message = typeof e?.message === "string" && e.message.trim() ? e.message.trim().slice(0, 500) : "The Figbloom platform refused the request.";
-    throw new PlatformError(response.status, code, message);
-  }
-  console.error("[platform/school-groups]", method, path.split("?")[0], "answered", response.status);
-  throw unavailable();
-}
+/** One call to the platform API as the console (see platform_client.js for what comes back). */
+export const callPlatform = (method, path, body, timeoutMs) => consoleClient.call(method, path, body, timeoutMs);
 
 /** A school (platform customer account) as the console shows it: Schools' own ID and address for it. */
 function toSchool(t) {
@@ -205,7 +91,7 @@ function toGroup(o) {
 }
 
 /** Every Schools organisation on the platform (all pages), with the counts by status. */
-async function listGroups(timeoutMs) {
+export async function listGroups(timeoutMs) {
   const groups = [];
   let counts = {};
   let truncated = false;
@@ -222,7 +108,7 @@ async function listGroups(timeoutMs) {
 }
 
 /** The signed-in platform admin, if their role allows `permission`; else a PlatformError. */
-async function callerWith(req, permission, refusal) {
+export async function callerWith(req, permission, refusal) {
   let caller;
   try {
     caller = await authenticatePlatformAdmin(req);
@@ -234,7 +120,7 @@ async function callerWith(req, permission, refusal) {
   return caller;
 }
 
-function send(res, err) {
+export function send(res, err) {
   if (err instanceof PlatformError) return res.status(err.status).json({ error: { code: err.code, message: err.message } });
   console.error("[platform/school-groups]", err?.message || err);
   return res.status(500).json({ error: { code: "server_error", message: "Something went wrong. Try again." } });

@@ -19,9 +19,10 @@ const ADMIN_B = '00000000-0000-0000-0000-00000000b0ad';
 // platform_admins and platform_rate_changes are Figbloom's own, above every company (finance_bill_readiness.test.ts), and so
 // are platform_settings and tenant_status_changes, the audit of companies' approval (platform_organisations.test.ts), and
 // platform_admin_changes, the log of platform admins added and removed (platform_staff.test.ts).
+// platform_event_receipts are the Figbloom platform's deliveries, applied by the backend only (platform_events_schools.test.ts).
 // attendance_scanner_unregistered is a door scanner that called in before any company registered its serial, so it has
 // no company yet; nobody reads it directly (HR asks about one serial they typed); attendance_scanners.test.ts.
-const NOT_TENANT_OWNED = ['tenants', 'permissions', 'user_profiles', 'memberships', 'user_preferences', 'Employee_Records_Duplicate', 'kenya_branches_duplicate', 'statutory_rates', 'document_types', 'banks', 'bank_branches', 'platform_admins', 'platform_rate_changes', 'attendance_scanner_unregistered', 'platform_settings', 'tenant_status_changes', 'platform_admin_changes'];
+const NOT_TENANT_OWNED = ['tenants', 'permissions', 'user_profiles', 'memberships', 'user_preferences', 'Employee_Records_Duplicate', 'kenya_branches_duplicate', 'statutory_rates', 'document_types', 'banks', 'bank_branches', 'platform_admins', 'platform_rate_changes', 'attendance_scanner_unregistered', 'platform_settings', 'tenant_status_changes', 'platform_admin_changes', 'platform_event_receipts'];
 
 let db: PGlite;
 
