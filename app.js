@@ -19,6 +19,7 @@ import platformSchoolGroupsRouter from "./platform_school_groups_routes.js";
 import platformSchoolHrRouter from "./platform_school_hr_routes.js";
 import { createOutboxRouter, createPlatformEventsRouter } from "./platform_events_routes.js";
 import { createPlatformHandoffRouter } from "./platform_handoff_routes.js";
+import { createMyHrRouter } from "./my_hr_routes.js";
 
 /**
  * @param {{ mpesaRouter?: import("express").Router, routes?: { path: string, router: import("express").Router }[] }} options
@@ -42,6 +43,9 @@ export function buildApp({ mpesaRouter, routes = [] } = {}) {
   // code, and the app finishing a first-time link. Before the app-wide CORS: the link endpoints carry a cookie and
   // answer CORS themselves, with credentials, only to the origins in CORS_ORIGIN
   app.use("/api/platform/handoff", createPlatformHandoffRouter());
+  // "My HR" for Figbloom Schools staff (ERP/SCHOOLS_HR_PHASE2_CONTRACT.md): Schools' server calls with its platform
+  // token, never a browser, so no CORS
+  app.use("/api/integrations/my-hr", createMyHrRouter());
 
   // CORS_ORIGIN (comma separated) limits which sites may call the API; unset allows any, as before.
   const origins = (process.env.CORS_ORIGIN || "").split(",").map((o) => o.trim()).filter(Boolean);
