@@ -38,6 +38,11 @@ const notes = async (to: string, type: string) =>
     `select title, message from hr_notifications where employee_number = '${to}' and notification_type = '${type}' order by id`
   );
 const PREV_MONTH = `(date_trunc('month', current_date) - interval '1 month')::date + 9`;
+// The app's "today" (public.work_today()): contract jobs count by the Nairobi day they were approved. current_date follows
+// the session time zone, which PGlite takes from the host: UTC in CI, so from 21:00 UTC it is still yesterday there.
+const NAIROBI_TODAY = `(now() at time zone 'Africa/Nairobi')::date`;
+// Covers every day this file counts on (current_date - 2 to today in Nairobi) in any host time zone.
+const TOTALS_PERIOD = `${NAIROBI_TODAY} - 30, ${NAIROBI_TODAY}`;
 
 beforeAll(async () => {
   db = await bootLiveDb();
@@ -172,19 +177,21 @@ describe('spreadsheet import', () => {
   type Row = { row: number; ok: boolean; error: string | null; employee_number: string; amount: number | null };
   const sheet = (r: Record<string, unknown>[]) => `'${JSON.stringify(r).replace(/'/g, "''")}'::jsonb`;
   const today = async () => (await rows<{ d: string }>(`select to_char(current_date, 'YYYY-MM-DD') d`))[0].d;
-  const yesterday = async () => (await rows<{ d: string }>(`select to_char(current_date - 1, 'YYYY-MM-DD') d`))[0].d;
+  // tomorrow, not yesterday: on the 1st yesterday is in last month, which the month lock above has approved and locked.
+  // W2 already has tea for today, and tomorrow is the latest day an import accepts.
+  const tomorrow = async () => (await rows<{ d: string }>(`select to_char(current_date + 1, 'YYYY-MM-DD') d`))[0].d;
   const prev = async () => (await rows<{ d: string }>(`select to_char(${PREV_MONTH}, 'YYYY-MM-DD') d`))[0].d;
 
   it('checks every row and imports only the good ones, keeping a record', async () => {
     const d = await today();
-    const y = await yesterday();
+    const t = await tomorrow();
     const input = [
-      { employee_number: 'w2', work_date: y, work_type: 'tea PICKED', quantity: '12.5' },     // ok (any case)
+      { employee_number: 'w2', work_date: t, work_type: 'tea PICKED', quantity: '12.5' },     // ok (any case)
       { employee_number: 'NOBODY', work_date: d, work_type: 'Tea picked', quantity: 3 },
       { employee_number: 'W2', work_date: d, work_type: 'Ploughing', quantity: 3 },
       { employee_number: 'W2', work_date: d, work_type: 'Weeding', quantity: 'lots' },
       { employee_number: 'W2', work_date: await prev(), work_type: 'Weeding', quantity: 2 },
-      { employee_number: 'W2', work_date: y, work_type: 'Tea picked', quantity: 4 },          // same as row 1
+      { employee_number: 'W2', work_date: t, work_type: 'Tea picked', quantity: 4 },          // same as row 1
       { employee_number: 'C1', work_date: d, work_type: 'Weeding', quantity: 2 },
       { employee_number: 'M1', work_date: d, work_type: 'Weeding', quantity: 2 },
       { employee_number: 'W3', work_date: '16/10/26', work_type: 'Weeding', quantity: 2 },
@@ -292,7 +299,7 @@ describe('contract jobs', () => {
 describe('running totals', () => {
   it("per worker: approved quantity and gross, what's waiting, approved jobs; a supervisor sees only their team", async () => {
     const t = await read<{ employee_number: string; approved_amount: string; waiting_amount: string; jobs_approved_amount: string; lines: { work_type: string; quantity: number }[] }>(
-      SUP, `select * from work_totals(current_date - 30, current_date)`
+      SUP, `select * from work_totals(${TOTALS_PERIOD})`
     );
     expect(t.map((r) => r.employee_number).sort()).toEqual(['W1', 'W2']);
     const w1 = t.find((r) => r.employee_number === 'W1')!;
@@ -300,7 +307,7 @@ describe('running totals', () => {
     expect(Number(w1.waiting_amount)).toBe(300); // the corrected 25 kg sent again
     expect(Number(w1.approved_amount)).toBe(492 + 240);
     expect(w1.lines).toEqual([{ work_type: 'Tea picked', unit: 'kg', quantity: 61, amount: 732 }]);
-    const all = await read<{ employee_number: string }>(PAY, `select employee_number from work_totals(current_date - 30, current_date)`);
+    const all = await read<{ employee_number: string }>(PAY, `select employee_number from work_totals(${TOTALS_PERIOD})`);
     expect(all.map((r) => r.employee_number)).toContain('W3');
   });
 });
@@ -311,7 +318,7 @@ describe('company isolation', () => {
     expect(await read(OTHER, `select 1 from work_type_rates`)).toHaveLength(0);
     expect(await read(OTHER, `select 1 from work_imports`)).toHaveLength(0);
     expect(await read(OTHER, `select employee_number from work_people()`)).toEqual([{ employee_number: 'X1' }]);
-    expect(await read(OTHER, `select 1 from work_totals(current_date - 30, current_date)`)).toHaveLength(0);
+    expect(await read(OTHER, `select 1 from work_totals(${TOTALS_PERIOD})`)).toHaveLength(0);
     const ids = (await rows<{ id: string }>(`select id from work_entries where tenant_id = '${A}' and status = 'submitted'`)).map((r) => `'${r.id}'::uuid`);
     const out = await one<{ r: { done: number } }>(OTHER, `select decide_work_entries(array[${ids.join(',')}], 'approved') r`);
     expect(out.r.done).toBe(0);
