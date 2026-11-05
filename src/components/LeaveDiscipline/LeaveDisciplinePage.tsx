@@ -4,21 +4,34 @@ import { AlertTriangle, FileWarning, Plus, UserX } from 'lucide-react';
 import { Button, Card, EmptyState, PageHeader, StatusPill, TabBar, TableScroll } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import {
-  ABSENCE_KIND_LABEL, dueText, formatDateRange, warningForAbsence, warningForDocument, workingDaysText,
-  type AbsenceKind, type AbsenceRecord, type DisciplineAccess, type DisciplineCounts, type OverdueDocument, type WarningDraft,
+  ABSENCE_KIND_LABEL, DEFAULT_POSSIBLE_ABSENCE_SETTINGS, dueText, formatDateRange, warningForAbsence, warningForDocument,
+  workingDaysText,
+  type AbsenceKind, type AbsenceRecord, type DisciplineAccess, type DisciplineCounts, type OverdueDocument, type PossibleAbsence,
+  type PossibleAbsenceSettings, type WarningDraft,
 } from '../../lib/leaveDiscipline';
 import {
   checkOverdueDocuments, deleteAbsence, loadAbsences, loadDisciplineAccess, loadDisciplineCounts, loadLeaveTypeNames,
-  loadOverdueDocuments,
+  loadOverdueDocuments, loadPossibleAbsences, loadPossibleAbsenceSettings,
 } from '../../lib/leaveDisciplineApi';
-import { DisciplineWarningModal, ExcuseAbsenceModal, RecordAbsenceModal } from './DisciplineDialogs';
+import {
+  DismissPossibleAbsenceModal, DisciplineWarningModal, ExcuseAbsenceModal, RecordAbsenceModal, type AbsencePrefill,
+} from './DisciplineDialogs';
+import { PossibleAbsenceSettingsCard, PossibleAbsencesTable } from './PossibleAbsences';
 
 // Leave discipline (FIG-881): HR's three failures of communication. Absences without leave (unpaid unless excused),
 // failures to notify (a conduct record), and leave applied for without the required document. Each can be warned
 // with the Disciplinary module's warnings, pre-filled from a template and linked to the record. HR sees everything;
-// a supervisor records and sees their team's absences. The database decides who may do what.
+// a supervisor records and sees their team's absences. The database decides who may do what. Possible absences are
+// the days attendance counts as absent, to record or dismiss (nothing is recorded by itself).
 
-type Tab = 'unexcused_absence' | 'failed_to_notify' | 'documents' | 'employees';
+type Tab = 'possible' | 'unexcused_absence' | 'failed_to_notify' | 'documents' | 'employees';
+const TABS: Tab[] = ['possible', 'unexcused_absence', 'failed_to_notify', 'documents', 'employees'];
+
+/** The tab an address opens (?tab=possible from a notification), else the unexcused absences. */
+const tabFromAddress = (): Tab => {
+  const t = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search).get('tab');
+  return TABS.includes(t as Tab) ? (t as Tab) : 'unexcused_absence';
+};
 
 const th = 'text-left text-[10.5px] font-bold uppercase text-subtle px-3 py-2 whitespace-nowrap';
 const td = 'px-3 py-2.5 text-xs text-ink align-top';
@@ -35,19 +48,24 @@ export default function LeaveDisciplinePage() {
   const [counts, setCounts] = useState<DisciplineCounts[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>('unexcused_absence');
-  const [recording, setRecording] = useState<AbsenceKind | null>(null);
+  const [possible, setPossible] = useState<PossibleAbsence[]>([]);
+  const [settings, setSettings] = useState<PossibleAbsenceSettings>(DEFAULT_POSSIBLE_ABSENCE_SETTINGS);
+  const [tab, setTab] = useState<Tab>(tabFromAddress);
+  const [recording, setRecording] = useState<{ kind: AbsenceKind; prefill?: AbsencePrefill } | null>(null);
+  const [dismissing, setDismissing] = useState<PossibleAbsence | null>(null);
   const [excusing, setExcusing] = useState<AbsenceRecord | null>(null);
   const [warning, setWarning] = useState<{ key: number; draft: WarningDraft } | null>(null);
 
   const reload = useCallback(async (a: DisciplineAccess) => {
     try {
-      const [abs, docs, cnt] = await Promise.all([
+      const [abs, docs, cnt, pos] = await Promise.all([
         loadAbsences(),
         a.manage ? loadOverdueDocuments() : Promise.resolve([] as OverdueDocument[]),
         loadDisciplineCounts(),
+        loadPossibleAbsences(),
       ]);
       setAbsences(abs);
+      setPossible(pos);
       setDocuments(docs);
       setCounts(cnt);
     } catch (err) {
@@ -66,6 +84,7 @@ export default function LeaveDisciplinePage() {
           // tell HR (once per application) about documents that have become overdue, then list them
           await checkOverdueDocuments();
           if (a.leaves) setLeaveTypes(await loadLeaveTypeNames());
+          setSettings(await loadPossibleAbsenceSettings());
         }
         if (a.manage || a.supervised.length > 0) await reload(a);
       } catch (err) {
@@ -81,6 +100,7 @@ export default function LeaveDisciplinePage() {
 
   const changed = () => {
     setRecording(null);
+    setDismissing(null);
     setExcusing(null);
     setWarning(null);
     if (access) void reload(access);
@@ -103,11 +123,12 @@ export default function LeaveDisciplinePage() {
   }), [absences]);
 
   const tabs = useMemo(() => [
+    { id: 'possible', label: `Possible absences (${possible.length})` },
     { id: 'unexcused_absence', label: `Unexcused absences (${byKind.unexcused_absence.filter((a) => a.status === 'recorded').length})` },
     { id: 'failed_to_notify', label: `Failure to notify (${byKind.failed_to_notify.filter((a) => a.status === 'recorded').length})` },
     ...(access?.manage ? [{ id: 'documents', label: `Missing documents (${documents.length})` }] : []),
     { id: 'employees', label: 'By employee (12 months)' },
-  ], [byKind, documents.length, access?.manage]);
+  ], [byKind, documents.length, access?.manage, possible.length]);
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><FigbloomLoader label="Loading leave discipline" /></div>;
@@ -202,7 +223,7 @@ export default function LeaveDisciplinePage() {
         title="Leave discipline"
         subtitle={<span>Absences without leave, failures to notify, and leave without the required document</span>}
         actions={
-          <Button icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setRecording(tab === 'failed_to_notify' ? 'failed_to_notify' : 'unexcused_absence')}>
+          <Button icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setRecording({ kind: tab === 'failed_to_notify' ? 'failed_to_notify' : 'unexcused_absence' })}>
             Record absence
           </Button>
         }
@@ -210,6 +231,24 @@ export default function LeaveDisciplinePage() {
 
       <TabBar items={tabs} activeId={tab} onChange={(id) => setTab(id as Tab)} className="mb-4" />
 
+      {tab === 'possible' && (
+        <>
+          <p className="text-[11.5px] text-muted-foreground mt-0 mb-3">
+            From attendance: past working days with no clock-in, no approved leave, no public holiday and no missed-scan request,
+            from the last {settings.lookback_days} days. Consecutive days are one entry. Nothing is recorded until you record it;
+            dismiss what was not an absence (with the reason).
+          </p>
+          {access.manage && <PossibleAbsenceSettingsCard settings={settings} onSaved={(s) => { setSettings(s); if (access) void reload(access); }} />}
+          <PossibleAbsencesTable
+            list={possible}
+            onRecord={(p, kind) => setRecording({
+              kind,
+              prefill: { employeeNumber: p.employee_number, employeeName: p.employee_name, start: p.start_date, end: p.end_date },
+            })}
+            onDismiss={setDismissing}
+          />
+        </>
+      )}
       {tab === 'unexcused_absence' && (
         <>
           <p className="text-[11.5px] text-muted-foreground mt-0 mb-3">
@@ -327,12 +366,14 @@ export default function LeaveDisciplinePage() {
       {recording && (
         <RecordAbsenceModal
           open
-          kind={recording}
+          kind={recording.kind}
+          prefill={recording.prefill}
           allowedNumbers={access.manage ? undefined : access.supervised}
           onClose={() => setRecording(null)}
           onSaved={changed}
         />
       )}
+      <DismissPossibleAbsenceModal absence={dismissing} onClose={() => setDismissing(null)} onSaved={changed} />
       <ExcuseAbsenceModal absence={excusing} leaveTypes={leaveTypes} canMakeLeave={access.leaves} onClose={() => setExcusing(null)} onSaved={changed} />
       {warning && <DisciplineWarningModal key={warning.key} draft={warning.draft} onClose={() => setWarning(null)} onSent={changed} />}
     </div>

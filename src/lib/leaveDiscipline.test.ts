@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { leavePayFor, leaveLineLabel, leaveLineWorking, leaveLinesText, payslipLeaveLines, type LeavePayRow } from './leavePay';
 import { withAbsencePay, type AbsencePayRow } from './absencePay';
-import { dueText, formatDateRange, warningForAbsence, warningForDocument, workingDaysText, type AbsenceRecord, type OverdueDocument } from './leaveDiscipline';
+import {
+  dayRange, dueText, formatDateRange, noticeText, possibleAbsenceSettingsProblem, possibleAbsenceText, warningForAbsence, warningForDocument,
+  workingDaysText, type AbsenceRecord, type OverdueDocument,
+} from './leaveDiscipline';
 import { DISCIPLINE_TEMPLATES, WARNING_TEMPLATES, fillWarningTemplate } from './warningTemplates';
 
 const absenceRow = (days: number, working = 22): AbsencePayRow => ({
@@ -94,5 +97,27 @@ describe('warnings pre-filled from the templates', () => {
     expect(WARNING_TEMPLATES.map((t) => t.type)).toEqual(expect.arrayContaining(Object.values(DISCIPLINE_TEMPLATES).map((t) => t.type)));
     expect(new Set(WARNING_TEMPLATES.map((t) => t.id)).size).toBe(WARNING_TEMPLATES.length);
     expect(fillWarningTemplate(DISCIPLINE_TEMPLATES.missing_document.message, {})).not.toMatch(/\{/);
+  });
+});
+
+describe('possible absences', () => {
+  it('a run of days reads "Mon 2 – Wed 4 Nov, 3 working days"', () => {
+    expect(possibleAbsenceText({ start_date: '2026-11-02', end_date: '2026-11-04', days: 3 })).toBe('Mon 2 – Wed 4 Nov, 3 working days');
+    expect(possibleAbsenceText({ start_date: '2026-11-02', end_date: '2026-11-02', days: 1 })).toBe('Mon 2 Nov, 1 working day');
+    expect(dayRange('2026-10-30', '2026-11-02')).toBe('Fri 30 Oct – Mon 2 Nov');
+    expect(dayRange('2026-12-31', '2027-01-04')).toBe('Thu 31 Dec 2026 – Mon 4 Jan 2027');
+  });
+
+  it('the notice: when the employee was told and when the reply is due', () => {
+    expect(noticeText({ notified_on: null, reply_by: null }, '2026-11-05')).toBeNull();
+    expect(noticeText({ notified_on: '2026-11-03', reply_by: '2026-11-05' }, '2026-11-05'))
+      .toEqual({ text: 'Employee notified Tue 3 Nov, reply due Thu 5 Nov', overdue: false });
+    expect(noticeText({ notified_on: '2026-11-03', reply_by: '2026-11-05' }, '2026-11-06')?.overdue).toBe(true);
+  });
+
+  it('checks the settings', () => {
+    expect(possibleAbsenceSettingsProblem({ lookback_days: 60, reply_working_days: 2 })).toBeNull();
+    expect(possibleAbsenceSettingsProblem({ lookback_days: 3, reply_working_days: 2 })).toMatch(/7 and 180/);
+    expect(possibleAbsenceSettingsProblem({ lookback_days: 60, reply_working_days: 0 })).toMatch(/1 and 10/);
   });
 });
