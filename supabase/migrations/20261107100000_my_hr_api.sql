@@ -26,8 +26,10 @@
 --   my_hr_kpis            the current KPI period (open and covering today, else the latest one out of draft: the
 --                         employee never sees a draft period's KPIs), their KPIs in it with targets, weights,
 --                         self-assessment, final and calculated values, and their attendance over the period so far
---   my_hr_api_log         every call: when, the company, the employee number, the route, the answer's status. No
---                         payload, no token. Written by the backend only; nobody reads it through the API.
+--   my_hr_api_log         every call once the company is known: when, the company, the employee number, the route,
+--                         the answer's status. No payload, no token. Written by the backend only; nobody reads it
+--                         through the API. (Calls refused before a company is known, e.g. a bad token, are only in
+--                         the backend's own log.)
 --
 -- Executable by service_role only. Safe to run again.
 
@@ -37,7 +39,7 @@
 create table if not exists public.my_hr_api_log (
   id bigint generated always as identity primary key,
   at timestamptz not null default now(),
-  tenant_id uuid references public.tenants(id) on delete set null,
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
   employee_number text check (employee_number is null or char_length(employee_number) <= 100),
   route text not null check (char_length(route) <= 60),
   status integer not null,
@@ -45,6 +47,9 @@ create table if not exists public.my_hr_api_log (
 );
 create index if not exists my_hr_api_log_tenant_at on public.my_hr_api_log (tenant_id, at desc);
 alter table public.my_hr_api_log enable row level security;
+drop policy if exists tenant_isolation on public.my_hr_api_log;
+create policy tenant_isolation on public.my_hr_api_log as restrictive for all
+  using (tenant_id = (select public.current_tenant_id())) with check (tenant_id = (select public.current_tenant_id()));
 revoke all on public.my_hr_api_log from anon, authenticated;
 grant select, insert on public.my_hr_api_log to service_role;
 

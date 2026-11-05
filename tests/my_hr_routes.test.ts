@@ -435,6 +435,15 @@ describe('the audit and the logs', () => {
     ]);
   });
 
+  it('calls refused before the company is known are not written to the per-company table', async () => {
+    await get('summary', { token: await sign(access(), { key: 'attacker' }) });
+    await get('summary', { school: SCHOOL_UNLINKED });
+    process.env.MY_HR_API_ENABLED = 'false';
+    await get('summary');
+    expect(logRows).toEqual([]);
+    expect(logged.some((l) => l.includes('[my-hr] summary 401 invalid_token'))).toBe(true);
+  });
+
   it('no token, header or answer ever reaches a log', async () => {
     logged.length = 0;
     const tokens = [await sign(access()), await sign(access(), { key: 'attacker' }), await sign(access({ client_id: 'x' }))];

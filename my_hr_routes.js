@@ -20,7 +20,8 @@
 //     GET leave                   GET attendance?from&to (YYYY-MM-DD, up to 93 days; default the last 30)
 //     GET kpis
 //
-// Every call is written to my_hr_api_log (route, company, employee number, status: never a payload or a token). The
+// Every call is written to my_hr_api_log once its company is known (route, company, employee number, status: never a
+// payload or a token; calls refused earlier only to the server's log). The
 // token, the headers and the answers are never logged.
 //
 // Settings (server only, never VITE_):
@@ -152,7 +153,7 @@ export function supabaseMyHrStore(db = admin) {
     kpis: ({ tenantId, employee }) => rpc("my_hr_kpis", { p_tenant: tenantId, p_employee: employee }),
     async log({ tenantId, employee, route, status, outcome }) {
       const { error } = await client().from("my_hr_api_log").insert({
-        tenant_id: UUID_RE.test(String(tenantId ?? "")) ? tenantId : null,
+        tenant_id: tenantId,
         employee_number: employee ? String(employee).slice(0, 100) : null,
         route,
         status,
@@ -264,6 +265,8 @@ export function createMyHrRouter({
 
   const audit = async (entry) => {
     console.log(TAG, entry.route, entry.status, entry.outcome ?? "-", entry.tenantId ?? "-", entry.employee ?? "-");
+    // the table is per company: a call refused before the company is known (switch, token, school) is only logged here
+    if (!UUID_RE.test(String(entry.tenantId ?? ""))) return;
     try {
       await store.log(entry);
     } catch (err) {

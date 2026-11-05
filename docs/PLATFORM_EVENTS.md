@@ -98,8 +98,9 @@ platform's `GET /links/resolve?module=schools&local_id=<school>` (the `hr` servi
 `school_not_linked`), whose `caller_local_id` must be an active HR company with that `platform_tenant_id` (else 403);
 the person only through `external_people (company, 'schools', person)` (else 404 `not_linked`; never by email, never an
 employee number from the caller); 120 calls per person per 10 minutes (429); a draft employee (onboarding not approved)
-gets `200 {"status": "pending_hr"}` and nothing else. Every call is written to `my_hr_api_log` (company, employee
-number, route, status; no payload, no token).
+gets `200 {"status": "pending_hr"}` and nothing else. Every call is written to `my_hr_api_log` once its company is
+known (company, employee number, route, status; no payload, no token; a per-company table with the usual
+`tenant_isolation` policy); calls refused before that (switch, token, school) are only in the server's log.
 
 | Route | Answer (`status: "active"` plus) |
 |---|---|
