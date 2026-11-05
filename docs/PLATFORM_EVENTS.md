@@ -48,7 +48,7 @@ admin (Schools' `admin_email`, when real) and the caller's email.
 ## One-click sign-in from Figbloom Schools ("handoff")
 
 What bloomHR does in ERP/SCHOOLS_HR_HANDOFF_CONTRACT.md section 2 (`platform_handoff_routes.js`, migration
-`20261106100000_platform_handoff.sql`).
+`20261106200000_platform_handoff.sql`).
 
 A school admin clicks **HR & Payroll** in Schools; the platform opens `GET /api/platform/handoff?code=...` in their
 browser. HR redeems the code (`POST /handoffs/redeem`, the `hr` service client; single use, 60 seconds), finds the HR

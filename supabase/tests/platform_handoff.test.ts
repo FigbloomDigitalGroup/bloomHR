@@ -1,6 +1,6 @@
 // @vitest-environment node
 //
-// Schools -> HR one-click sign-in (20261106100000): the functions the backend calls (platform_handoff_routes.js) and
+// Schools -> HR one-click sign-in (20261106200000): the functions the backend calls (platform_handoff_routes.js) and
 // who may see what.
 //   platform_handoff_begin()     linked -> switched into the company; no access; not linked -> a pending record
 //   platform_handoff_complete()  this browser, unused, not expired, a member of that same company -> linked once
