@@ -91,6 +91,9 @@ const TaskManager = lazy(() => import('./components/Task Manager/TaskManager'));
 const SMSCenter = lazy(() => import('./components/SMS/Sms').then((m) => ({ default: m.SMSCenter })));
 const JoinCompany = lazy(() => import('./pages/JoinCompany'));
 const OfferPage = lazy(() => import('./pages/OfferPage'));
+// arriving from Figbloom Schools' HR & Payroll (one-click sign-in, src/lib/platformHandoff.ts)
+const PlatformHandoff = lazy(() => import('./pages/PlatformHandoff'));
+const HandoffLinker = lazy(() => import('./components/Platform/HandoffLinker'));
 const OffersPage = lazy(() => import('./components/AfterHiring/OffersPage'));
 const CreateCompany = lazy(() => import('./pages/CreateCompany'));
 const NoCompany = lazy(() => import('./pages/NoCompany'));
@@ -117,7 +120,8 @@ interface Branch {
 }
 
 // Pages a signed-in person may be on before two-step sign-in is done.
-const MFA_OPEN_PATHS = ['/login', '/mfa', '/update-password', '/join', '/create-company'];
+// /handoff signs a person in from Figbloom Schools and opens the next page at once; two-step sign-in is asked on that page.
+const MFA_OPEN_PATHS = ['/login', '/mfa', '/update-password', '/join', '/create-company', '/handoff'];
 
 const Loader = () => <FigbloomLoader fullScreen />;
 // while the person's company and workspace load
@@ -791,7 +795,8 @@ function WorkspaceApp() {
         } else {
           setUser(null);
           const currentPath = location.pathname;
-          const publicPaths = ['/login', '/update-password', '/mfa', '/join', '/offer', '/create-company'];
+          // /handoff: arriving from Figbloom Schools, before anyone is signed in
+          const publicPaths = ['/login', '/update-password', '/mfa', '/join', '/offer', '/create-company', '/handoff'];
 
           const urlHasRecoveryToken = window.location.href.includes('type=recovery') ||
             window.location.hash.includes('type=recovery');
@@ -969,6 +974,11 @@ function WorkspaceApp() {
       <ErrorBoundary>
         <div className="min-h-screen bg-page overflow-x-hidden">
           {switchingCompany && <FigbloomLoader fullScreen label="Switching company" />}
+          {session && (
+            <Suspense fallback={null}>
+              <HandoffLinker userId={session.user.id} email={session.user.email ?? ''} pathname={location.pathname} />
+            </Suspense>
+          )}
           <Suspense fallback={<Loader />}>
           <Routes>
             <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
@@ -979,6 +989,7 @@ function WorkspaceApp() {
               }
             />
             <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/handoff" element={<PlatformHandoff />} />
             <Route path="/join" element={<JoinCompany />} />
             {/* a candidate's offer letter: the link's token opens that one offer, signed in or not */}
             <Route path="/offer" element={<OfferPage />} />

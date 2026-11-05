@@ -17,6 +17,7 @@ import {
 import { rgbToHex } from '../../theme/color';
 import ProfilePicture from './ProfilePicture';
 import EmailNotifications from './EmailNotifications';
+import ConnectedAccounts from './ConnectedAccounts';
 import MySignature from '../Signature/MySignature';
 import { saveMyTheme } from '../../lib/preferences';
 import AccessibilityPanel from '../Accessibility/AccessibilityPanel';
@@ -131,6 +132,8 @@ export default function Appearance() {
       <MySignature />
 
       <EmailNotifications />
+
+      <ConnectedAccounts />
 
       <Card className="mb-4">
         <h2 className="m-0 text-[14px] font-bold text-ink">Themes</h2>
