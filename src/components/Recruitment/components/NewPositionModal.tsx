@@ -42,7 +42,7 @@ export const NewPositionModal = ({ onClose }: NewPositionModalProps) => {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Employee Type</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Employment type</label>
               <select className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary">
                 <option value="">Select Type</option>
                 {employeeTypes.map(type => (

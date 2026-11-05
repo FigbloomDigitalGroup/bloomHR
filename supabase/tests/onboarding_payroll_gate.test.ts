@@ -97,7 +97,7 @@ describe('what is missing', () => {
   it('an employee asks about their own record', async () => {
     const [r] = await asUser(db, U.NEW, () => rows<{ employee_part: string[]; employer_part: string[] }>(`select * from onboarding_missing_for()`));
     expect(r.employee_part).toContain('KRA PIN');
-    expect(r.employer_part).toEqual(['Type of employee', 'Basic salary', 'Payment method']);
+    expect(r.employer_part).toEqual(['KRA tax status (Primary or Secondary)', 'Basic salary', 'Payment method']);
   });
 
   it('HR asks about anyone; an employee cannot ask about a colleague', async () => {

@@ -121,6 +121,13 @@ export const isValidTaxNumber = (value: unknown, country?: string | null) => num
 export const isValidSocialSecurityNumber = (value: unknown, country?: string | null) => numbersOf(country).nssfOk(normaliseNssfNumber(value));
 /** An SHA number is asked for in Kenya only. */
 export const needsShaNumber = (country?: string | null) => numbersOf(country).sha;
+/**
+ * kra_employee_type (Primary / Secondary Employee) by its name in the employee's country: "KRA tax status" in Kenya,
+ * "Tax status" in Tanzania and Uganda (as onboarding_missing_details names it, 20261108100000_kra_tax_status_label).
+ */
+export const taxStatusLabel = (country?: string | null) => (countryOf(country) === 'Kenya' ? 'KRA tax status' : 'Tax status');
+/** The missing-list item for it. */
+export const taxStatusItem = (country?: string | null) => `${taxStatusLabel(country)} (Primary or Secondary)`;
 export const isValidIdNumberIn = (type: unknown, value: unknown, country?: string | null) => {
   const own = numbersOf(country).nationalId;
   if (own && type === 'National ID') return own.ok(normaliseIdNumberIn(value, country, type));
@@ -203,10 +210,10 @@ export function employeePartMissing(e: EmployeeRecord, contacts: OnboardingConta
 }
 
 /** What HR still has to enter before it can approve. */
-export function employerPartMissing(e: EmployeeRecord): string[] {
+export function employerPartMissing(e: EmployeeRecord, country?: string | null): string[] {
   const m: string[] = [];
   if (!text(e['Job Title'])) m.push('Position');
-  if (!KRA_EMPLOYEE_TYPES.includes(e['kra_employee_type'] as (typeof KRA_EMPLOYEE_TYPES)[number])) m.push('Type of employee');
+  if (!KRA_EMPLOYEE_TYPES.includes(e['kra_employee_type'] as (typeof KRA_EMPLOYEE_TYPES)[number])) m.push(taxStatusItem(country));
   if (!(Number(e['Basic Salary']) > 0)) m.push('Basic salary');
   if (!text(e['payment_method'])) m.push('Payment method');
   return m;
@@ -214,7 +221,7 @@ export function employerPartMissing(e: EmployeeRecord): string[] {
 
 export const onboardingMissing = (e: EmployeeRecord, contacts: OnboardingContacts, country?: string | null) => [
   ...employeePartMissing(e, contacts, country),
-  ...employerPartMissing(e),
+  ...employerPartMissing(e, country),
 ];
 
 const thisPeriod = () => {

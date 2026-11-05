@@ -287,7 +287,7 @@ describe('onboarding', () => {
   it('only HR reviews, and HR cannot approve until its own part is complete', async () => {
     expect(await review(U.STAFF, 'approve')).toMatch(/Only HR/);
     expect(await review(U.PAYROLL, 'approve')).toMatch(/Only HR/);
-    expect(await review(U.HR, 'approve')).toMatch(/Still missing: Type of employee/);
+    expect(await review(U.HR, 'approve')).toMatch(/Still missing: KRA tax status \(Primary or Secondary\)/);
   });
 
   it('sends a record back only with a comment, which the employee sees', async () => {

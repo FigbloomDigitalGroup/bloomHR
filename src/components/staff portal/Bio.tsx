@@ -1084,7 +1084,7 @@ const EmployeeBioPage = () => {
                 />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
                   <FormField
-                    label="Employee Type"
+                    label="Employment type"
                     name="Employee Type"
                     type={isEditMode ? "select" : "text"}
                     value={employee['Employee Type'] || ''}
