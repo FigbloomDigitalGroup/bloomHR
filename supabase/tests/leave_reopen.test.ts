@@ -23,7 +23,22 @@ const run = async (sql: string) => {
     return (e as Error).message;
   }
 };
-const apply = async (start = '2030-11-04', end = '2030-11-06') =>
+
+// each application in these tests gets its own week (Monday to Wednesday), so none overlaps another of the same
+// employee (leave_application_overlap(), 20261108300000); the first keeps 2030-11-04
+let week = 0;
+const nextWeek = () => {
+  const start = new Date('2030-11-04T00:00:00Z');
+  start.setUTCDate(start.getUTCDate() + 7 * week++);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 2);
+  return [start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)];
+};
+const apply = async (...dates: [string, string] | []) => {
+  const [start, end] = dates.length ? dates : nextWeek();
+  return applyOn(start, end);
+};
+const applyOn = async (start: string, end: string) =>
   (await asUser(db, ME, () => rows<{ id: string }>(
     `insert into leave_application ("Employee Number", name, "Leave Type", "Start Date", "End Date", status)
      values ('E-ME', 'Mia Staff', 'Annual Leave', '${start}', '${end}', 'pending') returning id`)))[0].id;

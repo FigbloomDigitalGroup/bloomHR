@@ -12,6 +12,9 @@
 //   cancelling     the employee's own, while pending or before an approved leave starts; the days go back
 //   history        idempotent on the source id, a dry run writes nothing, no notifications, no events, counted in balances
 //   isolation      another company's application, employee or login is never reached
+//   overlaps       refused on every path (HR, staff portal, My HR, the import), adjacent days and declined or
+//                  cancelled ones fine, two half days on one day overlap (HR doesn't record which half), existing
+//                  overlaps left alone
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { PGlite } from '@electric-sql/pglite';
 import { asUser, bootLiveDb } from './db';
@@ -376,6 +379,109 @@ describe('history from Schools', () => {
 
   it('only for the platform tenant\'s company', async () => {
     expect(await failsWith(`select my_hr_leave_import($1, $2, '[]'::jsonb, true)`, [school, PT_OTHER])).toMatchObject({ code: 'P0002' });
+  });
+});
+
+describe('overlapping leave: refused on every path (leave_application_overlap())', () => {
+  const JOHN = '00000000-0000-0000-0000-00000000c105';
+  // a Monday at least 60 days ahead, and the days after it (no weekend in between)
+  const monday = (() => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() + 60);
+    while (d.getUTCDay() !== 1) d.setUTCDate(d.getUTCDate() + 1);
+    return d;
+  })();
+  const wd = (n: number) => {
+    const d = new Date(monday);
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+  const unpaid = () => typeId(school, 'Unpaid Leave');
+  // HR (or the server) entering leave for someone
+  const enter = (start: string, end: string, status = 'pending', type = 'Full Day', employee = 'E2') =>
+    rows<{ id: string }>(`insert into leave_application (tenant_id, "Employee Number", "Leave Type", "Start Date", "End Date", days, status, type)
+      values ($1, $2, 'Unpaid Leave', $3, $4, 1, $5, $6) returning id`, [school, employee, start, end, status, type]).then((r) => r[0].id);
+  const enterError = async (start: string, end: string, status = 'pending', type = 'Full Day') => {
+    try {
+      await enter(start, end, status, type);
+      return '';
+    } catch (e) {
+      return (e as Error).message;
+    }
+  };
+  const label = (n: number) => {
+    const d = new Date(`${wd(n)}T00:00:00Z`);
+    return { day: String(d.getUTCDate()), mon: d.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' }) };
+  };
+  let first: string;
+
+  beforeAll(async () => {
+    await db.exec(`
+      insert into auth.users (id, email) values ('${JOHN}', 'john@hillside.ac.ke');
+      insert into user_profiles (user_id, email, role, tenant_id, full_name) values ('${JOHN}', 'john@hillside.ac.ke', 'STAFF', '${school}', 'John Colleague');
+      delete from leave_application where tenant_id = '${school}' and "Employee Number" = 'E2';
+    `);
+    first = await enter(wd(1), wd(3)); // Tuesday to Thursday, pending
+  });
+
+  it('HR entering leave: refused, naming the other application', async () => {
+    const msg = await enterError(wd(3), wd(4));
+    expect(msg).toMatch(/^This overlaps John Colleague's Unpaid Leave from /);
+    const [a, b] = [label(1), label(3)];
+    expect(msg).toContain(a.mon === b.mon ? `from ${a.day} to ${b.day} ${b.mon}` : `from ${a.day} ${a.mon} to ${b.day} ${b.mon}`);
+    expect(msg).toMatch(/\(pending\)\. Cancel or change that one first\.$/);
+    expect(await enterError(wd(0), wd(4), 'approved')).toMatch(/This overlaps/);
+  });
+  it('the staff portal: refused, "your"', async () => {
+    const msg = await asUser(db, JOHN, () => fails(`insert into leave_application ("Employee Number", name, "Leave Type", "Start Date", "End Date", days, status, reason)
+      values ('E2', 'John Colleague', 'Unpaid Leave', $1, $1, 1, 'pending', 'Personal matters here')`, [wd(2)]));
+    expect(msg).toMatch(/^This overlaps your Unpaid Leave from .* \(pending\)\. Cancel or change that one first\.$/);
+  });
+  it('My HR from Schools: refused, "your"', async () => {
+    const e = await applyError({ type: await unpaid(), start: wd(2), end: wd(2), employee: 'E2' });
+    expect(e.code).toBe('P0001');
+    expect(e.message).toMatch(/^This overlaps your Unpaid Leave from /);
+  });
+  it('adjacent days are allowed', async () => {
+    expect(await enterError(wd(0), wd(0))).toBe('');
+    expect(await enterError(wd(4), wd(4))).toBe('');
+  });
+  it('rejected and cancelled applications don\'t count', async () => {
+    await enter(wd(7), wd(8), 'rejected');
+    await enter(wd(7), wd(8), 'cancelled');
+    expect(await enterError(wd(7), wd(8))).toBe('');
+  });
+  it('approved ones count; the message says so', async () => {
+    await enter(wd(14), wd(14), 'approved');
+    expect(await enterError(wd(14), wd(15))).toMatch(/Unpaid Leave on \d+ \w+( \d{4})? \(approved\)/);
+  });
+  it('half days: HR doesn\'t record which half, so two half days on the same day overlap', async () => {
+    await enter(wd(21), wd(21), 'pending', 'Half Day');
+    expect(await enterError(wd(21), wd(21), 'pending', 'Half Day')).toMatch(/on \d+ \w+( \d{4})?, a half day \(pending\)/);
+    expect(await enterError(wd(22), wd(22), 'pending', 'Half Day')).toBe('');
+  });
+  it('changing an application\'s own dates is allowed; moving it onto another is refused', async () => {
+    expect(await fails(`update leave_application set "Start Date" = $2, "End Date" = $3 where id = $1`, [first, wd(2), wd(3)])).toBe('');
+    expect(await fails(`update leave_application set "End Date" = $2 where id = $1`, [first, wd(4)])).toMatch(/This overlaps/);
+    expect(await fails(`update leave_application set "Leave Type" = 'Unpaid Leave', type = 'Full Day' where id = $1`, [first])).toBe('');
+  });
+  it('overlaps already in the data are left alone: other edits, renumbering and cancelling still work', async () => {
+    await db.exec(`alter table leave_application disable trigger leave_application_overlap`);
+    const a = await enter(wd(28), wd(29));
+    const b = await enter(wd(29), wd(30));
+    await db.exec(`alter table leave_application enable trigger leave_application_overlap`);
+    expect(await fails(`update leave_application set notes = 'seen', reason = 'Another reason' where id = $1`, [a])).toBe('');
+    expect(await fails(`update leave_application set "Employee Number" = 'E2' where id = $1`, [b])).toBe('');
+    expect(await val(`select (my_hr_leave_cancel($1, 'E2', $2)) ->> 'status' v`, [school, b])).toBe('cancelled');
+    expect(await fails(`update leave_application set "End Date" = $2 where id = $1`, [a, wd(30)])).toBe('');
+  });
+  it('history from Schools that overlaps HR\'s leave: refused, reason overlap (never counted twice)', async () => {
+    const r = await val(`select my_hr_leave_import($1, $2, $3::jsonb, $4) v`, [school, PT, JSON.stringify([
+      { external_id: 'person-john', leave_type_name: 'Unpaid Leave', start_date: wd(14), end_date: wd(14), days: 1, status: 'approved', source_id: 'ov-1' },
+      { external_id: 'person-john', leave_type_name: 'Unpaid Leave', start_date: wd(35), end_date: wd(35), days: 1, status: 'approved', source_id: 'ov-2' },
+    ]), true]);
+    expect(r.results.map((x: J) => [x.source_id, x.outcome, x.reason ?? null])).toEqual([['ov-1', 'refused', 'overlap'], ['ov-2', 'would_import', null]]);
+    expect(r.results[0].message).toMatch(/^This overlaps John Colleague's Unpaid Leave/);
   });
 });
 

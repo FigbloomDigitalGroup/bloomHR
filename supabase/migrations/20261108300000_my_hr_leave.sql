@@ -169,6 +169,71 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------------------------
+-- 2b. no overlapping leave (every path: the staff portal, HR entering leave, the server, My HR)
+-- ---------------------------------------------------------------------------------------------
+-- A new application, or a change to an application's dates or type, is refused when its dates meet another application
+-- of the same employee that is pending (at any step) or approved. Rejected and cancelled ones don't count, nor does the
+-- application itself. HR doesn't record which half of the day a half day is, so two half days on the same day overlap.
+-- Only inserts and date/type changes are checked: overlaps already in the data are left alone (a status change, a
+-- reopen, a renumbering or any other edit never trips on them).
+
+-- "3 to 5 Dec", "28 Nov to 2 Dec", "3 Dec", with the year when it isn't this year
+create or replace function public.leave_dates_text(p_start date, p_end date) returns text
+language sql stable as $$
+  select case
+    when p_end is null or p_end = p_start then to_char(p_start, 'FMDD Mon')
+    when to_char(p_start, 'MM YYYY') = to_char(p_end, 'MM YYYY') then to_char(p_start, 'FMDD') || ' to ' || to_char(p_end, 'FMDD Mon')
+    else to_char(p_start, 'FMDD Mon') || ' to ' || to_char(p_end, 'FMDD Mon')
+  end || case when extract(year from coalesce(p_end, p_start)) <> extract(year from current_date)
+              then ' ' || to_char(coalesce(p_end, p_start), 'YYYY') else '' end
+$$;
+
+create or replace function public.leave_application_overlap() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  v_start date := public.leave_parse_date(new."Start Date");
+  v_end date := public.leave_parse_date(new."End Date");
+  x public.leave_application;
+  v_whose text;
+begin
+  if tg_op = 'UPDATE' and new."Start Date" is not distinct from old."Start Date" and new."End Date" is not distinct from old."End Date"
+     and new."Leave Type" is not distinct from old."Leave Type" and new.type is not distinct from old.type then
+    return new;
+  end if;
+  if lower(btrim(coalesce(new.status, 'pending'))) not in ('pending', 'approved') or v_start is null then
+    return new;
+  end if;
+  v_end := coalesce(v_end, v_start);
+  select a.* into x from public.leave_application a
+  where a.tenant_id = new.tenant_id and a."Employee Number" = new."Employee Number" and a.id is distinct from new.id
+    and lower(btrim(coalesce(a.status, 'pending'))) in ('pending', 'approved')
+    and public.leave_parse_date(a."Start Date") <= v_end
+    and coalesce(public.leave_parse_date(a."End Date"), public.leave_parse_date(a."Start Date")) >= v_start
+  order by public.leave_parse_date(a."Start Date")
+  limit 1;
+  if x.id is null then
+    return new;
+  end if;
+  v_whose := case
+    when coalesce(current_setting('app.my_hr_applicant', true), '') = new.tenant_id::text || ':' || coalesce(new."Employee Number", '')
+         or (auth.uid() is not null and public.current_employee_number() is not distinct from new."Employee Number") then 'your'
+    else coalesce((select public.approval_employee_name(e) || '''s' from public.employees e
+                   where e.tenant_id = new.tenant_id and e."Employee Number" = new."Employee Number"), 'their') end;
+  raise exception 'This overlaps % % % (%). Cancel or change that one first.',
+    v_whose, btrim(x."Leave Type"),
+    case when coalesce(public.leave_parse_date(x."End Date"), public.leave_parse_date(x."Start Date")) = public.leave_parse_date(x."Start Date")
+         then 'on ' || public.leave_dates_text(public.leave_parse_date(x."Start Date"), null)
+              || case when lower(btrim(coalesce(x.type, ''))) = 'half day' then ', a half day' else '' end
+         else 'from ' || public.leave_dates_text(public.leave_parse_date(x."Start Date"), public.leave_parse_date(x."End Date")) end,
+    lower(btrim(coalesce(x.status, 'pending')))
+    using errcode = 'P0001';
+end $$;
+revoke all on function public.leave_application_overlap() from public, anon, authenticated;
+drop trigger if exists leave_application_overlap on public.leave_application;
+create trigger leave_application_overlap before insert or update of "Start Date", "End Date", "Leave Type", type
+  on public.leave_application for each row execute function public.leave_application_overlap();
+
+-- ---------------------------------------------------------------------------------------------
 -- 3. history imported from Schools, and what the platform was last told
 -- ---------------------------------------------------------------------------------------------
 create table if not exists public.leave_history_imports (
@@ -722,7 +787,7 @@ begin
           on conflict (tenant_id, name) where tenant_id is not null do nothing;
         end if;
         -- entered already decided, as HR enters leave for someone: HR counts the days (its work week and holidays) and
-        -- its balance trigger takes them from the balance, refusing leave the balance doesn't cover
+        -- its balance trigger takes them from the balance, refusing leave the balance doesn't cover, and leave_application_overlap() refusing leave that overlaps the employee's pending or approved leave (reported as refused, reason overlap: nothing is counted twice)
         insert into public.leave_application (tenant_id, "Employee Number", name, "Office Branch", "Leave Type",
                                               "Start Date", "End Date", days, type, "Application Type", reason, status, time_added)
         values (p_tenant, v_employee."Employee Number", btrim(concat_ws(' ', v_employee."First Name", v_employee."Last Name")),
@@ -743,7 +808,9 @@ begin
         when sqlstate 'XMHR1' then
           null; -- the dry run's rollback: v_result stays
         when others then
-          v_result := jsonb_build_object('outcome', 'refused', 'message', left(sqlerrm, 300));
+          v_result := jsonb_build_object('outcome', 'refused',
+            'reason', case when sqlerrm like 'This overlaps %' then 'overlap' when sqlerrm like 'Not enough %' then 'balance' else 'rules' end,
+            'message', left(sqlerrm, 300));
       end;
     end if;
     v_outcome := v_result ->> 'outcome';
