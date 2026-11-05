@@ -84,3 +84,45 @@ cookie or the token); links and removals are also in `audit_log`. `external_logi
 3. Register HR's handoff URL once: `ENV_FILE=<file with the settings> node scripts/register-platform-handoff-url.mjs`
    (`PUT /products/hr/handoff-url` with `<SITE_URL>/api/platform/handoff`).
 4. Set `PLATFORM_HANDOFF_ENABLED=true` on the backend.
+
+## "My HR" for Figbloom Schools staff (phase 2, step 1: view only)
+
+What bloomHR does in ERP/SCHOOLS_HR_PHASE2_CONTRACT.md section 2 (`my_hr_routes.js`, migration
+`20261107100000_my_hr_api.sql`). Schools' `my-hr` function calls, server to server, for one of its staff:
+`GET /api/integrations/my-hr/<route>` with `Authorization: Bearer <Schools' platform access token>`,
+`x-figbloom-school: <Schools tenants.id>` and `x-figbloom-person: <Schools profiles.id>`.
+
+Each call: the switch (off: 503 `my_hr_off`); the token, checked against the platform pool's JWKS (RS256, issuer,
+`token_use` access, `client_id` = Schools' client, not expired: else 401 `invalid_token`); the school through the
+platform's `GET /links/resolve?module=schools&local_id=<school>` (the `hr` service client, kept 10 minutes; unknown: 403
+`school_not_linked`), whose `caller_local_id` must be an active HR company with that `platform_tenant_id` (else 403);
+the person only through `external_people (company, 'schools', person)` (else 404 `not_linked`; never by email, never an
+employee number from the caller); 120 calls per person per 10 minutes (429); a draft employee (onboarding not approved)
+gets `200 {"status": "pending_hr"}` and nothing else. Every call is written to `my_hr_api_log` (company, employee
+number, route, status; no payload, no token).
+
+| Route | Answer (`status: "active"` plus) |
+|---|---|
+| `GET summary` | `employee` (number, name, job, department, branch, start date, status), `company.name`, `latest_payslip`, `leave_pending` |
+| `GET payslips` | `payslips[]`: id, pay_period, country, currency, basic, gross, deductions, net, run_status, approved_at, paid_at. Only months whose country is approved or paid (the staff portal's rule). |
+| `GET payslips/:id` | `payslip`: every saved figure of that payslip (as the staff portal reads it), the bank account as `account_number_last4` |
+| `GET payslips/:id/pdf` | 501 `pdf_not_available`: HR makes payslip PDFs in the browser (html2pdf); there is no server-side PDF, so Schools renders `payslips/:id` |
+| `GET leave` | `leave_types[]`, `balances[]` (per type: available_days free to book today less pending_days, accrued, carried over, used), `applications[]` (status, days, reason, `approval` with each step's label, status, who it waits on, who decided) |
+| `GET attendance?from&to` | `days[]` (status present/late/absent/leave/holiday/off, clock in/out, hours, late_minutes), `possible_absence_notices[]`, `missed_scan_requests[]`, `absences_recorded[]`; YYYY-MM-DD, up to 93 days, default the last 30 |
+| `GET kpis` | `period` (open now, else the latest out of draft), `items[]` (target, weight, self, final, calculated, `actual`, `achievement`), `overall` (the staff portal's weighted score), `attendance` over the period |
+
+### Settings (server only)
+
+| Name | Value |
+|---|---|
+| `MY_HR_API_ENABLED` | `true` to answer |
+| `PLATFORM_JWKS_URL` | `https://cognito-idp.<region>.amazonaws.com/<pool id>/.well-known/jwks.json` (the platform's customers pool) |
+| `PLATFORM_ISSUER` | `https://cognito-idp.<region>.amazonaws.com/<pool id>` |
+| `PLATFORM_SCHOOLS_CLIENT_ID` | the Schools service client's app client id |
+| `PLATFORM_API_URL`, `PLATFORM_TOKEN_URL`, `PLATFORM_CLIENT_ID`, `PLATFORM_CLIENT_SECRET` | as above (the `hr` service client, for `/links/resolve`) |
+
+### Switching on (per environment)
+
+1. Apply the migration (`docs/DATABASE_CHANGES.md`), then merge.
+2. Deploy the backend with this change and the settings above.
+3. Set `MY_HR_API_ENABLED=true`; give Schools the URL `<HR API>/api/integrations/my-hr`.
