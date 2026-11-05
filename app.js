@@ -18,6 +18,7 @@ import platformSchoolsRouter from "./platform_schools_routes.js";
 import platformSchoolGroupsRouter from "./platform_school_groups_routes.js";
 import platformSchoolHrRouter from "./platform_school_hr_routes.js";
 import { createOutboxRouter, createPlatformEventsRouter } from "./platform_events_routes.js";
+import { createPlatformHandoffRouter } from "./platform_handoff_routes.js";
 
 /**
  * @param {{ mpesaRouter?: import("express").Router, routes?: { path: string, router: import("express").Router }[] }} options
@@ -37,6 +38,10 @@ export function buildApp({ mpesaRouter, routes = [] } = {}) {
   // the Figbloom platform's signed events (ERP/SCHOOLS_HR_PHASE1_CONTRACT.md): the signature covers the raw body, so
   // this reads it itself, before the JSON parser; and it is a server calling, not a browser, so no CORS
   app.use("/api/platform/events", createPlatformEventsRouter());
+  // one-click sign-in from Figbloom Schools (ERP/SCHOOLS_HR_HANDOFF_CONTRACT.md): a browser arriving with the platform's
+  // code, and the app finishing a first-time link. Before the app-wide CORS: the link endpoints carry a cookie and
+  // answer CORS themselves, with credentials, only to the origins in CORS_ORIGIN
+  app.use("/api/platform/handoff", createPlatformHandoffRouter());
 
   // CORS_ORIGIN (comma separated) limits which sites may call the API; unset allows any, as before.
   const origins = (process.env.CORS_ORIGIN || "").split(",").map((o) => o.trim()).filter(Boolean);

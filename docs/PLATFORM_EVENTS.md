@@ -44,3 +44,43 @@ admin (Schools' `admin_email`, when real) and the caller's email.
 4. Register HR's event URL once: `ENV_FILE=<file with the settings> node scripts/register-platform-event-webhook.mjs`
    (`PUT /products/hr/event-webhook` with `<SITE_URL>/api/platform/events`).
 5. Set `PLATFORM_EVENTS_ENABLED=true`.
+
+## One-click sign-in from Figbloom Schools ("handoff")
+
+What bloomHR does in ERP/SCHOOLS_HR_HANDOFF_CONTRACT.md section 2 (`platform_handoff_routes.js`, migration
+`20261106100000_platform_handoff.sql`).
+
+A school admin clicks **HR & Payroll** in Schools; the platform opens `GET /api/platform/handoff?code=...` in their
+browser. HR redeems the code (`POST /handoffs/redeem`, the `hr` service client; single use, 60 seconds), finds the HR
+company by `tenant_local_id` (it must be the company of that `platform_tenant_id`), then the HR login for this person
+in `external_logins (tenant_id, source, external_id, user_id, linked_at)`:
+
+| Case | What happens |
+|---|---|
+| Linked, and still an active member of that active company | Switched into that company, then signed in as exactly that login: a one-time token from Supabase's admin `generateLink` (magiclink, for that login's own address), sent to the app's `/handoff#token_hash=...&next=...` page, which verifies it (`verifyOtp`) and opens `next`: `return_to` when it is a path on this site, else `/dashboard`. Two-step sign-in still applies when the company asks for it. |
+| Linked, but no access (left, suspended, company not active, login blocked) | "You don't have access to HR for this school. Ask your HR administrator." Nobody is signed in. |
+| Not linked yet | **Never matched by email.** A pending record (random id, only its SHA-256 kept, 10 minutes, used once, holding the redeemed claims) bound to this browser by an HttpOnly cookie (`fb_hr_handoff`, path `/api/platform/handoff`), then HR's normal sign-in with "Sign in to HR once to connect your Figbloom Schools account". After any normal sign-in (a password, or accepting an invitation and choosing a password) the app shows who would be connected and asks; **Connect** calls `POST /api/platform/handoff/link`, which links the login only if it is an active member of that same company, uses the record up and opens the company (then `return_to`). Another company's login is told so and nothing is linked. |
+| Unknown or used code, unknown company, switched off | A page saying so (`/handoff?status=invalid / not_set_up / off / error`). The code is not redeemed when switched off. |
+
+People see and remove their own connection under **Appearance, Connected accounts** (`DELETE
+/api/platform/handoff/link`). Every outcome is written to `platform_handoff_log` (never the code, the pending id, the
+cookie or the token); links and removals are also in `audit_log`. `external_logins` is readable by its own person only
+(row-level security) and written by the backend only.
+
+### Settings (server only: never `VITE_`)
+
+| Name | Value |
+|---|---|
+| `PLATFORM_HANDOFF_ENABLED` | `true` to switch on; anything else shows "not available yet" |
+| `PLATFORM_API_URL`, `PLATFORM_TOKEN_URL`, `PLATFORM_CLIENT_ID`, `PLATFORM_CLIENT_SECRET` | as for the events above (the `hr` service client) |
+| `SITE_URL` | the HR website people are sent back to (already set for invitations); without it, the same address |
+| `CORS_ORIGIN` | only when the app calls the API from another address (`VITE_API_URL`): the link endpoints then accept the cookie from these origins only |
+| `PLATFORM_HANDOFF_URL` | only for the registration script (default `SITE_URL` + `/api/platform/handoff`) |
+
+### Switching on (per environment)
+
+1. Apply the migration (`docs/DATABASE_CHANGES.md`).
+2. Deploy the backend and the app with this change.
+3. Register HR's handoff URL once: `ENV_FILE=<file with the settings> node scripts/register-platform-handoff-url.mjs`
+   (`PUT /products/hr/handoff-url` with `<SITE_URL>/api/platform/handoff`).
+4. Set `PLATFORM_HANDOFF_ENABLED=true` on the backend.

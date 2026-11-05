@@ -5,6 +5,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppUpdate } from '../sw';
 import ShowPasswordButton from '../components/UI/ShowPasswordButton';
 import AuthLayout from '../components/Auth/AuthLayout';
+import HandoffConnectNote from '../components/Platform/HandoffConnectNote';
 import { authButtonPrimary, authHeading, authInputOpen, authLabel, authLink, authQuietLink, authSubtitle } from '../components/Auth/authStyles';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -136,6 +137,8 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                   Enter your credentials to access your dashboard.
                 </p>
               </div>
+
+              <HandoffConnectNote />
 
               <form className="space-y-6" onSubmit={handleLogin}>
                 <div className="space-y-1.5">
