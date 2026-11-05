@@ -44,10 +44,21 @@ const run = async (sql: string) => {
     return (e as Error).message;
   }
 };
-const apply = async (user: string, employee: string, type = 'Annual Leave') =>
+
+// each application in these tests gets its own week (Monday to Wednesday), so none overlaps another of the same
+// employee (leave_application_overlap(), 20261108300000); the first keeps 2026-11-02
+let week = 0;
+const nextWeek = () => {
+  const start = new Date('2026-11-02T00:00:00Z');
+  start.setUTCDate(start.getUTCDate() + 7 * week++);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 2);
+  return [start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)];
+};
+const apply = async (user: string, employee: string, type = 'Annual Leave', [start, end] = nextWeek()) =>
   (await asUser(db, user, () => rows<{ id: string }>(
     `insert into leave_application ("Employee Number", name, "Leave Type", "Start Date", "End Date", days, status)
-     values ('${employee}', 'Applicant ${employee}', '${type}', '2026-11-02', '2026-11-04', 3, 'pending') returning id`)))[0].id;
+     values ('${employee}', 'Applicant ${employee}', '${type}', '${start}', '${end}', 3, 'pending') returning id`)))[0].id;
 const request = async (leave: string) =>
   (await rows<{ id: string; status: string; current_step: number; steps: unknown[] }>(
     `select id, status, current_step, steps from approval_requests where record_id = '${leave}'`))[0];
