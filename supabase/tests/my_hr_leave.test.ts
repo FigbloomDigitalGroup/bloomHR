@@ -59,6 +59,12 @@ const day = (offset: number) => {
   while (d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() + 1);
   return d.toISOString().slice(0, 10);
 };
+// the weekday after a date (day(14) and day(15) are the same Monday when day 14 falls on a Sunday)
+const dayAfter = (date: string) => {
+  const d = new Date(`${date}T00:00:00Z`);
+  do d.setUTCDate(d.getUTCDate() + 1); while (d.getUTCDay() === 0 || d.getUTCDay() === 6);
+  return d.toISOString().slice(0, 10);
+};
 const typeId = async (tenant: string, name: string) =>
   (await rows<{ id: string }>(`select id from leave_types where tenant_id = $1 and name = $2`, [tenant, name]))[0].id;
 const apply = (args: { type: string; start: string; end: string; half?: boolean; reason?: string; doc?: string | null; employee?: string; tenant?: string }) =>
@@ -93,6 +99,10 @@ beforeAll(async () => {
   school = (await rows<{ tenant_id: string }>(`select tenant_id from platform_enable_hr($1, 'Hillside Primary', 'hillside', '[]')`, [PT]))[0].tenant_id;
   other = (await rows<{ tenant_id: string }>(`select tenant_id from platform_enable_hr($1, 'Other School', 'other-school', '[]')`, [PT_OTHER]))[0].tenant_id;
   await db.exec(`
+    -- these tests approve as HR: the school's chain as HR's default (Leave Approver, then HR), as a school can set it
+    -- in Settings (the school chain itself is tested in school_leave_chain.test.ts)
+    update approval_steps s set label = null, approver_role = 'HR'
+      from approval_workflows w where w.id = s.workflow_id and w.tenant_id = '${school}' and w.kind = 'leave' and s.position = 2;
     -- dates near today: public holidays are tested elsewhere
     delete from holidays where source = 'auto';
     insert into auth.users (id, email) values
@@ -196,7 +206,7 @@ describe('apply, approve as the right HR login, events', () => {
   let app: J;
   it('applies: pending, the chain starts and the Leave Approver hears', async () => {
     const before = Number(await val(`select count(*) v from hr_notifications where tenant_id = $1 and employee_number = 'E-P' and notification_type = 'approval_needed'`, [school]));
-    app = await apply({ type: await typeId(school, 'Annual Leave'), start: day(14), end: day(15) });
+    app = await apply({ type: await typeId(school, 'Annual Leave'), start: day(14), end: dayAfter(day(14)) });
     expect(app).toMatchObject({ status: 'pending', leave_type: 'Annual Leave', days: 2, half_day: false });
     expect(app.approval.steps.map((s: J) => [s.label, s.status, s.waiting_on])).toEqual([
       ['Leave approver', 'current', 'Pat Principal'],
@@ -251,7 +261,7 @@ describe('apply, approve as the right HR login, events', () => {
     expect(ev[0].event_type).toBe('hr.leave.approved');
     expect(ev[0].data).toEqual({
       application_id: app.id, external_id: 'person-mary', employee_number: 'E1', leave_type: 'Annual Leave',
-      start_date: day(14), end_date: day(15), half_day: false, days: 2, status: 'approved',
+      start_date: day(14), end_date: dayAfter(day(14)), half_day: false, days: 2, status: 'approved',
     });
     expect(await decideError(U.HR, app.id, 'approved')).toMatchObject({ code: '55000' });
   });
