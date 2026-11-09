@@ -1,6 +1,17 @@
 import { App, Tags } from 'aws-cdk-lib';
+import { AccessStack } from '../lib/access-stack.js';
 import { AccountSecurityStack } from '../lib/account-security-stack.js';
-import { ACCOUNT_ID, ACCOUNT_SETTINGS, APP_HOST, REGION } from '../lib/config.js';
+import {
+  ACCOUNT_ID,
+  ACCOUNT_SETTINGS,
+  APP_HOST,
+  IDENTITY_CENTER_INSTANCE_ARN,
+  IDENTITY_CENTER_REGION,
+  IDENTITY_STORE_ID,
+  PRODUCTION_ACCOUNT_ID,
+  REGION,
+  STAGING_ACCOUNT_ID,
+} from '../lib/config.js';
 import { EnvironmentStack } from '../lib/environment-stack.js';
 import { ScannerRelayStack } from '../lib/scanner-relay-stack.js';
 
@@ -33,4 +44,15 @@ new ScannerRelayStack(app, 'FigbloomScannerRelay', {
   env,
   description: 'Figbloom scanner relay - door scanners on office networks send punches over HTTP, forwarded to the app over HTTPS',
   appHost: APP_HOST,
+});
+
+// Developer sign-in (IAM Identity Center). Has to be in Identity Center's home Region, eu-north-1, so it has its own env.
+new AccessStack(app, 'FigbloomAccess', {
+  env: { account: ACCOUNT_ID, region: IDENTITY_CENTER_REGION },
+  description: 'Figbloom developer access - Identity Center permission sets, groups and account assignments',
+  terminationProtection: true,
+  instanceArn: IDENTITY_CENTER_INSTANCE_ARN,
+  identityStoreId: IDENTITY_STORE_ID,
+  stagingAccountId: STAGING_ACCOUNT_ID,
+  productionAccountId: PRODUCTION_ACCOUNT_ID,
 });
