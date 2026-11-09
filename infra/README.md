@@ -9,6 +9,7 @@ AWS CDK app (TypeScript) for account 852845752791 in eu-west-1. This is its own 
 | `FigbloomProduction` | The live environment, built by the same code as staging. Has termination protection. |
 | `FigbloomScannerRelay` | Relays punches from office door scanners (HTTP) to the app over HTTPS. |
 | `FigbloomAccess` | Developer sign-in through IAM Identity Center: permission sets, groups and which group gets what in staging and production. In **eu-north-1** (Identity Center's home Region). See [Developer access](#developer-access). |
+| `FigbloomGuardrails` | The `figbloom-guardrails` service control policy (SCP) on the staging and production accounts: no IAM users or access keys, Identity Center's roles left alone, CloudTrail and GuardDuty stay on, no leaving the organization. See [Organization guardrails](#organization-guardrails). |
 
 ## Working on it
 
@@ -18,11 +19,13 @@ npm ci
 npm test              # checks the stacks without touching AWS
 npm run synth         # builds the CloudFormation templates into cdk.out/
 aws login --profile figbloom
-npm run diff          # shows what a deploy would add, change or delete
+npm run diff -- --profile figbloom                   # what a deploy would add, change or delete, every stack
+npm run diff -- FigbloomStaging --profile figbloom   # or one stack
 npx cdk deploy FigbloomStaging --profile figbloom
 ```
 
-Always run `npm run diff` and check the output before `cdk deploy`, and deploy staging before production. Sign in as your IAM Identity Center user, never the root user.
+`npm run diff` has no profile built in: pass the one you signed in with after `--` (`figbloom`, `figbloom-mgmt`,
+`figbloom-staging`, ...). Always run it and check the output before `cdk deploy`, and deploy staging before production. Sign in as your IAM Identity Center user, never the root user.
 
 ## One-time setup (already done once per account)
 
@@ -131,3 +134,75 @@ npx cdk deploy FigbloomStaging --profile figbloom-staging
 ```
 
 The web console is at the same start URL.
+
+## Organization guardrails
+
+`FigbloomGuardrails` (`lib/guardrails-stack.ts`) holds one AWS Organizations service control policy (SCP),
+`figbloom-guardrails`, attached to the staging (374254524440) and production (304550796505) accounts. Not to the
+organization root and not to the management account (SCPs never apply to the management account anyway). An SCP grants
+nothing: it is a list of denies that no IAM policy in those accounts can override, and it applies to every user and role
+there, the account root user and the CDK deployment roles included.
+
+| Denied | Why |
+| -- | -- |
+| Creating IAM users, console passwords, access keys, service-specific credentials, SSH keys and signing certificates | Nobody gets long-lived credentials. A developer could otherwise create an IAM user and access key through a `cdk deploy`, because CDK's CloudFormation execution role is an administrator. |
+| Creating, deleting or changing the roles under `/aws-reserved/sso.amazonaws.com/` (policies, trust policy, boundary, tags) | Those are Identity Center's roles (`AWSReservedSSO_*`). Identity Center itself still manages them: it uses a service-linked role, and SCPs don't apply to service-linked roles. |
+| Stopping, deleting or changing CloudTrail trails and event selectors; deleting, pausing or disconnecting GuardDuty | The audit trail and threat detection stay on. (AWS Config isn't used, so it isn't covered.) |
+| `organizations:LeaveOrganization` | An account can't step out from under these guardrails. |
+
+Everything is denied for everyone except two roles: the `AdministratorAccess` Identity Center sign-in
+(`arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*AWSReservedSSO_AdministratorAccess_*`, Mike) and
+`OrganizationAccountAccessRole` (the management account's way into each member account). So if something here ever needs
+doing, an administrator does it. Developer, Deployer and ViewOnly are all covered.
+
+### Deploying it (Mike, management account, once)
+
+1. Turn on SCPs for the organization (not something CloudFormation can do). AWS keeps the `FullAWSAccess` policy attached
+   everywhere, so this alone changes nothing for anyone:
+
+   ```sh
+   aws organizations enable-policy-type --root-id r-h7lc --policy-type SERVICE_CONTROL_POLICY --profile figbloom-mgmt
+   aws organizations list-roots --profile figbloom-mgmt   # PolicyTypes shows SERVICE_CONTROL_POLICY ENABLED
+   ```
+
+2. Check and deploy the stack. It is in eu-west-1 with the rest of the app (CloudFormation manages Organizations
+   policies from any commercial Region; the policy itself is global). It uses the `LegacyStackSynthesizer`, so it deploys
+   with your own credentials and needs no bootstrap:
+
+   ```sh
+   cd infra
+   aws sso login --profile figbloom-mgmt
+   npm run diff -- FigbloomGuardrails --profile figbloom-mgmt     # one AWS::Organizations::Policy, two account targets
+   npx cdk deploy FigbloomGuardrails --profile figbloom-mgmt
+   ```
+
+3. Check it:
+
+   ```sh
+   aws organizations list-policies --filter SERVICE_CONTROL_POLICY --profile figbloom-mgmt     # figbloom-guardrails
+   aws organizations list-targets-for-policy --policy-id <p-... from above> --profile figbloom-mgmt  # the two accounts
+   ```
+
+   Then as a developer in staging (`--profile figbloom-staging`), `aws iam create-user --user-name scp-test` should fail
+   with `AccessDenied ... with an explicit deny in a service control policy`, and the same command as
+   `AdministratorAccess` should be allowed (delete the test user straight after).
+
+To change the policy, edit `GUARDRAILS_POLICY` in `lib/guardrails-stack.ts` (the tests keep it under the 5,120 character
+SCP limit), then diff and deploy as above.
+
+### What it doesn't close yet
+
+CDK's execution role (`cdk-hnb659fds-cfn-exec-role-*`) is still an administrator, and it has to be able to create IAM
+roles: that is how a stack gets its Lambda roles. So a developer can still deploy a stack in staging that creates a role
+with broad rights (even `AdministratorAccess`) and then use it for anything the denies above don't cover. The full fix
+is a later step: re-bootstrap staging and production with a permissions boundary, so CloudFormation may only create
+roles that carry it, and every role a CDK deploy creates is capped by it:
+
+```sh
+npx cdk bootstrap aws://374254524440/eu-west-1 --custom-permissions-boundary <boundary-policy-name> --profile <admin>
+```
+
+That needs a boundary policy written first in each account (what app roles may do, and that they can only create roles
+with the same boundary), and the app has to attach it to the roles it creates (the `@aws-cdk/core:permissionsBoundary`
+context in `cdk.json`, or `PermissionsBoundary.of(...)`). It can be enforced on top with an SCP statement that denies
+`iam:CreateRole` without that boundary.

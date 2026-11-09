@@ -5,6 +5,13 @@ import { AccessStack, GROUPS, PERMISSION_SETS } from '../lib/access-stack.js';
 import { AccountSecurityStack } from '../lib/account-security-stack.js';
 import type { AccountSettings } from '../lib/config.js';
 import { EnvironmentStack } from '../lib/environment-stack.js';
+import {
+  EXEMPT_PRINCIPALS,
+  GUARDRAILS_POLICY,
+  GUARDRAILS_POLICY_NAME,
+  GuardrailsStack,
+  IDENTITY_CENTER_ROLES,
+} from '../lib/guardrails-stack.js';
 import { RELAY_HEADER, ScannerRelayStack } from '../lib/scanner-relay-stack.js';
 
 const env = { account: '123456789012', region: 'eu-west-1' };
@@ -286,5 +293,129 @@ describe('AccessStack', () => {
     expect(JSON.stringify(json)).not.toMatch(/—|–/);
     // small enough for CloudFormation to take inline, with no asset bucket to upload it to
     expect(JSON.stringify(json).length).toBeLessThan(51_200);
+  });
+});
+
+describe('GuardrailsStack', () => {
+  const management = '123456789012';
+  const staging = '111111111111';
+  const production = '222222222222';
+  const newStack = (stagingAccountId = staging, productionAccountId = production) =>
+    new GuardrailsStack(new App(), 'Guardrails', {
+      env: { account: management, region: 'eu-west-1' },
+      stagingAccountId,
+      productionAccountId,
+    });
+  const stack = newStack();
+  const t = Template.fromStack(stack);
+
+  type Statement = { Sid: string; Effect: string; Action: string[]; Resource: string | string[]; Condition: unknown };
+  const policies = Object.values(t.findResources('AWS::Organizations::Policy'));
+  const content = policies[0]?.Properties.Content as { Version: string; Statement: Statement[] };
+  const statement = (sid: string) => {
+    const found = content.Statement.find((s) => s.Sid === sid);
+    expect(found, sid).toBeDefined();
+    return found!;
+  };
+
+  it('creates one service control policy, figbloom-guardrails, with the policy as a JSON object', () => {
+    expect(policies).toHaveLength(1);
+    expect(policies[0].Properties.Type).toBe('SERVICE_CONTROL_POLICY');
+    expect(policies[0].Properties.Name).toBe(GUARDRAILS_POLICY_NAME);
+    expect(content).toEqual(GUARDRAILS_POLICY);
+  });
+
+  it('attaches it to the staging and production accounts only: not the root, an OU or the management account', () => {
+    const targets = policies[0].Properties.TargetIds as string[];
+    expect([...targets].sort()).toEqual([staging, production].sort());
+    expect(targets.some((id) => id.startsWith('r-') || id.startsWith('ou-'))).toBe(false);
+    expect(targets).not.toContain(management);
+    expect(() => newStack(management)).toThrow(/management account/);
+    expect(() => newStack(staging, 'r-h7lc')).toThrow(/member account ID/);
+  });
+
+  it('only denies, and exempts only the AdministratorAccess sign-in and OrganizationAccountAccessRole, everywhere', () => {
+    expect(content.Statement).toHaveLength(4);
+    for (const s of content.Statement) {
+      expect(s.Effect).toBe('Deny');
+      expect(s.Condition).toEqual({ ArnNotLike: { 'aws:PrincipalArn': EXEMPT_PRINCIPALS } });
+    }
+    expect(EXEMPT_PRINCIPALS).toEqual([
+      'arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*AWSReservedSSO_AdministratorAccess_*',
+      'arn:aws:iam::*:role/OrganizationAccountAccessRole',
+    ]);
+    // the exemption matches Identity Center role ARNs with and without a Region segment, and not the other sets
+    const arnLike = (pattern: string, arn: string) =>
+      new RegExp(`^${pattern.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*')}$`).test(arn);
+    const exempt = (arn: string) => EXEMPT_PRINCIPALS.some((p) => arnLike(p, arn));
+    expect(exempt('arn:aws:iam::111111111111:role/aws-reserved/sso.amazonaws.com/eu-north-1/AWSReservedSSO_AdministratorAccess_0123abcd')).toBe(true);
+    expect(exempt('arn:aws:iam::111111111111:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_0123abcd')).toBe(true);
+    expect(exempt('arn:aws:iam::111111111111:role/OrganizationAccountAccessRole')).toBe(true);
+    for (const set of ['Developer', 'Deployer', 'ViewOnly']) {
+      expect(exempt(`arn:aws:iam::111111111111:role/aws-reserved/sso.amazonaws.com/eu-north-1/AWSReservedSSO_${set}_0123abcd`)).toBe(false);
+    }
+    expect(exempt('arn:aws:iam::111111111111:role/cdk-hnb659fds-cfn-exec-role-111111111111-eu-west-1')).toBe(false);
+    expect(exempt('arn:aws:iam::111111111111:root')).toBe(false);
+  });
+
+  it('denies creating IAM users, passwords and access keys', () => {
+    expect(statement('NoLongLivedCredentials').Action).toEqual(
+      expect.arrayContaining(['iam:CreateUser', 'iam:CreateAccessKey', 'iam:CreateLoginProfile', 'iam:UpdateLoginProfile']),
+    );
+    expect(statement('NoLongLivedCredentials').Resource).toBe('*');
+  });
+
+  it("denies changing Identity Center's roles (the service-linked role Identity Center uses is not affected by SCPs)", () => {
+    const s = statement('ProtectIdentityCenterRoles');
+    expect(s.Resource).toBe(IDENTITY_CENTER_ROLES);
+    expect(IDENTITY_CENTER_ROLES).toBe('arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*');
+    expect(s.Action).toEqual(
+      expect.arrayContaining([
+        'iam:CreateRole',
+        'iam:DeleteRole',
+        'iam:UpdateAssumeRolePolicy',
+        'iam:AttachRolePolicy',
+        'iam:DetachRolePolicy',
+        'iam:PutRolePolicy',
+        'iam:DeleteRolePolicy',
+        'iam:PutRolePermissionsBoundary',
+        'iam:DeleteRolePermissionsBoundary',
+      ]),
+    );
+  });
+
+  it('denies turning off CloudTrail and GuardDuty', () => {
+    expect(statement('KeepAuditOn').Action).toEqual(
+      expect.arrayContaining([
+        'cloudtrail:StopLogging',
+        'cloudtrail:DeleteTrail',
+        'cloudtrail:UpdateTrail',
+        'cloudtrail:PutEventSelectors',
+        'cloudtrail:PutInsightSelectors',
+        'guardduty:DeleteDetector',
+        'guardduty:UpdateDetector',
+        'guardduty:DisassociateFromMasterAccount',
+        'guardduty:DisassociateFromAdministratorAccount',
+        'guardduty:StopMonitoringMembers',
+        'guardduty:DeleteMembers',
+      ]),
+    );
+  });
+
+  it('denies leaving the organization', () => {
+    expect(statement('StayInOrganization').Action).toEqual(['organizations:LeaveOrganization']);
+  });
+
+  it('keeps the policy well under the 5,120 character SCP limit, even with whitespace', () => {
+    expect(JSON.stringify(GUARDRAILS_POLICY).length).toBeLessThan(4_000);
+    expect(JSON.stringify(GUARDRAILS_POLICY, null, 2).length).toBeLessThan(5_120);
+  });
+
+  it('needs no CDK bootstrap, and uses no em dashes in names or descriptions', () => {
+    expect(stack.synthesizer).toBeInstanceOf(LegacyStackSynthesizer);
+    const json = t.toJSON();
+    expect(json.Parameters?.BootstrapVersion).toBeUndefined();
+    expect(JSON.stringify(json)).not.toMatch(/—|–/);
+    expect(policies[0].Properties.Description.length).toBeLessThanOrEqual(512);
   });
 });
