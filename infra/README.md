@@ -79,7 +79,8 @@ It needs no `cdk bootstrap` in eu-north-1: it has no assets and deploys with you
    .\scripts\add-developers-to-groups.ps1
    ```
 
-   It finds each person by user name (or email), adds them to their groups, skips anyone already in, and lists the result.
+   It finds each person by email or user name, ignoring case (`Hassan` / `Hassan@figbloom.org` matches
+   `hassan@figbloom.org`), adds them to their groups, skips anyone already in, and lists each group's members at the end.
    Anyone not created yet shows as "user not created yet": create them and run it again. To change who is in which group,
    edit `$Membership` at the top of the script (removing someone from a group is done in the console).
 
