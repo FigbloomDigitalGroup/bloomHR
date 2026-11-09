@@ -13,6 +13,7 @@ import {
   STAGING_ACCOUNT_ID,
 } from '../lib/config.js';
 import { EnvironmentStack } from '../lib/environment-stack.js';
+import { GuardrailsStack } from '../lib/guardrails-stack.js';
 import { ScannerRelayStack } from '../lib/scanner-relay-stack.js';
 
 const app = new App();
@@ -53,6 +54,16 @@ new AccessStack(app, 'FigbloomAccess', {
   terminationProtection: true,
   instanceArn: IDENTITY_CENTER_INSTANCE_ARN,
   identityStoreId: IDENTITY_STORE_ID,
+  stagingAccountId: STAGING_ACCOUNT_ID,
+  productionAccountId: PRODUCTION_ACCOUNT_ID,
+});
+
+// Organization guardrails: a service control policy on the staging and production accounts. Organizations policies are
+// managed from the management account; CloudFormation supports them in any commercial Region, so it sits in the main one.
+new GuardrailsStack(app, 'FigbloomGuardrails', {
+  env,
+  description: 'Figbloom organization guardrails - service control policy on the staging and production accounts',
+  terminationProtection: true,
   stagingAccountId: STAGING_ACCOUNT_ID,
   productionAccountId: PRODUCTION_ACCOUNT_ID,
 });
