@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Building2, GraduationCap } from 'lucide-react';
+import { ArrowRight, Building2, GraduationCap, Truck } from 'lucide-react';
 import { Button, Card, PageHeader } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import { ConsoleStat } from './ConsoleStat';
@@ -8,10 +8,11 @@ import { myPlatformRole, type PlatformRole } from '../../lib/platformRoles';
 import { organisationTotals, type OrganisationTotals } from '../../lib/platformOrganisations';
 import { listSchools, schoolTotals, schoolsProblem, type SchoolsProblem } from '../../lib/platformSchools';
 import { activeWithin, schoolsNeedingAttention } from '../../lib/consoleAnalytics';
+import { fleetProblem, fleetTotals, listFleetCompanies, type FleetProblem, type FleetTotals } from '../../lib/platformFleet';
 import { useConsoleBadge } from '../Console/consoleBadges';
 
 // The console's home (/platform/overview): one card per product, with its headline numbers and links to its pages.
-// Each product loads on its own, so Schools being unreachable (or not connected) never hides Figbloom HR. Any role.
+// Each product loads on its own, so Schools or Fleet being unreachable (or not connected) never hides another. Any role.
 
 type HrState = { totals: OrganisationTotals } | { error: string } | null;
 interface SchoolNumbers {
@@ -23,6 +24,8 @@ interface SchoolNumbers {
   attention: number;
 }
 type SchoolsState = { numbers: SchoolNumbers } | { problem: SchoolsProblem; message: string } | null;
+/** platformOk: whether the platform's statuses came with Fleet's list (without them nothing shows as waiting) */
+type FleetState = { totals: FleetTotals; platformOk: boolean } | { problem: FleetProblem; message: string } | null;
 
 const n = (v: number) => v.toLocaleString('en-KE');
 
@@ -54,6 +57,7 @@ export default function OverviewPage() {
   const [role, setRole] = useState<PlatformRole | null | undefined>(undefined);
   const [hr, setHr] = useState<HrState>(null);
   const [schools, setSchools] = useState<SchoolsState>(null);
+  const [fleet, setFleet] = useState<FleetState>(null);
 
   useEffect(() => {
     void myPlatformRole().then(setRole);
@@ -86,15 +90,27 @@ export default function OverviewPage() {
     }
   }, []);
 
+  const loadFleet = useCallback(async () => {
+    setFleet(null);
+    try {
+      const { companies, platform } = await listFleetCompanies();
+      setFleet({ totals: fleetTotals(companies), platformOk: platform.ok });
+    } catch (err) {
+      setFleet({ problem: fleetProblem(err), message: err instanceof Error ? err.message : 'Could not load Figbloom Fleet.' });
+    }
+  }, []);
+
   useEffect(() => {
     if (!role) return;
     void loadHr();
     void loadSchools();
-  }, [role, loadHr, loadSchools]);
+    void loadFleet();
+  }, [role, loadHr, loadSchools, loadFleet]);
 
   // the console menu's badges, from what this page loads anyway
   useConsoleBadge('/platform/organisations', hr && 'totals' in hr ? hr.totals.by_status.pending : null, (c) => `${c} waiting for approval`);
   useConsoleBadge('/platform/schools', schools && 'numbers' in schools ? schools.numbers.attention : null, (c) => `${c} need attention`);
+  useConsoleBadge('/platform/fleet/companies', fleet && 'totals' in fleet ? fleet.totals.pending : null, (c) => `${c} waiting for approval`);
 
   const header = <PageHeader title="Overview" subtitle="Every Figbloom product at a glance" />;
 
@@ -164,6 +180,40 @@ export default function OverviewPage() {
               <ConsoleStat label="Students" value={n(schools.numbers.students)} />
               <ConsoleStat label="Needs attention" value={n(schools.numbers.attention)} alarming={schools.numbers.attention > 0} />
               <ConsoleStat label="Active in the last 7 days" value={n(schools.numbers.activeLast7)} sub="someone signed in" />
+            </div>
+          )}
+        </ProductCard>
+
+        <ProductCard title="Figbloom Fleet" icon={<Truck className="w-4 h-4" />} mark="bg-orange-tint text-orange-text"
+          links={[{ label: 'Companies', to: '/platform/fleet/companies' }]}>
+          {!fleet ? (
+            <FigbloomLoader label="Loading Figbloom Fleet" size={40} />
+          ) : 'problem' in fleet ? (
+            <div>
+              <p className="text-xs font-semibold text-ink">
+                {fleet.problem === 'not_connected'
+                  ? "Fleet isn't connected to the console yet"
+                  : fleet.problem === 'unavailable'
+                    ? "Figbloom Fleet didn't answer"
+                    : 'Could not load Figbloom Fleet'}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {fleet.problem === 'not_connected'
+                  ? 'The console needs FLEET_PLATFORM_URL and FLEET_PLATFORM_SECRET. Figbloom HR and Schools work as usual.'
+                  : fleet.message}
+              </p>
+              {fleet.problem !== 'not_connected' && (
+                <div className="mt-2"><Button variant="secondary" onClick={() => void loadFleet()}>Try again</Button></div>
+              )}
+            </div>
+          ) : (
+            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+              <ConsoleStat label="Companies" value={n(fleet.totals.companies)} sub={`${n(fleet.totals.active)} active`} />
+              <ConsoleStat label="Waiting for approval" value={fleet.platformOk ? n(fleet.totals.pending) : '—'}
+                alarming={fleet.platformOk && fleet.totals.pending > 0}
+                sub={fleet.platformOk ? 'need your approval' : "the platform couldn't be read"} />
+              <ConsoleStat label="Vehicles" value={n(fleet.totals.vehicles)} sub={`${n(fleet.totals.drivers)} drivers`} />
+              <ConsoleStat label="Trips, last 30 days" value={n(fleet.totals.trips)} />
             </div>
           )}
         </ProductCard>

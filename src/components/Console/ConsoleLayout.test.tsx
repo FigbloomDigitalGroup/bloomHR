@@ -52,6 +52,9 @@ describe('the console menu', () => {
     expect(within(schools).getAllByRole('link').map((a) => a.textContent)).toEqual(['Schools', 'School groups']);
     expect(within(schools).getByRole('link', { name: 'School groups' }).getAttribute('href')).toBe('/platform/school-groups');
     expect(within(schools).getByRole('link', { name: 'Schools' }).getAttribute('href')).toBe('/platform/schools');
+    const fleet = within(products).getByRole('group', { name: 'Figbloom Fleet' });
+    expect(within(fleet).getAllByRole('link').map((a) => a.textContent)).toEqual(['Companies']);
+    expect(within(fleet).getByRole('link', { name: 'Companies' }).getAttribute('href')).toBe('/platform/fleet/companies');
     // Staff is Figbloom's own, apart from the products
     expect(within(products).queryByRole('link', { name: 'Staff' })).toBeNull();
     expect(within(screen.getByRole('navigation', { name: 'Figbloom' })).getByRole('link', { name: 'Staff' })).toBeTruthy();
@@ -112,7 +115,7 @@ describe('the console menu', () => {
   it('starts with the Overview, above the products', () => {
     renderLayout('/platform/overview');
     const links = within(screen.getByRole('navigation', { name: 'Console' })).getAllByRole('link');
-    expect(links.map((a) => a.textContent)).toEqual(['Overview', 'Organisations', 'Statutory rates', 'Schools', 'School groups']);
+    expect(links.map((a) => a.textContent)).toEqual(['Overview', 'Organisations', 'Statutory rates', 'Schools', 'School groups', 'Companies']);
     expect(links[0].getAttribute('href')).toBe('/platform/overview');
     expect(links[0].getAttribute('aria-current')).toBe('page');
   });
@@ -126,7 +129,7 @@ describe('the console menu', () => {
       </MemoryRouter>
     );
     expect(sidebar().innerHTML).not.toMatch(/orange/);
-    for (const product of ['Figbloom HR', 'Figbloom Schools']) {
+    for (const product of ['Figbloom HR', 'Figbloom Schools', 'Figbloom Fleet']) {
       const icon = screen.getByRole('button', { name: product }).querySelector('svg') as SVGElement;
       expect(icon.getAttribute('class')).toContain('text-shell-fg');
       expect(icon.parentElement?.tagName).toBe('BUTTON');
@@ -136,7 +139,7 @@ describe('the console menu', () => {
   it('gives every page an icon, and every product a mark', () => {
     renderLayout();
     for (const link of within(sidebar()).getAllByRole('link')) expect(link.querySelector('svg')).not.toBeNull();
-    for (const product of ['Figbloom HR', 'Figbloom Schools']) {
+    for (const product of ['Figbloom HR', 'Figbloom Schools', 'Figbloom Fleet']) {
       expect(screen.getByRole('button', { name: product }).querySelector('svg')).not.toBeNull();
     }
   });
