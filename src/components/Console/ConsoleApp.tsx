@@ -17,6 +17,7 @@ import SchoolsPage from '../Platform/SchoolsPage';
 import SchoolGroupsPage from '../Platform/SchoolGroupsPage';
 import FleetCompaniesPage from '../Platform/FleetCompaniesPage';
 import OverviewPage from '../Platform/OverviewPage';
+import PlatformSettingsPage from '../Platform/PlatformSettingsPage';
 import ConsoleLayout from './ConsoleLayout';
 import { ConsoleBadgesContext, type ConsoleBadge, type ConsoleBadges } from './consoleBadges';
 
@@ -138,6 +139,7 @@ export default function ConsoleApp() {
         <Route path="/platform/school-groups" element={<SchoolGroupsPage />} />
         <Route path="/platform/fleet/companies" element={<FleetCompaniesPage />} />
         <Route path="/platform/staff" element={<StaffPage currentUserId={session.user.id} />} />
+        <Route path="/platform/settings" element={<PlatformSettingsPage />} />
         <Route path="*" element={<Navigate to={HOME} replace />} />
       </Routes>
     </ConsoleLayout>
