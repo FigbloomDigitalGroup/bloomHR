@@ -54,6 +54,10 @@ vi.mock('../../lib/platformSchools', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/platformSchools')>()),
   listSchools: () => Promise.resolve({ generated_at: '2026-11-02T10:00:00Z', schools: [] }),
 }));
+vi.mock('../../lib/platformFleet', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/platformFleet')>()),
+  listFleetCompanies: () => Promise.resolve({ generated_at: null, companies: [], truncated: false, platform: { ok: true } }),
+}));
 // the sign-in pages have tests of their own
 vi.mock('./ConsoleLogin', () => ({ default: () => <p>Sign-in form</p> }));
 vi.mock('../../pages/MFAverification', () => ({ default: () => <p>Two-step code form</p> }));
@@ -175,6 +179,18 @@ describe('the Figbloom console', () => {
     expect(await screen.findByRole('heading', { name: 'Schools' })).toBeTruthy();
     expect(screen.getByTestId('path').textContent).toBe('/platform/schools');
     expect(await screen.findByText('No schools on Figbloom Schools yet.')).toBeTruthy();
+    expect(state.from).not.toHaveBeenCalled();
+  });
+
+  it('opens Figbloom Fleet > Companies from the product menu', async () => {
+    state.session = signedIn();
+    renderAt('/platform/organisations');
+    await screen.findByRole('heading', { name: 'Organisations' });
+    const fleet = within(screen.getByRole('navigation', { name: 'Console' })).getByRole('group', { name: 'Figbloom Fleet' });
+    fireEvent.click(within(fleet).getByRole('link', { name: 'Companies' }));
+    expect(await screen.findByRole('heading', { name: 'Fleet companies' })).toBeTruthy();
+    expect(screen.getByTestId('path').textContent).toBe('/platform/fleet/companies');
+    expect(await screen.findByText('No companies in Figbloom Fleet yet.')).toBeTruthy();
     expect(state.from).not.toHaveBeenCalled();
   });
 

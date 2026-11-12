@@ -2,7 +2,7 @@ import { ReactNode, useCallback, useEffect, useRef, useState, type MouseEvent } 
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Briefcase, Building2, ChevronDown, ChevronLeft, ChevronRight, GraduationCap, LayoutDashboard, LogOut, Menu, Network, Percent,
-  School, Users, X, type LucideIcon,
+  School, Truck, Users, X, type LucideIcon,
 } from 'lucide-react';
 import bloomMark from '../../../public/bloom-mark.png';
 import { ROLE_LABELS, type PlatformRole } from '../../lib/platformRoles';
@@ -31,8 +31,8 @@ export interface ConsoleNavGroup {
   items: ConsoleNavItem[];
 }
 
-// Grouped by product: Figbloom HR (bloomHR's database) and Figbloom Schools (its own, through bloomHR's backend:
-// ERP/SCHOOLS_CONSOLE_CONTRACT.md); other products get their own group when they join the platform (ERP design 2.1,
+// Grouped by product: Figbloom HR (bloomHR's database), Figbloom Schools (its own, through bloomHR's backend:
+// ERP/SCHOOLS_CONSOLE_CONTRACT.md) and Figbloom Fleet (ERP/FLEET_PLATFORM_CONTRACT.md); other products get their own group when they join the platform (ERP design 2.1,
 // 7.2). The product's name shows only when there are two or more, so a lone group doesn't read as the console's name.
 const CONSOLE_NAV: ConsoleNavGroup[] = [
   {
@@ -50,6 +50,11 @@ const CONSOLE_NAV: ConsoleNavGroup[] = [
       { label: 'Schools', path: '/platform/schools', icon: School },
       { label: 'School groups', path: '/platform/school-groups', icon: Network },
     ],
+  },
+  {
+    product: 'Figbloom Fleet',
+    icon: Truck,
+    items: [{ label: 'Companies', path: '/platform/fleet/companies', icon: Building2 }],
   },
 ];
 

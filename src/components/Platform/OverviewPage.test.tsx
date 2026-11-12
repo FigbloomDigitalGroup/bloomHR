@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { ApiError } from '../../lib/adminApi';
 import type { OrganisationTotals } from '../../lib/platformOrganisations';
 import type { School } from '../../lib/platformSchools';
+import type { FleetCompaniesList, FleetCompany } from '../../lib/platformFleet';
 
 const api = vi.hoisted(() => ({
   role: 'viewer' as import('../../lib/platformRoles').PlatformRole | null,
@@ -12,6 +13,9 @@ const api = vi.hoisted(() => ({
   schools: [] as School[],
   schoolsErrors: [] as Error[],
   schoolsCalls: 0,
+  fleet: null as FleetCompaniesList | null,
+  fleetErrors: [] as Error[],
+  fleetCalls: 0,
 }));
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
 vi.mock('../../lib/platformRoles', async (importOriginal) => ({
@@ -31,12 +35,26 @@ vi.mock('../../lib/platformSchools', async (importOriginal) => ({
   },
 }));
 
+vi.mock('../../lib/platformFleet', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/platformFleet')>()),
+  listFleetCompanies: () => {
+    api.fleetCalls += 1;
+    const error = api.fleetErrors.shift();
+    return error ? Promise.reject(error) : Promise.resolve(api.fleet!);
+  },
+}));
+
 import OverviewPage from './OverviewPage';
 import { ConsoleBadgesContext } from '../Console/consoleBadges';
 
 const school = (name: string, status: string, students: number, lastActive: string | null): School => ({
   id: name, name, slug: name, status, status_reason: null, organization: null, created_at: '2026-09-01T08:00:00Z',
   admin_email: null, students, teachers: 0, parents: 0, last_activity_at: lastActive,
+});
+
+const company = (id: string, status: FleetCompany['status'], vehicles: number, drivers: number, trips: number): FleetCompany => ({
+  id, name: id, fleet_status: status, plan: 'trial', created_at: null, owner_name: null, owner_email: null, vehicles, drivers, admins: 1,
+  trips_last_30_days: trips, last_location_at: null, in_fleet: true, organization_id: status ? `org-${id}` : null, status, status_reason: null,
 });
 
 afterEach(cleanup);
@@ -57,6 +75,14 @@ beforeEach(() => {
   ];
   api.schoolsErrors = [];
   api.schoolsCalls = 0;
+  api.fleet = {
+    generated_at: null,
+    truncated: false,
+    platform: { ok: true },
+    companies: [company('a', 'pending', 3, 2, 10), company('b', 'pending', 0, 0, 0), company('c', 'active', 20, 15, 400), company('d', null, 1, 1, 0)],
+  };
+  api.fleetErrors = [];
+  api.fleetCalls = 0;
 });
 
 const renderPage = () =>
@@ -118,11 +144,50 @@ describe('the console overview', () => {
     await waitFor(() => expect(figure(card('Figbloom Schools'), 'Schools')).toBe('4'));
   });
 
+  it('shows Figbloom Fleet: companies, waiting for approval, vehicles and trips, with a link to its companies', async () => {
+    renderPage();
+    await waitFor(() => expect(within(card('Figbloom Fleet')).queryByText('Vehicles')).toBeTruthy());
+    const fleet = card('Figbloom Fleet');
+    expect(figure(fleet, 'Companies')).toBe('4');
+    expect(figure(fleet, 'Waiting for approval')).toBe('2');
+    expect(figure(fleet, 'Vehicles')).toBe('24');
+    expect(figure(fleet, 'Trips, last 30 days')).toBe('410');
+    expect(within(fleet).getByRole('link', { name: 'Companies' }).getAttribute('href')).toBe('/platform/fleet/companies');
+  });
+
+  it("says Fleet isn't connected to the console yet, and the others still show", async () => {
+    api.fleetErrors = [new ApiError("Figbloom Fleet isn't connected to the console yet.", 503, 'fleet_not_connected')];
+    renderPage();
+    const fleet = await screen.findByRole('region', { name: 'Figbloom Fleet' });
+    expect(await within(fleet).findByText("Fleet isn't connected to the console yet")).toBeTruthy();
+    expect(within(fleet).getByText(/FLEET_PLATFORM_URL and FLEET_PLATFORM_SECRET/)).toBeTruthy();
+    expect(within(fleet).queryByRole('button', { name: 'Try again' })).toBeNull();
+    await waitFor(() => expect(figure(card('Figbloom Schools'), 'Schools')).toBe('4'));
+    await waitFor(() => expect(figure(card('Figbloom HR'), 'Companies')).toBe('13'));
+  });
+
+  it("says Fleet didn't answer, and tries again", async () => {
+    api.fleetErrors = [new ApiError("Figbloom Fleet didn't answer. Try again.", 502, 'fleet_unavailable')];
+    renderPage();
+    const fleet = await screen.findByRole('region', { name: 'Figbloom Fleet' });
+    fireEvent.click(await within(fleet).findByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(figure(card('Figbloom Fleet'), 'Companies')).toBe('4'));
+    expect(api.fleetCalls).toBe(2);
+  });
+
+  it("without the platform's statuses, Fleet's waiting count is unknown, not zero", async () => {
+    api.fleet = { ...api.fleet!, platform: { ok: false, code: 'platform_not_connected', message: 'x' }, companies: api.fleet!.companies.map((c) => ({ ...c, status: null })) };
+    renderPage();
+    await waitFor(() => expect(within(card('Figbloom Fleet')).queryByText('Vehicles')).toBeTruthy());
+    expect(figure(card('Figbloom Fleet'), 'Waiting for approval')).toBe('—');
+  });
+
   it('is for platform admins only', async () => {
     api.role = null;
     renderPage();
     expect(await screen.findByText('Only Figbloom platform admins can see the console.')).toBeTruthy();
     expect(api.schoolsCalls).toBe(0);
+    expect(api.fleetCalls).toBe(0);
   });
 
   it('publishes the menu badges: companies waiting for approval, schools needing attention', async () => {
@@ -137,6 +202,7 @@ describe('the console overview', () => {
     // B and C never signed in and have no admin; C is suspended, so left out; A and D have no admin
     await waitFor(() => expect(published['/platform/schools']).toEqual({ count: 3, label: '3 need attention' }));
     expect(published['/platform/organisations']).toEqual({ count: 2, label: '2 waiting for approval' });
+    await waitFor(() => expect(published['/platform/fleet/companies']).toEqual({ count: 2, label: '2 waiting for approval' }));
     expect(figure(card('Figbloom Schools'), 'Needs attention')).toBe('3');
   });
 });

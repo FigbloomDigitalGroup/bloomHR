@@ -17,6 +17,7 @@ import platformRouter from "./platform_routes.js";
 import platformSchoolsRouter from "./platform_schools_routes.js";
 import platformSchoolGroupsRouter from "./platform_school_groups_routes.js";
 import platformSchoolHrRouter from "./platform_school_hr_routes.js";
+import platformFleetRouter from "./platform_fleet_routes.js";
 import { createOutboxRouter, createPlatformEventsRouter } from "./platform_events_routes.js";
 import { createPlatformHandoffRouter } from "./platform_handoff_routes.js";
 import { createMyHrRouter } from "./my_hr_routes.js";
@@ -76,6 +77,8 @@ export function buildApp({ mpesaRouter, routes = [] } = {}) {
   app.use("/api/platform/school-groups", platformSchoolGroupsRouter);
   // ...and HR & Payroll switched on per school, on the platform (ERP/SCHOOLS_HR_PHASE1_CONTRACT.md)
   app.use("/api/platform/school-hr", platformSchoolHrRouter);
+  // ...and Figbloom Fleet's companies: Fleet's summaries, decided on the platform (ERP/FLEET_PLATFORM_CONTRACT.md 3)
+  app.use("/api/platform/fleet", platformFleetRouter);
   for (const { path, router } of routes) app.use(path, router);
 
   // anything else under /api is an API 404 in JSON, never the website's home page
