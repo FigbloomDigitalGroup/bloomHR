@@ -19,11 +19,20 @@
 // (platform_school_groups_routes.js); without them the companies still show, with no platform status and no decisions.
 // The secret only ever goes into the x-platform-secret header: it is never logged nor sent back.
 //
+// HR & Payroll per company (ERP/FLEET_HR_CONTRACT.md section 2, as on the Schools page: platform_school_hr_routes.js):
+// each company's platform tenant (the organisation's tenant with the same fleet local ID) carries its HR state, off /
+// enabling / on (hrState()); unknown ones are asked about one by one (GET /tenants/{id}, up to MAX_HR_LOOKUPS).
+// POST /hr/:tenantId/enable (approve_companies) switches the hr module on for that tenant on the platform with the
+// company's owner from Fleet's summary as the admin to invite (role fleet_owner, so HR knows it is a Fleet company);
+// Figbloom HR then creates the company, invites the owner and links it back.
+//
 // Errors are { error: { code, message } }.
 import express from "express";
 import { PLATFORM_TIMEOUT_MS, PlatformError } from "./platform_client.js";
 import { platformRoleAllows } from "./platform_routes.js";
 import { ACTIONS, MAX_REASON, callPlatform, callerWith } from "./platform_school_groups_routes.js";
+import { hrState, tenantParts } from "./platform_school_hr_routes.js";
+import { realEmail } from "./platform_events_routes.js";
 
 export { ACTIONS, MAX_REASON } from "./platform_school_groups_routes.js";
 export const FLEET_TIMEOUT_MS = 8 * 1000;
@@ -34,6 +43,10 @@ const TAG = "[platform/fleet]";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CODE_RE = /^[a-z][a-z0-9_]{0,63}$/;
+const MAX_HR_LOOKUPS = 100;
+const HR_LOOKUP_CONCURRENCY = 6;
+// the admin role HR is told about: fleet_* says the customer is a Fleet company (platform_events_routes.js enabledSource())
+export const FLEET_OWNER_ROLE = "fleet_owner";
 
 /** Fleet's address and secret, or 503 fleet_not_connected. */
 function fleetSettings() {
@@ -133,8 +146,19 @@ export async function fleetCompanies(timeoutMs) {
   return { companies: rows.map(toSummary).filter((c) => c.id), generated_at: str(result.generated_at) };
 }
 
+/** The organisation's platform tenant for the Fleet company: the one Fleet linked with the company's ID, else the only one. */
+function fleetTenant(o, localId) {
+  const tenants = Array.isArray(o?.tenants) ? o.tenants.filter((t) => t && typeof t === "object" && typeof t.id === "string") : [];
+  const linked = tenants.find((t) => Array.isArray(t.links) && t.links.some((l) => l?.module === MODULE && localId != null && String(l.local_tenant_id) === localId));
+  return linked ?? (tenants.length === 1 ? tenants[0] : null);
+}
+
 function toOrganization(o) {
   const link = Array.isArray(o?.links) ? o.links.find((l) => l?.module === MODULE) ?? null : null;
+  const localId = link?.local_organization_id != null ? String(link.local_organization_id) : null;
+  const tenant = fleetTenant(o, localId);
+  const links = Array.isArray(tenant?.links) ? tenant.links.filter((l) => l && typeof l === "object") : [];
+  const modules = Array.isArray(tenant?.modules) ? tenant.modules.filter((m) => m && typeof m === "object") : undefined;
   return {
     id: String(o?.id ?? ""),
     name: String(o?.name ?? ""),
@@ -142,7 +166,9 @@ function toOrganization(o) {
     status_reason: o?.status_reason ?? null,
     owner_email: o?.owner_email ?? null,
     created_at: o?.created_at ?? null,
-    local_organization_id: link?.local_organization_id != null ? String(link.local_organization_id) : null,
+    local_organization_id: localId,
+    platform_tenant_id: tenant ? tenant.id : null,
+    hr: tenant ? hrState(modules, links) : null,
   };
 }
 
@@ -162,6 +188,7 @@ export async function fleetOrganizations(timeoutMs) {
 }
 
 const EMPTY_SUMMARY = {
+  platform_tenant_id: null, hr: null,
   fleet_status: null, plan: null, owner_name: null, vehicles: null, drivers: null, admins: null, trips_last_30_days: null, last_location_at: null,
 };
 
@@ -183,6 +210,8 @@ export function mergeCompanies(summaries, organizations) {
       organization_id: o?.id ?? null,
       status: o?.status ?? null,
       status_reason: o?.status_reason ?? null,
+      platform_tenant_id: o?.platform_tenant_id ?? null,
+      hr: o?.hr ?? null,
     };
   });
   for (const o of organizations) {
@@ -197,9 +226,49 @@ export function mergeCompanies(summaries, organizations) {
       organization_id: o.id,
       status: o.status,
       status_reason: o.status_reason,
+      platform_tenant_id: o.platform_tenant_id,
+      hr: o.hr,
     });
   }
   return companies;
+}
+
+/** One platform tenant's HR state (GET /tenants/{id}). */
+export async function tenantHr(id, timeoutMs) {
+  const parts = tenantParts(await callPlatform("GET", `/tenants/${encodeURIComponent(id)}`, null, timeoutMs));
+  return { parts, hr: hrState(parts.modules, parts.links) };
+}
+
+/** Asks the platform about the companies whose HR state the list didn't carry, a few at a time (in place). */
+export async function fillHrStates(companies, timeoutMs) {
+  const ask = companies.filter((c) => c.platform_tenant_id && c.hr?.state === "unknown").slice(0, MAX_HR_LOOKUPS);
+  for (let i = 0; i < ask.length; i += HR_LOOKUP_CONCURRENCY) {
+    await Promise.all(ask.slice(i, i + HR_LOOKUP_CONCURRENCY).map(async (c) => {
+      try {
+        c.hr = (await tenantHr(c.platform_tenant_id, timeoutMs)).hr;
+      } catch (err) {
+        // that company stays unknown; the rest still show
+        if (!(err instanceof PlatformError)) throw err;
+      }
+    }));
+  }
+}
+
+/**
+ * The company's owner for HR to invite, from Fleet's summary: [{ email, name, role: fleet_owner }] when the owner has a
+ * real address, else nobody (HR's admins can then be invited from HR). Never throws.
+ */
+export async function fleetAdmins(companyId, timeoutMs) {
+  if (!companyId) return [];
+  try {
+    const { companies } = await fleetCompanies(timeoutMs);
+    const c = companies.find((x) => x.id === companyId);
+    const email = realEmail(c?.owner_email);
+    return email ? [{ email, name: (c.owner_name ?? email).slice(0, 200), role: FLEET_OWNER_ROLE }] : [];
+  } catch (err) {
+    console.warn(TAG, "the company's owner couldn't be read from Fleet:", err?.code || err?.message || err);
+    return [];
+  }
 }
 
 /** How many companies have each platform status (unregistered: not on the platform yet). */
@@ -239,6 +308,7 @@ export function createFleetRouter({ timeoutMs = FLEET_TIMEOUT_MS, platformTimeou
         ),
       ]);
       const companies = mergeCompanies(fleet.companies, platform.organizations);
+      if (platform.ok) await fillHrStates(companies, platformTimeoutMs);
       res.json({
         generated_at: fleet.generated_at,
         companies,
@@ -299,6 +369,40 @@ export function createFleetRouter({ timeoutMs = FLEET_TIMEOUT_MS, platformTimeou
           status_reason: o.status_reason ?? (reason || null),
         },
       });
+    } catch (err) {
+      send(res, err);
+    }
+  });
+
+  // POST /api/platform/fleet/hr/:tenantId/enable -> { company: { platform_tenant_id, hr } }. Permission:
+  // approve_companies (Owner, Admin). :tenantId is the platform's tenant for the company. Switches the hr module on for
+  // it on the platform (recorded as console:<your email>), with the company's owner from Fleet (fleetAdmins()); HR then
+  // creates and links the company and invites them. Already on: nothing is changed.
+  router.post("/hr/:id/enable", async (req, res) => {
+    try {
+      const caller = await callerWith(req, "approve_companies", "Only an owner or admin can switch HR & Payroll on for a company.");
+      const id = String(req.params.id || "");
+      if (!UUID_RE.test(id)) throw new PlatformError(400, "invalid_tenant_id", "That is not a Fleet company's platform ID.");
+      if (!caller.email) throw new PlatformError(400, "no_actor_email", "Your login has no email to record this under.");
+
+      const before = await tenantHr(id, platformTimeoutMs);
+      const fleetLink = before.parts.links.find((l) => l.module === MODULE && l.local_tenant_id);
+      if (!fleetLink) throw new PlatformError(404, "not_a_fleet_company", "That platform account isn't a Figbloom Fleet company.");
+      if (before.hr.state === "on") return res.json({ company: { platform_tenant_id: id, hr: before.hr } });
+
+      // HR invites whoever is listed here (passed on in platform.module.enabled)
+      const admins = await fleetAdmins(String(fleetLink.local_tenant_id), timeoutMs);
+      await callPlatform("PUT", `/tenants/${encodeURIComponent(id)}/modules/hr`, { status: "active", admins, actor_email: caller.email }, platformTimeoutMs);
+      let hr;
+      try {
+        hr = (await tenantHr(id, platformTimeoutMs)).hr;
+      } catch {
+        hr = { state: "enabling", module_status: "active", hr_tenant_id: null };
+      }
+      // switched on; HR links its company shortly
+      if (hr.state === "off" || hr.state === "unknown") hr = { ...hr, state: "enabling" };
+      console.log(TAG, "HR switched on for", id);
+      res.json({ company: { platform_tenant_id: id, hr } });
     } catch (err) {
       send(res, err);
     }

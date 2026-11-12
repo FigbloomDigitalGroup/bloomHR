@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   listCalls: 0,
   decisions: [] as unknown[][],
   decisionError: null as Error | null,
+  hrEnabled: [] as string[],
 }));
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
@@ -26,6 +27,10 @@ vi.mock('../../lib/platformFleet', async (importOriginal) => ({
     api.listCalls += 1;
     const error = api.listErrors.shift();
     return error ? Promise.reject(error) : Promise.resolve({ generated_at: null, companies: api.companies, truncated: false, platform: api.platform });
+  },
+  enableFleetHr: (tenant: string) => {
+    api.hrEnabled.push(tenant);
+    return Promise.resolve({ state: 'enabling', module_status: 'active', hr_tenant_id: null });
   },
   setFleetCompanyStatus: (id: string, action: string, reason: string) => {
     api.decisions.push([id, action, reason]);
@@ -61,6 +66,7 @@ beforeEach(() => {
   api.listCalls = 0;
   api.decisions = [];
   api.decisionError = null;
+  api.hrEnabled = [];
   toast.success.mockReset();
   toast.error.mockReset();
 });
@@ -242,5 +248,43 @@ describe('the Fleet companies page: decisions by role', () => {
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Approve' }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('A active organisation cannot become rejected'));
     expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+});
+
+describe('HR & Payroll per company (ERP/FLEET_HR_CONTRACT.md)', () => {
+  const withHr = () => {
+    api.companies = [
+      company('c1', 'Swift Couriers', 'active', { platform_tenant_id: 't-1', hr: { state: 'off', module_status: null, hr_tenant_id: null } }),
+      company('c2', 'Rift Valley Haulage', 'active', { platform_tenant_id: 't-2', hr: { state: 'on', module_status: 'active', hr_tenant_id: 'hr-2' } }),
+      company('c5', 'Brand New Logistics', null, { platform_tenant_id: null, hr: null }),
+    ];
+  };
+
+  it('shows Off / On, and nothing for a company without a platform account', async () => {
+    withHr();
+    renderPage();
+    expect(within(await rowOf('Swift Couriers')).getByText('Off')).toBeTruthy();
+    expect(within(await rowOf('Rift Valley Haulage')).getByText('On')).toBeTruthy();
+    expect(within(await rowOf('Brand New Logistics')).queryByRole('button', { name: /Enable HR/ })).toBeNull();
+  });
+
+  it('an owner enables it: the platform is asked, the company shows Enabling', async () => {
+    withHr();
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Enable HR & Payroll for Swift Couriers' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/emails the owner an invitation/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Enable' }));
+    await waitFor(() => expect(api.hrEnabled).toEqual(['t-1']));
+    expect(within(await rowOf('Swift Couriers')).getByText('Enabling')).toBeTruthy();
+    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("invites the company's owner"));
+  });
+
+  it('support and viewers see the state but cannot enable it', async () => {
+    withHr();
+    api.role = 'support';
+    renderPage();
+    expect(within(await rowOf('Swift Couriers')).getByText('Off')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Enable HR/ })).toBeNull();
   });
 });

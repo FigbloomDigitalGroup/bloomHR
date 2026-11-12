@@ -9,15 +9,19 @@
 // applied (x-figbloom-delivery, kept in platform_event_receipts) is answered 200 and not applied again. The answer is
 // 2xx only once the event is applied; the platform retries 5xx, 408, 425 and 429, and treats any other 4xx as
 // rejected (an alarm). Events:
-//   platform.module.enabled (module hr)   the school's HR company (platform_enable_hr()), its admins invited, then
-//                                         PUT /tenants/{id}/links/hr. A repeat re-links and re-sends nothing.
-//   schools.staff.created / .updated      the person's draft employee (platform_upsert_school_staff())
-//   schools.staff.left                    HR's exit for them (platform_school_staff_left())
+//   platform.module.enabled (module hr)   the customer's HR company (platform_enable_hr()), its admins invited, then
+//                                         PUT /tenants/{id}/links/hr. A repeat re-links and re-sends nothing. The
+//                                         product it came from (enabledSource()) picks its leave chain.
+//   <product>.staff.created / .updated    the person's draft employee (platform_upsert_staff()), for each product in
+//                                         STAFF_SOURCES: schools (Figbloom Schools), fleet (Figbloom Fleet,
+//                                         ERP/FLEET_HR_CONTRACT.md), mapped in external_people with that source
+//   <product>.staff.left                  HR's exit for them (platform_staff_left())
 //   anything else                         200, ignored
-// A staff event for a school with no HR company yet is a 425, so the platform tries again later.
+// A staff event for a customer with no HR company yet is a 425, so the platform tries again later.
 //
-// Sending: hr.employee.left, queued by the database when an exit ends a mapped employee's employment, is sent as
-// POST /events with this company as tenant_local_id, retried with backoff (finish_platform_event()).
+// Sending: hr.employee.left and hr.leave.*, queued by the database for a mapped employee (data.source: the product the
+// person came from), are sent as POST /events with this company as tenant_local_id, retried with backoff
+// (finish_platform_event()). The platform delivers them to the subscribing product linked to the same customer.
 //
 // Settings (server only):
 //   PLATFORM_EVENTS_ENABLED        "true" to apply events and send HR's; otherwise both answer 503 (nothing is lost:
@@ -44,6 +48,11 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // login addresses Schools makes up for staff who sign in with a login ID: never a real mailbox
 const SYNTHETIC_EMAIL_RE = /@([a-z0-9-]+\.)*(figbloom\.internal|invalid|local|localhost|example\.(com|org|net))$/i;
+
+// the products whose staff become HR employees (external_people.source = the product id)
+export const STAFF_SOURCES = ["schools", "fleet"];
+export const PRODUCT_NAMES = { schools: "Figbloom Schools", fleet: "Figbloom Fleet" };
+const STAFF_EVENTS = new Set(STAFF_SOURCES.flatMap((p) => [`${p}.staff.created`, `${p}.staff.updated`, `${p}.staff.left`]));
 
 const on = (value) => /^(1|true|yes|on)$/i.test(String(value || "").trim());
 export const eventsEnabled = () => on(process.env.PLATFORM_EVENTS_ENABLED);
@@ -111,7 +120,7 @@ export function staffToEmployee(data) {
   const role = typeof data?.role === "string" ? data.role.trim() : "";
   const title = typeof data?.job_title === "string" && data.job_title.trim()
     ? data.job_title.trim()
-    : role ? role.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) : null;
+    : role ? role.toLowerCase().replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase()) : null;
   return { first, middle, last, phone, email: realEmail(data?.email), job_title: title ? title.slice(0, 120) : null };
 }
 
@@ -129,7 +138,7 @@ const one = (data) => (Array.isArray(data) ? data[0] ?? null : data ?? null);
 
 function rpcError(fn, error) {
   // P0002: the platform tenant has no HR company (yet)
-  if (error?.code === "P0002") return new EventError(425, "no_hr_company", "There is no HR company for this school yet.");
+  if (error?.code === "P0002") return new EventError(425, "no_hr_company", "There is no HR company for this customer yet.");
   const err = new Error(`${fn}: ${error?.message || "failed"}`);
   err.code = error?.code;
   return err;
@@ -155,17 +164,17 @@ export function supabaseStore(db = admin) {
       const { error } = await client().from("platform_event_receipts").upsert(receipt, { onConflict: "delivery_id", ignoreDuplicates: true });
       if (error) throw new Error(`platform_event_receipts: ${error.message}`);
     },
-    enableHr: async ({ platformTenantId, name, slug, admins }) =>
-      one(await rpc("platform_enable_hr", { p_platform_tenant: platformTenantId, p_name: name, p_slug: slug, p_admins: admins })),
-    upsertStaff: async ({ platformTenantId, person, first, middle, last, phone, email, jobTitle }) =>
+    enableHr: async ({ platformTenantId, name, slug, admins, source = "schools" }) =>
+      one(await rpc("platform_enable_hr", { p_platform_tenant: platformTenantId, p_name: name, p_slug: slug, p_admins: admins, p_source: source })),
+    upsertStaff: async ({ platformTenantId, source = "schools", person, first, middle, last, phone, email, jobTitle }) =>
       one(
-        await rpc("platform_upsert_school_staff", {
-          p_platform_tenant: platformTenantId, p_person: person, p_first: first, p_middle: middle, p_last: last,
-          p_phone: phone, p_email: email, p_job_title: jobTitle,
+        await rpc("platform_upsert_staff", {
+          p_platform_tenant: platformTenantId, p_source: source, p_person: person, p_first: first, p_middle: middle,
+          p_last: last, p_phone: phone, p_email: email, p_job_title: jobTitle,
         })
       ),
-    staffLeft: async ({ platformTenantId, person, leftOn }) =>
-      one(await rpc("platform_school_staff_left", { p_platform_tenant: platformTenantId, p_person: person, p_left_on: leftOn })),
+    staffLeft: async ({ platformTenantId, source = "schools", person, leftOn }) =>
+      one(await rpc("platform_staff_left", { p_platform_tenant: platformTenantId, p_source: source, p_person: person, p_left_on: leftOn })),
     claimEvents: async (limit) => (await rpc("claim_platform_events", { p_limit: limit })) ?? [],
     finishEvent: async (id, ok, error = null, retry = true) =>
       rpc("finish_platform_event", { p_id: id, p_ok: ok, p_error: error, p_retry: retry }),
@@ -183,13 +192,26 @@ function personId(data) {
 }
 
 /**
+ * Which product a platform.module.enabled is for: data.source / data.product when the platform names one, else
+ * "fleet" when the console named Fleet's people (admin roles fleet_*), else "schools" (as before Fleet). HR corrects
+ * it from the first staff event if it guessed wrong (platform_upsert_staff()).
+ */
+export function enabledSource(data) {
+  for (const key of ["source", "product", "source_module"]) {
+    if (STAFF_SOURCES.includes(data?.[key])) return data[key];
+  }
+  const admins = Array.isArray(data?.admins) ? data.admins : [];
+  if (admins.some((a) => typeof a?.role === "string" && /^fleet_/.test(a.role))) return "fleet";
+  return "schools";
+}
+
+/**
  * Applies one event. Resolves a short description of what was done (kept with the receipt), or throws an EventError
  * (a refusal or "try later") or any other error (500: tried again).
  */
 export async function applyEvent(event, { store, platform, timeoutMs }) {
   const type = event.type;
-  const handled = ["platform.module.enabled", "schools.staff.created", "schools.staff.updated", "schools.staff.left"];
-  if (!handled.includes(type)) return "ignored";
+  if (type !== "platform.module.enabled" && !STAFF_EVENTS.has(type)) return "ignored";
   if (type === "platform.module.enabled" && event.data?.module !== "hr") return "ignored (another module)";
 
   const platformTenantId = event.platform_tenant_id;
@@ -207,6 +229,7 @@ export async function applyEvent(event, { store, platform, timeoutMs }) {
       name,
       slug: typeof data.tenant?.slug === "string" ? data.tenant.slug : null,
       admins,
+      source: enabledSource(data),
     });
     if (!company?.tenant_id) throw new Error("platform_enable_hr returned no company");
     // the platform records which HR company this school is; a repeat links again (the same values)
@@ -218,23 +241,26 @@ export async function applyEvent(event, { store, platform, timeoutMs }) {
       : `company ${company.tenant_id} already there, linked again`;
   }
 
-  if (type === "schools.staff.left") {
+  // <product>.staff.*: the product is the type's first part (the platform only relays a product's own types)
+  const source = type.split(".")[0];
+
+  if (type.endsWith(".staff.left")) {
     const person = personId(data);
     const leftOn = data.left_on == null ? null : String(data.left_on);
     if (leftOn !== null && (!DATE_RE.test(leftOn) || Number.isNaN(Date.parse(`${leftOn}T00:00:00Z`)))) throw bad("data.left_on must be YYYY-MM-DD");
-    const r = await store.staffLeft({ platformTenantId, person, leftOn });
+    const r = await store.staffLeft({ platformTenantId, source, person, leftOn });
     console.log(TAG, type, platformTenantId, r?.employee_number ?? "-", r?.outcome);
     return `${r?.outcome ?? "unknown"}${r?.employee_number ? ` ${r.employee_number}` : ""}`;
   }
 
-  // schools.staff.created / .updated
+  // <product>.staff.created / .updated
   const person = personId(data);
   const e = staffToEmployee(data);
   if (!e.first) throw bad("data.full_name is missing");
   const r = await store.upsertStaff({
-    platformTenantId, person, first: e.first, middle: e.middle, last: e.last, phone: e.phone, email: e.email, jobTitle: e.job_title,
+    platformTenantId, source, person, first: e.first, middle: e.middle, last: e.last, phone: e.phone, email: e.email, jobTitle: e.job_title,
   });
-  if (!r?.employee_number) throw new Error("platform_upsert_school_staff returned no employee");
+  if (!r?.employee_number) throw new Error("platform_upsert_staff returned no employee");
   console.log(TAG, type, platformTenantId, r.employee_number, r.created ? "created" : "updated");
   return `${r.created ? "created" : "updated"} ${r.employee_number}`;
 }

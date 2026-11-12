@@ -1,4 +1,5 @@
 import { ApiError, apiRequest } from './adminApi';
+import type { HrState } from './platformSchoolHr';
 import type { GroupAction } from './platformSchoolGroups';
 
 // Figbloom Fleet's companies in the console (/platform/fleet/companies, ERP/FLEET_PLATFORM_CONTRACT.md 3). Fleet's own
@@ -44,6 +45,17 @@ export interface FleetCompany {
   /** the platform's decision; null until Fleet has registered it */
   status: FleetStatus | null;
   status_reason: string | null;
+  /** the platform's account (tenant) for the company, where HR & Payroll is switched on; null until registered */
+  platform_tenant_id?: string | null;
+  /** HR & Payroll for the company (ERP/FLEET_HR_CONTRACT.md); null without a platform account */
+  hr?: FleetHr | null;
+}
+
+/** off: not switched on; enabling: switched on, HR hasn't linked its company yet; on: linked; unknown: couldn't ask. */
+export interface FleetHr {
+  state: HrState;
+  module_status: string | null;
+  hr_tenant_id: string | null;
 }
 
 export interface FleetCompaniesList {
@@ -89,6 +101,20 @@ export async function setFleetCompanyStatus(
   );
   return result.company ?? null;
 }
+
+/** Switches HR & Payroll on for a Fleet company (its platform account). Returns its HR state now. */
+export async function enableFleetHr(platformTenantId: string): Promise<FleetHr> {
+  const result = await apiRequest<{ company?: { platform_tenant_id: string; hr?: FleetHr } }>(
+    'POST',
+    `/platform/fleet/hr/${encodeURIComponent(platformTenantId)}/enable`
+  );
+  if (!result?.company?.hr) throw new Error('The Figbloom platform sent something the console does not understand.');
+  return result.company.hr;
+}
+
+/** The list with one company's HR state replaced (after switching it on). */
+export const withFleetHr = (list: FleetCompany[], platformTenantId: string, hr: FleetHr) =>
+  list.map((c) => (c.platform_tenant_id === platformTenantId ? { ...c, hr } : c));
 
 /** The status tab a company is under: the platform's, or unregistered. */
 export const statusOf = (c: FleetCompany) => c.status ?? 'unregistered';

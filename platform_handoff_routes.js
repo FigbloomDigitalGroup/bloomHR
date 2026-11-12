@@ -1,5 +1,8 @@
-// platform_handoff_routes.js: one-click sign-in from Figbloom Schools into HR ("handoff",
-// ERP/SCHOOLS_HR_HANDOFF_CONTRACT.md section 2).
+// platform_handoff_routes.js: one-click sign-in from Figbloom Schools or Figbloom Fleet into HR ("handoff",
+// ERP/SCHOOLS_HR_HANDOFF_CONTRACT.md section 2, ERP/FLEET_HR_CONTRACT.md section 2). The redeemed claims' source is
+// the product the person came from (the platform's word: the product whose service client asked for the code); only
+// the products HR maps people from (STAFF_SOURCES: schools, fleet) are accepted, and the person is looked up with that
+// source (external_logins).
 //
 //   browser --GET /api/platform/handoff?code=...-->  HR redeems the code on the platform (POST /handoffs/redeem, the
 //                                                     "hr" service client), then:
@@ -33,7 +36,7 @@ import cors from "cors";
 import crypto from "node:crypto";
 import { admin, authenticate, HttpError } from "./admin_routes.js";
 import { PlatformError } from "./platform_client.js";
-import { hrClient } from "./platform_events_routes.js";
+import { PRODUCT_NAMES, STAFF_SOURCES, hrClient } from "./platform_events_routes.js";
 
 const TAG = "[platform/handoff]";
 export const HANDOFF_COOKIE = "fb_hr_handoff";
@@ -81,7 +84,7 @@ export function readClaims(body) {
   const tenantId = typeof body?.tenant_local_id === "string" ? body.tenant_local_id.trim() : "";
   const person = body?.person && typeof body.person === "object" ? body.person : null;
   const externalId = typeof person?.external_id === "string" ? person.external_id.trim() : "";
-  if (!SOURCE_RE.test(source) || !UUID_RE.test(platformTenantId) || !UUID_RE.test(tenantId)) return null;
+  if (!SOURCE_RE.test(source) || !STAFF_SOURCES.includes(source) || !UUID_RE.test(platformTenantId) || !UUID_RE.test(tenantId)) return null;
   if (!externalId || externalId.length > 200) return null;
   const text = (v, max) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
   return {
@@ -177,14 +180,22 @@ function defaultSite() {
   return String(process.env.SITE_URL || process.env.PUBLIC_SITE_URL || "").trim().replace(/\/+$/, "");
 }
 
-const NOT_LINKED_AGAIN = "This connection link has expired or was already used. Open HR & Payroll from Figbloom Schools again, in this browser.";
+/** The product's name, for the person ("Figbloom Schools", "Figbloom Fleet"); Schools when not known. */
+export const productName = (source) => PRODUCT_NAMES[source] ?? PRODUCT_NAMES.schools;
+const notLinkedAgain = (source) =>
+  `This connection link has expired or was already used. Open HR & Payroll from ${productName(source)} again, in this browser.`;
+const NOT_LINKED_AGAIN = notLinkedAgain("schools");
 
 /** What the app is told for each outcome of finishing a pending handoff. */
 function completeAnswer(r, user) {
-  const company = r?.company_name || "this school";
+  const company = r?.company_name || (r?.source === "fleet" ? "this company" : "this school");
+  const product = productName(r?.source);
   switch (r?.outcome) {
     case "ready":
-      return { status: 200, body: { outcome: "ready", person_name: r.person_name ?? null, company_name: r.company_name ?? null } };
+      return {
+        status: 200,
+        body: { outcome: "ready", source: r.source ?? null, person_name: r.person_name ?? null, company_name: r.company_name ?? null },
+      };
     case "linked":
     case "already_linked":
       return { status: 200, body: { ok: true, outcome: r.outcome, company_name: r.company_name ?? null, return_to: safeReturnTo(r.return_to) } };
@@ -202,19 +213,19 @@ function completeAnswer(r, user) {
     case "taken":
       return {
         status: 409,
-        body: { error: { code: "taken", message: `Another HR login of ${company} is already connected to this Figbloom Schools account. Sign in with that login, or remove the connection there first (Appearance, Connected accounts).` } },
+        body: { error: { code: "taken", message: `Another HR login of ${company} is already connected to this ${product} account. Sign in with that login, or remove the connection there first (Appearance, Connected accounts).` } },
       };
     case "user_has_other":
       return {
         status: 409,
-        body: { error: { code: "user_has_other", message: `Your HR login is already connected to another Figbloom Schools account in ${company}. Remove that connection first (Appearance, Connected accounts).` } },
+        body: { error: { code: "user_has_other", message: `Your HR login is already connected to another ${product} account in ${company}. Remove that connection first (Appearance, Connected accounts).` } },
       };
     case "used":
     case "expired":
     case "other_browser":
     case "invalid":
     default:
-      return { status: 410, body: { error: { code: r?.outcome || "invalid", message: NOT_LINKED_AGAIN } } };
+      return { status: 410, body: { error: { code: r?.outcome || "invalid", message: notLinkedAgain(r?.source) } } };
   }
 }
 
@@ -256,6 +267,8 @@ export function createPlatformHandoffRouter({
   };
 
   const page = (res, query) => res.redirect(302, `${site()}/handoff${query}`);
+  // a status page for a person of another product than Schools says which (?from=fleet)
+  const from = (claims) => (claims?.source && claims.source !== "schools" ? `&from=${claims.source}` : "");
 
   router.get("/", async (req, res) => {
     if (!handoffEnabled()) {
@@ -305,17 +318,17 @@ export function createPlatformHandoffRouter({
 
       if (r?.outcome === "unknown_company") {
         await audit({ ...base, tenantId: null, outcome: "unknown_company", detail: `tenant_local_id ${claims.tenantId}` });
-        return page(res, "?status=not_set_up");
+        return page(res, `?status=not_set_up${from(claims)}`);
       }
       if (r?.outcome === "no_access") {
         await audit({ ...base, userId: r.user_id, outcome: "no_access" });
-        return page(res, "?status=no_access");
+        return page(res, `?status=no_access${from(claims)}`);
       }
       if (r?.outcome === "linked") {
         const signIn = await store.signInToken(r.user_id);
         if (!signIn.ok) {
           await audit({ ...base, userId: r.user_id, outcome: "no_access", detail: signIn.reason });
-          return page(res, "?status=no_access");
+          return page(res, `?status=no_access${from(claims)}`);
         }
         await audit({ ...base, userId: r.user_id, outcome: "signed_in" });
         const fragment = new URLSearchParams({ token_hash: signIn.tokenHash, next: claims.returnTo });
@@ -349,7 +362,7 @@ export function createPlatformHandoffRouter({
   });
 
   const finish = (confirm) => async (req, res) => {
-    if (!handoffEnabled()) return res.status(503).json({ error: { code: "handoff_off", message: "Signing in from Figbloom Schools isn't available yet." } });
+    if (!handoffEnabled()) return res.status(503).json({ error: { code: "handoff_off", message: "Signing in from other Figbloom products isn't available yet." } });
     let user;
     try {
       user = await verifyUser(req);
@@ -397,7 +410,7 @@ export function createPlatformHandoffRouter({
       return res.status(status).json({ error: { code: "not_signed_in", message: err?.message || "Sign in first." } });
     }
     const source = typeof req.body?.source === "string" ? req.body.source.trim() : "schools";
-    if (!SOURCE_RE.test(source)) return res.status(400).json({ error: { code: "invalid_source", message: "Unknown product." } });
+    if (!SOURCE_RE.test(source) || !STAFF_SOURCES.includes(source)) return res.status(400).json({ error: { code: "invalid_source", message: "Unknown product." } });
     try {
       const removed = await store.unlink({ userId: caller.id, tenantId: caller.tenantId, source });
       if (removed) await audit({ outcome: "unlinked", source, tenantId: caller.tenantId, userId: caller.id });
