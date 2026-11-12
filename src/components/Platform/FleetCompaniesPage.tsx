@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import toast from 'react-hot-toast';
 import { AlertTriangle, Info } from 'lucide-react';
 import { Button, Card, Modal, PageHeader, SearchInput, StatusPill, TableScroll } from '../UI';
 import type { StatusTone } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import ConsoleStatRow, { ConsoleStat } from './ConsoleStat';
+import { HrPayrollCell } from './SchoolHr';
 import { useConsoleBadge } from '../Console/consoleBadges';
 import { myPlatformRole, roleCan, type PlatformRole } from '../../lib/platformRoles';
 import { actionPermission, groupActions, needsReason } from '../../lib/platformSchoolGroups';
 import {
-  FLEET_STATUSES, FLEET_STATUS_LABELS, MAX_FLEET_REASON, filterCompanies, fleetProblem, fleetTotals, listFleetCompanies,
-  setFleetCompanyStatus, statusOf,
+  FLEET_STATUSES, FLEET_STATUS_LABELS, MAX_FLEET_REASON, enableFleetHr, filterCompanies, fleetProblem, fleetTotals,
+  listFleetCompanies, setFleetCompanyStatus, statusOf, withFleetHr,
   type FleetAction, type FleetCompaniesList, type FleetCompany, type FleetProblem,
 } from '../../lib/platformFleet';
 
@@ -18,6 +19,15 @@ import {
 // trips, last ping) with the platform's decision for each. Approve or reject a new company, suspend or reactivate one:
 // decided on the Figbloom platform, which tells Fleet. The backend checks the console role as for school groups
 // (Owner/Admin approve and reject; Support suspends and reactivates; Viewer views). A company opens a detail panel.
+// HR & Payroll per company (ERP/FLEET_HR_CONTRACT.md): Off / Enabling / On, with Enable for Owner/Admin, as on the
+// Schools page; Figbloom HR then creates the company and invites its owner.
+
+const HR_POLL_MS = 10 * 1000;
+const HR_MAX_POLLS = 6; // a minute of "Enabling" before it waits for a reload
+const FLEET_HR_EXPLAIN =
+  'Figbloom HR creates an HR company for this Fleet company, links it and emails the owner an invitation to it. ' +
+  'Team members and drivers sent from Figbloom Fleet are added as draft employees, who are not paid until HR ' +
+  'completes and approves their records. Recorded on the Figbloom platform with your email.';
 
 const TONES: Record<string, StatusTone> = { pending: 'warning', active: 'success', suspended: 'neutral', rejected: 'danger', unregistered: 'neutral' };
 
@@ -82,6 +92,35 @@ export default function FleetCompaniesPage() {
   useEffect(() => {
     if (allowed) void fetchCompanies();
   }, [allowed, fetchCompanies]);
+
+  // HR links the company a few seconds after it is switched on: refresh quietly meanwhile
+  const polls = useRef(0);
+  const hrEnabling = !!(load && 'companies' in load && load.companies.some((c) => c.hr?.state === 'enabling'));
+  useEffect(() => {
+    if (!hrEnabling || polls.current >= HR_MAX_POLLS) return;
+    const timer = setTimeout(() => {
+      polls.current += 1;
+      listFleetCompanies().then(setLoad, () => {});
+    }, HR_POLL_MS);
+    return () => clearTimeout(timer);
+  }, [hrEnabling, load]);
+
+  const enableHr = async (c: FleetCompany) => {
+    const tenant = c.platform_tenant_id;
+    if (!tenant) throw new Error('This company has no Figbloom platform account yet.');
+    const hr = await enableFleetHr(tenant);
+    polls.current = 0;
+    setLoad((l) => (l && 'companies' in l ? { ...l, companies: withFleetHr(l.companies, tenant, hr) } : l));
+    return hr.state;
+  };
+  const canEnableHr = roleCan(role, 'approve_companies');
+  const hrCell = (c: FleetCompany, labelled = false) =>
+    c.hr ? (
+      <HrPayrollCell name={c.name} state={c.hr.state} canEnable={canEnableHr && !!c.platform_tenant_id} labelled={labelled}
+        enable={() => enableHr(c)} explain={FLEET_HR_EXPLAIN} invitees="the company's owner" />
+    ) : (
+      <span className="text-muted-foreground" title="This company has no Figbloom platform account yet">{labelled ? 'HR & Payroll: ' : ''}—</span>
+    );
 
   const list = load && 'companies' in load ? load : null;
   const companies = list?.companies ?? null;
@@ -232,6 +271,7 @@ export default function FleetCompaniesPage() {
                   <th className="py-1 pr-3 font-medium">Last ping</th>
                   <th className="py-1 pr-3 font-medium">Created</th>
                   <th className="py-1 pr-3 font-medium">Status</th>
+                  <th className="py-1 pr-3 font-medium">HR &amp; Payroll</th>
                   <th />
                 </tr>
               </thead>
@@ -259,6 +299,7 @@ export default function FleetCompaniesPage() {
                         <StatusPill label={FLEET_STATUS_LABELS[s] ?? s} tone={TONES[s] ?? 'neutral'} />
                         {c.status_reason && <span className="block mt-1 text-muted-foreground">{c.status_reason}</span>}
                       </td>
+                      <td className="py-1.5 pr-3">{hrCell(c)}</td>
                       <td className="py-1.5 text-right whitespace-nowrap">
                         {actionsFor(c).map((a) => (
                           <button key={a} type="button" onClick={() => open(c, a)}
@@ -298,6 +339,7 @@ export default function FleetCompaniesPage() {
               <Detail label="Last location ping">{moment(viewing.last_location_at)}</Detail>
               <Detail label="Created">{day(viewing.created_at)}</Detail>
               <Detail label="Status in Fleet">{viewing.fleet_status ?? '—'}</Detail>
+              <Detail label="HR & Payroll">{hrCell(viewing)}</Detail>
               <Detail label="Fleet ID"><span className="font-mono text-[11px]">{viewing.id || '—'}</span></Detail>
               <Detail label="Platform ID"><span className="font-mono text-[11px]">{viewing.organization_id ?? 'not registered yet'}</span></Detail>
             </dl>

@@ -41,7 +41,9 @@ export default function PlatformHandoff() {
   }, [arrival]);
 
   if (arrival.kind === 'status' || failed) {
-    const { title, body } = statusMessage(failed ? 'invalid' : arrival.kind === 'status' ? arrival.status : 'invalid');
+    const { title, body } = arrival.kind === 'status' && !failed
+      ? statusMessage(arrival.status, arrival.from)
+      : statusMessage('invalid');
     return (
       <AuthShell title={title} subtitle={body}>
         <a href="/login" className={authLinkClass}>

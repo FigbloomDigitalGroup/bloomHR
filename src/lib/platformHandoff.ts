@@ -1,7 +1,8 @@
 import { supabase } from './supabase';
 import { ApiError } from './adminApi';
 
-// One-click sign-in from Figbloom Schools (ERP/SCHOOLS_HR_HANDOFF_CONTRACT.md, platform_handoff_routes.js).
+// One-click sign-in from Figbloom Schools or Figbloom Fleet (ERP/SCHOOLS_HR_HANDOFF_CONTRACT.md,
+// ERP/FLEET_HR_CONTRACT.md, platform_handoff_routes.js).
 //
 // The backend sends the browser to /handoff with either a one-time sign-in token (a linked person), a status (off,
 // invalid, no access, ...), or, the first time, a pending id ("connect"). The pending id is kept in this browser for
@@ -73,7 +74,7 @@ export function clearPendingHandoff() {
 export type HandoffArrival =
   | { kind: 'signin'; tokenHash: string; next: string }
   | { kind: 'connect'; pending: string }
-  | { kind: 'status'; status: string };
+  | { kind: 'status'; status: string; from: string };
 
 /** Reads /handoff's query (?status=) and fragment (#token_hash=&next= or #connect=). */
 export function readArrival(search: string, hash: string): HandoffArrival {
@@ -83,31 +84,34 @@ export function readArrival(search: string, hash: string): HandoffArrival {
   const pending = fragment.get('connect') ?? '';
   if (TOKEN_RE.test(pending)) return { kind: 'connect', pending };
   const status = new URLSearchParams(search).get('status') ?? '';
-  return { kind: 'status', status: /^[a-z_]{1,40}$/.test(status) ? status : 'invalid' };
+  const from = new URLSearchParams(search).get('from') ?? '';
+  return { kind: 'status', status: /^[a-z_]{1,40}$/.test(status) ? status : 'invalid', from: from === 'fleet' ? 'fleet' : 'schools' };
 }
 
-/** The page shown for each status the backend sends. */
-export function statusMessage(status: string): { title: string; body: string } {
+/** The page shown for each status the backend sends; `from` is the product the person came from (default Schools). */
+export function statusMessage(status: string, from = 'schools'): { title: string; body: string } {
+  const product = sourceLabel(from === 'fleet' ? 'fleet' : 'schools');
+  const place = from === 'fleet' ? 'company' : 'school';
   switch (status) {
     case 'off':
       return {
         title: 'Not available yet',
-        body: 'Opening Figbloom HR from Figbloom Schools isn\'t available yet. Sign in to HR directly in the meantime.',
+        body: `Opening Figbloom HR from ${product} isn't available yet. Sign in to HR directly in the meantime.`,
       };
     case 'no_access':
-      return { title: 'No access', body: 'You don\'t have access to HR for this school. Ask your HR administrator.' };
+      return { title: 'No access', body: `You don't have access to HR for this ${place}. Ask your HR administrator.` };
     case 'not_set_up':
       return {
-        title: 'HR isn\'t set up for this school',
-        body: 'Figbloom HR isn\'t set up for this school yet. Ask your Figbloom contact to switch HR & Payroll on.',
+        title: `HR isn't set up for this ${place}`,
+        body: `Figbloom HR isn't set up for this ${place} yet. Ask your Figbloom contact to switch HR & Payroll on.`,
       };
     case 'error':
-      return { title: 'Something went wrong', body: 'We couldn\'t open Figbloom HR just now. Go back to Figbloom Schools and try again.' };
+      return { title: 'Something went wrong', body: `We couldn't open Figbloom HR just now. Go back to ${product} and try again.` };
     case 'invalid':
     default:
       return {
         title: 'This link has expired',
-        body: 'Links from Figbloom Schools work once, for a minute. Go back to Figbloom Schools and click HR & Payroll again.',
+        body: `Links from ${product} work once, for a minute. Go back to ${product} and click HR & Payroll again.`,
       };
   }
 }
@@ -116,6 +120,8 @@ export function statusMessage(status: string): { title: string; body: string } {
 
 export interface PendingPreview {
   outcome: 'ready';
+  /** the product the person came from: schools, fleet */
+  source?: string | null;
   person_name: string | null;
   company_name: string | null;
 }
@@ -171,4 +177,5 @@ export async function loadMyExternalLogins(): Promise<ExternalLogin[]> {
   return (data ?? []) as ExternalLogin[];
 }
 
-export const sourceLabel = (source: string) => (source === 'schools' ? 'Figbloom Schools' : source);
+const SOURCE_LABELS: Record<string, string> = { schools: 'Figbloom Schools', fleet: 'Figbloom Fleet' };
+export const sourceLabel = (source: string) => SOURCE_LABELS[source] ?? source;

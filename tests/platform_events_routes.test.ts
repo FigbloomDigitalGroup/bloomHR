@@ -33,6 +33,7 @@ const db = {
   outbox: [] as Row[],
   finished: [] as unknown[][],
   calls: [] as string[],
+  sources: [] as string[],
   fail: null as null | { fn: string; error: Error },
 };
 let next = 0;
@@ -41,8 +42,9 @@ const store = {
   saveReceipt: async (r: Row) => {
     if (!db.receipts.has(String(r.delivery_id))) db.receipts.set(String(r.delivery_id), r);
   },
-  enableHr: async ({ platformTenantId, name, slug, admins }: Row) => {
+  enableHr: async ({ platformTenantId, name, slug, admins, source }: Row) => {
     db.calls.push('enableHr');
+    db.sources.push(String(source));
     if (db.fail?.fn === 'enableHr') throw db.fail.error;
     const found = db.companies.get(String(platformTenantId));
     if (found) return { ...found, name, created: false, invited: 0 };
@@ -121,6 +123,7 @@ beforeEach(() => {
   db.outbox = [];
   db.finished = [];
   db.calls = [];
+  db.sources = [];
   db.fail = null;
   next = 0;
   platform.calls = [];
@@ -325,7 +328,7 @@ describe('schools.staff.*', () => {
     await deliver(staff('schools.staff.created'));
     const r = await deliver(event('schools.staff.left', { person_id: 'person-1', left_on: '2026-11-04' }));
     expect(r.json.result).toBe('exit_started MCL-000001');
-    expect(db.left).toEqual([{ platformTenantId: PT, person: 'person-1', leftOn: '2026-11-04' }]);
+    expect(db.left).toEqual([{ platformTenantId: PT, source: 'schools', person: 'person-1', leftOn: '2026-11-04' }]);
     expect((await deliver(event('schools.staff.left', { person_id: 'person-1', left_on: '4/11/2026' }))).status).toBe(400);
   });
 
@@ -334,6 +337,48 @@ describe('schools.staff.*', () => {
     const r = await deliver(enabled(), { delivery: 'dlv-db' });
     expect(r.status).toBe(500);
     expect(db.receipts.has('dlv-db')).toBe(false);
+  });
+});
+
+describe('Figbloom Fleet (fleet.staff.*, ERP/FLEET_HR_CONTRACT.md)', () => {
+  const fleetEnabled = (extra: Row = {}) =>
+    event('platform.module.enabled', {
+      module: 'hr',
+      tenant: { name: 'Swift Haulage', slug: 'swift-haulage', country: 'KE' },
+      admins: [{ email: 'owner@swift.co.ke', name: 'Owen Owner', role: 'fleet_owner' }],
+      ...extra,
+    });
+  const driver = (type: string, data: Row = {}) =>
+    event(type, { person_id: 'ckdriver0001', full_name: 'Dan Kamau', phone: '+254 700 000 001', email: null, role: 'DRIVER', job_title: null, ...data });
+
+  it('enabledSource: the platform\'s word, else Fleet\'s admins, else schools', () => {
+    expect(mod.enabledSource({ source: 'fleet' })).toBe('fleet');
+    expect(mod.enabledSource({ admins: [{ role: 'fleet_owner' }] })).toBe('fleet');
+    expect(mod.enabledSource({ admins: [{ role: 'school_admin' }] })).toBe('schools');
+    expect(mod.enabledSource({})).toBe('schools');
+  });
+
+  it('module.enabled for a Fleet company passes source fleet; a school still passes schools', async () => {
+    await deliver(fleetEnabled());
+    await deliver(enabled(), {});
+    expect(db.sources).toEqual(['fleet', 'schools']);
+  });
+
+  it('created / updated / left: mapped with source fleet, the role in words as the job title', async () => {
+    await deliver(fleetEnabled());
+    const created = await deliver(driver('fleet.staff.created'));
+    expect(created.json.result).toBe('created MCL-000001');
+    expect(db.people.get(`${PT}:ckdriver0001`)!.fields).toMatchObject({ source: 'fleet', first: 'Dan', last: 'Kamau', jobTitle: 'Driver', phone: '+254700000001' });
+    expect((await deliver(driver('fleet.staff.updated', { full_name: 'Daniel Kamau' }))).json.result).toBe('updated MCL-000001');
+    const left = await deliver(event('fleet.staff.left', { person_id: 'ckdriver0001', left_on: '2026-11-10' }));
+    expect(left.json.result).toBe('exit_started MCL-000001');
+    expect(db.left).toEqual([{ platformTenantId: PT, source: 'fleet', person: 'ckdriver0001', leftOn: '2026-11-10' }]);
+  });
+
+  it('before HR is switched on: 425; another product\'s staff events: ignored', async () => {
+    expect((await deliver(driver('fleet.staff.created'))).status).toBe(425);
+    const other = await deliver(event('crm.staff.created', { person_id: 'x', full_name: 'X' }));
+    expect(other.json).toMatchObject({ ok: true, result: 'ignored' });
   });
 });
 

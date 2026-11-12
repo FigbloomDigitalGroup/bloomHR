@@ -288,7 +288,7 @@ describe('not linked yet: sign in once, then connect', () => {
     const { pending, cookie } = await firstTime();
     const look = await post('/pending', { pending }, { cookie });
     expect(look.status).toBe(200);
-    expect(await look.json()).toEqual({ outcome: 'ready', person_name: 'Mary Head', company_name: 'Hillside Primary' });
+    expect(await look.json()).toEqual({ outcome: 'ready', source: 'schools', person_name: 'Mary Head', company_name: 'Hillside Primary' });
     expect(db.links).toEqual([]);
 
     const done = await post('/link', { pending }, { cookie });
@@ -400,5 +400,55 @@ describe('secrets stay out of the logs', () => {
     expect(all).not.toContain(pending);
     expect(all).not.toContain(cookie.split('=')[1]);
     expect(all).not.toContain('hashed-token-for');
+  });
+});
+
+describe('Figbloom Fleet (ERP/FLEET_HR_CONTRACT.md)', () => {
+  const fleetClaims = () => claims({ source: 'fleet' }, { external_id: 'clx0owner000000000000001', role: 'COMPANY_OWNER' });
+
+  it('a linked Fleet person is signed straight in, looked up with source fleet', async () => {
+    db.links.push({ tenant: SCHOOL, source: 'fleet', external: 'clx0owner000000000000001', user: HEAD });
+    platform.answer = fleetClaims;
+    const res = await open();
+    expect(Object.fromEntries(fragment(res))).toMatchObject({ token_hash: 'hashed-token-for-c001' });
+    expect(db.log).toEqual([expect.objectContaining({ outcome: 'signed_in', source: 'fleet', externalId: 'clx0owner000000000000001' })]);
+  });
+
+  it('a Schools link never signs in the Fleet person with the same id', async () => {
+    db.links.push({ tenant: SCHOOL, source: 'schools', external: 'clx0owner000000000000001', user: HEAD });
+    platform.answer = fleetClaims;
+    const res = await open();
+    expect(fragment(res).get('connect')).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(db.log).toEqual([expect.objectContaining({ outcome: 'not_linked', source: 'fleet' })]);
+  });
+
+  it('first time: connects as a Fleet link', async () => {
+    platform.answer = fleetClaims;
+    const res = await open();
+    const pending = fragment(res).get('connect')!;
+    const done = await post('/link', { pending }, { cookie: cookieOf(res) });
+    expect(done.status).toBe(200);
+    expect(db.links).toEqual([{ tenant: SCHOOL, source: 'fleet', external: 'clx0owner000000000000001', user: HEAD }]);
+  });
+
+  it('a status page says it is Fleet\'s (?from=fleet)', async () => {
+    platform.answer = () => claims({ source: 'fleet', tenant_local_id: OTHER });
+    expect(location(await open())).toBe(`${SITE}/handoff?status=not_set_up&from=fleet`);
+  });
+
+  it('a product HR maps nobody from is refused', async () => {
+    platform.answer = () => claims({ source: 'crm' });
+    expect(location(await open())).toBe(`${SITE}/handoff?status=invalid`);
+  });
+
+  it('removing one\'s own Fleet link', async () => {
+    db.links.push({ tenant: SCHOOL, source: 'fleet', external: 'clx0owner000000000000001', user: HEAD });
+    const res = await fetch(`${base}/api/platform/handoff/link`, {
+      method: 'DELETE',
+      headers: { authorization: 'Bearer session-head', 'content-type': 'application/json' },
+      body: JSON.stringify({ source: 'fleet' }),
+    });
+    expect(await res.json()).toEqual({ ok: true, removed: 1 });
+    expect(db.links).toEqual([]);
   });
 });

@@ -10,10 +10,10 @@ export default function HandoffConnectNote() {
   if (!pending) return null;
   return (
     <div role="status" className="rounded-card border border-brand/30 bg-brand/5 px-4 py-3 text-[13px] text-ink">
-      <p className="m-0 font-semibold">Sign in to HR once to connect your Figbloom Schools account</p>
+      <p className="m-0 font-semibold">Sign in to HR once to connect your Figbloom account</p>
       <p className="m-0 mt-1 text-[12px] text-muted-foreground">
-        After this, HR &amp; Payroll in Figbloom Schools opens HR without a password. Use the HR account you were
-        invited with for your school.
+        After this, HR &amp; Payroll in Figbloom Schools or Figbloom Fleet opens HR without a password. Use the HR
+        account you were invited with for your school or company.
       </p>
     </div>
   );

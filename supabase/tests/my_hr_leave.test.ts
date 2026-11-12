@@ -261,7 +261,7 @@ describe('apply, approve as the right HR login, events', () => {
     expect(ev[0].event_type).toBe('hr.leave.approved');
     expect(ev[0].data).toEqual({
       application_id: app.id, external_id: 'person-mary', employee_number: 'E1', leave_type: 'Annual Leave',
-      start_date: day(14), end_date: dayAfter(day(14)), half_day: false, days: 2, status: 'approved',
+      start_date: day(14), end_date: dayAfter(day(14)), half_day: false, days: 2, status: 'approved', source: 'schools',
     });
     expect(await decideError(U.HR, app.id, 'approved')).toMatchObject({ code: '55000' });
   });

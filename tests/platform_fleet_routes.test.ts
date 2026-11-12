@@ -228,7 +228,7 @@ describe('GET /api/platform/fleet/companies', () => {
       id: 'cmp_pending', name: 'Swift Couriers', fleet_status: 'pending', plan: 'trial', created_at: '2026-10-01T08:00:00.000Z',
       owner_name: 'Owner of Swift Couriers', owner_email: 'owner@cmp_pending.co.ke',
       vehicles: 12, drivers: 9, admins: 2, trips_last_30_days: 340, last_location_at: '2026-11-12T07:55:00.000Z',
-      in_fleet: true, organization_id: PENDING, status: 'pending', status_reason: null,
+      in_fleet: true, organization_id: PENDING, status: 'pending', status_reason: null, platform_tenant_id: null, hr: null,
     });
     // the platform's decision wins over Fleet's own status
     expect(body.companies[3]).toMatchObject({ id: 'cmp_rejected', fleet_status: 'pending', status: 'rejected', status_reason: 'Not a business' });
@@ -413,5 +413,81 @@ describe('POST /api/platform/fleet/companies/:organizationId/status', () => {
     expect(text).not.toMatch(/tok-\d/);
     expect(text).not.toContain(CLIENT_SECRET);
     expect(text).not.toContain('deliveries');
+  });
+});
+
+describe('HR & Payroll per Fleet company (ERP/FLEET_HR_CONTRACT.md)', () => {
+  const T_ACTIVE = '66666666-6666-4666-8666-666666666666';
+  const T_PENDING = '77777777-7777-4777-8777-777777777777';
+  const tenant = (id: string, localId: string, extra: Row = {}) => ({ id, name: localId, links: [{ module: 'fleet', local_tenant_id: localId, local_slug: localId }], ...extra });
+  const tenants: Record<string, Row> = {};
+  const hrOn = new Set<string>();
+
+  beforeEach(() => {
+    fake.orgs[0] = org(PENDING, 'pending', 'cmp_pending', { tenants: [tenant(T_PENDING, 'cmp_pending')] });
+    fake.orgs[1] = org(ACTIVE, 'active', 'cmp_active', {
+      tenants: [tenant(T_ACTIVE, 'cmp_active', { links: [{ module: 'fleet', local_tenant_id: 'cmp_active' }, { module: 'hr', local_tenant_id: 'hr-co-1' }] })],
+    });
+    tenants[T_PENDING] = { modules: [{ module: 'fleet', status: 'active' }], links: [{ module: 'fleet', local_tenant_id: 'cmp_pending' }] };
+    tenants[T_ACTIVE] = { modules: [], links: [{ module: 'fleet', local_tenant_id: 'cmp_active' }, { module: 'hr', local_tenant_id: 'hr-co-1' }] };
+    hrOn.clear();
+    fake.platformOverride = (method, path) => {
+      const g = path.match(/^\/tenants\/([^/]+)$/);
+      if (method === 'GET' && g) {
+        const t = tenants[g[1]];
+        if (!t) return { status: 404, json: { error: { code: 'tenant_not_found', message: 'No such account' } } };
+        const modules = [...(t.modules as Row[]), ...(hrOn.has(g[1]) ? [{ module: 'hr', status: 'active' }] : [])];
+        return { status: 200, json: { tenant: { id: g[1], legal_name: 'X' }, modules, links: t.links } };
+      }
+      if (method === 'PUT' && /^\/tenants\/[^/]+\/modules\/hr$/.test(path)) {
+        hrOn.add(path.split('/')[2]);
+        return { status: 200, json: { module: { module: 'hr', status: 'active' }, event: {} } };
+      }
+      return null;
+    };
+  });
+
+  it('each company shows its HR state: linked is on; not linked is asked about (off)', async () => {
+    const body = await (await call('view')).json();
+    const byId = Object.fromEntries(body.companies.map((c: Row) => [c.id, c]));
+    expect(byId.cmp_active).toMatchObject({ platform_tenant_id: T_ACTIVE, hr: { state: 'on', hr_tenant_id: 'hr-co-1' } });
+    expect(byId.cmp_pending).toMatchObject({ platform_tenant_id: T_PENDING, hr: { state: 'off' } });
+    // a company with no platform tenant: no HR state, nothing asked
+    expect(byId.cmp_new).toMatchObject({ platform_tenant_id: null, hr: null });
+    expect(fake.apiCalls.filter((c) => c.path.startsWith('/tenants/')).map((c) => c.path)).toEqual([`/tenants/${T_PENDING}`]);
+  });
+
+  it('Enable: switches hr on for the company with its owner as a fleet_owner, recorded under the caller', async () => {
+    const res = await call('adm', `/hr/${T_PENDING}/enable`, { method: 'POST' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ company: { platform_tenant_id: T_PENDING, hr: { state: 'enabling', module_status: 'active', hr_tenant_id: null } } });
+    const put = fake.apiCalls.find((c) => c.method === 'PUT')!;
+    expect(put.path).toBe(`/tenants/${T_PENDING}/modules/hr`);
+    expect(put.body).toEqual({
+      status: 'active', actor_email: 'adm@figbloom.org',
+      admins: [{ email: 'owner@cmp_pending.co.ke', name: 'Owner of Swift Couriers', role: 'fleet_owner' }],
+    });
+  });
+
+  it('already on: nothing is changed', async () => {
+    const res = await call('own', `/hr/${T_ACTIVE}/enable`, { method: 'POST' });
+    expect((await res.json()).company.hr.state).toBe('on');
+    expect(fake.apiCalls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
+  it('only approve_companies; a bad id is a 400; another product\'s account is a 404', async () => {
+    expect((await call('sup', `/hr/${T_PENDING}/enable`, { method: 'POST' })).status).toBe(403);
+    expect((await call('view', `/hr/${T_PENDING}/enable`, { method: 'POST' })).status).toBe(403);
+    expect((await call('adm', '/hr/nope/enable', { method: 'POST' })).status).toBe(400);
+    tenants[T_PENDING] = { modules: [], links: [{ module: 'schools', local_tenant_id: 's1' }] };
+    expect((await call('adm', `/hr/${T_PENDING}/enable`, { method: 'POST' })).status).toBe(404);
+    expect(fake.apiCalls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
+  it('Fleet down: still switched on, with nobody to invite', async () => {
+    fake.fleetOverride = () => ({ status: 500, json: {} });
+    const res = await call('adm', `/hr/${T_PENDING}/enable`, { method: 'POST' });
+    expect(res.status).toBe(200);
+    expect(fake.apiCalls.find((c) => c.method === 'PUT')!.body.admins).toEqual([]);
   });
 });

@@ -165,7 +165,7 @@ describe('schools.staff.left and hr.employee.left', () => {
     await db.query(`select end_exit_access($1)`, [id]);
     const out = await rows(`select event_type, data, status, tenant_id from platform_event_outbox`);
     expect(out).toEqual([
-      { event_type: 'hr.employee.left', data: { employee_number: n, external_id: 'person-2', left_on: '2026-11-04' }, status: 'pending', tenant_id: company.tenant_id },
+      { event_type: 'hr.employee.left', data: { employee_number: n, external_id: 'person-2', source: 'schools', left_on: '2026-11-04' }, status: 'pending', tenant_id: company.tenant_id },
     ]);
     expect(await rows(`select "Status" s from employees where tenant_id = $1 and "Employee Number" = $2`, [company.tenant_id, n])).toEqual([{ s: 'Terminated' }]);
     expect(await rows(`select outcome from platform_school_staff_left($1, 'person-2', null)`, [PT])).toEqual([{ outcome: 'already_left' }]);
