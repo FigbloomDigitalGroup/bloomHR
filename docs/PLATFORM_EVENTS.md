@@ -120,6 +120,7 @@ known (company, employee number, route, status; no payload, no token; a per-comp
 | `PLATFORM_JWKS_URL` | `https://cognito-idp.<region>.amazonaws.com/<pool id>/.well-known/jwks.json` (the platform's customers pool) |
 | `PLATFORM_ISSUER` | `https://cognito-idp.<region>.amazonaws.com/<pool id>` |
 | `PLATFORM_SCHOOLS_CLIENT_ID` | the Schools service client's app client id |
+| `PLATFORM_FLEET_CLIENT_ID` | the Fleet service client's app client id (ERP/FLEET_HR_CONTRACT.md). The token's `client_id` must be one of these product clients; it decides the product (`schools`, `fleet`), never a header |
 | `PLATFORM_API_URL`, `PLATFORM_TOKEN_URL`, `PLATFORM_CLIENT_ID`, `PLATFORM_CLIENT_SECRET` | as above (the `hr` service client, for `/links/resolve`) |
 
 ### Switching on (per environment)
@@ -168,3 +169,28 @@ change is queued once and other edits send nothing.
 3. The platform subscribes `schools` to `hr.leave.approved` and `hr.leave.cancelled` (contract section 1).
 
 On Vercel a request body is limited to about 4.5 MB, so there a document can be about 3 MB (base64 adds a third).
+
+## Figbloom Fleet (ERP/FLEET_HR_CONTRACT.md section 2)
+
+Fleet takes Schools' place everywhere above, with product id `fleet` (migration `20261112100000_platform_fleet_hr.sql`):
+
+- **Companies:** `tenants.platform_source` (`schools` / `fleet`) is the product a company was switched on from.
+  `platform.module.enabled` takes it from `data.source`/`data.product` when the platform names one, else `fleet` when
+  an admin's role is `fleet_*` (the console sends Fleet's owner as `fleet_owner`), else `schools`. A company with nobody
+  mapped from another product takes the product of its first staff event. Leave chain: 1. the Leave Approver,
+  2. role ADMIN, labelled *Company admin* for Fleet (*School admin* for Schools) (`platform_leave_chain()`).
+- **Staff:** `fleet.staff.created|updated|left` (`{person_id, full_name, phone, email, role, job_title}`, Fleet's cuid
+  ids) do what `schools.staff.*` do (`platform_upsert_staff()`, `platform_staff_left()`), mapped in
+  `external_people (tenant_id, employee_number, 'fleet', person_id)`. A role in capitals (`DRIVER`) becomes *Driver*.
+- **Sent back:** `hr.employee.left` (one per product the employee is mapped from) and `hr.leave.*` carry
+  `data.source` (`fleet`); the platform delivers them to the product subscribed and linked for that customer.
+- **One-click:** handoffs whose `source` is `fleet` are looked up in `external_logins` with source `fleet`; a source HR
+  maps nobody from is refused. Status pages for Fleet people get `&from=fleet`.
+- **My HR:** a token of `PLATFORM_FLEET_CLIENT_ID` is Fleet's: the company in `x-figbloom-company` (or
+  `x-figbloom-tenant`), the person in `x-figbloom-person` (cuids), resolved with `/links/resolve?module=fleet`; a
+  company not linked is `403 company_not_linked`. Everything else as for Schools.
+- **Console:** Figbloom Fleet > Companies shows **HR & Payroll: Off / Enabling / On** per company with **Enable**
+  (Owner, Admin): `POST /api/platform/fleet/hr/:tenantId/enable`, the company's owner from Fleet's summary invited.
+
+Switching on: apply the migration first, then merge; set `PLATFORM_FLEET_CLIENT_ID` (HR's Vercel production and the HR
+staging settings). The platform seeds the `fleet` subscriptions (figbloom-platform migration `0009_fleet_hr_events`).

@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { ApiError } from '../../lib/adminApi';
 import { Button, Modal } from '../UI';
-import { clearPendingHandoff, handoffApi, loadPendingHandoff, safeNext, type PendingPreview } from '../../lib/platformHandoff';
+import { clearPendingHandoff, handoffApi, loadPendingHandoff, safeNext, sourceLabel, type PendingPreview } from '../../lib/platformHandoff';
 
 // pages where the person is still signing in: ask once they are in
 const SIGNING_IN = ['/login', '/mfa', '/update-password', '/join', '/create-company', '/handoff', '/auth/callback', '/offer'];
@@ -56,7 +56,7 @@ export default function HandoffLinker({ userId, email, pathname }: { userId: str
     try {
       const r = await handoffApi.link(state.pending);
       clearPendingHandoff();
-      toast.success('Your Figbloom Schools account is connected. Next time HR & Payroll opens HR straight away.');
+      toast.success(`Your ${sourceLabel(state.preview.source ?? 'schools')} account is connected. Next time HR & Payroll opens HR straight away.`);
       // a full load, so every screen starts from the school's company
       window.location.assign(safeNext(r.return_to));
     } catch (err) {
@@ -90,17 +90,19 @@ export default function HandoffLinker({ userId, email, pathname }: { userId: str
 
   if (state.kind === 'ask' || state.kind === 'working') {
     const { preview } = state;
-    const company = preview.company_name || 'your school';
+    const fleet = preview.source === 'fleet';
+    const product = sourceLabel(fleet ? 'fleet' : 'schools');
+    const company = preview.company_name || (fleet ? 'your company' : 'your school');
     return (
-      <Modal open onClose={notNow} title="Connect your Figbloom Schools account?" size="md" closeOnBackdrop={false}>
+      <Modal open onClose={notNow} title={`Connect your ${product} account?`} size="md" closeOnBackdrop={false}>
         <div className="space-y-3 text-[13px] text-ink">
           <p className="m-0">
-            Connect the Figbloom Schools account{preview.person_name ? <> of <strong>{preview.person_name}</strong></> : null} at{' '}
-            <strong>{company}</strong> to this HR login, <strong>{email}</strong>. After that, HR &amp; Payroll in Figbloom
-            Schools opens HR without a password.
+            Connect the {product} account{preview.person_name ? <> of <strong>{preview.person_name}</strong></> : null} at{' '}
+            <strong>{company}</strong> to this HR login, <strong>{email}</strong>. After that, HR &amp; Payroll in{' '}
+            {product} opens HR without a password.
           </p>
           <p className="m-0 text-[12px] text-muted-foreground">
-            Only connect it if you just clicked HR &amp; Payroll in Figbloom Schools yourself. You can remove the
+            Only connect it if you just clicked HR &amp; Payroll in {product} yourself. You can remove the
             connection any time under Appearance, Connected accounts.
           </p>
         </div>

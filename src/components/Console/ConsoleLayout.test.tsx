@@ -58,6 +58,9 @@ describe('the console menu', () => {
     // Staff is Figbloom's own, apart from the products
     expect(within(products).queryByRole('link', { name: 'Staff' })).toBeNull();
     expect(within(screen.getByRole('navigation', { name: 'Figbloom' })).getByRole('link', { name: 'Staff' })).toBeTruthy();
+    // ...and so are the platform's settings (auto-approve per product)
+    expect(within(products).queryByRole('link', { name: 'Settings' })).toBeNull();
+    expect(within(screen.getByRole('navigation', { name: 'Figbloom' })).getByRole('link', { name: 'Settings' }).getAttribute('href')).toBe('/platform/settings');
   });
 
   it('is a left sidebar with the console\'s name at the top, and the page beside it', () => {

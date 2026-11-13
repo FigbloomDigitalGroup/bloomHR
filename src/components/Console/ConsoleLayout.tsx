@@ -2,7 +2,7 @@ import { ReactNode, useCallback, useEffect, useRef, useState, type MouseEvent } 
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   Briefcase, Building2, ChevronDown, ChevronLeft, ChevronRight, GraduationCap, LayoutDashboard, LogOut, Menu, Network, Percent,
-  School, Truck, Users, X, type LucideIcon,
+  School, Settings, Truck, Users, X, type LucideIcon,
 } from 'lucide-react';
 import bloomMark from '../../../public/bloom-mark.png';
 import { ROLE_LABELS, type PlatformRole } from '../../lib/platformRoles';
@@ -61,7 +61,10 @@ const CONSOLE_NAV: ConsoleNavGroup[] = [
 // every product at a glance: first, above the products
 const HOME_NAV: ConsoleNavItem[] = [{ label: 'Overview', path: '/platform/overview', icon: LayoutDashboard }];
 // Figbloom's own, not one product's: at the bottom of the sidebar, above the account
-const PLATFORM_NAV: ConsoleNavItem[] = [{ label: 'Staff', path: '/platform/staff', icon: Users }];
+const PLATFORM_NAV: ConsoleNavItem[] = [
+  { label: 'Staff', path: '/platform/staff', icon: Users },
+  { label: 'Settings', path: '/platform/settings', icon: Settings },
+];
 
 const SIDEBAR_ID = 'console-sidebar';
 export const SECTIONS_KEY = 'figbloom.console.sections';

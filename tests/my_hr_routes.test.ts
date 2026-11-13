@@ -29,6 +29,12 @@ const NEW = 'a0000000-0000-4000-8000-000000000002'; // linked, draft (E3)
 const STRANGER = 'a0000000-0000-4000-8000-000000000003'; // not linked
 const OTHER_PERSON = 'a0000000-0000-4000-8000-000000000004'; // linked in the other company (its E1)
 const PAYSLIP = 'b0000000-0000-4000-8000-000000000001';
+// Figbloom Fleet (ERP/FLEET_HR_CONTRACT.md): its own client, cuid ids
+const FLEET_CLIENT = 'fleet-client-id';
+const PT_FLEET = '9d2c2a4e-3b7d-4c1e-9a55-2d8f0e7b9c12';
+const HR_FLEET = '3b1c2a4e-3b7d-4c1e-9a55-2d8f0e7b9c22';
+const FLEET_CO = 'clx0company0000000000001';
+const DRIVER = 'clx0driver00000000000001';
 
 type Row = Record<string, unknown>;
 let mod: typeof import('../my_hr_routes.js');
@@ -43,10 +49,12 @@ type Emp = { tenant: string; number: string; onboarding: string };
 const people = new Map<string, Emp>(); // `${tenant}|${person}` -> employee
 const companies = new Map<string, string>(); // HR company -> platform tenant
 const calls: Row[] = [];
+const sources: unknown[] = [];
 const logRows: Row[] = [];
 const store = {
-  person: async ({ tenantId, platformTenantId, externalId }: Row) => {
+  person: async ({ tenantId, platformTenantId, externalId, source }: Row) => {
     calls.push({ fn: 'person', tenantId, platformTenantId, externalId });
+    sources.push(source);
     if (companies.get(String(tenantId)) !== platformTenantId) return { outcome: 'unknown_company' };
     const e = people.get(`${tenantId}|${externalId}`);
     if (!e) return { outcome: 'not_linked' };
@@ -99,6 +107,7 @@ const platform = {
     if (school === SCHOOL) return { platform_tenant_id: PT, module: 'schools', local_id: SCHOOL, caller_local_id: HR_CO };
     if (school === SCHOOL_OTHER) return { platform_tenant_id: PT_OTHER, module: 'schools', local_id: SCHOOL_OTHER, caller_local_id: HR_OTHER };
     // the platform says HR_CO, but HR_CO is another platform tenant's company here
+    if (school === FLEET_CO && path.includes('module=fleet')) return { platform_tenant_id: PT_FLEET, module: 'fleet', local_id: FLEET_CO, caller_local_id: HR_FLEET };
     if (school === SCHOOL_MISMATCH) return { platform_tenant_id: PT_OTHER, module: 'schools', local_id: SCHOOL_MISMATCH, caller_local_id: HR_CO };
     throw new PlatformError(404, 'not_found', 'Not found');
   },
@@ -163,10 +172,14 @@ beforeEach(() => {
   companies.clear();
   companies.set(HR_CO, PT);
   companies.set(HR_OTHER, PT_OTHER);
+  companies.set(HR_FLEET, PT_FLEET);
+  delete process.env.PLATFORM_FLEET_CLIENT_ID;
+  sources.length = 0;
   people.clear();
   people.set(`${HR_CO}|${MARY}`, { tenant: HR_CO, number: 'E1', onboarding: 'approved' });
   people.set(`${HR_CO}|${NEW}`, { tenant: HR_CO, number: 'E3', onboarding: 'draft' });
   people.set(`${HR_OTHER}|${OTHER_PERSON}`, { tenant: HR_OTHER, number: 'E1', onboarding: 'approved' });
+  people.set(`${HR_FLEET}|${DRIVER}`, { tenant: HR_FLEET, number: 'F1', onboarding: 'approved' });
   calls.length = 0;
   logRows.length = 0;
   platform.calls = [];
@@ -463,5 +476,58 @@ describe('the audit and the logs', () => {
     expect(all).not.toContain('Bearer');
     expect(all).not.toContain('80000');
     expect(all).not.toContain(MARY);
+  });
+});
+
+describe('Figbloom Fleet (PLATFORM_FLEET_CLIENT_ID)', () => {
+  const fleetGet = async (path: string, { client = FLEET_CLIENT, company = FLEET_CO, person = DRIVER, header = 'x-figbloom-company' } = {}) =>
+    fetch(`${base}/api/integrations/my-hr/${path}`, {
+      headers: { authorization: `Bearer ${await sign(access({ client_id: client, sub: client }))}`, [header]: company, 'x-figbloom-person': person },
+    });
+
+  it('productClients: client id -> product, only for the clients set', () => {
+    process.env.PLATFORM_FLEET_CLIENT_ID = FLEET_CLIENT;
+    expect([...mod.productClients()]).toEqual([[SCHOOLS_CLIENT, 'schools'], [FLEET_CLIENT, 'fleet']]);
+    delete process.env.PLATFORM_SCHOOLS_CLIENT_ID;
+    expect([...mod.productClients()]).toEqual([[FLEET_CLIENT, 'fleet']]);
+  });
+
+  it('a Fleet token is refused while Fleet\'s client isn\'t allowed', async () => {
+    const res = await fleetGet('summary');
+    expect(res.status).toBe(401);
+    expect(platform.calls).toEqual([]);
+  });
+
+  it('allowed: the company is resolved as a Fleet one, the person with source fleet', async () => {
+    process.env.PLATFORM_FLEET_CLIENT_ID = FLEET_CLIENT;
+    const res = await fleetGet('summary');
+    expect(res.status).toBe(200);
+    expect(platform.calls).toEqual([`/links/resolve?module=fleet&local_id=${FLEET_CO}`]);
+    expect(calls[0]).toEqual({ fn: 'person', tenantId: HR_FLEET, platformTenantId: PT_FLEET, externalId: DRIVER });
+    expect(sources).toEqual(['fleet']);
+    // x-figbloom-tenant works too
+    expect((await fleetGet('summary', { header: 'x-figbloom-tenant' })).status).toBe(200);
+  });
+
+  it('Schools\' token still resolves Schools people with source schools', async () => {
+    process.env.PLATFORM_FLEET_CLIENT_ID = FLEET_CLIENT;
+    expect((await get('summary')).status).toBe(200);
+    expect(sources).toEqual(['schools']);
+  });
+
+  it('the product comes from the token, never the headers: Schools\' token with Fleet ids is not Fleet', async () => {
+    process.env.PLATFORM_FLEET_CLIENT_ID = FLEET_CLIENT;
+    const res = await fleetGet('summary', { client: SCHOOLS_CLIENT, header: 'x-figbloom-school' });
+    expect(res.status).toBe(400); // cuids aren't Schools ids
+    expect(platform.calls).toEqual([]);
+  });
+
+  it('a company the platform does not link: 403 company_not_linked; malformed ids: 400', async () => {
+    process.env.PLATFORM_FLEET_CLIENT_ID = FLEET_CLIENT;
+    const res = await fleetGet('summary', { company: 'clx0unknown0000000000001' });
+    expect(res.status).toBe(403);
+    expect(await errorCode(res)).toBe('company_not_linked');
+    expect((await fleetGet('summary', { person: 'a b' })).status).toBe(400);
+    expect((await fleetGet('summary', { company: '' })).status).toBe(400);
   });
 });

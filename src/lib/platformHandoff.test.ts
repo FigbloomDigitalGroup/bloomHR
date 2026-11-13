@@ -33,15 +33,18 @@ describe('readArrival: what /handoff was opened with', () => {
   });
 
   it('a status, or "invalid" for anything unexpected', () => {
-    expect(readArrival('?status=no_access', '')).toEqual({ kind: 'status', status: 'no_access' });
-    expect(readArrival('?status=<script>', '')).toEqual({ kind: 'status', status: 'invalid' });
-    expect(readArrival('', '#connect=short')).toEqual({ kind: 'status', status: 'invalid' });
+    expect(readArrival('?status=no_access', '')).toEqual({ kind: 'status', status: 'no_access', from: 'schools' });
+    expect(readArrival('?status=<script>', '')).toEqual({ kind: 'status', status: 'invalid', from: 'schools' });
+    expect(readArrival('', '#connect=short')).toEqual({ kind: 'status', status: 'invalid', from: 'schools' });
+    expect(readArrival('?status=not_set_up&from=fleet', '')).toEqual({ kind: 'status', status: 'not_set_up', from: 'fleet' });
   });
 
   it('the pages say what the contract says', () => {
     expect(statusMessage('no_access').body).toBe('You don\'t have access to HR for this school. Ask your HR administrator.');
     expect(statusMessage('off').title).toBe('Not available yet');
     expect(statusMessage('anything').title).toBe('This link has expired');
+    expect(statusMessage('no_access', 'fleet').body).toBe('You don\'t have access to HR for this company. Ask your HR administrator.');
+    expect(statusMessage('invalid', 'fleet').body).toContain('Figbloom Fleet');
   });
 });
 

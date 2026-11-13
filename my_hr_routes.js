@@ -1,16 +1,21 @@
-// my_hr_routes.js: "My HR" for Figbloom Schools staff, step 1 (view only): ERP/SCHOOLS_HR_PHASE2_CONTRACT.md section 2.
+// my_hr_routes.js: "My HR" for the staff of Figbloom Schools and Figbloom Fleet: ERP/SCHOOLS_HR_PHASE2_CONTRACT.md
+// section 2, ERP/FLEET_HR_CONTRACT.md section 2 (Fleet takes Schools' place, product "fleet").
 //
-//   Schools' my-hr function --GET /api/integrations/my-hr/<route>-->  (Bearer: Schools' platform access token,
-//                                                                      x-figbloom-school, x-figbloom-person)
+//   a product's backend --GET /api/integrations/my-hr/<route>-->  (Bearer: that product's platform access token,
+//                                                                  the customer: x-figbloom-school (Schools) or
+//                                                                  x-figbloom-company (Fleet) or x-figbloom-tenant,
+//                                                                  and x-figbloom-person)
 //     1. the switch MY_HR_API_ENABLED (off: 503 my_hr_off)
 //     2. the token: a Cognito ACCESS token of the platform's pool, signature checked against its JWKS
-//        (PLATFORM_JWKS_URL), issuer PLATFORM_ISSUER, token_use "access", client_id PLATFORM_SCHOOLS_CLIENT_ID, not
-//        expired (401 invalid_token otherwise; an id token is refused)
-//     3. the school: GET /links/resolve?module=schools&local_id=<school> on the platform (the "hr" service client,
+//        (PLATFORM_JWKS_URL), issuer PLATFORM_ISSUER, token_use "access", not expired, and its client_id one of the
+//        product clients (productClients(): PLATFORM_SCHOOLS_CLIENT_ID -> schools, PLATFORM_FLEET_CLIENT_ID -> fleet),
+//        which says which product is calling (401 invalid_token otherwise; an id token is refused)
+//     3. the customer: GET /links/resolve?module=<product>&local_id=<id> on the platform (the "hr" service client,
 //        answers kept 10 minutes) gives the platform tenant and HR's own company for it (caller_local_id); that
-//        company must be active and have that platform_tenant_id (403 school_not_linked otherwise)
-//     4. the person: only external_people (company, 'schools', person id) (404 not_linked otherwise). Never by email,
-//        and never an employee number from the caller.
+//        company must be active and have that platform_tenant_id (403 school_not_linked for Schools,
+//        company_not_linked for Fleet, otherwise)
+//     4. the person: only external_people (company, <product>, person id) (404 not_linked otherwise). Never by email,
+//        and never an employee number from the caller. Ids: Schools' are uuids, Fleet's cuids.
 //     5. per person: 120 calls per 10 minutes (429)
 //     6. a draft employee (onboarding not approved): 200 {"status": "pending_hr"} and nothing else
 //   Then the employee's own data, with the staff portal's rules (supabase/migrations/20261107100000_my_hr_api.sql):
@@ -44,6 +49,7 @@
 //   PLATFORM_JWKS_URL            https://cognito-idp.<region>.amazonaws.com/<pool>/.well-known/jwks.json
 //   PLATFORM_ISSUER              https://cognito-idp.<region>.amazonaws.com/<pool>
 //   PLATFORM_SCHOOLS_CLIENT_ID   the Schools service client's app client id
+//   PLATFORM_FLEET_CLIENT_ID     the Fleet service client's app client id
 //   PLATFORM_CLIENT_ID / PLATFORM_CLIENT_SECRET, PLATFORM_API_URL, PLATFORM_TOKEN_URL   the "hr" service client
 import { randomUUID } from "node:crypto";
 import express from "express";
@@ -81,8 +87,16 @@ const COMMENT_MAX = 1000;
 export const IMPORT_MAX_RECORDS = 5000;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-// Schools' ids (tenants.id, profiles.id) are uuids; anything else is refused before it goes anywhere
-const ID_RE = UUID_RE;
+// each product's ids: Schools' (tenants.id, profiles.id) are uuids, Fleet's (Company.id, User.id, Driver.id) cuids;
+// anything else is refused before it goes anywhere
+const ID_RES = { schools: UUID_RE, fleet: /^[A-Za-z0-9_-]{8,64}$/ };
+// the product client env settings: client id -> product
+export const PRODUCT_CLIENT_ENVS = { schools: "PLATFORM_SCHOOLS_CLIENT_ID", fleet: "PLATFORM_FLEET_CLIENT_ID" };
+// how each product calls its customers, in the answers
+const CUSTOMER = {
+  schools: { noun: "school", notLinked: "school_not_linked", name: "Figbloom Schools" },
+  fleet: { noun: "company", notLinked: "company_not_linked", name: "Figbloom Fleet" },
+};
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 const on = (value) => /^(1|true|yes|on)$/i.test(String(value || "").trim());
@@ -110,14 +124,25 @@ export class TokenError extends Error {
   }
 }
 
+/** The allow-list of product clients: Map(client id -> product), from the settings that are set. */
+export function productClients() {
+  const map = new Map();
+  for (const [product, env] of Object.entries(PRODUCT_CLIENT_ENVS)) {
+    const id = read(env);
+    if (id) map.set(id, product);
+  }
+  return map;
+}
+
 /**
- * Checks Schools' bearer token: a Cognito access token signed by the platform's pool (keys: the JWKS, or `keys` in
- * tests), its issuer, not expired, for the Schools client. Resolves its claims, or throws a TokenError.
+ * Checks a product's bearer token: a Cognito access token signed by the platform's pool (keys: the JWKS, or `keys` in
+ * tests), its issuer, not expired, for one of the product clients (productClients()). Resolves its claims with
+ * `product` (schools, fleet) added, or throws a TokenError.
  */
-export async function verifySchoolsToken(header, keys = remoteKeys()) {
+export async function verifyPlatformToken(header, keys = remoteKeys()) {
   const issuer = read("PLATFORM_ISSUER");
-  const clientId = read("PLATFORM_SCHOOLS_CLIENT_ID");
-  if (!keys || !issuer || !clientId) throw new TokenError(503, "my_hr_not_configured", "My HR isn't set up on HR yet.");
+  const clients = productClients();
+  if (!keys || !issuer || clients.size === 0) throw new TokenError(503, "my_hr_not_configured", "My HR isn't set up on HR yet.");
   const match = /^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/.exec(String(header || ""));
   if (!match) throw new TokenError(401, "invalid_token", "A platform token is needed.");
   let payload;
@@ -129,24 +154,29 @@ export async function verifySchoolsToken(header, keys = remoteKeys()) {
     throw new TokenError(401, "invalid_token", "The platform token isn't valid.");
   }
   if (payload.token_use !== "access") throw new TokenError(401, "invalid_token", "The platform token isn't an access token.");
-  if (payload.client_id !== clientId) throw new TokenError(401, "invalid_token", "The platform token isn't Figbloom Schools'.");
-  return payload;
+  const product = typeof payload.client_id === "string" ? clients.get(payload.client_id) : undefined;
+  if (!product) throw new TokenError(401, "invalid_token", "The platform token isn't a Figbloom product's.");
+  return { ...payload, product };
 }
 
-// ---- the platform's link: which HR company a school is
+/** (the name before Fleet: any product client's token now) */
+export const verifySchoolsToken = verifyPlatformToken;
+
+// ---- the platform's link: which HR company a product's customer is
 
 export function createLinkResolver({ platform = hrClient, now = () => Date.now() } = {}) {
-  const cache = new Map(); // school -> { at, ttl, value | null }
+  const cache = new Map(); // product:customer -> { at, ttl, value | null }
   return {
     clear: () => cache.clear(),
-    /** { platformTenantId, tenantId } for the school, or null when the platform doesn't link it to HR. */
-    async resolve(school) {
-      const hit = cache.get(school);
+    /** { platformTenantId, tenantId } for the product's customer, or null when the platform doesn't link it to HR. */
+    async resolve(school, product = "schools") {
+      const key = `${product}:${school}`;
+      const hit = cache.get(key);
       if (hit && now() - hit.at < hit.ttl) return hit.value;
       let value = null;
       try {
-        const r = await platform.call("GET", `/links/resolve?module=schools&local_id=${encodeURIComponent(school)}`);
-        const ok = r && r.module === "schools" && String(r.local_id) === school
+        const r = await platform.call("GET", `/links/resolve?module=${encodeURIComponent(product)}&local_id=${encodeURIComponent(school)}`);
+        const ok = r && r.module === product && String(r.local_id) === school
           && UUID_RE.test(String(r.platform_tenant_id ?? "")) && UUID_RE.test(String(r.caller_local_id ?? ""));
         if (!ok) throw new PlatformError(502, "platform_unavailable", "The platform's answer was not understood.");
         value = { platformTenantId: r.platform_tenant_id, tenantId: r.caller_local_id };
@@ -154,7 +184,7 @@ export function createLinkResolver({ platform = hrClient, now = () => Date.now()
         if (!(err instanceof PlatformError) || err.status !== 404) throw err;
       }
       if (cache.size > 5000) cache.clear();
-      cache.set(school, { at: now(), ttl: value ? RESOLVE_CACHE_MS : RESOLVE_MISS_CACHE_MS, value });
+      cache.set(key, { at: now(), ttl: value ? RESOLVE_CACHE_MS : RESOLVE_MISS_CACHE_MS, value });
       return value;
     },
   };
@@ -181,8 +211,8 @@ export function supabaseMyHrStore(db = admin) {
   const bucket = () => client().storage.from(LEAVE_DOCUMENTS_BUCKET);
   const one = (data) => (Array.isArray(data) ? data[0] ?? null : data ?? null);
   return {
-    person: async ({ tenantId, platformTenantId, externalId }) =>
-      one(await rpc("my_hr_person", { p_tenant: tenantId, p_platform_tenant: platformTenantId, p_external_id: externalId })),
+    person: async ({ tenantId, platformTenantId, externalId, source = "schools" }) =>
+      one(await rpc("my_hr_person", { p_tenant: tenantId, p_platform_tenant: platformTenantId, p_external_id: externalId, p_source: source })),
     summary: ({ tenantId, employee }) => rpc("my_hr_summary", { p_tenant: tenantId, p_employee: employee }),
     payslips: ({ tenantId, employee }) => rpc("my_hr_payslips", { p_tenant: tenantId, p_employee: employee }),
     payslip: ({ tenantId, employee, id }) => rpc("my_hr_payslip", { p_tenant: tenantId, p_employee: employee, p_id: id }),
@@ -205,13 +235,13 @@ export function supabaseMyHrStore(db = admin) {
       }),
     leaveCancel: ({ tenantId, employee, id }) =>
       rpc("my_hr_leave_cancel", { p_tenant: tenantId, p_employee: employee, p_application: id }),
-    approver: async ({ tenantId, platformTenantId, externalId }) =>
-      one(await rpc("my_hr_approver", { p_tenant: tenantId, p_platform_tenant: platformTenantId, p_external_id: externalId })),
+    approver: async ({ tenantId, platformTenantId, externalId, source = "schools" }) =>
+      one(await rpc("my_hr_approver", { p_tenant: tenantId, p_platform_tenant: platformTenantId, p_external_id: externalId, p_source: source })),
     approvals: ({ tenantId, userId }) => rpc("my_hr_leave_approvals", { p_tenant: tenantId, p_user: userId }),
     decide: ({ tenantId, userId, id, decision, comment }) =>
       rpc("my_hr_leave_decide", { p_tenant: tenantId, p_user: userId, p_application: id, p_decision: decision, p_comment: comment ?? null }),
-    importLeave: ({ tenantId, platformTenantId, records, dryRun }) =>
-      rpc("my_hr_leave_import", { p_tenant: tenantId, p_platform_tenant: platformTenantId, p_records: records, p_dry_run: dryRun }),
+    importLeave: ({ tenantId, platformTenantId, records, dryRun, source = "schools" }) =>
+      rpc("my_hr_leave_import", { p_tenant: tenantId, p_platform_tenant: platformTenantId, p_records: records, p_dry_run: dryRun, p_source: source }),
     /** Stores a document as HR stores leave documents (private bucket, under the company); resolves its path. */
     async uploadDocument({ tenantId, bytes, contentType, extension }) {
       const path = `${tenantId}/my-hr/${randomUUID()}.${extension}`;
@@ -425,7 +455,7 @@ export function sharedRateLimit() {
 export function createMyHrRouter({
   store = supabaseMyHrStore(),
   links = createLinkResolver(),
-  verifyToken = (header) => verifySchoolsToken(header),
+  verifyToken = (header) => verifyPlatformToken(header),
   rateLimit = sharedRateLimit(),
 } = {}) {
   const router = express.Router();
@@ -450,31 +480,43 @@ export function createMyHrRouter({
     return null;
   };
 
-  /** The switch, the token and the school: { link, person } or an answer already sent (null). */
+  /** The calling product's customer isn't linked to HR: its own code and words. */
+  const notLinked = (res, entry, product) => {
+    const c = CUSTOMER[product] ?? CUSTOMER.schools;
+    return refuse(res, entry, 403, c.notLinked, `This ${c.noun} isn't connected to Figbloom HR.`);
+  };
+
+  /** The switch, the token and the customer: { link, person, product } or an answer already sent (null). */
   async function gate(req, res, route, { person: needPerson = true } = {}) {
     const entry = { route };
     if (!myHrEnabled()) return refuse(res, entry, 503, "my_hr_off", "My HR isn't available yet.");
+    let claims;
     try {
-      await verifyToken(req.headers.authorization);
+      claims = await verifyToken(req.headers.authorization);
     } catch (err) {
       if (err instanceof TokenError) return refuse(res, entry, err.status, err.code, err.message);
       console.error(TAG, "token check failed", err?.name || "error");
       return refuse(res, entry, 401, "invalid_token", "The platform token isn't valid.");
     }
-    const school = String(req.get("x-figbloom-school") || "").trim();
+    // the product is the token's client's, never a header's
+    const product = CUSTOMER[claims?.product] ? claims.product : "schools";
+    const idRe = ID_RES[product];
+    const header = product === "fleet" ? "x-figbloom-company" : "x-figbloom-school";
+    const school = String(req.get(header) || req.get("x-figbloom-tenant") || "").trim();
     const person = String(req.get("x-figbloom-person") || "").trim();
-    if (!ID_RE.test(school) || (needPerson && !ID_RE.test(person))) {
-      return refuse(res, entry, 400, "bad_request", needPerson ? "The school and the person are needed." : "The school is needed.");
+    if (!idRe.test(school) || (needPerson && !idRe.test(person))) {
+      const noun = CUSTOMER[product].noun;
+      return refuse(res, entry, 400, "bad_request", needPerson ? `The ${noun} and the person are needed.` : `The ${noun} is needed.`);
     }
 
     let link;
     try {
-      link = await links.resolve(school);
+      link = await links.resolve(school, product);
     } catch (err) {
       return refuse(res, entry, 502, "platform_unavailable", "The Figbloom platform didn't answer. Try again.", { detail: err?.code });
     }
-    if (!link) return refuse(res, entry, 403, "school_not_linked", "This school isn't connected to Figbloom HR.");
-    return { link, person };
+    if (!link) return notLinked(res, entry, product);
+    return { link, person, product };
   }
 
   const limited = async (res, who, route) => {
@@ -488,16 +530,16 @@ export function createMyHrRouter({
   async function caller(req, res, route) {
     const gated = await gate(req, res, route);
     if (!gated) return null;
-    const { link, person } = gated;
+    const { link, person, product } = gated;
     const entry = { route, tenantId: link.tenantId };
     let found;
     try {
-      found = await store.person({ tenantId: link.tenantId, platformTenantId: link.platformTenantId, externalId: person });
+      found = await store.person({ tenantId: link.tenantId, platformTenantId: link.platformTenantId, externalId: person, source: product });
     } catch (err) {
       console.error(TAG, "person", err?.message || err);
       return refuse(res, entry, 500, "server_error", "Something went wrong. Try again.");
     }
-    if (found?.outcome === "unknown_company") return refuse(res, entry, 403, "school_not_linked", "This school isn't connected to Figbloom HR.");
+    if (found?.outcome === "unknown_company") return notLinked(res, entry, product);
     if (found?.outcome !== "found" || !found.employee_number) {
       return refuse(res, entry, 404, "not_linked", "Your HR record isn't ready yet.");
     }
@@ -510,18 +552,19 @@ export function createMyHrRouter({
   async function approver(req, res, route) {
     const gated = await gate(req, res, route);
     if (!gated) return null;
-    const { link, person } = gated;
+    const { link, person, product } = gated;
     const entry = { route, tenantId: link.tenantId };
     let found;
     try {
-      found = await store.approver({ tenantId: link.tenantId, platformTenantId: link.platformTenantId, externalId: person });
+      found = await store.approver({ tenantId: link.tenantId, platformTenantId: link.platformTenantId, externalId: person, source: product });
     } catch (err) {
       console.error(TAG, "approver", err?.message || err);
       return refuse(res, entry, 500, "server_error", "Something went wrong. Try again.");
     }
-    if (found?.outcome === "unknown_company") return refuse(res, entry, 403, "school_not_linked", "This school isn't connected to Figbloom HR.");
+    if (found?.outcome === "unknown_company") return notLinked(res, entry, product);
     if (found?.outcome === "no_access") {
-      return refuse(res, { ...entry, userId: found.user_id }, 403, "approver_no_access", "You don't have access to HR for this school. Ask your HR administrator.");
+      return refuse(res, { ...entry, userId: found.user_id }, 403, "approver_no_access",
+        `You don't have access to HR for this ${CUSTOMER[product].noun}. Ask your HR administrator.`);
     }
     if (found?.outcome !== "found" || !UUID_RE.test(String(found.user_id ?? ""))) {
       return refuse(res, entry, 409, "approver_not_linked", "Open HR & Payroll once to connect your HR account.");
@@ -693,13 +736,13 @@ export function createMyHrRouter({
     }
   }, { body: true }));
 
-  // ---- history from Schools (the school's token, no person)
+  // ---- history from the product (its token, no person)
 
   router.post("/import/leave-history", async (req, res) => {
     const route = "leave_import";
     const gated = await gate(req, res, route, { person: false });
     if (!gated) return;
-    const { link } = gated;
+    const { link, product } = gated;
     const entry = { route, tenantId: link.tenantId };
     if (await limited(res, { tenantId: link.tenantId, employee: "import:leave-history" }, route)) return;
     const err = await readBody(req, res);
@@ -708,10 +751,10 @@ export function createMyHrRouter({
       const imp = parseImport(req.body);
       if (imp.error) return refusal(400, "bad_request", imp.error);
       try {
-        const result = await store.importLeave({ tenantId: link.tenantId, platformTenantId: link.platformTenantId, ...imp });
+        const result = await store.importLeave({ tenantId: link.tenantId, platformTenantId: link.platformTenantId, source: product, ...imp });
         return { status: 200, outcome: imp.dryRun ? "dry_run" : "imported", body: { status: "active", ...result } };
       } catch (e) {
-        if (e?.code === "P0002") return refusal(403, "school_not_linked", "This school isn't connected to Figbloom HR.");
+        if (e?.code === "P0002") return refusal(403, CUSTOMER[product].notLinked, `This ${CUSTOMER[product].noun} isn't connected to Figbloom HR.`);
         throw e;
       }
     });
