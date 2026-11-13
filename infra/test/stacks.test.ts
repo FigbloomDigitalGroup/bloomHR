@@ -171,8 +171,9 @@ describe('ScannerRelayStack', () => {
 describe('AccessStack', () => {
   const staging = '111111111111';
   const production = '222222222222';
+  const management = '123456789012';
   const stack = new AccessStack(new App(), 'Access', {
-    env: { account: '123456789012', region: 'eu-north-1' },
+    env: { account: management, region: 'eu-north-1' },
     instanceArn: 'arn:aws:sso:::instance/ssoins-0000000000000000',
     identityStoreId: 'd-0000000000',
     stagingAccountId: staging,
@@ -250,20 +251,23 @@ describe('AccessStack', () => {
     expect(statements.some((s) => s.Sid === 'NoBillingOrIdentityAdmin' && s.Effect === 'Deny')).toBe(true);
   });
 
-  it('creates the three groups, with no members (the script adds people)', () => {
-    t.resourceCountIs('AWS::IdentityStore::Group', 3);
+  it('creates the four groups, with no members (the script adds people)', () => {
+    t.resourceCountIs('AWS::IdentityStore::Group', 4);
     for (const name of Object.values(GROUPS)) {
       t.hasResourceProperties('AWS::IdentityStore::Group', { DisplayName: name, IdentityStoreId: 'd-0000000000' });
     }
     t.resourceCountIs('AWS::IdentityStore::GroupMembership', 0);
   });
 
-  it('assigns developers to staging, viewers and deployers to production, and nothing else', () => {
-    t.resourceCountIs('AWS::SSO::Assignment', 3);
+  it('assigns developers to staging, viewers and deployers to production, leads to both plus billing, and nothing else', () => {
+    t.resourceCountIs('AWS::SSO::Assignment', 6);
     const expected = [
       [GROUPS.developers, PERMISSION_SETS.developer, staging],
       [GROUPS.prodViewers, PERMISSION_SETS.viewOnly, production],
       [GROUPS.prodDeployers, PERMISSION_SETS.deployer, production],
+      [GROUPS.leads, PERMISSION_SETS.lead, staging],
+      [GROUPS.leads, PERMISSION_SETS.lead, production],
+      [GROUPS.leads, PERMISSION_SETS.billing, management],
     ] as const;
     for (const [group, set, account] of expected) {
       t.hasResourceProperties('AWS::SSO::Assignment', {
@@ -276,7 +280,41 @@ describe('AccessStack', () => {
     }
   });
 
-  it('creates no IAM users, access keys or roles, and grants no IAM actions', () => {
+  it('gives Lead AdministratorAccess (8h), minus Identity Center, IAM users and keys, the audit trail and the organization', () => {
+    const { props, statements } = permissionSet(PERMISSION_SETS.lead);
+    expect(props.ManagedPolicies).toEqual(['arn:aws:iam::aws:policy/AdministratorAccess']);
+    expect(props.SessionDuration).toBe('PT8H');
+    expect(statements.filter((s) => s.Effect === 'Allow')).toEqual([]);
+    const deny = statements.find((s) => s.Sid === 'LeadLimits')!;
+    expect(deny.Effect).toBe('Deny');
+    expect(actions(deny)).toEqual(
+      expect.arrayContaining([
+        'sso:*',
+        'identitystore:*',
+        'iam:CreateUser',
+        'iam:CreateAccessKey',
+        'iam:CreateLoginProfile',
+        'cloudtrail:StopLogging',
+        'cloudtrail:DeleteTrail',
+        'guardduty:DeleteDetector',
+        'organizations:*',
+        'account:CloseAccount',
+      ]),
+    );
+  });
+
+  it('gives Billing (4h) the Billing job policy, minus payment methods and closing the account', () => {
+    const { props, statements } = permissionSet(PERMISSION_SETS.billing);
+    expect(props.ManagedPolicies).toEqual(['arn:aws:iam::aws:policy/job-function/Billing']);
+    expect(props.SessionDuration).toBe('PT4H');
+    const deny = statements.find((s) => s.Sid === 'BillingLimits')!;
+    expect(deny.Effect).toBe('Deny');
+    expect(actions(deny)).toEqual(
+      expect.arrayContaining(['payments:CreatePaymentInstrument', 'payments:DeletePaymentInstrument', 'account:CloseAccount']),
+    );
+  });
+
+  it('creates no IAM users, access keys or roles, and grants no IAM actions inline', () => {
     for (const type of ['AWS::IAM::User', 'AWS::IAM::AccessKey', 'AWS::IAM::Role', 'AWS::IAM::Policy']) t.resourceCountIs(type, 0);
     for (const set of Object.values(PERMISSION_SETS)) {
       const allowed = permissionSet(set).statements.filter((s) => s.Effect === 'Allow').flatMap(actions);

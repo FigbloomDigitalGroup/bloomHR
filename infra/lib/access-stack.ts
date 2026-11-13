@@ -16,6 +16,7 @@ export const GROUPS = {
   developers: 'figbloom-developers',
   prodViewers: 'figbloom-prod-viewers',
   prodDeployers: 'figbloom-prod-deployers',
+  leads: 'figbloom-leads',
 } as const;
 
 // Permission set names: the role names developers pick when they run `aws configure sso`
@@ -23,10 +24,65 @@ export const PERMISSION_SETS = {
   developer: 'Developer',
   viewOnly: 'ViewOnly',
   deployer: 'Deployer',
+  lead: 'Lead',
+  billing: 'Billing',
 } as const;
 
 const POWER_USER = 'arn:aws:iam::aws:policy/PowerUserAccess';
 const VIEW_ONLY = 'arn:aws:iam::aws:policy/job-function/ViewOnlyAccess';
+const ADMINISTRATOR = 'arn:aws:iam::aws:policy/AdministratorAccess';
+const BILLING = 'arn:aws:iam::aws:policy/job-function/Billing';
+
+// Leads get everything an administrator has in staging and production (servers, IAM roles for them, databases, networks),
+// less what would let them get round the owner: giving themselves more access through Identity Center, creating IAM users
+// or long-lived access keys (sign-in stays single sign-on only), switching off the audit trail and threat detection,
+// leaving or changing the organization, and closing the account.
+const LEAD_LIMITS = {
+  Sid: 'LeadLimits',
+  Effect: 'Deny',
+  Action: [
+    'sso:*',
+    'sso-directory:*',
+    'identitystore:*',
+    'identitystore-auth:*',
+    'iam:CreateUser',
+    'iam:CreateAccessKey',
+    'iam:CreateLoginProfile',
+    'iam:UpdateLoginProfile',
+    'iam:CreateSAMLProvider',
+    'iam:CreateOpenIDConnectProvider',
+    'cloudtrail:StopLogging',
+    'cloudtrail:DeleteTrail',
+    'cloudtrail:UpdateTrail',
+    'cloudtrail:PutEventSelectors',
+    'guardduty:DeleteDetector',
+    'guardduty:DisassociateFromAdministratorAccount',
+    'guardduty:DisassociateFromMasterAccount',
+    'guardduty:UpdateDetector',
+    'organizations:*',
+    'account:CloseAccount',
+    'account:PutAlternateContact',
+    'account:DeleteAlternateContact',
+    'account:PutContactInformation',
+  ],
+  Resource: '*',
+};
+
+// Billing is kept in the management account (the organization pays for every account), so Leads get it there and nothing
+// else there. They can see and manage bills, costs, budgets and invoices, but not add, change or remove payment methods,
+// and not close the account.
+const BILLING_LIMITS = {
+  Sid: 'BillingLimits',
+  Effect: 'Deny',
+  Action: [
+    'payments:CreatePaymentInstrument',
+    'payments:UpdatePaymentPreferences',
+    'payments:DeletePaymentInstrument',
+    'payments:MakePayment',
+    'account:CloseAccount',
+  ],
+  Resource: '*',
+};
 
 // PowerUserAccess already leaves out IAM (no users, roles, access keys or policies), Organizations and account settings.
 // These close what it still allows that the owner ruled out: billing and payments, and setting up a second Identity Center
@@ -199,6 +255,24 @@ export class AccessStack extends Stack {
       },
     });
 
+    const lead = new sso.CfnPermissionSet(this, 'LeadPermissionSet', {
+      instanceArn,
+      name: PERMISSION_SETS.lead,
+      description:
+        'Figbloom lead - administrator in staging and production, including IAM roles. No Identity Center, IAM users, access keys, audit trail or organization changes.',
+      sessionDuration: 'PT8H',
+      managedPolicies: [ADMINISTRATOR],
+      inlinePolicy: { Version: '2012-10-17', Statement: [LEAD_LIMITS] },
+    });
+    const billing = new sso.CfnPermissionSet(this, 'BillingPermissionSet', {
+      instanceArn,
+      name: PERMISSION_SETS.billing,
+      description: 'Figbloom billing - bills, costs, budgets and invoices for the organization. No payment method changes.',
+      sessionDuration: 'PT4H',
+      managedPolicies: [BILLING],
+      inlinePolicy: { Version: '2012-10-17', Statement: [BILLING_LIMITS] },
+    });
+
     // --- Groups (who). Members are added by the script, not here: the users are created in the console first. ---
     const group = (key: keyof typeof GROUPS, description: string) =>
       new identitystore.CfnGroup(this, `${key[0].toUpperCase()}${key.slice(1)}Group`, {
@@ -209,6 +283,7 @@ export class AccessStack extends Stack {
     const developers = group('developers', 'Figbloom developers - Developer access to staging');
     const prodViewers = group('prodViewers', 'Figbloom production viewers - ViewOnly access to production');
     const prodDeployers = group('prodDeployers', 'Figbloom production deployers - Deployer access to production');
+    const leads = group('leads', 'Figbloom leads - Lead access to staging and production, Billing in the management account');
 
     // --- Assignments (which group gets which permission set, in which account) ---
     const assign = (id: string, who: identitystore.CfnGroup, what: sso.CfnPermissionSet, accountId: string) =>
@@ -223,5 +298,8 @@ export class AccessStack extends Stack {
     assign('DevelopersInStaging', developers, developer, stagingAccountId);
     assign('ProdViewersInProduction', prodViewers, viewOnly, productionAccountId);
     assign('ProdDeployersInProduction', prodDeployers, deployer, productionAccountId);
+    assign('LeadsInStaging', leads, lead, stagingAccountId);
+    assign('LeadsInProduction', leads, lead, productionAccountId);
+    assign('LeadsBillingInManagement', leads, billing, this.account);
   }
 }
