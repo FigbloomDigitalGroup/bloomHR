@@ -518,6 +518,11 @@ const EditEmployeePage = () => {
         .from('employees')
         .update({
           ...employee,
+          // clearing the termination date brings them back: a Terminated status left behind would keep the sign-in
+          // check refusing them, and there is no Status field on this page to change it
+          ...(!String(employee['Termination Date'] ?? '').trim() && ['terminated', 'inactive'].includes(String((employee as { Status?: string | null }).Status ?? '').toLowerCase())
+            ? { Status: 'Active' }
+            : {}),
           'Profile Image': imageUrl,
           'SHIF Number': statutoryDeductions.find(d => d.name === 'SHIF Number')?.number || null,
           'NSSF Number': statutoryDeductions.find(d => d.name === 'NSSF Number')?.number || null,

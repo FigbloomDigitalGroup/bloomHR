@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { Button, Card, StatusPill, type StatusTone } from '../UI';
 import { formatDay, parseDay } from '../../lib/contract';
 import { openPrivateFile } from '../../lib/privateFiles';
+import { confirmDialog } from '../../lib/confirmDialog';
 import { downloadStatementCsv, downloadStatementPdf, duesTotals, money, periodOf, type FinalDuesLine } from '../../lib/finalDues';
 import {
   DEFAULT_INTERVIEW_QUESTIONS,
@@ -394,6 +395,17 @@ export default function ExitDetail({ exitId, onBack, onChanged }: { exitId: stri
     load();
   }, [load]);
 
+  // their access has ended but the exit isn't completed: cancelling it brings them back (20261113200000)
+  const bringBack = async () => {
+    if (!exit) return;
+    const ok = await confirmDialog({
+      title: `Bring ${exit.employee_name ?? exit.employee_number} back?`,
+      message: 'This cancels the exit. They become Active again with no termination date, they can sign in again, and payroll includes them after their last working day.',
+      confirmLabel: 'Bring back',
+    });
+    if (ok) await act(() => cancelExit(exit.id), `${exit.employee_name ?? exit.employee_number} is back: they can sign in again`);
+  };
+
   const act = async (fn: () => Promise<void>, done: string) => {
     setBusy(true);
     try {
@@ -477,8 +489,10 @@ export default function ExitDetail({ exitId, onBack, onChanged }: { exitId: stri
                 Complete exit
               </Button>
             )}
-            {!exit.access_ended_at && (
+            {!exit.access_ended_at ? (
               <Button variant="ghost" disabled={busy} onClick={() => act(() => cancelExit(exit.id), 'Exit cancelled')}>Cancel exit</Button>
+            ) : (
+              <Button variant="secondary" disabled={busy} onClick={() => void bringBack()}>Bring back</Button>
             )}
           </div>
         )}

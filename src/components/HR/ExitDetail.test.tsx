@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   items: [] as ClearanceItem[],
   decide: vi.fn(),
   complete: vi.fn(),
+  cancel: vi.fn(),
   saveItem: vi.fn(),
   workOut: vi.fn(),
   saveDues: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock('../../lib/exits', async (importOriginal) => {
     loadFinalDues: () => Promise.resolve(null),
     decideExit: (...a: unknown[]) => mocks.decide(...a),
     completeExit: (...a: unknown[]) => mocks.complete(...a),
+    cancelExit: (...a: unknown[]) => mocks.cancel(...a),
     saveClearanceItem: (...a: unknown[]) => mocks.saveItem(...a),
     workOutFinalDues: (...a: unknown[]) => mocks.workOut(...a),
     saveFinalDues: (...a: unknown[]) => mocks.saveDues(...a),
@@ -71,7 +73,7 @@ const item = (id: string, done: boolean): ClearanceItem => ({
 beforeEach(() => {
   mocks.exit = exit();
   mocks.items = [];
-  for (const fn of [mocks.decide, mocks.complete, mocks.saveItem, mocks.saveDues]) fn.mockReset().mockResolvedValue(undefined);
+  for (const fn of [mocks.decide, mocks.complete, mocks.cancel, mocks.saveItem, mocks.saveDues]) fn.mockReset().mockResolvedValue(undefined);
   mocks.workOut.mockReset().mockResolvedValue({
     lines: [
       { code: 'basic', label: 'Basic pay for the last month', detail: '15 of 31 days', kind: 'earning', amount: 30000 },
@@ -138,5 +140,26 @@ describe('ExitDetail', () => {
     await screen.findByText('Exit interview');
     expect(screen.getByLabelText('What is your main reason for leaving?')).toBeTruthy();
     expect(screen.getByText(/Confidential to HR/)).toBeTruthy();
+  });
+
+  it('before their access ends HR cancels the exit; after, Bring back (asked first) cancels it and brings them back', async () => {
+    mocks.exit = exit({ status: 'approved' });
+    render(<ExitDetail exitId="x1" onBack={() => {}} />);
+    await screen.findByRole('button', { name: 'Cancel exit' });
+    expect(screen.queryByRole('button', { name: 'Bring back' })).toBeNull();
+    cleanup();
+
+    mocks.exit = exit({ status: 'approved', access_ended_at: '2026-10-16T00:15:00Z' });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<ExitDetail exitId="x1" onBack={() => {}} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Bring back' }));
+    expect(screen.queryByRole('button', { name: 'Cancel exit' })).toBeNull();
+    await waitFor(() => expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Bring Eric Two back?')));
+    expect(mocks.cancel).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Bring back' }));
+    await waitFor(() => expect(mocks.cancel).toHaveBeenCalledWith('x1'));
+    confirm.mockRestore();
   });
 });

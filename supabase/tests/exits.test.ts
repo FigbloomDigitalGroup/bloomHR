@@ -232,8 +232,21 @@ describe('the end', () => {
     expect((await read<{ n: number }>(HR1, `select public.end_due_exit_access() n`))[0].n).toBe(1);
     expect(await rows(`select "Status" from employees where "Employee Number" = 'E3'`)).toEqual([{ Status: 'Terminated' }]);
     expect(await rows(`select account_status from memberships where user_id = '${S3}'`)).toEqual([{ account_status: 'DEACTIVATED' }]);
-    // an exit whose person has gone can't be cancelled any more
-    await expect(as(HR1, `update employee_exits set status = 'cancelled' where employee_number = 'E3'`)).rejects.toThrow(/already left/);
+  });
+
+  it('cancelling an exit after their access ended brings them back (20261113200000); a completed one stays history', async () => {
+    // E3's access ended above: staff can't, HR can
+    await as(S3, `update employee_exits set status = 'cancelled' where employee_number = 'E3'`).catch(() => undefined);
+    expect((await rows<{ status: string }>(`select status from employee_exits where employee_number = 'E3'`))[0].status).toBe('approved');
+    await as(HR1, `update employee_exits set status = 'cancelled' where employee_number = 'E3'`);
+    const [x] = await rows<{ status: string; ended: boolean }>(`select status, access_ended_at is not null ended from employee_exits where employee_number = 'E3'`);
+    expect(x).toEqual({ status: 'cancelled', ended: true });
+    expect(await rows(`select "Status", "Termination Date" from employees where "Employee Number" = 'E3'`)).toEqual([{ Status: 'Active', 'Termination Date': null }]);
+    expect(await rows(`select account_status from memberships where user_id = '${S3}'`)).toEqual([{ account_status: 'ACTIVE' }]);
+    // the sign-in check reads the profile
+    expect(await rows(`select account_status from user_profiles where user_id = '${S3}'`)).toEqual([{ account_status: 'ACTIVE' }]);
+    // E2's completed exit can't be cancelled
+    await expect(as(HR1, `update employee_exits set status = 'cancelled' where employee_number = 'E2'`)).rejects.toThrow(/completed exit/);
   });
 
   it('no payslip after the month they left in', async () => {
