@@ -157,13 +157,15 @@ describe('the form', () => {
 });
 
 describe('applying: HR\'s checks, each refusal in HR\'s words', () => {
+  // day(0): today, or Monday at a weekend, so always under 3 calendar days away. day(1) on a Friday is Monday, 3 days
+  // away, which meets the notice and the refusal never came (the test failed every Friday and weekend).
   it('notice', async () => {
-    const e = await applyError({ type: await typeId(school, 'Annual Leave'), start: day(1), end: day(1) });
+    const e = await applyError({ type: await typeId(school, 'Annual Leave'), start: day(0), end: day(0) });
     expect(e.code).toBe('P0001');
     expect(e.message).toMatch(/Annual Leave needs 3 days' notice/);
   });
   it('most days in one application, with every rule that failed', async () => {
-    const e = await applyError({ type: await typeId(school, 'Annual Leave'), start: day(1), end: day(30) });
+    const e = await applyError({ type: await typeId(school, 'Annual Leave'), start: day(0), end: day(30) });
     expect(e.message).toMatch(/allows at most 10 days in one application/);
     expect(e.message).toMatch(/needs 3 days' notice/);
   });
