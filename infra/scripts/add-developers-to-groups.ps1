@@ -27,7 +27,8 @@ param(
 $Membership = [ordered]@{
   'figbloom-developers'     = @('ancel@figbloom.org', 'morris@figbloom.org', 'hassan@figbloom.org', 'given@figbloom.org', 'joseph@figbloom.org')
   'figbloom-prod-viewers'   = @('ancel@figbloom.org', 'hassan@figbloom.org', 'morris@figbloom.org')
-  'figbloom-prod-deployers' = @('morris@figbloom.org')
+  'figbloom-prod-deployers' = @('morris@figbloom.org', 'ancel@figbloom.org')
+  'figbloom-leads'          = @('morris@figbloom.org', 'ancel@figbloom.org')
 }
 
 # Errors from the AWS CLI are handled through its exit code. ('Stop' would turn its stderr into a terminating error in
