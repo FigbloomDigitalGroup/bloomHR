@@ -30,6 +30,7 @@ import { profileItems, profileScore } from '../../lib/profileCompleteness';
 import { STATUS_LABELS, statusLabel, statusTone } from '../../lib/onboarding';
 import { ONBOARDING_STATUSES } from '../../lib/onboardingValidation';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { EMPLOYEE_VIEW_LABELS, employmentState, inEmployeeView, localToday, type EmployeeView } from '../../lib/employeeStatus';
 
 import ModuleGate from '../ProtectedRoutes/ModuleGate';
 import { useBranches } from '../../hooks/useBranches';
@@ -80,6 +81,11 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
   const [selectedProfile, setSelectedProfile] = useState('all');
   // where each person is in onboarding (only approved employees are paid)
   const [selectedOnboarding, setSelectedOnboarding] = useState('all');
+  // current employees by default; former (they have left) and all one choice away. ?view=former opens on them.
+  const [view, setView] = useState<EmployeeView>(() => {
+    const v = searchParams.get('view');
+    return v === 'former' || v === 'all' ? v : 'current';
+  });
   const [emergencyContacts, setEmergencyContacts] = useState<Set<string> | null>(null);
 
   useEffect(() => {
@@ -208,8 +214,9 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
     fetchEmployees();
   }, [currentTown, isArea, townsInArea]);
 
-  // Filter employees
-  const filteredEmployees = employees.filter(employee => {
+  // Filter employees: every filter but the current / former view, then the view
+  const today = localToday();
+  const matchesFilters = (employee: Employee) => {
     // Apply town/area filter
     if (currentTown && currentTown !== 'ADMIN_ALL') {
       if (isArea) {
@@ -237,7 +244,13 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
     const matchesOnboarding = selectedOnboarding === 'all' || statusLabel(employee.onboarding_status) === selectedOnboarding;
 
     return matchesSearch && matchesDepartment && matchesBranch && matchesEmploymentType && matchesProfile && matchesOnboarding;
-  });
+  };
+  const otherwiseMatching = employees.filter(matchesFilters);
+  const filteredEmployees = otherwiseMatching.filter((e) => inEmployeeView(e, view, today));
+  // nothing among current employees, but someone who has left matches: offer them (searching for a leaver by name)
+  const formerMatching = view === 'current' && filteredEmployees.length === 0
+    ? otherwiseMatching.filter((e) => inEmployeeView(e, 'former', today)).length
+    : 0;
 
   // Get display name for current selection
   const getDisplayName = () => {
@@ -380,6 +393,24 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
           />
         </div>
 
+        <label className="relative inline-block">
+          <select
+            aria-label="Show current or former employees"
+            value={view}
+            onChange={(e) => {
+              setView(e.target.value as EmployeeView);
+              setCurrentPage(1);
+            }}
+            className={pillSelect}
+          >
+            {(Object.keys(EMPLOYEE_VIEW_LABELS) as EmployeeView[]).map((v) => (
+              <option key={v} value={v}>
+                {EMPLOYEE_VIEW_LABELS[v]}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-subtle" strokeWidth={2} />
+        </label>
         {renderPillSelect(departments, selectedDepartment, setSelectedDepartment, 'All Departments', 'Filter by department')}
         {renderPillSelect(branches, selectedBranch, setSelectedBranch, 'All Branches', 'Filter by branch')}
         {renderPillSelect(employmentTypes, selectedEmploymentType, setSelectedEmploymentType, 'Town Office', 'Filter by town office')}
@@ -465,7 +496,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
         {currentEmployees.map((employee) => {
           const empNo = employee['Employee Number'];
           const isSelected = selectedIds.includes(empNo);
-          const isInactive = !!employee['Termination Date'];
+          const state = employmentState(employee, today);
           const fullName = [employee['First Name'], employee['Last Name']].filter(Boolean).join(' ');
           return (
             <Card
@@ -499,7 +530,10 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                 </div>
                 {!selectionAction && (
                   <div className="flex flex-col items-end gap-1">
-                    <StatusPill label={isInactive ? 'Inactive' : 'Active'} tone={isInactive ? 'warning' : 'success'} />
+                    <StatusPill
+                      label={state === 'former' ? 'Former' : state === 'leaving' ? 'Leaving' : 'Active'}
+                      tone={state === 'former' ? 'neutral' : state === 'leaving' ? 'warning' : 'success'}
+                    />
                     {employee.worker_kind === 'casual' ? (
                       <StatusPill label="Casual" tone="purple" />
                     ) : employee.onboarding_status !== 'approved' && (
@@ -562,7 +596,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
                 <ModuleGate anyOf={['approve-exits']}>
                   <button
                     type="button"
-                    disabled={isInactive}
+                    disabled={state !== 'current'}
                     className="flex-1 text-center py-[7px] rounded-lg border border-[#F6DCC7] bg-white text-[11px] font-semibold text-status-danger hover:bg-orange-tint transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -582,7 +616,7 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
       {filteredEmployees.length > 0 && (
         <div className="mt-6 flex flex-col text-xs sm:flex-row justify-between items-center gap-4">
           <div className="text-xs text-muted-foreground">
-            Showing {indexOfFirstEmployee + 1} to {Math.min(indexOfLastEmployee, filteredEmployees.length)} of {filteredEmployees.length} employees
+            Showing {indexOfFirstEmployee + 1} to {Math.min(indexOfLastEmployee, filteredEmployees.length)} of {filteredEmployees.length} {view === 'former' ? 'former employees' : 'employees'}
           </div>
           <div className="flex gap-2">
             <button
@@ -647,8 +681,19 @@ const EmployeeList: React.FC<TownProps> = ({ selectedTown, onTownChange }) => {
         <Card className="mt-4">
           <EmptyState
             icon={<Search size={20} />}
-            title="No employees found"
-            description="Try adjusting your search or filters"
+            title={view === 'former' ? 'No former employees found' : 'No employees found'}
+            description={
+              formerMatching > 0
+                ? `${formerMatching} former employee${formerMatching === 1 ? '' : 's'} match${formerMatching === 1 ? 'es' : ''}: they have left, so they aren't in the current list.`
+                : 'Try adjusting your search or filters'
+            }
+            action={
+              formerMatching > 0 ? (
+                <Button variant="secondary" onClick={() => { setView('former'); setCurrentPage(1); }}>
+                  Show former employees
+                </Button>
+              ) : undefined
+            }
           />
         </Card>
       )}
