@@ -210,6 +210,41 @@ async function belongsToOtherCompany(userId, tenantId) {
   return data.some((m) => m.tenant_id !== tenantId);
 }
 
+// Reactivating a login does not bring back someone whose employee record says they have left: the sign-in check
+// signs them straight out again ("Your employment account has been deactivated"), and an open exit keeps refusing
+// their payslips. Refuse, and say what does bring them back: Bring back on their exit, or clearing the termination
+// on their employee record when no exit is open.
+async function assertHasNotLeft(tenantId, email) {
+  if (!email) return;
+  const { data: employees, error } = await admin
+    .from("employees")
+    .select('"Employee Number", "First Name", "Last Name", "Status", "Termination Date"')
+    .eq("tenant_id", tenantId)
+    .ilike('"Work Email"', String(email).replace(/[\\%_]/g, "\\$&"));
+  if (error) throw error;
+  const today = new Date().toISOString().slice(0, 10);
+  const left = (employees || []).find((e) => {
+    const ended = String(e["Termination Date"] || "").slice(0, 10);
+    return ["terminated", "inactive"].includes(String(e.Status || "").toLowerCase()) || (ended && ended < today);
+  });
+  if (!left) return;
+  const name = [left["First Name"], left["Last Name"]].filter(Boolean).join(" ") || left["Employee Number"];
+  const { data: exits, error: exitError } = await admin
+    .from("employee_exits")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("employee_number", left["Employee Number"])
+    .in("status", ["approved", "clearance"])
+    .limit(1);
+  if (exitError) throw exitError;
+  throw new HttpError(
+    409,
+    exits?.length
+      ? `${name} has left through an exit, so reactivating their login won't let them sign in. Open HR Lifecycle > Exits, find their exit and choose Bring back: that restores their employee record and their login together.`
+      : `${name}'s employee record says they have left, so reactivating their login won't let them sign in. Open Employees > Manage > Edit Employee, clear their Termination Date and save, then reactivate their login.`
+  );
+}
+
 // The target of a by-id operation must belong to the caller's tenant. A user in another tenant
 // is reported as "not found" so the endpoint does not reveal that they exist.
 async function loadTenantProfile(userId, caller) {
@@ -399,6 +434,10 @@ router.patch(
 
     if ((email !== undefined || password !== undefined) && (await belongsToOtherCompany(id, caller.tenantId))) {
       throw new HttpError(409, "This person also belongs to another company, so their email and password can only be changed by themselves (use Forgot password).");
+    }
+
+    if (account_status === "ACTIVE" && currentProfile?.account_status !== "ACTIVE") {
+      await assertHasNotLeft(caller.tenantId, current.email);
     }
 
     const update = { user_metadata };
