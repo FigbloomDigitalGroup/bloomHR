@@ -217,6 +217,8 @@ describe('reading', () => {
     fireEvent.click(await screen.findByText('October payslip'));
     const pane = await screen.findByRole('region', { name: 'Email' });
     await waitFor(() => expect(within(pane).getByRole('heading', { name: 'October payslip' })).toBeTruthy());
+    // the full addresses are behind the 'to …' line, as in Gmail
+    fireEvent.click(within(pane).getByRole('button', { name: /^to Mary/ }));
     expect(within(pane).getByText('Payroll <payroll@client.co.ke>')).toBeTruthy();
     expect(within(pane).getByText('Mary <mary@client.co.ke>')).toBeTruthy();
     expect(within(pane).getByText('boss@client.co.ke')).toBeTruthy();

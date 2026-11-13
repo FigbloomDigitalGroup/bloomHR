@@ -260,10 +260,11 @@ export async function loadAttachments(taskId: string): Promise<TaskAttachment[]>
   return (data ?? []) as TaskAttachment[];
 }
 
-export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+/** 250 MB a file (the storage server takes up to 2 GiB; figbloomHR-platform host-defaults.sh) */
+export const MAX_ATTACHMENT_BYTES = 250 * 1024 * 1024;
 
 export async function uploadAttachment(taskId: string, file: File): Promise<void> {
-  if (file.size > MAX_ATTACHMENT_BYTES) throw new Error('Files can be up to 10 MB');
+  if (file.size > MAX_ATTACHMENT_BYTES) throw new Error('Files can be up to 250 MB');
   const { userId, tenantId } = await currentUserAndTenant();
   const path = `${tenantId}/${taskId}/${randomFileName(file.name)}`;
   const { error: upErr } = await supabase.storage.from(TASK_ATTACHMENTS_BUCKET).upload(path, file, { contentType: file.type || undefined });

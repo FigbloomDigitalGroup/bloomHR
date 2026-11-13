@@ -52,6 +52,7 @@ import { notifyMailbox } from '../../../hooks/useMailboxUnread';
 import MailboxConnect from './MailboxConnect';
 import MailCompose from './MailCompose';
 import MailReader, { type ReplyMode } from './MailReader';
+import MailAvatar from './MailAvatar';
 
 const FOLDER_ICONS: Record<string, typeof Inbox> = { inbox: Inbox, sent: Send, drafts: FileText, trash: Trash2, junk: ShieldAlert, archive: Archive };
 
@@ -153,6 +154,7 @@ function MailboxView({
   const [query, setQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<Omit<SearchFilters, 'q'>>({});
+  const { frame, frameHeight } = useFillHeight(editing);
 
   const loadFolders = useCallback(async () => {
     try {
@@ -401,7 +403,8 @@ function MailboxView({
   }
 
   const current = folders.find((f) => f.path === folder);
-  const reading = openUid !== null || compose !== null;
+  // (writing happens in its own window, so the list and the email stay as they are)
+  const reading = openUid !== null;
   const chosen = items.filter((m) => selected.has(m.uid));
   const allSelected = items.length > 0 && chosen.length === items.length;
   const allFlagged = chosen.length > 0 && chosen.every((m) => m.flagged);
@@ -413,146 +416,169 @@ function MailboxView({
       return next;
     });
 
+  const runRowAction = (e: React.MouseEvent, run: () => void) => {
+    e.stopPropagation();
+    run();
+  };
+
+  // Gmail-like: the mailbox fills the screen below where it starts, and the folders, the list and the email each scroll
+  // on their own, so an email (or a new message) never opens out of sight
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-[13px] font-bold text-ink truncate">{account.email}</div>
-          <div className="text-[11.5px] text-muted-foreground">{account.imap_host}</div>
+    <div ref={frame} style={{ height: frameHeight }} className="flex flex-col gap-3 min-h-[520px]">
+      {/* the bar: whose mailbox, search (this folder), refresh / settings / disconnect */}
+      <div className="flex flex-wrap items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2.5 min-w-0 md:w-56 shrink-0">
+          <MailAvatar name={account.email} />
+          <div className="min-w-0">
+            <div className="text-[13px] font-bold text-ink truncate">{account.email}</div>
+            <div className="text-[11px] text-muted-foreground truncate">{account.imap_host}</div>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button icon={<PenSquare className="w-4 h-4" />} onClick={() => startCompose(newDraft())}>
-            New message
-          </Button>
-          <Button variant="secondary" icon={<RefreshCw className={`w-4 h-4 ${listLoading ? 'animate-spin' : ''}`} />} onClick={refresh} disabled={listLoading}>
-            Refresh
-          </Button>
-          <Button variant="ghost" icon={<Settings className="w-4 h-4" />} onClick={() => setEditing(true)}>
-            Settings
-          </Button>
-          <Button variant="ghost" icon={<Unplug className="w-4 h-4" />} onClick={disconnect}>
-            Disconnect
-          </Button>
-        </div>
-      </div>
 
-      {/* phones: a folder picker above the list */}
-      <div className={`md:hidden ${reading ? 'hidden' : ''}`}>
-        <select
-          className="w-full rounded-tile border border-border bg-white px-3 py-2 text-[12.5px] text-ink"
-          value={folder}
-          onChange={(e) => chooseFolder(e.target.value)}
-          aria-label="Folder"
-        >
-          {(folders.length ? folders : [{ path: 'INBOX', name: 'Inbox', unread: 0 } as MailFolder]).map((f) => (
-            <option key={f.path} value={f.path}>
-              {f.name}
-              {f.unread ? ` (${f.unread})` : ''}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <Card padding="none" className="flex min-h-[560px] overflow-hidden">
-        <nav className="hidden md:block w-48 shrink-0 border-r border-border p-2 space-y-0.5 overflow-y-auto" aria-label="Folders">
-          {folders.map((f) => {
-            const Icon = (f.special && FOLDER_ICONS[f.special]) || Folder;
-            const active = f.path === folder;
-            return (
-              <button
-                key={f.path}
-                type="button"
-                onClick={() => chooseFolder(f.path)}
-                aria-current={active ? 'true' : undefined}
-                className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-tile text-[12.5px] text-left ${
-                  active ? 'bg-secondary font-bold text-ink' : 'text-muted-foreground hover:bg-secondary hover:text-ink'
-                }`}
-              >
-                <Icon className="w-4 h-4 shrink-0" aria-hidden />
-                <span className="truncate flex-1">{f.name}</span>
-                {f.unread > 0 && <span className="text-[11px] font-bold text-brand">{f.unread}</span>}
+        <form role="search" onSubmit={runSearch} className="relative flex-1 min-w-[220px] order-last md:order-none basis-full md:basis-auto">
+          <div className="flex items-center gap-1 rounded-full bg-secondary px-3 py-1.5 focus-within:bg-white focus-within:ring-1 focus-within:ring-border focus-within:shadow-sm">
+            <Search className="w-4 h-4 shrink-0 text-subtle" aria-hidden />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              maxLength={200}
+              placeholder={`Search ${current?.name || 'this folder'}`}
+              aria-label="Search mail"
+              className="flex-1 min-w-0 bg-transparent px-1.5 py-0.5 text-[12.5px] text-ink outline-none"
+            />
+            {(query || search) && (
+              <button type="button" onClick={clearSearch} aria-label="Clear search" className="p-1 rounded-full hover:bg-border">
+                <X className="w-3.5 h-3.5 text-muted-foreground" aria-hidden />
               </button>
-            );
-          })}
-        </nav>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowFilters((v) => !v)}
+              aria-expanded={showFilters}
+              aria-label="Search filters"
+              title="Search filters"
+              className={`p-1 rounded-full hover:bg-border ${showFilters ? 'bg-border' : ''}`}
+            >
+              <SlidersHorizontal className="w-4 h-4 text-muted-foreground" aria-hidden />
+            </button>
+          </div>
+          {showFilters && (
+            <div className="absolute z-20 left-0 right-0 mt-1 rounded-tile border border-border bg-white shadow-lg p-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] text-ink">
+              <label className="inline-flex items-center gap-1.5">
+                <input type="checkbox" checked={!!filters.unread} onChange={(e) => setFilters({ ...filters, unread: e.target.checked })} />
+                Unread only
+              </label>
+              <label className="inline-flex items-center gap-1.5">
+                <input type="checkbox" checked={!!filters.attachments} onChange={(e) => setFilters({ ...filters, attachments: e.target.checked })} />
+                Has attachments
+              </label>
+              <label className="inline-flex items-center gap-1.5">
+                From
+                <input
+                  type="date"
+                  aria-label="From date"
+                  value={filters.since || ''}
+                  onChange={(e) => setFilters({ ...filters, since: e.target.value || undefined })}
+                  className="rounded border border-border px-1.5 py-0.5"
+                />
+              </label>
+              <label className="inline-flex items-center gap-1.5">
+                To
+                <input
+                  type="date"
+                  aria-label="To date"
+                  value={filters.before || ''}
+                  onChange={(e) => setFilters({ ...filters, before: e.target.value || undefined })}
+                  className="rounded border border-border px-1.5 py-0.5"
+                />
+              </label>
+              <Button type="submit" className="ml-auto !px-3 !py-1">
+                Search
+              </Button>
+            </div>
+          )}
+        </form>
 
+        <div className="flex items-center gap-0.5 ml-auto md:ml-0">
+          <IconButton label="Refresh" onClick={refresh} disabled={listLoading}>
+            <RefreshCw className={`w-4 h-4 ${listLoading ? 'animate-spin' : ''}`} aria-hidden />
+          </IconButton>
+          <span title={SHORTCUTS_HELP} aria-label={SHORTCUTS_HELP} className="hidden md:inline-flex p-2 text-muted-foreground cursor-help">
+            <Keyboard className="w-4 h-4" aria-hidden />
+          </span>
+          <IconButton label="Settings" onClick={() => setEditing(true)}>
+            <Settings className="w-4 h-4" aria-hidden />
+          </IconButton>
+          <IconButton label="Disconnect" onClick={disconnect}>
+            <Unplug className="w-4 h-4" aria-hidden />
+          </IconButton>
+        </div>
+      </div>
+
+      <Card padding="none" className="flex flex-1 min-h-0 overflow-hidden">
+        {/* folders, with the big New message button on top (Gmail's Compose) */}
+        <div className="hidden md:flex flex-col w-56 shrink-0 border-r border-border min-h-0">
+          <div className="p-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => startCompose(newDraft())}
+              className="inline-flex items-center gap-3 rounded-2xl bg-brand/10 hover:bg-brand/15 hover:shadow-md transition-shadow px-5 py-3.5 text-[13px] font-semibold text-ink"
+            >
+              <PenSquare className="w-5 h-5 text-brand" aria-hidden />
+              New message
+            </button>
+          </div>
+          <nav className="flex-1 min-h-0 overflow-y-auto pr-3 pb-3 space-y-0.5" aria-label="Folders">
+            {folders.map((f) => {
+              const Icon = (f.special && FOLDER_ICONS[f.special]) || Folder;
+              const active = f.path === folder;
+              return (
+                <button
+                  key={f.path}
+                  type="button"
+                  onClick={() => chooseFolder(f.path)}
+                  aria-current={active ? 'true' : undefined}
+                  className={`w-full flex items-center gap-3 pl-5 pr-3 py-1.5 rounded-r-full text-[13px] text-left ${
+                    active ? 'bg-brand/15 font-bold text-ink' : 'text-ink/80 hover:bg-secondary'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-brand' : 'text-muted-foreground'}`} aria-hidden />
+                  <span className="truncate flex-1">{f.name}</span>
+                  {f.unread > 0 && <span className={`text-[11.5px] ${active ? 'font-bold text-ink' : 'font-semibold text-ink/80'}`}>{f.unread}</span>}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* the list */}
         <section
-          className={`${reading ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 lg:w-96 shrink-0 border-r border-border min-h-0`}
+          className={`${reading ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-[22rem] lg:w-[26rem] shrink-0 border-r border-border min-h-0`}
           aria-label={current ? `${current.name} messages` : 'Messages'}
         >
-          {/* search: this folder only */}
-          <form role="search" onSubmit={runSearch} className="p-2 border-b border-border space-y-2">
-            <div className="flex items-center gap-1.5">
-              <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-subtle" aria-hidden />
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  maxLength={200}
-                  placeholder={`Search ${current?.name || 'this folder'}`}
-                  aria-label="Search mail"
-                  className="w-full rounded-tile bg-secondary border border-transparent pl-8 pr-7 py-1.5 text-[12px] text-ink outline-none focus:bg-white focus:border-border"
-                />
-                {(query || search) && (
-                  <button type="button" onClick={clearSearch} aria-label="Clear search" className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-border">
-                    <X className="w-3.5 h-3.5 text-muted-foreground" aria-hidden />
-                  </button>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowFilters((v) => !v)}
-                aria-expanded={showFilters}
-                aria-label="Search filters"
-                title="Search filters"
-                className={`p-1.5 rounded-tile hover:bg-secondary ${showFilters ? 'bg-secondary' : ''}`}
-              >
-                <SlidersHorizontal className="w-4 h-4 text-muted-foreground" aria-hidden />
-              </button>
-              <span title={SHORTCUTS_HELP} aria-label={SHORTCUTS_HELP} className="hidden md:inline-flex p-1.5 text-muted-foreground cursor-help">
-                <Keyboard className="w-4 h-4" aria-hidden />
-              </span>
-            </div>
-            {showFilters && (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11.5px] text-ink">
-                <label className="inline-flex items-center gap-1">
-                  <input type="checkbox" checked={!!filters.unread} onChange={(e) => setFilters({ ...filters, unread: e.target.checked })} />
-                  Unread only
-                </label>
-                <label className="inline-flex items-center gap-1">
-                  <input type="checkbox" checked={!!filters.attachments} onChange={(e) => setFilters({ ...filters, attachments: e.target.checked })} />
-                  Has attachments
-                </label>
-                <label className="inline-flex items-center gap-1">
-                  From
-                  <input
-                    type="date"
-                    aria-label="From date"
-                    value={filters.since || ''}
-                    onChange={(e) => setFilters({ ...filters, since: e.target.value || undefined })}
-                    className="rounded border border-border px-1 py-0.5"
-                  />
-                </label>
-                <label className="inline-flex items-center gap-1">
-                  To
-                  <input
-                    type="date"
-                    aria-label="To date"
-                    value={filters.before || ''}
-                    onChange={(e) => setFilters({ ...filters, before: e.target.value || undefined })}
-                    className="rounded border border-border px-1 py-0.5"
-                  />
-                </label>
-                <Button type="submit" variant="secondary" className="!px-2.5 !py-1">
-                  Search
-                </Button>
-              </div>
-            )}
-          </form>
+          {/* phones: a folder picker and New message above the list */}
+          <div className="md:hidden flex items-center gap-2 p-2 border-b border-border shrink-0">
+            <select
+              className="flex-1 min-w-0 rounded-tile border border-border bg-white px-3 py-2 text-[12.5px] text-ink"
+              value={folder}
+              onChange={(e) => chooseFolder(e.target.value)}
+              aria-label="Folder"
+            >
+              {(folders.length ? folders : [{ path: 'INBOX', name: 'Inbox', unread: 0 } as MailFolder]).map((f) => (
+                <option key={f.path} value={f.path}>
+                  {f.name}
+                  {f.unread ? ` (${f.unread})` : ''}
+                </option>
+              ))}
+            </select>
+            <IconButton label="Write a new message" onClick={() => startCompose(newDraft())}>
+              <PenSquare className="w-4 h-4 text-brand" aria-hidden />
+            </IconButton>
+          </div>
 
           {search && (
-            <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-secondary/60 text-[11.5px]">
+            <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-secondary/60 text-[11.5px] shrink-0">
               <button type="button" onClick={clearSearch} className="inline-flex items-center gap-1 font-semibold text-brand hover:underline">
                 <ArrowLeft className="w-3.5 h-3.5" aria-hidden />
                 Back to {current?.name || 'folder'}
@@ -563,21 +589,21 @@ function MailboxView({
             </div>
           )}
 
-          {/* selecting: the toolbar */}
+          {/* selecting: the toolbar (always there, so the list never jumps) */}
           {items.length > 0 && !error && (
-            <div className="flex flex-wrap items-center gap-1 px-2 py-1.5 border-b border-border" role="toolbar" aria-label="Selected emails">
+            <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border min-h-[42px] shrink-0" role="toolbar" aria-label="Selected emails">
               <input
                 type="checkbox"
-                className="mx-1"
+                className="mx-1.5"
                 checked={allSelected}
                 onChange={() => setSelected(allSelected ? new Set() : new Set(items.map((m) => m.uid)))}
                 aria-label="Select all"
               />
               {chosen.length === 0 ? (
-                <span className="text-[11.5px] text-muted-foreground">Select emails to act on several at once</span>
+                <span className="text-[11.5px] text-muted-foreground truncate">Select emails to act on several at once</span>
               ) : (
                 <>
-                  <span className="text-[11.5px] font-semibold text-ink mr-1">{chosen.length} selected</span>
+                  <span className="text-[11.5px] font-semibold text-ink mr-1 whitespace-nowrap">{chosen.length} selected</span>
                   <ToolButton label="Mark read" icon={<Mail className="w-4 h-4" />} onClick={() => act([...selected], 'read')} disabled={busy} />
                   <ToolButton label="Mark unread" icon={<MailOpen className="w-4 h-4" />} onClick={() => act([...selected], 'unread')} disabled={busy} />
                   <ToolButton
@@ -588,7 +614,7 @@ function MailboxView({
                   />
                   {moveTargets.length > 0 && (
                     <select
-                      className="max-w-[9rem] rounded-tile border border-border bg-white px-1.5 py-1 text-[11.5px] text-ink"
+                      className="max-w-[8rem] rounded-tile border border-border bg-white px-1.5 py-1 text-[11.5px] text-ink"
                       aria-label="Move to…"
                       value=""
                       disabled={busy}
@@ -611,47 +637,77 @@ function MailboxView({
           {error ? (
             <EmptyState icon={<AlertTriangle className="w-5 h-5" />} title="Your mail could not be loaded" description={error} action={<Button variant="secondary" onClick={refresh}>Try again</Button>} />
           ) : !listLoading && items.length === 0 ? (
-            <EmptyState icon={<Mail className="w-5 h-5" />} title={search ? 'No emails match' : 'No emails here'} />
+            <EmptyState icon={<Mail className="w-5 h-5" />} title={search ? 'No emails match' : 'No emails here'} className="m-auto" />
           ) : (
-            <ul className="overflow-y-auto divide-y divide-border">
-              {items.map((m) => (
-                <li key={m.uid} className={`flex items-start ${m.uid === openUid ? 'bg-secondary' : selected.has(m.uid) ? 'bg-secondary/60' : ''}`}>
-                  <input
-                    type="checkbox"
-                    className="mt-3 ml-3 shrink-0"
-                    checked={selected.has(m.uid)}
-                    onChange={() => toggle(m.uid)}
-                    aria-label={`Select ${m.subject || '(no subject)'}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => openMessage(m)}
-                    aria-current={m.uid === openUid ? 'true' : undefined}
-                    className="flex-1 min-w-0 text-left px-2 py-2.5 hover:bg-secondary"
+            <ul className="flex-1 min-h-0 overflow-y-auto">
+              {items.map((m) => {
+                const sender = m.from ? m.from.name || m.from.address : '(unknown sender)';
+                const subject = m.subject || '(no subject)';
+                const isOpen = m.uid === openUid;
+                return (
+                  <li
+                    key={m.uid}
+                    className={`group relative flex items-start gap-1 border-b border-border/70 ${
+                      isOpen ? 'bg-brand/10' : selected.has(m.uid) ? 'bg-secondary' : m.seen ? 'bg-white' : 'bg-white'
+                    } hover:shadow-[inset_1px_0_0_rgb(0_0_0/0.06),inset_-1px_0_0_rgb(0_0_0/0.06),0_1px_2px_rgb(0_0_0/0.08)] hover:z-[1]`}
                   >
-                    <div className="flex items-center gap-2">
-                      {!m.seen && <span className="w-2 h-2 rounded-full bg-brand shrink-0" aria-label="Unread" />}
-                      <span className={`flex-1 truncate text-[12.5px] ${m.seen ? 'text-ink' : 'font-bold text-ink'}`}>
-                        {m.from ? m.from.name || m.from.address : '(unknown sender)'}
+                    {isOpen && <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-brand" aria-hidden />}
+                    <input
+                      type="checkbox"
+                      className="mt-3.5 ml-3 shrink-0"
+                      checked={selected.has(m.uid)}
+                      onChange={() => toggle(m.uid)}
+                      aria-label={`Select ${subject}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => openMessage(m)}
+                      aria-current={isOpen ? 'true' : undefined}
+                      className="flex-1 min-w-0 flex items-start gap-2.5 text-left pl-1.5 pr-2 py-2.5"
+                    >
+                      <MailAvatar name={sender} small />
+                      <span className="flex-1 min-w-0">
+                        <span className="flex items-center gap-2">
+                          {!m.seen && <span className="w-2 h-2 rounded-full bg-brand shrink-0" aria-label="Unread" />}
+                          <span className={`flex-1 truncate text-[12.5px] ${m.seen ? 'text-ink/80' : 'font-bold text-ink'}`}>{sender}</span>
+                          {m.has_attachments && <Paperclip className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-label="Has attachments" />}
+                          <span className={`text-[11px] shrink-0 group-hover:invisible ${m.seen ? 'text-muted-foreground' : 'font-bold text-ink'}`}>{listDate(m.date)}</span>
+                        </span>
+                        <span className={`block truncate text-[12px] mt-0.5 ${m.seen ? 'text-muted-foreground' : 'font-bold text-ink'}`}>{subject}</span>
                       </span>
-                      {m.has_attachments && <Paperclip className="w-3.5 h-3.5 text-muted-foreground shrink-0" aria-label="Has attachments" />}
-                      <span className="text-[11px] text-muted-foreground shrink-0">{listDate(m.date)}</span>
+                    </button>
+                    {/* on hover, like Gmail: archive, delete, read / unread (the date makes room) */}
+                    <div className="absolute right-9 top-1.5 hidden group-hover:flex items-center bg-white/95 rounded-full">
+                      {archive && folder !== archive && (
+                        <RowAction label={`Archive ${subject}`} onClick={(e) => runRowAction(e, () => act([m.uid], 'move', archive))} disabled={busy}>
+                          <Archive className="w-4 h-4" aria-hidden />
+                        </RowAction>
+                      )}
+                      <RowAction label={`Delete ${subject}`} onClick={(e) => runRowAction(e, () => act([m.uid], 'delete'))} disabled={busy}>
+                        <Trash2 className="w-4 h-4" aria-hidden />
+                      </RowAction>
+                      <RowAction
+                        label={m.seen ? `Mark ${subject} unread` : `Mark ${subject} read`}
+                        onClick={(e) => runRowAction(e, () => act([m.uid], m.seen ? 'unread' : 'read'))}
+                        disabled={busy}
+                      >
+                        {m.seen ? <Mail className="w-4 h-4" aria-hidden /> : <MailOpen className="w-4 h-4" aria-hidden />}
+                      </RowAction>
                     </div>
-                    <div className={`truncate text-[12px] mt-0.5 ${m.seen ? 'text-muted-foreground' : 'font-bold text-ink'}`}>{m.subject || '(no subject)'}</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => act([m.uid], m.flagged ? 'unflag' : 'flag')}
-                    disabled={busy}
-                    aria-pressed={m.flagged}
-                    aria-label={`${m.flagged ? 'Unflag' : 'Flag'} ${m.subject || '(no subject)'}`}
-                    title={m.flagged ? 'Unflag' : 'Flag'}
-                    className="shrink-0 mt-2 mr-2 p-1 rounded-tile hover:bg-border disabled:opacity-50"
-                  >
-                    <Star className={`w-3.5 h-3.5 ${m.flagged ? 'fill-current text-status-warning' : 'text-subtle'}`} aria-hidden />
-                  </button>
-                </li>
-              ))}
+                    <button
+                      type="button"
+                      onClick={() => act([m.uid], m.flagged ? 'unflag' : 'flag')}
+                      disabled={busy}
+                      aria-pressed={m.flagged}
+                      aria-label={`${m.flagged ? 'Unflag' : 'Flag'} ${subject}`}
+                      title={m.flagged ? 'Unflag' : 'Flag'}
+                      className="shrink-0 mt-2 mr-2 p-1 rounded-full hover:bg-secondary disabled:opacity-50"
+                    >
+                      <Star className={`w-4 h-4 ${m.flagged ? 'fill-current text-status-warning' : 'text-subtle'}`} aria-hidden />
+                    </button>
+                  </li>
+                );
+              })}
               {(listLoading || hasMore) && (
                 <li className="p-3 text-center">
                   {listLoading ? (
@@ -667,11 +723,10 @@ function MailboxView({
           )}
         </section>
 
-        <section className={`${reading ? 'flex' : 'hidden md:flex'} flex-col flex-1 min-w-0 p-4`} aria-label="Email">
-          {compose ? (
-            <MailCompose key={composeKey} account={account} draft={compose} onClose={() => setCompose(null)} onSent={sent} />
-          ) : opening ? (
-            <EmptyState icon={<Loader2 className="w-5 h-5 animate-spin" />} title="Opening the email…" />
+        {/* the email */}
+        <section className={`${reading ? 'flex' : 'hidden md:flex'} flex-col flex-1 min-w-0 min-h-0`} aria-label="Email">
+          {opening ? (
+            <EmptyState icon={<Loader2 className="w-5 h-5 animate-spin" />} title="Opening the email…" className="m-auto" />
           ) : open ? (
             <MailReader
               message={open}
@@ -684,13 +739,17 @@ function MailboxView({
                 onMarkUnread: () => act([open.uid], 'unread'),
                 onDelete: () => act([open.uid], 'delete'),
                 onMove: (to) => act([open.uid], 'move', to),
+                ...(archive && folder !== archive ? { onArchive: () => act([open.uid], 'move', archive) } : {}),
               }}
             />
           ) : (
-            <EmptyState icon={<Mail className="w-5 h-5" />} title="Choose an email to read it" className="m-auto" />
+            <EmptyState icon={<Mail className="w-5 h-5" />} title="Choose an email to read it" description={current ? `${current.name}${current.unread ? ` · ${current.unread} unread` : ''}` : undefined} className="m-auto" />
           )}
         </section>
       </Card>
+
+      {/* writing: a window over the bottom right (full screen on a phone), so the list and the email stay in view */}
+      {compose && <MailCompose key={composeKey} account={account} draft={compose} onClose={() => setCompose(null)} onSent={sent} />}
     </div>
   );
 }
@@ -710,4 +769,62 @@ function ToolButton({ label, icon, onClick, disabled }: { label: string; icon: R
       <span className="hidden sm:inline">{label}</span>
     </button>
   );
+}
+
+/** An icon-only button with its name as a tooltip (the bar above the mailbox, phones' New message). */
+function IconButton({ label, onClick, disabled, children }: { label: string; onClick: () => void; disabled?: boolean; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className="p-2 rounded-full text-muted-foreground hover:bg-secondary hover:text-ink disabled:opacity-50"
+    >
+      {children}
+    </button>
+  );
+}
+
+/** A row's quick action, shown when the pointer is over the row. */
+function RowAction({ label, onClick, disabled, children }: { label: string; onClick: (e: React.MouseEvent) => void; disabled?: boolean; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label.split(' ')[0] === 'Mark' ? label.replace(/^Mark .* (read|unread)$/, 'Mark $1') : label.split(' ')[0]}
+      className="p-1.5 rounded-full text-muted-foreground hover:bg-secondary hover:text-ink disabled:opacity-50"
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * The mailbox's height: from where it starts down to the bottom of the window (at least 520px), measured again when
+ * the window is resized, so the page itself doesn't scroll and each column scrolls on its own.
+ */
+function useFillHeight(remeasure: unknown, bottomGap = 16) {
+  const frame = useRef<HTMLDivElement>(null);
+  const [frameHeight, setFrameHeight] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    const measure = () => {
+      const el = frame.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      setFrameHeight(Math.max(520, Math.floor(window.innerHeight - top - bottomGap)));
+    };
+    measure();
+    // again once the page around it has settled (fonts, the tabs above)
+    const later = window.setTimeout(measure, 200);
+    window.addEventListener('resize', measure);
+    return () => {
+      window.clearTimeout(later);
+      window.removeEventListener('resize', measure);
+    };
+  }, [remeasure, bottomGap]);
+  return { frame, frameHeight };
 }
