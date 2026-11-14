@@ -77,6 +77,12 @@ const ReportsList = lazy(() => import('./components/Reports/ReportLists'));
 const StaffLoansReport = lazy(() => import('./components/Reports/staffloans'));
 const StatutoryDeductionsReport = lazy(() => import('./components/Reports/statutory'));
 const GroupReport = lazy(() => import('./components/Reports/GroupReport'));
+const SalaryReport = lazy(() => import('./components/Reports/SalaryReport'));
+const OtherDeductionsReport = lazy(() => import('./components/Reports/OtherDeductionsReport'));
+const LeaveReport = lazy(() => import('./components/Reports/LeaveReport'));
+const TerminationReport = lazy(() => import('./components/Reports/TerminationReport'));
+const SmsReport = lazy(() => import('./components/Reports/SmsReport'));
+const BranchPerformanceReport = lazy(() => import('./components/Reports/BranchPerformanceReport'));
 const AssetManagement = lazy(() => import('./components/Asset/Asset'));
 const QRScanner = lazy(() => import('./components/Asset/scan'));
 const MpesaZapPortal = lazy(() => import('./components/Settings/MpesaZapPortal'));
@@ -1109,6 +1115,12 @@ function WorkspaceApp() {
                                 {gate('/sms', <SMSCenter />)}
                                 {gate('/reports', <ReportsList />)}
                                 {gate('/reports/group', <GroupReport />)}
+                                {gate('/reports/staff-salary', <SalaryReport />)}
+                                {gate('/reports/other-deductions', <OtherDeductionsReport />)}
+                                {gate('/reports/leave-management', <LeaveReport />)}
+                                {gate('/reports/termination-report', <TerminationReport />)}
+                                {gate('/reports/sms-reports', <SmsReport />)}
+                                {gate('/reports/branch-performance', <BranchPerformanceReport />)}
                                 {gate('/reports/base', <BaseReport
                                   selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange}
                                   reportTitle="Base Report"
