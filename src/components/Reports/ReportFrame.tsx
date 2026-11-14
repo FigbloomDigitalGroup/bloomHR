@@ -37,10 +37,7 @@ export function ReportFrame({
 }) {
   return (
     <div className="p-4 md:p-6 max-w-[1500px] mx-auto space-y-4">
-      <Link to="/reports" className="inline-flex items-center gap-1 text-[12px] font-semibold text-brand hover:underline">
-        <ArrowLeft className="w-3.5 h-3.5" aria-hidden />
-        All reports
-      </Link>
+      <BackToReports />
       <PageHeader
         title={title}
         subtitle={subtitle}
@@ -71,6 +68,16 @@ export function ReportFrame({
         children
       )}
     </div>
+  );
+}
+
+/** The link back to the list of reports, at the top of every report. */
+export function BackToReports({ className = '' }: { className?: string }) {
+  return (
+    <Link to="/reports" className={`inline-flex items-center gap-1 text-[12px] font-semibold text-brand hover:underline ${className}`}>
+      <ArrowLeft className="w-3.5 h-3.5" aria-hidden />
+      All reports
+    </Link>
   );
 }
 

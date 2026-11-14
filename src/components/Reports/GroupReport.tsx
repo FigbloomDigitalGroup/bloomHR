@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Download, Users } from 'lucide-react';
 import { saveAs } from 'file-saver';
 import { Button, Card, EmptyState, PageHeader, TabBar, TableScroll } from '../UI';
+import { BackToReports } from './ReportFrame';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useBranches } from '../../hooks/useBranches';
@@ -362,6 +363,7 @@ export default function GroupReport() {
   return (
     <div className="p-6 bg-background min-h-screen">
       <div className="max-w-7xl mx-auto space-y-4">
+        <BackToReports />
         <PageHeader title="Group report" subtitle="People across every country; money per currency" />
         {permissionsLoading || branchesLoading ? (
           <div className="flex justify-center items-center h-64"><FigbloomLoader label="Loading the report" /></div>
