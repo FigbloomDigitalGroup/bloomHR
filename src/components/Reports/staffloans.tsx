@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import EmployeePicker from '../UI/EmployeePicker';
+import { BackToReports } from './ReportFrame';
 import { 
   Filter, 
   Download, 
@@ -1073,6 +1074,7 @@ const StaffLoansReport: React.FC<BaseReportProps> = ({
   return (
     <div className="p-6 bg-page min-h-screen">
       <div className="max-w-7xl mx-auto">
+        <BackToReports className="mb-3" />
         {/* Accounting Report Header */}
         <div className="mb-6 bg-white rounded-lg border border-gray-300 p-6 shadow-sm">
           <div className="flex justify-between items-start">
