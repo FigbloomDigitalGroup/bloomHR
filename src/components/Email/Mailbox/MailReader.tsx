@@ -93,7 +93,7 @@ export default function MailReader({
               onClick={onBack}
               aria-label="Back to messages"
               title="Back to messages"
-              className="md:hidden p-2 rounded-full text-muted-foreground hover:bg-secondary hover:text-ink"
+              className="2xl:hidden p-2 rounded-full text-muted-foreground hover:bg-secondary hover:text-ink"
             >
               <ArrowLeft className="w-4 h-4" aria-hidden />
             </button>

@@ -422,7 +422,9 @@ function MailboxView({
   };
 
   // Gmail-like: the mailbox fills the screen below where it starts, and the folders, the list and the email each scroll
-  // on their own, so an email (or a new message) never opens out of sight
+  // on their own, so an email (or a new message) never opens out of sight. The list and the email sit side by side only
+  // on a wide screen (2xl); on a laptop or a phone the email takes the list's place, with Back, and below xl the folders
+  // are icons, so nothing is squeezed.
   return (
     <div ref={frame} style={{ height: frameHeight }} className="flex flex-col gap-3 min-h-[520px]">
       {/* the bar: whose mailbox, search (this folder), refresh / settings / disconnect */}
@@ -518,18 +520,20 @@ function MailboxView({
 
       <Card padding="none" className="flex flex-1 min-h-0 overflow-hidden">
         {/* folders, with the big New message button on top (Gmail's Compose) */}
-        <div className="hidden md:flex flex-col w-56 shrink-0 border-r border-border min-h-0">
-          <div className="p-3 shrink-0">
+        <div className="hidden md:flex flex-col w-[4.5rem] xl:w-56 shrink-0 border-r border-border min-h-0">
+          <div className="p-3 shrink-0 flex justify-center xl:justify-start">
             <button
               type="button"
               onClick={() => startCompose(newDraft())}
-              className="inline-flex items-center gap-3 rounded-2xl bg-brand/10 hover:bg-brand/15 hover:shadow-md transition-shadow px-5 py-3.5 text-[13px] font-semibold text-ink"
+              aria-label="New message"
+              title="New message"
+              className="inline-flex items-center gap-3 rounded-2xl bg-brand/10 hover:bg-brand/15 hover:shadow-md transition-shadow p-3.5 xl:px-5 text-[13px] font-semibold text-ink"
             >
               <PenSquare className="w-5 h-5 text-brand" aria-hidden />
-              New message
+              <span className="hidden xl:inline">New message</span>
             </button>
           </div>
-          <nav className="flex-1 min-h-0 overflow-y-auto pr-3 pb-3 space-y-0.5" aria-label="Folders">
+          <nav className="flex-1 min-h-0 overflow-y-auto px-2 xl:pl-0 xl:pr-3 pb-3 space-y-0.5" aria-label="Folders">
             {folders.map((f) => {
               const Icon = (f.special && FOLDER_ICONS[f.special]) || Folder;
               const active = f.path === folder;
@@ -539,13 +543,20 @@ function MailboxView({
                   type="button"
                   onClick={() => chooseFolder(f.path)}
                   aria-current={active ? 'true' : undefined}
-                  className={`w-full flex items-center gap-3 pl-5 pr-3 py-1.5 rounded-r-full text-[13px] text-left ${
+                  title={f.unread ? `${f.name} (${f.unread} unread)` : f.name}
+                  className={`relative w-full flex items-center justify-center xl:justify-start gap-3 py-2 xl:py-1.5 xl:pl-5 xl:pr-3 rounded-full xl:rounded-l-none xl:rounded-r-full text-[13px] text-left ${
                     active ? 'bg-brand/15 font-bold text-ink' : 'text-ink/80 hover:bg-secondary'
                   }`}
                 >
                   <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-brand' : 'text-muted-foreground'}`} aria-hidden />
-                  <span className="truncate flex-1">{f.name}</span>
-                  {f.unread > 0 && <span className={`text-[11.5px] ${active ? 'font-bold text-ink' : 'font-semibold text-ink/80'}`}>{f.unread}</span>}
+                  <span className="sr-only xl:not-sr-only xl:truncate xl:flex-1">{f.name}</span>
+                  {f.unread > 0 && (
+                    <>
+                      <span className={`hidden xl:inline text-[11.5px] ${active ? 'font-bold text-ink' : 'font-semibold text-ink/80'}`}>{f.unread}</span>
+                      {/* folders as icons only: a dot for unread mail */}
+                      <span className="xl:hidden absolute top-1.5 right-3 w-2 h-2 rounded-full bg-brand" aria-hidden />
+                    </>
+                  )}
                 </button>
               );
             })}
@@ -554,7 +565,7 @@ function MailboxView({
 
         {/* the list */}
         <section
-          className={`${reading ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-[22rem] lg:w-[26rem] shrink-0 border-r border-border min-h-0`}
+          className={`${reading ? 'hidden 2xl:flex' : 'flex'} flex-col flex-1 min-w-0 2xl:flex-none 2xl:w-[26rem] 2xl:shrink-0 2xl:border-r border-border min-h-0`}
           aria-label={current ? `${current.name} messages` : 'Messages'}
         >
           {/* phones: a folder picker and New message above the list */}
@@ -724,7 +735,7 @@ function MailboxView({
         </section>
 
         {/* the email */}
-        <section className={`${reading ? 'flex' : 'hidden md:flex'} flex-col flex-1 min-w-0 min-h-0`} aria-label="Email">
+        <section className={`${reading ? 'flex' : 'hidden 2xl:flex'} flex-col flex-1 min-w-0 min-h-0`} aria-label="Email">
           {opening ? (
             <EmptyState icon={<Loader2 className="w-5 h-5 animate-spin" />} title="Opening the email…" className="m-auto" />
           ) : open ? (
