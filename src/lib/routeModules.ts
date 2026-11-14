@@ -50,6 +50,13 @@ export const SCREENS: ScreenAccess[] = [
   sub('/reports/base', 'Base report', ['reports']),
   sub('/reports/staffloan', 'Staff loan report', ['reports']),
   sub('/reports/statutory', 'Statutory deductions report', ['reports']),
+  // HR reports (each also for the module whose data it shows)
+  sub('/reports/staff-salary', 'Staff salary report', ['reports', 'payroll']),
+  sub('/reports/other-deductions', 'Other deductions report', ['reports', 'payroll']),
+  sub('/reports/leave-management', 'Leave report', ['reports', 'leaves']),
+  sub('/reports/termination-report', 'Termination report', ['reports', 'hr-lifecycle']),
+  sub('/reports/sms-reports', 'SMS report', ['reports', 'sms']),
+  sub('/reports/branch-performance', 'Branch performance report', ['reports']),
   sub('/ai-assistant', 'AI assistant', ['ai-assistant']),
 
   // tasks and communication
