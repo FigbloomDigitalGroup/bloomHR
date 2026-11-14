@@ -260,12 +260,12 @@ describe('reading', () => {
     expect(screen.queryByTitle('Email content')).toBeNull();
   });
 
-  it('on a phone, the email replaces the list and Back returns to it', async () => {
+  it('on a phone or a laptop, the email replaces the list and Back returns to it (side by side on a wide screen)', async () => {
     render(<MyMailbox />);
     fireEvent.click(await screen.findByText('October payslip'));
     const back = await screen.findByRole('button', { name: 'Back to messages' });
     const list = screen.getByRole('region', { name: 'Inbox messages' });
-    expect(list.className).toContain('hidden md:flex');
+    expect(list.className).toContain('hidden 2xl:flex');
     fireEvent.click(back);
     expect(list.className).not.toContain('hidden');
   });
