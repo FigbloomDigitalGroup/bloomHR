@@ -33,9 +33,9 @@ const today = () => {
 };
 
 /** onSent(true) when everyone got it (the form closes); onSent(false) when some didn't (it stays open with just them). */
-function SendContractModal({ open, onClose, onSent }: { open: boolean; onClose: () => void; onSent: (all: boolean) => void }) {
+function SendContractModal({ open, onClose, onSent, initialChosen = [] }: { open: boolean; onClose: () => void; onSent: (all: boolean) => void; initialChosen?: string[] }) {
   const { employees } = useEmployeeDirectory();
-  const [chosen, setChosen] = useState<string[]>([]);
+  const [chosen, setChosen] = useState<string[]>(initialChosen);
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [signBy, setSignBy] = useState('');
@@ -261,12 +261,15 @@ const filters: { id: ContractFilter; label: string }[] = [
   { id: 'all', label: 'All' },
 ];
 
-/** HR Lifecycle > Contracts: send contracts to sign, and follow each one until the signed copy is accepted. */
-export default function ContractsModule() {
+/**
+ * HR Lifecycle > Contracts: send contracts to sign, and follow each one until the signed copy is accepted. `sendTo`: an
+ * employee number to send a contract to straight away (from "Send contract link" after adding someone).
+ */
+export default function ContractsModule({ sendTo = null }: { sendTo?: string | null } = {}) {
   const [contracts, setContracts] = useState<SigningContract[] | null>(null);
   const [filter, setFilter] = useState<ContractFilter>('review');
   const [selected, setSelected] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
+  const [sending, setSending] = useState(Boolean(sendTo));
 
   const load = useCallback(async () => {
     try {
@@ -340,6 +343,7 @@ export default function ContractsModule() {
       )}
       <SendContractModal
         open={sending}
+        initialChosen={sendTo ? [sendTo] : []}
         onClose={() => setSending(false)}
         onSent={(all) => {
           if (all) setSending(false);

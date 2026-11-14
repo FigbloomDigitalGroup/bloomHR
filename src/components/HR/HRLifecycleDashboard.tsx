@@ -271,7 +271,7 @@ export default function HRLifecycleDashboard() {
 
             {activeTab === 'status' && <EmploymentStatusModule onRefresh={fetchDashboardStats} initialSearch={searchParams.get('q') || ''} />}
             {activeTab === 'history' && <LifecycleHistoryModule />}
-            {activeTab === 'contracts' && <ContractsModule />}
+            {activeTab === 'contracts' && <ContractsModule sendTo={searchParams.get('send')} />}
             {activeTab === 'suspension' && <SuspensionModule onRefresh={fetchDashboardStats} />}
             {activeTab === 'exits' && <ExitsModule onRefresh={fetchDashboardStats} />}
             {activeTab === 'reports' && <HRReportsDashboard stats={stats} />}

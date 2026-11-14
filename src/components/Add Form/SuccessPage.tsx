@@ -1,4 +1,3 @@
-import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { Check, PartyPopper, Send } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -28,9 +27,9 @@ const SuccessPage = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // HR Lifecycle > Contracts, with the send form open for this employee: they get the contract to sign in the staff portal
   const handleSendContract = () => {
-    // Implement contract sending logic here
-    toast(`Sending a contract link for ${employeeNumber} is coming soon.`);
+    navigate(employeeNumber ? `/hr-lifecycle?tab=contracts&send=${encodeURIComponent(employeeNumber)}` : '/hr-lifecycle?tab=contracts');
   };
 
   if (isPageLoading) {
