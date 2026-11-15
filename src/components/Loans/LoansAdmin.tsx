@@ -16,7 +16,10 @@ import {
   currentPeriod,
   formatKsh,
   interestMethodLabel,
+  loanPaidOut,
   loanSchedule,
+  rateFieldLabel,
+  rateText,
   maxMonthsFor,
   outstandingBalance,
   periodLabel,
@@ -351,6 +354,7 @@ export default function LoansAdmin() {
                     {loan.monthly_instalment !== null && !['rejected', 'cancelled'].includes(loan.status) && (
                       <span className="text-[11.5px] text-muted-foreground">
                         {formatKsh(loan.monthly_instalment)} a month from {periodLabel(loan.start_period)} · {formatKsh(loan.total_interest ?? 0)} interest
+                        {loan.interest_method === 'upfront' ? ` · pays out ${formatKsh(loanPaidOut(loan))}` : ''}
                       </span>
                     )}
                   </div>
@@ -428,8 +432,12 @@ export default function LoansAdmin() {
           <>
             <p className="text-[12.5px] text-ink mb-3">
               Approve {approving.employee_name}'s loan of {formatKsh(approving.principal)} over {approving.months} months? It is charged the current rate for
-              {approving.product_name ? ` ${approving.product_name}` : ' staff loans'} ({(products.find((p) => p.id === approving.product_id)?.annual_rate ?? settings.annual_rate)}% a
-              year).
+              {approving.product_name ? ` ${approving.product_name}` : ' staff loans'} (
+              {(() => {
+                const p = products.find((x) => x.id === approving.product_id);
+                return rateText(p?.annual_rate ?? settings.annual_rate, p?.interest_method ?? settings.interest_method);
+              })()}
+              ).
             </p>
             <label htmlFor="approve-start" className="block text-[12px] font-semibold text-ink mb-1">
               First repayment from
@@ -495,7 +503,10 @@ export default function LoansAdmin() {
         {viewing && (
           <>
             <p className="text-[12px] text-muted-foreground mb-3">
-              {viewing.months} months at {viewing.annual_rate}% a year, {interestMethodLabel(viewing.interest_method).toLowerCase()}, from {periodLabel(viewing.start_period)}.
+              {viewing.months} months at {rateText(viewing.annual_rate, viewing.interest_method)}, {interestMethodLabel(viewing.interest_method).toLowerCase()}, from {periodLabel(viewing.start_period)}.
+              {viewing.interest_method === 'upfront' && viewing.total_interest !== null
+                ? ` ${formatKsh(loanPaidOut(viewing))} is paid out and ${formatKsh(viewing.principal)} repaid.`
+                : ''}
               {['requested', 'approved'].includes(viewing.status) ? ' The schedule may still change until the loan is paid out.' : ''}
             </p>
             <LoanSchedule
@@ -548,7 +559,7 @@ export default function LoansAdmin() {
                   </select>
                 </label>
                 <label className="block">
-                  <span className="block text-[12px] font-semibold text-ink mb-1">Interest rate (% a year)</span>
+                  <span className="block text-[12px] font-semibold text-ink mb-1">{rateFieldLabel(newMethod)}</span>
                   <input
                     className={inputClass}
                     type="number"
@@ -578,6 +589,7 @@ export default function LoansAdmin() {
               {newPreview && newPreview.totalRepayable > 0 && (
                 <p className="m-0 p-3 rounded-tile bg-secondary text-[12.5px] text-ink" data-testid="new-loan-preview">
                   {formatKsh(newPreview.instalment)} a month · {formatKsh(newPreview.totalInterest)} interest · {formatKsh(newPreview.totalRepayable)} in all
+                  {newMethod === 'upfront' ? ` · ${formatKsh(newPreview.paidOut)} paid out` : ''}
                 </p>
               )}
               {createWarning && <p className="m-0 text-[11.5px] text-orange-text-alt">{createWarning}</p>}
