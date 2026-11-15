@@ -305,7 +305,12 @@ h6 {
 }
 
 /* ---- Accessibility preferences (src/lib/a11y.ts) ---- */
-:root { --ui-zoom: 1; --screen-h: calc(100vh / var(--ui-zoom)); }
+:root { --ui-zoom: 1; --screen-h: calc(100vh / var(--ui-zoom)); --screen-dvh: var(--screen-h); }
+/* phones: 100vh is the height with the address bar hidden, so a fixed full-height panel ends behind the browser
+   toolbar; dvh is the height actually visible (the sidebar's Log out sits at its very bottom) */
+@supports (height: 100dvh) {
+  :root { --screen-dvh: calc(100dvh / var(--ui-zoom)); }
+}
 /* #root is zoomed, and zoom also scales vh: undo that so full-height layouts still fit the real screen */
 html .h-screen { height: var(--screen-h); }
 html .min-h-screen { min-height: var(--screen-h); }

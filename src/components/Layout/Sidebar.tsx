@@ -301,7 +301,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
       aria-label="Main navigation"
       role={isMobile ? 'dialog' : undefined}
       aria-modal={drawerOpen ? true : undefined}
-      className={`fixed left-0 top-0 h-screen z-50 flex flex-col select-none transition-[transform,visibility] duration-300 ${mobileOpen ? '' : 'max-md:-translate-x-full max-md:invisible'}`}
+      className={`fixed left-0 top-0 h-[var(--screen-dvh)] z-50 flex flex-col select-none transition-[transform,visibility] duration-300 ${mobileOpen ? '' : 'max-md:-translate-x-full max-md:invisible'}`}
     >
       <motion.div
         initial="expanded"
@@ -375,7 +375,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
         </AnimatePresence>
 
         {/* Scrollable Navigation */}
-        <div className="relative z-10 flex-1 overflow-y-auto px-3 pb-4 sidebar-scroll hover:overflow-y-auto overflow-hidden">
+        <div className="relative z-10 flex-1 min-h-0 overflow-y-auto px-3 pb-4 sidebar-scroll hover:overflow-y-auto overflow-hidden">
           <div className="space-y-6">
             {(platformAdmin ? [...menuGroups, platformGroup] : menuGroups).map((group) => (
               <div key={group.title}>
@@ -476,7 +476,8 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
         </div>
 
         {/* User Profile */}
-        <div className="relative z-10 p-3 mt-auto border-t border-shell-fg/10">
+        {/* shrink-0 so a long menu can't push it out; the safe-area inset keeps it above the iPhone home bar */}
+        <div className="relative z-10 shrink-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] mt-auto border-t border-shell-fg/10">
           <div className="relative overflow-hidden rounded-xl bg-shell-fg/5 border border-shell-fg/10 p-2.5 backdrop-blur-sm">
             <div className="flex items-center gap-3 relative z-10">
               <div className="relative flex-shrink-0">
