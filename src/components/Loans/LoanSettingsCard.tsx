@@ -6,6 +6,8 @@ import {
   INTEREST_METHODS,
   formatKsh,
   loanSchedule,
+  rateFieldLabel,
+  rateText,
   currentPeriod,
   scheduleTotals,
   settingsError,
@@ -182,7 +184,7 @@ export default function LoanSettingsCard({ canEdit: canEditProp, className = '' 
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {field('annual_rate', 'Interest rate (% a year)', 'For example 12', { min: 0, max: 100, step: '0.1' })}
+        {field('annual_rate', rateFieldLabel(form.interest_method), form.interest_method === 'upfront' ? 'For example 20' : 'For example 12', { min: 0, max: 100, step: '0.1' })}
         <label className="block sm:col-span-2">
           <span className="block text-[12px] font-semibold text-ink mb-1">How interest is charged</span>
           <select
@@ -222,7 +224,8 @@ export default function LoanSettingsCard({ canEdit: canEditProp, className = '' 
             <span className="text-red-600">{problem}</span>
           ) : (
             <span className="text-muted-foreground">
-              Example: KSh 100,000 over {Math.min(12, next.max_months)} months is {formatKsh(example.instalment)} a month, {formatKsh(example.totalInterest)} interest.
+              Example: KSh 100,000 over {Math.min(12, next.max_months)} months is {formatKsh(example.instalment)} a month, {formatKsh(example.totalInterest)} interest
+              {next.interest_method === 'upfront' ? `, ${formatKsh(example.paidOut)} paid out` : ''}.
             </span>
           )}
         </p>
@@ -258,7 +261,7 @@ export default function LoanSettingsCard({ canEdit: canEditProp, className = '' 
               <div className={p.active ? '' : 'opacity-60'}>
                 <span className="text-[12.5px] font-semibold text-ink">{p.name}</span>
                 <span className="ml-2 text-[11.5px] text-muted-foreground">
-                  {p.annual_rate}% a year, {INTEREST_METHODS.find((m) => m.id === p.interest_method)?.label.toLowerCase()}, up to {p.max_months} months
+                  {rateText(p.annual_rate, p.interest_method)}, {INTEREST_METHODS.find((m) => m.id === p.interest_method)?.label.toLowerCase()}, up to {p.max_months} months
                   {p.active ? '' : ' · paused'}
                 </span>
               </div>
@@ -289,7 +292,7 @@ export default function LoanSettingsCard({ canEdit: canEditProp, className = '' 
                 <input className={inputClass} value={editing.name} maxLength={60} onChange={(e) => setEditing({ ...editing, name: e.target.value })} placeholder="For example: School fees loan" />
               </label>
               <label className="block">
-                <span className="block text-[12px] font-semibold text-ink mb-1">Rate (% a year)</span>
+                <span className="block text-[12px] font-semibold text-ink mb-1">{editing.interest_method === 'upfront' ? 'Rate (% of the loan)' : 'Rate (% a year)'}</span>
                 <input className={inputClass} type="number" min={0} max={100} step="0.1" value={editing.annual_rate} onChange={(e) => setEditing({ ...editing, annual_rate: e.target.value })} />
               </label>
               <label className="block">

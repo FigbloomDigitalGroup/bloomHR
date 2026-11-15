@@ -57,7 +57,7 @@ describe('loanSchedule', () => {
     expect(sum(s.map((i) => i.principal))).toBe(100000);
     // the same totals as the database's loan_schedule
     expect(totalInterest(s)).toBe(6619);
-    expect(scheduleTotals(s)).toEqual({ instalment: 8885, totalInterest: 6619, totalRepayable: 106619 });
+    expect(scheduleTotals(s)).toEqual({ instalment: 8885, totalInterest: 6619, totalRepayable: 106619, paidOut: 100000 });
   });
 
   it('flat: the interest on the whole amount, spread evenly', () => {
@@ -65,7 +65,19 @@ describe('loanSchedule', () => {
     expect(s.map((i) => i.payment)).toEqual([...Array(11).fill(9333), 9337]);
     expect(s[0]).toMatchObject({ principal: 8333, interest: 1000, balance: 91667 });
     expect(s[11]).toMatchObject({ principal: 8337, interest: 1000, balance: 0 });
-    expect(scheduleTotals(s)).toEqual({ instalment: 9333, totalInterest: 12000, totalRepayable: 112000 });
+    expect(scheduleTotals(s)).toEqual({ instalment: 9333, totalInterest: 12000, totalRepayable: 112000, paidOut: 100000 });
+  });
+
+  it('upfront: 20% of a 100,000 loan is taken off once, so 80,000 is paid out and 100,000 repaid', () => {
+    const s = loanSchedule(100000, 20, 3, 'upfront', '2026-11');
+    expect(s.map((i) => i.payment)).toEqual([33333, 33333, 33334]);
+    expect(s.map((i) => i.balance)).toEqual([66667, 33334, 0]);
+    expect(s.map((i) => i.principal)).toEqual([26666, 26667, 26667]);
+    expect(s.map((i) => i.interest)).toEqual([6667, 6666, 6667]);
+    expect(scheduleTotals(s)).toEqual({ instalment: 33333, totalInterest: 20000, totalRepayable: 100000, paidOut: 80000 });
+    // the rate is per loan, not per year: the term does not change the interest
+    expect(scheduleTotals(loanSchedule(100000, 20, 1, 'upfront', '2026-11')).totalInterest).toBe(20000);
+    expect(monthlyInstalment(100000, 20, 3, 'upfront')).toBe(33333.33);
   });
 
   it('0%: equal parts with the remainder last', () => {
@@ -75,12 +87,13 @@ describe('loanSchedule', () => {
 
   it('totals are exact for awkward amounts and terms', () => {
     for (const [p, rate, n] of [[12345.67, 13.5, 7], [999, 24, 36], [250000, 18, 60], [1, 12, 12]] as const) {
-      for (const method of ['reducing_balance', 'flat'] as const) {
+      for (const method of ['reducing_balance', 'flat', 'upfront'] as const) {
         const s = loanSchedule(p, rate, n, method, '2026-01');
         expect(s).toHaveLength(n);
-        expect(sum(s.map((i) => i.principal))).toBe(p);
+        expect(sum(s.map((i) => i.principal))).toBe(method === 'upfront' ? scheduleTotals(s).paidOut : p);
+        if (method === 'upfront') expect(scheduleTotals(s).totalRepayable).toBe(p);
         expect(s[n - 1].balance).toBe(0);
-        expect(sum(s.map((i) => i.payment))).toBe(sum([p, totalInterest(s)]));
+        if (method !== 'upfront') expect(sum(s.map((i) => i.payment))).toBe(sum([p, totalInterest(s)]));
         expect(s.every((i) => i.principal >= 0 && i.interest >= 0)).toBe(true);
       }
     }

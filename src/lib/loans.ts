@@ -6,12 +6,16 @@
 //   reducing balance: a fixed payment P·r / (1 − (1 + r)^−n), r the monthly rate (annual / 12). Each month's interest is
 //                     r on what is still owed; the rest of the payment pays the loan down. A 0% loan is P / n a month.
 //   flat:             interest is the annual rate on the whole amount for the whole term, spread evenly over the months.
+//   upfront:          the rate is charged once on the loan, whatever the term, and taken off what is paid out: the
+//                     amount is what the employee repays (P / n a month) and they receive P less rate% of P. A KSh 100,000
+//                     loan at 20% pays out 80,000 and books 20,000 interest. Here the schedule's principal is the share
+//                     of each instalment that repays the money paid out, and its balance is the loan amount still to repay.
 //
 // The schedule is in whole shillings; the last instalment takes the rounding so the principal and the interest add up
 // exactly. Payroll takes everything due up to the month less what was already repaid, so a month that could not cover
 // its instalment carries the shortfall forward.
 
-export type InterestMethod = 'reducing_balance' | 'flat';
+export type InterestMethod = 'reducing_balance' | 'flat' | 'upfront';
 
 export type LoanStatus = 'requested' | 'approved' | 'rejected' | 'disbursed' | 'repaying' | 'completed' | 'cancelled';
 
@@ -54,7 +58,7 @@ export interface LoanInstalment {
   payment: number;
   principal: number;
   interest: number;
-  /** principal still owed after this instalment */
+  /** principal still owed after this instalment (for 'upfront', what is still to be repaid of the loan amount) */
   balance: number;
 }
 
@@ -67,7 +71,19 @@ export interface LoanRepayment {
 export const INTEREST_METHODS: { id: InterestMethod; label: string; hint: string }[] = [
   { id: 'reducing_balance', label: 'Reducing balance', hint: 'Interest is charged on what is still owed, so it falls each month' },
   { id: 'flat', label: 'Flat rate', hint: 'Interest is charged on the full amount for the whole term' },
+  {
+    id: 'upfront',
+    label: 'Interest off up front',
+    hint: 'The rate is charged once per loan and taken off the payout: at 20%, a KSh 100,000 loan pays out KSh 80,000 and KSh 100,000 is repaid',
+  },
 ];
+
+/** The rate as words: "12% a year", or "20% of the loan" when it is charged once up front. */
+export const rateText = (rate: number, method: string | null | undefined) => `${rate}% ${method === 'upfront' ? 'of the loan' : 'a year'}`;
+
+/** The label for a rate field, by how interest is charged. */
+export const rateFieldLabel = (method: string | null | undefined) =>
+  method === 'upfront' ? 'Interest rate (% of the loan, charged once)' : 'Interest rate (% a year)';
 
 export const interestMethodLabel = (method: string | null | undefined) =>
   INTEREST_METHODS.find((m) => m.id === method)?.label ?? 'Reducing balance';
@@ -118,6 +134,7 @@ export const monthlyInstalment = (principal: number, annualRate: number, months:
   if (!(principal > 0)) return 0;
   const rate = Math.max(0, annualRate || 0);
   if (method === 'flat') return round2((principal + (principal * rate * n) / 1200) / n);
+  if (method === 'upfront') return round2(principal / n);
   if (rate === 0) return round2(principal / n);
   const r = rate / 1200;
   return round2((principal * r) / (1 - Math.pow(1 + r, -n)));
@@ -151,6 +168,26 @@ export const loanSchedule = (
     return out;
   }
 
+  if (method === 'upfront') {
+    const paidOut = roundKsh(principal - (principal * rate) / 100);
+    const partPayment = roundKsh(principal / n);
+    // each instalment's principal is its share of the payout, on the running total so the parts add up exactly and
+    // no month's interest goes below 0
+    let paid = 0;
+    let principalSoFar = 0;
+    for (let i = 1; i <= n; i++) {
+      const last = i === n;
+      const payment = last ? balance : partPayment;
+      paid = round2(paid + payment);
+      const upTo = last ? paidOut : roundKsh((paid * paidOut) / principal);
+      const p = round2(upTo - principalSoFar);
+      principalSoFar = upTo;
+      balance = round2(balance - payment);
+      out.push({ instalment_no: i, period: addMonths(startPeriod, i - 1), payment, principal: p, interest: round2(payment - p), balance });
+    }
+    return out;
+  }
+
   const r = rate / 1200;
   const payment = rate === 0 ? roundKsh(principal / n) : roundKsh((principal * r) / (1 - Math.pow(1 + r, -n)));
   for (let i = 1; i <= n; i++) {
@@ -167,13 +204,19 @@ export interface LoanTotals {
   instalment: number;
   totalInterest: number;
   totalRepayable: number;
+  /** what the employee receives: the amount borrowed, less the interest when it is taken off up front */
+  paidOut: number;
 }
 
-export const scheduleTotals = (schedule: LoanInstalment[]): LoanTotals => ({
-  instalment: schedule[0]?.payment ?? 0,
-  totalInterest: round2(schedule.reduce((s, i) => s + i.interest, 0)),
-  totalRepayable: round2(schedule.reduce((s, i) => s + i.payment, 0)),
-});
+export const scheduleTotals = (schedule: LoanInstalment[]): LoanTotals => {
+  const totalInterest = round2(schedule.reduce((s, i) => s + i.interest, 0));
+  const totalRepayable = round2(schedule.reduce((s, i) => s + i.payment, 0));
+  return { instalment: schedule[0]?.payment ?? 0, totalInterest, totalRepayable, paidOut: round2(totalRepayable - totalInterest) };
+};
+
+/** What is paid out to the employee for a loan (the amount, less up-front interest). */
+export const loanPaidOut = (loan: { principal: number; interest_method: string; total_interest: number | null }) =>
+  loan.interest_method === 'upfront' ? round2(loan.principal - (loan.total_interest ?? 0)) : loan.principal;
 
 /** Total interest over the loan. */
 export const totalInterest = (schedule: LoanInstalment[]) => scheduleTotals(schedule).totalInterest;
@@ -271,7 +314,7 @@ export const validateLoanRequest = (
 
 /** What is wrong with the company's loan settings, or null. */
 export const settingsError = (s: LoanSettings): string | null => {
-  if (!(s.annual_rate >= 0 && s.annual_rate <= 100)) return 'The interest rate must be between 0% and 100% a year.';
+  if (!(s.annual_rate >= 0 && s.annual_rate <= 100)) return `The interest rate must be between 0% and 100%${s.interest_method === 'upfront' ? '' : ' a year'}.`;
   if (!Number.isInteger(s.min_months) || s.min_months < 1 || s.min_months > 120) return 'The shortest term must be 1 to 120 months.';
   if (!Number.isInteger(s.max_months) || s.max_months < 1 || s.max_months > 120) return 'The longest term must be 1 to 120 months.';
   if (s.min_months > s.max_months) return 'The shortest term can’t be longer than the longest.';
