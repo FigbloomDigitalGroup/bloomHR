@@ -232,15 +232,16 @@ async function askModelWithTools(caller, request) {
     }
     if (round > MAX_TOOL_ROUNDS) throw new HttpError(502, "The AI service gave an unexpected answer");
     messages.push({ role: "assistant", content: response.content });
-    // every result in one message, one per call, in order
-    const results = [];
-    for (const [i, call] of calls.entries()) {
-      let content;
-      if (round === MAX_TOOL_ROUNDS) content = JSON.stringify({ error: "Lookup limit reached. Answer now with what you have." });
-      else if (i >= MAX_TOOL_CALLS_PER_ROUND) content = JSON.stringify({ error: "Too many lookups at once; ask for fewer." });
-      else content = await runTool(caller, call.name, call.input);
-      results.push({ type: "tool_result", tool_use_id: call.id, content });
-    }
+    // the round's lookups run at the same time (runTool never throws); every result goes back in one message, in order
+    const results = await Promise.all(
+      calls.map(async (call, i) => {
+        let content;
+        if (round === MAX_TOOL_ROUNDS) content = JSON.stringify({ error: "Lookup limit reached. Answer now with what you have." });
+        else if (i >= MAX_TOOL_CALLS_PER_ROUND) content = JSON.stringify({ error: "Too many lookups at once; ask for fewer." });
+        else content = await runTool(caller, call.name, call.input);
+        return { type: "tool_result", tool_use_id: call.id, content };
+      })
+    );
     messages.push({ role: "user", content: results });
   }
 }

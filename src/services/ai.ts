@@ -39,6 +39,8 @@ const post = async <T>(path: string, body: unknown): Promise<T> => {
   }
 
   const payload = await response.json().catch(() => ({}));
+  // a 504 comes from the host when the function runs out of time, with no JSON body
+  if (response.status === 504 && !payload.error) throw new Error('The AI took too long to answer. Try again, or ask a shorter question.');
   if (!response.ok) throw new Error(payload.error || `AI request failed (${response.status})`);
   return payload as T;
 };
