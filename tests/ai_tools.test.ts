@@ -105,6 +105,16 @@ describe('get_payslips', () => {
     expect(payslips.some((p: { gross_pay: number }) => p.gross_pay === 1)).toBe(false); // the other company's
   });
 
+  it("works out a Kenyan payslip's employer NSSF and housing levy shares from the month's rates, as payroll does", async () => {
+    db.tables.salary_history.push({ tenant_id: 't-a', employee_id: 'A-002', pay_period: '2026-10', country: 'Kenya', nssf_deduction: 3121.56, housing_levy: 780.39, employer_nssf: 0 });
+    const [slip] = (await run('get_payslips', { employee_number: 'A-002' })).payslips;
+    expect(slip.employer_nssf).toBe(3121.56); // not the 0 saved on the row
+    expect(slip.employer_housing_levy).toBe(780.39);
+    db.tables.statutory_rates.push(...rateRows('t-a', { nssf_employer_rate: 0.12 }));
+    expect((await run('get_payslips', { employee_number: 'A-002' })).payslips[0].employer_nssf).toBe(6243.12);
+    expect(tools.kenyaEmployerShare(100, {}, 'nssf_rate', 'nssf_employer_rate')).toBe(100); // no rates: matches
+  });
+
   it('gives one pay period when asked, and checks its format', async () => {
     expect((await run('get_payslips', { employee_number: 'A-001', pay_period: '2026-09' })).payslips).toHaveLength(1);
     expect((await run('get_payslips', { employee_number: 'A-001', pay_period: 'Sept' })).error).toMatch(/YYYY-MM/);
