@@ -11,6 +11,7 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives",
     "typecheck": "node scripts/check-types.mjs",
     "typecheck:update": "node scripts/check-types.mjs --update",
+    "build:server-lib": "node scripts/build-server-lib.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "start": "node safaricom.js",

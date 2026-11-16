@@ -23,7 +23,22 @@ const state = vi.hoisted(() => ({
     status: number;
     json: unknown;
   },
+  // when set, the model's messages in turn (one per call), before falling back to modelReply
+  modelMessages: [] as Record<string, unknown>[],
+  toolRuns: [] as { caller: { tenantId: string }; name: string; args: string }[],
 }));
+
+// the tools themselves are tested in ai_tools.test.ts; here only who gets them and the conversation around them
+vi.mock('../ai_tools.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    runTool: async (caller: { tenantId: string }, name: string, args: string) => {
+      state.toolRuns.push({ caller, name, args });
+      return JSON.stringify({ payslips: [{ pay_period: '2026-10', net_pay: 63000 }] });
+    },
+  };
+});
 
 vi.mock('@supabase/supabase-js', () => {
   const table = (rows: () => Record<string, unknown>[]) => {
@@ -71,6 +86,8 @@ vi.mock('@supabase/supabase-js', () => {
 vi.mock('node-fetch', () => ({
   default: async (url: string, init: { headers: Record<string, string>; body: string }) => {
     state.modelCalls.push({ url, auth: init.headers.Authorization, body: JSON.parse(init.body) });
+    const next = state.modelMessages.shift();
+    if (next) return { ok: true, status: 200, json: async () => ({ choices: [{ message: next }], usage: { total_tokens: 5 } }) };
     return {
       ok: state.modelReply.ok,
       status: state.modelReply.status,
@@ -118,6 +135,8 @@ beforeEach(() => {
   state.budgets = new Map();
   state.budgetCalls = [];
   state.modelReply = { ok: true, status: 200, json: { choices: [{ message: { content: 'An answer' } }], usage: { total_tokens: 7 } } };
+  state.modelMessages = [];
+  state.toolRuns = [];
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -185,6 +204,40 @@ describe('asking the model', () => {
   it('leaves the Kenyan pay-items table out for a question about another country', async () => {
     await ask(who('hr'), { ...question, prompt: 'Is the NSSF deduction taxable in Uganda?' });
     expect(state.modelCalls[0].body.messages[0].content).not.toContain('Pay item treatment');
+  });
+
+  it('gives the payroll tools only to someone with the Payroll module, and tells the others why not', async () => {
+    await ask(who('hr'), question); // HR here has the AI assistant, not Payroll
+    expect(state.modelCalls[0].body).not.toHaveProperty('tools');
+    expect(state.modelCalls[0].body.messages[0].content).toContain('does not have the Payroll module');
+
+    await ask(who('admin'), question);
+    expect(state.modelCalls[1].body.tools.map((t: { function: { name: string } }) => t.function.name)).toEqual([
+      'find_employees', 'get_payslips', 'calculate_kenya_pay',
+    ]);
+    expect(state.modelCalls[1].body.messages[0].content).toContain('never work PAYE out yourself');
+  });
+
+  it("runs the tools the model asks for, as the caller, and gives it the results before it answers", async () => {
+    const call = { id: 'call-1', type: 'function', function: { name: 'get_payslips', arguments: '{"employee_number":"A-001"}' } };
+    state.modelMessages = [{ content: null, tool_calls: [call] }, { content: "Jane's net pay in October was KSh 63,000." }];
+    const res = await ask(who('admin'), { ...question, prompt: "Why is Jane's net pay 63,000?" });
+    expect(await res.json()).toEqual({ response: "Jane's net pay in October was KSh 63,000.", metadata: { total_tokens: 10 } });
+    expect(state.toolRuns).toEqual([{ caller: expect.objectContaining({ tenantId: TENANT }), name: 'get_payslips', args: '{"employee_number":"A-001"}' }]);
+    const second = state.modelCalls[1].body.messages;
+    expect(second.at(-2)).toEqual({ role: 'assistant', content: null, tool_calls: [call] });
+    expect(second.at(-1)).toEqual({ role: 'tool', tool_call_id: 'call-1', content: '{"payslips":[{"pay_period":"2026-10","net_pay":63000}]}' });
+    expect(state.budgetCalls).toHaveLength(1); // one question, however many lookups
+  });
+
+  it('stops looking things up after a few rounds and makes the model answer', async () => {
+    const call = { id: 'c', type: 'function', function: { name: 'find_employees', arguments: '{"query":"jane"}' } };
+    state.modelMessages = [1, 2, 3, 4].map(() => ({ content: null, tool_calls: [call] }));
+    state.modelMessages.push({ content: 'Here is what I found.' });
+    const res = await ask(who('admin'), question);
+    expect((await res.json()).response).toBe('Here is what I found.');
+    expect(state.modelCalls).toHaveLength(5);
+    expect(state.modelCalls[4].body).not.toHaveProperty('tools');
   });
 
   it('uses OPENAI_ASSISTANT_MODEL for the HR assistant only, when set', async () => {
