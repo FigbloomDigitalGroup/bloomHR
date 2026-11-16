@@ -437,7 +437,7 @@ router.post("/tax-treatment", async (req, res) => {
     const { answer } = await askModel({
       system: TAX_SYSTEM,
       messages: [{ role: "user", content: JSON.stringify(item) }],
-      maxTokens: 8000, // a short JSON answer; the rest is room for the model's thinking
+      maxTokens: 10_000, // a short JSON answer; the rest is room for the model's thinking
       effort: "medium",
     });
     const suggestion = normaliseTaxAnswer(answer);

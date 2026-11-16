@@ -408,7 +408,7 @@ describe('tax_treatment: how a pay item is taxed (a suggestion only)', () => {
     expect(await res.json()).toEqual(good);
     const { body } = state.modelCalls[0];
     expect(body.output_config).toEqual({ effort: 'medium' });
-    expect(body.max_tokens).toBe(8000);
+    expect(body.max_tokens).toBe(10_000);
     expect(body.messages).toHaveLength(1);
     expect(body.system).toContain('Kenyan law');
     expect(body.system).toContain('"depends"');
