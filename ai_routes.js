@@ -1,8 +1,12 @@
 // ai_routes.js - the AI features (HR assistant, warning letters, meeting summaries) call the model through here.
 //
-// The model is OpenAI's, called with OPENAI_API_KEY, which lives only on the server (a VITE_ variable would be built
-// into the JavaScript every visitor downloads). OPENAI_MODEL picks the model. Callers must be signed in, have the
-// module the feature belongs to (ADMIN always), and stay within a per-user hourly budget.
+// The model is Anthropic's Claude, called through the Anthropic SDK with ANTHROPIC_API_KEY, which lives only on the
+// server (a VITE_ variable would be built into the JavaScript every visitor downloads). ANTHROPIC_MODEL picks the model
+// (claude-opus-5-5 when not set); each feature sets its effort (how hard the model thinks). Every request opts into
+// server-side refusal fallbacks (fallbacks: "default"): a request the model's safety classifiers decline is re-run on
+// Anthropic's recommended fallback model in the same call; one still declined comes back as a 422 the page shows.
+// Callers must be signed in, have the module the feature belongs to (ADMIN always), and stay within a per-user
+// hourly budget.
 //
 //   POST /api/ai/chat   { purpose, prompt, context?, history? }  ->  { response, metadata }
 //   history: the conversation so far, oldest first, as [{ role: "user" | "assistant", content }]
@@ -23,14 +27,14 @@
 // countries (hr_law.js), plus the default statutory rates in force today when the question is about a rate, and are
 // told to cite the section, call it a guide and not legal advice, and say when they do not know. The HR assistant
 // answers as a consultant (HR_CONSULTANT_BRIEF) and, for questions on how pay is taxed or deducted, also gets the
-// Kenyan pay-items table and the payslip order (pay_items.js) with today's caps. OPENAI_ASSISTANT_MODEL, when set, is
-// the model for the HR assistant only (a stronger one; the other features keep OPENAI_MODEL).
+// Kenyan pay-items table and the payslip order (pay_items.js) with today's caps. ANTHROPIC_ASSISTANT_MODEL, when set,
+// is the model for the HR assistant only (the other features keep ANTHROPIC_MODEL).
 //
 // Tools: a caller with the Payroll module also lets the HR assistant look up employees, open their payslips and run the
 // payroll engine's Kenyan calculation for a "what if" (ai_tools.js), for up to MAX_TOOL_ROUNDS rounds per question. The
 // tools only read and calculate, always within the caller's own company. Others are told it cannot open pay records.
 import express from "express";
-import fetch from "node-fetch";
+import Anthropic from "@anthropic-ai/sdk";
 import { authenticate, HttpError, admin } from "./admin_routes.js";
 import { callerHasModule, createSharedBudget } from "./authz.js";
 import { RATE_TOPICS, countriesIn, hrLawPrompt, lawCountry, selectHrLaw } from "./hr_law.js";
@@ -48,17 +52,20 @@ const PURPOSES = {
     law: true, // also gets the cited HR law that fits the question (hr_law.js)
     payItems: true, // and, for pay and tax questions, the Kenyan pay-items table and payslip order (pay_items.js)
     tools: true, // payslips and the payroll calculation (ai_tools.js), for callers with the Payroll module
-    modelEnv: "OPENAI_ASSISTANT_MODEL", // a stronger model for this one feature, when set
+    modelEnv: "ANTHROPIC_ASSISTANT_MODEL", // a different model for this one feature, when set
+    effort: "medium",
   },
   warning: {
     modules: ["staffcheck"],
     system: (context) => `You are an HR assistant. Analyze this HR data and respond helpfully: ${context}`,
+    effort: "low",
   },
   "meeting-summary": {
     modules: null,
     system: () =>
       "You are a helpful assistant that summarizes meeting transcripts. Provide concise, structured summaries that capture key decisions, action items, and important discussion points. Keep it under 200 words.",
-    maxTokens: 500,
+    maxTokens: 4000, // the summary is short; the rest is room for the model's thinking
+    effort: "low",
   },
 };
 
@@ -89,7 +96,7 @@ export const TOOLS_ON = `Tools: you can look up this company's employees (find_e
 /** Told to the HR assistant when the caller does not have the Payroll module. */
 export const TOOLS_OFF = `This person does not have the Payroll module, so you cannot open anyone's payslips or salary figures for them. If they ask about a specific person's pay, say so and suggest someone with Payroll access; general questions on how pay is taxed or deducted are fine to answer.`;
 
-const DEFAULT_MODEL = "gpt-4.1-mini";
+const DEFAULT_MODEL = "claude-opus-5-5";
 const MAX_PROMPT = 50_000; // characters
 const MAX_CONTEXT = 200_000; // characters
 const MAX_HISTORY_MESSAGES = 20;
@@ -101,30 +108,94 @@ const takeBudget = createSharedBudget("ai", {
   tax_treatment: { limit: 60, windowMs: 60 * 60 * 1000 },
 });
 
-/** Asks the model and returns its answer text. The model's own error text is logged, never sent to the browser. */
-async function askModel(messages, extra = {}) {
-  const { message, usage } = await callModel(messages, extra);
-  const answer = message?.content;
-  if (typeof answer !== "string") throw new HttpError(502, "The AI service gave an unexpected answer");
-  return { answer, usage };
-}
+// the beta that lets a request declined by the model's safety classifiers be re-run on Anthropic's recommended
+// fallback model in the same call (fallbacks: "default"); on a model without fallbacks it simply runs alone
+const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
-/** One call to the model; its message as it came back (text, or tool calls), and the tokens used. */
-async function callModel(messages, extra = {}) {
-  // No temperature: newer OpenAI models only accept the default. max_completion_tokens works on all of them.
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-    body: JSON.stringify({ model: (process.env.OPENAI_MODEL || "").trim() || DEFAULT_MODEL, messages, ...extra }),
-  });
-  if (!response.ok) {
-    console.error("[ai] model request failed:", response.status, await response.text());
+let anthropicClient = null;
+/** The Anthropic client, made on first use (ANTHROPIC_API_KEY is read from the server's environment). */
+const anthropic = () => (anthropicClient ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 120_000, maxRetries: 2 }));
+
+/** Whether the server has an Anthropic key. */
+const aiConfigured = () => Boolean((process.env.ANTHROPIC_API_KEY || "").trim());
+
+/** The model for a feature: its own variable when set (modelEnv), else ANTHROPIC_MODEL, else DEFAULT_MODEL. */
+const modelFor = (modelEnv) => (modelEnv && (process.env[modelEnv] || "").trim()) || (process.env.ANTHROPIC_MODEL || "").trim() || DEFAULT_MODEL;
+
+/** The text of a response (its text blocks; thinking and fallback markers left out). */
+const textOf = (response) =>
+  (response.content ?? [])
+    .filter((b) => b.type === "text")
+    .map((b) => b.text)
+    .join("")
+    .trim();
+
+/**
+ * One call to the model. The request's system prompt and conversation are cached (the company data is large and is
+ * sent again on every tool round). The model's own error text is logged, never sent to the browser.
+ *   request: { system, messages, model?, maxTokens?, effort?, tools? }
+ */
+async function callModel({ system, messages, model, maxTokens = 16000, effort = "medium", tools }) {
+  let response;
+  try {
+    response = await anthropic().beta.messages.create({
+      model: model || modelFor(),
+      max_tokens: maxTokens,
+      system,
+      messages,
+      output_config: { effort },
+      ...(tools ? { tools } : {}),
+      cache_control: { type: "ephemeral" },
+      betas: [FALLBACK_BETA],
+      fallbacks: "default",
+    });
+  } catch (err) {
+    if (err instanceof Anthropic.APIError) console.error("[ai] model request failed:", err.status, err.message);
+    else console.error("[ai] model request failed:", err);
     throw new HttpError(502, "The AI service could not answer right now");
   }
-  const data = await response.json();
-  const message = data?.choices?.[0]?.message;
-  if (!message || typeof message !== "object") throw new HttpError(502, "The AI service gave an unexpected answer");
-  return { message, usage: data.usage };
+  // a decline by the safety classifiers (after any fallback): a normal 200, not an error
+  if (response.stop_reason === "refusal") {
+    console.error("[ai] model declined:", response.stop_details?.category ?? "no category");
+    throw new HttpError(422, "The AI could not answer this one. Try asking it a different way.");
+  }
+  return response;
+}
+
+/**
+ * The JSON object in a model's answer: the whole text, else the part from its first "{" to its last "}" (a code fence
+ * or a sentence around it is left out). Throws when there is none.
+ */
+export function parseJsonObject(text) {
+  const t = String(text ?? "").trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
+  try {
+    return JSON.parse(t);
+  } catch (err) {
+    const start = t.indexOf("{");
+    const end = t.lastIndexOf("}");
+    if (start < 0 || end <= start) throw err;
+    return JSON.parse(t.slice(start, end + 1));
+  }
+}
+
+/**
+ * The set-up chat as the model takes it: it must start with the person, so a greeting the page showed first is kept
+ * after a note that the administrator opened the chat.
+ */
+export function setupConversation(messages) {
+  const turns = messages.map((m) => ({ role: m.role, content: m.content }));
+  return turns[0]?.role === "assistant" ? [{ role: "user", content: "(The administrator opened the set-up chat.)" }, ...turns] : turns;
+}
+
+/** Asks the model and returns its answer text. */
+async function askModel(request) {
+  const response = await callModel(request);
+  const answer = textOf(response);
+  if (!answer) {
+    console.error("[ai] no answer text; stop_reason:", response.stop_reason);
+    throw new HttpError(502, "The AI service gave an unexpected answer");
+  }
+  return { answer, usage: response.usage };
 }
 
 /** Adds up the tokens of several model calls. */
@@ -140,29 +211,37 @@ export const MAX_TOOL_ROUNDS = 4;
 const MAX_TOOL_CALLS_PER_ROUND = 6;
 
 /**
- * Asks the model, letting it call the tools (ai_tools.js) for up to MAX_TOOL_ROUNDS rounds before it must answer.
- * The tool results go back to it as data; it never gets more than the caller may see.
+ * Asks the model, letting it call the tools (ai_tools.js) for up to MAX_TOOL_ROUNDS rounds; after that its lookups are
+ * answered with "limit reached" and it must answer with what it has. The tool results go back to it as data; it never
+ * gets more than the caller may see. The conversation is only ever appended to, as the API needs.
  */
-async function askModelWithTools(caller, messages, extra) {
-  const conversation = [...messages];
+async function askModelWithTools(caller, request) {
+  const messages = [...request.messages];
   let usage;
   for (let round = 0; ; round++) {
-    const last = round === MAX_TOOL_ROUNDS;
-    const { message, usage: used } = await callModel(conversation, last ? extra : { ...extra, tools: TOOL_DEFINITIONS });
-    usage = addUsage(usage, used);
-    const calls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
-    if (!calls.length || last) {
-      if (typeof message.content !== "string" || !message.content.trim()) throw new HttpError(502, "The AI service gave an unexpected answer");
-      return { answer: message.content, usage };
+    const response = await callModel({ ...request, messages, tools: TOOL_DEFINITIONS });
+    usage = addUsage(usage, response.usage);
+    const calls = (response.content ?? []).filter((b) => b.type === "tool_use");
+    if (response.stop_reason !== "tool_use" || !calls.length) {
+      const answer = textOf(response);
+      if (!answer) {
+        console.error("[ai] no answer text; stop_reason:", response.stop_reason);
+        throw new HttpError(502, "The AI service gave an unexpected answer");
+      }
+      return { answer, usage };
     }
-    conversation.push({ role: "assistant", content: message.content ?? null, tool_calls: calls });
+    if (round > MAX_TOOL_ROUNDS) throw new HttpError(502, "The AI service gave an unexpected answer");
+    messages.push({ role: "assistant", content: response.content });
+    // every result in one message, one per call, in order
+    const results = [];
     for (const [i, call] of calls.entries()) {
-      const content =
-        i < MAX_TOOL_CALLS_PER_ROUND
-          ? await runTool(caller, call?.function?.name, call?.function?.arguments)
-          : JSON.stringify({ error: "Too many lookups at once; ask for fewer." });
-      conversation.push({ role: "tool", tool_call_id: call.id, content });
+      let content;
+      if (round === MAX_TOOL_ROUNDS) content = JSON.stringify({ error: "Lookup limit reached. Answer now with what you have." });
+      else if (i >= MAX_TOOL_CALLS_PER_ROUND) content = JSON.stringify({ error: "Too many lookups at once; ask for fewer." });
+      else content = await runTool(caller, call.name, call.input);
+      results.push({ type: "tool_result", tool_use_id: call.id, content });
     }
+    messages.push({ role: "user", content: results });
   }
 }
 
@@ -245,7 +324,7 @@ router.post("/chat", async (req, res) => {
       throw new HttpError(400, "Invalid history");
     }
 
-    if (!process.env.OPENAI_API_KEY) throw new HttpError(503, "The AI assistant is not configured on the server");
+    if (!aiConfigured()) throw new HttpError(503, "The AI assistant is not configured on the server");
     if (!(await takeBudget(caller, "default", 1))) throw new HttpError(429, "AI limit reached for now. Try again later.");
 
     // the question and the person's two before it decide the topics; the countries come from the question, else the
@@ -261,14 +340,14 @@ router.post("/chat", async (req, res) => {
     const tools = rule.tools ? await callerMayUseTools(caller) : false;
     if (rule.tools) system += `\n\n${tools ? TOOLS_ON : TOOLS_OFF}`;
 
-    const model = rule.modelEnv ? (process.env[rule.modelEnv] || "").trim() : "";
-    const messages = [
-      { role: "system", content: system },
-      ...history.map((m) => ({ role: m.role, content: m.content })),
-      { role: "user", content: prompt },
-    ];
-    const extra = { ...(model ? { model } : {}), ...(rule.maxTokens ? { max_completion_tokens: rule.maxTokens } : {}) };
-    const { answer, usage } = tools ? await askModelWithTools(caller, messages, extra) : await askModel(messages, extra);
+    const request = {
+      system,
+      messages: [...history.map((m) => ({ role: m.role, content: m.content })), { role: "user", content: prompt }],
+      model: modelFor(rule.modelEnv),
+      ...(rule.maxTokens ? { maxTokens: rule.maxTokens } : {}),
+      ...(rule.effort ? { effort: rule.effort } : {}),
+    };
+    const { answer, usage } = tools ? await askModelWithTools(caller, request) : await askModel(request);
     res.json({ response: answer, metadata: usage });
   } catch (err) {
     const status = err instanceof HttpError ? err.status : 500;
@@ -320,7 +399,7 @@ const cleanText = (v, max) => (typeof v === "string" ? v.replace(/\s+/g, " ").tr
 export function normaliseTaxAnswer(text) {
   let raw;
   try {
-    raw = JSON.parse(String(text).trim().replace(/^```(?:json)?\s*|\s*```$/g, ""));
+    raw = parseJsonObject(text);
   } catch {
     return null;
   }
@@ -351,17 +430,16 @@ router.post("/tax-treatment", async (req, res) => {
     if (typeof name !== "string" || name.trim().length < 2 || name.length > MAX_TAX_NAME) throw new HttpError(400, "Invalid name");
     if (typeof description !== "string" || description.length > MAX_TAX_DESCRIPTION) throw new HttpError(400, "Invalid description");
 
-    if (!process.env.OPENAI_API_KEY) throw new HttpError(503, "The AI assistant is not configured on the server");
+    if (!aiConfigured()) throw new HttpError(503, "The AI assistant is not configured on the server");
     if (!(await takeBudget(caller, "tax_treatment", 1))) throw new HttpError(429, "AI limit reached for now. Try again later.");
 
     const item = { kind, name: name.trim(), ...(description.trim() ? { description: description.trim() } : {}) };
-    const { answer } = await askModel(
-      [
-        { role: "system", content: TAX_SYSTEM },
-        { role: "user", content: JSON.stringify(item) },
-      ],
-      { max_completion_tokens: 600, response_format: { type: "json_object" } }
-    );
+    const { answer } = await askModel({
+      system: TAX_SYSTEM,
+      messages: [{ role: "user", content: JSON.stringify(item) }],
+      maxTokens: 8000, // a short JSON answer; the rest is room for the model's thinking
+      effort: "medium",
+    });
     const suggestion = normaliseTaxAnswer(answer);
     if (!suggestion) {
       console.error("[ai] tax_treatment: the answer did not match the schema");
@@ -576,7 +654,7 @@ function normaliseSetupProposal(p) {
 export function normaliseSetupAnswer(text) {
   let raw;
   try {
-    raw = JSON.parse(String(text).trim().replace(/^```(?:json)?\s*|\s*```$/g, ""));
+    raw = parseJsonObject(text);
   } catch {
     return null;
   }
@@ -622,17 +700,16 @@ router.post("/setup", async (req, res) => {
     const companyJson = JSON.stringify(company);
     if (companyJson.length > MAX_SETUP_COMPANY) throw new HttpError(400, "Invalid company");
 
-    if (!process.env.OPENAI_API_KEY) throw new HttpError(503, "The AI assistant is not configured on the server");
+    if (!aiConfigured()) throw new HttpError(503, "The AI assistant is not configured on the server");
     if (!(await takeBudget(caller, "default", 1))) throw new HttpError(429, "AI limit reached for now. Try again later.");
 
-    const { answer } = await askModel(
-      [
-        { role: "system", content: SETUP_SYSTEM(companyJson, await lawSection(setupQuestion(messages), setupCountries(company))) },
-        ...messages.map((m) => ({ role: m.role, content: m.content })),
-      ],
-      // room for a suggestion of up to MAX_SETUP_EMPLOYEES people
-      { max_completion_tokens: 6000, response_format: { type: "json_object" } }
-    );
+    const { answer } = await askModel({
+      system: SETUP_SYSTEM(companyJson, await lawSection(setupQuestion(messages), setupCountries(company))),
+      messages: setupConversation(messages),
+      // room for a suggestion of up to MAX_SETUP_EMPLOYEES people, and the model's thinking
+      maxTokens: 16000,
+      effort: "medium",
+    });
     const result = normaliseSetupAnswer(answer);
     if (!result) {
       console.error("[ai] setup: the answer did not match the schema");
