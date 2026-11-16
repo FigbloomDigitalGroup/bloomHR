@@ -3,6 +3,7 @@
 //
 // Who gets them: only a caller with the Payroll module (ADMIN always), as payslips are. Everyone else gets no tools and
 // is told the assistant cannot open individual pay records for them. The tools only read and calculate; none writes.
+// TOOL_DEFINITIONS are in the Anthropic Messages API shape; runTool takes the tool_use block's input.
 //
 // The server reads with the service key, which bypasses row-level security, so every query here is pinned to the
 // caller's own company (tenant_id) and to the module check above. Bank details never reach the model.
@@ -38,75 +39,66 @@ const EMPLOYEE_FIELDS = [
 const PERIOD = /^\d{4}-(0[1-9]|1[0-2])$/;
 const text = (v) => (v === null || v === undefined ? "" : String(v).trim());
 
-/** The tool definitions, in OpenAI's function-calling shape. */
+/** The tool definitions, in the Anthropic Messages API's shape. */
 export const TOOL_DEFINITIONS = [
   {
-    type: "function",
-    function: {
-      name: "find_employees",
-      description:
-        "Find employees of this company by name or employee number. Returns up to 10 matches with their employee number, job, type (e.g. permanent, casual, contract), branch, country and dates. Use it to get the employee number before get_payslips.",
-      parameters: {
-        type: "object",
-        properties: { query: { type: "string", description: "Part of a name, or an employee number" } },
-        required: ["query"],
-        additionalProperties: false,
-      },
+    name: "find_employees",
+    description:
+      "Find employees of this company by name or employee number. Returns up to 10 matches with their employee number, job, type (e.g. permanent, casual, contract), branch, country and dates. Use it to get the employee number before get_payslips.",
+    input_schema: {
+      type: "object",
+      properties: { query: { type: "string", description: "Part of a name, or an employee number" } },
+      required: ["query"],
+      additionalProperties: false,
     },
   },
   {
-    type: "function",
-    function: {
-      name: "get_payslips",
-      description:
-        "An employee's saved payslips, newest first (up to 3), or the one for a pay period: every earning, the statutory deductions, taxable pay, PAYE, voluntary deductions, net pay and the employer's costs. Use it to explain a payslip with the real figures.",
-      parameters: {
-        type: "object",
-        properties: {
-          employee_number: { type: "string" },
-          pay_period: { type: "string", description: "YYYY-MM; leave out for the latest" },
-        },
-        required: ["employee_number"],
-        additionalProperties: false,
+    name: "get_payslips",
+    description:
+      "An employee's saved payslips, newest first (up to 3), or the one for a pay period: every earning, the statutory deductions, taxable pay, PAYE, voluntary deductions, net pay and the employer's costs. Use it to explain a payslip with the real figures.",
+    input_schema: {
+      type: "object",
+      properties: {
+        employee_number: { type: "string" },
+        pay_period: { type: "string", description: "YYYY-MM; leave out for the latest" },
       },
+      required: ["employee_number"],
+      additionalProperties: false,
     },
   },
   {
-    type: "function",
-    function: {
-      name: "calculate_kenya_pay",
-      description:
-        "Work out a Kenyan employee's NSSF, SHIF, housing levy, taxable pay, PAYE and net pay with Figbloom HR's payroll engine and the statutory rates in force for the month. Use it for any 'what if' (a raise, a new allowance, a pension or insurance deduction, a loan) and to check figures; do not work PAYE out yourself. To compare, run it for before and after.",
-      parameters: {
-        type: "object",
-        properties: {
-          pay_period: { type: "string", description: "YYYY-MM; the rates in force at the end of that month. Leave out for this month." },
-          gross_pay: { type: "number", description: "All cash pay for the month, including any per diem and non-taxed earnings" },
-          per_diem: { type: "number", description: "The part of gross pay that is a non-taxed per diem (left out of tax, SHIF and the levy)" },
-          non_taxable_earnings: { type: "number", description: "Other parts of gross pay that are not taxed but count for SHIF and the levy" },
-          pensionable_pay: { type: "number", description: "The pay NSSF is worked out on, when not all cash pay" },
-          benefits: {
-            type: "object",
-            description: "Monthly non-cash benefits",
-            properties: {
-              car: { type: "number" }, housing: { type: "number" }, meals: { type: "number" }, non_cash: { type: "number" }, other: { type: "number" },
-            },
-            additionalProperties: false,
+    name: "calculate_kenya_pay",
+    description:
+      "Work out a Kenyan employee's NSSF, SHIF, housing levy, taxable pay, PAYE and net pay with Figbloom HR's payroll engine and the statutory rates in force for the month. Use it for any 'what if' (a raise, a new allowance, a pension or insurance deduction, a loan) and to check figures; do not work PAYE out yourself. To compare, run it for before and after.",
+    input_schema: {
+      type: "object",
+      properties: {
+        pay_period: { type: "string", description: "YYYY-MM; the rates in force at the end of that month. Leave out for this month." },
+        gross_pay: { type: "number", description: "All cash pay for the month, including any per diem and non-taxed earnings" },
+        per_diem: { type: "number", description: "The part of gross pay that is a non-taxed per diem (left out of tax, SHIF and the levy)" },
+        non_taxable_earnings: { type: "number", description: "Other parts of gross pay that are not taxed but count for SHIF and the levy" },
+        pensionable_pay: { type: "number", description: "The pay NSSF is worked out on, when not all cash pay" },
+        benefits: {
+          type: "object",
+          description: "Monthly non-cash benefits",
+          properties: {
+            car: { type: "number" }, housing: { type: "number" }, meals: { type: "number" }, non_cash: { type: "number" }, other: { type: "number" },
           },
-          pension: { type: "number", description: "Employee's monthly registered pension or provident fund contribution, for the tax deduction only" },
-          post_retirement_medical_fund: { type: "number", description: "Monthly contribution, for the tax deduction only" },
-          mortgage_interest: { type: "number", description: "Monthly interest on an owner-occupied home loan, for the tax deduction only" },
-          insurance_premium: { type: "number", description: "Monthly life, education or health insurance premium, for insurance relief only" },
-          is_pwd: { type: "boolean", description: "Has a disability exemption certificate" },
-          voluntary_deductions: {
-            type: "number",
-            description:
-              "Everything else payroll takes from pay, in total: loans, SACCO, HELB, welfare, and any pension or insurance premium it also collects from pay (the fields above only change the tax)",
-          },
+          additionalProperties: false,
         },
-        required: ["gross_pay"],
-        additionalProperties: false,
+        pension: { type: "number", description: "Employee's monthly registered pension or provident fund contribution, for the tax deduction only" },
+        post_retirement_medical_fund: { type: "number", description: "Monthly contribution, for the tax deduction only" },
+        mortgage_interest: { type: "number", description: "Monthly interest on an owner-occupied home loan, for the tax deduction only" },
+        insurance_premium: { type: "number", description: "Monthly life, education or health insurance premium, for insurance relief only" },
+        is_pwd: { type: "boolean", description: "Has a disability exemption certificate" },
+        voluntary_deductions: {
+          type: "number",
+          description:
+            "Everything else payroll takes from pay, in total: loans, SACCO, HELB, welfare, and any pension or insurance premium it also collects from pay (the fields above only change the tax)",
+        },
       },
+      required: ["gross_pay"],
+      additionalProperties: false,
     },
   },
 ];
