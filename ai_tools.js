@@ -189,7 +189,37 @@ async function getPayslips(caller, { employee_number, pay_period }) {
   const payslips = data.map((p) =>
     Object.fromEntries(PAYSLIP_FIELDS.filter((f) => p[f] !== null && p[f] !== undefined && p[f] !== "").map((f) => [f, p[f]]))
   );
-  return { payslips, labels: { nhif_deduction: "SHIF", heslb_deduction: "HELB", tax_relief: "personal and insurance relief" } };
+  // a Kenyan payslip does not save the employer's NSSF and housing levy shares: payroll works them out from the month's
+  // rates (src/lib/payroll/countries/kenya.ts), so they are worked out here the same way, not shown as 0
+  const ratesByPeriod = new Map();
+  for (const slip of payslips) {
+    if (String(slip.country || "Kenya").toLowerCase() !== "kenya" || !PERIOD.test(text(slip.pay_period))) continue;
+    if (!ratesByPeriod.has(slip.pay_period)) ratesByPeriod.set(slip.pay_period, await ratesOn(caller.tenantId, lastDayOf(slip.pay_period)));
+    const rates = ratesByPeriod.get(slip.pay_period);
+    slip.employer_nssf = kenyaEmployerShare(num(slip.nssf_deduction), rates, "nssf_rate", "nssf_employer_rate");
+    slip.employer_housing_levy = kenyaEmployerShare(num(slip.housing_levy), rates, "ahl_rate", "ahl_employer_rate");
+  }
+  return {
+    payslips,
+    labels: {
+      nhif_deduction: "SHIF",
+      heslb_deduction: "HELB",
+      tax_relief: "personal and insurance relief",
+      employer_nssf: "the employer's NSSF share, on top of pay (worked out from the month's rates for Kenya)",
+      employer_housing_levy: "the employer's housing levy share, on top of pay (worked out from the month's rates)",
+    },
+  };
+}
+
+/**
+ * The employer's share of a Kenyan contribution, from the employee's, as the payroll engine works it out (kenya.ts
+ * kenyaPayslipResult): employee's share x employer rate / employee rate; the same as the employee's without the rates.
+ */
+export function kenyaEmployerShare(employee, rates, employeeRateCode, employerRateCode) {
+  if (rates[employeeRateCode] === undefined || rates[employeeRateCode] === null) return employee;
+  const r = num(rates[employeeRateCode]);
+  const er = rates[employerRateCode] === undefined ? r : num(rates[employerRateCode]);
+  return r > 0 ? round2((employee * er) / r) : 0;
 }
 
 const num = (v) => {
