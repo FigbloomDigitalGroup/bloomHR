@@ -277,7 +277,8 @@ export const AIAssistantPage = ({ selectedTown, onTownChange, widget = false }: 
       ])
       setMessage('')
     } catch (error) {
-      setError('Failed to get AI response')
+      // the server's own message (services/ai.ts), e.g. "The AI assistant is not configured on the server"
+      setError(error instanceof Error && error.message ? error.message : 'Failed to get AI response')
       console.error(error)
     } finally {
       setLoading(false)
