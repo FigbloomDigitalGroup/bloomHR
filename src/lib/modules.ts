@@ -21,6 +21,10 @@
 // reopen-leave (20261023000000_leave_reopen.sql) was given once to Operations: send approved leave back to pending.
 // mailbox (20261025200000_user_mailboxes.sql) was given to no role: a company ticks it for the roles that should read
 // their own mailbox in the app.
+// payments (20261025400000_payments_to_make.sql) was given once to administrators and every role holding payroll, the
+// people who paid until then; requisitions to HR.
+// staff-id-cards (20261027400000_staff_id_cards.sql) was given once to ADMIN and HR: view, print and reissue anyone's
+// staff ID card (everyone sees their own without it).
 // (custom roles based on those roles got them too). Administrators always have every module.
 
 export type ModuleArea = 'overview' | 'workspace' | 'people' | 'time' | 'performance' | 'pay' | 'system';
@@ -57,7 +61,7 @@ export const MODULES: ModuleInfo[] = [
   { id: 'chat-admin', name: 'Moderate chat', area: 'workspace', explain: 'See private channels, manage any channel and its members, edit or remove anyone’s messages (never direct messages)' },
   { id: 'sms', name: 'SMS Center', area: 'workspace', explain: 'Send SMS messages to staff' },
   { id: 'email-portal', name: 'Email Portal', area: 'workspace', explain: 'Send emails to staff from the app' },
-  { id: 'mailbox', name: 'My mailbox', area: 'workspace', explain: 'Connect their own email account and read it in the Email Portal' },
+  { id: 'mailbox', name: 'My mailbox', area: 'workspace', explain: 'Connect their own email account and read and send it in the app (Email Portal, or Mail in the staff portal)' },
   // people
   { id: 'employees', name: 'Employees', area: 'people', explain: 'See and edit employee records, departments, onboarding and bulk uploads' },
   { id: 'employee-edit', name: 'Add and edit employees', area: 'people', explain: 'Show Add employee and Edit on employee records (what can be saved still follows Employees)' },
@@ -67,6 +71,7 @@ export const MODULES: ModuleInfo[] = [
   { id: 'recruitment', name: 'Recruitment', area: 'people', explain: 'Job openings, candidates and offers' },
   { id: 'training', name: 'Training', area: 'people', explain: 'Upload and assign training videos' },
   { id: 'hr-lifecycle', name: 'HR Lifecycle', area: 'people', explain: 'Contracts, probation, employment status, suspensions and the HR Lifecycle screen' },
+  { id: 'staff-id-cards', name: 'Staff ID cards', area: 'people', explain: 'View, print and reissue anyone’s staff ID card, and choose what the cards show' },
   { id: 'approve-exits', name: 'Approve exits', area: 'people', explain: 'Approve or decline an employee’s exit, and open HR Lifecycle to do it' },
   { id: 'adminconfirm', name: 'Email Admin', area: 'people', explain: 'Approve staff who sign up for the staff portal' },
   { id: 'phone-approvals', name: 'Approvals', area: 'people', explain: 'Approve phone and device changes' },
@@ -87,6 +92,8 @@ export const MODULES: ModuleInfo[] = [
   { id: 'salaryadmin', name: 'Salary Advance', area: 'pay', explain: 'Review and approve salary advance requests' },
   { id: 'loans', name: 'Staff loans', area: 'pay', explain: 'Manage staff loans and get loan requests' },
   { id: 'expenses', name: 'Expenses', area: 'pay', explain: 'Expense claims and approvals' },
+  { id: 'requisitions', name: 'Approve requisitions', area: 'pay', explain: 'Raise, approve or turn down requests for money (requisitions)' },
+  { id: 'payments', name: 'Payments to make', area: 'pay', explain: 'Get told when money is approved, and record how it was paid' },
   { id: 'asset', name: 'Assets', area: 'pay', explain: 'Track company assets' },
   { id: 'mpesa-zap', name: 'Mpesa Zap', area: 'pay', explain: 'M-Pesa payments' },
   // company set-up and security

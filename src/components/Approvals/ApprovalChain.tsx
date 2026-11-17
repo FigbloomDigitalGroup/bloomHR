@@ -30,7 +30,9 @@ const StepIcon = ({ status }: { status: ChainStepStatus }) => {
   return <Minus className={cls} strokeWidth={2.5} />;
 };
 
-const when = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString() : '');
+// the day and time a step was decided: "23/10/2026, 13:05"
+const when = (iso: string | null) =>
+  (iso ? new Date(iso).toLocaleString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');
 
 /** One line per step: "Line manager · Approved by Jane Doe", "HR · Waiting on HR". */
 function StepLine({ step }: { step: ChainStep }) {
@@ -86,13 +88,16 @@ export default function ApprovalChain({ chain, onDecided, compact = false }: App
 
   if (compact) {
     const current = chain.steps.find((s) => s.status === 'current');
+    // a finished request says who ended it, and why: the step that rejected it, or the last to approve it
+    const decided = chain.steps.find((s) => s.status === 'rejected')
+      ?? (chain.status === 'approved' ? [...chain.steps].reverse().find((s) => s.status === 'approved') : undefined);
     return (
       <div className="flex flex-col gap-1 min-w-0">
         <ol className="m-0 p-0 list-none flex flex-wrap items-center gap-1" aria-label="Approval chain">
           {chain.steps.map((s, i) => (
             <li key={s.position} className="flex items-center gap-1">
               <span
-                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill text-[10.5px] font-semibold ${dotClass[s.status]}`}
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-pill text-[10.5px] font-semibold whitespace-nowrap ${dotClass[s.status]}`}
                 title={`${s.label}: ${STATUS[s.status].label}`}
               >
                 <StepIcon status={s.status} />
@@ -103,11 +108,23 @@ export default function ApprovalChain({ chain, onDecided, compact = false }: App
           ))}
         </ol>
         {current?.waiting_on && <span className="text-[10.5px] text-muted-foreground">Waiting on {current.waiting_on}</span>}
+        {decided?.actor_name && (
+          <span className="text-[10.5px] text-muted-foreground">
+            {decided.status === 'rejected' ? 'Rejected' : 'Approved'} by {decided.actor_name}
+            {decided.acted_as === 'admin' ? ' (admin)' : ''}{decided.acted_at ? `, ${when(decided.acted_at)}` : ''}
+          </span>
+        )}
+        {decided?.comment && <span className="text-[10.5px] text-ink italic break-words">“{decided.comment}”</span>}
       </div>
     );
   }
 
   const decide = async (decision: 'approved' | 'rejected') => {
+    // the employee is told why (decide_approval refuses a rejection without a reason too)
+    if (decision === 'rejected' && !comment.trim()) {
+      setError('Give a reason for rejecting: the employee will see it');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -155,7 +172,7 @@ export default function ApprovalChain({ chain, onDecided, compact = false }: App
       {canAct && (
         <div className="flex flex-col gap-2 border-t border-border pt-3">
           <label className="text-[11.5px] font-semibold text-ink" htmlFor={`approval-comment-${chain.request_id}`}>
-            Comment (optional)
+            Comment (optional to approve, required to reject)
           </label>
           <textarea
             id={`approval-comment-${chain.request_id}`}

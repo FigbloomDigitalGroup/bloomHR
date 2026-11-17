@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /mfa
+Disallow: /join
+Disallow: /offer
+Disallow: /update-password
+Disallow: /auth/
+
+Sitemap: https://hr.figbloom.org/sitemap.xml

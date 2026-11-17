@@ -1,4 +1,4 @@
-import { useMemo, useState, type DragEvent } from 'react';
+import { useMemo, useRef, useState, type DragEvent, type PointerEvent } from 'react';
 import { CalendarDays, GitBranch } from 'lucide-react';
 import {
   STATUSES, dropPosition, formatDue, groupByStatus, isOverdue, subtaskProgress,
@@ -39,6 +39,7 @@ export function TaskCard({ task, props, dragging, onDragStart, onDragEnd, onDrop
       role="button"
       tabIndex={0}
       data-testid={`task-card-${task.key}`}
+      data-task-card
       draggable={editable}
       onDragStart={(e) => onDragStart(e, task)}
       onDragEnd={onDragEnd}
@@ -75,11 +76,36 @@ export function TaskCard({ task, props, dragging, onDragStart, onDragEnd, onDrop
   );
 }
 
-/** Columns per status; drag a card to another column or between cards (HTML5 drag and drop). */
+// pressing on these moves them (or uses them), not the board
+const NOT_PANNED = '[data-task-card], button, a, input, select, textarea, label';
+
+/**
+ * Columns per status; drag a card to another column or between cards (HTML5 drag and drop). Grab the board anywhere
+ * else and drag to pan across the columns (no scrollbar); touch screens swipe as usual.
+ */
 export default function TaskBoard(props: TaskViewProps) {
   const columns = useMemo(() => groupByStatus(props.tasks, props.sort ?? 'manual'), [props.tasks, props.sort]);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overStatus, setOverStatus] = useState<TaskStatus | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const pan = useRef<{ x: number; left: number } | null>(null);
+  const [panning, setPanning] = useState(false);
+
+  const startPan = (e: PointerEvent<HTMLDivElement>) => {
+    // touch screens already swipe the board
+    if (e.pointerType === 'touch' || e.button !== 0 || (e.target as HTMLElement).closest(NOT_PANNED)) return;
+    pan.current = { x: e.clientX, left: e.currentTarget.scrollLeft };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    setPanning(true);
+  };
+  const movePan = (e: PointerEvent<HTMLDivElement>) => {
+    if (!pan.current || !boardRef.current) return;
+    boardRef.current.scrollLeft = pan.current.left - (e.clientX - pan.current.x);
+  };
+  const endPan = () => {
+    pan.current = null;
+    setPanning(false);
+  };
 
   const byId = useMemo(() => new Map(props.tasks.map((t) => [t.id, t])), [props.tasks]);
 
@@ -111,7 +137,15 @@ export default function TaskBoard(props: TaskViewProps) {
   };
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2 min-h-[50vh]" data-testid="task-board">
+    <div
+      ref={boardRef}
+      className={`flex gap-3 overflow-x-auto pb-2 min-h-[50vh] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${panning ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
+      data-testid="task-board"
+      onPointerDown={startPan}
+      onPointerMove={movePan}
+      onPointerUp={endPan}
+      onPointerCancel={endPan}
+    >
       {STATUSES.map((s) => (
         <section
           key={s.value}

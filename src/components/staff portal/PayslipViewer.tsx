@@ -34,6 +34,7 @@ import { useBackToClose } from '../../hooks/useBackToClose';
 import { currencyOf, currencySymbol } from '../../lib/payroll/currency';
 import { PayslipDocument } from '../Payroll/PayslipDocument';
 import { perDiemRateOf, statutoryFor, type Rates } from '../../lib/statutoryCalc';
+import { reimbursementOf } from '../../lib/reimbursements';
 import { lastDayOf } from '../../lib/payrollExports';
 import { usePayslipExtras } from '../Payroll/usePayslipExtras';
 
@@ -72,6 +73,8 @@ const savedPayslipValues = (saved: Record<string, any>) => {
     commission: n(saved.commission),
     bonus: n(saved.bonus),
     perDiem,
+    // what the payslip pays as per diem: the share of basic (until September 2026), or the Per diem reimbursement since
+    perDiemPaid: perDiem + reimbursementOf(saved, 'Per diem'),
     grossPay,
     payeTax: n(saved.paye_tax),
     nhifDeduction: n(saved.nhif_deduction),
@@ -248,6 +251,7 @@ const calculatePayrollValues = (employee, overrideStatutoryChecks = true, salary
     commission,
     bonus,
     perDiem,
+    perDiemPaid: perDiem,
     grossPay,
     payeTax,
     nhifDeduction,
@@ -947,7 +951,7 @@ const PayslipViewer = () => {
                           {calculated.sym} {calculated.grossPay.toLocaleString()}
                         </td>
                         <td className="px-4 py-4 text-right font-bold text-orange-text-alt">
-                          {calculated.sym} {calculated.perDiem.toLocaleString()}
+                          {calculated.sym} {calculated.perDiemPaid.toLocaleString()}
                         </td>
                         <td className="px-4 py-4 text-right text-status-danger">
                           {calculated.sym} {Math.round(calculated.payeTax).toLocaleString()}
@@ -1021,7 +1025,7 @@ const PayslipViewer = () => {
                                 )}
                                 <div className="flex justify-between font-bold bg-orange-tint-alt p-1">
                                   <span>Per Diem:</span>
-                                  <span>{calculated.sym} {calculated.perDiem.toLocaleString()}</span>
+                                  <span>{calculated.sym} {calculated.perDiemPaid.toLocaleString()}</span>
                                 </div>
                               </div>
 

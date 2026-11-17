@@ -4,12 +4,12 @@ import { Card } from '../UI';
 import type { EmployeeRecord } from '../../lib/profileCompleteness';
 import { returnsReadiness } from '../../lib/payrollExports';
 
-// On the payroll page: whether everyone on this month's payroll has what the KRA P10, SHA and NSSF returns need, and
+// On the payroll page: whether everyone on this month's payroll has what the KRA P10, SHIF and NSSF returns need, and
 // who is missing what. Fix them (Missing details, or the employee's onboarding) before approving the month.
 
 const RETURNS = [
   { key: 'p10', label: 'KRA P10' },
-  { key: 'sha', label: 'SHA' },
+  { key: 'sha', label: 'SHIF' },
   { key: 'nssf', label: 'NSSF' },
 ] as const;
 
@@ -24,7 +24,7 @@ export default function ReturnsReadiness({ employees }: { employees: EmployeeRec
       <div className="flex flex-wrap items-center gap-3 text-xs">
         <span className="font-semibold text-ink">Returns check</span>
         {allReady ? (
-          <span className="inline-flex items-center gap-1 text-status-success"><CheckCircle2 className="w-3.5 h-3.5" /> Everyone on payroll has what the P10, SHA and NSSF returns need</span>
+          <span className="inline-flex items-center gap-1 text-status-success"><CheckCircle2 className="w-3.5 h-3.5" /> Everyone on payroll has what the P10, SHIF and NSSF returns need</span>
         ) : (
           RETURNS.map(({ key, label }) => (
             <button key={key} type="button" onClick={() => setOpen(open === key ? null : key)}

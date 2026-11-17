@@ -75,18 +75,34 @@ export interface Message {
   timestamp: string;
   reactions?: Reaction[];
   attachments?: Attachment[];
+  /** the message this one replies to (in the same chat) */
+  replyTo?: string | null;
+  /** the text was changed after it was sent */
+  isEdited?: boolean;
 }
 
+/** One emoji on one message, summed up from the people who chose it. */
 export interface Reaction {
   emoji: string;
   count: number;
+  /** login ids of the people who reacted with it */
   users: string[];
+  /** whether I am one of them (clicking it again takes mine away) */
+  mine?: boolean;
 }
 
-export interface Attachment {
+/** One person's reaction, as stored (message_reactions). */
+export interface ReactionRow {
   id: string;
+  messageId: string;
+  userId: string;
+  emoji: string;
+}
+
+/** A file sent with a message: its path in the private chat-attachments bucket, opened through a short-lived link. */
+export interface Attachment {
+  path: string;
   name: string;
-  url: string;
   type: string;
   size: number;
 }

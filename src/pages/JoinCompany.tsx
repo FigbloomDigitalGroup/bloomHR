@@ -7,6 +7,7 @@ import { ApiError } from '../lib/adminApi';
 import AuthShell, { AuthButton, Field, authLinkClass } from '../components/Company/AuthShell';
 import { useSessionEmail } from '../components/Company/useSessionEmail';
 import { LoaderBlock } from '../components/UI/FigbloomLoader';
+import HandoffConnectNote from '../components/Platform/HandoffConnectNote';
 
 const roleLabel = (role: string) => role.charAt(0) + role.slice(1).toLowerCase();
 
@@ -175,6 +176,7 @@ export default function JoinCompany() {
       title={heading}
       subtitle={`${about} ${mode === 'create' ? 'Tell us your name and choose a password to get started.' : 'You already have an account: sign in to add this company to it.'}`}
     >
+      <div className="mb-6 empty:hidden"><HandoffConnectNote /></div>
       <form onSubmit={submit} className="space-y-6">
         {mode === 'create' && <Field label="Your full name" value={fullName} onChange={setFullName} autoComplete="name" placeholder="Jane Doe" />}
         <Field label="Email" type="email" value={preview.email} onChange={() => undefined} readOnly autoComplete="email" />

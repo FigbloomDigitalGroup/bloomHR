@@ -1,7 +1,9 @@
 import toast from 'react-hot-toast';
+import { downloadAdvances, printAdvanceReport } from '../../lib/reports/advanceExports';
 import { noticeDialog } from '../../lib/confirmDialog';
 import React, { useState, useEffect } from 'react';
 import EmployeePicker from '../UI/EmployeePicker';
+import { BackToReports } from './ReportFrame';
 import Modal from '../UI/Modal';
 import {
   Filter,
@@ -1405,8 +1407,14 @@ const BaseReport: React.FC<BaseReportProps> = ({
       ? employeeAdvanceArray
       : employeeAdvanceArray.filter(emp => selectedEmployees.has(emp.employee.employee_number));
 
-    toast(`Downloading ${employeesToDownload.length} reports in ${format.toUpperCase()} is coming soon.`);
-    // Implement actual download logic here
+    const numbers = new Set(employeesToDownload.map((emp: any) => emp.employee.employee_number));
+    const records = reportData.filter((t) => numbers.has(t.employee_number));
+    if (records.length === 0) {
+      toast.error('Choose at least one employee with advances to download.');
+      return;
+    }
+    downloadAdvances(format, records);
+    toast.success(`Downloaded ${records.length} advance${records.length === 1 ? '' : 's'} for ${numbers.size} employee${numbers.size === 1 ? '' : 's'}.`);
   };
 
   // Toggle employee selection
@@ -1664,8 +1672,11 @@ const BaseReport: React.FC<BaseReportProps> = ({
                         </button>
                         <button
                           onClick={() => {
-                            toast(`Printing ${employee.first_name} ${employee.last_name}'s report is coming soon.`);
-                            // Add print logic here
+                            const opened = printAdvanceReport(
+                              { name: `${employee.first_name} ${employee.last_name}`, number: employee.employee_number },
+                              reportData.filter((t) => t.employee_number === employee.employee_number)
+                            );
+                            if (!opened) toast.error('Your browser blocked the print window. Allow pop-ups for this site, then try again.');
                           }}
                           className="flex-1 px-2 py-1 text-xs font-medium text-orange bg-orange-tint hover:bg-orange-tint rounded border border-orange/20 transition-colors"
                         >
@@ -1705,6 +1716,7 @@ const BaseReport: React.FC<BaseReportProps> = ({
   return (
     <div className="p-6 bg-page min-h-screen">
       <div className="max-w-7xl mx-auto">
+        <BackToReports className="mb-3" />
         {/* Accounting Report Header */}
         <div className="mb-6 bg-white rounded-lg border border-gray-300 p-6 shadow-sm">
           <div className="flex justify-between items-start">

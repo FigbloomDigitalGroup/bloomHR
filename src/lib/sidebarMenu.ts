@@ -67,6 +67,8 @@ export const SIDEBAR_MENU: SidebarMenuGroup[] = [
       { id: 'advanced', label: 'Salary Advance', path: '/salaryadmin' },
       // HR and payroll (and admins): staff loans with interest
       { id: 'loans', label: 'Loans', path: '/loans' },
+      // approved advances, loans, expenses and requisitions for finance to pay; HR's requisitions (FIG-1209)
+      { id: 'payments', label: 'Payments to make', path: '/payments' },
       { id: 'asset', label: 'Assets', path: '/asset' },
       { id: 'mpesa-zap', label: 'Mpesa Zap', path: '/mpesa-zap' },
     ],
@@ -92,6 +94,18 @@ export const SIDEBAR_MENU: SidebarMenuGroup[] = [
     ],
   },
 ];
+
+// Figbloom's own pages, shown in the sidebar only to platform admins (is_platform_admin()). Not part of SIDEBAR_MENU:
+// they are not a company's modules, so the Roles screen's preview never shows them.
+// The Figbloom console (console.figbloom.org, src/lib/console.ts) now has these pages without any company role; this
+// group stays in the company app until the console is live in production, then a follow-up removes it.
+export const PLATFORM_MENU: SidebarMenuGroup = {
+  title: 'Platform',
+  items: [
+    { id: 'platform-organisations', label: 'Organisations', path: '/platform/organisations' },
+    { id: 'platform-rates', label: 'Statutory rates', path: '/platform/rates' },
+  ],
+};
 
 // The staff portal's menu, without its icons (StaffPortal.tsx adds those). Staff (base role STAFF, and the company
 // roles based on it) always get these; the portal does not hide entries by module. Inside Tasks, the modules decide
@@ -183,6 +197,8 @@ export const STAFF_PORTAL_MENU: PortalMenuGroup[] = [
         ],
       },
       { id: 'contract', label: 'Contracts' },
+      // the staff ID card ("job card"), to show on the phone or print (migration 20261027400000)
+      { id: 'id-card', label: 'My ID card', keywords: ['job card', 'staff id', 'badge', 'qr'] },
       // resigning starts at the bottom of Profile (behind a confirmation), so searching for it finds Profile
       { id: 'details', label: 'Profile', keywords: ['resign', 'resignation', 'leaving'] },
       { id: 'biodata', label: 'Bio Data' },
@@ -191,6 +207,20 @@ export const STAFF_PORTAL_MENU: PortalMenuGroup[] = [
     ],
   },
 ];
+
+/** Communication's Mail: their own mailbox, shown only with the My mailbox module (FIG-1205) */
+export const STAFF_PORTAL_MAIL = { id: 'mail', label: 'Mail' };
+
+/** The staff portal's menu, with Mail first under Communication when they have My mailbox. */
+export function staffPortalMenu({ mail }: { mail: boolean }): PortalMenuGroup[] {
+  if (!mail) return STAFF_PORTAL_MENU;
+  return STAFF_PORTAL_MENU.map((group) => ({
+    ...group,
+    items: group.items.map((item) =>
+      item.id === 'communication' ? { ...item, submenu: [STAFF_PORTAL_MAIL, ...(item.submenu ?? [])], keywords: [...(item.keywords ?? []), 'email', 'inbox'] } : item
+    ),
+  }));
+}
 
 /** Shown only to someone who supervises at least one person (migration 20261018900000) */
 export const STAFF_PORTAL_MY_TEAM: PortalMenuGroup = { title: 'My team', items: [{ id: 'my-team', label: 'My team' }] };

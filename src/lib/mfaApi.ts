@@ -83,6 +83,37 @@ export async function saveTwoStepSettings(mode: TwoStepMode, method: TwoStepMeth
 }
 
 // ---------------------------------------------------------------------------------------------
+// how long people stay signed in (migration 20261026100000): the idle limit, and how long a passed code is trusted
+// ---------------------------------------------------------------------------------------------
+
+export const STAY_SIGNED_IN_OPTIONS: { minutes: number; label: string }[] = [
+  { minutes: 30, label: '30 minutes' },
+  { minutes: 480, label: '8 hours' },
+  { minutes: 1440, label: '1 day' },
+  { minutes: 10080, label: '7 days' },
+];
+
+export interface StaySignedIn {
+  minutes: number;
+  /** people whose role has Sign-in security */
+  can_edit: boolean;
+}
+
+/** The company's setting; null when it cannot be read. */
+export async function loadStaySignedIn(): Promise<StaySignedIn | null> {
+  const { data, error } = await supabase.rpc('stay_signed_in_settings');
+  if (error) return null;
+  return ((Array.isArray(data) ? data[0] : data) as StaySignedIn | undefined) ?? null;
+}
+
+/** Saves the company's setting. Throws with the reason when refused. */
+export async function saveStaySignedIn(minutes: number): Promise<StaySignedIn> {
+  const { data, error } = await supabase.rpc('set_stay_signed_in', { p_minutes: minutes });
+  if (error) throw new Error(error.message);
+  return (Array.isArray(data) ? data[0] : data) as StaySignedIn;
+}
+
+// ---------------------------------------------------------------------------------------------
 // a person's own setting (FIG-891, migration 20261018500000)
 // ---------------------------------------------------------------------------------------------
 

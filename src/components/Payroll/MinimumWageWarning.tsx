@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Scale } from 'lucide-react';
 import { Card, TableScroll } from '../UI';
@@ -45,10 +45,16 @@ export default function MinimumWageWarning({ payslips, employees, payPeriod, per
         : [],
     [loaded, payslips, employees],
   );
+  // reported only when the counts change: reporting the same counts again re-renders the payroll page, which could
+  // hand this a new payslip list and come back here (a loop that hung the page)
+  const reported = useRef<string | null>(null);
   useEffect(() => {
     if (!onShortfalls) return;
     const byCountry = new Map<string, number>();
     for (const s of below) byCountry.set(s.country, (byCountry.get(s.country) ?? 0) + 1);
+    const key = JSON.stringify([...byCountry].sort());
+    if (key === reported.current) return;
+    reported.current = key;
     onShortfalls(byCountry);
   }, [below, onShortfalls]);
   if (below.length === 0) return null;

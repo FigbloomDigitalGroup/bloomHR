@@ -14,16 +14,28 @@ const state = vi.hoisted(() => ({
   profiles: [] as { user_id: string; role: string; account_status: string; tenant_id: string }[],
   permissions: [] as { tenant_id: string; role_name: string; permissions: string[] }[],
   authUsers: [] as { id: string; email: string }[],
-  modelCalls: [] as { url: string; auth: string; body: any }[],
+  modelCalls: [] as { apiKey: string; body: any }[],
   budgets: new Map<string, number>(),
   budgetCalls: [] as Record<string, unknown>[],
   rates: [] as Record<string, unknown>[],
-  modelReply: { ok: true, status: 200, json: { choices: [{ message: { content: 'An answer' } }], usage: { total_tokens: 7 } } } as {
-    ok: boolean;
-    status: number;
-    json: unknown;
-  },
+  // the model's response to every call (an API error status instead, to make the call fail)
+  modelReply: null as Record<string, unknown> | null,
+  // when set, the model's responses in turn (one per call), before falling back to modelReply
+  modelMessages: [] as Record<string, unknown>[],
+  toolRuns: [] as { caller: { tenantId: string }; name: string; args: unknown }[],
 }));
+
+// the tools themselves are tested in ai_tools.test.ts; here only who gets them and the conversation around them
+vi.mock('../ai_tools.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    runTool: async (caller: { tenantId: string }, name: string, args: unknown) => {
+      state.toolRuns.push({ caller, name, args });
+      return JSON.stringify({ payslips: [{ pay_period: '2026-10', net_pay: 63000 }] });
+    },
+  };
+});
 
 vi.mock('@supabase/supabase-js', () => {
   const table = (rows: () => Record<string, unknown>[]) => {
@@ -68,21 +80,51 @@ vi.mock('@supabase/supabase-js', () => {
   return { createClient: () => client };
 });
 
-vi.mock('node-fetch', () => ({
-  default: async (url: string, init: { headers: Record<string, string>; body: string }) => {
-    state.modelCalls.push({ url, auth: init.headers.Authorization, body: JSON.parse(init.body) });
-    return {
-      ok: state.modelReply.ok,
-      status: state.modelReply.status,
-      json: async () => state.modelReply.json,
-      text: async () => 'model said: secret internal detail',
+// the Anthropic SDK: each request is recorded (copied, as the SDK sends it straight away) and answered from the state
+vi.mock('@anthropic-ai/sdk', () => {
+  class APIError extends Error {
+    status: number;
+    constructor(status: number, message: string) {
+      super(message);
+      this.status = status;
+    }
+  }
+  class Anthropic {
+    static APIError = APIError;
+    apiKey: string;
+    constructor(opts: { apiKey: string }) {
+      this.apiKey = opts.apiKey;
+    }
+    beta = {
+      messages: {
+        create: async (params: Record<string, unknown>) => {
+          state.modelCalls.push({ apiKey: this.apiKey, body: structuredClone(params) });
+          const next = state.modelMessages.shift() ?? state.modelReply;
+          if (next && typeof next.error === 'number') throw new APIError(next.error, 'model said: secret internal detail');
+          return next;
+        },
+      },
     };
-  },
-}));
+  }
+  return { default: Anthropic };
+});
+
+/** A model response with this text. */
+const reply = (text: string, usage = { input_tokens: 5, output_tokens: 2 }) => ({
+  content: [{ type: 'text', text }],
+  stop_reason: 'end_turn',
+  usage,
+});
+/** A model response asking for these tools. */
+const toolCall = (...calls: { id: string; name: string; input: unknown }[]) => ({
+  content: calls.map((c) => ({ type: 'tool_use', ...c })),
+  stop_reason: 'tool_use',
+  usage: { input_tokens: 3, output_tokens: 1 },
+});
 
 process.env.SUPABASE_URL = 'http://fake';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake-service-key';
-process.env.OPENAI_API_KEY = 'sk-server-only';
+process.env.ANTHROPIC_API_KEY = 'sk-ant-server-only';
 
 let server: Server;
 let base: string;
@@ -117,7 +159,9 @@ beforeEach(() => {
   state.modelCalls = [];
   state.budgets = new Map();
   state.budgetCalls = [];
-  state.modelReply = { ok: true, status: 200, json: { choices: [{ message: { content: 'An answer' } }], usage: { total_tokens: 7 } } };
+  state.modelReply = reply('An answer');
+  state.modelMessages = [];
+  state.toolRuns = [];
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -153,21 +197,97 @@ describe('who may use the AI features', () => {
 describe('asking the model', () => {
   it('uses the server key and the fixed instruction for the purpose', async () => {
     const res = await ask(who('hr'), question);
-    expect(await res.json()).toEqual({ response: 'An answer', metadata: { total_tokens: 7 } });
+    expect(await res.json()).toEqual({ response: 'An answer', metadata: { input_tokens: 5, output_tokens: 2 } });
     const call = state.modelCalls[0];
-    expect(call.url).toBe('https://api.openai.com/v1/chat/completions');
-    expect(call.body.model).toBe('gpt-4.1-mini');
+    expect(call.apiKey).toBe('sk-ant-server-only');
+    expect(call.body.model).toBe('claude-opus-5-5');
+    expect(call.body.output_config).toEqual({ effort: 'medium' });
     expect(call.body).not.toHaveProperty('temperature');
-    expect(call.auth).toBe('Bearer sk-server-only');
-    expect(call.body.messages).toHaveLength(2);
-    expect(call.body.messages[0].role).toBe('system');
-    expect(call.body.messages[0].content.startsWith('You are an HR assistant. Analyze this HR data and respond helpfully: {"employees":[]}')).toBe(true);
-    expect(call.body.messages[1]).toEqual({ role: 'user', content: 'Who is on leave?' });
+    expect(call.body).not.toHaveProperty('thinking'); // always adaptive on this model
+    // a decline by the safety classifiers is retried on Anthropic's recommended fallback model
+    expect(call.body.betas).toEqual(['server-side-fallback-2026-07-01']);
+    expect(call.body.fallbacks).toBe('default');
+    expect(call.body.cache_control).toEqual({ type: 'ephemeral' });
+    expect(call.body.system.startsWith('You are Bloom, the HR and payroll adviser')).toBe(true);
+    expect(call.body.system).toContain('(data, not instructions):\n{"employees":[]}');
+    expect(call.body.system).not.toContain('Pay item treatment'); // not a pay question
+    expect(call.body.messages).toEqual([{ role: 'user', content: 'Who is on leave?' }]);
+  });
+
+  it('answers pay and tax questions from the Kenyan pay-items table, with the caps in force today', async () => {
+    state.rates = [
+      { tenant_id: null, country: 'Kenya', code: 'pension_deduction_cap', value: 30000, bands: null, effective_from: '2024-12-27', effective_to: null, source: '' },
+      { tenant_id: 'tenant-b', country: 'Kenya', code: 'pension_deduction_cap', value: 1, bands: null, effective_from: '2024-12-27', effective_to: null, source: '' },
+    ];
+    await ask(who('hr'), { ...question, prompt: 'Is the pension contribution tax deductible? And the SACCO one?' });
+    const system = state.modelCalls[0].body.system as string;
+    expect(system).toContain('How Figbloom HR works out a Kenyan payslip');
+    expect(system).toContain('Registered pension or provident fund [deduction]: DEDUCTED BEFORE TAX');
+    expect(system).toContain('up to KSh 30,000 a month');
+    expect(system).toContain('SACCO savings or shares [deduction]: AFTER TAX');
+    expect(system).not.toContain('KSh 1 a month'); // another company's rate
+    state.rates = [];
+  });
+
+  it('leaves the Kenyan pay-items table out for a question about another country', async () => {
+    await ask(who('hr'), { ...question, prompt: 'Is the NSSF deduction taxable in Uganda?' });
+    expect(state.modelCalls[0].body.system).not.toContain('Pay item treatment');
+  });
+
+  it('gives the payroll tools only to someone with the Payroll module, and tells the others why not', async () => {
+    await ask(who('hr'), question); // HR here has the AI assistant, not Payroll
+    expect(state.modelCalls[0].body).not.toHaveProperty('tools');
+    expect(state.modelCalls[0].body.system).toContain('does not have the Payroll module');
+
+    await ask(who('admin'), question);
+    expect(state.modelCalls[1].body.tools.map((t: { name: string }) => t.name)).toEqual([
+      'find_employees', 'get_payslips', 'calculate_kenya_pay',
+    ]);
+    expect(state.modelCalls[1].body.system).toContain('never work PAYE out yourself');
+  });
+
+  it("runs the tools the model asks for, as the caller, and gives it the results before it answers", async () => {
+    const asked = toolCall({ id: 'call-1', name: 'get_payslips', input: { employee_number: 'A-001' } });
+    state.modelMessages = [asked, reply("Jane's net pay in October was KSh 63,000.")];
+    const res = await ask(who('admin'), { ...question, prompt: "Why is Jane's net pay 63,000?" });
+    expect(await res.json()).toEqual({ response: "Jane's net pay in October was KSh 63,000.", metadata: { input_tokens: 8, output_tokens: 3 } });
+    expect(state.toolRuns).toEqual([{ caller: expect.objectContaining({ tenantId: TENANT }), name: 'get_payslips', args: { employee_number: 'A-001' } }]);
+    const second = state.modelCalls[1].body.messages;
+    expect(second.at(-2)).toEqual({ role: 'assistant', content: asked.content });
+    expect(second.at(-1)).toEqual({
+      role: 'user',
+      content: [{ type: 'tool_result', tool_use_id: 'call-1', content: '{"payslips":[{"pay_period":"2026-10","net_pay":63000}]}' }],
+    });
+    expect(state.modelCalls[1].body.tools).toHaveLength(3); // the tools stay, as the history holds tool calls
+    expect(state.budgetCalls).toHaveLength(1); // one question, however many lookups
+  });
+
+  it('stops looking things up after a few rounds and makes the model answer', async () => {
+    state.modelMessages = [0, 1, 2, 3, 4].map((i) => toolCall({ id: `c${i}`, name: 'find_employees', input: { query: 'jane' } }));
+    state.modelMessages.push(reply('Here is what I found.'));
+    const res = await ask(who('admin'), question);
+    expect((await res.json()).response).toBe('Here is what I found.');
+    expect(state.modelCalls).toHaveLength(6);
+    expect(state.toolRuns).toHaveLength(4); // the fifth round's lookups were not run...
+    const last = state.modelCalls[5].body.messages.at(-1);
+    expect(last.content[0].content).toContain('Lookup limit reached'); // ...but answered, so the model answers
+  });
+
+  it('uses ANTHROPIC_ASSISTANT_MODEL for the HR assistant only, when set', async () => {
+    process.env.ANTHROPIC_ASSISTANT_MODEL = 'claude-other';
+    try {
+      await ask(who('hr'), question);
+      await ask(who('staff'), { purpose: 'meeting-summary', prompt: 'transcript...' });
+      expect(state.modelCalls.map((c) => c.body.model)).toEqual(['claude-other', 'claude-opus-5-5']);
+      expect(state.modelCalls[1].body.output_config).toEqual({ effort: 'low' }); // a short summary
+    } finally {
+      delete process.env.ANTHROPIC_ASSISTANT_MODEL;
+    }
   });
 
   it('gives the HR assistant the cited law for the question, with the rules for answering it', async () => {
     expect((await ask(who('hr'), { ...question, prompt: 'How many days of annual leave must we give?' })).status).toBe(200);
-    const system = state.modelCalls[0].body.messages[0].content as string;
+    const system = state.modelCalls[0].body.system as string;
     expect(system).toContain('Employment Act 2007, s.28');
     expect(system).toContain('a guide, not legal advice');
     expect(system).toContain('say you do not have a cited rule');
@@ -176,9 +296,9 @@ describe('asking the model', () => {
 
   it("follows the country in the question, else the company's data", async () => {
     await ask(who('hr'), { ...question, prompt: 'What is the maternity leave in Uganda?' });
-    expect(state.modelCalls[0].body.messages[0].content).toContain('Employment Act 2006, s.56');
+    expect(state.modelCalls[0].body.system).toContain('Employment Act 2006, s.56');
     await ask(who('hr'), { ...question, prompt: 'What notice do we give?', context: '{"employees":[{"branch":"Dar es Salaam","country":"Tanzania"}]}' });
-    expect(state.modelCalls[1].body.messages[0].content).toContain('Employment and Labour Relations Act 2004, s.41');
+    expect(state.modelCalls[1].body.system).toContain('Employment and Labour Relations Act 2004, s.41');
   });
 
   it("quotes the default rates in force today from statutory_rates when asked about one, never another company's", async () => {
@@ -188,7 +308,7 @@ describe('asking the model', () => {
       { tenant_id: 'tenant-b', country: 'Kenya', code: 'nssf_rate', value: 0.99, bands: null, effective_from: '2025-02-01', effective_to: null, source: '' },
     ];
     await ask(who('hr'), { ...question, prompt: 'How much NSSF do we deduct?' });
-    const system = state.modelCalls[0].body.messages[0].content as string;
+    const system = state.modelCalls[0].body.system as string;
     expect(system).toContain('Kenya nssf_rate: 0.06 (from 2025-02-01; NSSF Act 2013)');
     expect(system).not.toContain('old_rate');
     expect(system).not.toContain('0.99');
@@ -201,8 +321,8 @@ describe('asking the model', () => {
       { role: 'assistant', content: 'Jane, on 9 October.' },
     ];
     expect((await ask(who('hr'), { ...question, prompt: 'How old will she be?', history })).status).toBe(200);
-    expect(state.modelCalls[0].body.messages.map((m: { role: string }) => m.role)).toEqual(['system', 'user', 'assistant', 'user']);
-    expect(state.modelCalls[0].body.messages[3].content).toBe('How old will she be?');
+    expect(state.modelCalls[0].body.messages.map((m: { role: string }) => m.role)).toEqual(['user', 'assistant', 'user']);
+    expect(state.modelCalls[0].body.messages[2].content).toBe('How old will she be?');
   });
 
   it('rejects bad input before calling the model', async () => {
@@ -219,10 +339,17 @@ describe('asking the model', () => {
   });
 
   it("does not pass the model's error text on to the browser", async () => {
-    state.modelReply = { ok: false, status: 401, json: {} };
+    state.modelReply = { error: 401 };
     const res = await ask(who('admin'), question);
     expect(res.status).toBe(502);
     expect(JSON.stringify(await res.json())).not.toContain('secret internal detail');
+  });
+
+  it('says so when the model declines to answer, even after the fallback', async () => {
+    state.modelReply = { content: [], stop_reason: 'refusal', stop_details: { type: 'refusal', category: 'cyber' }, usage: {} };
+    const res = await ask(who('admin'), question);
+    expect(res.status).toBe(422);
+    expect((await res.json()).error).toMatch(/could not answer this one/);
   });
 
   it('stops one user asking more than 100 times an hour', async () => {
@@ -260,7 +387,7 @@ describe('tax_treatment: how a pay item is taxed (a suggestion only)', () => {
     caveats: ['Check with KRA.'],
   };
   const replyWith = (content: unknown) => {
-    state.modelReply = { ok: true, status: 200, json: { choices: [{ message: { content } }], usage: { total_tokens: 9 } } };
+    state.modelReply = reply(content);
   };
 
   beforeEach(() => {
@@ -280,14 +407,13 @@ describe('tax_treatment: how a pay item is taxed (a suggestion only)', () => {
     const res = await askTax(who('hr'), { ...item, name: '  Gym membership ', description: 'Paid to a gym' });
     expect(await res.json()).toEqual(good);
     const { body } = state.modelCalls[0];
-    expect(body.response_format).toEqual({ type: 'json_object' });
-    expect(body.max_completion_tokens).toBe(600);
-    expect(body.messages).toHaveLength(2);
-    expect(body.messages[0].role).toBe('system');
-    expect(body.messages[0].content).toContain('Kenyan law');
-    expect(body.messages[0].content).toContain('"depends"');
-    expect(body.messages[0].content).toContain('Never invent section numbers');
-    expect(JSON.parse(body.messages[1].content)).toEqual({ kind: 'deduction', name: 'Gym membership', description: 'Paid to a gym' });
+    expect(body.output_config).toEqual({ effort: 'medium' });
+    expect(body.max_tokens).toBe(10_000);
+    expect(body.messages).toHaveLength(1);
+    expect(body.system).toContain('Kenyan law');
+    expect(body.system).toContain('"depends"');
+    expect(body.system).toContain('Never invent section numbers');
+    expect(JSON.parse(body.messages[0].content)).toEqual({ kind: 'deduction', name: 'Gym membership', description: 'Paid to a gym' });
   });
 
   it('rejects bad input before calling the model', async () => {
@@ -321,7 +447,7 @@ describe('tax_treatment: how a pay item is taxed (a suggestion only)', () => {
     replyWith(JSON.stringify({ ...good, go_ahead: ' With_Conditions ', go_ahead_reason: 'Get the  employee’s written consent.' }));
     const res = await askTax(who('admin'), item);
     expect(await res.json()).toEqual({ ...good, go_ahead: 'with_conditions', go_ahead_reason: 'Get the employee’s written consent.' });
-    expect(state.modelCalls[0].body.messages[0].content).toContain('s.19(3)');
+    expect(state.modelCalls[0].body.system).toContain('s.19(3)');
   });
 
   it('leaves out a go-ahead that is unknown or has no reason', async () => {
@@ -347,7 +473,7 @@ describe('tax_treatment: how a pay item is taxed (a suggestion only)', () => {
   });
 
   it("does not pass the model's error text on", async () => {
-    state.modelReply = { ok: false, status: 500, json: {} };
+    state.modelReply = { error: 500 };
     const res = await askTax(who('admin'), item);
     expect(res.status).toBe(502);
     expect(JSON.stringify(await res.json())).not.toContain('secret internal detail');
@@ -374,7 +500,7 @@ describe('setup: setting a company up by chatting (proposals only)', () => {
     });
   const chat = { messages: [{ role: 'user', content: 'We grow flowers in Naivasha, 40 people.' }], company: { company_name: 'Bloom Farm', departments: [] } };
   const replyWith = (content: unknown) => {
-    state.modelReply = { ok: true, status: 200, json: { choices: [{ message: { content } }], usage: { total_tokens: 9 } } };
+    state.modelReply = reply(content);
   };
 
   beforeEach(() => {
@@ -399,11 +525,12 @@ describe('setup: setting a company up by chatting (proposals only)', () => {
     const res = await askSetup(who('hr'), { ...chat, messages });
     expect(await res.json()).toEqual({ reply: 'Lovely! What departments do you have?', proposals: [] });
     const { body } = state.modelCalls[0];
-    expect(body.response_format).toEqual({ type: 'json_object' });
-    expect(body.messages.map((m: { role: string }) => m.role)).toEqual(['system', 'assistant', 'user']);
-    expect(body.messages[0].content).toContain('set it up in Figbloom HR');
-    expect(body.messages[0].content).toContain('never make up an email address');
-    expect(body.messages[0].content).toContain(JSON.stringify(chat.company));
+    // the conversation must start with the person, so the page's greeting follows a note that the chat was opened
+    expect(body.messages.map((m: { role: string }) => m.role)).toEqual(['user', 'assistant', 'user']);
+    expect(body.messages[1].content).toBe('Hi! Tell me about the business.');
+    expect(body.system).toContain('set it up in Figbloom HR');
+    expect(body.system).toContain('never make up an email address');
+    expect(body.system).toContain(JSON.stringify(chat.company));
     expect(body.messages[2].content).toBe('We grow flowers.');
   });
 
@@ -484,13 +611,13 @@ describe('setup: setting a company up by chatting (proposals only)', () => {
   it('tells the model to propose employees straight away, and gives it the law for the company countries', async () => {
     const messages = [{ role: 'user', content: 'How long can probation be? Also add Jane Wanjiru, jane@bloom.co.ke' }];
     await askSetup(who('admin'), { messages, company: { profile: { country: 'Kenya' }, branches: ['Kampala (Uganda)'] } });
-    const system = state.modelCalls[0].body.messages[0].content as string;
+    const system = state.modelCalls[0].body.system as string;
     expect(system).toContain('"type": "add_employees"');
     expect(system).toContain('in that same reply');
     expect(system).toContain('Do not ask them to confirm the list first');
     expect(system).toContain('Employment Act 2007, s.42'); // Kenya probation
     expect(system).toContain('Employment Act 2006, s.67'); // Uganda probation (a branch there)
-    expect(state.modelCalls[0].body.max_completion_tokens).toBeGreaterThanOrEqual(6000);
+    expect(state.modelCalls[0].body.max_tokens).toBeGreaterThanOrEqual(16000);
   });
 
   it('keeps employees it can add, tidied, and caps how many', async () => {
@@ -541,5 +668,15 @@ describe('setup: setting a company up by chatting (proposals only)', () => {
     expect(setupCountries({ profile: { country: 'Kenya' }, branches: ['Arusha (Tanzania)', 'HQ (Kenya), default'] })).toEqual(['Kenya', 'Tanzania']);
     expect(setupCountries({ profile: { country: 'Rwanda' } })).toEqual(['General']);
     expect(setupCountries({ profile: 'not set up yet', branches: 'unknown' })).toEqual([]);
+  });
+});
+
+describe('reading JSON answers', () => {
+  it('takes the JSON object from an answer, with or without a fence or a sentence around it', async () => {
+    const { parseJsonObject } = await import('../ai_routes.js');
+    expect(parseJsonObject('{"a":1}')).toEqual({ a: 1 });
+    expect(parseJsonObject('```json\n{"a":1}\n```')).toEqual({ a: 1 });
+    expect(parseJsonObject('Here it is:\n{"a":{"b":2}}\nHope that helps.')).toEqual({ a: { b: 2 } });
+    expect(() => parseJsonObject('no json here')).toThrow();
   });
 });

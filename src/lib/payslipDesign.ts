@@ -23,6 +23,8 @@ export interface PayslipDesign {
   show_employer_contributions: boolean;
   show_ytd: boolean;
   show_bank_details: boolean;
+  /** NSSF, SHA and ID numbers under Employee information (the tax PIN always shows) */
+  show_statutory_numbers: boolean;
   show_leave_balance: boolean;
 }
 
@@ -47,6 +49,7 @@ export const DEFAULT_DESIGN: PayslipDesign = {
   show_employer_contributions: true,
   show_ytd: true,
   show_bank_details: true,
+  show_statutory_numbers: false,
   show_leave_balance: false,
 };
 
@@ -72,6 +75,7 @@ export function designOf(row: Partial<Record<keyof PayslipDesign, unknown>> | nu
     show_employer_contributions: bool(row.show_employer_contributions, true),
     show_ytd: bool(row.show_ytd, true),
     show_bank_details: bool(row.show_bank_details, true),
+    show_statutory_numbers: bool(row.show_statutory_numbers, false),
     show_leave_balance: bool(row.show_leave_balance, false),
   };
 }

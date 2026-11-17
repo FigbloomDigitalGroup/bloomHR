@@ -72,12 +72,14 @@ describe('the rates the migration adds', () => {
     );
   });
 
-  it('keeps the per diem at 33% of basic as a dated default a company can change', async () => {
-    expect((await kenyaOn('2026-10-31')).per_diem_rate).toBe(0.33);
+  it('keeps the per diem share of basic as a dated default (33% until September 2026, none since) a company can change', async () => {
+    expect((await kenyaOn('2026-09-30')).per_diem_rate).toBe(0.33);
     expect((await kenyaOn('2001-01-31')).per_diem_rate).toBe(0.33);
-    await as(PAY, `insert into statutory_rates (tenant_id, country, code, value, effective_from) values ('${A}', 'Kenya', 'per_diem_rate', 0, '2030-01-01')`);
-    expect((await kenyaOn('2030-01-31')).per_diem_rate).toBe(0);
-    expect((await read<{ r: Record<string, unknown> }>(OTHER, `select statutory_rates_on('2030-01-31', 'Kenya') r`))[0].r.per_diem_rate).toBe(0.33);
+    // typed in as a reimbursement from October 2026 (20261028100000_payroll_reimbursements)
+    expect((await kenyaOn('2026-10-31')).per_diem_rate).toBe(0);
+    await as(PAY, `insert into statutory_rates (tenant_id, country, code, value, effective_from) values ('${A}', 'Kenya', 'per_diem_rate', 0.33, '2030-01-01')`);
+    expect((await kenyaOn('2030-01-31')).per_diem_rate).toBe(0.33);
+    expect((await read<{ r: Record<string, unknown> }>(OTHER, `select statutory_rates_on('2030-01-31', 'Kenya') r`))[0].r.per_diem_rate).toBe(0);
     await db.exec(`delete from statutory_rates where tenant_id = '${A}' and code = 'per_diem_rate'`);
   });
 

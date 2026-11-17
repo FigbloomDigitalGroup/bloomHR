@@ -13,6 +13,8 @@ const kpi = vi.hoisted(() => ({
   removeAssignment: vi.fn(),
   addCheckin: vi.fn(),
   downloadCsv: vi.fn(),
+  startCurrentPeriod: vi.fn(),
+  saveKpi: vi.fn(),
 }));
 const ot = vi.hoisted(() => ({ loadOvertimePeople: vi.fn(), loadWaitingOvertime: vi.fn(), loadOvertime: vi.fn() }));
 const cas = vi.hoisted(() => ({ loadCasuals: vi.fn(), loadDays: vi.fn() }));
@@ -128,11 +130,39 @@ describe('My team', () => {
     expect(kpi.assignKpi).toHaveBeenCalledWith({ periodId: 'p1', kpiId: 'k1', scope: 'person', value: 'E2', target: 120, weight: 40 });
   });
 
-  it('KPIs: says so when HR has not set up a review period', async () => {
-    kpi.loadPeriods.mockResolvedValue([]);
+  it('KPIs: with no review period, the supervisor starts this quarter’s instead of waiting for HR', async () => {
+    kpi.loadPeriods.mockResolvedValueOnce([]).mockResolvedValue([Q4]);
+    kpi.startCurrentPeriod.mockResolvedValue(undefined);
     renderTeam();
     openTab('KPIs');
     expect(await screen.findByText('No review periods yet')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /^Start the Q\d \d{4} review$/ }));
+    await waitFor(() => expect(kpi.startCurrentPeriod).toHaveBeenCalled());
+    // straight on to giving out KPIs
+    expect(await screen.findByLabelText('KPI')).toBeTruthy();
+  });
+
+  it('KPIs: someone with no reports and no KPI rights still waits for HR', async () => {
+    kpi.loadPeriods.mockResolvedValue([]);
+    kpi.loadKpiAccess.mockResolvedValue({ manages: false, employeeNumber: 'LEAD', team: [] });
+    renderTeam();
+    openTab('KPIs');
+    expect(await screen.findByText(/HR sets up review periods/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Start the/ })).toBeNull();
+  });
+
+  it('KPIs: the supervisor adds a KPI to the library when it has none', async () => {
+    kpi.loadKpis.mockResolvedValueOnce([]).mockResolvedValue([CALLS]);
+    kpi.saveKpi.mockResolvedValue(undefined);
+    renderTeam();
+    openTab('KPIs');
+    fireEvent.click(await screen.findByText('Assign and edit'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Add a KPI' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Add a KPI' });
+    fireEvent.change(within(dialog).getByLabelText(/Name/), { target: { value: 'Deals closed' } });
+    fireEvent.submit(dialog.querySelector('form')!);
+    await waitFor(() => expect(kpi.saveKpi).toHaveBeenCalledWith(null, expect.objectContaining({ name: 'Deals closed' })));
+    expect(await screen.findByLabelText('KPI')).toBeTruthy();
   });
 
   it('Overtime: the team’s requests wait for approval, not the supervisor’s own', async () => {

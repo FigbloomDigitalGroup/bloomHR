@@ -58,7 +58,9 @@ const banDuration = (status) => (status === "ACTIVE" ? "none" : status === "SUSP
 // user_metadata is user-editable, so it is never trusted for authorization. Every query below
 // runs with the service-role key (no RLS), so tenant isolation is enforced here, in code: each
 // handler is scoped to caller.tenantId (docs/MULTI_TENANCY_RFC.md, section 4).
-async function authenticate(req) {
+// A company Figbloom has not approved (pending, rejected) or has suspended can't act through the API either
+// (migration 20261029100000_platform_organisations.sql); `anyCompanyStatus` is for signing in itself (two-step codes).
+async function authenticate(req, { anyCompanyStatus = false } = {}) {
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
   if (!token) throw new HttpError(401, "Missing bearer token");
@@ -68,12 +70,16 @@ async function authenticate(req) {
 
   const { data: profile, error: profileError } = await admin
     .from("user_profiles")
-    .select("role, account_status, tenant_id, company_role_id")
+    .select("role, account_status, tenant_id, company_role_id, tenants(status)")
     .eq("user_id", data.user.id)
     .maybeSingle();
   if (profileError) throw new HttpError(500, "Could not verify caller role");
   if (!profile || !profile.tenant_id || (profile.account_status && profile.account_status !== "ACTIVE")) {
     throw new HttpError(403, "Forbidden");
+  }
+  const companyStatus = profile.tenants?.status;
+  if (!anyCompanyStatus && companyStatus && companyStatus !== "active") {
+    throw new HttpError(403, companyStatus === "pending" ? "Your company is waiting for approval" : "Your company is not active");
   }
   return {
     id: data.user.id,
@@ -202,6 +208,41 @@ async function belongsToOtherCompany(userId, tenantId) {
   const { data, error } = await admin.from("memberships").select("tenant_id").eq("user_id", userId);
   if (error) throw error;
   return data.some((m) => m.tenant_id !== tenantId);
+}
+
+// Reactivating a login does not bring back someone whose employee record says they have left: the sign-in check
+// signs them straight out again ("Your employment account has been deactivated"), and an open exit keeps refusing
+// their payslips. Refuse, and say what does bring them back: Bring back on their exit, or clearing the termination
+// on their employee record when no exit is open.
+async function assertHasNotLeft(tenantId, email) {
+  if (!email) return;
+  const { data: employees, error } = await admin
+    .from("employees")
+    .select('"Employee Number", "First Name", "Last Name", "Status", "Termination Date"')
+    .eq("tenant_id", tenantId)
+    .ilike('"Work Email"', String(email).replace(/[\\%_]/g, "\\$&"));
+  if (error) throw error;
+  const today = new Date().toISOString().slice(0, 10);
+  const left = (employees || []).find((e) => {
+    const ended = String(e["Termination Date"] || "").slice(0, 10);
+    return ["terminated", "inactive"].includes(String(e.Status || "").toLowerCase()) || (ended && ended < today);
+  });
+  if (!left) return;
+  const name = [left["First Name"], left["Last Name"]].filter(Boolean).join(" ") || left["Employee Number"];
+  const { data: exits, error: exitError } = await admin
+    .from("employee_exits")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("employee_number", left["Employee Number"])
+    .in("status", ["approved", "clearance"])
+    .limit(1);
+  if (exitError) throw exitError;
+  throw new HttpError(
+    409,
+    exits?.length
+      ? `${name} has left through an exit, so reactivating their login won't let them sign in. Open HR Lifecycle > Exits, find their exit and choose Bring back: that restores their employee record and their login together.`
+      : `${name}'s employee record says they have left, so reactivating their login won't let them sign in. Open Employees > Manage > Edit Employee, clear their Termination Date and save, then reactivate their login.`
+  );
 }
 
 // The target of a by-id operation must belong to the caller's tenant. A user in another tenant
@@ -393,6 +434,10 @@ router.patch(
 
     if ((email !== undefined || password !== undefined) && (await belongsToOtherCompany(id, caller.tenantId))) {
       throw new HttpError(409, "This person also belongs to another company, so their email and password can only be changed by themselves (use Forgot password).");
+    }
+
+    if (account_status === "ACTIVE" && currentProfile?.account_status !== "ACTIVE") {
+      await assertHasNotLeft(caller.tenantId, current.email);
     }
 
     const update = { user_metadata };

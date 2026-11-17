@@ -94,8 +94,9 @@ export default function HRLifecycleDashboard() {
     }, []);
 
     const loadHRNotifications = useCallback(async () => {
+        // the alerts this person hasn't read yet (dismissing one marks it read for them)
         const notifs = await fetchAdminHRNotifications();
-        setHrNotifications(notifs);
+        setHrNotifications(notifs.filter((n) => !n.is_read));
     }, []);
 
     const dismissNotification = async (id: number) => {
@@ -270,7 +271,7 @@ export default function HRLifecycleDashboard() {
 
             {activeTab === 'status' && <EmploymentStatusModule onRefresh={fetchDashboardStats} initialSearch={searchParams.get('q') || ''} />}
             {activeTab === 'history' && <LifecycleHistoryModule />}
-            {activeTab === 'contracts' && <ContractsModule />}
+            {activeTab === 'contracts' && <ContractsModule sendTo={searchParams.get('send')} />}
             {activeTab === 'suspension' && <SuspensionModule onRefresh={fetchDashboardStats} />}
             {activeTab === 'exits' && <ExitsModule onRefresh={fetchDashboardStats} />}
             {activeTab === 'reports' && <HRReportsDashboard stats={stats} />}

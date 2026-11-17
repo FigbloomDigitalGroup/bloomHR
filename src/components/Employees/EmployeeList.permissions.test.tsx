@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 // The employee list's buttons follow the modules of the person's role, never its name:
 // Add employee / Manage = employee-edit; Duplicates, Bulk add, Relocate = hr-admin; Terminate = approve-exits;
-// Bulk Edit (the pay sheet) = hr-admin and payroll together.
+// Bulk Edit (the pay sheet) = hr-admin and payroll together; ID cards (print several staff ID cards) = staff-id-cards.
 const state = vi.hoisted(() => ({ role: 'HR', modules: [] as string[] }));
 
 vi.mock('../../hooks/usePermissions', () => ({
@@ -36,6 +36,9 @@ vi.mock('../../lib/supabase', () => {
 vi.mock('./DuplicateCheckModal', () => ({ default: () => null }));
 vi.mock('./BulkEditModal', () => ({ default: () => null }));
 vi.mock('./BulkTerminateModal', () => ({ default: () => null }));
+vi.mock('../StaffIdCard/StaffIdCardsPrintDialog', () => ({
+  default: ({ selectedNumbers }: { selectedNumbers: string[] }) => <div role="dialog">Print ID cards for {selectedNumbers.join(', ') || 'nobody'}</div>,
+}));
 
 import EmployeeList from './EmployeeList';
 import { DEFAULT_ROLE_MODULES_AFTER } from '../../lib/__fixtures__/defaultRoleModules';
@@ -43,7 +46,7 @@ import { DEFAULT_ROLE_MODULES_AFTER } from '../../lib/__fixtures__/defaultRoleMo
 // what each system role holds by default (after 20261021200000_roles_everywhere.sql)
 const DEFAULTS = DEFAULT_ROLE_MODULES_AFTER;
 
-const BUTTONS = ['Add Employee', 'Manage', 'Duplicates', 'Bulk add', 'Bulk Edit', 'Relocate', 'Bulk Terminate', 'Terminate'] as const;
+const BUTTONS = ['Add Employee', 'Manage', 'Duplicates', 'Bulk add', 'Bulk Edit', 'Relocate', 'ID cards', 'Bulk Terminate', 'Terminate'] as const;
 
 /** the list's buttons someone sees, once the list has loaded (read in one go: the list reloads while it settles) */
 const expectButtons = async (role: string, modules: string[], expected: readonly string[]) => {
@@ -86,6 +89,29 @@ describe('employee list buttons by module', () => {
   it('approve-exits alone gives Terminate; hr-admin with payroll gives Bulk Edit', async () => {
     await expectButtons('OPERATIONS', [...DEFAULTS.OPERATIONS, 'approve-exits'], ['Bulk Terminate', 'Terminate']);
     await expectButtons('HR', [...DEFAULTS.HR, 'payroll'], ['Add Employee', 'Manage', 'Duplicates', 'Bulk add', 'Bulk Edit', 'Relocate', 'Bulk Terminate', 'Terminate']);
+  });
+
+  it('staff-id-cards alone gives ID cards: tick employees, then print their cards', async () => {
+    await expectButtons('OPERATIONS', [...DEFAULTS.OPERATIONS, 'staff-id-cards'], ['ID cards']);
+    await expectButtons('HR', [...DEFAULTS.HR, 'staff-id-cards'], ['Add Employee', 'Manage', 'Duplicates', 'Bulk add', 'Relocate', 'ID cards', 'Bulk Terminate', 'Terminate']);
+
+    state.role = 'OPERATIONS';
+    state.modules = [...DEFAULTS.OPERATIONS, 'staff-id-cards'];
+    render(
+      <MemoryRouter>
+        <EmployeeList selectedTown="" onTownChange={() => {}} selectedRegion="" onRegionChange={() => {}} />
+      </MemoryRouter>
+    );
+    // the list reloads while it settles: let it finish before ticking
+    await waitFor(() => {
+      screen.getByText(/Jane/);
+      expect(screen.queryByRole('status', { name: 'Loading employees' })).toBeNull();
+    });
+    await new Promise((r) => setTimeout(r, 50));
+    fireEvent.click(await screen.findByRole('button', { name: 'ID cards' }));
+    fireEvent.click(await screen.findByText(/Jane/));
+    fireEvent.click(await screen.findByRole('button', { name: 'Print ID cards (1)' }));
+    expect(screen.getByRole('dialog').textContent).toBe('Print ID cards for E1');
   });
 
   it('HR whose role lost hr-admin, approve-exits and employee-edit sees none of them', async () => {

@@ -189,8 +189,10 @@ describe('the new modules', () => {
   });
 
   it('a company missing a system role row gets one holding just the new modules; CHECKER with Performance gets kpi-admin', async () => {
+    // (requisitions comes from a later migration, 20261025400000_payments_to_make.sql, given to HR, and staff-id-cards
+    // from 20261027400000_staff_id_cards.sql)
     expect(await modulesOf(C, 'HR')).toEqual(
-      ['approve-exits', 'casual-overtime', 'chat-channels', 'employee-edit', 'hr-admin', 'kpi-admin', 'loans', 'task-oversight']);
+      ['approve-exits', 'casual-overtime', 'chat-channels', 'employee-edit', 'hr-admin', 'kpi-admin', 'loans', 'requisitions', 'staff-id-cards', 'task-oversight']);
     expect(await modulesOf(C, 'MANAGER')).toEqual(['chat-channels', 'employee-edit', 'team-work']);
     expect(await modulesOf(C, 'REGIONAL')).toEqual(['employee-edit']);
     expect(await modulesOf(C, 'ADMIN')).toBeNull(); // administrators have every module anyway
@@ -201,7 +203,7 @@ describe('the new modules', () => {
   it('custom roles that existed before get the modules of their base role', async () => {
     const mods = async (k: string) => modulesOf(A, before[k].role_key);
     expect(await mods('oldHr')).toEqual(
-      ['approve-exits', 'casual-overtime', 'chat-channels', 'employee-edit', 'employees', 'hr-admin', 'kpi-admin', 'loans', 'task-oversight']);
+      ['approve-exits', 'casual-overtime', 'chat-channels', 'employee-edit', 'employees', 'hr-admin', 'kpi-admin', 'loans', 'requisitions', 'staff-id-cards', 'task-oversight']);
     expect(await mods('oldMgr')).toEqual(['chat-channels', 'employee-edit', 'leaves', 'team-work']);
     // the old KPI rule: Performance, not MANAGER/REGIONAL (reopen-leave comes from a later migration,
     // 20261023000000_leave_reopen.sql, given to OPERATIONS-based roles)
@@ -209,8 +211,9 @@ describe('the new modules', () => {
     expect(await mods('oldOpsNoPerf')).toEqual(['leaves', 'reopen-leave']);
     expect(await mods('oldStaff')).toEqual(['kpi-admin', 'performance']);
     expect(await mods('oldReg')).toEqual(['employee-edit', 'performance']); // REGIONAL never managed KPIs
-    // (payslip-design comes from a later migration, 20261021600000_payslip_details.sql, given to ADMIN-based roles too)
-    expect(await mods('oldAdmin')).toEqual(['dashboard', 'payslip-design', 'task-oversight']);
+    // (payslip-design comes from a later migration, 20261021600000_payslip_details.sql, given to ADMIN-based roles too, as
+    // do payments and requisitions, 20261025400000_payments_to_make.sql, and staff-id-cards, 20261027400000_staff_id_cards.sql)
+    expect(await mods('oldAdmin')).toEqual(['dashboard', 'payments', 'payslip-design', 'requisitions', 'staff-id-cards', 'task-oversight']);
   });
 
   it('a company created later copies them from the default company', async () => {
@@ -223,7 +226,7 @@ describe('the new modules', () => {
 
   it('loans, approve-exits, sign-in-security and hr-admin cannot go on a STAFF-based role', async () => {
     expect((await one<{ v: string[] }>(`select staff_restricted_modules() v`)).v).toEqual(
-      ['payroll', 'salaryadmin', 'mpesa-zap', 'adminconfirm', 'assign-managers', 'hr-lifecycle', 'loans', 'approve-exits', 'sign-in-security', 'hr-admin']);
+      ['payroll', 'salaryadmin', 'mpesa-zap', 'adminconfirm', 'assign-managers', 'hr-lifecycle', 'loans', 'approve-exits', 'sign-in-security', 'hr-admin', 'payments', 'requisitions']);
     for (const m of ['loans', 'approve-exits', 'sign-in-security', 'hr-admin']) {
       expect([m, await fails(createRole(ADM, `Staff ${m}`, "STAFF", [m]))]).toEqual([m, expect.stringMatching(/cannot be given to a role based on Staff/)]);
     }
@@ -328,8 +331,8 @@ describe('exits (approve-exits)', () => {
     for (const k of ['CHK', 'MGR', 'REG', 'OPS', 'STF']) {
       expect([k, await refusal(IDS[k], STF)]).toEqual([k, 'Only HR or an administrator can approve or decline an exit']);
     }
-    // someone else can approve, so not the person who started it
-    expect(await refusal(HR1, HR1)).toBe('You started this exit, so another HR person or an administrator must approve it');
+    // the person who started it may decide it too (20261026400000: an exit HR starts is HR's decision)
+    expect(await refusal(HR1, HR1)).toBeNull();
     expect(await refusal(HR1, HR1, 'declined')).toBeNull();
   });
 
@@ -339,18 +342,6 @@ describe('exits (approve-exits)', () => {
     expect(await refusal(CU2, STF)).toBeNull();
     await setModules(ADM, r, []);
     expect(await refusal(CU2, STF)).toBe('Only HR or an administrator can approve or decline an exit');
-  });
-
-  it('"another approver" counts a custom role holding approve-exits, not one without', async () => {
-    // tenant C: one HR person, and CX with a custom role
-    const r = (await one<{ id: string; role_key: string }>(
-      `insert into company_roles (tenant_id, name, base_role, is_system, role_key)
-       values ($1, 'Approvers', 'MANAGER', false, 'CR_00000000000000000000000000000000') returning id, role_key`, [C]));
-    await rows(`insert into role_permissions (tenant_id, role_name, permissions) values ($1, $2, array['approve-exits'])`, [C, r.role_key]);
-    await rows(`update memberships set company_role_id = $1 where user_id = $2 and tenant_id = $3`, [r.id, CX, C]);
-    expect(await refusal(CHR, CHR)).toBe('You started this exit, so another HR person or an administrator must approve it');
-    await rows(`update role_permissions set permissions = '{}' where tenant_id = $1 and role_name = $2`, [C, r.role_key]);
-    expect(await refusal(CHR, CHR)).toBeNull(); // nobody else can, so they may
   });
 });
 

@@ -4,6 +4,15 @@ import { MemoryRouter } from 'react-router-dom';
 
 const rpc = vi.hoisted(() => vi.fn());
 vi.mock('../lib/supabase', () => ({ supabase: { rpc: (...a: unknown[]) => rpc(...a) } }));
+// the pad: "drawing" hands over a tiny PNG
+vi.mock('../components/Signature/SignaturePad', () => ({
+  default: ({ onSave, saveLabel, onCancel }: { onSave: (b: Blob) => void; saveLabel: string; onCancel: () => void }) => (
+    <div>
+      <button type="button" onClick={() => onSave(new Blob(['PNG'], { type: 'image/png' }))}>{saveLabel}</button>
+      <button type="button" onClick={onCancel}>Cancel signing</button>
+    </div>
+  ),
+}));
 
 import OfferPage from './OfferPage';
 
@@ -43,13 +52,34 @@ describe('OfferPage (public)', () => {
     expect(screen.queryByText('Accept offer')).toBeNull();
   });
 
-  it('accepting sends the answer once and shows it', async () => {
+  it('shows the sender’s signature on the letter', async () => {
+    rpc.mockResolvedValue({ data: { ...offer(), body: 'Dear {{candidate_name}},\n\nYours sincerely,\n\n{{signature}}\n{{company_name}}', signature: 'data:image/png;base64,SIG' }, error: null });
+    open();
+    expect(((await screen.findByTestId('letter-signature')) as HTMLImageElement).src).toBe('data:image/png;base64,SIG');
+  });
+
+  it('accepting means signing: the drawn signature is sent once with the answer and shown under the letter', async () => {
     rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'offer_by_token' ? { data: offer(), error: null } : { data: 'accepted', error: null }));
     open();
     fireEvent.click(await screen.findByText('Accept offer'));
+    expect(rpc).not.toHaveBeenCalledWith('respond_to_offer', expect.anything()); // not before signing
+    fireEvent.click(screen.getByText('Sign and accept'));
     expect(await screen.findByText(/You accepted this offer/)).toBeTruthy();
-    expect(rpc).toHaveBeenCalledWith('respond_to_offer', { p_token: 'a'.repeat(64), p_accept: true, p_reason: null });
+    expect(rpc).toHaveBeenCalledWith('respond_to_offer', {
+      p_token: 'a'.repeat(64), p_accept: true, p_reason: null, p_signature: `data:image/png;base64,${btoa('PNG')}`,
+    });
+    expect(screen.getByText('Accepted by Jane Wanjiku')).toBeTruthy();
+    expect((screen.getByAltText('Signature of Jane Wanjiku') as HTMLImageElement).src).toBe(`data:image/png;base64,${btoa('PNG')}`);
     expect(screen.queryByText('Accept offer')).toBeNull();
+  });
+
+  it('they can step back from signing', async () => {
+    rpc.mockResolvedValue({ data: offer(), error: null });
+    open();
+    fireEvent.click(await screen.findByText('Accept offer'));
+    fireEvent.click(screen.getByText('Cancel signing'));
+    expect(screen.getByText('Accept offer')).toBeTruthy();
+    expect(screen.getByText(/Please reply by/)).toBeTruthy();
   });
 
   it('declining asks for an optional reason', async () => {
@@ -59,7 +89,7 @@ describe('OfferPage (public)', () => {
     fireEvent.change(screen.getByLabelText(/tell us why/), { target: { value: ' Took another job ' } });
     fireEvent.click(screen.getByText('Decline offer'));
     expect(await screen.findByText('You declined this offer.')).toBeTruthy();
-    expect(rpc).toHaveBeenCalledWith('respond_to_offer', { p_token: 'a'.repeat(64), p_accept: false, p_reason: 'Took another job' });
+    expect(rpc).toHaveBeenCalledWith('respond_to_offer', { p_token: 'a'.repeat(64), p_accept: false, p_reason: 'Took another job', p_signature: null });
   });
 
   it('an expired or answered offer can only be read', async () => {
@@ -75,6 +105,7 @@ describe('OfferPage (public)', () => {
       Promise.resolve(fn === 'offer_by_token' ? { data: offer(), error: null } : { data: null, error: { message: 'This offer expired on 13 October 2026' } }));
     open();
     fireEvent.click(await screen.findByText('Accept offer'));
+    fireEvent.click(screen.getByText('Sign and accept'));
     await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/expired on 13 October/));
   });
 });

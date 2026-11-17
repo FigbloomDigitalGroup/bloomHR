@@ -1,10 +1,11 @@
 import { supabase } from './supabase';
 import { fetchAll, IN_LIST_SIZE, chunks } from './fetchAll';
 import { requireUpdatedRows } from './requireUpdated';
-import type { AdvanceRow, PayeeRecord } from './salaryAdvance';
+import type { AdvanceRow, AdvanceTaken, PayeeRecord } from './salaryAdvance';
+import { decideApproval, loadApprovalChains } from './approvals';
 
-// Reading and saving salary advances for the staff request screen and the approver queue. Nothing here pays anyone:
-// "Mark as paid" records that finance paid the advance outside the app, which is what makes payroll take it back.
+// Reading and saving salary advances for the staff request screen, the approver queue and payroll. Nothing here pays
+// anyone: finance pays outside the app and records it in Payments to make, which is what makes payroll take it back.
 
 const NOT_SAVED = 'The request was not saved: you do not have permission to change it, or it no longer exists.';
 
@@ -16,33 +17,51 @@ export interface MyEmployee {
   terminated: boolean;
 }
 
+const EMPLOYEE_COLUMNS = '"Employee Number", "First Name", "Last Name", "Office", "Basic Salary", "Termination Date"';
+
+const asMyEmployee = (data: Record<string, unknown>): MyEmployee => ({
+  employeeNumber: String(data['Employee Number'] ?? ''),
+  fullName: [data['First Name'], data['Last Name']].filter(Boolean).join(' '),
+  office: String(data['Office'] ?? ''),
+  basicSalary: String(data['Basic Salary'] ?? '0'),
+  terminated: Boolean(data['Termination Date']),
+});
+
 /** The signed-in staff member's employee record (matched on Work Email, as the rest of the portal does). */
 export async function loadMyEmployee(): Promise<MyEmployee | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.email) return null;
-  const { data, error } = await supabase
-    .from('employees')
-    .select('"Employee Number", "First Name", "Last Name", "Office", "Basic Salary", "Termination Date"')
-    .eq('"Work Email"', user.email)
-    .maybeSingle();
+  const { data, error } = await supabase.from('employees').select(EMPLOYEE_COLUMNS).eq('"Work Email"', user.email).maybeSingle();
   if (error) throw error;
-  if (!data) return null;
-  return {
-    employeeNumber: String(data['Employee Number'] ?? ''),
-    fullName: [data['First Name'], data['Last Name']].filter(Boolean).join(' '),
-    office: data['Office'] ?? '',
-    basicSalary: String(data['Basic Salary'] ?? '0'),
-    terminated: Boolean(data['Termination Date']),
-  };
+  return data ? asMyEmployee(data) : null;
 }
 
-/** Whether the company has advance requests open, and the message to show when they are not. */
-export async function loadAdvanceWindow(): Promise<{ open: boolean; message: string }> {
-  const { data } = await supabase.from('salary_advance_settings').select('applications_active, custom_message').eq('id', 1).maybeSingle();
+/** Someone's employee record, for applying for an advance on their behalf. */
+export async function loadEmployeeForAdvance(employeeNumber: string): Promise<MyEmployee | null> {
+  const { data, error } = await supabase.from('employees').select(EMPLOYEE_COLUMNS).eq('"Employee Number"', employeeNumber).maybeSingle();
+  if (error) throw error;
+  return data ? asMyEmployee(data) : null;
+}
+
+export interface AdvanceWindow {
+  open: boolean;
+  message: string;
+}
+
+/**
+ * Whether the company has advance requests open, and the message to show when they are not (salary_advance_terms(),
+ * which staff may call: they can't read the settings table).
+ */
+export async function loadAdvanceWindow(): Promise<AdvanceWindow> {
+  const { data } = await supabase.rpc('salary_advance_terms');
+  const terms = (Array.isArray(data) ? data[0] : data) as
+    | { applications_active: boolean | null; custom_message: string | null }
+    | null
+    | undefined;
   return {
-    // no settings row: requests are open
-    open: data ? data.applications_active !== false : true,
-    message: data?.custom_message || 'Salary advance requests are closed for now. They reopen at the start of next month.',
+    // no settings: requests are open
+    open: terms ? terms.applications_active !== false : true,
+    message: terms?.custom_message || 'Salary advance requests are closed for now. They reopen at the start of next month.',
   };
 }
 
@@ -67,21 +86,46 @@ export function watchMyAdvances(employeeNumber: string, onChange: () => void): (
   };
 }
 
-export async function requestAdvance(employee: MyEmployee, input: { amount: number; reason: string; months: number }) {
-  const { error } = await supabase.from('salary_advance').insert([{
-    'Employee Number': employee.employeeNumber,
-    'Full Name': employee.fullName,
-    'Office Branch': employee.office,
-    'Basic Salary': employee.basicSalary,
-    'Amount Requested': input.amount,
-    'Net Salary': String((parseFloat(employee.basicSalary) || 0) - input.amount),
-    'Reason for Advance': input.reason.trim(),
-    // one month is the column's default; leaving it out keeps one-month requests working on a database without it
-    ...(input.months > 1 ? { repayment_months: input.months } : {}),
-    status: 'Pending',
-    time_added: new Date().toISOString(),
-  }]);
+const advanceRow = (employee: MyEmployee, input: { amount: number; reason: string }) => ({
+  'Employee Number': employee.employeeNumber,
+  'Full Name': employee.fullName,
+  'Office Branch': employee.office,
+  'Basic Salary': employee.basicSalary,
+  'Amount Requested': input.amount,
+  'Net Salary': String((parseFloat(employee.basicSalary) || 0) - input.amount),
+  'Reason for Advance': input.reason.trim(),
+  // repaid in full on the next payday: repayment_months keeps its default of 1
+  time_added: new Date().toISOString(),
+});
+
+export async function requestAdvance(employee: MyEmployee, input: { amount: number; reason: string }) {
+  const { error } = await supabase.from('salary_advance').insert([{ ...advanceRow(employee, input), status: 'Pending' }]);
   if (error) throw error;
+}
+
+/** Where a request applied for on someone's behalf stands once saved. */
+export type AppliedStatus = 'approved' | 'pending' | 'your-step-approved';
+
+/**
+ * An admin applies for an advance on someone's behalf (the salary advance screen); the database records who applied.
+ * It starts on the company's approval chain like any request. With `approveNow`, the admin then approves the step it
+ * waits on when they may decide it: the advance is approved when that was the last step, or goes on to the next one.
+ */
+export async function requestAdvanceFor(
+  employee: MyEmployee,
+  input: { amount: number; reason: string; approveNow: boolean },
+): Promise<AppliedStatus> {
+  const { data, error } = await supabase
+    .from('salary_advance')
+    .insert([{ ...advanceRow(employee, input), status: 'Pending' }])
+    .select('id')
+    .single();
+  if (error) throw error;
+  if (!input.approveNow || !data?.id) return 'pending';
+  const chain = (await loadApprovalChains('salary_advance', [String(data.id)]))[String(data.id)];
+  if (!chain?.can_approve) return 'pending';
+  const status = await decideApproval(chain.request_id, 'approved', 'Applied for on their behalf');
+  return status === 'approved' ? 'approved' : 'your-step-approved';
 }
 
 /** Every request the approver may see (the database limits it to their company and access). */
@@ -92,6 +136,51 @@ export async function loadAdvanceQueue(): Promise<AdvanceRow[]> {
     .order('time_added', { ascending: false })
     .order('id', { ascending: false })
     .range(from, to));
+}
+
+const APPROVED = ['approved', 'paid'];
+
+/**
+ * What these people's approved payslips took back for advances, month by month, for payroll to catch up on parts it
+ * missed. A payslip counts once its country of the run is approved (payroll_run_countries), or the run is when it has
+ * no countries; payslips of draft runs and those outside any run don't.
+ */
+export async function loadAdvancesTaken(employeeNumbers: string[]): Promise<AdvanceTaken[]> {
+  const unique = [...new Set(employeeNumbers.map(String).filter(Boolean))];
+  if (unique.length === 0) return [];
+  const [runs, countries] = await Promise.all([
+    supabase.from('payroll_runs').select('id, status'),
+    supabase.from('payroll_run_countries').select('run_id, country, status'),
+  ]);
+  if (runs.error) throw runs.error;
+  const runApproved = new Map((runs.data ?? []).map((r) => [String(r.id), APPROVED.includes(String(r.status))]));
+  const byCountry = new Map<string, boolean>();
+  const runsWithCountries = new Set<string>();
+  // a database without payroll_run_countries yet: the runs' own status
+  for (const c of countries.error ? [] : countries.data ?? []) {
+    runsWithCountries.add(String(c.run_id));
+    byCountry.set(`${c.run_id}|${String(c.country ?? '').toLowerCase()}`, APPROVED.includes(String(c.status)));
+  }
+  const out: AdvanceTaken[] = [];
+  for (const part of chunks(unique, IN_LIST_SIZE)) {
+    const rows = await fetchAll<{ employee_id: string; pay_period: string; advance_deduction: number | string | null; run_id: string | null; country: string | null }>(
+      (from, to) =>
+        supabase
+          .from('salary_history')
+          .select('id, employee_id, pay_period, advance_deduction, run_id, country')
+          .in('employee_id', part)
+          .order('id')
+          .range(from, to),
+    );
+    for (const r of rows) {
+      if (!r.run_id || !r.pay_period) continue;
+      const run = String(r.run_id);
+      const approved = runsWithCountries.has(run) ? byCountry.get(`${run}|${String(r.country ?? '').toLowerCase()}`) : runApproved.get(run);
+      if (!approved) continue;
+      out.push({ employee_number: String(r.employee_id), pay_period: r.pay_period, amount: Number(r.advance_deduction) || 0 });
+    }
+  }
+  return out;
 }
 
 /** Payment details of the people in the queue, by employee number. */

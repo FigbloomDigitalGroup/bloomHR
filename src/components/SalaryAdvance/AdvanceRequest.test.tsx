@@ -30,35 +30,38 @@ const amount = () => screen.getByLabelText('Amount (KSh)');
 const reason = () => screen.getByLabelText('Reason');
 
 describe('asking for an advance', () => {
-  it('shows the limit and blocks an amount over it', async () => {
+  it('shows the 30% limit and blocks an amount over it', async () => {
     render(<AdvanceRequest />);
-    expect(await screen.findByText('KSh 10,000')).toBeTruthy();
-    fireEvent.change(amount(), { target: { value: '12000' } });
-    expect(screen.getByRole('alert').textContent).toMatch(/most you can ask for is KSh 10,000/);
+    expect(await screen.findByText('KSh 15,000')).toBeTruthy();
+    expect(screen.getByText(/30% of your basic/)).toBeTruthy();
+    fireEvent.change(amount(), { target: { value: '15001' } });
+    expect(screen.getByRole('alert').textContent).toBe('The most that can be asked for is KSh 15,000 (30% of the basic salary).');
     fireEvent.change(reason(), { target: { value: 'School fees for next term' } });
     fireEvent.click(screen.getByRole('button', { name: /Send request/ }));
     expect(mocked.requestAdvance).not.toHaveBeenCalled();
+  });
+
+  it('sends up to the limit, to come off the next pay in full', async () => {
+    render(<AdvanceRequest />);
+    await screen.findByText('KSh 15,000');
+    fireEvent.change(amount(), { target: { value: '15000' } });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByTestId('advance-plan').textContent).toMatch(/^KSh 15,000 comes off the next pay in full/);
+    // nothing to spread it over
+    expect(screen.queryByLabelText(/Spread over months/)).toBeNull();
+    expect(screen.queryByLabelText('Number of months')).toBeNull();
+    fireEvent.change(reason(), { target: { value: 'School fees for next term' } });
+    fireEvent.click(screen.getByRole('button', { name: /Send request/ }));
+    await vi.waitFor(() => expect(mocked.requestAdvance).toHaveBeenCalledWith(ME, { amount: 15000, reason: 'School fees for next term' }));
   });
 
   it('needs a reason', async () => {
     render(<AdvanceRequest />);
-    await screen.findByText('KSh 10,000');
+    await screen.findByText('KSh 15,000');
     fireEvent.change(amount(), { target: { value: '5000' } });
     fireEvent.click(screen.getByRole('button', { name: /Send request/ }));
     expect((await screen.findByRole('alert')).textContent).toMatch(/at least 10 characters/);
     expect(mocked.requestAdvance).not.toHaveBeenCalled();
-  });
-
-  it('sends a request spread over months, with the monthly part shown first', async () => {
-    render(<AdvanceRequest />);
-    await screen.findByText('KSh 10,000');
-    fireEvent.change(amount(), { target: { value: '9000' } });
-    fireEvent.change(reason(), { target: { value: 'School fees for next term' } });
-    fireEvent.click(screen.getByLabelText(/Spread over months/));
-    fireEvent.change(screen.getByLabelText('Number of months'), { target: { value: '3' } });
-    expect(screen.getByTestId('advance-plan').textContent).toMatch(/KSh 3,000 a month/);
-    fireEvent.click(screen.getByRole('button', { name: /Send request/ }));
-    await vi.waitFor(() => expect(mocked.requestAdvance).toHaveBeenCalledWith(ME, { amount: 9000, reason: 'School fees for next term', months: 3 }));
   });
 
   it('cannot ask while requests are closed', async () => {

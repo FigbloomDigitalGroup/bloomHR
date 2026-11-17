@@ -11,6 +11,7 @@ import {
   formatKsh,
   interestMethodLabel,
   loanSchedule,
+  rateText,
   maxLoanFor,
   maxMonthsFor,
   periodLabel,
@@ -177,10 +178,10 @@ export default function LoanRequest() {
                     disabled={!!blocked}
                     className={inputClass}
                   >
-                    <option value="">Staff loan ({settings.annual_rate}% a year)</option>
+                    <option value="">Staff loan ({rateText(settings.annual_rate, settings.interest_method)})</option>
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name} ({p.annual_rate}% a year, up to {p.max_months} months)
+                        {p.name} ({rateText(p.annual_rate, p.interest_method)}, up to {p.max_months} months)
                       </option>
                     ))}
                   </select>
@@ -264,7 +265,13 @@ export default function LoanRequest() {
                     </div>
                   </div>
                   <p className="mt-2 mb-0 text-[11.5px] text-muted-foreground">
-                    {rate}% a year, {interestMethodLabel(method).toLowerCase()}. If approved, repayments come off your pay from about{' '}
+                    {method === 'upfront' && (
+                      <>
+                        You receive <strong className="text-ink">{formatKsh(totals.paidOut)}</strong>: the interest is taken off when the loan is paid
+                        out, and you repay {formatKsh(totals.totalRepayable)}.{' '}
+                      </>
+                    )}
+                    {rateText(rate, method)}, {interestMethodLabel(method).toLowerCase()}. If approved, repayments come off your pay from about{' '}
                     {periodLabel(firstMonth)}. HR confirms the start month.
                   </p>
                 </div>

@@ -422,10 +422,16 @@ export function filesByCountry(args: {
   ratesByCountry: Map<string, Rates>;
   payPeriod: string;
   debitAccount: string;
+  /**
+   * a draft country's returns too, to check before approving (marked draft; never its payment files: nobody is paid
+   * from a draft)
+   */
+  drafts?: boolean;
 }): CountryFiles[] {
   const out: CountryFiles[] = [];
   for (const rc of [...args.runCountries].sort((a, b) => countryOrder(tidyCountry(a.country), tidyCountry(b.country)))) {
-    if (rc.status !== 'approved' && rc.status !== 'paid') continue;
+    const draft = rc.status !== 'approved' && rc.status !== 'paid';
+    if (draft && !args.drafts) continue;
     const country = tidyCountry(rc.country);
     const engine = engineFor(country);
     const slips = args.payslips.filter((p) => sameCountry(payslipCountry(p), country));
@@ -446,7 +452,7 @@ export function filesByCountry(args: {
         // an optional return (the WHT return) only in a month it has rows
         .filter(({ def, file }) => !def.optional || file.rows.length > 0)
         .map(({ def, file }) => ({ key: def.key, label: def.label, name: def.name, what: def.what, authority: def.authority, file })),
-      payments: (currencies.length ? currencies : [currency]).flatMap((c) => paymentFilesFor(c, slips, args.employees, args.payPeriod, args.debitAccount)),
+      payments: draft ? [] : (currencies.length ? currencies : [currency]).flatMap((c) => paymentFilesFor(c, slips, args.employees, args.payPeriod, args.debitAccount)),
     });
   }
   return out;

@@ -201,7 +201,7 @@ describe('Attendance page', () => {
       day('E1', '2026-10-19', { status: 'present', clockIn: '2026-10-18T21:01:00Z', clockOut: '2026-10-19T14:05:00Z', hours: 17.07, lateMinutes: 0, flag }),
     ]);
     api.loadDayScans.mockResolvedValue([
-      { at: '2026-10-18T21:01:00Z', via: 'scanner', scannerName: 'Front Door', kind: 'clock_in', reason: null },
+      { at: '2026-10-18T21:01:00Z', via: 'scanner', scannerName: 'Front Door', kind: 'clock_in', reason: null, verify: 1, status: 1, punchMode: 'first_last' },
       { at: '2026-10-19T05:02:00Z', via: 'app', scannerName: null, kind: 'between', reason: null },
       { at: '2026-10-19T09:30:00Z', via: 'scanner', scannerName: 'Front Door', kind: 'between', reason: null },
       { at: '2026-10-19T14:05:00Z', via: 'scanner', scannerName: 'Front Door', kind: 'clock_out', reason: null },
@@ -220,7 +220,7 @@ describe('Attendance page', () => {
     expect(api.loadDayScans).toHaveBeenCalledWith('E1', '2026-10-19');
     const list = await within(dialog).findByRole('list', { name: 'Scans on Mon 19 Oct' });
     expect(within(list).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
-      '12:01 am · Front Door · clock-in',
+      '12:01 am · Front Door · fingerprint · clock-in',
       '8:02 am · App',
       '12:30 pm · Front Door',
       '5:05 pm · Front Door · clock-out',

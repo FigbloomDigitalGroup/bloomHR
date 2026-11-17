@@ -80,12 +80,31 @@ import { isCasual } from "../../lib/casualPay";
 import { nitaTotal } from "../../lib/nitaLevy";
 
 const withoutCasuals = <T extends Record<string, unknown>>(rows: T[] | null | undefined): T[] => (rows ?? []).filter((e) => !isCasual(e));
-import { advanceDeductionFor } from "../../lib/salaryAdvance";
+import { advanceDeductionFor, type AdvanceTaken } from "../../lib/salaryAdvance";
+import { loadAdvancesTaken } from "../../lib/salaryAdvanceApi";
 import { loadCompanyIdentity } from "../../lib/companyProfile";
 import { useNavigate } from "react-router-dom";
 import { deductionsForPeriod, loadDeductionSetup } from "../../lib/voluntaryDeductions";
 import { loadPayrollLoans } from "../../lib/loansApi";
 import { earningsForPeriod } from "../../lib/earnings";
+import {
+  type EmployeeReimbursement,
+  type JobGroupPerDiem,
+  type ReimbursementType,
+  jobGroupPerDiems,
+  reimbursementColumns,
+  reimbursementToSave,
+  reimbursementsForPeriod,
+  withReimbursement,
+  withReimbursements,
+} from "../../lib/reimbursements";
+import {
+  addReimbursementType,
+  loadReimbursements,
+  removeReimbursementType,
+  saveRunPayslipReimbursements,
+  setEmployeeReimbursement,
+} from "../../lib/reimbursementsDb";
 import { loadEarningSetup } from "../../lib/earningsDb";
 import { loadLeavePay, loadLeavePayouts, loadLeaveRateBasis } from "../../lib/leavePayDb";
 import { loadAbsencePay } from "../../lib/leaveDisciplineApi";
@@ -131,6 +150,8 @@ import PlatformRatesBanner from "./PlatformRatesBanner";
 import UgandaLstSettings from "./UgandaLstSettings";
 import PayrollFilesTab from "./PayrollFilesTab";
 import PayrollHistoryTab from "./PayrollHistoryTab";
+import { loadMySignature } from "../../lib/signatures";
+import { loadLetterSender } from "../../lib/exitLetters";
 
 // The payroll page: a month picker and seven tabs (Run, Employees' pay, Deductions, Earnings, Rates, Files, History). This shell
 // works out the month's figures and owns the run, the shared state and the pop-ups; each tab only shows its part.
@@ -146,6 +167,8 @@ const PAYSLIP_AMOUNTS = [
   // Tanzania and Uganda (FIG-905): the employer's NSSF (both, never taken from pay); Tanzania's HESLB repayment and
   // the employer's SDL and WCF; Uganda's Local Service Tax
   "employer_nssf", "heslb_deduction", "sdl_levy", "wcf_levy", "lst_deduction",
+  // per diem, mileage and other reimbursements typed in on the Run tab: their total, part of net pay
+  "reimbursements",
 ] as const;
 
 /** A calculated payroll row as the salary_history row saved for it */
@@ -156,6 +179,7 @@ const toSalaryHistory = (record: any): SalaryHistoryRecord => ({
   pay_period: record.pay_period,
   deduction_items: record.deduction_items ?? [],
   earning_items: record.earning_items ?? [],
+  reimbursement_items: record.reimbursement_items ?? [],
   leave_items: record.leave_items ?? [],
   payslip_note: record.payslip_note ?? null,
   overtime_items: record.overtime_items ?? [],
@@ -189,6 +213,7 @@ const fromSalaryHistory = (saved: any, live: any | undefined) => ({
   pay_period: saved.pay_period,
   deduction_items: saved.deduction_items ?? [],
   earning_items: saved.earning_items ?? [],
+  reimbursement_items: saved.reimbursement_items ?? [],
   leave_items: saved.leave_items ?? [],
   payslip_note: saved.payslip_note ?? null,
   overtime_items: saved.overtime_items ?? [],
@@ -316,6 +341,8 @@ export default function PayrollDashboard() {
   const [smsSendingStatus] = useState({});
   // Add this with your other state declarations
   const [salaryAdvances, setSalaryAdvances] = useState<any[]>([]);
+  // what approved payslips already took back, so a part payroll missed comes off the next run
+  const [advancesTaken, setAdvancesTaken] = useState<AdvanceTaken[]>([]);
   const [currentView, setCurrentView] = useState("dashboard");
 
   // Statutory override state
@@ -358,6 +385,13 @@ export default function PayrollDashboard() {
 
         console.log(`Loaded ${data?.length || 0} salary advances for payroll`);
         setSalaryAdvances(data || []);
+        // without it, each month's own parts are still taken (no catching up)
+        setAdvancesTaken(
+          await loadAdvancesTaken((data || []).map((a: any) => String(a["Employee Number"] ?? ""))).catch((err) => {
+            console.warn("Failed to load advance deductions already taken:", err?.message);
+            return [];
+          }),
+        );
       } catch (error: any) {
         console.warn("Failed to load salary advances:", error.message);
         setSalaryAdvances([]);
@@ -367,10 +401,11 @@ export default function PayrollDashboard() {
     fetchAllSalaryAdvances();
   }, []); // Empty dependency array = runs once when component mounts
 
-  // What comes off this pay for advances (no database call): a one-month advance in full in the month it was asked
-  // for, an advance spread over N months in N parts from that month (src/lib/salaryAdvance.ts)
+  // What comes off this pay for advances (no database call): an advance in full in the month it was asked for, plus
+  // any an approved payslip missed (paid after that payroll), and the parts of older advances spread over months
+  // (src/lib/salaryAdvance.ts)
   const calculateAdvanceDeduction = (employeeNumber: any, period: any) =>
-    advanceDeductionFor(salaryAdvances, employeeNumber, period);
+    advanceDeductionFor(salaryAdvances, employeeNumber, period, advancesTaken);
   // Enhanced SMS notification functions
   const sendPayslipNotification = async (employee: any) => {
     if (!employee.employeeNu) {
@@ -1227,6 +1262,43 @@ export default function PayrollDashboard() {
     };
   }, [actualPeriod, runVersion]);
 
+  // per diem, mileage and the company's other reimbursement columns, and this month's amounts (lib/reimbursements)
+  const [reimbursementSetup, setReimbursementSetup] = useState<{ period: string; types: ReimbursementType[]; rows: EmployeeReimbursement[]; groupRates: JobGroupPerDiem[] } | null>(null);
+  const [reimbursementsVersion, setReimbursementsVersion] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    loadReimbursements(actualPeriod)
+      .then((r) => { if (!cancelled) setReimbursementSetup({ period: actualPeriod, ...r }); })
+      .catch((err) => { if (!cancelled) toast.error(runErrorMessage(err, "Could not load the reimbursements.")); });
+    return () => {
+      cancelled = true;
+    };
+  }, [actualPeriod, reimbursementsVersion]);
+  const reimbursementTypes = useMemo(
+    () => (reimbursementSetup && reimbursementSetup.period === actualPeriod ? reimbursementColumns(reimbursementSetup.types) : []),
+    [reimbursementSetup, actualPeriod],
+  );
+  // each employee's job group per diem this month (the company's amount per job level)
+  const groupPerDiems = useMemo(
+    () =>
+      reimbursementSetup && reimbursementSetup.period === actualPeriod
+        ? jobGroupPerDiems(
+            reimbursementSetup.groupRates,
+            employees.map((e: any) => ({ employeeNumber: e["Employee Number"], jobGroupId: e.job_group_id })),
+            actualPeriod,
+          )
+        : new Map<string, number>(),
+    [reimbursementSetup, actualPeriod, employees],
+  );
+  // null until this month's are loaded: a run is never saved without them
+  const reimbursementsByEmployee = useMemo(
+    () =>
+      reimbursementSetup && reimbursementSetup.period === actualPeriod
+        ? reimbursementsForPeriod(reimbursementSetup.types, reimbursementSetup.rows, actualPeriod, groupPerDiems)
+        : null,
+    [reimbursementSetup, actualPeriod, groupPerDiems],
+  );
+
   const runLoading = runPeriod !== actualPeriod;
   const monthRun = runLoading ? null : run;
 
@@ -1250,10 +1322,11 @@ export default function PayrollDashboard() {
 
   // once the month's run is started, everything here (table, totals, exports, payslips, bulk pay) uses its saved figures
   const payrollRecords = useMemo(() => {
-    if (!monthRun) return liveRecords;
+    // before the run is started: the calculation, with the reimbursements typed in so far
+    if (!monthRun) return liveRecords.map((r) => withReimbursements(r, reimbursementsByEmployee?.get(r.employee_id) ?? []));
     const liveByEmployee = new Map(liveRecords.map((r) => [r.employee_id, r]));
     return markEditedPayslips(runPayslips.map((saved) => fromSalaryHistory(saved, liveByEmployee.get(saved.employee_id))), payslipEdits);
-  }, [monthRun, runPayslips, liveRecords, payslipEdits]);
+  }, [monthRun, runPayslips, liveRecords, payslipEdits, reimbursementsByEmployee]);
 
   const applyAdditionalFilters = (records: any[]) => {
     return records.filter((record: any) => {
@@ -1398,6 +1471,10 @@ export default function PayrollDashboard() {
   // Start the month's run, or recalculate its draft: saves every employee's figures (whatever the filters show)
   const handleSaveRun = async () => {
     const unnumbered = liveRecords.filter((r) => !r.employee_id).length;
+    if (!reimbursementsByEmployee) {
+      toast.error("The reimbursements haven't loaded yet. Reload the page and try again.");
+      return;
+    }
     setRunBusy(true);
     try {
       // with the payslips' hand edits applied again on top (FIG-883)
@@ -1407,7 +1484,10 @@ export default function PayrollDashboard() {
         ...(await withRunEdits(monthRun?.id, numbered.filter((r) => !isUsdPayslip(r)), (r) => payslipContext(r.employee_id))),
         ...numbered.filter((r) => isUsdPayslip(r)),
       ];
-      const all = calculated.map((r) => toSalaryHistory({ ...r, pay_period: actualPeriod }));
+      // and the month's reimbursements added to net pay, after deductions
+      const all = calculated.map((r) =>
+        toSalaryHistory(withReimbursements({ ...r, pay_period: actualPeriod }, reimbursementsByEmployee.get(r.employee_id) ?? [])),
+      );
       // a payslip never goes out in another currency than the one its country is paid in (the database refuses it too)
       const mismatch = all.map((r) => currencyMismatch(r, payCurrencies)).find(Boolean);
       if (mismatch) {
@@ -1442,11 +1522,17 @@ export default function PayrollDashboard() {
   };
 
   /** Approves, reopens or marks paid some of the run's countries in one go (FIG-905). */
-  const changeCountries = async (countries: string[], status: PayrollRunStatus, question: DialogOptions, done: string) => {
+  const changeCountries = async (
+    countries: string[],
+    status: PayrollRunStatus,
+    question: DialogOptions,
+    done: string,
+    signer?: { signature: string | null; name: string } | null,
+  ) => {
     if (!monthRun || countries.length === 0 || !(await confirmDialog(question))) return;
     setRunBusy(true);
     try {
-      const changed = await setCountriesStatus(monthRun.id, countries, status);
+      const changed = await setCountriesStatus(monthRun.id, countries, status, signer);
       if (changed.length === 0) throw new Error("Nothing changed: reload and try again.");
       toast.success(done);
       setRunVersion((v) => v + 1);
@@ -1485,6 +1571,63 @@ export default function PayrollDashboard() {
     return () => { stale = true; };
   }, [showDemoPayAll]);
   const approvedCountries = useMemo(() => new Set(runCountries.filter((c) => c.status !== "draft").map((c) => c.country)), [runCountries]);
+
+  // Reimbursements typed in on the Run tab: before the month is started, or while the payslip's country is a draft
+  const canEditReimbursements = (record: any) => Boolean(record.employee_id) && (!monthRun || !approvedCountries.has(payslipCountry(record)));
+  const handleSetReimbursement = async (record: any, type: ReimbursementType, amount: number) => {
+    const period = actualPeriod;
+    const employeeNumber = record.employee_id;
+    // in the job group column, the group's amount again removes what was typed (the group's amount then applies)
+    const action = reimbursementToSave(amount, type.from_job_group ? groupPerDiems.get(employeeNumber) ?? 0 : 0);
+    try {
+      await setEmployeeReimbursement({ employeeNumber, typeId: type.id, period, amount: "save" in action ? action.save : null });
+      setReimbursementSetup((prev) =>
+        prev && prev.period === period
+          ? {
+              ...prev,
+              rows: [
+                ...prev.rows.filter((r) => !(r.employee_number === employeeNumber && r.reimbursement_type_id === type.id)),
+                ...("save" in action ? [{ id: `${employeeNumber}:${type.id}`, employee_number: employeeNumber, reimbursement_type_id: type.id, pay_period: period, amount: action.save }] : []),
+              ],
+            }
+          : prev,
+      );
+      // a started month's saved payslip changes at once: its net pay goes up or down by the difference
+      const saved = monthRun ? runPayslips.find((p) => p.employee_id === employeeNumber) : null;
+      if (monthRun && saved) {
+        const next = withReimbursement(saved, type.name, amount, reimbursementTypes.map((t) => t.name));
+        await saveRunPayslipReimbursements(monthRun.id, employeeNumber, next);
+        setRunPayslips((ps) => ps.map((p) => (p.employee_id === employeeNumber ? { ...p, ...next } : p)));
+      }
+      return true;
+    } catch (err) {
+      toast.error(runErrorMessage(err, `Could not save ${type.name.toLowerCase()} for ${record.employee_name || employeeNumber}.`));
+      return false;
+    }
+  };
+  const handleAddReimbursementColumn = async (name: string) => {
+    try {
+      await addReimbursementType(name, reimbursementSetup?.types ?? []);
+      setReimbursementsVersion((v) => v + 1);
+      return true;
+    } catch (err) {
+      toast.error(runErrorMessage(err, "Could not add the column."));
+      return false;
+    }
+  };
+  const handleRemoveReimbursementColumn = async (type: ReimbursementType) => {
+    if ((reimbursementSetup?.rows ?? []).some((r) => r.reimbursement_type_id === type.id && r.pay_period === actualPeriod)) {
+      toast.error(`Clear everyone's ${type.name.toLowerCase()} for ${periodLabel} first, then remove the column.`);
+      return;
+    }
+    if (!(await confirmDialog({ title: `Remove the ${type.name} column?`, message: "Payslips already saved keep their amounts. Add it again any time.", confirmLabel: "Remove" }))) return;
+    try {
+      await removeReimbursementType(type.id);
+      setReimbursementsVersion((v) => v + 1);
+    } catch (err) {
+      toast.error(runErrorMessage(err, "Could not remove the column."));
+    }
+  };
   // payslips of approved (or paid) countries: what can be paid, emailed and filed
   const approvedRecords = useMemo(() => payrollRecords.filter((r: any) => monthRun && approvedCountries.has(payslipCountry(r))), [payrollRecords, approvedCountries, monthRun]);
   const demoLines = useMemo(
@@ -1558,8 +1701,13 @@ export default function PayrollDashboard() {
   const listOf = (cs: string[]) => cs.join(", ");
   const currencyTotals = useMemo(() => totalsByCurrency(finalFilteredRecords), [finalFilteredRecords]);
 
-  const approveCountries = (countries: string[]) => {
+  const approveCountries = async (countries: string[]) => {
     const ready = readiness.filter((r) => countries.includes(r.country));
+    // the approver signs the payslips: their drawn signature (Settings > Appearance) and name
+    const [signature, sender] = await Promise.all([
+      loadMySignature().catch(() => null),
+      loadLetterSender().catch(() => ({ name: "", title: "" })),
+    ]);
     return changeCountries(
       countries,
       "approved",
@@ -1578,6 +1726,9 @@ export default function PayrollDashboard() {
           readiness.some((r) => r.state === "blocked" || r.state === "waiting")
             ? "Countries that aren't ready stay as they are and can be approved later."
             : "",
+          signature
+            ? "Your signature will be on the payslips as the authorised signatory."
+            : "You haven't drawn a signature, so the payslips' signatory line will be blank. Draw one in Settings > Appearance first if they should carry it.",
           "Payslips will be locked and staff will be able to see them.",
         ]
           .filter(Boolean)
@@ -1585,6 +1736,7 @@ export default function PayrollDashboard() {
         confirmLabel: "Approve payroll",
       },
       `Payroll for ${periodLabel} approved for ${listOf(countries)}. Staff there can now see their payslips.`,
+      { signature, name: sender.name },
     );
   };
 
@@ -1840,7 +1992,7 @@ export default function PayrollDashboard() {
               <div className="bg-white p-4 rounded-[10px] border border-gray-200 shadow-sm">
                 <div className="flex items-center gap-2 mb-1">
                   <TrendingUp className="w-3.5 h-3.5 text-blue-500" />
-                  <span className="text-xs font-medium text-gray-500">Gross pay</span>
+                  <span className="text-xs font-medium text-gray-500">Basic pay</span>
                 </div>
                 <p className="text-sm font-bold text-blue-700">KSh {totalGrossPay.toLocaleString()}</p>
                 <p className="text-[10px] text-gray-400 mt-0.5">Before deductions</p>
@@ -1853,7 +2005,7 @@ export default function PayrollDashboard() {
                   <span className="text-xs font-medium text-gray-500">Net pay</span>
                 </div>
                 <p className="text-sm font-bold text-green-700">KSh {totalNetPay.toLocaleString()}</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">Take-home</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">Take-home, with reimbursements</p>
               </div>
 
               {/* Total Deductions */}
@@ -2037,6 +2189,13 @@ export default function PayrollDashboard() {
           currentItems={currentItems}
           totals={{ totalGrossPay, totalDeductions, totalNetPay, totalPAYE, totalNHIF, totalNSSF, totalHousingLevy }}
           nitaLevy={nitaTotal(payrollRecords)}
+          reimbursements={{
+            columns: reimbursementTypes,
+            canEdit: canEditReimbursements,
+            onSet: handleSetReimbursement,
+            onAddColumn: handleAddReimbursementColumn,
+            onRemoveColumn: handleRemoveReimbursementColumn,
+          }}
           expandedRows={expandedRows}
           toggleRowExpand={toggleRowExpand}
           smsSendingStatus={smsSendingStatus}

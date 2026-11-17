@@ -1,8 +1,8 @@
 import { AmountField, SelectField } from './Fields';
-import { KRA_EMPLOYEE_TYPES } from '../../lib/onboardingValidation';
+import { KRA_EMPLOYEE_TYPES, taxStatusLabel } from '../../lib/onboardingValidation';
 
-// HR's part of onboarding on the add and edit employee pages: the KRA type of employee, cash allowances, non-cash
-// benefits and pension-type contributions, each a monthly amount (they feed the KRA P10 and NSSF returns).
+// HR's part of onboarding on the add and edit employee pages: the KRA tax status (primary or secondary employee),
+// cash allowances, non-cash benefits and pension-type contributions, each a monthly amount (they feed the KRA P10 and NSSF returns).
 
 const AMOUNTS: [field: string, label: string, hint?: string][] = [
   ['house_allowance', 'House allowance'],
@@ -27,18 +27,20 @@ interface Props {
   locked?: string[];
   /** the currency the employee is paid in (FIG-906: USD for a country paid in USD); labels the amounts when given */
   currency?: string;
+  /** the employee's payroll country: names the primary / secondary choice ("KRA tax status" in Kenya) */
+  country?: string | null;
 }
 
-export default function EmployerPayFields({ values, onChange, disabled, locked = [], currency }: Props) {
+export default function EmployerPayFields({ values, onChange, disabled, locked = [], currency, country }: Props) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
       <SelectField
-        label="Type of employee (KRA)"
+        label={taxStatusLabel(country)}
         required
         value={values['kra_employee_type']}
         options={KRA_EMPLOYEE_TYPES}
         onChange={(v) => onChange('kra_employee_type', v || null)}
-        hint="Primary: this is their main job. Secondary: they have a main job elsewhere"
+        hint="Primary employee: this is their main job. Secondary employee: they have a main job elsewhere."
         disabled={disabled}
       />
       {AMOUNTS.map(([field, label, hint]) => (

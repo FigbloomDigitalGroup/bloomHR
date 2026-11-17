@@ -43,7 +43,9 @@ export interface HRNotification {
         | 'onboarding_followups_overdue'
         | 'leave_reopened'
         | 'attendance_odd_hours'
-        | 'missed_scan_requested' | 'missed_scan_request' | 'missed_scan_approved' | 'missed_scan_declined';
+        | 'missed_scan_requested' | 'missed_scan_request' | 'missed_scan_approved' | 'missed_scan_declined'
+        | 'payment_due' | 'payment_made' | 'requisition_requested' | 'requisition_approved' | 'requisition_rejected'
+        | 'possible_absences' | 'possible_absences_team' | 'possible_absence';
     title: string;
     message: string;
     // Nullable for leave notifications - only contract/probation reminders
@@ -55,6 +57,8 @@ export interface HRNotification {
     is_read_staff: boolean;
     email_sent: boolean;
     created_at: string;
+    /** the admin bell: read by the signed-in person (my_admin_notifications) */
+    is_read?: boolean;
     employee_name?: string;
     work_email?: string;
 }
@@ -190,17 +194,44 @@ export function useHRNotifications() {
     return { checkAndNotify };
 }
 
-/** Fetch unread HR notifications for the admin bell panel */
+/**
+ * The admin bell: the newest notifications the signed-in person can see and hasn't cleared, with is_read their own
+ * (my_admin_notifications; hr_notification_reads keeps each person's read and cleared, so one admin reading an alert
+ * doesn't hide it from the others).
+ */
 export async function fetchAdminHRNotifications(): Promise<HRNotification[]> {
-    const { data } = await supabase
-        .from('hr_notifications')
-        .select('*')
-        .eq('is_read_admin', false)
-        // the daily company digest is each employee's own, not something for HR (FIG-771)
-        .neq('notification_type', 'company_digest')
-        .order('created_at', { ascending: false })
-        .limit(50);
-    return (data || []) as HRNotification[];
+    const { data } = await supabase.rpc('my_admin_notifications', { p_limit: 50 });
+    return ((data || []) as Partial<HRNotification>[]).map((n) => ({
+        is_read_admin: false,
+        is_read_staff: false,
+        email_sent: false,
+        ...n,
+        is_read: n.is_read === true,
+    })) as HRNotification[];
+}
+
+async function myUserId() {
+    const { data: { user } } = await supabase.auth.getUser();
+    return user?.id ?? null;
+}
+
+/** Marks these notifications read for the signed-in person only. */
+export async function markAdminNotificationsRead(ids: number[]) {
+    const userId = await myUserId();
+    if (!userId || ids.length === 0) return;
+    await supabase
+        .from('hr_notification_reads')
+        .upsert(ids.map((id) => ({ notification_id: id, user_id: userId })), { onConflict: 'notification_id,user_id', ignoreDuplicates: true });
+}
+
+/** Clears these notifications from the signed-in person's bell (and marks them read), for them only. */
+export async function clearAdminNotifications(ids: number[]) {
+    const userId = await myUserId();
+    if (!userId || ids.length === 0) return;
+    const now = new Date().toISOString();
+    await supabase
+        .from('hr_notification_reads')
+        .upsert(ids.map((id) => ({ notification_id: id, user_id: userId, cleared_at: now })), { onConflict: 'notification_id,user_id' });
 }
 
 /** Fetch HR notifications for a specific staff member */
@@ -215,9 +246,9 @@ export async function fetchStaffHRNotifications(employeeNumber: string): Promise
     return (data || []) as HRNotification[];
 }
 
-/** Mark a notification as read by admin */
+/** Mark a notification as read by the signed-in admin (for them only) */
 export async function markAdminNotificationRead(id: number) {
-    await supabase.from('hr_notifications').update({ is_read_admin: true }).eq('id', id);
+    await markAdminNotificationsRead([id]);
 }
 
 /** Mark a notification as read by staff */

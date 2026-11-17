@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { IDLE_TIMEOUT_MS, IDLE_WARNING_MS, idleState, lastActivity, markActivity } from './idleLogout';
+import { FALLBACK_IDLE_TIMEOUT_MS, IDLE_TIMEOUT_MS, IDLE_WARNING_MS, idleState, lastActivity, markActivity } from './idleLogout';
 
 describe('idleLogout', () => {
   beforeEach(() => localStorage.clear());
@@ -27,5 +27,15 @@ describe('idleLogout', () => {
 
   it('nothing recorded yet is not idle', () => {
     expect(idleState(Date.now(), null)).toBe('active');
+  });
+});
+
+describe('the company setting', () => {
+  it('is 7 days unless the company chose otherwise; a shorter setting signs out sooner', () => {
+    const last = 1_000_000;
+    expect(IDLE_TIMEOUT_MS).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(idleState(last + 3 * 24 * 60 * 60 * 1000, last)).toBe('active'); // 3 days away: still signed in
+    expect(idleState(last + FALLBACK_IDLE_TIMEOUT_MS, last, 8 * 60 * 60 * 1000)).toBe('active');
+    expect(idleState(last + FALLBACK_IDLE_TIMEOUT_MS, last, FALLBACK_IDLE_TIMEOUT_MS)).toBe('expired');
   });
 });

@@ -5,6 +5,7 @@ import { PayslipEditBar, type PayslipEditing } from "./PayslipEditModal";
 import { isUsdPayslip } from "../../lib/payroll/usdPay";
 import { PayslipDocument } from "./PayslipDocument";
 import { usePayslipExtras } from "./usePayslipExtras";
+import { cn } from "../../lib/utils";
 
 // One employee's payslip for the month (view, previous / next, PDF), moved from PayrollDashboard.
 
@@ -43,7 +44,7 @@ export const GlowButtonss = ({
 
   return (
     <button
-      className={`${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${className || ""}`}
+      className={cn(baseClasses, sizeClasses[size], variantClasses[variant], disabled && "opacity-50 cursor-not-allowed", className)}
       onClick={onClick}
       disabled={disabled}
     >

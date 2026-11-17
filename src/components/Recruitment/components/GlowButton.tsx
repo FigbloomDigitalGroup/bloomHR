@@ -1,3 +1,4 @@
+import { cn } from '../../../lib/utils';
 import { LucideIcon } from 'lucide-react';
 
 interface GlowButtonProps {
@@ -33,7 +34,7 @@ export const GlowButton = ({
 
   return (
     <button 
-      className={`${baseClasses} ${sizeClasses[size]} ${variantClasses[variant]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+      className={cn(baseClasses, sizeClasses[size], variantClasses[variant], disabled && 'opacity-50 cursor-not-allowed', className)}
       onClick={onClick}
       disabled={disabled}
     >

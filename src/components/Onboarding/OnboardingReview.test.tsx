@@ -6,6 +6,7 @@ const api = vi.hoisted(() => ({
   loadOnboardingOverview: vi.fn(),
   loadOnboardingForReview: vi.fn(),
   approveOnboarding: vi.fn(),
+  approveOnBehalf: vi.fn(),
   requestOnboardingChanges: vi.fn(),
   inviteToOnboard: vi.fn(),
   setFollowUpDueDate: vi.fn(),
@@ -35,6 +36,7 @@ beforeEach(() => {
   api.loadOnboardingForReview.mockImplementation((id: string) =>
     Promise.resolve({ employee: { id, 'First Name': `Person ${id}` }, emergency: emptyContact(), nextOfKin: emptyContact(), missing: { employee: [], employer: [], documentsOutstanding: [], essentialsEmployee: [], essentialsEmployer: [], followUps: [] }, history: [] }));
   api.approveOnboarding.mockResolvedValue(undefined);
+  api.approveOnBehalf.mockResolvedValue(undefined);
   api.requestOnboardingChanges.mockResolvedValue(undefined);
   api.inviteToOnboard.mockResolvedValue({ status: 'sent', email: '2@co.com' });
   api.setFollowUpDueDate.mockResolvedValue(undefined);
@@ -73,14 +75,44 @@ describe('OnboardingReview', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
+  it('approves for someone who was invited but never sent their form', async () => {
+    api.loadOnboardingOverview.mockResolvedValue([row('4', 'invited')]);
+    show();
+    fireEvent.click(await screen.findByText('All (1)'));
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText(/haven’t sent their form/)).toBeTruthy();
+    expect(within(dialog).queryByRole('button', { name: /^Approve$/ })).toBeNull();
+    const button = within(dialog).getByRole('button', { name: /Approve for them/ }) as HTMLButtonElement;
+    await waitFor(() => expect(button.disabled).toBe(false));
+    fireEvent.click(button);
+    await waitFor(() => expect(api.approveOnBehalf).toHaveBeenCalledWith('4'));
+    expect(toast.success).toHaveBeenCalledWith('Person 4 is approved');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('can’t approve for them while an essential is missing', async () => {
+    api.loadOnboardingOverview.mockResolvedValue([row('4', 'invited')]);
+    api.loadOnboardingForReview.mockResolvedValue({ employee: { id: '4' }, emergency: emptyContact(), nextOfKin: emptyContact(),
+      missing: { employee: ['Next of kin'], employer: [], documentsOutstanding: [], essentialsEmployee: ['Next of kin'], essentialsEmployer: [], followUps: [] },
+      history: [] });
+    show();
+    fireEvent.click(await screen.findByText('All (1)'));
+    fireEvent.click(screen.getByRole('button', { name: 'View' }));
+    const dialog = await screen.findByRole('dialog');
+    const essentials = await within(dialog).findByRole('region', { name: 'Essentials' });
+    expect(within(essentials).getByText('Next of kin')).toBeTruthy();
+    expect((within(dialog).getByRole('button', { name: /Approve for them/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('can’t approve while HR’s own part is missing, and says what it is', async () => {
     api.loadOnboardingForReview.mockResolvedValue({ employee: { id: '1' }, emergency: emptyContact(), nextOfKin: emptyContact(),
-      missing: { employee: [], employer: ['Type of employee'], documentsOutstanding: [], essentialsEmployee: [], essentialsEmployer: ['Type of employee'], followUps: [] },
+      missing: { employee: [], employer: ['KRA tax status (Primary or Secondary)'], documentsOutstanding: [], essentialsEmployee: [], essentialsEmployer: ['KRA tax status (Primary or Secondary)'], followUps: [] },
       history: [] });
     show();
     fireEvent.click(await screen.findByRole('button', { name: 'Review' }));
     const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByText('Type of employee')).toBeTruthy();
+    expect(await within(dialog).findByText('KRA tax status (Primary or Secondary)')).toBeTruthy();
     expect((within(dialog).getByRole('button', { name: /Approve/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 

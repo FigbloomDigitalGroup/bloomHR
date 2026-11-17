@@ -1,0 +1,160 @@
+import { useCallback, useEffect, useState } from 'react';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import type { Session } from '@supabase/supabase-js';
+import toast from 'react-hot-toast';
+import { supabase } from '../../lib/supabase';
+import { isPlatformAdmin } from '../../lib/platformRates';
+import { myPlatformRole, type PlatformRole } from '../../lib/platformRoles';
+import ConsoleLogin from './ConsoleLogin';
+import FigbloomCallback from '../../pages/FigbloomCallback';
+import { figbloomLogoutUrl, figbloomSignInEnabled } from '../../lib/figbloomSignIn';
+import MFAVerification from '../../pages/MFAverification';
+import UpdatePasswordPage from '../../pages/UpdatePassword';
+import AuthShell, { AuthButton } from '../Company/AuthShell';
+import FigbloomLoader from '../UI/FigbloomLoader';
+import OrganisationsPage from '../Platform/OrganisationsPage';
+import PlatformRatesPage from '../Payroll/PlatformRatesPage';
+import StaffPage from '../Platform/StaffPage';
+import SchoolsPage from '../Platform/SchoolsPage';
+import SchoolGroupsPage from '../Platform/SchoolGroupsPage';
+import FleetCompaniesPage from '../Platform/FleetCompaniesPage';
+import OverviewPage from '../Platform/OverviewPage';
+import PlatformSettingsPage from '../Platform/PlatformSettingsPage';
+import ConsoleLayout from './ConsoleLayout';
+import { ConsoleBadgesContext, type ConsoleBadge, type ConsoleBadges } from './consoleBadges';
+
+// The Figbloom console (src/lib/console.ts): what App shows on console.figbloom.org instead of the company app. Only
+// signing in, two-step sign-in and Figbloom's own pages: no company is loaded, so a platform admin who is staff in their
+// company, or in no company at all, gets the same console. is_platform_admin() decides who gets in; the database
+// refuses anyone else on every platform call anyway.
+
+// the console's home: every product at a glance
+const HOME = '/platform/overview';
+
+const Loader = () => <FigbloomLoader fullScreen />;
+
+/** Whether this sign-in still needs a two-step code (the company app asks the same; false without a company). */
+async function mfaRequired(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('mfa_required');
+  return !error && data === true; // as in the company app, a failed check does not lock anyone out
+}
+
+interface Access {
+  userId: string;
+  admin: boolean;
+  mfa: boolean;
+  /** their console role (owner, admin, support, viewer), shown in the header */
+  role: PlatformRole | null;
+}
+
+function NoConsoleAccess({ email, onSignOut }: { email: string; onSignOut: () => void }) {
+  return (
+    <AuthShell
+      title="No console access"
+      subtitle={<>You are signed in as <span className="font-semibold">{email}</span>, which is not a Figbloom platform admin.</>}
+    >
+      <AuthButton variant="secondary" onClick={onSignOut}>
+        Sign out
+      </AuthButton>
+    </AuthShell>
+  );
+}
+
+export default function ConsoleApp() {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  // undefined until the stored sign-in has been read
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+
+  // index.html names the company app; the console is a different place
+  useEffect(() => {
+    document.title = 'Figbloom console';
+  }, []);
+  const [access, setAccess] = useState<Access | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (live) setSession(data.session);
+    });
+    // only note the session here: supabase holds its auth lock until this callback returns (see App.tsx)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
+    return () => {
+      live = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Asked once per sign-in, and again on each page while a two-step code is still due (MFAVerification moves on
+  // to another page once the code is right).
+  const userId = session?.user?.id;
+  const known = !!userId && access?.userId === userId;
+  const cleared = known && !access?.mfa;
+  useEffect(() => {
+    if (!userId || cleared || (known && pathname === '/mfa')) return;
+    let live = true;
+    setAccess(null);
+    void Promise.all([isPlatformAdmin(), mfaRequired(), myPlatformRole()]).then(([admin, mfa, role]) => {
+      if (live) setAccess({ userId, admin, mfa, role });
+    });
+    return () => {
+      live = false;
+    };
+  }, [userId, known, cleared, pathname]);
+
+  // the menu's count badges, published by the pages that load those numbers anyway (consoleBadges.ts)
+  const [badges, setBadges] = useState<ConsoleBadges>({});
+  const publishBadge = useCallback((path: string, badge: ConsoleBadge | null) => {
+    setBadges((prev) =>
+      prev[path]?.count === badge?.count && prev[path]?.label === badge?.label ? prev : { ...prev, [path]: badge ?? undefined }
+    );
+  }, []);
+
+  const signOut = useCallback(async () => {
+    sessionStorage.removeItem('isMFAProcess');
+    sessionStorage.removeItem('mfaCompleted');
+    // this browser only, as in the company app
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+    if (error) toast.error('Error signing out: ' + error.message);
+    // Figbloom staff sign-in: end Figbloom's own session too (it sends the browser back here)
+    const figbloomLogout = figbloomSignInEnabled() ? figbloomLogoutUrl('staff') : null;
+    if (figbloomLogout) {
+      window.location.assign(figbloomLogout);
+      return;
+    }
+    navigate('/', { replace: true });
+  }, [navigate]);
+
+  // the password reset link works signed in (the link's own session) or not
+  if (pathname === '/update-password') return <UpdatePasswordPage />;
+  // back from Figbloom staff sign-in: the session it gives moves on by itself (the session change above)
+  if (pathname === '/auth/staff/callback' && !session) {
+    return <FigbloomCallback pool="staff" onLoginSuccess={() => navigate(HOME, { replace: true })} />;
+  }
+  if (session === undefined) return <Loader />;
+  // signing in moves on by itself: the session change above picks it up
+  if (!session) return <ConsoleLogin />;
+  if (!known || !access) return <Loader />;
+  if (access.mfa) return pathname === '/mfa' ? <MFAVerification /> : <Navigate to="/mfa" replace />;
+
+  const email = session.user.email ?? '';
+  if (!access.admin) return <NoConsoleAccess email={email} onSignOut={() => void signOut()} />;
+
+  return (
+    <ConsoleBadgesContext.Provider value={publishBadge}>
+    <ConsoleLayout email={email} role={access.role} badges={badges} onSignOut={() => void signOut()}>
+      <Routes>
+        <Route path="/platform/overview" element={<OverviewPage />} />
+        <Route path="/platform/organisations" element={<OrganisationsPage />} />
+        <Route path="/platform/rates" element={<PlatformRatesPage />} />
+        <Route path="/platform/schools" element={<SchoolsPage />} />
+        <Route path="/platform/school-groups" element={<SchoolGroupsPage />} />
+        <Route path="/platform/fleet/companies" element={<FleetCompaniesPage />} />
+        <Route path="/platform/staff" element={<StaffPage currentUserId={session.user.id} />} />
+        <Route path="/platform/settings" element={<PlatformSettingsPage />} />
+        <Route path="*" element={<Navigate to={HOME} replace />} />
+      </Routes>
+    </ConsoleLayout>
+    </ConsoleBadgesContext.Provider>
+  );
+}

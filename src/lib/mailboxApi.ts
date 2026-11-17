@@ -29,7 +29,11 @@ async function send(method: string, path: string, body?: unknown): Promise<Respo
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const response = await send(method, path, body);
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
+  if (!response.ok) {
+    // a body over the hosting limit is refused before it reaches the API, without a JSON answer
+    if (response.status === 413 && !payload.error) throw new Error('This is too large to send. Remove some attachments and try again.');
+    throw new Error(payload.error || `Request failed (${response.status})`);
+  }
   return payload as T;
 }
 
@@ -55,6 +59,23 @@ export interface MailboxDefaults {
   smtp_port: number;
   /** the suggestion came from the company's own mail server settings */
   from_company_server: boolean;
+}
+
+/** Where an address's mail is read and sent, found by the server from its domain (GET /servers). */
+export interface MailServers {
+  email: string;
+  imap_host: string;
+  imap_port: number;
+  smtp_host: string;
+  smtp_port: number;
+  /** a big provider, known by the domain or where its mail goes */
+  provider: 'google' | 'microsoft' | 'zoho' | null;
+  /** false: this mailbox can't be connected with a password (Microsoft) */
+  supported: boolean;
+  /** what to know before connecting (an app password...) */
+  note: string | null;
+  /** how it was found: a provider, mail.<domain> exists, the domain's MX server, or an unconfirmed guess (null) */
+  found: 'provider' | 'name' | 'mx' | null;
 }
 
 export interface MailboxInput {
@@ -133,8 +154,10 @@ const q = (params: Record<string, string | number>) =>
     .join('&');
 
 export const getMailbox = () => request<{ account: MailboxAccount | null; defaults: MailboxDefaults }>('GET', '/account');
+export const findMailServers = (email: string) => request<MailServers>('GET', `/servers?${q({ email })}`);
 export const testMailbox = (input: MailboxInput) => request<{ ok: boolean; message: string }>('POST', '/test', input);
-export const connectMailbox = (input: MailboxInput) => request<{ account: MailboxAccount }>('PUT', '/account', input);
+/** Saves when reading works; `smtp` says whether sending works with the same login. */
+export const connectMailbox = (input: MailboxInput) => request<{ account: MailboxAccount; smtp?: { ok: boolean; message: string } }>('PUT', '/account', input);
 export const disconnectMailbox = () => request<{ ok: boolean }>('DELETE', '/account');
 export const listFolders = () => request<{ folders: MailFolder[] }>('GET', '/folders');
 export const listMessages = (folder: string, page = 1) => request<MessagePage>('GET', `/messages?${q({ folder, page })}`);
@@ -157,3 +180,105 @@ export async function downloadAttachment(folder: string, uid: number, attachment
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
+
+// ---------------------------------------------------------------------------------------------
+// sending (FIG-1205, PR 2 of 3)
+// ---------------------------------------------------------------------------------------------
+
+/** Files added from this device: 3 MB in all (they travel to the server as base64, under the hosting's 4.5 MB). */
+export const MAX_UPLOAD_BYTES = 3 * 1024 * 1024;
+/** The whole email, with the files being forwarded (read on the server). */
+export const MAX_SEND_BYTES = 20 * 1024 * 1024;
+export const MAX_RECIPIENTS = 50;
+
+export interface SendInput {
+  to: MailPerson[];
+  cc: MailPerson[];
+  bcc: MailPerson[];
+  subject: string;
+  text: string;
+  attachments: { filename: string; content_type: string; data: string }[];
+  reply?: { folder: string; uid: number };
+  forward?: { folder: string; uid: number; parts: string[] };
+}
+
+export interface SendResult {
+  ok: boolean;
+  saved_to_sent: boolean;
+  /** the Sent folder the copy went to (null when it couldn't be saved) */
+  sent_folder: string | null;
+  /** recipients the mail server refused (the rest got it) */
+  rejected: string[];
+  message: string;
+}
+
+/** Sends from the person's own mailbox (From is always their mailbox) and saves a copy to their Sent folder. */
+export const sendMail = (input: SendInput) => request<SendResult>('POST', '/send', input);
+
+// ---------------------------------------------------------------------------------------------
+// managing mail (FIG-1205, PR 3 of 3)
+// ---------------------------------------------------------------------------------------------
+
+/** Emails acted on at once (the server's cap). */
+export const MAX_UIDS = 200;
+
+export interface DeleteResult {
+  ok: boolean;
+  folder: string;
+  uids: number[];
+  /** true: removed for good (only ever from Trash, when asked); false: moved to `trash` */
+  permanent: boolean;
+  trash: string | null;
+}
+
+export interface SearchFilters {
+  q?: string;
+  unread?: boolean;
+  attachments?: boolean;
+  /** YYYY-MM-DD, inclusive */
+  since?: string;
+  before?: string;
+}
+
+export interface SearchPage extends MessagePage {
+  q: string;
+  /** more than 500 matched: only the newest 500 are shown */
+  capped: boolean;
+}
+
+/** Mark read / unread and flag / unflag. */
+export const setFlags = (folder: string, uids: number[], change: { seen?: boolean; flagged?: boolean }) =>
+  request<{ ok: boolean }>('POST', '/flags', { folder, uids, ...change });
+/** Move to another folder of the mailbox. */
+export const moveMessages = (folder: string, uids: number[], to: string) => request<{ ok: boolean }>('POST', '/move', { folder, uids, to });
+/** To Trash; in Trash, `permanent` deletes for good (the screen asks first). */
+export const deleteMessages = (folder: string, uids: number[], permanent = false) =>
+  request<DeleteResult>('POST', '/delete', { folder, uids, ...(permanent ? { permanent: true } : {}) });
+/** Searches one folder, newest first, 50 a page. */
+export function searchMessages(folder: string, filters: SearchFilters, page = 1) {
+  const params: Record<string, string | number> = { folder, page };
+  if (filters.q) params.q = filters.q;
+  if (filters.unread) params.unread = 1;
+  if (filters.attachments) params.attachments = 1;
+  if (filters.since) params.since = filters.since;
+  if (filters.before) params.before = filters.before;
+  return request<SearchPage>('GET', `/search?${q(params)}`);
+}
+/** INBOX's unread count, for the sidebar badge; `connected: false` when there is no mailbox. */
+export const getUnreadCount = () => request<{ connected: boolean; unread: number }>('GET', '/unread');
+
+const TRASH_NAMES = ['trash', 'inbox.trash', 'inbox/trash', 'deleted items', 'inbox.deleted items', 'inbox/deleted items', 'deleted messages', 'inbox.deleted messages'];
+const ARCHIVE_NAMES = ['archive', 'inbox.archive', 'inbox/archive'];
+
+const byNames = (folders: MailFolder[], names: string[]) => {
+  for (const name of names) {
+    const hit = folders.find((f) => f.path.toLowerCase() === name);
+    if (hit) return hit.path;
+  }
+  return null;
+};
+
+/** The Trash folder as the server finds it: marked Trash, else Trash / INBOX.Trash, else Deleted Items. */
+export const findTrash = (folders: MailFolder[]) => folders.find((f) => f.special === 'trash')?.path ?? byNames(folders, TRASH_NAMES);
+/** The Archive folder (for the "e" shortcut), or null when there is none. */
+export const findArchive = (folders: MailFolder[]) => folders.find((f) => f.special === 'archive')?.path ?? byNames(folders, ARCHIVE_NAMES);

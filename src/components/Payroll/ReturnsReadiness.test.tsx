@@ -13,7 +13,7 @@ const ready = {
 describe('ReturnsReadiness', () => {
   it('says so when everyone on payroll has what the returns need', () => {
     render(<ReturnsReadiness employees={[ready]} />);
-    expect(screen.getByText(/Everyone on payroll has what the P10, SHA and NSSF returns need/)).toBeTruthy();
+    expect(screen.getByText(/Everyone on payroll has what the P10, SHIF and NSSF returns need/)).toBeTruthy();
   });
 
   it('counts the gaps per return and lists who is missing what', () => {

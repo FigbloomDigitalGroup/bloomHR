@@ -7,6 +7,7 @@ import {
   checkPayee,
   maxAdvanceFor,
   queueTab,
+  repaymentNote,
   repaymentProgress,
   repaymentSchedule,
   validateAdvanceRequest,
@@ -78,6 +79,46 @@ describe('payroll deduction', () => {
   });
 });
 
+describe('catching up a part payroll missed', () => {
+  const slip = (pay_period: string, amount: number, employee_number = 'E1') => ({ employee_number, pay_period, amount });
+
+  it('an advance recorded paid after its month was approved comes off the next payroll', () => {
+    // October's payslip was approved before the payment was recorded, so it took nothing
+    const taken = [slip('2026-09', 0), slip('2026-10', 0)];
+    expect(advanceDeductionFor([paid()], 'E1', '2026-11', taken)).toBe(9000);
+    // once November took it, nothing more
+    expect(advanceDeductionFor([paid()], 'E1', '2026-12', [...taken, slip('2026-11', 9000)])).toBe(0);
+  });
+
+  it('nothing extra when each month took its part', () => {
+    const rows = [paid({ repayment_months: 3 })];
+    const taken = [slip('2026-10', 3000), slip('2026-11', 3000)];
+    expect(advanceDeductionFor(rows, 'E1', '2026-12', taken)).toBe(3000);
+    expect(advanceDeductionFor(rows, 'E1', '2027-01', [...taken, slip('2026-12', 3000)])).toBe(0);
+  });
+
+  it('a missed part is added to the month’s own part', () => {
+    const rows = [paid({ repayment_months: 3 })];
+    expect(advanceDeductionFor(rows, 'E1', '2026-11', [slip('2026-10', 0)])).toBe(6000);
+  });
+
+  it('a month with no payslip counts as missed, once the person has an approved payslip', () => {
+    const rows = [paid({ repayment_months: 3 })];
+    expect(advanceDeductionFor(rows, 'E1', '2026-12', [slip('2026-10', 3000)])).toBe(6000);
+  });
+
+  it('months before the first approved payslip in the app are not charged again', () => {
+    // paid outside the app before payroll moved in; payroll first ran in December
+    expect(advanceDeductionFor([paid({ repayment_months: 3 })], 'E1', '2027-01', [slip('2026-12', 0)])).toBe(3000);
+    expect(advanceDeductionFor([paid()], 'E1', '2027-01', [])).toBe(0);
+  });
+
+  it('only the person’s own payslips before this month count', () => {
+    const taken = [slip('2026-10', 9000, 'E2'), slip('2026-11', 9000)];
+    expect(advanceDeductionFor([paid()], 'E1', '2026-11', taken)).toBe(0);
+  });
+});
+
 describe('progress and stages', () => {
   it('counts parts of past months as repaid', () => {
     const row = paid({ repayment_months: 3 });
@@ -105,15 +146,40 @@ describe('progress and stages', () => {
 });
 
 describe('request validation', () => {
-  it('limits the amount to 20% of basic salary', () => {
-    expect(maxAdvanceFor('50000')).toBe(10000);
-    expect(validateAdvanceRequest({ amount: '10001', reason: 'School fees for term', months: 1 }, 10000).amount).toMatch(/KSh 10,000/);
-    expect(validateAdvanceRequest({ amount: '10000', reason: 'School fees for term', months: 2 }, 10000)).toEqual({});
+  it('limits the amount to 30% of basic salary', () => {
+    expect(maxAdvanceFor('50000')).toBe(15000);
+    expect(maxAdvanceFor('KSh 45,555')).toBe(13666);
+    expect(validateAdvanceRequest({ amount: '15000', reason: 'School fees for term' }, 15000)).toEqual({});
+    expect(validateAdvanceRequest({ amount: '15001', reason: 'School fees for term' }, 15000).amount).toBe(
+      'The most that can be asked for is KSh 15,000 (30% of the basic salary).',
+    );
+    expect(validateAdvanceRequest({ amount: '100', reason: 'School fees for term' }, 0).amount).toMatch(/No basic salary/);
   });
 
-  it('needs an amount, a reason and 1-6 months', () => {
-    const e = validateAdvanceRequest({ amount: '', reason: 'short', months: 7 }, 10000);
-    expect(Object.keys(e).sort()).toEqual(['amount', 'months', 'reason']);
+  it('needs an amount above nothing and a reason', () => {
+    const e = validateAdvanceRequest({ amount: '', reason: 'short' }, 15000);
+    expect(Object.keys(e).sort()).toEqual(['amount', 'reason']);
+    expect(validateAdvanceRequest({ amount: '0', reason: 'School fees for term' }, 15000).amount).toBe('Enter the amount needed.');
+  });
+
+  it('says it comes off the next pay in full', () => {
+    expect(repaymentNote(30000, '2026-10')).toBe(
+      'KSh 30,000 comes off the next pay in full: October 2026, or the month after if that payroll has already been approved.',
+    );
+  });
+});
+
+describe('repaid in full on the next payday', () => {
+  const advance = (over: Partial<AdvanceRow> = {}) => paid({ 'Amount Requested': 80000, time_added: '2026-10-05T09:00:00Z', ...over });
+  it('the whole amount comes off the pay of the month it was asked for', () => {
+    expect(advanceDeductionFor([advance()], 'E1', '2026-10')).toBe(80000);
+    expect(advanceDeductionFor([advance()], 'E1', '2026-11')).toBe(0);
+  });
+  it('paid after that payroll was approved, it all comes off the next one', () => {
+    const taken = [{ employee_number: 'E1', pay_period: '2026-10', amount: 0 }];
+    expect(advanceDeductionFor([advance()], 'E1', '2026-11', taken)).toBe(80000);
+    // and not again once it has been taken
+    expect(advanceDeductionFor([advance()], 'E1', '2026-12', [...taken, { employee_number: 'E1', pay_period: '2026-11', amount: 80000 }])).toBe(0);
   });
 });
 

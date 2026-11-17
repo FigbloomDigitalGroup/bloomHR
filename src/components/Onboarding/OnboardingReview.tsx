@@ -18,6 +18,7 @@ import {
   type OnboardingRecord,
   type OverviewRow,
   STATUS_LABELS,
+  approveOnBehalf,
   approveOnboarding,
   errorMessage,
   inviteToOnboard,
@@ -32,7 +33,8 @@ import FigbloomLoader from '../UI/FigbloomLoader';
 
 // HR's onboarding page: where every employee is, what each still needs, inviting them, and reviewing what they
 // submitted (approve, or send back with a comment). Only approved employees are paid. Approving needs the company's
-// essentials only (20261021700000); the rest is "still to provide" and can follow later, with due dates.
+// essentials only (20261021700000); the rest is "still to provide" and can follow later, with due dates. Someone who never
+// sends their form can be approved by HR for them, once HR has typed the essentials in (Edit HR details).
 
 const ACTION_LABELS: Record<string, string> = {
   invited: 'Invited',
@@ -47,7 +49,7 @@ const when = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleSt
 function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: () => void; onChanged: () => void }) {
   const [record, setRecord] = useState<OnboardingRecord | null>(null);
   const [comment, setComment] = useState('');
-  const [busy, setBusy] = useState<'approve' | 'back' | null>(null);
+  const [busy, setBusy] = useState<'approve' | 'back' | 'behalf' | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -63,13 +65,14 @@ function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: (
     onChanged();
   };
 
-  const decide = async (decision: 'approve' | 'back') => {
+  const decide = async (decision: 'approve' | 'back' | 'behalf') => {
     setBusy(decision);
     setProblem(null);
     try {
       if (decision === 'approve') await approveOnboarding(row.id, comment);
+      else if (decision === 'behalf') await approveOnBehalf(row.id);
       else await requestOnboardingChanges(row.id, comment);
-      toast.success(decision === 'approve' ? `${row.name || row.employee_number} is approved` : 'Sent back to the employee');
+      toast.success(decision === 'back' ? 'Sent back to the employee' : `${row.name || row.employee_number} is approved`);
       onChanged();
       onClose();
     } catch (err) {
@@ -81,6 +84,7 @@ function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: (
 
   const status = row.status;
   const blocking = Boolean(record && (record.missing.essentialsEmployee.length > 0 || record.missing.essentialsEmployer.length > 0));
+  const notSent = status === 'draft' || status === 'invited' || status === 'changes_requested';
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto" role="dialog" aria-label={`Review ${row.name}`}>
       <div className="bg-white rounded-[10px] border border-border shadow-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
@@ -88,7 +92,7 @@ function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: (
           <div className="min-w-0">
             <h2 className="text-sm font-semibold text-ink truncate">{row.name || row.employee_number}</h2>
             <p className="text-xs text-muted-foreground">
-              {row.payroll_number} · {row.job_title || 'No position yet'}
+              {row.employee_number} · {row.job_title || 'No position yet'}
               {row.submitted_at ? ` · submitted ${when(row.submitted_at)}` : ''}
             </p>
           </div>
@@ -107,7 +111,12 @@ function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: (
               <div className="grid gap-3 sm:grid-cols-2">
                 <section aria-label="Essentials" className={`rounded-lg px-3 py-2 text-sm text-ink space-y-1 ${blocking ? 'bg-orange-tint-alt' : 'bg-secondary'}`}>
                   <h3 className="font-semibold">Essentials <span className="font-normal text-muted-foreground">(needed to approve)</span></h3>
-                  {!blocking && <p className="text-muted-foreground">All in.{status === 'submitted' ? ' You can approve.' : ''}</p>}
+                  {!blocking && <p className="text-muted-foreground">All in.{status === 'submitted' || notSent ? ' You can approve.' : ''}</p>}
+                  {notSent && (
+                    <p className="text-xs text-muted-foreground">
+                      They haven’t sent their form. You can approve for them: type in anything missing with Edit HR details first.
+                    </p>
+                  )}
                   {record.missing.essentialsEmployee.length > 0 && (
                     <p><span className="font-medium">The employee still needs to give: </span>{record.missing.essentialsEmployee.join(', ')}</p>
                   )}
@@ -183,6 +192,12 @@ function ReviewPanel({ row, onClose, onChanged }: { row: OverviewRow; onClose: (
               <Button variant="secondary" disabled={busy !== null} onClick={() => void decide('back')}
                 icon={busy === 'back' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}>
                 Send back
+              </Button>
+            )}
+            {notSent && (
+              <Button disabled={busy !== null || !record || blocking} onClick={() => void decide('behalf')}
+                icon={busy === 'behalf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}>
+                Approve for them
               </Button>
             )}
             {status === 'submitted' && (
@@ -290,7 +305,7 @@ export default function OnboardingReview() {
               <div className="flex-1 min-w-[200px]">
                 <p className="text-sm font-medium text-ink">{r.name || r.employee_number}</p>
                 <p className="text-xs text-muted-foreground">
-                  {r.payroll_number} · {r.job_title || 'No position yet'}
+                  {r.employee_number} · {r.job_title || 'No position yet'}
                   {r.work_email ? ` · ${r.work_email}` : ''}
                 </p>
                 {r.essentials_missing.length > 0 && r.status !== 'approved' && (

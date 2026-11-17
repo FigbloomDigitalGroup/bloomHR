@@ -29,10 +29,10 @@ export default function EmailPortal() {
   }, [loading, canMailbox, canSend]);
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
+    <div className="p-4 md:p-6 max-w-[1600px] mx-auto space-y-3">
       <div>
-        <h1 className="text-2xl font-bold text-ink">Email Portal</h1>
-        <p className="text-[13px] text-muted-foreground mt-1">Read your own mailbox, send email to staff and see what was sent</p>
+        <h1 className="text-xl md:text-2xl font-bold text-ink">Email Portal</h1>
+        <p className="hidden lg:block text-[13px] text-muted-foreground mt-0.5">Read your own mailbox, send email to staff and see what was sent</p>
       </div>
 
       {tabs.length > 1 && <TabBar items={tabs} activeId={activeTab ?? ''} onChange={(id) => setActiveTab(id as Tab)} />}

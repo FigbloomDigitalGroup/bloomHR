@@ -92,6 +92,40 @@ describe('TaskWorkspace (staff)', () => {
     expect([...options].map((o) => o.textContent)).toEqual(['Operations (OPS)']); // a member of OPS, not of Sales
   });
 
+  it('everyone has the Personal project, first, for their own tasks (no settings, no group tasks)', async () => {
+    const MINE: TaskProject = { id: 'pp', key: 'MY', name: 'Personal', description: null, department_id: null, lead_number: null, archived: false, created_by: null, personal: true };
+    api.loadProjects.mockResolvedValue([OPS, SALES, MINE]);
+    api.loadProjectMembers.mockResolvedValue({});
+    perms.modules = ['dashboard', 'task-manager', 'task-projects'];
+    render(<TaskWorkspace mode="staff" />);
+    await screen.findByText('Mine to do');
+    const nav = screen.getByRole('navigation', { name: 'Task views' });
+    const projectButtons = within(nav).getAllByRole('button').map((b) => b.textContent ?? '').filter((t) => /MY|OPS|SAL/.test(t));
+    expect(projectButtons[0]).toContain('Personal');
+    expect(screen.queryByRole('button', { name: 'Edit Personal' })).toBeNull();
+    fireEvent.click(within(nav).getByRole('button', { name: /Personal/ }));
+    expect(screen.getByText(/Your own tasks/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: /New task/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'New task' });
+    expect((within(dialog).getByLabelText('Project') as HTMLSelectElement).value).toBe('pp');
+    expect(within(dialog).queryByLabelText('A department')).toBeNull();
+    expect(within(dialog).getByText(/A Personal task is your own/)).toBeTruthy();
+  });
+
+  it('staff in no project can still add their own task', async () => {
+    const MINE: TaskProject = { id: 'pp', key: 'MY', name: 'Personal', description: null, department_id: null, lead_number: null, archived: false, created_by: null, personal: true };
+    api.loadProjects.mockResolvedValue([MINE]);
+    api.loadProjectMembers.mockResolvedValue({});
+    api.loadTasks.mockResolvedValue([]);
+    render(<TaskWorkspace mode="staff" />);
+    await screen.findByRole('button', { name: /Personal/ });
+    fireEvent.keyDown(window, { key: 'c' });
+    const dialog = await screen.findByRole('dialog', { name: 'New task' });
+    const options = within(dialog).getByLabelText('Project').querySelectorAll('option');
+    expect([...options].map((o) => o.textContent)).toEqual(['Personal (MY)']);
+  });
+
   it('a supervisor’s team view shows only the team’s tasks', async () => {
     render(<TaskWorkspace mode="staff" teamNumbers={['E-RITA']} />);
     expect(await screen.findByText('Rita’s task')).toBeTruthy();

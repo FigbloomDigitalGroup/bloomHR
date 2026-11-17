@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { ClipboardList, Users } from 'lucide-react';
-import { Card, EmptyState, PageHeader, StatusPill, TabBar, type TabBarItem } from '../UI';
+import { ClipboardList, Plus, Users } from 'lucide-react';
+import { Button, Card, EmptyState, Modal, PageHeader, StatusPill, TabBar, type TabBarItem } from '../UI';
 import FigbloomLoader, { LoaderBlock } from '../UI/FigbloomLoader';
-import { loadKpiAccess, loadKpis, loadPeriods, type Kpi, type KpiAccess, type KpiPeriod } from '../../lib/kpiApi';
+import { loadKpiAccess, loadKpis, loadPeriods, saveKpi, startCurrentPeriod, type Kpi, type KpiAccess, type KpiInput, type KpiPeriod } from '../../lib/kpiApi';
+import { currentQuarter } from '../../lib/kpis';
 import { loadOvertimePeople, loadWaitingOvertime, type OvertimeEntry, type OvertimePerson } from '../../lib/overtimeApi';
 import { loadCasuals } from '../../lib/casualApi';
 import type { CasualWorker } from '../../lib/casualPay';
 import { loadTeamLeave, memberInitials, memberName, toKpiPerson, type TeamLeave, type TeamMember } from '../../lib/myTeamApi';
 import Scorecards from '../Perfomance/kpis/Scorecards';
 import AssignKpis from '../Perfomance/kpis/AssignKpis';
+import { BLANK, KpiForm } from '../Perfomance/kpis/KpiLibrary';
 import OvertimeWeekGrid from '../Overtime/OvertimeWeekGrid';
 import OvertimeWaiting from '../Overtime/OvertimeWaiting';
 import CasualDaysGrid from '../Casual/CasualDaysGrid';
@@ -121,7 +123,44 @@ function TeamKpis({ team }: { team: TeamMember[] }) {
   const [kpis, setKpis] = useState<Kpi[]>([]);
   const [periods, setPeriods] = useState<KpiPeriod[]>([]);
   const [view, setView] = useState<KpiView>('scores');
+  const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState(false);
   const people = useMemo(() => team.map(toKpiPerson), [team]);
+  // a manager doesn't wait for HR: they start the current quarter's review and add the KPIs their team needs
+  const canSetUp = !!access && (access.manages || access.team.length > 0);
+
+  const startReview = async () => {
+    setBusy(true);
+    try {
+      await startCurrentPeriod();
+      setPeriods(await loadPeriods());
+      setView('assign');
+      toast.success(`${currentQuarter().name} review started`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addKpi = async (fields: KpiInput) => {
+    setBusy(true);
+    try {
+      await saveKpi(null, fields);
+      setKpis(await loadKpis());
+      setAdding(false);
+      toast.success(`${fields.name.trim()} added: give it to your team below`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const addKpiModal = (
+    <Modal open={adding} onClose={() => !busy && setAdding(false)} title="Add a KPI" size="xl">
+      <KpiForm initial={BLANK} onCancel={() => setAdding(false)} onSave={addKpi} busy={busy} />
+    </Modal>
+  );
 
   useEffect(() => {
     (async () => {
@@ -141,7 +180,14 @@ function TeamKpis({ team }: { team: TeamMember[] }) {
   if (periods.length === 0) {
     return (
       <Card>
-        <EmptyState icon={<ClipboardList size={20} />} title="No review periods yet" description="HR sets up review periods and the KPI library; you can then give your team their KPIs here." />
+        <EmptyState
+          icon={<ClipboardList size={20} />}
+          title="No review periods yet"
+          description={canSetUp
+            ? `Start the ${currentQuarter().name} review to give your team their KPIs. HR can rename, change or close it later.`
+            : 'HR sets up review periods and the KPI library; you can then give your team their KPIs here.'}
+          action={canSetUp ? <Button onClick={() => void startReview()} disabled={busy}>{busy ? 'Starting...' : `Start the ${currentQuarter().name} review`}</Button> : undefined}
+        />
       </Card>
     );
   }
@@ -156,13 +202,26 @@ function TeamKpis({ team }: { team: TeamMember[] }) {
       {view === 'scores' && <Scorecards kpis={kpis} periods={periods} people={people} departments={[]} access={access} teamMode />}
       {view === 'assign' && (
         kpis.some((k) => !k.archived) ? (
-          <AssignKpis kpis={kpis} periods={periods} people={people} departments={[]} access={access} teamMode />
+          <>
+            {canSetUp && (
+              <div className="flex justify-end">
+                <Button variant="secondary" icon={<Plus size={14} />} onClick={() => setAdding(true)}>Add a KPI</Button>
+              </div>
+            )}
+            <AssignKpis kpis={kpis} periods={periods} people={people} departments={[]} access={access} teamMode />
+          </>
         ) : (
           <Card>
-            <EmptyState icon={<ClipboardList size={20} />} title="No KPIs in the library yet" description="Ask HR to add your company's KPIs; you can then assign them to your team here." />
+            <EmptyState
+              icon={<ClipboardList size={20} />}
+              title="No KPIs in the library yet"
+              description={canSetUp ? 'Add the KPIs your team is measured on; you can then give them to your team here.' : "Ask HR to add your company's KPIs; you can then assign them to your team here."}
+              action={canSetUp ? <Button icon={<Plus size={14} />} onClick={() => setAdding(true)}>Add a KPI</Button> : undefined}
+            />
           </Card>
         )
       )}
+      {addKpiModal}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 
 const api = vi.hoisted(() => ({
   admin: true,
+  role: 'owner' as import('../../lib/platformRoles').PlatformRole,
   latest: null as string | null,
   saved: [] as unknown[][],
 }));
@@ -22,11 +23,17 @@ vi.mock('../../lib/platformRates', async (importOriginal) => {
   };
 });
 
+vi.mock('../../lib/platformRoles', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/platformRoles')>()),
+  myPlatformRole: () => Promise.resolve(api.admin ? api.role : null),
+}));
+
 import PlatformRatesPage from './PlatformRatesPage';
 
 afterEach(cleanup);
 beforeEach(() => {
   api.admin = true;
+  api.role = 'owner';
   api.latest = null;
   api.saved = [];
 });
@@ -60,8 +67,8 @@ describe('the platform rates screen', () => {
     fireEvent.change(field('From'), { target: { value: '2027-07-01' } });
     fireEvent.change(field('Source'), { target: { value: 'Finance Act 2027' } });
     const preview = await screen.findByRole('table', { name: 'Preview' });
-    // 100,000 basic: the levy 1,005 -> 1,340
-    expect(within(preview).getByText('KSh 1,005 → KSh 1,340')).toBeTruthy();
+    // 100,000 basic (no per diem share since October 2026): the levy 1,500 -> 2,000
+    expect(within(preview).getByText('KSh 1,500 → KSh 2,000')).toBeTruthy();
     expect(within(preview).getAllByRole('row')).toHaveLength(4);
     // another salary
     fireEvent.change(field('Another salary'), { target: { value: '250000' } });
@@ -101,5 +108,26 @@ describe('the platform rates screen', () => {
     fireEvent.click(save);
     await waitFor(() => expect(api.saved).toHaveLength(1));
     expect(api.saved[0][1]).toBe(true);
+  });
+});
+
+describe('the platform rates screen: console roles', () => {
+  it('is read-only for support and viewers', async () => {
+    for (const role of ['support', 'viewer'] as const) {
+      api.role = role;
+      render(<PlatformRatesPage />);
+      expect((await screen.findAllByText('NSSF upper earnings limit')).length).toBe(3);
+      expect(screen.queryByText('New version')).toBeNull();
+      expect(screen.queryByText(/doesn.t have yet/)).toBeNull();
+      expect(screen.getByText(/Read only: owners and admins change the statutory rates/)).toBeTruthy();
+      cleanup();
+    }
+  });
+
+  it('an admin edits them', async () => {
+    api.role = 'admin';
+    render(<PlatformRatesPage />);
+    expect((await screen.findAllByText('New version')).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Read only/)).toBeNull();
   });
 });

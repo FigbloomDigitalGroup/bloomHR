@@ -75,6 +75,14 @@ describe('previewRole', () => {
     expect(p.areas.find((a) => a.title === 'My team')!.shown[0].when).toMatch(/supervises/);
   });
 
+  it('shows Mail under Communication in the staff portal only with My mailbox', () => {
+    const shown = (modules: string[]) => previewRole('STAFF', modules).areas.find((a) => a.title === 'Communication')!;
+    expect(shown(['mailbox']).shown.map((e) => e.label)).toEqual(['Communication: Mail', 'Communication: Chat', 'Communication: Video Conference']);
+    const without = shown([]);
+    expect(without.shown.map((e) => e.label)).not.toContain('Communication: Mail');
+    expect(without.hidden.map((e) => e.label)).toEqual(['Communication: Mail']);
+  });
+
   it('says why a screen is out of reach for a Staff-based role', () => {
     expect(whatWouldShow('STAFF', ['payroll'])).toBe('Not for roles based on Staff');
     expect(whatWouldShow('STAFF', ['payroll', 'work-records'])).toBe('Tick Work & Piece Rate');

@@ -145,3 +145,72 @@ export function warningForDocument(d: OverdueDocument): WarningDraft {
     }),
   };
 }
+
+// ---------------------------------------------------------------------------------------------
+// possible absences: the days attendance counts as absent (migration 20261106100000)
+// ---------------------------------------------------------------------------------------------
+
+/** A row of possible_absences(): a run of working days with no clock-in, no leave and no holiday */
+export interface PossibleAbsence {
+  employee_number: string;
+  employee_name: string;
+  start_date: string;
+  end_date: string;
+  /** the absent working days in the run */
+  days: number;
+  absent_days: string[];
+  /** a leave application not yet decided covers some of it */
+  pending_leave: boolean;
+  /** when the employee was sent a notice about it, and the day their reply is due */
+  notified_on: string | null;
+  reply_by: string | null;
+}
+
+export interface PossibleAbsenceSettings {
+  lookback_days: number;
+  notify_employees: boolean;
+  /** the day the employee notice was switched on: only absences from then are noticed */
+  notify_from: string | null;
+  reply_working_days: number;
+}
+
+export const DEFAULT_POSSIBLE_ABSENCE_SETTINGS: PossibleAbsenceSettings = {
+  lookback_days: 60, notify_employees: false, notify_from: null, reply_working_days: 2,
+};
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const weekday = (iso: string) => WEEKDAYS[new Date(`${iso.slice(0, 10)}T00:00:00Z`).getUTCDay()];
+
+/** "Mon 3 Nov" */
+export function shortDay(iso: string) {
+  const { m, d } = parts(iso);
+  return `${weekday(iso)} ${d} ${MONTHS[m - 1]}`;
+}
+
+/** "Mon 3 Nov", "Mon 3 – Wed 5 Nov", "Fri 31 Oct – Mon 3 Nov", "Wed 31 Dec 2025 – Fri 2 Jan 2026" */
+export function dayRange(start: string, end: string) {
+  const a = parts(start);
+  const b = parts(end);
+  if (start.slice(0, 10) === end.slice(0, 10)) return shortDay(start);
+  if (a.y !== b.y) return `${shortDay(start)} ${a.y} – ${shortDay(end)} ${b.y}`;
+  if (a.m === b.m) return `${weekday(start)} ${a.d} – ${shortDay(end)}`;
+  return `${shortDay(start)} – ${shortDay(end)}`;
+}
+
+/** "Mon 3 – Wed 5 Nov, 3 working days" */
+export const possibleAbsenceText = (p: Pick<PossibleAbsence, 'start_date' | 'end_date' | 'days'>) =>
+  `${dayRange(p.start_date, p.end_date)}, ${workingDaysText(p.days)}`;
+
+/** "Notified Tue 4 Nov, reply due Thu 6 Nov" (with whether the reply is overdue on `today`), or null */
+export function noticeText(p: Pick<PossibleAbsence, 'notified_on' | 'reply_by'>, today: string): { text: string; overdue: boolean } | null {
+  if (!p.notified_on) return null;
+  const due = p.reply_by ? `, reply due ${shortDay(p.reply_by)}` : '';
+  return { text: `Employee notified ${shortDay(p.notified_on)}${due}`, overdue: !!p.reply_by && p.reply_by < today };
+}
+
+/** What is wrong with the settings form, or null */
+export function possibleAbsenceSettingsProblem(s: Pick<PossibleAbsenceSettings, 'lookback_days' | 'reply_working_days'>): string | null {
+  if (!Number.isInteger(s.lookback_days) || s.lookback_days < 7 || s.lookback_days > 180) return 'Look back between 7 and 180 days';
+  if (!Number.isInteger(s.reply_working_days) || s.reply_working_days < 1 || s.reply_working_days > 10) return 'Give between 1 and 10 working days to reply';
+  return null;
+}

@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { X, Save, ArrowLeft, Plus, AlertCircle, Users, Check, PencilLine, Trash2 } from 'lucide-react';
+import { X, Save, ArrowLeft, Plus, AlertCircle, Users, Check, PencilLine, Trash2, IdCard } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../../lib/supabase';
 import toast from 'react-hot-toast';
@@ -39,6 +39,8 @@ import { activeTitleNames, useJobTitles } from '../../hooks/useJobTitles';
 import { confirmDialog } from '../../lib/confirmDialog';
 import { LoaderBlock } from '../UI/FigbloomLoader';
 import WorkArrangementField from '../Attendance/WorkArrangementField';
+import StaffIdCardDialog from '../StaffIdCard/StaffIdCardDialog';
+import { STAFF_ID_CARDS_MODULE } from '../../lib/staffIdCards';
 import type { WorkArrangement } from '../../lib/attendance';
 type Employee = Database['public']['Tables']['employees']['Row'] & {
   'SHIF Number'?: string | null;
@@ -125,6 +127,8 @@ const EditEmployeePage = () => {
   const jobGroups = useJobGroups();
   const jobTitles = useJobTitles();
   const [deleting, setDeleting] = useState(false);
+  // the employee's staff ID card (the staff-id-cards module)
+  const [showIdCard, setShowIdCard] = useState(false);
 
   const [employee, setEmployee] = useState<Partial<Employee>>({});
   // the "Reports to" picker works by employee number; reports_to_id is what is saved
@@ -156,6 +160,8 @@ const EditEmployeePage = () => {
   });
   const [activeTab, setActiveTab] = useState('personal');
   const [emergencyContact, setEmergencyContact] = useState<EmergencyContact>({ name: '', relationship: '', phone: '', email: '' });
+  // next of kin: an onboarding essential, so HR can type it in for someone who never sends their form
+  const [nextOfKin, setNextOfKin] = useState({ name: '', relationship: '', phone: '' });
   const [dependents, setDependents] = useState<Dependent[]>([]);
   const [statutoryDeductions, setStatutoryDeductions] = useState<StatutoryDeduction[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -188,6 +194,12 @@ const EditEmployeePage = () => {
           .limit(1)
           .single();
 
+        const { data: kin } = await supabase
+          .from('next_of_kin')
+          .select('full_name, relationship, phone_number')
+          .eq('Employee Number', id)
+          .maybeSingle();
+
         // Fetch dependents
         const { data: deps } = await supabase
           .from('dependents')
@@ -216,6 +228,8 @@ const EditEmployeePage = () => {
 
         // older records say "Mobile Money" or "MPESA": show (and save) the spelling payroll and payslips match
         setEmployee(empData.payment_method ? { ...empData, payment_method: paymentMethodOption(empData.payment_method) } : empData);
+
+        setNextOfKin({ name: kin?.full_name ?? '', relationship: kin?.relationship ?? '', phone: kin?.phone_number ?? '' });
 
         // Set single emergency contact
         setEmergencyContact(
@@ -408,18 +422,18 @@ const EditEmployeePage = () => {
       newErrors['Last Name'] = 'Last Name is required';
       isValid = false;
     }
-    if (!employee['Mobile Number']) {
-      newErrors['Mobile Number'] = 'Mobile Number is required';
-      isValid = false;
-    } else if (!isValidPhone(employee['Mobile Number'])) {
+    // mobile and personal email are the employee's to fill in (their profile asks for them): HR checks only what is
+    // there, so someone bulk-added with a name and work email can still be corrected
+    if (employee['Mobile Number'] && !isValidPhone(employee['Mobile Number'])) {
       newErrors['Mobile Number'] = 'Invalid phone number format';
       isValid = false;
     }
-    if (!employee['Personal Email']) {
-      newErrors['Personal Email'] = 'Personal Email is required';
-      isValid = false;
-    } else if (!emailRegex.test(employee['Personal Email'])) {
+    if (employee['Personal Email'] && !emailRegex.test(employee['Personal Email'])) {
       newErrors['Personal Email'] = 'Invalid email format';
+      isValid = false;
+    }
+    if (employee['Work Email'] && !emailRegex.test(employee['Work Email'])) {
+      newErrors['Work Email'] = 'Invalid email format';
       isValid = false;
     }
 
@@ -504,6 +518,11 @@ const EditEmployeePage = () => {
         .from('employees')
         .update({
           ...employee,
+          // clearing the termination date brings them back: a Terminated status left behind would keep the sign-in
+          // check refusing them, and there is no Status field on this page to change it
+          ...(!String(employee['Termination Date'] ?? '').trim() && ['terminated', 'inactive'].includes(String((employee as { Status?: string | null }).Status ?? '').toLowerCase())
+            ? { Status: 'Active' }
+            : {}),
           'Profile Image': imageUrl,
           'SHIF Number': statutoryDeductions.find(d => d.name === 'SHIF Number')?.number || null,
           'NSSF Number': statutoryDeductions.find(d => d.name === 'NSSF Number')?.number || null,
@@ -542,6 +561,20 @@ const EditEmployeePage = () => {
           .eq('Employee Number', id);
 
         if (deleteContactsError) throw deleteContactsError;
+      }
+
+      // next of kin: saved when named, never removed here (the employee's own entry may hold more than this form shows)
+      if (nextOfKin.name.trim()) {
+        const { error: kinError } = await supabase
+          .from('next_of_kin')
+          .upsert({
+            "Employee Number": id,
+            full_name: nextOfKin.name.trim(),
+            relationship: nextOfKin.relationship.trim(),
+            phone_number: nextOfKin.phone.trim()
+          }, { onConflict: 'tenant_id,Employee Number' });
+
+        if (kinError) throw kinError;
       }
 
       // Update dependents
@@ -688,11 +721,22 @@ const EditEmployeePage = () => {
             </>
           ) : (
             <>
+              <ModuleGate anyOf={[STAFF_ID_CARDS_MODULE]}>
+                <GlowButton
+                  onClick={() => setShowIdCard(true)}
+                  icon={IdCard}
+                  variant="secondary"
+                  className="mr-2 text-gray-800 border-gray-300"
+                >
+                  View / print ID card
+                </GlowButton>
+              </ModuleGate>
               <ModuleGate anyOf={['hr-admin']}>
                 <GlowButton
                   onClick={() => setDeleting(true)}
                   icon={Trash2}
-                  className="mr-2 bg-white hover:bg-red-50 text-red-700 border border-red-200"
+                  variant="secondary"
+                  className="mr-2 hover:bg-red-50 text-red-700 border-red-200 hover:border-red-300"
                 >
                   Delete
                 </GlowButton>
@@ -707,6 +751,9 @@ const EditEmployeePage = () => {
                 </GlowButton>
               </ModuleGate>
             </>
+          )}
+          {showIdCard && employee.id && (
+            <StaffIdCardDialog employeeId={String(employee.id)} open onClose={() => setShowIdCard(false)} />
           )}
           {deleting && employee.id && (
             <DeleteEmployeeModal employeeId={String(employee.id)} isAdmin={mayRemoveLogin} onClose={() => setDeleting(false)} />
@@ -980,7 +1027,7 @@ const EditEmployeePage = () => {
                 />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
                   <FormField
-                    label="Employee Type"
+                    label="Employment type"
                     name="Employee Type"
                     type={isEditMode ? "select" : "text"}
                     value={employee['Employee Type'] || ''}
@@ -1183,7 +1230,6 @@ const EditEmployeePage = () => {
                     value={employee['Personal Email'] || ''}
                     onChange={handleInputChange}
                     error={errors['Personal Email']}
-                    required={isEditMode}
                     disabled={!isEditMode}
                   />
                   <FormField
@@ -1193,7 +1239,6 @@ const EditEmployeePage = () => {
                     value={employee['Mobile Number'] || ''}
                     onChange={handleInputChange}
                     error={errors['Mobile Number']}
-                    required={isEditMode}
                     disabled={!isEditMode}
                     placeholder="e.g., +254712345678"
                   />
@@ -1354,6 +1399,7 @@ const EditEmployeePage = () => {
                     disabled={!isEditMode}
                     locked={lockedPayFields(jobGroups, employee as Record<string, unknown>)}
                     currency={payCurrency}
+                    country={payrollCountry}
                   />
                 </div>
               )}
@@ -1523,6 +1569,55 @@ const EditEmployeePage = () => {
                     {errors['emergencyContactEmail'] && (
                       <p className="mt-1 text-xs text-red-500">{errors['emergencyContactEmail']}</p>
                     )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8">
+                <SectionHeader
+                  title="Next of Kin"
+                  icon={Users}
+                />
+              </div>
+              <p className="text-gray-600 mb-6">Needed to approve onboarding in most companies</p>
+
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-medium text-gray-700 mb-1">Full Name</label>
+                    <input
+                      type="text"
+                      aria-label="Next of kin full name"
+                      value={nextOfKin.name}
+                      onChange={(e) => setNextOfKin(prev => ({ ...prev, name: e.target.value }))}
+                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm`}
+                      placeholder="Full Name"
+                      disabled={!isEditMode}
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-gray-700 mb-1">Relationship</label>
+                    <input
+                      type="text"
+                      aria-label="Next of kin relationship"
+                      value={nextOfKin.relationship}
+                      onChange={(e) => setNextOfKin(prev => ({ ...prev, relationship: e.target.value }))}
+                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm`}
+                      placeholder="Relationship"
+                      disabled={!isEditMode}
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-medium text-gray-700 mb-1">Phone Number</label>
+                    <input
+                      type="tel"
+                      aria-label="Next of kin phone number"
+                      value={nextOfKin.phone}
+                      onChange={(e) => setNextOfKin(prev => ({ ...prev, phone: e.target.value }))}
+                      className={`w-full h-11 ${isEditMode ? 'bg-white border-gray-300' : 'bg-gray-100 border-gray-200'} border rounded-lg px-4 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand transition-all duration-200 shadow-sm`}
+                      placeholder="Phone Number"
+                      disabled={!isEditMode}
+                    />
                   </div>
                 </div>
               </div>

@@ -54,9 +54,13 @@ describe('the year to date', () => {
 });
 
 describe('the run and the employee', () => {
-  it("gives the run's reference and dates", async () => {
+  it("gives the run's reference, dates and the approver's signature", async () => {
     h.rpc.payslip_run_details = { data: [{ run_id: 'abcd1234-5678-0000-0000-000000000000', status: 'paid', approved_at: '2026-10-28', paid_at: '2026-10-30' }], error: null };
-    expect(await loadPayslipRun(current)).toEqual({ runId: 'abcd1234-5678-0000-0000-000000000000', ref: '2026-04 · ABCD1234', status: 'paid', approvedAt: '2026-10-28', paidAt: '2026-10-30' });
+    h.rpc.payslip_run_signature = { data: [{ approved_signature: 'data:image/png;base64,AAAA', approved_signer: 'Wanjiru Kamau' }], error: null };
+    expect(await loadPayslipRun(current)).toEqual({
+      runId: 'abcd1234-5678-0000-0000-000000000000', ref: '2026-04 · ABCD1234', status: 'paid', approvedAt: '2026-10-28', paidAt: '2026-10-30',
+      approvedSignature: 'data:image/png;base64,AAAA', approvedBy: 'Wanjiru Kamau',
+    });
     h.rpc.payslip_run_details = { data: [], error: null };
     expect(await loadPayslipRun(current)).toBeNull();
     expect(runRef('11112222-3333', '2026-10')).toBe('2026-10 · 11112222');
@@ -66,5 +70,10 @@ describe('the run and the employee', () => {
     expect(employeeDetailsOf({ position: 'Clerk' }, { 'Tax PIN': 'A1', 'NSSF Number': 'N1', 'NHIF Number': 'H1', 'ID Number': '9', 'Job Title': 'Old title' }, 'Kampala')).toEqual({
       taxNumber: 'A1', nssfNumber: 'N1', shaNumber: 'H1', idNumber: '9', branch: 'Kampala', department: null, position: 'Clerk', jobGroup: null,
     });
+  });
+
+  it("the department from the employee's record (the `Job Level` column the forms call Department) when the payslip has none", () => {
+    expect(employeeDetailsOf({}, { 'Job Level': 'Engineering' }, null).department).toBe('Engineering');
+    expect(employeeDetailsOf({ department: 'Finance' }, { 'Job Level': 'Engineering' }, null).department).toBe('Finance');
   });
 });

@@ -143,7 +143,10 @@ describe('what is still missing', () => {
 
   it('lists HR’s gaps separately', () => {
     expect(employerPartMissing({ ...complete, kra_employee_type: 'Casual', 'Basic Salary': 0, payment_method: '', 'Job Title': ' ' }))
-      .toEqual(['Position', 'Type of employee', 'Basic salary', 'Payment method']);
+      .toEqual(['Position', 'KRA tax status (Primary or Secondary)', 'Basic salary', 'Payment method']);
+    // no KRA outside Kenya: the same choice is the "Tax status" there, as the database names it
+    expect(employerPartMissing({ ...complete, kra_employee_type: null }, 'Tanzania')).toEqual(['Tax status (Primary or Secondary)']);
+    expect(employerPartMissing({ ...complete, kra_employee_type: null }, 'Kenya')).toEqual(['KRA tax status (Primary or Secondary)']);
   });
 });
 

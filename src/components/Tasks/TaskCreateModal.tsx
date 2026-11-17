@@ -43,16 +43,19 @@ export default function TaskCreateModal(props: TaskCreateModalProps) {
   const [jobTitle, setJobTitle] = useState('');
   const [people, setPeople] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  // a task in the Personal project is your own: for you (or nobody yet), never for a group
+  const personal = !!props.projects.find((p) => p.id === project)?.personal;
+  const mine = props.viewer.employeeNumber ? [props.viewer.employeeNumber] : [];
 
   const submit = async () => {
     if (!project) return toast.error('Choose a project');
     if (!title.trim()) return toast.error('Give the task a title');
     setSaving(true);
     try {
-      if (target === 'person') {
+      if (target === 'person' || personal) {
         await createTask({
           project_id: project, title: title.trim(), description: description.trim() || null, status, priority,
-          assignee_number: assignee, due_date: due || null, labels,
+          assignee_number: personal && assignee && !mine.includes(assignee) ? null : assignee, due_date: due || null, labels,
         }, props.viewer);
         toast.success('Task created');
       } else {
@@ -94,7 +97,7 @@ export default function TaskCreateModal(props: TaskCreateModalProps) {
           </div>
           <div>
             <label className={labelClass} htmlFor="new-task-status">Status</label>
-            <select id="new-task-status" className={fieldClass} value={status} onChange={(e) => setStatus(e.target.value as TaskStatus)} disabled={target !== 'person'}>
+            <select id="new-task-status" className={fieldClass} value={status} onChange={(e) => setStatus(e.target.value as TaskStatus)} disabled={target !== 'person' && !personal}>
               {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </div>
@@ -126,7 +129,7 @@ export default function TaskCreateModal(props: TaskCreateModalProps) {
 
         <fieldset className="border border-border rounded-tile p-3">
           <legend className="px-1 text-[11px] font-medium text-muted-foreground">Assign to</legend>
-          {props.allowGroups && (
+          {props.allowGroups && !personal && (
             <div className="flex flex-wrap gap-3 mb-2 text-xs">
               {([['person', 'One person'], ['department', 'A department'], ['job_title', 'A job title'], ['people', 'Several people']] as [Target, string][]).map(([v, l]) => (
                 <label key={v} className="inline-flex items-center gap-1">
@@ -135,16 +138,22 @@ export default function TaskCreateModal(props: TaskCreateModalProps) {
               ))}
             </div>
           )}
-          {target === 'person' && (
-            <EmployeePicker value={assignee} onChange={(e) => setAssignee(e?.employeeNumber ?? null)} placeholder="Unassigned - search by name" allowedNumbers={props.assignable} />
+          {(target === 'person' || personal) && (
+            <EmployeePicker
+              value={personal && assignee && !mine.includes(assignee) ? null : assignee}
+              onChange={(e) => setAssignee(e?.employeeNumber ?? null)}
+              placeholder="Unassigned - search by name"
+              allowedNumbers={personal ? mine : props.assignable}
+            />
           )}
-          {target === 'department' && (
+          {personal && <p className="mt-2 text-[11px] text-muted-foreground">A Personal task is your own: only you, your supervisor and HR see it.</p>}
+          {target === 'department' && !personal && (
             <DepartmentPicker value={department} onChange={(d) => setDepartment(d?.id ?? null)} label="Department (and the departments under it)" />
           )}
-          {target === 'job_title' && (
+          {target === 'job_title' && !personal && (
             <input aria-label="Job title" className={fieldClass} value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} placeholder="e.g. Loan Officer" />
           )}
-          {target === 'people' && (
+          {target === 'people' && !personal && (
             <div className="flex flex-col gap-2">
               <EmployeePicker value={null} onChange={(e) => e && setPeople((cur) => (cur.includes(e.employeeNumber) ? cur : [...cur, e.employeeNumber]))} placeholder="Add a person..." allowedNumbers={props.assignable} />
               <div className="flex flex-wrap gap-1">
@@ -157,7 +166,7 @@ export default function TaskCreateModal(props: TaskCreateModalProps) {
               </div>
             </div>
           )}
-          {target !== 'person' && <p className="mt-2 text-[11px] text-muted-foreground">Each current employee gets their own task; a group task shows how many have finished.</p>}
+          {target !== 'person' && !personal && <p className="mt-2 text-[11px] text-muted-foreground">Each current employee gets their own task; a group task shows how many have finished.</p>}
         </fieldset>
 
         <div className="flex justify-end gap-2">

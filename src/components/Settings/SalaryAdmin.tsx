@@ -5637,7 +5637,9 @@ const SalaryAdvanceAdmin: React.FC<SalaryAdvanceAdminProps> = ({
         {activeTab === 'requests' ? (
           <AdvanceQueue canDecide={isAdminOrChecker} onChanged={fetchApplications} />
         ) : activeTab === 'settings' ? (
-          <AdvanceApplicationManager />
+          <div className="space-y-4">
+            <AdvanceApplicationManager />
+          </div>
         ) : activeTab === 'callbacks' ? (
           <MpesaCallbacks filterType="payments" />
         ) : activeTab === 'transaction_status' ? (

@@ -5,12 +5,42 @@
   <meta charset="UTF-8" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- The fonts load without holding the page back: as a "print" stylesheet it blocks nothing, and it applies to the screen
+       once it has arrived (display=swap shows text in a system font until then). Loaded as a plain stylesheet it blocked
+       the first paint and every script until Google answered: about 2.7 s on a slow phone connection. -->
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
-    rel="stylesheet">
+    rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" type="image/png" href="/favicon.png" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <title>Figbloom HR</title>
+  <!-- What the public landing page (src/pages/LandingPage.tsx) tells crawlers that run no scripts, and what a shared link
+       looks like. Every route shares this file, so the title stays the app's and there is neither a canonical link nor an
+       og:url here: the landing page sets its own title and canonical at runtime. Its words are in src/lib/landing.ts
+       (landing.test.ts keeps this description the same). -->
+  <meta name="description" content="HR and payroll software for employers: employee records, leave, attendance, approvals and monthly payroll in one workspace.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Figbloom HR">
+  <meta property="og:title" content="Figbloom HR | HR and payroll in one workspace">
+  <meta property="og:description" content="HR and payroll software for employers: employee records, leave, attendance, approvals and monthly payroll in one workspace.">
+  <meta property="og:image" content="https://hr.figbloom.org/og-image.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Figbloom HR: run your people and your payroll from one place.">
+  <meta name="twitter:card" content="summary_large_image">
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        { "@type": "Organization", "@id": "https://hr.figbloom.org/#organization", "name": "Figbloom Digital Group", "url": "https://hr.figbloom.org/", "logo": "https://hr.figbloom.org/favicon.png" },
+        { "@type": "WebSite", "@id": "https://hr.figbloom.org/#website", "name": "Figbloom HR", "url": "https://hr.figbloom.org/", "publisher": { "@id": "https://hr.figbloom.org/#organization" } },
+        { "@type": "SoftwareApplication", "name": "Figbloom HR", "applicationCategory": "BusinessApplication", "operatingSystem": "Web browser", "url": "https://hr.figbloom.org/", "description": "HR and payroll software for employers." }
+      ]
+    }
+  </script>
+  <!-- without scripts the loader below would cover the text further down, so it goes -->
+  <noscript><style>#boot { display: none; }</style></noscript>
 </head>
 
 <body>
@@ -39,6 +69,21 @@
       if (!signedIn || /^\/(login|mfa|join|create-company|update-password|auth)/.test(location.pathname)) boot.remove();
     })();
   </script>
+  <noscript>
+    <div style="max-width:40rem;margin:0 auto;padding:6rem 1.25rem;font-family:Outfit,system-ui,sans-serif;color:#16201a;line-height:1.55">
+      <h1 style="font-size:2rem;margin:0 0 1rem">Figbloom HR</h1>
+      <p><strong>Figbloom HR needs JavaScript to run.</strong> Please turn it on and reload this page.</p>
+      <p>HR and payroll software for employers: employee records, leave, attendance, approvals and monthly payroll in one workspace.</p>
+      <ul>
+        <li>Pay worked out by each branch's country</li>
+        <li>Kenyan PAYE, SHIF, NSSF, Housing Levy and NITA</li>
+        <li>KRA iTax, SHA and NSSF files to upload</li>
+        <li>An audit trail of changes</li>
+      </ul>
+      <p><a href="/create-company">Create your company</a> &middot; <a href="/login">Sign in</a></p>
+      <p>Questions? Write to <a href="mailto:hr@figbloom.org">hr@figbloom.org</a>.</p>
+    </div>
+  </noscript>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

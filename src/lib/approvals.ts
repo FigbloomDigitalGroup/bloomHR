@@ -1,17 +1,32 @@
 import { supabase } from './supabase';
+import { moduleInfo } from './modules';
 
 // Approval workflows each company sets up (migration 20261015800000, FIG-829): per kind of request, an ordered chain of
 // approvers. The database decides who may approve (decide_approval); these helpers read and save the chains.
+// Loans, salary advances, expense claims and requisitions joined leave in 20261025700000 (FIG-1216).
 
-export type ApprovalKind = 'leave' | 'salary_advance' | 'bulk_import';
-export type ApproverType = 'leave_approver' | 'reports_to' | 'department_head' | 'role' | 'person';
+export type ApprovalKind = 'leave' | 'salary_advance' | 'bulk_import' | 'loan' | 'expense' | 'requisition';
+/** The kinds of money request: their approval writes the item's approval, and it joins Payments to make. */
+export type MoneyKind = 'loan' | 'salary_advance' | 'expense' | 'requisition';
+export type ApproverType = 'leave_approver' | 'reports_to' | 'department_head' | 'role' | 'person' | 'module';
 export type AlternateType = 'role' | 'person';
 
 export const APPROVAL_KINDS: { id: ApprovalKind; label: string; inUse: boolean }[] = [
   { id: 'leave', label: 'Leave', inUse: true },
-  { id: 'salary_advance', label: 'Salary advance', inUse: false },
+  { id: 'loan', label: 'Loans', inUse: true },
+  { id: 'salary_advance', label: 'Salary advance', inUse: true },
+  { id: 'expense', label: 'Expense claims', inUse: true },
+  { id: 'requisition', label: 'Requisitions', inUse: true },
   { id: 'bulk_import', label: 'Bulk import', inUse: false },
 ];
+
+/** What a money request is called ("Loan request"), as the database says it. */
+export const MONEY_KIND_NOUN: Record<MoneyKind, string> = {
+  loan: 'Loan request',
+  salary_advance: 'Salary advance',
+  expense: 'Expense claim',
+  requisition: 'Requisition',
+};
 
 // the fixed roles today (user_profiles.role)
 export const APPROVER_ROLES = ['ADMIN', 'HR', 'CHECKER', 'MANAGER', 'REGIONAL', 'OPERATIONS', 'STAFF'];
@@ -22,12 +37,18 @@ export const APPROVER_TYPES: { id: ApproverType; label: string; hint: string }[]
   { id: 'department_head', label: 'Department head', hint: 'The head of their department' },
   { id: 'role', label: 'Anyone with a role', hint: 'For example HR' },
   { id: 'person', label: 'A named person', hint: 'For example the CTO' },
+  { id: 'module', label: 'Anyone who can…', hint: 'Everyone whose role has this ticked, for example Staff loans' },
 ];
+
+/** The modules a "Anyone who can…" step offers: the ones that manage money, then the rest. */
+export const APPROVER_MODULES = ['loans', 'salaryadmin', 'expenses', 'requisitions', 'payments', 'payroll', 'employees', 'hr-admin'];
 
 export interface ApprovalStep {
   label?: string | null;
   approver_type: ApproverType;
   approver_role?: string | null;
+  /** for a module step: the module whose holders approve ('loans') */
+  approver_module?: string | null;
   approver_employee_number?: string | null;
   approver_name?: string | null;
   alternate_type?: AlternateType | null;
@@ -88,6 +109,8 @@ export function stepLabel(step: ApprovalStep): string {
       return step.approver_role || 'Role';
     case 'person':
       return step.approver_name || step.approver_employee_number || 'Person';
+    case 'module':
+      return (step.approver_module && moduleInfo(step.approver_module)?.name) || step.approver_module || 'Module';
   }
 }
 
@@ -101,6 +124,7 @@ export function chainPreview(kind: ApprovalKind, steps: ApprovalStep[]): string 
 export function stepError(step: ApprovalStep): string | null {
   if (step.approver_type === 'role' && !step.approver_role) return 'Choose the role';
   if (step.approver_type === 'person' && !step.approver_employee_number) return 'Choose who approves';
+  if (step.approver_type === 'module' && !step.approver_module) return 'Choose what the approvers can do';
   if (step.alternate_type === 'role' && !step.alternate_role) return 'Choose the alternate’s role';
   if (step.alternate_type === 'person' && !step.alternate_employee_number) return 'Choose the alternate';
   if ((step.label?.length ?? 0) > 60) return 'The name may be up to 60 characters';
@@ -120,6 +144,7 @@ export async function saveApprovalWorkflow(kind: ApprovalKind, steps: ApprovalSt
     label: s.label?.trim() || null,
     approver_type: s.approver_type,
     approver_role: s.approver_type === 'role' ? s.approver_role : null,
+    approver_module: s.approver_type === 'module' ? s.approver_module : null,
     approver_employee_number: s.approver_type === 'person' ? s.approver_employee_number : null,
     alternate_type: s.alternate_type || null,
     alternate_role: s.alternate_type === 'role' ? s.alternate_role : null,
@@ -176,4 +201,22 @@ export async function loadLeaveAwaitingMe(): Promise<LeaveAwaitingMe[]> {
   const { data, error } = await supabase.rpc('my_leave_approvals');
   if (error) throw new Error(error.message);
   return (data || []) as LeaveAwaitingMe[];
+}
+
+export interface MoneyAwaitingMe {
+  request_id: string;
+  kind: MoneyKind;
+  record_id: string;
+  employee_number: string | null;
+  /** "Jane Doe's loan request of KES 30,000.00 over 6 months" */
+  summary: string;
+  step_label: string;
+  created_at: string;
+}
+
+/** Loans, advances, expense claims and requisitions waiting on the signed-in person's decision (not just as an admin). */
+export async function loadMoneyAwaitingMe(): Promise<MoneyAwaitingMe[]> {
+  const { data, error } = await supabase.rpc('my_money_approvals');
+  if (error) throw new Error(error.message);
+  return (data || []) as MoneyAwaitingMe[];
 }

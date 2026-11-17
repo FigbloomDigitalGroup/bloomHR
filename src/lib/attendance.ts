@@ -387,8 +387,56 @@ export interface DayScan {
   via: ScanVia;
   scannerName: string | null;
   kind: ScanKind;
-  /** why a scan was held back: 'clock_ahead', 'hr_corrected' */
+  /** why a scan was held back: 'clock_ahead', 'hr_corrected', 'no_clock_in', 'break', 'overtime' */
   reason: string | null;
+  /** how the scanner verified the person (ZKTeco verify code; migration 20261025300000); null for the app's and HR's times */
+  verify?: number | null;
+  /** the key pressed on the scanner (ZKTeco status: 0 in, 1 out, 2-5 break/overtime) */
+  status?: number | null;
+  /** the scanner's mode when the punch arrived ('first_last', 'in_only', 'out_only', 'device_keys') */
+  punchMode?: string | null;
+}
+
+export type VerifyMethod = 'fingerprint' | 'card' | 'face' | 'PIN' | 'palm' | 'other';
+
+/**
+ * How a ZKTeco scanner verified a punch (the ATTLOG verify code), from the push protocol's verify-mode table: 0 and 3
+ * password (PIN), 1 fingerprint, 2 card on older (black and white) firmware, 4 card (RFID), 15 face, 25 palm. The
+ * combined modes (5-14, 16-20: e.g. fingerprint and card), finger vein and door events (200+) are "other".
+ */
+export function verifyMethod(code: number | null | undefined): VerifyMethod | null {
+  if (code === null || code === undefined || !Number.isFinite(code)) return null;
+  switch (code) {
+    case 0:
+    case 3:
+      return 'PIN';
+    case 1:
+      return 'fingerprint';
+    case 2:
+    case 4:
+      return 'card';
+    case 15:
+      return 'face';
+    case 25:
+      return 'palm';
+    default:
+      return 'other';
+  }
+}
+
+const STATUS_KEY_LABEL: Record<number, string> = {
+  0: 'In key',
+  1: 'Out key',
+  2: 'Break out key',
+  3: 'Break in key',
+  4: 'Overtime in key',
+  5: 'Overtime out key',
+};
+
+/** The key pressed on the scanner (ZKTeco status): "In key", "Out key", "Break out key"...; "Key 9" for others. */
+export function statusKeyLabel(status: number | null | undefined): string | null {
+  if (status === null || status === undefined || !Number.isFinite(status)) return null;
+  return STATUS_KEY_LABEL[status] ?? `Key ${status}`;
 }
 
 const KIND_LABEL: Record<ScanKind, string> = {
@@ -402,6 +450,9 @@ const KIND_LABEL: Record<ScanKind, string> = {
 const REASON_LABEL: Record<string, string> = {
   clock_ahead: "the scanner's clock was ahead",
   hr_corrected: 'HR corrected this day',
+  no_clock_in: 'no clock-in before it yet',
+  break: 'break',
+  overtime: 'overtime',
 };
 
 /** Where a scan came from: the scanner's name, "App" ("App · office" with the clock-in's place) or "HR correction". */
@@ -415,9 +466,18 @@ export function scanRole(s: Pick<DayScan, 'kind' | 'reason'>): string {
   return label;
 }
 
-/** One line of a day's scans: "7:55 am · Front Door · clock-in", "12:30 pm · Front Door", "8:02 am · App · clock-in". */
+/**
+ * One line of a day's scans: "7:55 am · Front Door · fingerprint · clock-in", "12:30 pm · Front Door · card",
+ * "8:02 am · App · clock-in"; a scanner using its In/Out keys also says the key ("8:03 am · Gate · card · In key · clock-in").
+ */
 export const scanLine = (s: DayScan, place?: ClockPlace | null) =>
-  [formatTime(s.at), scanSource(s, s.kind === 'clock_in' ? place : null), scanRole(s)].filter(Boolean).join(' · ');
+  [
+    formatTime(s.at),
+    scanSource(s, s.kind === 'clock_in' ? place : null),
+    s.via === 'scanner' ? verifyMethod(s.verify) : null,
+    s.via === 'scanner' && s.punchMode === 'device_keys' ? statusKeyLabel(s.status) : null,
+    scanRole(s),
+  ].filter(Boolean).join(' · ');
 
 // ---------------------------------------------------------------------------------------------
 // where a clock-in was made (migration 20261024100000, FIG-1200)

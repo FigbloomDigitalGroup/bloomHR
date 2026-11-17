@@ -52,7 +52,7 @@ export function PlatformRatesLink({ onOpen }: { onOpen: () => void }) {
   if (!allowed) return null;
   return (
     <button type="button" onClick={onOpen} className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand underline">
-      <Globe className="h-3.5 w-3.5" /> Platform rates (Figbloom): new rates from a date for every company
+      <Globe className="h-3.5 w-3.5" /> Statutory rates (Figbloom): new rates from a date for every company
     </button>
   );
 }

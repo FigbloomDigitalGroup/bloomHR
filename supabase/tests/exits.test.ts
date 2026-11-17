@@ -2,7 +2,7 @@
 //
 // Exits (FIG-832): resignations and terminations. Staff resign only themselves, with at least their notice period; HR
 // (employees or hr-lifecycle module) starts terminations and runs the checklist, interview and final dues; HR or an
-// administrator approves, not the person who started it while someone else can. When the exit ends the employee is
+// administrator approves; an exit HR starts is approved as it starts (20261026400000). When the exit ends the employee is
 // Terminated, their login to the company is deactivated and payslips after their last month are refused.
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { PGlite } from '@electric-sql/pglite';
@@ -114,7 +114,7 @@ describe('resigning (staff)', () => {
 });
 
 describe('terminating (HR)', () => {
-  it('HR starts it with a reason category; staff and other companies cannot see it', async () => {
+  it('HR starts it with a reason category, approved at once; staff and other companies cannot see it', async () => {
     await expect(
       as(HR1, `insert into employee_exits (employee_number, kind, last_working_day) values ('E2', 'termination', ${day(10)})`)
     ).rejects.toThrow(/check/i);
@@ -122,20 +122,18 @@ describe('terminating (HR)', () => {
       HR1,
       `(employee_number, kind, reason_category, reason, last_working_day, notice_pay) values ('E2', 'termination', 'redundancy', 'Role closed', ${day(10)}, true)`
     );
-    expect(await exit(id)).toMatchObject({ status: 'requested', notice_days: 28, requested_by: HR1 });
+    expect(await exit(id)).toMatchObject({ status: 'approved', notice_days: 28, requested_by: HR1, decided_by: HR1 });
     expect(await read(S2, `select 1 from employee_exits`)).toHaveLength(0);
     expect(await read(HRB, `select 1 from employee_exits`)).toHaveLength(0);
     await as(HRB, `update employee_exits set status = 'cancelled'`);
-    expect((await exit(id)).status).toBe('requested');
+    expect((await exit(id)).status).toBe('approved');
     // never in the employee's bell
     expect(await rows(`select 1 from hr_notifications where employee_number = 'E2' and notification_type like 'exit%'`)).toHaveLength(0);
   });
 
-  it('the person who started it cannot approve it while another HR person can; someone else can', async () => {
+  it('approving at the start adds the checklist, as approving later does', async () => {
     const [{ id }] = await rows<{ id: string }>(`select id from employee_exits where employee_number = 'E2'`);
-    await expect(as(HR1, `update employee_exits set status = 'approved' where id = '${id}'`)).rejects.toThrow(/another HR person/);
-    await as(HR2, `update employee_exits set status = 'approved' where id = '${id}'`);
-    expect(await exit(id)).toMatchObject({ status: 'approved', decided_by: HR2 });
+    expect((await rows(`select 1 from employee_exit_clearance_items where exit_id = '${id}'`)).length).toBeGreaterThan(0);
   });
 
   it('a module-only HR user may start one but only HR or an administrator approves', async () => {
@@ -234,8 +232,21 @@ describe('the end', () => {
     expect((await read<{ n: number }>(HR1, `select public.end_due_exit_access() n`))[0].n).toBe(1);
     expect(await rows(`select "Status" from employees where "Employee Number" = 'E3'`)).toEqual([{ Status: 'Terminated' }]);
     expect(await rows(`select account_status from memberships where user_id = '${S3}'`)).toEqual([{ account_status: 'DEACTIVATED' }]);
-    // an exit whose person has gone can't be cancelled any more
-    await expect(as(HR1, `update employee_exits set status = 'cancelled' where employee_number = 'E3'`)).rejects.toThrow(/already left/);
+  });
+
+  it('cancelling an exit after their access ended brings them back (20261113200000); a completed one stays history', async () => {
+    // E3's access ended above: staff can't, HR can
+    await as(S3, `update employee_exits set status = 'cancelled' where employee_number = 'E3'`).catch(() => undefined);
+    expect((await rows<{ status: string }>(`select status from employee_exits where employee_number = 'E3'`))[0].status).toBe('approved');
+    await as(HR1, `update employee_exits set status = 'cancelled' where employee_number = 'E3'`);
+    const [x] = await rows<{ status: string; ended: boolean }>(`select status, access_ended_at is not null ended from employee_exits where employee_number = 'E3'`);
+    expect(x).toEqual({ status: 'cancelled', ended: true });
+    expect(await rows(`select "Status", "Termination Date" from employees where "Employee Number" = 'E3'`)).toEqual([{ Status: 'Active', 'Termination Date': null }]);
+    expect(await rows(`select account_status from memberships where user_id = '${S3}'`)).toEqual([{ account_status: 'ACTIVE' }]);
+    // the sign-in check reads the profile
+    expect(await rows(`select account_status from user_profiles where user_id = '${S3}'`)).toEqual([{ account_status: 'ACTIVE' }]);
+    // E2's completed exit can't be cancelled
+    await expect(as(HR1, `update employee_exits set status = 'cancelled' where employee_number = 'E2'`)).rejects.toThrow(/completed exit/);
   });
 
   it('no payslip after the month they left in', async () => {

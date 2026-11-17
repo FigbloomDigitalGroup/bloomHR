@@ -7,7 +7,8 @@ import { currencySymbol } from '../../lib/payroll/currency';
 import {
   SAMPLE_SALARIES, type RateChange, type RateVersion, lineAmount, periodEnd, previewChange, previewLabels, rateChangeProblems, ratesOn, withVersion,
 } from '../../lib/payroll/rateVersions';
-import { addPlatformRate, isPlatformAdmin, latestApprovedMonth, longDate, platformRows } from '../../lib/platformRates';
+import { addPlatformRate, latestApprovedMonth, longDate, platformRows } from '../../lib/platformRates';
+import { myPlatformRole, roleCan, type PlatformRole } from '../../lib/platformRoles';
 import { isPercentCode, rateLabel } from '../../lib/statutoryRates';
 
 // New platform rates from a date (FIG-813): a Figbloom platform admin enters a change in the law the day it is known,
@@ -79,7 +80,10 @@ function draftFrom(rows: RateVersion[], country: string, code: string, from: str
 }
 
 export default function PlatformRatesPage() {
-  const [allowed, setAllowed] = useState<boolean | null>(null);
+  // undefined while loading; null when not a platform admin. Support and viewers only read (console roles).
+  const [role, setRole] = useState<PlatformRole | null | undefined>(undefined);
+  const allowed = role === undefined ? null : role !== null;
+  const canEdit = roleCan(role, 'edit_rates');
   const [country, setCountry] = useState('Kenya');
   const [rows, setRows] = useState<RateVersion[] | null>(null);
   const [latest, setLatest] = useState<string | null>(null);
@@ -89,7 +93,7 @@ export default function PlatformRatesPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    void isPlatformAdmin().then(setAllowed);
+    void myPlatformRole().then(setRole);
   }, []);
 
   const load = useCallback(async () => {
@@ -146,7 +150,7 @@ export default function PlatformRatesPage() {
   if (!allowed) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Platform rates" subtitle="The statutory rates every company starts from" />
+        <PageHeader title="Statutory rates" subtitle="The statutory rates every company starts from" />
         <Card>
           <p className="text-sm text-ink">Only Figbloom platform admins can change the platform rates.</p>
           <p className="text-xs text-muted-foreground mt-1">
@@ -167,7 +171,7 @@ export default function PlatformRatesPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Platform rates" subtitle="New statutory rates from a date, for every company (companies' own rates stay on top)" />
+      <PageHeader title="Statutory rates" subtitle="New statutory rates from a date, for every company (companies' own rates stay on top)" />
 
       <div className="flex gap-1" role="tablist" aria-label="Country">
         {supportedCountries().map((c) => (
@@ -208,7 +212,7 @@ export default function PlatformRatesPage() {
                     <td className="py-1.5 pr-3 text-muted-foreground">{r.effective_to ?? 'in force'}</td>
                     <td className="py-1.5 pr-3 text-muted-foreground">{r.source ?? ''}</td>
                     <td className="py-1.5 text-right">
-                      {r.effective_to === null && (
+                      {canEdit && r.effective_to === null && (
                         <button type="button" className="text-brand font-semibold" onClick={() => { setConfirmBackdate(false); setDraft(draftFrom(rows, country, r.code, today())); }}>
                           New version
                         </button>
@@ -220,12 +224,16 @@ export default function PlatformRatesPage() {
             </table>
           </TableScroll>
         )}
-        <button type="button" className="mt-3 text-xs text-brand font-semibold" onClick={() => setDraft({ code: '', value: '', bands: null, amounts: false, from: today(), source: '' })}>
-          A rate {country} doesn&apos;t have yet
-        </button>
+        {canEdit ? (
+          <button type="button" className="mt-3 text-xs text-brand font-semibold" onClick={() => setDraft({ code: '', value: '', bands: null, amounts: false, from: today(), source: '' })}>
+            A rate {country} doesn&apos;t have yet
+          </button>
+        ) : (
+          <p className="mt-3 text-xs text-muted-foreground">Read only: owners and admins change the statutory rates.</p>
+        )}
       </Card>
 
-      {draft && (
+      {canEdit && draft && (
         <Card>
           <h2 className="text-sm font-semibold text-ink mb-2">
             New version{draft.code ? `: ${rateLabel(draft.code, country)}` : ''} ({country})

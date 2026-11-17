@@ -1,6 +1,8 @@
 // Settings for the Figbloom AWS account. Change these through a PR, then run `npm run diff` and `cdk deploy`.
 
 export const ACCOUNT_ID = '852845752791';
+// The AWS Organization this (management) account runs. Its trail covers every account in it: staging, prod, ...
+export const ORGANIZATION_ID = 'o-7n7zn7ftfn';
 
 // eu-west-1 (Ireland) keeps data in the EU, which is what the ODPC registration says.
 export const REGION = 'eu-west-1';
@@ -33,5 +35,17 @@ export const ACCOUNT_SETTINGS: AccountSettings = {
 
 export type EnvironmentName = 'staging' | 'production';
 
-// The app door scanners send punches to (its /iclock/* receiver). The scanner relay forwards to it over HTTPS.
-export const APP_HOST = 'bloom-hr-phi.vercel.app';
+// The app door scanners send punches to (its /iclock/* receiver). The scanner relay forwards to it over HTTPS. Use the
+// app's own domain, not bloom-hr-phi.vercel.app: if that address ever redirects, CloudFront won't follow it.
+export const APP_HOST = 'hr.figbloom.org';
+
+// --- Developer access (IAM Identity Center). Lives in the management account, in Identity Center's home Region. ---
+// Identity Center can only be managed from its home Region, which is eu-north-1 (not REGION above).
+export const IDENTITY_CENTER_REGION = 'eu-north-1';
+export const IDENTITY_CENTER_INSTANCE_ARN = 'arn:aws:sso:::instance/ssoins-650868325a7f4fe2';
+export const IDENTITY_STORE_ID = 'd-c3676f2769';
+// The sign-in page developers use with `aws configure sso`
+export const SSO_START_URL = 'https://d-c3676f2769.awsapps.com/start';
+// The organization's workload accounts the developer groups get access to
+export const STAGING_ACCOUNT_ID = '374254524440';
+export const PRODUCTION_ACCOUNT_ID = '304550796505';

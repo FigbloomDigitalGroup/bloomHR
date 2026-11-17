@@ -13,12 +13,13 @@ const TENANT = 'tenant-a';
 const OTHER_TENANT = 'tenant-b';
 
 type Row = Record<string, any>;
-type FakeMessage = { seq: number; uid: number; flags: Set<string>; envelope: Row; bodyStructure: Row; size: number; source: string };
+type FakeMessage = { seq: number; uid: number; flags: Set<string>; envelope: Row; bodyStructure: Row; size: number; source: string; headers?: string };
 
 const state = vi.hoisted(() => ({
   tables: {} as Record<string, Record<string, any>[]>,
   authUsers: [] as { id: string; email: string }[],
   dns: {} as Record<string, { address: string; family: number }[]>,
+  mx: {} as Record<string, { exchange: string; priority: number }[]>,
   // the fake IMAP server
   imapOptions: [] as Record<string, any>[],
   connectError: null as Record<string, unknown> | null,
@@ -31,6 +32,25 @@ const state = vi.hoisted(() => ({
   logouts: 0,
   parsed: {} as Record<string, unknown>,
   downloads: [] as { uid: string; part: string; options: Record<string, unknown> }[],
+  // the shared rate limit (take_rate_limit): units used per bucket
+  budget: {} as Record<string, number>,
+  // the fake outgoing server (nodemailer) and the Sent copies (IMAP APPEND)
+  smtpOptions: [] as Record<string, any>[],
+  sent: [] as Record<string, any>[],
+  smtpError: null as Record<string, unknown> | null,
+  verifyError: null as Record<string, unknown> | null,
+  smtpRejected: [] as string[],
+  appended: [] as { path: string; raw: string; flags: string[] }[],
+  appendError: null as Record<string, unknown> | null,
+  // managing mail (PR 3): what the server supports, and what was asked of it
+  capabilities: new Set<string>(['UIDPLUS', 'MOVE']),
+  unflagged: [] as { uid: string; flags: string[] }[],
+  moves: [] as { uid: string; to: string }[],
+  deletes: [] as string[],
+  searches: [] as Record<string, any>[],
+  searchResult: null as number[] | null,
+  statuses: [] as { path: string; query: Record<string, unknown> }[],
+  unseen: 4,
 }));
 
 vi.mock('@supabase/supabase-js', () => {
@@ -72,8 +92,13 @@ vi.mock('@supabase/supabase-js', () => {
     return b;
   };
   const client = {
-    rpc: async (fn: string) => {
-      if (fn === 'take_rate_limit') return { data: true, error: null };
+    rpc: async (fn: string, args: Record<string, any>) => {
+      if (fn === 'take_rate_limit') {
+        const used = (state.budget[args.p_bucket] || 0) + args.p_cost;
+        if (used > args.p_limit) return { data: false, error: null };
+        state.budget[args.p_bucket] = used;
+        return { data: true, error: null };
+      }
       throw new Error(`unexpected rpc ${fn}`);
     },
     // the bearer token is the caller's user id in these tests
@@ -89,6 +114,11 @@ vi.mock('node:dns', () => ({
       lookup: async (host: string) => {
         const found = state.dns[host];
         if (!found) throw Object.assign(new Error(`getaddrinfo ENOTFOUND ${host}`), { code: 'ENOTFOUND' });
+        return found;
+      },
+      resolveMx: async (domain: string) => {
+        const found = state.mx[domain];
+        if (!found) throw Object.assign(new Error(`queryMx ENOTFOUND ${domain}`), { code: 'ENOTFOUND' });
         return found;
       },
     },
@@ -116,9 +146,17 @@ vi.mock('imapflow', () => ({
       if (path !== 'INBOX' && !state.folders.some((f) => f.path === path)) throw Object.assign(new Error('NO Mailbox does not exist'), { responseStatus: 'NO' });
       return { path, exists: state.messages.length };
     }
-    async *fetch(range: string, query: Record<string, unknown>) {
+    get capabilities() {
+      return new Map([...state.capabilities].map((c) => [c, true]));
+    }
+    async *fetch(range: string, query: Record<string, unknown>, opts: { uid?: boolean } = {}) {
       state.fetchRanges.push(range);
       state.fetchQueries.push(query);
+      if (opts.uid) {
+        const uids = range.split(',').map(Number);
+        for (const m of state.messages) if (uids.includes(m.uid)) yield { ...m, source: undefined };
+        return;
+      }
       const [from, to] = range.split(':').map(Number);
       for (const m of state.messages) if (m.seq >= from && m.seq <= to) yield { ...m, source: undefined };
     }
@@ -126,15 +164,42 @@ vi.mock('imapflow', () => ({
       state.fetchQueries.push(query);
       const m = state.messages.find((x) => String(x.uid) === uid);
       if (!m) return false;
+      if (query.headers) return { uid: m.uid, headers: Buffer.from(m.headers || '') };
       return query.source ? { uid: m.uid, source: Buffer.from(m.source) } : { ...m, source: undefined };
     }
     async messageFlagsAdd(uid: string, flags: string[]) {
       state.flagged.push({ uid, flags });
       return true;
     }
+    async messageFlagsRemove(uid: string, flags: string[]) {
+      state.unflagged.push({ uid, flags });
+      return true;
+    }
+    async messageMove(uid: string, to: string) {
+      state.moves.push({ uid, to });
+      return { path: 'x', destination: to };
+    }
+    async messageDelete(uid: string) {
+      state.deletes.push(uid);
+      return true;
+    }
+    async search(query: Record<string, any>) {
+      state.searches.push(query);
+      if (query.deleted) return state.messages.filter((m) => m.flags.has('\\Deleted')).map((m) => m.uid);
+      return state.searchResult ?? state.messages.map((m) => m.uid);
+    }
+    async status(path: string, query: Record<string, unknown>) {
+      state.statuses.push({ path, query });
+      return { path, unseen: state.unseen };
+    }
     async download(uid: string, part: string, options: Record<string, unknown>) {
       state.downloads.push({ uid, part, options });
       return { meta: { filename: 'pay"slip/../Oct\r\n.pdf', contentType: 'text/html' }, content: Readable.from([Buffer.from('%PDF-1.4 file')]) };
+    }
+    async append(path: string, raw: Buffer, flags: string[]) {
+      if (state.appendError) throw Object.assign(new Error('NO append failed'), state.appendError);
+      state.appended.push({ path, raw: raw.toString(), flags });
+      return { destination: path, uid: 1 };
     }
     async logout() {
       state.logouts += 1;
@@ -144,6 +209,27 @@ vi.mock('imapflow', () => ({
 }));
 
 vi.mock('mailparser', () => ({ simpleParser: async () => state.parsed }));
+
+// the outgoing server; the Sent copy is still built by the real MailComposer (nodemailer/lib/mail-composer)
+vi.mock('nodemailer', () => ({
+  default: {
+    createTransport: (opts: Record<string, any>) => {
+      state.smtpOptions.push(opts);
+      return {
+        verify: async () => {
+          if (state.verifyError) throw Object.assign(new Error(`535 auth failed for ${opts.auth.user} ${opts.auth.pass}`), state.verifyError);
+          return true;
+        },
+        sendMail: async (mail: Record<string, any>) => {
+          if (state.smtpError) throw Object.assign(new Error(`550 refused ${JSON.stringify(mail.to)} ${opts.auth.pass}`), state.smtpError);
+          state.sent.push(mail);
+          return { messageId: mail.messageId, accepted: [], rejected: state.smtpRejected };
+        },
+        close() {},
+      };
+    },
+  },
+}));
 
 process.env.SUPABASE_URL = 'http://fake';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'fake-service-key';
@@ -157,7 +243,7 @@ beforeAll(async () => {
   const express = (await import('express')).default;
   const router = (await import('../mailbox_routes.js')).default;
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' })); // as app.js
   app.use('/api/mailbox', router);
   server = createServer(app);
   await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -202,7 +288,7 @@ beforeEach(() => {
   ];
   state.authUsers = users.map(([n]) => ({ id: `${n}-id`, email: `${n}@a.co` }));
   state.tables = {
-    user_profiles: users.map(([n, role, tenant]) => ({ user_id: `${n}-id`, role, account_status: 'ACTIVE', tenant_id: tenant })),
+    user_profiles: users.map(([n, role, tenant]) => ({ user_id: `${n}-id`, role, account_status: 'ACTIVE', tenant_id: tenant, full_name: `${n.toUpperCase()} Person` })),
     role_permissions: [
       { tenant_id: TENANT, role_name: 'HR', permissions: ['email-portal', 'mailbox'] },
       { tenant_id: TENANT, role_name: 'STAFF', permissions: ['email-portal'] },
@@ -212,6 +298,7 @@ beforeEach(() => {
     company_mail_servers: [],
   };
   state.dns = { 'mail.a.co': [{ address: '203.0.113.10', family: 4 }], 'mail.b.co': [{ address: '203.0.113.20', family: 4 }] };
+  state.mx = {};
   state.imapOptions = [];
   state.connectError = null;
   state.folders = [
@@ -228,6 +315,22 @@ beforeEach(() => {
   state.flagged = [];
   state.logouts = 0;
   state.downloads = [];
+  state.budget = {};
+  state.smtpOptions = [];
+  state.sent = [];
+  state.smtpError = null;
+  state.verifyError = null;
+  state.smtpRejected = [];
+  state.appended = [];
+  state.appendError = null;
+  state.capabilities = new Set(['UIDPLUS', 'MOVE']);
+  state.unflagged = [];
+  state.moves = [];
+  state.deletes = [];
+  state.searches = [];
+  state.searchResult = null;
+  state.statuses = [];
+  state.unseen = 4;
   state.parsed = {
     subject: 'Your payslip',
     from: { value: [{ name: 'Payroll', address: 'payroll@client.co.ke' }] },
@@ -373,6 +476,69 @@ describe('connecting', () => {
     await connect('admin-id');
     expect((await call('DELETE', '/account', 'hr-id')).status).toBe(200);
     expect(state.tables.user_mailboxes.map((r) => r.user_id)).toEqual(['admin-id']);
+  });
+});
+
+describe('finding the mail server', () => {
+  const servers = async (email: string, token = 'hr-id') => (await call('GET', `/servers?email=${encodeURIComponent(email)}`, token)).json();
+
+  it('needs the My mailbox module and a valid address', async () => {
+    expect((await call('GET', '/servers?email=x%40a.co', 'staff-id')).status).toBe(403);
+    expect((await call('GET', '/servers?email=nonsense', 'hr-id')).status).toBe(400);
+  });
+
+  it('uses mail.<domain> when it exists', async () => {
+    expect(await servers('Mary@A.co')).toEqual({
+      email: 'mary@a.co', imap_host: 'mail.a.co', imap_port: 993, smtp_host: 'mail.a.co', smtp_port: 465,
+      provider: null, supported: true, note: null, found: 'name',
+    });
+  });
+
+  it("otherwise the domain's own MX server, skipping spam filters, forwarders and private addresses", async () => {
+    state.mx['figbloom.org'] = [{ exchange: 'lon105.truehost.cloud.', priority: 10 }];
+    state.dns['lon105.truehost.cloud'] = [{ address: '54.36.164.223', family: 4 }];
+    expect(await servers('michael@figbloom.org')).toMatchObject({ imap_host: 'lon105.truehost.cloud', smtp_host: 'lon105.truehost.cloud', found: 'mx' });
+
+    state.mx['filtered.co'] = [
+      { exchange: 'mx2.mailchannels.net', priority: 5 },
+      { exchange: 'server9.host.co', priority: 20 },
+    ];
+    state.dns['mx2.mailchannels.net'] = [{ address: '203.0.113.50', family: 4 }];
+    state.dns['server9.host.co'] = [{ address: '203.0.113.9', family: 4 }];
+    expect(await servers('a@filtered.co')).toMatchObject({ imap_host: 'server9.host.co', found: 'mx' });
+
+    state.mx['forwarded.co'] = [{ exchange: 'eforward1.registrar-servers.com', priority: 10 }];
+    state.dns['eforward1.registrar-servers.com'] = [{ address: '203.0.113.60', family: 4 }];
+    expect(await servers('a@forwarded.co')).toMatchObject({ imap_host: 'mail.forwarded.co', found: null });
+
+    state.mx['inside.co'] = [{ exchange: 'mx.inside.co', priority: 10 }];
+    state.dns['mx.inside.co'] = [{ address: '10.0.0.5', family: 4 }];
+    expect(await servers('a@inside.co')).toMatchObject({ imap_host: 'mail.inside.co', found: null });
+
+    // nothing at all: the plain guess
+    expect(await servers('a@nowhere.co')).toMatchObject({ imap_host: 'mail.nowhere.co', found: null });
+    expect(state.imapOptions).toHaveLength(0);
+  });
+
+  it('knows Google (with the app password note), Zoho by region, and that Microsoft cannot be connected', async () => {
+    expect(await servers('a@gmail.com')).toMatchObject({ imap_host: 'imap.gmail.com', smtp_host: 'smtp.gmail.com', provider: 'google', supported: true, note: expect.stringMatching(/app password/) });
+    state.mx['workspace.co'] = [{ exchange: 'aspmx.l.google.com', priority: 1 }];
+    expect(await servers('a@workspace.co')).toMatchObject({ imap_host: 'imap.gmail.com', provider: 'google' });
+    state.mx['zo.co'] = [{ exchange: 'mx.zoho.eu', priority: 10 }];
+    expect(await servers('a@zo.co')).toMatchObject({ imap_host: 'imap.zoho.eu', smtp_host: 'smtp.zoho.eu', provider: 'zoho' });
+    expect(await servers('a@hotmail.com')).toMatchObject({ provider: 'microsoft', supported: false, note: expect.stringMatching(/can't be connected/) });
+    state.mx['m365.co'] = [{ exchange: 'm365-co.mail.protection.outlook.com', priority: 0 }];
+    expect(await servers('a@m365.co')).toMatchObject({ provider: 'microsoft', supported: false });
+  });
+
+  it("explains a refused Google or Microsoft password instead of 'wrong password'", async () => {
+    state.dns['imap.gmail.com'] = [{ address: '203.0.113.70', family: 4 }];
+    state.dns['outlook.office365.com'] = [{ address: '203.0.113.80', family: 4 }];
+    state.connectError = { authenticationFailed: true };
+    let body = await (await call('POST', '/test', 'hr-id', { email: 'a@gmail.com', imap_host: 'imap.gmail.com', password: 'x' })).json();
+    expect(body.message).toMatch(/^Google didn't accept the password\. .*app password/);
+    body = await (await call('POST', '/test', 'hr-id', { email: 'a@hotmail.com', imap_host: 'outlook.office365.com', password: 'x' })).json();
+    expect(body.message).toMatch(/Microsoft 365 and Outlook\.com don't let other apps sign in with a password/);
   });
 });
 
@@ -561,5 +727,536 @@ describe('encryption', () => {
     expect(() => decryptPassword(stored, 't1')).toThrow(/can't be read/);
     // two encryptions of the same password differ
     expect(encryptSecret('hunter2', mailboxBinding('u1', 't1'))).not.toBe(stored);
+  });
+});
+
+describe('checking sending when connecting', () => {
+  it('Test also logs in to the outgoing server (same login, checked address, name kept for TLS)', async () => {
+    let body = await (await call('POST', '/test', 'hr-id', { email: 'hr@a.co', imap_host: 'mail.a.co', password: 'hunter2', smtp_port: 587 })).json();
+    expect(body).toEqual({ ok: true, message: 'Connected to mail.a.co. Your mailbox is ready.' });
+    expect(state.smtpOptions[0]).toMatchObject({
+      host: '203.0.113.10',
+      port: 587,
+      secure: false,
+      requireTLS: true,
+      auth: { user: 'hr@a.co', pass: 'hunter2' },
+      tls: { servername: 'mail.a.co' },
+      logger: false,
+    });
+    state.verifyError = { code: 'EAUTH', responseCode: 535 };
+    body = await (await call('POST', '/test', 'hr-id', { email: 'hr@a.co', imap_host: 'mail.a.co', password: 'hunter2' })).json();
+    expect(body.ok).toBe(false);
+    expect(body.message).toMatch(/^Reading works, but sending doesn't: Your mail server refused your password for sending/);
+  });
+
+  it('connecting saves when reading works and says whether sending does', async () => {
+    state.verifyError = { code: 'ECONNECTION' };
+    const res = await connect('hr-id');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.account.email).toBe('hr@a.co');
+    expect(body.smtp).toEqual({ ok: false, message: "Can't reach mail.a.co on port 465 to send. Check the outgoing server and port under Change server settings." });
+    expect(state.tables.user_mailboxes).toHaveLength(1);
+  });
+
+  it('changing only the outgoing server keeps the saved password', async () => {
+    await connect('hr-id');
+    const res = await call('PUT', '/account', 'hr-id', { email: 'hr@a.co', imap_host: 'mail.a.co', smtp_host: 'mail.a.co', smtp_port: 587 });
+    expect(res.status).toBe(200);
+    expect(state.tables.user_mailboxes[0].smtp_port).toBe(587);
+    expect(state.smtpOptions.at(-1)!.auth).toEqual({ user: 'hr@a.co', pass: 'hunter2' });
+  });
+});
+
+describe('sending', () => {
+  const send = (body: Row, token = 'hr-id') => call('POST', '/send', token, body);
+  const raw = () => state.appended[0]?.raw || '';
+
+  beforeEach(async () => {
+    await connect('hr-id');
+    state.imapOptions = [];
+    state.smtpOptions = [];
+    state.logouts = 0;
+    state.messages[1].headers = 'Message-ID: <m1@client>\r\nReferences: <r0@client>\r\n <r1@client>\r\nSubject: SECRET subject\r\n';
+  });
+
+  it('needs a session, the module and a connected mailbox', async () => {
+    expect((await send({ to: ['x@b.co'] }, 'nobody')).status).toBe(401);
+    expect((await send({ to: ['x@b.co'] }, 'staff-id')).status).toBe(403);
+    const res = await send({ to: ['x@b.co'] }, 'admin-id');
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toBe('Connect your mailbox first');
+    expect(state.sent).toHaveLength(0);
+  });
+
+  it('sends from your own mailbox only: your address, your name, your login, whatever the request says', async () => {
+    await connect('admin-id', { password: 'admin-pass' });
+    state.imapOptions = [];
+    state.smtpOptions = [];
+    state.logouts = 0;
+    const res = await send({ to: [{ name: 'Joe', address: 'joe@client.co.ke' }], subject: 'Hello', text: 'SECRET-BODY hi', from: 'admin@a.co', user_id: 'admin-id', headers: { Bcc: 'x@evil.co' } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, saved_to_sent: true, sent_folder: 'Sent', rejected: [], message: 'Sent.' });
+    expect(state.smtpOptions).toHaveLength(1);
+    expect(state.smtpOptions[0]).toMatchObject({ host: '203.0.113.10', port: 465, secure: true, auth: { user: 'hr@a.co', pass: 'hunter2' }, tls: { servername: 'mail.a.co' } });
+    expect(state.imapOptions.map((o) => o.auth)).toEqual([{ user: 'hr@a.co', pass: 'hunter2' }]);
+    const [mail] = state.sent;
+    expect(mail.from).toEqual({ name: 'HR Person', address: 'hr@a.co' });
+    expect(mail.to).toEqual([{ name: 'Joe', address: 'joe@client.co.ke' }]);
+    expect(mail.headers).toBeUndefined();
+    expect(mail).toMatchObject({ subject: 'Hello', text: 'SECRET-BODY hi', disableFileAccess: true, disableUrlAccess: true });
+    expect(mail.messageId).toMatch(/^<[0-9a-f-]{36}@a\.co>$/);
+    expect(raw()).toMatch(/^From: HR Person <hr@a\.co>$/m);
+    expect(raw()).not.toMatch(/admin|evil/);
+    expect(state.logouts).toBe(1);
+  });
+
+  it('checks the recipients: valid addresses, at least one, at most 50 in all', async () => {
+    let res = await send({ to: ['joe@client.co.ke', 'not-an-address'] });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('"not-an-address" in To is not a valid email address');
+    res = await send({ to: ['joe@client.co.ke'], bcc: ['a@b.co\r\nBcc: x@evil.co'] });
+    expect(res.status).toBe(400);
+    res = await send({ subject: 'nobody' });
+    expect((await res.json()).error).toBe('Add at least one recipient');
+    const many = Array.from({ length: 30 }, (_, i) => `p${i}@client.co.ke`);
+    res = await send({ to: many, cc: many.slice(0, 21) });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('Send to at most 50 people at once');
+    expect((await send({ to: many, cc: many.slice(0, 20) })).status).toBe(200);
+    expect(state.sent).toHaveLength(1);
+    expect(state.imapOptions).toHaveLength(1);
+  });
+
+  it('a reply is threaded from the original (In-Reply-To, References) and marks it answered', async () => {
+    const res = await send({ to: ['payroll@client.co.ke'], subject: 'Re: Your payslip', text: 'Thanks', reply: { folder: 'INBOX', uid: 102 } });
+    expect(res.status).toBe(200);
+    const [mail] = state.sent;
+    expect(mail.inReplyTo).toBe('<m1@client>');
+    expect(mail.references).toEqual(['<r0@client>', '<r1@client>', '<m1@client>']);
+    expect(raw()).toMatch(/^In-Reply-To: <m1@client>$/m);
+    expect(raw()).toMatch(/^References: <r0@client> <r1@client> <m1@client>$/m);
+    expect(state.opened).toEqual([{ path: 'INBOX', readOnly: false }]);
+    expect(state.flagged).toEqual([{ uid: '102', flags: ['\\Answered'] }]);
+    // an original that is gone: nothing is sent
+    expect((await send({ to: ['payroll@client.co.ke'], reply: { folder: 'INBOX', uid: 999 } })).status).toBe(404);
+    expect((await send({ to: ['payroll@client.co.ke'], reply: { folder: 'INBOX', uid: 'abc' } })).status).toBe(400);
+    expect(state.sent).toHaveLength(1);
+  });
+
+  it('a forward takes the attachments from the original on the server, read-only', async () => {
+    const res = await send({ to: ['joe@client.co.ke'], subject: 'Fwd: Your payslip', text: '---------- Forwarded message ---------', forward: { folder: 'INBOX', uid: 102, parts: ['2'] } });
+    expect(res.status).toBe(200);
+    expect(state.opened).toEqual([{ path: 'INBOX', readOnly: true }]);
+    expect(state.downloads).toEqual([{ uid: '102', part: '2', options: { uid: true, maxBytes: 20 * 1024 * 1024 + 1 } }]);
+    const [mail] = state.sent;
+    expect(mail.attachments).toHaveLength(1);
+    expect(mail.attachments[0].filename).toBe('pay"slip_.._Oct.pdf');
+    expect(mail.attachments[0].contentType).toBe('application/pdf');
+    expect(mail.attachments[0].content.toString()).toBe('%PDF-1.4 file');
+    expect(state.flagged).toHaveLength(0);
+    // a part that is not in the email
+    expect((await send({ to: ['joe@client.co.ke'], forward: { folder: 'INBOX', uid: 102, parts: ['9'] } })).status).toBe(404);
+    expect((await send({ to: ['joe@client.co.ke'], forward: { folder: 'INBOX', uid: 102, parts: ['../1'] } })).status).toBe(400);
+    expect(state.sent).toHaveLength(1);
+  });
+
+  it('attaches uploaded files (base64), with safe names', async () => {
+    const res = await send({
+      to: ['joe@client.co.ke'],
+      attachments: [{ filename: '../../etc/passwd\r\n.txt', content_type: 'text/plain', data: Buffer.from('hello file').toString('base64') }],
+    });
+    expect(res.status).toBe(200);
+    const [file] = state.sent[0].attachments;
+    expect(file).toMatchObject({ filename: '_.._etc_passwd.txt', contentType: 'text/plain' });
+    expect(file.content.toString()).toBe('hello file');
+    expect((await send({ to: ['joe@client.co.ke'], attachments: [{ filename: 'x', data: 'not base64!' }] })).status).toBe(400);
+  });
+
+  it('caps the size: 3 MB of uploads, 20 MB in all with forwarded files, 256 KB of text', async () => {
+    const big = Buffer.alloc(3 * 1024 * 1024 + 1).toString('base64');
+    let res = await send({ to: ['joe@client.co.ke'], attachments: [{ filename: 'big.bin', data: big }] });
+    expect(res.status).toBe(413);
+    expect((await res.json()).error).toMatch(/up to 3 MB/);
+    state.messages[1].bodyStructure = { type: 'multipart/mixed', childNodes: [{ part: '1', type: 'text/html', size: 300 }, { ...PDF_PART, size: 28 * 1024 * 1024 }] };
+    res = await send({ to: ['joe@client.co.ke'], forward: { folder: 'INBOX', uid: 102, parts: ['2'] } });
+    expect(res.status).toBe(413);
+    expect((await res.json()).error).toMatch(/over 20 MB/);
+    expect(state.downloads).toHaveLength(0);
+    expect((await send({ to: ['joe@client.co.ke'], text: 'x'.repeat(256 * 1024 + 1) })).status).toBe(413);
+    expect(state.sent).toHaveLength(0);
+  });
+
+  it('saves the copy (Bcc kept, marked read) to the folder marked \\Sent, else INBOX.Sent', async () => {
+    state.folders = state.folders.map((f) => (f.path === 'Sent' ? { ...f, path: 'Sent Items', name: 'Sent Items' } : f));
+    await send({ to: ['joe@client.co.ke'], bcc: ['boss@a.co'], subject: 'Hi' });
+    expect(state.appended[0]).toMatchObject({ path: 'Sent Items', flags: ['\\Seen'] });
+    expect(raw()).toMatch(/^Bcc: boss@a\.co$/m);
+    // the copy is the same email: the same Message-ID
+    expect(raw()).toContain(`Message-ID: ${state.sent[0].messageId}`);
+
+    // no special use (older cPanel): INBOX.Sent
+    state.appended = [];
+    state.folders = [
+      { path: 'INBOX', name: 'INBOX', flags: new Set(), delimiter: '.' },
+      { path: 'INBOX.Drafts', name: 'Drafts', flags: new Set(), delimiter: '.' },
+      { path: 'INBOX.Sent', name: 'Sent', flags: new Set(), delimiter: '.' },
+    ];
+    const body = await (await send({ to: ['joe@client.co.ke'] })).json();
+    expect(body.sent_folder).toBe('INBOX.Sent');
+    expect(state.appended[0].path).toBe('INBOX.Sent');
+  });
+
+  it('sent but not saved: no Sent folder, or the save failed, says so (and is not an error)', async () => {
+    state.folders = state.folders.filter((f) => f.path !== 'Sent');
+    let res = await send({ to: ['joe@client.co.ke'] });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, saved_to_sent: false, sent_folder: null, message: "Sent, but couldn't save a copy to Sent." });
+    state.folders.push({ path: 'Sent', name: 'Sent', specialUse: '\\Sent', flags: new Set(), delimiter: '/' });
+    state.appendError = { responseStatus: 'NO', code: 'OVERQUOTA' };
+    res = await send({ to: ['joe@client.co.ke'] });
+    expect(res.status).toBe(200);
+    expect((await res.json()).message).toBe("Sent, but couldn't save a copy to Sent.");
+    expect(state.sent).toHaveLength(2);
+  });
+
+  it('plain errors from the outgoing server, and nothing saved to Sent when it was not sent', async () => {
+    state.smtpError = { code: 'EAUTH', responseCode: 535 };
+    let res = await send({ to: ['joe@client.co.ke'] });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/^Your mail server refused your password for sending/);
+    state.smtpError = { code: 'EENVELOPE', responseCode: 550, rejected: ['joe@client.co.ke'] };
+    res = await send({ to: ['joe@client.co.ke'] });
+    expect((await res.json()).error).toBe('Your mail server refused to send to joe@client.co.ke. Check the address.');
+    state.smtpError = { code: 'EMESSAGE', responseCode: 552 };
+    res = await send({ to: ['joe@client.co.ke'] });
+    expect(res.status).toBe(413);
+    expect((await res.json()).error).toMatch(/too large for your mail server/);
+    expect(state.appended).toHaveLength(0);
+    // some refused, the rest sent
+    state.smtpError = null;
+    state.smtpRejected = ['gone@client.co.ke'];
+    const body = await (await send({ to: ['joe@client.co.ke', 'gone@client.co.ke'] })).json();
+    expect(body).toMatchObject({ ok: true, rejected: ['gone@client.co.ke'], message: 'Sent. Your mail server refused gone@client.co.ke.' });
+  });
+
+  it('refuses an outgoing server on a private network or a port outside the list, before connecting', async () => {
+    state.dns['mail.internal.co'] = [{ address: '10.1.2.3', family: 4 }];
+    state.tables.user_mailboxes[0].smtp_host = 'mail.internal.co';
+    let res = await send({ to: ['joe@client.co.ke'] });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('mail.internal.co is not a public mail server');
+    state.tables.user_mailboxes[0].smtp_host = '127.0.0.1';
+    expect((await send({ to: ['joe@client.co.ke'] })).status).toBe(400);
+    state.tables.user_mailboxes[0].smtp_host = 'mail.a.co';
+    state.tables.user_mailboxes[0].smtp_port = 8080;
+    res = await send({ to: ['joe@client.co.ke'] });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/outgoing mail port must be one of 25, 465, 587, 2525/);
+    expect(state.imapOptions).toHaveLength(0);
+    expect(state.smtpOptions).toHaveLength(0);
+  });
+
+  it('30 sends an hour per person', async () => {
+    expect((await send({ to: ['joe@client.co.ke'] })).status).toBe(200);
+    expect(state.budget['mailbox-send:default:hr-id']).toBe(1);
+    state.budget['mailbox-send:default:hr-id'] = 30;
+    const res = await send({ to: ['joe@client.co.ke'] });
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toMatch(/30 emails from here in the last hour/);
+    expect(state.sent).toHaveLength(1);
+  });
+
+  it('never logs contents, addresses, subjects or passwords while sending', async () => {
+    await send({ to: ['joe@client.co.ke'], bcc: ['boss@a.co'], subject: 'SECRET subject', text: 'SECRET-BODY', reply: { folder: 'INBOX', uid: 102 } });
+    state.appendError = { code: 'NOSPACE' };
+    await send({ to: ['joe@client.co.ke'], subject: 'SECRET subject', text: 'SECRET-BODY' });
+    state.smtpError = { code: 'EENVELOPE', rejected: ['joe@client.co.ke'] };
+    await send({ to: ['joe@client.co.ke'], subject: 'SECRET subject', text: 'SECRET-BODY' });
+    state.smtpError = { code: 'EAUTH' };
+    await send({ to: ['joe@client.co.ke'], subject: 'SECRET subject', text: 'SECRET-BODY', forward: { folder: 'INBOX', uid: 102, parts: ['2'] } });
+    state.verifyError = { code: 'EAUTH' };
+    await call('POST', '/test', 'hr-id', { email: 'hr@a.co', imap_host: 'mail.a.co', password: 'hunter2' });
+    const all = logged.join('\n');
+    expect(all).toContain('[mailbox] send failed: EAUTH');
+    for (const secret of ['SECRET', 'hunter2', 'hr@a.co', 'joe@client.co.ke', 'boss@a.co', 'payslip', 'HR Person']) {
+      expect([secret, all.includes(secret)]).toEqual([secret, false]);
+    }
+    expect(state.smtpOptions.every((o) => o.logger === false && o.debug === false)).toBe(true);
+  });
+});
+
+describe('managing mail', () => {
+  const post = (path: string, body: Row, token = 'hr-id') => call('POST', path, token, body);
+  const get = (path: string, token = 'hr-id') => call('GET', path, token);
+
+  beforeEach(async () => {
+    await connect('hr-id', { password: 'hr-pass' });
+    await connect('admin-id', { password: 'admin-pass' });
+    state.imapOptions = [];
+    state.logouts = 0;
+    state.opened = [];
+  });
+
+  it('needs a session, the module and a connected mailbox; never touches IMAP otherwise', async () => {
+    const calls: [string, string, Row | undefined][] = [
+      ['POST', '/flags', { folder: 'INBOX', uids: [101], seen: true }],
+      ['POST', '/move', { folder: 'INBOX', uids: [101], to: 'Projects' }],
+      ['POST', '/delete', { folder: 'INBOX', uids: [101] }],
+      ['GET', '/search?q=pay', undefined],
+      ['GET', '/unread', undefined],
+    ];
+    for (const [method, path, body] of calls) {
+      expect([path, (await call(method, path, null, body)).status]).toEqual([path, 401]);
+      expect([path, (await call(method, path, 'staff-id', body)).status]).toEqual([path, 403]);
+    }
+    state.tables.user_mailboxes = state.tables.user_mailboxes.filter((r) => r.user_id !== 'hr-id');
+    expect((await post('/flags', { folder: 'INBOX', uids: [101], seen: true })).status).toBe(404);
+    // the badge: not connected is an answer, not an error, and no mail server is asked
+    expect(await (await get('/unread')).json()).toEqual({ connected: false, unread: 0 });
+    expect(state.imapOptions).toHaveLength(0);
+    expect(Object.keys(state.budget).filter((k) => k.startsWith('mailbox-manage'))).toEqual([]);
+  });
+
+  it('acts on your own mailbox only, whatever the request says', async () => {
+    await post('/flags', { folder: 'INBOX', uids: [101], seen: true, user_id: 'admin-id', email: 'admin@a.co' });
+    await get('/unread?user_id=admin-id');
+    expect(state.imapOptions.map((o) => o.auth)).toEqual([
+      { user: 'hr@a.co', pass: 'hr-pass' },
+      { user: 'hr@a.co', pass: 'hr-pass' },
+    ]);
+  });
+
+  it('flags: read / unread and flag / unflag, by uid, in a folder opened for writing', async () => {
+    const res = await post('/flags', { folder: 'INBOX', uids: [101, 102, 101], seen: true, flagged: false });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, folder: 'INBOX', uids: [101, 102], seen: true, flagged: false });
+    expect(state.opened).toEqual([{ path: 'INBOX', readOnly: false }]);
+    expect(state.flagged).toEqual([{ uid: '101,102', flags: ['\\Seen'] }]);
+    expect(state.unflagged).toEqual([{ uid: '101,102', flags: ['\\Flagged'] }]);
+    await post('/flags', { folder: 'INBOX', uids: [103], seen: false });
+    expect(state.unflagged.at(-1)).toEqual({ uid: '103', flags: ['\\Seen'] });
+    await post('/flags', { folder: 'INBOX', uids: [103], flagged: true });
+    expect(state.flagged.at(-1)).toEqual({ uid: '103', flags: ['\\Flagged'] });
+    // nothing to change, or not a yes/no
+    expect((await post('/flags', { folder: 'INBOX', uids: [103] })).status).toBe(400);
+    expect((await post('/flags', { folder: 'INBOX', uids: [103], seen: 'yes' })).status).toBe(400);
+    expect(state.logouts).toBe(3);
+  });
+
+  it('checks the uids and the folder: 1 to 200 real ids, a folder name without line breaks', async () => {
+    const bad: Row[] = [
+      { folder: 'INBOX', uids: [] },
+      { folder: 'INBOX', uids: '101' },
+      { folder: 'INBOX', uids: ['1:*'] },
+      { folder: 'INBOX', uids: [0] },
+      { folder: 'INBOX', uids: [-1] },
+      { folder: 'INBOX', uids: ['101,102'] },
+      { folder: 'INBOX', uids: [4294967296] },
+      { folder: 'INBOX', uids: Array.from({ length: 201 }, (_, i) => i + 1) },
+      { folder: 'INBOX\r\nA1 DELETE INBOX', uids: [101] },
+      { folder: 'x'.repeat(513), uids: [101] },
+      { folder: 42, uids: [101] },
+    ];
+    for (const body of bad) {
+      expect([body, (await post('/flags', { ...body, seen: true })).status]).toEqual([body, 400]);
+      expect([body, (await post('/delete', body)).status]).toEqual([body, 400]);
+      expect([body, (await post('/move', { ...body, to: 'Projects' })).status]).toEqual([body, 400]);
+    }
+    const res = await post('/flags', { folder: 'INBOX', uids: Array.from({ length: 201 }, (_, i) => i + 1), seen: true });
+    expect((await res.json()).error).toBe('Choose at most 200 emails at a time');
+    expect(state.imapOptions).toHaveLength(0);
+    expect((await post('/flags', { folder: 'INBOX', uids: Array.from({ length: 200 }, (_, i) => i + 1), seen: true })).status).toBe(200);
+    expect(state.imapOptions).toHaveLength(1);
+    // a folder that isn't there
+    expect((await post('/flags', { folder: 'Gone', uids: [101], seen: true })).status).toBe(404);
+  });
+
+  it('move: only to an existing folder from your own list that holds mail', async () => {
+    let res = await post('/move', { folder: 'INBOX', uids: [101, 102], to: 'Projects' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, folder: 'INBOX', to: 'Projects', uids: [101, 102] });
+    expect(state.moves).toEqual([{ uid: '101,102', to: 'Projects' }]);
+    for (const to of ['Nowhere', '[Gmail]', '', 'Projects\r\n']) {
+      res = await post('/move', { folder: 'INBOX', uids: [101], to });
+      expect([to, res.status]).toEqual([to, 400]);
+    }
+    res = await post('/move', { folder: 'INBOX', uids: [101], to: 'Nowhere' });
+    expect((await res.json()).error).toBe("That folder isn't in your mailbox. Refresh.");
+    expect((await post('/move', { folder: 'INBOX', uids: [101], to: 'INBOX' })).status).toBe(400);
+    expect(state.moves).toHaveLength(1);
+  });
+
+  it('delete: to the folder marked \\Trash, never permanently from anywhere else', async () => {
+    let res = await post('/delete', { folder: 'INBOX', uids: [101] });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, folder: 'INBOX', uids: [101], permanent: false, trash: 'Trash' });
+    expect(state.moves).toEqual([{ uid: '101', to: 'Trash' }]);
+    // asking for permanent outside Trash is refused, and nothing happens
+    res = await post('/delete', { folder: 'INBOX', uids: [101], permanent: true });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/permanently only from Trash/);
+    expect((await post('/delete', { folder: 'INBOX', uids: [101], permanent: 'yes' })).status).toBe(400);
+    expect(state.deletes).toHaveLength(0);
+    expect(state.moves).toHaveLength(1);
+  });
+
+  it('delete in Trash: permanent only with permanent: true, removing only those uids', async () => {
+    let res = await post('/delete', { folder: 'Trash', uids: [101] });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/deleting them here is permanent/);
+    expect(state.deletes).toHaveLength(0);
+    res = await post('/delete', { folder: 'Trash', uids: [101, 102], permanent: true });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true, folder: 'Trash', uids: [101, 102], permanent: true, trash: 'Trash' });
+    expect(state.deletes).toEqual(['101,102']);
+    expect(state.moves).toHaveLength(0);
+  });
+
+  it('without UIDPLUS, removes for good only when no other email is already marked deleted', async () => {
+    state.capabilities = new Set();
+    state.messages[2].flags = new Set(['\\Deleted']); // uid 103: someone else's pending delete
+    let res = await post('/delete', { folder: 'Trash', uids: [101], permanent: true });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/other emails in this folder are already marked deleted/);
+    // a server without MOVE moves by copy and removal: the same check
+    res = await post('/delete', { folder: 'INBOX', uids: [101] });
+    expect(res.status).toBe(409);
+    expect(state.deletes).toHaveLength(0);
+    expect(state.moves).toHaveLength(0);
+    res = await post('/delete', { folder: 'Trash', uids: [101, 103], permanent: true });
+    expect(res.status).toBe(200);
+    expect(state.deletes).toEqual(['101,103']);
+  });
+
+  it('Trash found by name when not marked (Trash, INBOX.Trash, Deleted Items); none found: refused, nothing deleted', async () => {
+    const plain = (path: string) => ({ path, name: path, flags: new Set(), delimiter: '.' });
+    const cases: [string[], string][] = [
+      [['INBOX', 'INBOX.Sent', 'INBOX.Trash'], 'INBOX.Trash'],
+      [['INBOX', 'Deleted Items'], 'Deleted Items'],
+      [['INBOX', 'Deleted Items', 'Trash'], 'Trash'],
+    ];
+    for (const [names, expected] of cases) {
+      state.folders = names.map(plain);
+      state.moves = [];
+      const res = await post('/delete', { folder: 'INBOX', uids: [101] });
+      expect(await res.json()).toMatchObject({ permanent: false, trash: expected });
+      expect(state.moves).toEqual([{ uid: '101', to: expected }]);
+    }
+    state.folders = [plain('INBOX'), plain('INBOX.Sent')];
+    state.moves = [];
+    const res = await post('/delete', { folder: 'INBOX', uids: [101] });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/^Your mailbox has no Trash folder, so nothing was deleted/);
+    expect((await post('/delete', { folder: 'INBOX', uids: [101], permanent: true })).status).toBe(400);
+    expect(state.moves).toHaveLength(0);
+    expect(state.deletes).toHaveLength(0);
+  });
+
+  it('search: subject, from, to or text, plus unread, attachments and dates, in one folder, read-only', async () => {
+    const res = await get('/search?folder=Projects&q=payslip&unread=1&attachments=1&since=2026-10-01&before=2026-10-15');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(state.opened).toEqual([{ path: 'Projects', readOnly: true }]);
+    expect(state.searches).toEqual([
+      {
+        or: [{ subject: 'payslip' }, { from: 'payslip' }, { to: 'payslip' }, { body: 'payslip' }],
+        seen: false,
+        header: { 'content-type': 'multipart/mixed' },
+        since: new Date('2026-10-01T00:00:00Z'),
+        before: new Date('2026-10-16T00:00:00Z'),
+      },
+    ]);
+    const body = await res.json();
+    expect(body).toMatchObject({ folder: 'Projects', q: 'payslip', unread: true, attachments: true, since: '2026-10-01', before: '2026-10-15', page: 1, total: 3, capped: false, has_more: false });
+    // newest first, the list's own shape
+    expect(body.messages.map((m: Row) => m.uid)).toEqual([103, 102, 101]);
+    expect(body.messages[0]).toMatchObject({ subject: 'Subject 3', seen: true, flagged: true });
+    expect(state.fetchQueries.some((q) => q.source)).toBe(false);
+    // the default folder is the Inbox, and words alone are enough
+    await get('/search?q=lunch');
+    expect(state.opened.at(-1)).toEqual({ path: 'INBOX', readOnly: true });
+    expect(state.searches.at(-1)).toEqual({ or: [{ subject: 'lunch' }, { from: 'lunch' }, { to: 'lunch' }, { body: 'lunch' }] });
+  });
+
+  it('search: checked input, and nothing searched without a criterion', async () => {
+    const bad = ['', 'q=', 'q=%20%20', `q=${'x'.repeat(201)}`, 'q=a&since=2026-13-01', 'q=a&before=yesterday', 'q=a&since=2026-10-10&before=2026-10-01', 'q=a&page=0', 'q=a&folder=IN%0D%0ABOX'];
+    for (const qs of bad) {
+      expect([qs, (await get(`/search?${qs}`)).status]).toEqual([qs, 400]);
+    }
+    expect(state.searches).toHaveLength(0);
+    expect(state.imapOptions).toHaveLength(0);
+    // a filter alone is a search
+    expect((await get('/search?unread=1')).status).toBe(200);
+    expect(state.searches).toEqual([{ seen: false }]);
+  });
+
+  it('search: at most 500 results, newest first, 50 a page, only the page fetched', async () => {
+    state.messages = Array.from({ length: 600 }, (_, i) => msg(i + 1));
+    state.searchResult = state.messages.map((m) => m.uid);
+    let body = await (await get('/search?q=x')).json();
+    expect(body).toMatchObject({ total: 500, capped: true, has_more: true, page: 1, page_size: 50 });
+    expect(body.messages).toHaveLength(50);
+    expect(body.messages[0].uid).toBe(700);
+    expect(state.fetchRanges.at(-1)!.split(',')).toHaveLength(50);
+    body = await (await get('/search?q=x&page=10')).json();
+    expect(body.has_more).toBe(false);
+    expect(body.messages.at(-1).uid).toBe(201);
+    // past the end: nothing fetched
+    state.fetchRanges = [];
+    body = await (await get('/search?q=x&page=11')).json();
+    expect(body.messages).toEqual([]);
+    expect(state.fetchRanges).toEqual([]);
+  });
+
+  it('unread: STATUS UNSEEN on INBOX, without opening a folder', async () => {
+    const res = await get('/unread');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(await res.json()).toEqual({ connected: true, unread: 4 });
+    expect(state.statuses).toEqual([{ path: 'INBOX', query: { unseen: true } }]);
+    expect(state.opened).toEqual([]);
+    expect(state.fetchQueries).toEqual([]);
+    expect(state.logouts).toBe(1);
+  });
+
+  it('per-person limits: 300 changes, 60 searches and 90 unread checks an hour, before any mail server is asked', async () => {
+    expect((await post('/flags', { folder: 'INBOX', uids: [101], seen: true })).status).toBe(200);
+    expect(state.budget['mailbox-manage:default:hr-id']).toBe(1);
+    state.budget['mailbox-manage:default:hr-id'] = 300;
+    state.budget['mailbox-manage:search:hr-id'] = 60;
+    state.budget['mailbox-manage:unread:hr-id'] = 90;
+    state.imapOptions = [];
+    const calls: [string, string, Row | undefined][] = [
+      ['POST', '/flags', { folder: 'INBOX', uids: [101], seen: true }],
+      ['POST', '/move', { folder: 'INBOX', uids: [101], to: 'Projects' }],
+      ['POST', '/delete', { folder: 'INBOX', uids: [101] }],
+      ['GET', '/search?q=pay', undefined],
+      ['GET', '/unread', undefined],
+    ];
+    for (const [method, path, body] of calls) {
+      const res = await call(method, path, 'hr-id', body);
+      expect([path, res.status]).toEqual([path, 429]);
+      expect((await res.json()).error).toMatch(/Wait a while and try again/);
+    }
+    expect(state.imapOptions).toHaveLength(0);
+    // someone else's budget is their own
+    expect((await call('GET', '/unread', 'admin-id')).status).toBe(200);
+  });
+
+  it('never logs subjects, addresses, search words or passwords', async () => {
+    await post('/flags', { folder: 'INBOX', uids: [101], seen: true });
+    await post('/move', { folder: 'INBOX', uids: [101], to: 'Projects' });
+    await post('/delete', { folder: 'INBOX', uids: [101] });
+    await post('/delete', { folder: 'Trash', uids: [101], permanent: true });
+    await get('/search?q=SECRET-WORDS&since=2026-10-01');
+    await get('/unread');
+    state.connectError = { code: 'ETIMEDOUT' };
+    await get('/search?q=SECRET-WORDS');
+    await get('/unread');
+    const all = logged.join('\n');
+    for (const secret of ['SECRET', 'hr-pass', 'hr@a.co', 'sender1@client.co.ke', 'Subject 1', 'mary@a.co']) {
+      expect([secret, all.includes(secret)]).toEqual([secret, false]);
+    }
   });
 });

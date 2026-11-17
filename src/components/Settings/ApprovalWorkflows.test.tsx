@@ -74,6 +74,27 @@ describe('Approval workflows card', () => {
     expect(steps[2]).toMatchObject({ approver_employee_number: 'E-CTO', label: 'CTO' });
   });
 
+  it('loans: the line manager, then anyone who can manage Staff loans (FIG-1216)', async () => {
+    state.workflow = { kind: 'loan', admins_can_act: true, department_head_available: false,
+      steps: [{ approver_type: 'module', approver_module: 'loans', skip_if_requester: true }] };
+    render(<ApprovalWorkflowsCard />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Loans' }));
+    await waitFor(() => expect(preview()).toBe('Loans: Staff loans'));
+    fireEvent.click(screen.getByRole('button', { name: 'Add step' }));
+    fireEvent.change(screen.getByLabelText('Who approves', { selector: '#step-2-type' }), { target: { value: 'module' } });
+    expect(screen.getByText('Choose what the approvers can do')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Anyone who can', { selector: '#step-2-module' }), { target: { value: 'payments' } });
+    fireEvent.change(screen.getByLabelText('Who approves', { selector: '#step-1-type' }), { target: { value: 'reports_to' } });
+    expect(preview()).toBe('Loans: Line manager → Payments to make');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(saveApprovalWorkflow).toHaveBeenCalled());
+    const [kind, steps] = saveApprovalWorkflow.mock.calls[0];
+    expect(kind).toBe('loan');
+    // (saveApprovalWorkflow sends a step's module only for a module step)
+    expect(steps.map((s: { approver_type: string; approver_module?: string }) => [s.approver_type, s.approver_type === 'module' ? s.approver_module : null]))
+      .toEqual([['reports_to', null], ['module', 'payments']]);
+  });
+
   it('tells HR when a request is decided, without HR being a step', async () => {
     render(<ApprovalWorkflowsCard />);
     await screen.findByTestId('approval-preview');

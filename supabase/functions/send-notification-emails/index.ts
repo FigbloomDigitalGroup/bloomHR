@@ -26,8 +26,8 @@
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import {
-  chatDigestHtml, chatDigestSubject, chatLink, htmlFor, hrAlertHtml, hrAlertSubject, payslipEmailHtml, payslipEmailSubject,
-  payslipFileName, subjectFor, type ChatDigestItem, type NotificationItem,
+  chatDigestHtml, chatDigestSubject, chatLink, htmlFor, hrAlertHtml, hrAlertSubject, isPlatformEmail, payslipEmailHtml, payslipEmailSubject,
+  payslipFileName, subjectFor, withAppLinks, type ChatDigestItem, type NotificationItem,
 } from './email.ts';
 import { createPacer, createResendSender, groupFailures, toBase64, type Attachment, type OutgoingEmail } from './sending.ts';
 
@@ -370,7 +370,9 @@ Deno.serve(async (req) => {
     const emails: OutgoingEmail[] = claims.map((c) => {
       const b = bulkEmails.get(c.bulk_email_id)!;
       const attachments = Array.isArray(b?.attachments) && b.attachments.length ? b.attachments : undefined;
-      return { from: b?.from_address || from, to: c.to_email, subject: b?.subject ?? '', html: b?.html ?? '', attachments };
+      // the platform's own emails (a new company, an approval) link to the app by path
+      const html = isPlatformEmail(b?.purpose) ? withAppLinks(b?.html ?? '', appUrl) : b?.html ?? '';
+      return { from: b?.from_address || from, to: c.to_email, subject: b?.subject ?? '', html, attachments };
     });
     const results = await sender.send(emails);
 
@@ -381,6 +383,8 @@ Deno.serve(async (req) => {
       sent++;
       const b = bulkEmails.get(claims[i].bulk_email_id)!;
       done.push({ id: claims[i].id, providerId: r.id });
+      // the sign-up notice goes to Figbloom, not the company: kept out of the company's sent-mail log
+      if (b.purpose === 'platform-new-company') return;
       log.push({
         tenant_id: claims[i].tenant_id, provider: 'resend', provider_id: r.id, purpose: b.purpose,
         sent_by: b.created_by, from_address: emails[i].from, to_addresses: [emails[i].to], subject: emails[i].subject,

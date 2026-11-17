@@ -1,18 +1,19 @@
 import { normalisePhone } from './onboardingValidation';
 import { paymentKind, paymentMethodLabel } from './paymentMethods';
 
-// Salary advances: how much a person may ask for, how payroll takes it back, and where each request stands.
+// Salary advances: what a request needs, how payroll takes it back, and where each request stands.
 //
-// An advance is paid once and repaid through payroll. A one-month advance comes off the pay of the month it was
-// asked for, in full (as payroll has always done). An advance spread over N months comes off in N equal parts,
-// starting that same month; the last part takes any rounding so the parts add up to the amount exactly.
+// An advance is paid once and taken back in full on the next payday: the pay of the month it was asked for, or, when
+// that payroll was approved before the advance was paid, the next one. A request is at most 30% of the person's basic
+// salary (checked by the database too, 20261027800000). (Advances asked for before 20261027700000 could be spread over N months: those still come off in
+// N equal parts from the month they were asked for, the last part taking any rounding.)
 // Payroll only takes back advances that are paid (status 'paid' and payment_processed 'true').
+// A part that an approved payslip did not take (the advance was recorded paid after that month's payroll, or the
+// person had no payslip that month) comes off the next payroll, counted from the person's first approved payslip
+// (earlier months were paid outside the app).
 
-/** The most a person may ask for, as a share of their basic salary (the company's long-standing rule). */
-export const ADVANCE_LIMIT_SHARE = 0.2;
-
-/** The repayment choices offered: one month, or spread over up to this many. The database allows up to 12. */
-export const MAX_REPAYMENT_MONTHS = 6;
+/** The most a person may ask for, as a share of their basic salary (the company's rule). */
+export const ADVANCE_LIMIT_SHARE = 0.3;
 
 /** The shortest reason accepted. */
 export const MIN_REASON_LENGTH = 10;
@@ -34,6 +35,8 @@ export interface AdvanceRow {
   approved_by_email?: string | null;
   rejected_by_email?: string | null;
   paid_by_email?: string | null;
+  /** who applied, when an admin applied on the person's behalf (20261027700000) */
+  requested_by_email?: string | null;
   mpesa_transaction_id?: string | null;
 }
 
@@ -94,20 +97,36 @@ export const repaymentSchedule = (amount: number, months: number, startPeriod: s
 /** An advance's own schedule. */
 export const advanceSchedule = (row: AdvanceRow) => repaymentSchedule(advanceAmount(row), repaymentMonths(row), advancePeriod(row.time_added));
 
+/** What one approved payslip took back for advances (salary_history.advance_deduction). */
+export interface AdvanceTaken {
+  employee_number: string;
+  pay_period: string;
+  amount: number;
+}
+
 /**
- * What payroll takes from an employee's pay for `period` (YYYY-MM), from the paid advances payroll loaded.
- * Without a period every advance counts in full, as before.
+ * What payroll takes from an employee's pay for `period` (YYYY-MM), from the paid advances payroll loaded: this
+ * month's parts, plus earlier parts that approved payslips did not take (`taken`, the person's approved payslips
+ * before `period`), from their first approved payslip on. Without a period every advance counts in full, as before.
  */
-export const advanceDeductionFor = (advances: AdvanceRow[], employeeNumber: unknown, period: string | null | undefined): number => {
+export const advanceDeductionFor = (
+  advances: AdvanceRow[],
+  employeeNumber: unknown,
+  period: string | null | undefined,
+  taken: AdvanceTaken[] = [],
+): number => {
   if (!employeeNumber) return 0;
-  return advances
-    // loose equality: employee numbers come as text or numbers
-    .filter((adv) => adv['Employee Number'] == employeeNumber)
-    .reduce((sum, adv) => {
-      if (!period) return sum + advanceAmount(adv);
-      const part = advanceSchedule(adv).find((i) => i.period === period);
-      return sum + (part ? part.amount : 0);
-    }, 0);
+  // loose equality: employee numbers come as text or numbers
+  const own = advances.filter((adv) => adv['Employee Number'] == employeeNumber);
+  if (!period) return own.reduce((sum, adv) => sum + advanceAmount(adv), 0);
+  const parts = own.flatMap(advanceSchedule);
+  const due = parts.filter((i) => i.period === period).reduce((s, i) => s + i.amount, 0);
+  const before = taken.filter((t) => String(t.employee_number) === String(employeeNumber) && t.pay_period < period);
+  if (before.length === 0) return round2(due);
+  const from = before.reduce((min, t) => (t.pay_period < min ? t.pay_period : min), before[0].pay_period);
+  const owed = parts.filter((i) => i.period >= from && i.period < period).reduce((s, i) => s + i.amount, 0);
+  const took = before.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  return round2(due + Math.max(0, owed - took));
 };
 
 export const isPaid = (row: AdvanceRow) => {
@@ -175,27 +194,32 @@ export const queueTab = (row: AdvanceRow): QueueTab => {
   return 'paid';
 };
 
-/** The most this person may ask for. */
-export const maxAdvanceFor = (basicSalary: unknown) => Math.floor((parseFloat(String(basicSalary ?? '')) || 0) * ADVANCE_LIMIT_SHARE);
-
 export interface AdvanceRequestInput {
   amount: string;
   reason: string;
-  months: number;
 }
 
+/** The most this person may ask for: 30% of their basic salary, in whole shillings. */
+export const maxAdvanceFor = (basicSalary: unknown) =>
+  Math.floor((parseFloat(String(basicSalary ?? '').replace(/[^0-9.]/g, '')) || 0) * ADVANCE_LIMIT_SHARE);
+
 /** What is wrong with a request, by field; empty when it may be sent. */
-export const validateAdvanceRequest = (input: AdvanceRequestInput, maxAmount: number): Partial<Record<keyof AdvanceRequestInput, string>> => {
+export const validateAdvanceRequest = (
+  input: AdvanceRequestInput,
+  maxAmount: number,
+): Partial<Record<keyof AdvanceRequestInput, string>> => {
   const errors: Partial<Record<keyof AdvanceRequestInput, string>> = {};
   const amount = Number(input.amount);
-  if (!text(input.amount) || !Number.isFinite(amount) || amount <= 0) errors.amount = 'Enter the amount you need.';
-  else if (amount > maxAmount) errors.amount = `The most you can ask for is ${formatKsh(maxAmount)} (${ADVANCE_LIMIT_SHARE * 100}% of your basic salary).`;
-  if (text(input.reason).length < MIN_REASON_LENGTH) errors.reason = `Tell us why in a few words (at least ${MIN_REASON_LENGTH} characters).`;
-  if (!Number.isInteger(input.months) || input.months < 1 || input.months > MAX_REPAYMENT_MONTHS) {
-    errors.months = `Choose between 1 and ${MAX_REPAYMENT_MONTHS} months.`;
-  }
+  if (!text(input.amount) || !Number.isFinite(amount) || amount <= 0) errors.amount = 'Enter the amount needed.';
+  else if (maxAmount <= 0) errors.amount = 'No basic salary is on the employee record, so no advance can be given. Ask HR to add it.';
+  else if (amount > maxAmount) errors.amount = `The most that can be asked for is ${formatKsh(maxAmount)} (${ADVANCE_LIMIT_SHARE * 100}% of the basic salary).`;
+  if (text(input.reason).length < MIN_REASON_LENGTH) errors.reason = `Say why in a few words (at least ${MIN_REASON_LENGTH} characters).`;
   return errors;
 };
+
+/** When a new advance comes back, for the form: in full on the next payday. */
+export const repaymentNote = (amount: number, period = currentPeriod()) =>
+  `${formatKsh(amount)} comes off the next pay in full: ${periodLabel(period)}, or the month after if that payroll has already been approved.`;
 
 // ---------------------------------------------------------------------------------------------
 // where the money goes (for the demo "Pay advance")

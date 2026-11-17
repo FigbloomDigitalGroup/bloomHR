@@ -81,7 +81,9 @@ const ROWS: Row[] = [
   ['Kenya', 'wht_contractual', 0.03, null, '2023-07-01', null],
   ['Kenya', 'wht_professional', 0.05, null, '2023-07-01', null],
   ['Kenya', 'nita_levy', 50, null, '2012-01-01', null],
-  ['Kenya', 'per_diem_rate', 0.33, null, '2000-01-01', null],
+  ['Kenya', 'per_diem_rate', 0.33, null, '2000-01-01', '2026-09-30'],
+  // per diem is typed in as a reimbursement from October 2026 (20261028100000_payroll_reimbursements)
+  ['Kenya', 'per_diem_rate', 0, null, '2026-10-01', null],
   // Tanzania (20261021000000_tanzania_payroll)
   ['Tanzania', 'paye_bands', null, TANZANIA_BANDS, '2023-07-01', null],
   ['Tanzania', 'nonresident_paye_rate', 0.15, null, '2023-07-01', null],

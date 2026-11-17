@@ -1,0 +1,124 @@
+import { supabase } from './supabase';
+import { apiRequest } from './adminApi';
+import { ROLE_LABELS, type PlatformRole } from './platformRoles';
+
+// Figbloom's platform admins, for the console's Staff page (/platform/staff, migration 20261102100000_platform_staff.sql).
+// Listing, removing and the log come from SECURITY DEFINER functions that check is_platform_admin(). Inviting needs
+// the service key (it may create a login), so it goes through the backend (POST /api/platform/staff/invite,
+// platform_routes.js), which checks the caller is a platform admin too. Roles: migration 20261103100000_platform_roles.sql.
+
+export interface PlatformStaffMember {
+  user_id: string;
+  email: string;
+  note: string | null;
+  role: PlatformRole;
+  added_by: string | null;
+  added_by_email: string | null;
+  added_at: string;
+  last_sign_in_at: string | null;
+  /** whether they also belong to a company */
+  in_company: boolean;
+  companies: number;
+}
+
+export interface PlatformAdminChange {
+  id: string;
+  user_id: string | null;
+  email: string | null;
+  action: 'added' | 'removed' | 'role_changed';
+  note: string | null;
+  old_role: PlatformRole | null;
+  new_role: PlatformRole | null;
+  changed_by: string | null;
+  changed_by_email: string | null;
+  changed_at: string;
+}
+
+/**
+ * What inviting did: invited (new login, Supabase emailed a link to set a password), notified (existing login, emailed
+ * that they now have console access), notify_failed (existing login, added, but that email failed) or already_admin
+ * (only the note was updated).
+ */
+export type InviteOutcome = 'invited' | 'notified' | 'notify_failed' | 'already_admin';
+
+export interface InviteResult {
+  ok: true;
+  email: string;
+  userId: string | null;
+  /** their role now: for someone who already was an admin, the role they keep */
+  role?: PlatformRole;
+  /** the console address they were sent to */
+  origin?: string;
+  result: InviteOutcome;
+  invited: boolean;
+  notified: boolean;
+  alreadyAdmin: boolean;
+  /** why the notification email failed (notify_failed) */
+  notifyError?: string;
+}
+
+/** The message to show for what inviting did. */
+export function inviteMessage(r: InviteResult): { tone: 'success' | 'warning'; text: string } {
+  const where = (r.origin || 'https://console.figbloom.org').replace(/^https:\/\//, '');
+  switch (r.result) {
+    case 'invited':
+      return { tone: 'success', text: `Invite sent to ${r.email}. They set a password from the email, then sign in here.` };
+    case 'notified':
+      return { tone: 'success', text: `${r.email} already had a login; we emailed them that they now have console access.` };
+    case 'notify_failed':
+      return {
+        tone: 'warning',
+        text: `${r.email} is now an admin, but the notification email failed${r.notifyError ? ` (${r.notifyError})` : ''}: they can sign in at ${where} with their usual password. Let them know yourself.`,
+      };
+    case 'already_admin':
+      return {
+        tone: 'success',
+        text: `${r.email} was already an admin${r.role ? ` (${ROLE_LABELS[r.role]})` : ''}; note updated. Their role is unchanged: use Change role for that.`,
+      };
+    default:
+      return { tone: 'success', text: `${r.email} is a platform admin.` };
+  }
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Whether this looks like an email address (the server checks again). */
+export const isEmail = (value: string) => {
+  const v = value.trim();
+  return v.length <= 254 && EMAIL_RE.test(v);
+};
+
+const fail = (err: unknown, fallback: string): never => {
+  const message = (err as { message?: unknown } | null)?.message;
+  throw new Error(typeof message === 'string' && message ? message : fallback);
+};
+
+export async function listPlatformStaff(): Promise<PlatformStaffMember[]> {
+  const { data, error } = await supabase.rpc('platform_staff');
+  if (error) fail(error, 'Could not load the platform admins.');
+  return ((data ?? []) as PlatformStaffMember[]).map((s) => ({ ...s, companies: Number(s.companies) || 0 }));
+}
+
+export async function recentPlatformAdminChanges(limit = 10): Promise<PlatformAdminChange[]> {
+  const { data, error } = await supabase.rpc('platform_admin_changes_recent', { p_limit: limit });
+  if (error) fail(error, 'Could not load the recent changes.');
+  return (data ?? []) as PlatformAdminChange[];
+}
+
+/** Removes a platform admin (not yourself, not the last one); a reason is needed. */
+export async function removePlatformAdmin(userId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('remove_platform_admin', { p_user: userId, p_reason: reason.trim() });
+  if (error) fail(error, 'The platform admin was not removed.');
+}
+
+/** Makes the person with this email a platform admin with this role, creating their login (and emailing them) if they have none. */
+export function invitePlatformAdmin(email: string, note: string, role: PlatformRole = 'viewer'): Promise<InviteResult> {
+  return apiRequest<InviteResult>('POST', '/platform/staff/invite', { email: email.trim(), note: note.trim() || null, role });
+}
+
+/** Changes a platform admin's role; a reason is needed. Returns the new role. */
+export async function setPlatformAdminRole(userId: string, role: PlatformRole, reason: string): Promise<PlatformRole> {
+  const { data, error } = await supabase.rpc('set_platform_admin_role', { p_user: userId, p_role: role, p_reason: reason.trim() });
+  if (error) fail(error, 'The role was not changed.');
+  return data as PlatformRole;
+}

@@ -10,7 +10,11 @@ const fx = vi.hoisted(() => {
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
-  return { ym, ymd };
+  // a weekday of this month, "yyyy-MM-dd": the Monday of its second week plus `days` (annual leave skips weekends on the
+  // calendar, so a fixed date such as the 10th would show nothing in a month where it is a Saturday)
+  const firstMonday = 1 + ((8 - new Date(now.getFullYear(), now.getMonth(), 1).getDay()) % 7);
+  const weekday = (days: number) => `${ym}-${String(firstMonday + 7 + days).padStart(2, '0')}`;
+  return { ym, ymd, weekday };
 });
 
 const state = vi.hoisted(() => ({
@@ -114,8 +118,10 @@ describe('Company area', () => {
     state.tables = {
       holidays: [{ name: 'Founders Day', date: `${fx.ym}-03`, recurring: false }],
       leave_application: [
-        { 'Leave Type': 'Annual Leave', 'Start Date': `${fx.ym}-10`, 'End Date': `${fx.ym}-11`, status: 'approved' },
-        { 'Leave Type': 'Sick Leave', 'Start Date': `${fx.ym}-20`, 'End Date': `${fx.ym}-20`, status: 'pending' },
+        // Monday and Tuesday
+        { 'Leave Type': 'Annual Leave', 'Start Date': fx.weekday(0), 'End Date': fx.weekday(1), status: 'approved' },
+        // the next week's Thursday
+        { 'Leave Type': 'Sick Leave', 'Start Date': fx.weekday(10), 'End Date': fx.weekday(10), status: 'pending' },
         { 'Leave Type': 'Study Leave', 'Start Date': `${fx.ym}-22`, 'End Date': `${fx.ym}-22`, status: 'rejected' },
       ],
       company_events: [{ id: 'e1', title: 'Town hall', date: `${fx.ym}-15`, description: null }],

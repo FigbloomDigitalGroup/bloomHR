@@ -1,33 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Banknote, Check, CheckCircle2, HandCoins, RefreshCw, X } from 'lucide-react';
+import { Check, HandCoins, RefreshCw, UserPlus, X } from 'lucide-react';
 import { Button, Card, EmptyState, Modal, TabBar } from '../UI';
 import AdvanceTimeline, { AdvanceStagePill, RepaymentSummary } from './AdvanceTimeline';
-import PayAdvanceModal, { DemoTag } from './PayAdvanceModal';
-import { IN_APP_PAYMENTS, PAYMENTS_DEMO } from '../../lib/inAppPayments';
+import RecordPaymentLink from '../Payments/RecordPaymentLink';
+import ApplyForSomeone from './ApplyForSomeone';
 import { saveFailureMessage } from '../../lib/requireUpdated';
-import {
-  advanceAmount,
-  advancePeriod,
-  checkPayee,
-  formatKsh,
-  periodLabel,
-  queueTab,
-  repaymentMonths,
-  repaymentSchedule,
-  type AdvanceRow,
-  type PayeeRecord,
-  type QueueTab,
-} from '../../lib/salaryAdvance';
-import { approveAdvance, declineAdvance, loadAdvanceQueue, loadPayees, markAdvancePaid } from '../../lib/salaryAdvanceApi';
+import { advanceAmount, formatKsh, queueTab, repaymentMonths, type AdvanceRow, type QueueTab } from '../../lib/salaryAdvance';
+import { approveAdvance, declineAdvance, loadAdvanceQueue } from '../../lib/salaryAdvanceApi';
 import { LoaderBlock } from '../UI/FigbloomLoader';
+import ApprovalChain from '../Approvals/ApprovalChain';
+import { decideApproval, loadApprovalChains, type ApprovalChain as Chain } from '../../lib/approvals';
 
-// The approver's queue for salary advances: approve or decline what is pending, then record the payment.
+// The approver's queue for salary advances: approve or decline what is pending, then follow it to paid.
 //
-//   * "Mark as paid" is the real step: finance paid the advance outside the app (bank or M-Pesa bulk upload), and
-//     marking it paid is what makes payroll take it back.
-//   * "Pay advance" only appears for demos (PAYMENTS_DEMO while IN_APP_PAYMENTS is off). It walks through paying from
-//     the platform without sending or saving anything.
+//   * A request goes through the company's salary advance approvals (Settings > Approval workflows): Approve and
+//     Decline decide the step it is waiting on, for whoever may decide it, and the chain shows under it. A request
+//     with no chain (made before chains) is decided directly, by those who may decide.
+//   * Those who may decide can also apply for someone (Apply for someone): a request made on a person's behalf goes
+//     through the same approvals, and the card says who applied.
+//   * An approved advance is paid from Payments to make: finance pays it outside the app (bank or M-Pesa) and records
+//     it there with its reference, which marks it paid and makes payroll take it back.
 
 const TABS: { id: QueueTab; label: string }[] = [
   { id: 'pending', label: 'Pending' },
@@ -36,40 +29,34 @@ const TABS: { id: QueueTab; label: string }[] = [
   { id: 'declined', label: 'Declined' },
 ];
 
-const showDemoPay = PAYMENTS_DEMO && !IN_APP_PAYMENTS;
-
 interface AdvanceQueueProps {
-  /** may approve, decline and record payments (others see the queue only) */
+  /** may approve and decline (others see the queue only) */
   canDecide: boolean;
   /** something was saved; the older applications view reloads */
   onChanged?: () => void;
-  /** how long the demo payment takes */
-  demoDelayMs?: number;
 }
 
 const dateText = (value: unknown) =>
   value ? new Date(String(value)).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 
-export default function AdvanceQueue({ canDecide, onChanged, demoDelayMs }: AdvanceQueueProps) {
+export default function AdvanceQueue({ canDecide, onChanged }: AdvanceQueueProps) {
   const [rows, setRows] = useState<AdvanceRow[]>([]);
-  const [payees, setPayees] = useState<Record<string, PayeeRecord>>({});
+  const [chains, setChains] = useState<Record<string, Chain>>({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<QueueTab>('pending');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [declining, setDeclining] = useState<AdvanceRow | null>(null);
   const [declineReason, setDeclineReason] = useState('');
   const [declineTried, setDeclineTried] = useState(false);
-  const [markingPaid, setMarkingPaid] = useState<AdvanceRow | null>(null);
-  const [paying, setPaying] = useState<AdvanceRow | null>(null);
-  // demo payments, in this screen only: id -> where it "went"
-  const [demoSent, setDemoSent] = useState<Record<string, string>>({});
+  const [applying, setApplying] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await loadAdvanceQueue();
       setRows(data);
-      setPayees(await loadPayees(data.map((r) => String(r['Employee Number'] ?? ''))));
+      const pending = data.filter((r) => queueTab(r) === 'pending' && r.id).map((r) => r.id!);
+      setChains(await loadApprovalChains('salary_advance', pending).catch(() => ({})));
     } catch (error) {
       console.error('Error loading salary advance queue:', error);
       toast.error('Could not load salary advance requests');
@@ -110,26 +97,14 @@ export default function AdvanceQueue({ canDecide, onChanged, demoDelayMs }: Adva
     setDeclineTried(true);
     if (!declining || !declineReason.trim()) return;
     const row = declining;
-    if (await act(row, () => declineAdvance(row.id!, declineReason), `Declined ${row['Full Name'] ?? 'the request'}'s advance`)) {
+    const chain = chains[row.id!];
+    const decline = chain ? () => decideApproval(chain.request_id, 'rejected', declineReason.trim()).then(() => undefined) : () => declineAdvance(row.id!, declineReason);
+    if (await act(row, decline, `Declined ${row['Full Name'] ?? 'the request'}'s advance`)) {
       setDeclining(null);
     }
   };
 
-  const confirmMarkPaid = async () => {
-    if (!markingPaid) return;
-    const row = markingPaid;
-    if (await act(row, () => markAdvancePaid(row.id!), `Marked ${row['Full Name'] ?? 'the advance'} as paid. Payroll will take it back.`)) {
-      setMarkingPaid(null);
-      setDemoSent((s) => {
-        const next = { ...s };
-        delete next[row.id!];
-        return next;
-      });
-    }
-  };
-
   const list = byTab[tab];
-  const markPaidSchedule = markingPaid ? repaymentSchedule(advanceAmount(markingPaid), repaymentMonths(markingPaid), advancePeriod(markingPaid.time_added)) : [];
 
   return (
     <div className="space-y-4">
@@ -141,7 +116,11 @@ export default function AdvanceQueue({ canDecide, onChanged, demoDelayMs }: Adva
           onChange={(id) => setTab(id as QueueTab)}
         />
         <div className="flex items-center gap-2">
-          {showDemoPay && <DemoTag />}
+          {canDecide && (
+            <Button onClick={() => setApplying(true)} icon={<UserPlus className="w-3.5 h-3.5" />}>
+              Apply for someone
+            </Button>
+          )}
           <Button variant="secondary" onClick={load} disabled={loading} icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />}>
             Refresh
           </Button>
@@ -167,6 +146,15 @@ export default function AdvanceQueue({ canDecide, onChanged, demoDelayMs }: Adva
             const name = row['Full Name'] || String(row['Employee Number'] ?? '');
             const months = repaymentMonths(row);
             const busy = busyId === id;
+            const chain = chains[id];
+            // the chain says who may decide its step; without one, those who may decide on this screen
+            const mayDecide = chain ? chain.can_approve : canDecide;
+            const mayDecline = chain ? chain.can_reject : canDecide;
+            const approve = async () => {
+              if (!chain) return approveAdvance(id);
+              const status = await decideApproval(chain.request_id, 'approved', '');
+              if (status === 'pending') toast('Your step is approved. It now goes to the next approver.');
+            };
             return (
               <li key={id} data-testid={`advance-${id}`}>
                 <Card className="h-full flex flex-col">
@@ -176,10 +164,13 @@ export default function AdvanceQueue({ canDecide, onChanged, demoDelayMs }: Adva
                       <div className="text-[11.5px] text-muted-foreground">
                         {row['Employee Number']} · asked {dateText(row.time_added)}
                       </div>
+                      {row.requested_by_email && (
+                        <div className="text-[11px] text-muted-foreground">Applied on their behalf by {row.requested_by_email}</div>
+                      )}
                     </div>
                     <div className="text-right">
                       <div className="text-[15px] font-bold text-ink">{formatKsh(advanceAmount(row))}</div>
-                      <div className="text-[11px] text-muted-foreground">{months === 1 ? 'repaid in one month' : `over ${months} months`}</div>
+                      <div className="text-[11px] text-muted-foreground">{months === 1 ? 'repaid in full on the next pay' : `over ${months} months`}</div>
                     </div>
                   </div>
 
@@ -199,7 +190,7 @@ export default function AdvanceQueue({ canDecide, onChanged, demoDelayMs }: Adva
                     {tab === 'paid' && (row.paid_by_email || row.payment_date) && (
                       <span className="text-[11px] text-muted-foreground">
                         Paid {dateText(row.payment_date)}
-                        {row.paid_by_email ? ` · marked by ${row.paid_by_email}` : ''}
+                        {row.paid_by_email ? ` · recorded by ${row.paid_by_email}` : ''}
                       </span>
                     )}
                   </div>
@@ -217,21 +208,19 @@ export default function AdvanceQueue({ canDecide, onChanged, demoDelayMs }: Adva
                     </div>
                   )}
 
-                  {demoSent[id] && (
-                    <p className="mt-2 text-[11.5px] text-status-purple">
-                      Demo payment shown to {demoSent[id]}. Nothing was sent: mark it paid once finance has paid it.
-                    </p>
+                  {tab === 'pending' && chain && (
+                    <div className="mt-2">
+                      <ApprovalChain chain={chain} compact />
+                    </div>
                   )}
 
-                  {canDecide && tab === 'pending' && (
+                  {tab === 'pending' && (mayDecide || mayDecline) && (
                     <div className="mt-auto pt-3 flex flex-wrap gap-2">
-                      <Button
-                        onClick={() => act(row, () => approveAdvance(id), `Approved ${name}'s advance`)}
-                        disabled={busy}
-                        icon={<Check className="w-3.5 h-3.5" />}
-                      >
-                        Approve
-                      </Button>
+                      {mayDecide && (
+                        <Button onClick={() => act(row, approve, `Approved ${name}'s advance`)} disabled={busy} icon={<Check className="w-3.5 h-3.5" />}>
+                          Approve
+                        </Button>
+                      )}
                       <Button
                         variant="secondary"
                         onClick={() => {
@@ -249,20 +238,7 @@ export default function AdvanceQueue({ canDecide, onChanged, demoDelayMs }: Adva
 
                   {canDecide && tab === 'approved' && (
                     <div className="mt-auto pt-3 flex flex-wrap gap-2">
-                      {showDemoPay && (
-                        <Button onClick={() => setPaying(row)} disabled={busy} icon={<Banknote className="w-3.5 h-3.5" />} title="Demo: nothing is sent">
-                          Pay advance (demo)
-                        </Button>
-                      )}
-                      <Button
-                        variant={showDemoPay ? 'secondary' : 'primary'}
-                        onClick={() => setMarkingPaid(row)}
-                        disabled={busy}
-                        icon={<CheckCircle2 className="w-3.5 h-3.5" />}
-                        title="Finance paid it outside the app"
-                      >
-                        Mark as paid
-                      </Button>
+                      <RecordPaymentLink />
                     </div>
                   )}
                 </Card>
@@ -271,6 +247,15 @@ export default function AdvanceQueue({ canDecide, onChanged, demoDelayMs }: Adva
           })}
         </ul>
       )}
+
+      <ApplyForSomeone
+        open={applying}
+        onClose={() => setApplying(false)}
+        onSaved={() => {
+          load();
+          onChanged?.();
+        }}
+      />
 
       <Modal open={!!declining} onClose={() => setDeclining(null)} title="Decline advance" size="md">
         {declining && (
@@ -306,43 +291,6 @@ export default function AdvanceQueue({ canDecide, onChanged, demoDelayMs }: Adva
         )}
       </Modal>
 
-      <Modal open={!!markingPaid} onClose={() => setMarkingPaid(null)} title="Mark as paid" size="md">
-        {markingPaid && (
-          <>
-            <p className="text-[12.5px] text-ink">
-              Record that finance has paid {markingPaid['Full Name']} {formatKsh(advanceAmount(markingPaid))} outside the app. This does not send any money.
-            </p>
-            <div className="mt-3 p-3 rounded-tile bg-secondary text-[12px] text-ink">
-              <div className="font-semibold mb-1">Payroll will take it back:</div>
-              <ul className="space-y-0.5">
-                {markPaidSchedule.map((i) => (
-                  <li key={i.period}>
-                    {formatKsh(i.amount)} off {periodLabel(i.period)} pay
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="mt-4 flex flex-wrap justify-end gap-2">
-              <Button variant="secondary" onClick={() => setMarkingPaid(null)}>
-                Cancel
-              </Button>
-              <Button onClick={confirmMarkPaid} disabled={busyId === markingPaid.id}>
-                Mark as paid
-              </Button>
-            </div>
-          </>
-        )}
-      </Modal>
-
-      {showDemoPay && (
-        <PayAdvanceModal
-          advance={paying}
-          payee={paying ? checkPayee(payees[String(paying['Employee Number'] ?? '')]) : null}
-          onClose={() => setPaying(null)}
-          onSent={(row, destination) => setDemoSent((s) => ({ ...s, [row.id!]: destination }))}
-          delayMs={demoDelayMs}
-        />
-      )}
     </div>
   );
 }

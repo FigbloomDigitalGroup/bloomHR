@@ -31,6 +31,7 @@ interface Draft {
   house: string;
   travel: string;
   other: string;
+  perDiem: string;
   from: string;
 }
 
@@ -47,6 +48,7 @@ const draftOf = (g: JobGroup | null): Draft => ({
   house: str(g?.house_allowance ?? null),
   travel: str(g?.travel_allowance ?? null),
   other: str(g?.other_allowances ?? null),
+  perDiem: str(g?.per_diem ?? null),
   from: today(),
 });
 
@@ -58,9 +60,10 @@ const rateOf = (d: Draft): JobGroupRateInput => ({
   house_allowance: amount(d.house) ?? 0,
   travel_allowance: amount(d.travel) ?? 0,
   other_allowances: amount(d.other) ?? 0,
+  per_diem: amount(d.perDiem) ?? 0,
 });
 
-const amountsOf = (d: Draft) => JSON.stringify([d.band, d.basic, d.min, d.max, d.house, d.travel, d.other].map((v) => (typeof v === 'string' ? v.trim() : v)));
+const amountsOf = (d: Draft) => JSON.stringify([d.band, d.basic, d.min, d.max, d.house, d.travel, d.other, d.perDiem].map((v) => (typeof v === 'string' ? v.trim() : v)));
 
 /**
  * Settings → Job groups: the company's job groups and what each pays (a fixed basic salary or a band, and the
@@ -145,6 +148,7 @@ export default function JobGroupsPage() {
                   <th className="px-4 py-2.5 font-semibold">House</th>
                   <th className="px-4 py-2.5 font-semibold">Travel</th>
                   <th className="px-4 py-2.5 font-semibold">Other</th>
+                  <th className="px-4 py-2.5 font-semibold">Per diem</th>
                   <th className="px-4 py-2.5 font-semibold">Employees</th>
                   <th className="px-4 py-2.5 font-semibold">Status</th>
                   <th className="px-4 py-2.5"><span className="sr-only">Actions</span></th>
@@ -165,6 +169,7 @@ export default function JobGroupsPage() {
                     <td className="px-4 py-3">{g.effective_from ? formatKsh(g.house_allowance) : '—'}</td>
                     <td className="px-4 py-3">{g.effective_from ? formatKsh(g.travel_allowance) : '—'}</td>
                     <td className="px-4 py-3">{g.effective_from ? formatKsh(g.other_allowances) : '—'}</td>
+                    <td className="px-4 py-3">{g.effective_from ? formatKsh(g.per_diem ?? 0) : '—'}</td>
                     <td className="px-4 py-3">{g.employee_count}</td>
                     <td className="px-4 py-3"><StatusPill label={g.active ? 'Active' : 'Inactive'} tone={g.active ? 'success' : 'neutral'} /></td>
                     <td className="px-4 py-3">
@@ -277,6 +282,9 @@ function JobGroupForm({ group, onClose, onSaved }: { group: JobGroup | null; onC
         <Field label="House allowance"><input className={inputClass} type="number" inputMode="decimal" min={0} value={draft.house} onChange={set('house')} /></Field>
         <Field label="Travel allowance"><input className={inputClass} type="number" inputMode="decimal" min={0} value={draft.travel} onChange={set('travel')} /></Field>
         <Field label="Other allowances"><input className={inputClass} type="number" inputMode="decimal" min={0} value={draft.other} onChange={set('other')} /></Field>
+        <Field label="Per diem" hint="Per month, not taxed: added to net pay. Change one person's on the payroll page">
+          <input className={inputClass} type="number" inputMode="decimal" min={0} value={draft.perDiem} onChange={set('perDiem')} />
+        </Field>
         <Field label="Amounts start on" hint="Not in a month whose payroll is approved">
           <input className={inputClass} type="date" value={draft.from} onChange={set('from')} />
         </Field>

@@ -32,6 +32,8 @@ import {
   oddHoursProblem,
   oddHoursSummary,
   scanLine,
+  statusKeyLabel,
+  verifyMethod,
   scanRole,
   scanSource,
   clockOutLabel,
@@ -266,6 +268,40 @@ describe('odd-hours flags and the scans of a day (20261023800000)', () => {
     expect(scanRole({ kind: 'between', reason: null })).toBe('');
     // just after midnight
     expect(scanLine(scan({ at: '2026-10-18T21:01:00Z', kind: 'clock_in' }))).toBe('12:01 am · Front Door · clock-in');
+  });
+
+  it('names how a scanner verified a punch (ZKTeco verify codes)', () => {
+    expect(verifyMethod(1)).toBe('fingerprint');
+    expect(verifyMethod(0)).toBe('PIN');
+    expect(verifyMethod(3)).toBe('PIN');
+    expect(verifyMethod(2)).toBe('card');
+    expect(verifyMethod(4)).toBe('card');
+    expect(verifyMethod(15)).toBe('face');
+    expect(verifyMethod(25)).toBe('palm');
+    for (const c of [5, 9, 14, 16, 21, 201]) expect(verifyMethod(c)).toBe('other');
+    expect(verifyMethod(null)).toBeNull();
+    expect(verifyMethod(undefined)).toBeNull();
+  });
+
+  it('names the key pressed on the scanner (ZKTeco status)', () => {
+    expect([0, 1, 2, 3, 4, 5].map(statusKeyLabel)).toEqual([
+      'In key', 'Out key', 'Break out key', 'Break in key', 'Overtime in key', 'Overtime out key',
+    ]);
+    expect(statusKeyLabel(9)).toBe('Key 9');
+    expect(statusKeyLabel(null)).toBeNull();
+  });
+
+  it('adds the verify method to a scanner punch, and the key when the scanner uses its keys', () => {
+    const scan = (fields: Partial<DayScan>): DayScan => ({ at: '2026-10-19T05:03:00Z', via: 'scanner', scannerName: 'Front Door', kind: 'clock_in', reason: null, ...fields });
+    expect(scanLine(scan({ verify: 4, status: 1, punchMode: 'first_last' }))).toBe('8:03 am · Front Door · card · clock-in');
+    expect(scanLine(scan({ verify: 15, status: 0, punchMode: 'device_keys' }))).toBe('8:03 am · Front Door · face · In key · clock-in');
+    expect(scanLine(scan({ verify: 1, status: 2, punchMode: 'device_keys', kind: 'held', reason: 'break' })))
+      .toBe('8:03 am · Front Door · fingerprint · Break out key · not counted (break)');
+    expect(scanLine(scan({ verify: 1, punchMode: 'out_only', kind: 'held', reason: 'no_clock_in' })))
+      .toBe('8:03 am · Front Door · fingerprint · not counted (no clock-in before it yet)');
+    expect(scanLine(scan({ kind: 'held', reason: 'overtime', verify: 25 }))).toBe('8:03 am · Front Door · palm · not counted (overtime)');
+    // the app's and HR's times have no verify method
+    expect(scanLine(scan({ via: 'app', scannerName: null, verify: 1 }))).toBe('8:03 am · App · clock-in');
   });
 
   it('checks and explains the odd-hours setting', () => {

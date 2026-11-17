@@ -55,7 +55,8 @@ const LETTERHEADS: { value: LetterheadMode; label: string; hint: string }[] = [
 const SECTIONS: { key: keyof PayslipDesign; label: string; hint?: string }[] = [
   { key: 'show_employer_contributions', label: 'Employer contributions', hint: 'NSSF, housing levy, NITA, SDL, WCF paid on top of pay' },
   { key: 'show_ytd', label: 'Year to date', hint: 'Totals for the tax year' },
-  { key: 'show_bank_details', label: 'Bank and M-Pesa details' },
+  { key: 'show_bank_details', label: 'Payment details', hint: 'How they are paid, and the bank account or M-Pesa number' },
+  { key: 'show_statutory_numbers', label: 'NSSF, SHA and ID numbers', hint: 'The tax PIN always shows' },
   { key: 'show_leave_balance', label: 'Leave balance', hint: 'Shown once the payslip carries leave balances' },
 ];
 

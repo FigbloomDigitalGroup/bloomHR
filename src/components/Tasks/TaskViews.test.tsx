@@ -18,11 +18,12 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('../../lib/tasksApi', () => api);
-vi.mock('../../lib/confirmDialog', () => ({ confirmDialog: vi.fn().mockResolvedValue(true) }));
+const confirm = vi.hoisted(() => vi.fn());
+vi.mock('../../lib/confirmDialog', () => ({ confirmDialog: confirm }));
 // the picker reads the company directory (react-query); a plain stand-in here
 vi.mock('../UI/EmployeePicker', () => ({
-  default: ({ label, value, disabled }: { label?: string; value: string | null; disabled?: boolean }) => (
-    <div data-testid="employee-picker">{label}: {value ?? 'none'}{disabled ? ' (locked)' : ''}</div>
+  default: ({ label, value, disabled, allowedNumbers }: { label?: string; value: string | null; disabled?: boolean; allowedNumbers?: string[] }) => (
+    <div data-testid="employee-picker" data-allowed={allowedNumbers?.join(',')}>{label}: {value ?? 'none'}{disabled ? ' (locked)' : ''}</div>
   ),
 }));
 
@@ -105,6 +106,38 @@ describe('TaskBoard', () => {
     expect(props.onMove).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'b' }), 'todo', 5.5);
   });
 
+  it('grabbing the board (not a card) pans across the columns', () => {
+    // jsdom has no PointerEvent: a mouse event with a pointer type stands in
+    if (!('PointerEvent' in window)) {
+      Object.defineProperty(window, 'PointerEvent', {
+        configurable: true,
+        value: class extends MouseEvent {
+          pointerType: string;
+          pointerId: number;
+          constructor(type: string, init: PointerEventInit = {}) {
+            super(type, init);
+            this.pointerType = init.pointerType ?? 'mouse';
+            this.pointerId = init.pointerId ?? 1;
+          }
+        },
+      });
+    }
+    render(<TaskBoard {...viewProps()} />);
+    const board = screen.getByTestId('task-board');
+    board.scrollLeft = 100;
+    fireEvent.pointerDown(board, { pointerType: 'mouse', button: 0, clientX: 500 });
+    expect(board.className).toContain('cursor-grabbing');
+    fireEvent.pointerMove(board, { pointerType: 'mouse', clientX: 440 });
+    expect(board.scrollLeft).toBe(160);
+    fireEvent.pointerUp(board, { pointerType: 'mouse' });
+    expect(board.className).not.toContain('cursor-grabbing');
+
+    // pressing on a card leaves the board where it is (the card is dragged instead)
+    fireEvent.pointerDown(screen.getByText('Call the bank'), { pointerType: 'mouse', button: 0, clientX: 500 });
+    fireEvent.pointerMove(board, { pointerType: 'mouse', clientX: 300 });
+    expect(board.scrollLeft).toBe(160);
+  });
+
   it('cards the viewer cannot change are not draggable', () => {
     render(<TaskBoard {...viewProps()} />);
     expect(screen.getByTestId('task-card-OPS-6').getAttribute('draggable')).toBe('false');
@@ -148,6 +181,7 @@ describe('TaskDetail', () => {
 
   beforeEach(() => {
     for (const f of Object.values(api)) f.mockReset();
+    confirm.mockReset().mockResolvedValue(true);
     api.loadComments.mockResolvedValue([
       { id: 'cm1', task_id: 'a', body: 'Started counting', mentions: [], author_id: 'u-hr', author_number: 'E-HR', author_name: 'Hana HR', created_at: '2026-10-02T09:00:00Z', edited_at: null },
     ]);
@@ -173,11 +207,56 @@ describe('TaskDetail', () => {
     expect(screen.getByTestId('task-activity').textContent).toContain('Hana HR assigned it to Mo Member');
   });
 
-  it('the assignee changes the status; the change is saved', async () => {
+  it('changes wait for Save, which sends only what changed (labels too)', async () => {
     const props = detail(TASKS[0]);
+    const save = screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    expect(screen.getByText('All changes saved')).toBeTruthy();
+
     fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'done' } });
-    await waitFor(() => expect(api.updateTask).toHaveBeenCalledWith('a', { status: 'done' }));
-    await waitFor(() => expect(props.onChanged).toHaveBeenCalledWith(expect.objectContaining({ status: 'done' })));
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Count the safe twice ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Audit', pressed: true }));
+    expect(api.updateTask).not.toHaveBeenCalled();
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+
+    api.setTaskLabels.mockResolvedValue(undefined);
+    fireEvent.click(save);
+    await waitFor(() => expect(api.updateTask).toHaveBeenCalledWith('a', { status: 'done', title: 'Count the safe twice' }));
+    expect(api.setTaskLabels).toHaveBeenCalledWith('a', [], ['l1']);
+    await waitFor(() => expect(props.onChanged).toHaveBeenCalledWith(expect.objectContaining({ status: 'done', title: 'Count the safe twice', labels: [] })));
+  });
+
+  it('Ctrl+S saves; Discard puts the fields back', async () => {
+    detail(TASKS[0]);
+    fireEvent.change(screen.getByLabelText('Priority'), { target: { value: 'low' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
+    expect((screen.getByLabelText('Priority') as HTMLSelectElement).value).toBe('urgent');
+
+    fireEvent.change(screen.getByLabelText('Priority'), { target: { value: 'high' } });
+    fireEvent.keyDown(screen.getByLabelText('Priority'), { key: 's', ctrlKey: true });
+    await waitFor(() => expect(api.updateTask).toHaveBeenCalledWith('a', { priority: 'high' }));
+  });
+
+  it('closing with unsaved changes asks first, and stays open when told to', async () => {
+    const props = detail(TASKS[0]);
+    fireEvent.click(screen.getByLabelText('Close'));
+    expect(props.onClose).toHaveBeenCalledTimes(1); // nothing changed: no question
+    expect(confirm).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Both safes' } });
+    confirm.mockResolvedValueOnce(false);
+    fireEvent.click(screen.getByLabelText('Close'));
+    await waitFor(() => expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ title: 'Discard your changes?' })));
+    expect(props.onClose).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByLabelText('Close'));
+    await waitFor(() => expect(props.onClose).toHaveBeenCalledTimes(2));
+  });
+
+  it('a Personal task can only be given to the person who added it', () => {
+    const mine = { ...PROJECT, id: 'pp', key: 'MY', name: 'Personal', lead_number: null, created_by: null, personal: true };
+    detail(task({ id: 'm', project_id: 'pp', key: 'MY-1', created_by: 'u-mo', creator_number: 'E-MO', assignee_number: 'E-MO' }), { projects: [PROJECT, mine] });
+    expect(screen.getByTestId('employee-picker').getAttribute('data-allowed')).toBe('E-MO');
   });
 
   it('a task the viewer cannot change is read-only and cannot be deleted', async () => {

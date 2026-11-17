@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Phosphor Icons - Premium icon set
@@ -12,6 +12,7 @@ import {
   UserCircle as PhUserCircle,
   CalendarBlank as PhCalendarBlank,
   File as PhFile,
+  IdentificationCard as PhIdentificationCard,
   Upload as PhUpload,
   Palette as PhPalette,
   Phone as PhPhone,
@@ -64,6 +65,7 @@ import PasswordResetModal from './PasswordRestModal';
 import MyDocumentsPage from '../Onboarding/MyDocumentsPage';
 import Appearance from '../Settings/Appearance';
 import MyContract from './MyContract';
+import MyIdCard from './MyIdCard';
 import MyResignation from './MyResignation';
 import MyOvertime from './MyOvertime';
 import MyTeam from './MyTeam';
@@ -72,9 +74,13 @@ import { loadMyTeam, type TeamMember } from '../../lib/myTeamApi';
 import StaffCompany from './StaffCompany';
 import MyApprovalChain from './MyApprovalChain';
 import LeavePlanningHints from './LeavePlanningHints';
+import { leaveDateRange, leaveDaysLabel, shortSubmitted } from '../../lib/leaveDisplay';
 import { isCompanySection } from '../../lib/staffCompany';
 import MyAbsences from './MyAbsences';
-import { STAFF_PORTAL_MENU, STAFF_PORTAL_MY_TEAM, STAFF_PORTAL_MY_WORK, type PortalMenuGroup } from '../../lib/sidebarMenu';
+import { STAFF_PORTAL_MY_TEAM, STAFF_PORTAL_MY_WORK, staffPortalMenu, type PortalMenuGroup } from '../../lib/sidebarMenu';
+import MyMailbox from '../Email/Mailbox/MyMailbox';
+import { usePermissions } from '../../hooks/usePermissions';
+import { useMailboxUnread } from '../../hooks/useMailboxUnread';
 import { NO_EMPLOYEE_RECORD_MESSAGE } from '../../lib/leaveDays';
 import { describeFree, useLeaveCheck } from '../../lib/leaveRules';
 import { LEAVE_DOCUMENTS_BUCKET, LeaveDocumentRule, loadLeaveDocumentRules, uploadLeaveDocument } from '../../lib/leaveDocuments';
@@ -112,7 +118,7 @@ interface NotificationItem {
 }
 
 /** hr_notifications that are for HR, not the employee */
-const HR_ONLY_NOTIFICATIONS = ['contract_expiring', 'probation_expiring', 'leave_recommended', 'exit_requested', 'application_received', 'loan_requested', 'contract_signed', 'leave_exhausted', 'casual_limit', 'leave_document_overdue', 'contribution_requested', 'onboarding_followups_overdue', 'attendance_odd_hours', 'missed_scan_requested'];
+const HR_ONLY_NOTIFICATIONS = ['contract_expiring', 'probation_expiring', 'leave_recommended', 'exit_requested', 'application_received', 'loan_requested', 'contract_signed', 'leave_exhausted', 'casual_limit', 'leave_document_overdue', 'contribution_requested', 'onboarding_followups_overdue', 'attendance_odd_hours', 'missed_scan_requested', 'payment_due', 'requisition_requested', 'possible_absences'];
 
 /** Marks an hr_notifications item ("hr-<id>") read, so it stays cleared; warnings are not stored as read. */
 const persistRead = (id: string) => {
@@ -831,79 +837,50 @@ const LeaveApplicationsList = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Leave Type
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Dates
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Days
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Approvals
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Documents
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Submitted On
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {applications.map((app) => (
-                <tr key={app.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-xs font-medium text-gray-900 capitalize">
+      {/* one card per application: reads at any width, no sideways scrolling */}
+      <ul className="m-0 p-0 list-none flex flex-col gap-3" aria-label="My leave applications">
+        {applications.map((app) => {
+          const rule = docRules.find((r) => r.leave_type === app["Leave Type"]);
+          return (
+            <li key={app.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-5">
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-x-6 gap-y-3">
+                <div className="min-w-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="m-0 text-sm font-semibold text-gray-900 capitalize">
                       {app["Leave Type"].replace(/-/g, ' ')}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1 truncate max-w-xs">
+                    </h3>
+                    <span className="shrink-0">{getStatusBadge(app.status)}</span>
+                  </div>
+                  {app.reason && (
+                    <p className="m-0 mt-1 text-xs text-gray-600 line-clamp-2 break-words" title={app.reason}>
                       {app.reason}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-xs text-gray-900">
-                      {new Date(app["Start Date"]).toLocaleDateString()}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      to {new Date(app["End Date"]).toLocaleDateString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
-                    {app.days} day{app.days !== 1 ? 's' : ''}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(app.status)}
-                  </td>
-                  <td className="px-6 py-4">
-                    {chains[app.id] ? <ApprovalChain chain={chains[app.id]} compact /> : <span className="text-xs text-gray-400">-</span>}
-                  </td>
-                  <td className="px-6 py-4">
-                    <LeaveDocuments
-                      app={app}
-                      rule={docRules.find((r) => r.leave_type === app["Leave Type"])}
-                      canAdd
-                      onChanged={() => setReloadKey((k) => k + 1)}
-                    />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
-                    {parseApplicationDate(app).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                    </p>
+                  )}
+                  <p className="m-0 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+                    <span className="whitespace-nowrap font-medium text-gray-800">
+                      {leaveDateRange(app["Start Date"], app["End Date"])}
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span className="whitespace-nowrap">{leaveDaysLabel(app.days)}</span>
+                    <span aria-hidden="true">·</span>
+                    <span className="whitespace-nowrap">Submitted {shortSubmitted(parseApplicationDate(app))}</span>
+                  </p>
+                </div>
+                <div className="min-w-0 flex flex-col gap-2 lg:border-l lg:border-gray-100 lg:pl-6">
+                  <div>
+                    <div className="text-[10.5px] font-semibold uppercase tracking-wider text-gray-400 mb-1">Approvals</div>
+                    {chains[app.id] ? <ApprovalChain chain={chains[app.id]} compact /> : <span className="text-xs text-gray-400">—</span>}
+                  </div>
+                  <div>
+                    <div className="text-[10.5px] font-semibold uppercase tracking-wider text-gray-400 mb-1">Documents</div>
+                    <LeaveDocuments app={app} rule={rule} canAdd onChanged={() => setReloadKey((k) => k + 1)} />
+                  </div>
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 };
@@ -945,6 +922,7 @@ const STAFF_ICONS: Record<string, any> = {
   'first-weeks': PhListChecks,
   leave: PhCalendarBlank,
   contract: PhFile,
+  'id-card': PhIdentificationCard,
   details: PhUserCircle,
   biodata: PhBriefcase,
   documents: PhUpload,
@@ -956,7 +934,6 @@ const withIcons = (group: PortalMenuGroup): MenuGroup => ({
   title: group.title,
   items: group.items.map((item) => ({ ...item, icon: STAFF_ICONS[item.id], ...(item.submenu ? { hasSubmenu: true } : {}) })),
 });
-const staffMenuGroups: MenuGroup[] = STAFF_PORTAL_MENU.map(withIcons);
 
 // Shown only to someone who supervises at least one person (migration 20261018900000)
 const myTeamGroup: MenuGroup = withIcons(STAFF_PORTAL_MY_TEAM);
@@ -1030,6 +1007,17 @@ const StaffPortal = () => {
   const myWork = useMyWorkProfile();
   const showMyWork = !!myWork?.qualifies;
   const extraGroups = [...(showMyWork ? [myWorkGroup] : []), ...(team.length > 0 ? [myTeamGroup] : [])];
+  // Mail (their own mailbox) under Communication, for roles given My mailbox
+  const { hasAnyPermission, loading: permissionsLoading } = usePermissions();
+  const canMail = !permissionsLoading && hasAnyPermission(['mailbox']);
+  const [myEmail, setMyEmail] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setMyEmail(data.user?.email ?? undefined)).catch(() => {});
+  }, []);
+  const mailUnread = useMailboxUnread(canMail, myEmail);
+  // Communication's badge: unread chat messages and new mail
+  const communicationUnread = unreadMessageCount + mailUnread;
+  const staffMenuGroups = useMemo(() => staffPortalMenu({ mail: canMail }).map(withIcons), [canMail]);
   const menuGroups = [staffMenuGroups[0], ...extraGroups, ...staffMenuGroups.slice(1)];
 
   const fetchCompanyProfile = async () => {
@@ -1398,7 +1386,7 @@ const StaffPortal = () => {
                                   {item.id === 'leave' && unreadLeaveCount > 0 && !isExpanded && (
                                     <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange border border-shell"></span>
                                   )}
-                                  {item.id === 'communication' && unreadMessageCount > 0 && !isExpanded && (
+                                  {item.id === 'communication' && communicationUnread > 0 && !isExpanded && (
                                     <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange border border-shell"></span>
                                   )}
                                 </div>
@@ -1420,9 +1408,9 @@ const StaffPortal = () => {
                                           {unreadLeaveCount > 99 ? '99+' : unreadLeaveCount}
                                         </span>
                                       )}
-                                      {item.id === 'communication' && unreadMessageCount > 0 && (
+                                      {item.id === 'communication' && communicationUnread > 0 && (
                                         <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-orange text-white text-[10px] font-bold mr-1">
-                                          {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                                          {communicationUnread > 99 ? '99+' : communicationUnread}
                                         </span>
                                       )}
                                       {item.hasSubmenu && (
@@ -1437,7 +1425,7 @@ const StaffPortal = () => {
                                   <div className="absolute left-full ml-5 px-2.5 py-1.5 bg-slate-800 text-white text-[10px] font-semibold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 whitespace-nowrap shadow-xl translate-x-2 group-hover:translate-x-0">
                                     {item.label}
                                     {item.id === 'leave' && unreadLeaveCount > 0 && ` (${unreadLeaveCount})`}
-                                    {item.id === 'communication' && unreadMessageCount > 0 && ` (${unreadMessageCount})`}
+                                    {item.id === 'communication' && communicationUnread > 0 && ` (${communicationUnread})`}
                                     <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 w-2 h-2 bg-slate-800 rotate-45" />
                                   </div>
                                 )}
@@ -1477,6 +1465,11 @@ const StaffPortal = () => {
                                             own count, so "Communication"'s badge reads as the total of
                                             its children rather than a single opaque number. Video
                                             Conference has no unread concept yet, so it gets none. */}
+                                        {subItem.id === 'mail' && mailUnread > 0 && (
+                                          <span className="ml-auto min-w-[16px] h-[16px] px-1 flex items-center justify-center rounded-full bg-orange text-white text-[9px] font-bold" aria-label={`${mailUnread} unread`}>
+                                            {mailUnread > 99 ? '99+' : mailUnread}
+                                          </span>
+                                        )}
                                         {subItem.id === 'chat' && unreadMessageCount > 0 && (
                                           <span className="ml-auto min-w-[16px] h-[16px] px-1 flex items-center justify-center rounded-full bg-orange text-white text-[9px] font-bold">
                                             {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
@@ -1637,6 +1630,7 @@ const StaffPortal = () => {
                 <StaffCompany section={activeTab} onSectionChange={setActiveTab} employeeNumber={employeeNumber} onOpenTask={openTask} />
               )}
               {activeTab === 'contract' && <MyContract />}
+              {activeTab === 'id-card' && <MyIdCard />}
               {activeTab === 'resignation' && <MyResignation />}
               {activeTab === 'details' && <Profile onOpenResignation={() => setActiveTab('resignation')} />}
               {activeTab === 'documents' && <MyDocumentsPage />}
@@ -1645,6 +1639,7 @@ const StaffPortal = () => {
               {activeTab === 'job-applications' && <JobApplications />}
               {activeTab === 'chat' && <div className="relative h-full"><ChatLayout onMessagesRead={handleChatRead} /></div>}
               {activeTab === 'VideoConf' && <VideoConferenceComponent />}
+              {activeTab === 'mail' && canMail && <MyMailbox />}
             </motion.div>
           </div>
         </main>

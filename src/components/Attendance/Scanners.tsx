@@ -13,6 +13,8 @@ import {
   loadScannerUsers,
   loadUnmatched,
   normaliseSerial,
+  PUNCH_MODES,
+  punchModeLabel,
   removeScannerUser,
   saveScanner,
   saveScannerUser,
@@ -23,6 +25,7 @@ import {
   suggestScannerMatches,
   unignoreScannerUser,
   type IgnoredScannerUser,
+  type PunchMode,
   type Scanner,
   type ScannerInput,
   type ScannerUser,
@@ -95,6 +98,7 @@ export default function Scanners() {
                   <tr key={s.id} className="border-b border-border last:border-0">
                     <td className={tdClass}>
                       <div className="font-semibold">{s.name}</div>
+                      <div className="text-[11px] text-muted-foreground">Counts: {punchModeLabel(s.punchMode)}</div>
                       {s.lastError && <div className="text-[11px] text-status-danger">{s.lastError} ({seenLabel(s.lastErrorAt, '')})</div>}
                       {s.usersReceivedAt && (
                         <div className="text-[11px] text-muted-foreground">User names received {seenLabel(s.usersReceivedAt, '')}</div>
@@ -148,6 +152,7 @@ export function ScannerForm({ scanner, onClose, onSaved }: { scanner: Scanner | 
     serialNumber: scanner?.serialNumber ?? '',
     allowedIp: scanner?.allowedIp ?? '',
     active: scanner?.active ?? true,
+    punchMode: scanner?.punchMode ?? 'first_last',
   });
   const [check, setCheck] = useState<SerialCheck | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -224,6 +229,11 @@ export function ScannerForm({ scanner, onClose, onSaved }: { scanner: Scanner | 
             address changes.{scanner?.lastIp ? ` This scanner last called from ${scanner.lastIp}.` : ''}
           </p>
         </div>
+        <PunchModePicker
+          value={form.punchMode}
+          onChange={(punchMode) => set({ punchMode })}
+          changed={!!scanner && form.punchMode !== scanner.punchMode}
+        />
         <label className="flex items-center gap-2 text-[12.5px] text-ink">
           <input type="checkbox" checked={form.active} onChange={(e) => set({ active: e.target.checked })} />
           On (punches from it count)
@@ -239,6 +249,38 @@ export function ScannerForm({ scanner, onClose, onSaved }: { scanner: Scanner | 
 }
 
 /** How to point a ZKTeco scanner at this app, in plain steps. */
+/** How a scanner's punches count: one choice per mode, each with its plain-language description. */
+export function PunchModePicker({ value, onChange, changed = false }: { value: PunchMode; onChange: (mode: PunchMode) => void; changed?: boolean }) {
+  return (
+    <fieldset className="min-w-0">
+      <legend className={labelClass}>How its punches count</legend>
+      <div className="space-y-1.5">
+        {PUNCH_MODES.map((m) => (
+          <label key={m.value} className="flex items-start gap-2 text-[12.5px] text-ink cursor-pointer">
+            <input
+              type="radio"
+              name="scanner-punch-mode"
+              className="mt-0.5"
+              value={m.value}
+              checked={value === m.value}
+              onChange={() => onChange(m.value)}
+            />
+            <span className="min-w-0">
+              <span className="font-semibold">{m.label}</span>
+              <span className="block text-[11.5px] text-muted-foreground">{m.description}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+      {changed && (
+        <p role="note" className="text-[11.5px] text-muted-foreground mt-1">
+          This applies to punches from now on. Days already recorded stay as they are.
+        </p>
+      )}
+    </fieldset>
+  );
+}
+
 export function SetupSteps() {
   const { relay, app } = scannerServers();
   return (

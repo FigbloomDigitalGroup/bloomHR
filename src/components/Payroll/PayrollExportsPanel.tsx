@@ -16,7 +16,8 @@ import FigbloomLoader from '../UI/FigbloomLoader';
 // The Files tab's downloads, per country (FIG-905 stage 2): each approved (or paid) country's statutory returns, built
 // from its own staff's payslips only (Kenya: KRA P10, SHA, NSSF, housing levy, NITA, and the WHT return in a month with
 // contractors), and its bulk-payment files in its currency (KES: M-Pesa, bank and the Equity Eazzy Biz file; other
-// currencies: the bank file). CSV or Excel, each with who is missing what. A country still a draft has no files yet.
+// currencies: the bank file). CSV or Excel, each with who is missing what. A country still a draft has its returns too,
+// to check before approving: marked draft, named ...-draft, and with no payment files (nobody is paid from a draft).
 
 export interface Files {
   countries: CountryFiles[];
@@ -50,7 +51,7 @@ const countriesOf = (run: PayrollRun, runCountries?: PayrollRunCountry[] | RunCo
 
 export async function loadExportFiles(run: PayrollRun, runCountries?: PayrollRunCountry[] | RunCountry[]): Promise<Files> {
   const countries = countriesOf(run, runCountries);
-  const filed = countries.filter((c) => c.status !== 'draft').map((c) => c.country);
+  const filed = countries.map((c) => c.country);
   const [payslips, employees, rates, debitAccount] = await Promise.all([
     getRunPayslips(run.id),
     fetchAll((from, to) => supabase.from('employees').select('*').order('id').range(from, to)),
@@ -73,6 +74,7 @@ export async function loadExportFiles(run: PayrollRun, runCountries?: PayrollRun
     ratesByCountry,
     payPeriod: run.pay_period,
     debitAccount,
+    drafts: true,
   });
   return {
     countries: files,
@@ -82,16 +84,22 @@ export async function loadExportFiles(run: PayrollRun, runCountries?: PayrollRun
   };
 }
 
-/** Saves one file as CSV or Excel, named after it and the month (kra-p10-2026-10.csv, kra-p10-2026-10.xlsx). */
-const saveFile = (f: ExportFile, name: string, payPeriod: string, format: Format, sheet: string) =>
-  format === 'xlsx'
-    ? saveAs(new Blob([toXlsx(f.headers, f.rows, sheet)], { type: XLSX_TYPE }), `${name}-${payPeriod}.xlsx`)
-    : saveAs(new Blob([toCsv(f.headers, f.rows)], { type: 'text/csv;charset=utf-8' }), `${name}-${payPeriod}.csv`);
+/**
+ * Saves one file as CSV or Excel, named after it and the month (kra-p10-2026-10.csv, kra-p10-2026-10.xlsx); a draft
+ * country's ends in -draft (nssf-2026-10-draft.xlsx) so it is never mistaken for the one to file.
+ */
+const saveFile = (f: ExportFile, name: string, payPeriod: string, format: Format, sheet: string, draft = false) => {
+  const base = `${name}-${payPeriod}${draft ? '-draft' : ''}`;
+  return format === 'xlsx'
+    ? saveAs(new Blob([toXlsx(f.headers, f.rows, sheet)], { type: XLSX_TYPE }), `${base}.xlsx`)
+    : saveAs(new Blob([toCsv(f.headers, f.rows)], { type: 'text/csv;charset=utf-8' }), `${base}.csv`);
+};
 
 /** The payroll page's P10 button: Kenya's KRA P10 for the month, Kenya's staff only (CSV unless asked). Returns who is missing details. */
 export async function downloadP10(run: PayrollRun, format: Format = 'csv', runCountries?: PayrollRunCountry[] | RunCountry[]) {
   const files = await loadExportFiles(run, runCountries);
-  const p10 = files.countries.find((c) => c.country === 'Kenya')?.returns.find((r) => r.key === 'p10');
+  const kenya = files.countries.find((c) => c.country === 'Kenya');
+  const p10 = kenya?.status === 'draft' ? undefined : kenya?.returns.find((r) => r.key === 'p10');
   if (!p10) throw new Error('Kenya’s payroll for this month is not approved yet');
   saveFile(p10.file, 'kra-p10', run.pay_period, format, 'KRA P10');
   return p10.file.problems;
@@ -195,7 +203,7 @@ export default function PayrollExportsPanel({ run, runCountries }: { run: Payrol
 
       {problem && <p role="alert" className="text-sm text-status-danger">{problem}</p>}
       {!files && !problem && <FigbloomLoader label="Preparing files" size={48} />}
-      {files && files.countries.length === 0 && <p className="text-xs text-muted-foreground">No country is approved for this month yet.</p>}
+      {files && files.countries.length === 0 && <p className="text-xs text-muted-foreground">No payslips for this month yet.</p>}
 
       {files?.countries.map((c) => (
         <section key={c.country} className="mb-5 last:mb-0" aria-label={`${c.country} files`} data-testid={`files-${c.country}`}>
@@ -204,6 +212,15 @@ export default function PayrollExportsPanel({ run, runCountries }: { run: Payrol
               <Globe2 className="w-3.5 h-3.5 text-brand" />
               {c.country} <span className="font-semibold text-subtle">· {c.currency} · {c.payslips.length} {c.payslips.length === 1 ? 'payslip' : 'payslips'}</span>
             </h4>
+          )}
+          {c.status === 'draft' && (
+            <p className="mb-2 flex items-start gap-1.5 rounded-tile border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900" data-testid={`draft-${c.country}`}>
+              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              <span>
+                <span className="font-semibold">Draft:</span> {c.country}’s payroll isn’t approved, so these figures can still change.
+                Use them to check; file the ones you download after approving. Bank and M-Pesa files come with approval.
+              </span>
+            </p>
           )}
           {c.country === 'Kenya' && files.totals.get(c.country) && <RemittanceTotals totals={files.totals.get(c.country)!} />}
           {c.country === 'Tanzania' && <TanzaniaRemittance payslips={c.payslips} />}
@@ -214,9 +231,9 @@ export default function PayrollExportsPanel({ run, runCountries }: { run: Payrol
             {c.returns.map((f) => (
               <FileRow key={f.key} f={f} disabled={false} open={open === `${c.country}:${f.key}`}
                 onToggle={() => setOpen(open === `${c.country}:${f.key}` ? null : `${c.country}:${f.key}`)}
-                onDownload={(format) => saveFile(f.file, f.name, run.pay_period, format, f.label)} />
+                onDownload={(format) => saveFile(f.file, f.name, run.pay_period, format, f.label, c.status === 'draft')} />
             ))}
-            <p className="pt-1 text-[10.5px] font-bold uppercase text-subtle">Bulk payments in {c.currency}</p>
+            {c.payments.length > 0 && <p className="pt-1 text-[10.5px] font-bold uppercase text-subtle">Bulk payments in {c.currency}</p>}
             {c.payments.map((f) => (
               <FileRow key={f.key} f={f} disabled={f.key === 'equity' && !files.debitAccount} open={open === `${c.country}:${f.key}`}
                 onToggle={() => setOpen(open === `${c.country}:${f.key}` ? null : `${c.country}:${f.key}`)}

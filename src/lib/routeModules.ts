@@ -50,6 +50,13 @@ export const SCREENS: ScreenAccess[] = [
   sub('/reports/base', 'Base report', ['reports']),
   sub('/reports/staffloan', 'Staff loan report', ['reports']),
   sub('/reports/statutory', 'Statutory deductions report', ['reports']),
+  // HR reports (each also for the module whose data it shows)
+  sub('/reports/staff-salary', 'Staff salary report', ['reports', 'payroll']),
+  sub('/reports/other-deductions', 'Other deductions report', ['reports', 'payroll']),
+  sub('/reports/leave-management', 'Leave report', ['reports', 'leaves']),
+  sub('/reports/termination-report', 'Termination report', ['reports', 'hr-lifecycle']),
+  sub('/reports/sms-reports', 'SMS report', ['reports', 'sms']),
+  sub('/reports/branch-performance', 'Branch performance report', ['reports']),
   sub('/ai-assistant', 'AI assistant', ['ai-assistant']),
 
   // tasks and communication
@@ -99,7 +106,9 @@ export const SCREENS: ScreenAccess[] = [
   // how payslips look (FIG-814): letterhead, contacts, footer, sections
   S('/settings/payslip-design', 'Payslip design', ['payslip-design']),
   // new statutory rates for every company (FIG-813): reached from the Rates tab by Figbloom platform admins only
-  sub('/platform/rates', 'Platform rates', [], { open: 'Figbloom platform admins: the page checks is_platform_admin and the database refuses anyone else' }),
+  sub('/platform/rates', 'Statutory rates', [], { open: 'Figbloom platform admins: the page checks is_platform_admin and the database refuses anyone else' }),
+  // every company, approving new ones (migration 20261029100000): Figbloom platform admins only, from the sidebar's Platform group
+  sub('/platform/organisations', 'Organisations', [], { open: 'Figbloom platform admins: the page checks is_platform_admin and the database refuses anyone else' }),
   S('/casual-workers', 'Casual workers', ['work-records', 'payroll', 'employees', 'casual-overtime', 'team-work']),
   S('/piece-rate', 'Piece rate & jobs', ['work-records', 'payroll', 'team-work']),
   S('/overtime', 'Overtime', ['payroll', 'work-records', 'casual-overtime', 'team-work']),
@@ -108,6 +117,8 @@ export const SCREENS: ScreenAccess[] = [
   S('/salaryadmin', 'Salary Advance', ['salaryadmin']),
   S('/loans', 'Loans', ['payroll', 'loans']),
   sub('/loanadmin', 'Loan requests', ['payroll', 'loans']),
+  // finance pays what was approved; HR raises and approves requisitions there
+  S('/payments', 'Payments to make', ['payments', 'requisitions']),
   S('/asset', 'Assets', ['asset']),
   sub('/asset/scan', 'Scan an asset', ['asset']),
   S('/mpesa-zap', 'Mpesa Zap', ['mpesa-zap']),

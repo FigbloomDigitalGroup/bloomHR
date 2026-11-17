@@ -175,6 +175,13 @@ describe('files per country', () => {
     expect(files).toEqual([]);
   });
 
+  it("asked for drafts: a draft country's returns, to check before approving, but never its payment files", () => {
+    const files = filesByCountry({ payslips, employees, runCountries: [{ country: 'Kenya', status: 'draft' }], ratesByCountry: rates, payPeriod: '2026-10', debitAccount: '', drafts: true });
+    expect(files.map((f) => [f.country, f.status])).toEqual([['Kenya', 'draft']]);
+    expect(files[0].returns.map((r) => r.key)).toEqual(expect.arrayContaining(['p10', 'sha', 'nssf', 'ahl']));
+    expect(files[0].payments).toEqual([]);
+  });
+
   it('a payment file only takes its own currency', () => {
     expect(paymentFilesFor('KES', payslips, employees, '2026-10', '').find((p) => p.key === 'bank')!.file.rows).toHaveLength(1);
   });

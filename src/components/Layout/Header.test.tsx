@@ -19,12 +19,24 @@ vi.mock('../../lib/supabase', () => {
     },
   };
 });
-const hrNotifs = vi.hoisted(() => ({ rows: [] as Record<string, unknown>[], check: () => {} }));
+const hrNotifs = vi.hoisted(() => ({
+  rows: [] as Record<string, unknown>[],
+  check: () => {},
+  read: [] as number[][],
+  cleared: [] as number[][],
+}));
 vi.mock('../../hooks/useHRNotifications', () => ({
   // the same function every render, as the real hook's (Header fetches again when it changes)
   useHRNotifications: () => ({ checkAndNotify: hrNotifs.check }),
   fetchAdminHRNotifications: () => Promise.resolve(hrNotifs.rows),
-  markAdminNotificationRead: () => Promise.resolve(),
+  markAdminNotificationsRead: (ids: number[]) => {
+    hrNotifs.read.push(ids);
+    return Promise.resolve();
+  },
+  clearAdminNotifications: (ids: number[]) => {
+    hrNotifs.cleared.push(ids);
+    return Promise.resolve();
+  },
 }));
 const noCompanies = vi.hoisted(() => ({ data: [] as { is_current: boolean; name: string }[] }));
 vi.mock('../../hooks/useMyCompanies', () => ({ useMyCompanies: () => noCompanies }));
@@ -47,6 +59,8 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   hrNotifs.rows = [];
+  hrNotifs.read = [];
+  hrNotifs.cleared = [];
   headerPerms.granted = ['employees', 'payroll'];
 });
 
@@ -163,5 +177,56 @@ describe('Header notifications open the page they are about', () => {
     headerPerms.granted = ['dashboard'];
     await open({ notification_type: 'approval_needed', title: 'Leave awaiting your approval' });
     expect(screen.getByTestId('where').textContent).toBe('/staff?tab=leave-approvals');
+  });
+});
+
+describe('Header notifications: read and cleared are the person’s own', () => {
+  const rows = [
+    { id: 1, employee_number: 'E1', created_at: '2026-10-24T10:00:00Z', notification_type: 'loan_requested', title: 'Loan requested', message: 'm', is_read: false },
+    { id: 2, employee_number: 'E2', created_at: '2026-10-24T09:00:00Z', notification_type: 'exit_requested', title: 'Exit requested', message: 'm', is_read: false },
+    { id: 3, employee_number: 'E3', created_at: '2026-10-24T08:00:00Z', notification_type: 'payment_due', title: 'Payment due', message: 'm', is_read: true },
+  ];
+  const show = async () => {
+    hrNotifs.rows = rows;
+    render(
+      <MemoryRouter>
+        <Header />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications' }));
+    await screen.findByText('Loan requested');
+  };
+
+  it('counts what the person has not read', async () => {
+    await show();
+    expect(screen.getByText('2', { selector: 'span' })).toBeTruthy();
+  });
+
+  it('marks all as read (only the unread ones are sent)', async () => {
+    await show();
+    fireEvent.click(screen.getByRole('button', { name: 'Mark all as read' }));
+    expect(hrNotifs.read).toEqual([[1, 2]]);
+    expect(screen.queryByRole('button', { name: 'Mark all as read' })).toBeNull();
+    expect(screen.getByText('Payment due')).toBeTruthy();
+  });
+
+  it('clears all, saved for the person', async () => {
+    await show();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all notifications' }));
+    expect(hrNotifs.cleared).toEqual([[1, 2, 3]]);
+    expect(screen.getByText('No notifications')).toBeTruthy();
+  });
+
+  it('clears one', async () => {
+    await show();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Clear this notification' })[1]);
+    expect(hrNotifs.cleared).toEqual([[2]]);
+    expect(screen.queryByText('Exit requested')).toBeNull();
+  });
+
+  it('opening one marks it read', async () => {
+    await show();
+    fireEvent.click(screen.getByText('Loan requested'));
+    expect(hrNotifs.read).toEqual([[1]]);
   });
 });

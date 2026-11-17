@@ -141,7 +141,7 @@ export default function OnboardingPrint() {
         )}
 
         <footer className="mt-8 pt-4 border-t border-border text-xs text-muted-foreground">
-          Payroll number {String(e['Payroll Number'] ?? '—')} · printed {new Date().toLocaleDateString('en-KE', { dateStyle: 'long' })}
+          Employee number {String(e['Employee Number'] ?? '—')} · printed {new Date().toLocaleDateString('en-KE', { dateStyle: 'long' })}
         </footer>
       </div>
     </div>

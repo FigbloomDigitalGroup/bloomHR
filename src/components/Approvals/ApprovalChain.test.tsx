@@ -58,7 +58,7 @@ describe('Approval chain', () => {
     decideApproval.mockResolvedValue('pending');
     const onDecided = vi.fn();
     render(<ApprovalChain chain={chain({ can_approve: true, can_reject: true })} onDecided={onDecided} />);
-    fireEvent.change(screen.getByLabelText('Comment (optional)'), { target: { value: ' enjoy ' } });
+    fireEvent.change(screen.getByLabelText('Comment (optional to approve, required to reject)'), { target: { value: ' enjoy ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
     await waitFor(() => expect(onDecided).toHaveBeenCalledWith('pending'));
     expect(decideApproval).toHaveBeenCalledWith('req-1', 'approved', 'enjoy');
@@ -69,9 +69,18 @@ describe('Approval chain', () => {
     const onDecided = vi.fn();
     render(<ApprovalChain chain={chain({ can_reject: true })} onDecided={onDecided} />);
     expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+    fireEvent.change(screen.getByLabelText('Comment (optional to approve, required to reject)'), { target: { value: ' short staffed ' } });
     fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
     await waitFor(() => expect(onDecided).toHaveBeenCalledWith('rejected'));
-    expect(decideApproval).toHaveBeenCalledWith('req-1', 'rejected', '');
+    expect(decideApproval).toHaveBeenCalledWith('req-1', 'rejected', 'short staffed');
+  });
+
+  it('rejecting needs a reason', () => {
+    render(<ApprovalChain chain={chain({ can_approve: true, can_reject: true })} />);
+    fireEvent.change(screen.getByLabelText('Comment (optional to approve, required to reject)'), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
+    expect(screen.getByRole('alert').textContent).toBe('Give a reason for rejecting: the employee will see it');
+    expect(decideApproval).not.toHaveBeenCalled();
   });
 
   it('shows why the database refused', async () => {
@@ -95,6 +104,34 @@ describe('Approval chain', () => {
     render(<ApprovalChain chain={chain()} compact />);
     expect(screen.getByRole('list', { name: 'Approval chain' }).textContent).toBe('Line manager→HR→CTO');
     expect(screen.getByText('Waiting on HR')).toBeTruthy();
+    // still pending: the step already approved isn't summarised
+    expect(screen.queryByText(/Approved by/)).toBeNull();
+  });
+
+  it('the compact form says who rejected or approved a finished request, and why', () => {
+    const rejected = chain({
+      status: 'rejected',
+      steps: [
+        step(1, 'Leave approver', 'rejected', { actor_name: 'Ian Duncan', comment: 'short staffed', acted_at: '2026-10-23T10:00:00Z' }),
+        step(2, 'Operations', 'not_reached'),
+      ],
+    });
+    const { unmount } = render(<ApprovalChain chain={rejected} compact />);
+    // with the day and the time it was decided
+    expect(screen.getByText(/^Rejected by Ian Duncan, .*\d{2}:\d{2}/)).toBeTruthy();
+    expect(screen.getByText('“short staffed”')).toBeTruthy();
+    unmount();
+
+    const approved = chain({
+      status: 'approved',
+      steps: [
+        step(1, 'Leave approver', 'approved', { actor_name: 'Ian Duncan' }),
+        step(2, 'Operations', 'approved', { actor_name: 'Zilpar Okoth', acted_as: 'admin' }),
+      ],
+    });
+    render(<ApprovalChain chain={approved} compact />);
+    expect(screen.getByText(/^Approved by Zilpar Okoth \(admin\)/)).toBeTruthy();
+    expect(screen.queryByText(/Ian Duncan/)).toBeNull();
   });
 
   it('shows nothing without a chain', () => {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { LucideIcon } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 interface GlowButtonProps {
   children: React.ReactNode;
@@ -43,7 +44,7 @@ export default function GlowButton({
   return (
     <motion.button
       onClick={(disabled || loading) ? undefined : onClick}
-      className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${(disabled || loading) ? disabledClasses : ''} ${className}`}
+      className={cn(baseClasses, variantClasses[variant], sizeClasses[size], (disabled || loading) && disabledClasses, className)}
       whileHover={(disabled || loading) ? {} : { scale: 1.02 }}
       whileTap={(disabled || loading) ? {} : { scale: 0.98 }}
       disabled={disabled || loading}

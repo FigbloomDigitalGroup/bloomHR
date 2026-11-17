@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { Button, Card, StatusPill, type StatusTone } from '../UI';
 import { formatDay, parseDay } from '../../lib/contract';
 import { openPrivateFile } from '../../lib/privateFiles';
+import { confirmDialog } from '../../lib/confirmDialog';
 import { downloadStatementCsv, downloadStatementPdf, duesTotals, money, periodOf, type FinalDuesLine } from '../../lib/finalDues';
 import {
   DEFAULT_INTERVIEW_QUESTIONS,
@@ -29,6 +30,7 @@ import {
   type FinalDuesRecord,
 } from '../../lib/exits';
 import { LoaderBlock } from '../UI/FigbloomLoader';
+import ExitLetters from './ExitLetters';
 
 export const STATUS_TONE: Record<ExitStatus, StatusTone> = {
   requested: 'warning',
@@ -366,7 +368,7 @@ function FinalDues({ exit, dues, onSaved }: { exit: ExitRecord; dues: FinalDuesR
   );
 }
 
-/** One exit, for HR: decide it, clear them, interview them, settle their final dues, and complete it. */
+/** One exit, for HR: decide it, send their letter, clear them, interview them, settle their final dues, and complete it. */
 export default function ExitDetail({ exitId, onBack, onChanged }: { exitId: string; onBack: () => void; onChanged?: () => void }) {
   const [exit, setExit] = useState<ExitRecord | null>(null);
   const [items, setItems] = useState<ClearanceItem[]>([]);
@@ -392,6 +394,17 @@ export default function ExitDetail({ exitId, onBack, onChanged }: { exitId: stri
   useEffect(() => {
     load();
   }, [load]);
+
+  // their access has ended but the exit isn't completed: cancelling it brings them back (20261113200000)
+  const bringBack = async () => {
+    if (!exit) return;
+    const ok = await confirmDialog({
+      title: `Bring ${exit.employee_name ?? exit.employee_number} back?`,
+      message: 'This cancels the exit. They become Active again with no termination date, they can sign in again, and payroll includes them after their last working day.',
+      confirmLabel: 'Bring back',
+    });
+    if (ok) await act(() => cancelExit(exit.id), `${exit.employee_name ?? exit.employee_number} is back: they can sign in again`);
+  };
 
   const act = async (fn: () => Promise<void>, done: string) => {
     setBusy(true);
@@ -462,7 +475,7 @@ export default function ExitDetail({ exitId, onBack, onChanged }: { exitId: stri
           <div className="mt-4 border-t border-border pt-4">
             <label htmlFor="decision-note" className="block text-xs font-semibold text-ink mb-1">Note (needed to decline)</label>
             <textarea id="decision-note" rows={2} className={`${input} resize-none`} value={note} onChange={(e) => setNote(e.target.value)} />
-            <p className="mt-1 mb-2 text-[11px] text-subtle">HR or an administrator approves; not the person who started it, when someone else can.</p>
+            <p className="mt-1 mb-2 text-[11px] text-subtle">HR or an administrator approves (anyone with Approve exits).</p>
             <div className="flex flex-wrap gap-2">
               <Button disabled={busy} onClick={() => act(() => decideExit(exit.id, 'approved', note), 'Exit approved')}>Approve</Button>
               <Button variant="secondary" disabled={busy || !note.trim()} onClick={() => act(() => decideExit(exit.id, 'declined', note), 'Exit declined')}>Decline</Button>
@@ -476,8 +489,10 @@ export default function ExitDetail({ exitId, onBack, onChanged }: { exitId: stri
                 Complete exit
               </Button>
             )}
-            {!exit.access_ended_at && (
+            {!exit.access_ended_at ? (
               <Button variant="ghost" disabled={busy} onClick={() => act(() => cancelExit(exit.id), 'Exit cancelled')}>Cancel exit</Button>
+            ) : (
+              <Button variant="secondary" disabled={busy} onClick={() => void bringBack()}>Bring back</Button>
             )}
           </div>
         )}
@@ -488,6 +503,7 @@ export default function ExitDetail({ exitId, onBack, onChanged }: { exitId: stri
 
       {exit.status !== 'requested' && exit.status !== 'declined' && exit.status !== 'cancelled' && (
         <>
+          <ExitLetters exit={exit} />
           <Checklist exit={exit} items={items} onChanged={load} />
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
             <Interview exit={exit} interview={interview} onSaved={load} />

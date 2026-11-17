@@ -82,7 +82,7 @@ const REPORTS_LIST: ReportItem[] = [
     description: 'Reports on non-statutory deductions like welfare, loans, etc.',
     icon: PieChart,
     category: 'Payroll',
-    path: '/reports/statutory'
+    path: '/reports/other-deductions'
   },
   {
     id: 'branch-performance',

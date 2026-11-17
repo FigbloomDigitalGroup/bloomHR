@@ -37,6 +37,14 @@ vi.mock('./UserProfile', () => ({ default: () => null }));
 vi.mock('./StaffMobileHeader', () => ({ default: () => null }));
 vi.mock('./EmailNotificationsToggle', () => ({ default: () => null }));
 vi.mock('./PasswordRestModal', () => ({ default: () => null }));
+vi.mock('../Email/Mailbox/MyMailbox', () => ({ default: () => <div>Mailbox page</div> }));
+
+// the role's modules, and the mailbox's new-mail count
+const perms = vi.hoisted(() => ({ list: [] as string[], unread: 0 }));
+vi.mock('../../hooks/usePermissions', () => ({
+  usePermissions: () => ({ loading: false, hasAnyPermission: (ps: string[]) => ps.some((p) => perms.list.includes(p)) }),
+}));
+vi.mock('../../hooks/useMailboxUnread', () => ({ useMailboxUnread: (enabled: boolean) => (enabled ? perms.unread : 0) }));
 
 import StaffPortal from './StaffPortal';
 
@@ -50,7 +58,11 @@ const renderAt = (url: string) =>
 // framer-motion measures the page; jsdom has no scrolling
 window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  perms.list = [];
+  perms.unread = 0;
+});
 
 describe('StaffPortal and resignation', () => {
   it('no longer lists Resignation in the menu; Profile is there', async () => {
@@ -71,5 +83,33 @@ describe('StaffPortal and resignation', () => {
     const buttons = screen.getAllByRole('button').map((b) => b.textContent?.trim());
     expect(buttons).toContain('Profile');
     expect(buttons).not.toContain('Payslips');
+  });
+});
+
+describe('Mail in the staff portal', () => {
+  it('is under Communication, with its new-mail count, for a role with My mailbox', async () => {
+    perms.list = ['mailbox'];
+    perms.unread = 3;
+    renderAt('/staff');
+    await screen.findByText('Home page');
+    // Communication's badge counts the new mail
+    fireEvent.click(screen.getByRole('button', { name: /Communication\s*3/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Mail/ }));
+    expect(await screen.findByText('Mailbox page')).toBeTruthy();
+    expect(screen.getByLabelText('3 unread')).toBeTruthy();
+  });
+
+  it('is not there without My mailbox, not even from the address', async () => {
+    renderAt('/staff?tab=mail');
+    fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: 'mail' } });
+    expect(screen.queryByRole('button', { name: /^Mail/ })).toBeNull();
+    expect(screen.queryByText('Mailbox page')).toBeNull();
+  });
+
+  it('the menu search finds it by "email" or "inbox"', async () => {
+    perms.list = ['mailbox'];
+    renderAt('/staff');
+    fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: 'inbox' } });
+    expect(screen.getAllByRole('button').map((b) => b.textContent?.trim())).toContain('Communication');
   });
 });

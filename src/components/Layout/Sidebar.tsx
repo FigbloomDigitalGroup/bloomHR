@@ -20,6 +20,7 @@ import {
   UserPlus2,
   PieChart,
   Receipt,
+  WalletCards,
   UserCheck,
   Award,
   Smartphone,
@@ -39,11 +40,15 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import bloomMark from '../../../public/bloom-mark.png';
 import { usePermissions } from '../../hooks/usePermissions';
 import { inMenu } from '../../lib/routeModules';
-import { SIDEBAR_MENU } from '../../lib/sidebarMenu';
+import { PLATFORM_MENU, SIDEBAR_MENU } from '../../lib/sidebarMenu';
+import { isPlatformAdmin } from '../../lib/platformRates';
 import { supabase } from '../../lib/supabase';
 import { IN_LIST_SIZE, chunks, fetchAll } from '../../lib/fetchAll';
 import { SearchInput } from '../UI';
 import { onOverlayEntry } from '../../hooks/useBackToClose';
+import { useMailboxUnread } from '../../hooks/useMailboxUnread';
+import { useMoneyBadges } from '../../hooks/useMoneyBadges';
+import { useWorkBadges } from '../../hooks/useWorkBadges';
 
 // The menu, grouped (src/lib/sidebarMenu.ts, shared with the Roles screen's preview), with an icon per entry. Who
 // sees each entry is decided by its path in routeModules.ts (the modules of the person's role, FIG-827), the same list
@@ -77,6 +82,7 @@ const ICONS: Record<string, LucideIcon> = {
   expense: Receipt,
   advanced: Landmark,
   loans: HandCoins,
+  payments: WalletCards,
   asset: Package,
   'mpesa-zap': Smartphone,
   reports: PieChart,
@@ -91,11 +97,17 @@ const ICONS: Record<string, LucideIcon> = {
   'audit-trail': History,
   'role-permissions': ShieldHalf,
   appearance: Palette,
+  'platform-organisations': Building2,
+  'platform-rates': Landmark,
 };
-const menuGroups = SIDEBAR_MENU.map((group) => ({
+const withIcons = (group: typeof PLATFORM_MENU) => ({
   title: group.title,
   items: group.items.map((item) => ({ ...item, icon: ICONS[item.id] ?? LayoutGrid })),
-}));
+  platform: group === PLATFORM_MENU,
+});
+const menuGroups = SIDEBAR_MENU.map(withIcons);
+// Figbloom's own pages: only for platform admins (the pages check too, and the database refuses anyone else)
+const platformGroup = withIcons(PLATFORM_MENU);
 
 
 interface SidebarProps {
@@ -116,10 +128,22 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
   const [searchQuery, setSearchQuery] = useState('');
 
   // Use permissions hook for dynamic access control
-  const { hasPermission, roleName, loading: permissionsLoading } = usePermissions();
+  const { hasPermission, hasAnyPermission, roleName, loading: permissionsLoading } = usePermissions();
   // the final approvers (HR administration; administrators) count every pending request, others only their team's
   const seesAllLeave = !permissionsLoading && hasPermission('hr-admin');
   const { data: myPreferences } = useMyPreferences(user?.email);
+  // new mail on "Email Portal" (FIG-1205): only for the My mailbox module with a connected mailbox
+  const mailboxUnread = useMailboxUnread(!permissionsLoading && hasPermission('mailbox'), user?.email);
+  // advances, loans, expenses and payments waiting on this person (their approval step, or finance's payments)
+  const moneyBadges = useMoneyBadges(user?.email, !permissionsLoading && hasPermission('payments'));
+  // missed scans, exits, onboarding reviews and overtime waiting on this person, for the items they may act on
+  const workBadges = useWorkBadges(user?.email, {
+    attendance: !permissionsLoading && hasAnyPermission(['employees', 'hr-lifecycle', 'team-work']),
+    exits: !permissionsLoading && hasPermission('approve-exits'),
+    onboarding: !permissionsLoading && hasPermission('employees'),
+    overtime: !permissionsLoading && hasAnyPermission(['payroll', 'work-records', 'casual-overtime', 'team-work']),
+    signups: !permissionsLoading && hasPermission('adminconfirm'),
+  });
 
   // Badge on "Time Off" (FIG-575): count of pending leave applications that
   // need action from the logged-in user specifically - not a global count,
@@ -129,6 +153,22 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
   // Leave Approver/Alternate Approver (FIG-573) and it hasn't been
   // recommended yet - i.e. genuinely waiting on them.
   const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
+  const [platformAdmin, setPlatformAdmin] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    if (!user?.email) {
+      setPlatformAdmin(false);
+      return;
+    }
+    Promise.resolve()
+      .then(isPlatformAdmin)
+      .then((ok) => live && setPlatformAdmin(ok))
+      .catch(() => live && setPlatformAdmin(false));
+    return () => {
+      live = false;
+    };
+  }, [user?.email]);
 
   useEffect(() => {
     if (!user?.email) {
@@ -261,7 +301,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
       aria-label="Main navigation"
       role={isMobile ? 'dialog' : undefined}
       aria-modal={drawerOpen ? true : undefined}
-      className={`fixed left-0 top-0 h-screen z-50 flex flex-col select-none transition-[transform,visibility] duration-300 ${mobileOpen ? '' : 'max-md:-translate-x-full max-md:invisible'}`}
+      className={`fixed left-0 top-0 h-[var(--screen-dvh)] z-50 flex flex-col select-none transition-[transform,visibility] duration-300 ${mobileOpen ? '' : 'max-md:-translate-x-full max-md:invisible'}`}
     >
       <motion.div
         initial="expanded"
@@ -335,9 +375,9 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
         </AnimatePresence>
 
         {/* Scrollable Navigation */}
-        <div className="relative z-10 flex-1 overflow-y-auto px-3 pb-4 sidebar-scroll hover:overflow-y-auto overflow-hidden">
+        <div className="relative z-10 flex-1 min-h-0 overflow-y-auto px-3 pb-4 sidebar-scroll hover:overflow-y-auto overflow-hidden">
           <div className="space-y-6">
-            {menuGroups.map((group) => (
+            {(platformAdmin ? [...menuGroups, platformGroup] : menuGroups).map((group) => (
               <div key={group.title}>
                 {/* Section Header */}
                 <AnimatePresence>
@@ -359,10 +399,19 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
                 <div className="space-y-1">
                   {group.items.filter(item =>
                     // while permissions load every entry shows (no blank sidebar flash), then only those the role gives
-                    (permissionsLoading ? inMenu(item.path, () => true) : inMenu(item.path, hasPermission)) &&
+                    (group.platform || (permissionsLoading ? inMenu(item.path, () => true) : inMenu(item.path, hasPermission))) &&
                     item.label.toLowerCase().includes(searchQuery.toLowerCase())
                   ).map((item) => {
                     const isActive = currentPath.startsWith(item.path);
+                    // pending leave on "Time Off", new mail on "Email Portal", requests waiting on this person
+                    const badge =
+                      item.id === 'leaves'
+                        ? pendingLeaveCount
+                        : item.id === 'email-portal'
+                          ? mailboxUnread
+                          : (moneyBadges[item.id as keyof typeof moneyBadges] ?? workBadges[item.id as keyof typeof workBadges] ?? 0);
+                    const badgeLabel =
+                      item.id === 'email-portal' ? `${badge} unread` : item.id === 'payments' ? `${badge} to pay or approve` : `${badge} pending`;
 
                     return (
                       <motion.button
@@ -384,8 +433,8 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
                               }`}
                             strokeWidth={isActive ? 2.2 : 1.8}
                           />
-                          {item.id === 'leaves' && pendingLeaveCount > 0 && !isExpanded && (
-                            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange border border-shell"></span>
+                          {badge > 0 && !isExpanded && (
+                            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange border border-shell" aria-label={badgeLabel}></span>
                           )}
                         </div>
 
@@ -399,10 +448,10 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
                               className={`ml-[9px] text-[12.5px] truncate relative z-10 flex-1 flex items-center ${isActive ? 'text-shell-active-fg font-semibold' : 'text-shell-fg/80 font-normal'}`}
                             >
                               {item.label}
-                              {item.id === 'leaves' && pendingLeaveCount > 0 && (
-                                <span className={`ml-auto min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full text-[10px] font-bold ${isActive ? 'bg-brand text-white' : 'bg-orange text-white'
+                              {badge > 0 && (
+                                <span title={badgeLabel} className={`ml-auto min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full text-[10px] font-bold ${isActive ? 'bg-brand text-white' : 'bg-orange text-white'
                                   }`}>
-                                  {pendingLeaveCount > 99 ? '99+' : pendingLeaveCount}
+                                  {badge > 99 ? '99+' : badge}
                                 </span>
                               )}
                             </motion.span>
@@ -413,7 +462,7 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
                         {!isExpanded && (
                           <div className="absolute left-full ml-5 px-2.5 py-1.5 bg-slate-800 text-white text-[10px] font-semibold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 whitespace-nowrap shadow-xl translate-x-2 group-hover:translate-x-0">
                             {item.label}
-                            {item.id === 'leaves' && pendingLeaveCount > 0 && ` (${pendingLeaveCount})`}
+                            {badge > 0 && ` (${badge})`}
                             <div className="absolute left-0 top-1/2 -translate-x-1 -translate-y-1/2 w-2 h-2 bg-slate-800 rotate-45" />
                           </div>
                         )}
@@ -427,7 +476,8 @@ export default function Sidebar({ user, isCollapsed, onToggle, onLogout, isMobil
         </div>
 
         {/* User Profile */}
-        <div className="relative z-10 p-3 mt-auto border-t border-shell-fg/10">
+        {/* shrink-0 so a long menu can't push it out; the safe-area inset keeps it above the iPhone home bar */}
+        <div className="relative z-10 shrink-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] mt-auto border-t border-shell-fg/10">
           <div className="relative overflow-hidden rounded-xl bg-shell-fg/5 border border-shell-fg/10 p-2.5 backdrop-blur-sm">
             <div className="flex items-center gap-3 relative z-10">
               <div className="relative flex-shrink-0">

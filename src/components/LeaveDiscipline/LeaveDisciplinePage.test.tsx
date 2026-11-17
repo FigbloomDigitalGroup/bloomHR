@@ -1,12 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import type { AbsenceRecord, DisciplineAccess, DisciplineCounts, OverdueDocument } from '../../lib/leaveDiscipline';
+import type { AbsenceRecord, DisciplineAccess, DisciplineCounts, OverdueDocument, PossibleAbsence, PossibleAbsenceSettings } from '../../lib/leaveDiscipline';
 
 const api = vi.hoisted(() => ({
   access: { manage: true, leaves: true, warn: true, supervised: [] } as DisciplineAccess,
   absences: [] as AbsenceRecord[],
   documents: [] as OverdueDocument[],
   counts: [] as DisciplineCounts[],
+  possible: [] as PossibleAbsence[],
+  settings: { lookback_days: 60, notify_employees: false, notify_from: null, reply_working_days: 2 } as PossibleAbsenceSettings,
+  dismissPossibleAbsence: vi.fn(),
+  savePossibleAbsenceSettings: vi.fn(),
   checkOverdueDocuments: vi.fn(),
   issueDisciplineWarning: vi.fn(),
   excuseAbsence: vi.fn(),
@@ -38,6 +42,10 @@ vi.mock('../../lib/leaveDisciplineApi', () => ({
   excuseAbsence: api.excuseAbsence,
   recordAbsence: api.recordAbsence,
   deleteAbsence: api.deleteAbsence,
+  loadPossibleAbsences: () => Promise.resolve(api.possible),
+  loadPossibleAbsenceSettings: () => Promise.resolve(api.settings),
+  dismissPossibleAbsence: api.dismissPossibleAbsence,
+  savePossibleAbsenceSettings: api.savePossibleAbsenceSettings,
 }));
 
 import LeaveDisciplinePage from './LeaveDisciplinePage';
@@ -61,7 +69,21 @@ beforeEach(() => {
     due_date: '2026-10-01', warnings: 1, last_warning_at: '2026-10-03',
   }];
   api.counts = [{ employee_number: 'E1', employee_name: 'Wanjiru One', unexcused_absences: 1, unexcused_days: 2, failed_to_notify: 0, missing_documents: 0, warnings: 3 }];
-  for (const fn of [api.checkOverdueDocuments, api.issueDisciplineWarning, api.excuseAbsence, api.recordAbsence, api.deleteAbsence]) {
+  api.possible = [
+    {
+      employee_number: 'E4', employee_name: 'Kamau Four', start_date: '2026-11-03', end_date: '2026-11-05', days: 3,
+      absent_days: ['2026-11-03', '2026-11-04', '2026-11-05'], pending_leave: false, notified_on: '2026-11-04', reply_by: '2026-11-06',
+    },
+    {
+      employee_number: 'E5', employee_name: 'Njeri Five', start_date: '2026-10-31', end_date: '2026-11-03', days: 2,
+      absent_days: ['2026-10-31', '2026-11-03'], pending_leave: true, notified_on: null, reply_by: null,
+    },
+  ];
+  api.settings = { lookback_days: 60, notify_employees: false, notify_from: null, reply_working_days: 2 };
+  api.savePossibleAbsenceSettings.mockReset();
+  api.savePossibleAbsenceSettings.mockImplementation((s: Partial<PossibleAbsenceSettings>) =>
+    Promise.resolve({ ...api.settings, ...s, notify_from: s.notify_employees ? '2026-11-05' : null }));
+  for (const fn of [api.checkOverdueDocuments, api.issueDisciplineWarning, api.excuseAbsence, api.recordAbsence, api.deleteAbsence, api.dismissPossibleAbsence]) {
     fn.mockReset();
     fn.mockResolvedValue(undefined);
   }
@@ -147,5 +169,79 @@ describe('Leave discipline page', () => {
     api.access = { manage: false, leaves: false, warn: false, supervised: [] };
     render(<LeaveDisciplinePage />);
     expect(await screen.findByText('Nothing to show')).toBeTruthy();
+  });
+});
+
+describe('Possible absences', () => {
+  const openTab = async () => {
+    render(<LeaveDisciplinePage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Possible absences (2)' }));
+    return screen.findByText('Kamau Four');
+  };
+
+  it('lists runs of days with no clock-in, the notice sent, and leave applied for', async () => {
+    await openTab();
+    expect(screen.getByText('Tue 3 – Thu 5 Nov, 3 working days')).toBeTruthy();
+    expect(screen.getByText('Sat 31 Oct – Tue 3 Nov, 2 working days')).toBeTruthy();
+    expect(screen.getByText(/Employee notified Wed 4 Nov, reply due Fri 6 Nov/)).toBeTruthy();
+    expect(screen.getByText('Leave applied for, not decided')).toBeTruthy();
+  });
+
+  it('records one with the usual recording, the employee and days filled in', async () => {
+    await openTab();
+    fireEvent.click(screen.getByRole('button', { name: 'Record as unexcused absence: Kamau Four, 3 - 5 Nov 2026' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Kamau Four')).toBeTruthy();
+    expect((within(dialog).getByLabelText('First day') as HTMLInputElement).value).toBe('2026-11-03');
+    expect((within(dialog).getByLabelText('Last day') as HTMLInputElement).value).toBe('2026-11-05');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Record' }));
+    await waitFor(() => expect(api.recordAbsence).toHaveBeenCalledWith(
+      { employeeNumber: 'E4', kind: 'unexcused_absence', start: '2026-11-03', end: '2026-11-05', note: '' }));
+  });
+
+  it('records a failure to notify the same way', async () => {
+    await openTab();
+    fireEvent.click(screen.getByRole('button', { name: 'Record as failure to notify: Njeri Five, 31 Oct - 3 Nov 2026' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Record' }));
+    await waitFor(() => expect(api.recordAbsence).toHaveBeenCalledWith(
+      { employeeNumber: 'E5', kind: 'failed_to_notify', start: '2026-10-31', end: '2026-11-03', note: '' }));
+  });
+
+  it('dismisses one only with a reason', async () => {
+    await openTab();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss: Kamau Four, 3 - 5 Nov 2026' }));
+    const dialog = screen.getByRole('dialog');
+    const button = within(dialog).getByRole('button', { name: 'Dismiss' }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    fireEvent.change(within(dialog).getByLabelText(/Why is this not an absence/), { target: { value: 'At the client site' } });
+    fireEvent.click(button);
+    await waitFor(() => expect(api.dismissPossibleAbsence).toHaveBeenCalledWith(
+      { employeeNumber: 'E4', start: '2026-11-03', end: '2026-11-05', reason: 'At the client site' }));
+  });
+
+  it('HR switches the employee notice on', async () => {
+    await openTab();
+    fireEvent.click(screen.getByLabelText('Tell employees about their possible absences'));
+    fireEvent.change(screen.getByLabelText('Reply within (working days)'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.savePossibleAbsenceSettings).toHaveBeenCalledWith({ lookback_days: 60, notify_employees: true, reply_working_days: 3 }));
+    expect(await screen.findByText(/for absences from 5 Nov 2026 on/)).toBeTruthy();
+  });
+
+  it('a supervisor records and dismisses for their team but has no settings', async () => {
+    api.access = { manage: false, leaves: false, warn: false, supervised: ['E4', 'E5'] };
+    await openTab();
+    expect(screen.queryByLabelText('Tell employees about their possible absences')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Dismiss: Kamau Four, 3 - 5 Nov 2026' })).toBeTruthy();
+  });
+
+  it('opens on the list from a notification (?tab=possible)', async () => {
+    window.history.pushState({}, '', '/leave-discipline?tab=possible');
+    try {
+      render(<LeaveDisciplinePage />);
+      expect(await screen.findByText('Kamau Four')).toBeTruthy();
+    } finally {
+      window.history.pushState({}, '', '/');
+    }
   });
 });

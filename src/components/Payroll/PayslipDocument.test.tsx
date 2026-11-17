@@ -21,8 +21,11 @@ const employee = (number: string, extra: Record<string, unknown> = {}) => ({
   payment_method: 'bank', Bank: 'Equity Bank', 'Account Number': '0123456789', ...extra,
 });
 
+// the statutory numbers shown, so each country's own labels can be checked
+const WITH_NUMBERS = { ...DEFAULT_DESIGN, show_statutory_numbers: true };
+
 const extrasFor = (country: string, over: Partial<PayslipExtras> = {}): PayslipExtras => ({
-  design: DEFAULT_DESIGN,
+  design: WITH_NUMBERS,
   employer: {
     name: 'Acme Ltd', logoUrl: null, letterheadUrl: null, address: 'Plot 7, Mombasa Road, Nairobi', phone: '+254 700 000000', email: 'pay@acme.co', website: null,
     taxLabel: country === 'Kenya' ? 'KRA PIN' : 'TIN', taxNumber: country === 'Kenya' ? 'P051234567X' : '123456789',
@@ -113,11 +116,37 @@ describe('a Kenya payslip', () => {
     render(<PayslipDocument record={record} companyInfo={{}} extras={extrasFor('Kenya', { ytd })} design={design} />);
     expect(screen.queryByTestId('employer-contributions')).toBeNull();
     expect(screen.queryByTestId('payslip-ytd')).toBeNull();
-    expect(section('payslip-payment').queryByText('Bank:')).toBeNull();
+    expect(screen.queryByTestId('payslip-payment')).toBeNull();
     expect(screen.getByTestId('payslip-deductions')).toBeTruthy();
     expect(screen.getByTestId('payslip-net')).toBeTruthy();
     expect(amountOf('payslip-footer')).toContain('Payroll queries: pay@acme.co');
     expect((screen.getByText('Earnings') as HTMLElement).style.color).toBe('rgb(23, 64, 42)');
+  });
+
+  it("by default shows the KRA PIN with the employee's details, and no NSSF, SHA or ID numbers", () => {
+    render(<PayslipDocument record={record} companyInfo={{}} extras={extrasFor('Kenya', { design: DEFAULT_DESIGN })} />);
+    expect(amountOf('employee-tax-number')).toBe('KRA PIN:A012345678Z');
+    expect(screen.queryByTestId('payslip-statutory-numbers')).toBeNull();
+    expect(screen.queryByTestId('employee-sha-number')).toBeNull();
+    expect(screen.queryByText('NSSF number:')).toBeNull();
+    expect(screen.queryByText('ID number:')).toBeNull();
+    expect(screen.getByTestId('payslip-payment')).toBeTruthy();
+  });
+
+  it("carries the approver's signature, name and approval date as the authorised signatory", () => {
+    const signature = 'data:image/png;base64,iVBORw0KGgo=';
+    const extras = extrasFor('Kenya');
+    render(<PayslipDocument record={record} companyInfo={{}} extras={{ ...extras, run: { ...extras.run!, approvedSignature: signature, approvedBy: 'Wanjiru Kamau' } }} />);
+    const signatory = section('payslip-signatory');
+    expect((signatory.getByTestId('payslip-signature') as HTMLImageElement).src).toBe(signature);
+    expect(signatory.getByText('Wanjiru Kamau')).toBeTruthy();
+    expect(amountOf('payslip-signatory')).toContain('Date: 28 Oct 2026');
+  });
+
+  it('leaves the signatory line blank when the approver had no signature', () => {
+    render(<PayslipDocument record={record} companyInfo={{}} extras={extrasFor('Kenya')} />);
+    expect(screen.queryByTestId('payslip-signature')).toBeNull();
+    expect(amountOf('payslip-signatory')).toContain('Date: ____');
   });
 
   it('uses the letterhead image the design picks', () => {

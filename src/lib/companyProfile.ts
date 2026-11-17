@@ -248,3 +248,16 @@ export function letterheadFileError(file: File): string | null {
 
 /** Uploads a letterhead header or footer image (same bucket as the logo) and returns its public URL. */
 export const uploadLetterheadImage = (file: File) => uploadCompanyImage(file, 'The letterhead image was not uploaded.');
+
+/**
+ * Sets the letterhead images from a letter screen (migration 20261026300000): HR, Recruitment or Settings; only these
+ * two images change. null removes one.
+ */
+export async function setCompanyLetterhead(header: string | null, footer: string | null) {
+  const { data, error } = await supabase.rpc('set_company_letterhead', { p_header: header, p_footer: footer });
+  if (error) fail(error, 'The letterhead was not saved.');
+  return ((Array.isArray(data) ? data[0] : data) ?? { letterhead_header_url: header, letterhead_footer_url: footer }) as {
+    letterhead_header_url: string | null;
+    letterhead_footer_url: string | null;
+  };
+}

@@ -5,11 +5,12 @@ import * as cloudtrail from 'aws-cdk-lib/aws-cloudtrail';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as guardduty from 'aws-cdk-lib/aws-guardduty';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as subs from 'aws-cdk-lib/aws-sns-subscriptions';
 import type { Construct } from 'constructs';
-import type { AccountSettings } from './config.js';
+import { ORGANIZATION_ID, type AccountSettings } from './config.js';
 
 export interface AccountSecurityStackProps extends StackProps {
   settings: AccountSettings;
@@ -51,9 +52,27 @@ export class AccountSecurityStack extends Stack {
       ],
     });
 
+    // CDK grants CloudTrail only this account's folder (AWSLogs/<account>/) on a bucket it didn't create. The
+    // organization trail writes every other account under AWSLogs/<org id>/<account>/, from trails in this account only.
+    trailBucket.addToResourcePolicy(
+      new iam.PolicyStatement({
+        sid: 'CloudTrailOrganizationWrite',
+        principals: [new iam.ServicePrincipal('cloudtrail.amazonaws.com')],
+        actions: ['s3:PutObject'],
+        resources: [trailBucket.arnForObjects(`AWSLogs/${ORGANIZATION_ID}/*`)],
+        conditions: {
+          StringEquals: { 's3:x-amz-acl': 'bucket-owner-full-control' },
+          ArnLike: { 'aws:SourceArn': `arn:${this.partition}:cloudtrail:*:${this.account}:trail/*` },
+        },
+      }),
+    );
+
     new cloudtrail.Trail(this, 'AuditTrail', {
       bucket: trailBucket,
       isMultiRegionTrail: true,
+      // Every account in the organization (figbloom-staging, figbloom-prod, ...) logs here too, under AWSLogs/<org id>/
+      isOrganizationTrail: true,
+      orgId: ORGANIZATION_ID,
       includeGlobalServiceEvents: true,
       // A digest file per hour lets us prove the logs weren't edited afterwards
       enableFileValidation: true,

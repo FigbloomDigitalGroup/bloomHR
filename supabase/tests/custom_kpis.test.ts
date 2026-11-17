@@ -88,10 +88,10 @@ describe('the KPI library and review periods', () => {
     expect(await fails(as(HR, `insert into kpi_periods (name, starts_on, ends_on) values ('Back', '2026-12-01', '2026-01-01')`))).toMatch(/check/);
   });
 
-  it('everyone in the company reads them; staff and managers do not change them', async () => {
+  it('everyone in the company reads them; staff and managers do not change HR’s (managers add their own: manager_kpis.test.ts)', async () => {
     expect((await as(ME, `select name from kpis`)).length).toBe(2);
     expect(await fails(as(ME, `insert into kpis (name) values ('Mine')`))).toMatch(/row-level security/);
-    expect(await fails(as(BOSS, `insert into kpis (name) values ('Boss made')`))).toMatch(/row-level security/);
+    expect(await as(BOSS, `update kpis set default_weight = 1 returning 1`)).toHaveLength(0);
     expect(await as(BOSS, `update kpi_periods set status = 'closed' returning 1`)).toHaveLength(0);
   });
 

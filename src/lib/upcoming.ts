@@ -149,6 +149,31 @@ export function myOpenTasks(tasks: TaskRow[], employeeNumber: string | null | un
     .sort((a, b) => a.due.getTime() - b.due.getTime() || a.title.localeCompare(b.title));
 }
 
+/** How the employee's leave is counted: their work week (Monday first, 0 = day off) and the leave types counted in calendar days. */
+export interface LeaveDayRules {
+  workWeek: number[];
+  calendarTypes: Set<string>;
+}
+
+/**
+ * The days of a leave that it takes, as the day count does (leave_days_for): every day for a type counted in calendar
+ * days, otherwise the employee's working days less the public holidays (`holidayKeys`, "yyyy-MM-dd"). At most `max`.
+ */
+export function leaveDaysTaken(
+  range: { type: string; start: Date; end: Date },
+  rules: LeaveDayRules,
+  holidayKeys: Set<string>,
+  max = 366
+): Date[] {
+  const calendar = rules.calendarTypes.has(range.type.trim().toLowerCase());
+  const out: Date[] = [];
+  for (let day = startOfDay(range.start), i = 0; day <= range.end && i < max; day = addDays(day, 1), i++) {
+    // getDay(): Sunday 0; the week is Monday first
+    if (calendar || ((rules.workWeek[(day.getDay() + 6) % 7] ?? 0) > 0 && !holidayKeys.has(dayKey(day)))) out.push(day);
+  }
+  return out;
+}
+
 /** The employee's approved and pending leave, as days. */
 export function myLeaveRanges(leave: LeaveRow[]): { type: string; start: Date; end: Date; pending: boolean }[] {
   const out: { type: string; start: Date; end: Date; pending: boolean }[] = [];

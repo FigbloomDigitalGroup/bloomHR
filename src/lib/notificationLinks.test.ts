@@ -43,6 +43,14 @@ describe('where a notification opens', () => {
     expect(staffNotificationLink(n('approval_progress', 'Work approved', 'Ann X\'s work for 01 Oct 2026'))).toEqual({ tab: 'my-team', params: { view: 'work' } });
     expect(staffNotificationLink(n('approval_progress', 'Leave application moving on'))).toEqual({ tab: 'leave-history' });
     expect(adminNotificationPath(n('approval_needed', 'Payout waiting for approval'))).toBe('/piece-rate');
+    // loans, advances, expenses and requisitions on their approval chains (20261025700000)
+    expect(adminNotificationPath(n('approval_needed', 'Loan request awaiting your approval'))).toBe('/loans');
+    expect(adminNotificationPath(n('approval_needed', 'Salary advance awaiting your approval'))).toBe('/salaryadmin');
+    expect(adminNotificationPath(n('approval_needed', 'Requisition awaiting your approval'))).toBe('/payments?tab=requisitions');
+    expect(staffNotificationLink(n('approval_needed', 'Loan request awaiting your approval'))).toEqual({ tab: 'home' });
+    expect(staffNotificationLink(n('approval_progress', 'Loan request moving on'))).toEqual({ tab: 'loan' });
+    expect(staffNotificationLink(n('approval_progress', 'Salary advance moving on'))).toEqual({ tab: 'salary-advance' });
+    expect(adminNotificationPath(n('approval_progress', 'Requisition approved'))).toBe('/payments?tab=requisitions');
     expect(adminNotificationPath(n('employment_update', 'KPI targets changed'))).toBe('/performance');
   });
 

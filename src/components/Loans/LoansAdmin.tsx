@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Ban, Banknote, CalendarClock, Check, CheckCircle2, HandCoins, Hourglass, Plus, RefreshCw, Wallet, X } from 'lucide-react';
+import { Ban, CalendarClock, Check, HandCoins, Hourglass, Plus, RefreshCw, Wallet, X } from 'lucide-react';
 import { Button, Card, EmployeePicker, EmptyState, Modal, PageHeader, StatCard, TabBar } from '../UI';
 import LoanSchedule, { LoanBalance, LoanStatusPill } from './LoanSchedule';
 import LoanSettingsCard from './LoanSettingsCard';
-import { DemoTag } from '../SalaryAdvance/PayAdvanceModal';
-import { confirmDialog, noticeDialog } from '../../lib/confirmDialog';
-import { IN_APP_PAYMENTS, PAYMENTS_DEMO } from '../../lib/inAppPayments';
+import ApprovalChain from '../Approvals/ApprovalChain';
+import { loadApprovalChains, type ApprovalChain as Chain } from '../../lib/approvals';
+import RecordPaymentLink from '../Payments/RecordPaymentLink';
+import { confirmDialog } from '../../lib/confirmDialog';
 import { usePermissions } from '../../hooks/usePermissions';
 import {
   DEFAULT_LOAN_SETTINGS,
@@ -15,7 +16,10 @@ import {
   currentPeriod,
   formatKsh,
   interestMethodLabel,
+  loanPaidOut,
   loanSchedule,
+  rateFieldLabel,
+  rateText,
   maxMonthsFor,
   outstandingBalance,
   periodLabel,
@@ -33,18 +37,18 @@ import {
   loadLoanProducts,
   loadLoanSettings,
   loadSchedules,
-  markLoanDisbursed,
   type EmployeeLoan,
 } from '../../lib/loansApi';
 import type { LoanInstalment, LoanRepayment } from '../../lib/loans';
 import { LoaderBlock } from '../UI/FigbloomLoader';
 
-// HR's loans page: decide on requests, set up a loan for an employee, record that finance paid it out, and follow
+// HR's loans page: decide on requests, set up a loan for an employee, send it to finance to pay out, and follow
 // each loan's schedule and balance. Payroll takes the instalments once a loan is marked disbursed.
 //
-//   * "Mark as disbursed" is the real step: finance paid the loan outside the app, and marking it is what starts the
-//     payroll deductions.
-//   * "Pay out (demo)" only appears for demos (PAYMENTS_DEMO while IN_APP_PAYMENTS is off). Nothing is sent or saved.
+//   * A request goes through the company's loan approvals (Settings > Approval workflows): Approve and Decline decide
+//     the step it is waiting on, for whoever may decide it; the chain shows under it.
+//   * An approved loan is paid out from Payments to make: finance pays it outside the app and records it there with its
+//     reference, which marks it disbursed and starts the payroll deductions.
 
 type Tab = 'requests' | 'approved' | 'active' | 'closed' | 'settings';
 
@@ -57,8 +61,6 @@ const TAB_OF: Record<EmployeeLoan['status'], Exclude<Tab, 'settings'>> = {
   rejected: 'closed',
   cancelled: 'closed',
 };
-
-const showDemoPay = PAYMENTS_DEMO && !IN_APP_PAYMENTS;
 
 const inputClass =
   'w-full px-3 py-2 text-[13px] border border-border rounded-tile bg-white focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand';
@@ -92,6 +94,7 @@ export default function LoansAdmin() {
   const [loans, setLoans] = useState<EmployeeLoan[]>([]);
   const [schedules, setSchedules] = useState<Record<string, LoanInstalment[]>>({});
   const [repayments, setRepayments] = useState<Record<string, LoanRepayment[]>>({});
+  const [chains, setChains] = useState<Record<string, Chain>>({});
   const [settings, setSettings] = useState<LoanSettings>(DEFAULT_LOAN_SETTINGS);
   const [products, setProducts] = useState<LoanProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -114,6 +117,7 @@ export default function LoansAdmin() {
       setLoans(all);
       setSettings(s);
       setProducts(p);
+      setChains(await loadApprovalChains('loan', all.filter((l) => l.status === 'requested').map((l) => l.id)).catch(() => ({})));
       const loaded = await loadSchedules(all.filter((l) => ['disbursed', 'repaying', 'completed'].includes(l.status)).map((l) => l.id));
       setSchedules(loaded.schedules);
       setRepayments(loaded.repayments);
@@ -163,36 +167,29 @@ export default function LoansAdmin() {
   const confirmApprove = async () => {
     if (!approving) return;
     const loan = approving;
-    if (await act(loan, () => approveLoan(loan.id, { comment, startPeriod: approveStart }), `Approved ${loan.employee_name}'s loan`)) setApproving(null);
+    const chain = chains[loan.id];
+    if (!chain) return;
+    let status = 'approved';
+    const ok = await act(
+      loan,
+      async () => {
+        status = await approveLoan(loan.id, chain.request_id, { comment, startPeriod: approveStart });
+      },
+      `Approved ${loan.employee_name}'s loan`
+    );
+    if (ok) {
+      setApproving(null);
+      if (status === 'pending') toast('Your step is approved. It now goes to the next approver.');
+    }
   };
 
   const confirmDecline = async () => {
     setDeclineTried(true);
     if (!declining || !comment.trim()) return;
     const loan = declining;
-    if (await act(loan, () => declineLoan(loan.id, comment), `Declined ${loan.employee_name}'s loan`)) setDeclining(null);
-  };
-
-  const markDisbursed = async (loan: EmployeeLoan) => {
-    const ok = await confirmDialog({
-      title: 'Mark as disbursed?',
-      message: `Record that finance has paid ${loan.employee_name} ${formatKsh(loan.principal)} outside the app. This does not send any money. Payroll takes ${formatKsh(loan.monthly_instalment ?? 0)} a month from ${periodLabel(loan.start_period < currentPeriod() ? currentPeriod() : loan.start_period)}.`,
-      confirmLabel: 'Mark as disbursed',
-    });
-    if (ok) await act(loan, () => markLoanDisbursed(loan.id), `Marked ${loan.employee_name}'s loan as disbursed. Payroll will take the instalments.`);
-  };
-
-  const demoPay = async (loan: EmployeeLoan) => {
-    const ok = await confirmDialog({
-      title: 'Pay out loan (demo)',
-      message: `Pay ${formatKsh(loan.principal)} to ${loan.employee_name}? Demo mode: no money moves and nothing is saved.`,
-      confirmLabel: `Pay ${formatKsh(loan.principal)}`,
-    });
-    if (!ok) return;
-    await noticeDialog({
-      title: 'Demo payment shown',
-      message: `${formatKsh(loan.principal)} shown as sent to ${loan.employee_name}. Nothing was sent: use Mark as disbursed once finance has paid it.`,
-    });
+    const chain = chains[loan.id];
+    if (!chain) return;
+    if (await act(loan, () => declineLoan(chain.request_id, comment), `Declined ${loan.employee_name}'s loan`)) setDeclining(null);
   };
 
   const cancel = async (loan: EmployeeLoan) => {
@@ -232,7 +229,7 @@ export default function LoansAdmin() {
     if (!creating || createProblem) return;
     setBusyId('new');
     try {
-      await createLoan({
+      const status = await createLoan({
         employeeNumber: creating.employeeNumber,
         productId: creating.productId || null,
         amount: Number(creating.amount),
@@ -242,7 +239,11 @@ export default function LoansAdmin() {
         interestMethod: creating.method || null,
         reason: creating.reason,
       });
-      toast.success('Loan set up and approved. Mark it disbursed once finance has paid it.');
+      toast.success(
+        status === 'approved'
+          ? 'Loan set up and approved. Finance is told to pay it.'
+          : 'Loan set up. It goes through the loan approvals before it can be paid.'
+      );
       setCreating(null);
       await load();
     } catch (error) {
@@ -304,7 +305,6 @@ export default function LoansAdmin() {
           onChange={(id) => setTab(id as Tab)}
         />
         <div className="flex items-center gap-2">
-          {showDemoPay && tab === 'approved' && <DemoTag />}
           <Button variant="secondary" onClick={() => void load()} disabled={loading} icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />}>
             Refresh
           </Button>
@@ -354,9 +354,16 @@ export default function LoansAdmin() {
                     {loan.monthly_instalment !== null && !['rejected', 'cancelled'].includes(loan.status) && (
                       <span className="text-[11.5px] text-muted-foreground">
                         {formatKsh(loan.monthly_instalment)} a month from {periodLabel(loan.start_period)} · {formatKsh(loan.total_interest ?? 0)} interest
+                        {loan.interest_method === 'upfront' ? ` · pays out ${formatKsh(loanPaidOut(loan))}` : ''}
                       </span>
                     )}
                   </div>
+
+                  {loan.status === 'requested' && chains[loan.id] && (
+                    <div className="mt-2">
+                      <ApprovalChain chain={chains[loan.id]} compact />
+                    </div>
+                  )}
 
                   {loan.decided_by_email && tab !== 'requests' && (
                     <p className="mt-1 text-[11px] text-muted-foreground">
@@ -383,11 +390,13 @@ export default function LoansAdmin() {
                         Schedule
                       </Button>
                     )}
-                    {canManage && loan.status === 'requested' && (
+                    {loan.status === 'requested' && (chains[loan.id]?.can_approve || chains[loan.id]?.can_reject) && (
                       <>
-                        <Button onClick={() => openApprove(loan)} disabled={busy} icon={<Check className="w-3.5 h-3.5" />}>
-                          Approve
-                        </Button>
+                        {chains[loan.id]?.can_approve && (
+                          <Button onClick={() => openApprove(loan)} disabled={busy} icon={<Check className="w-3.5 h-3.5" />}>
+                            Approve
+                          </Button>
+                        )}
                         <Button
                           variant="secondary"
                           onClick={() => {
@@ -403,22 +412,7 @@ export default function LoansAdmin() {
                       </>
                     )}
                     {canManage && loan.status === 'approved' && (
-                      <>
-                        {showDemoPay && (
-                          <Button onClick={() => void demoPay(loan)} disabled={busy} icon={<Banknote className="w-3.5 h-3.5" />} title="Demo: nothing is sent">
-                            Pay out (demo)
-                          </Button>
-                        )}
-                        <Button
-                          variant={showDemoPay ? 'secondary' : 'primary'}
-                          onClick={() => void markDisbursed(loan)}
-                          disabled={busy}
-                          icon={<CheckCircle2 className="w-3.5 h-3.5" />}
-                          title="Finance paid it outside the app"
-                        >
-                          Mark as disbursed
-                        </Button>
-                      </>
+                      <RecordPaymentLink />
                     )}
                     {canManage && ['requested', 'approved'].includes(loan.status) && (
                       <Button variant="ghost" onClick={() => void cancel(loan)} disabled={busy} icon={<Ban className="w-3.5 h-3.5" />}>
@@ -438,8 +432,12 @@ export default function LoansAdmin() {
           <>
             <p className="text-[12.5px] text-ink mb-3">
               Approve {approving.employee_name}'s loan of {formatKsh(approving.principal)} over {approving.months} months? It is charged the current rate for
-              {approving.product_name ? ` ${approving.product_name}` : ' staff loans'} ({(products.find((p) => p.id === approving.product_id)?.annual_rate ?? settings.annual_rate)}% a
-              year).
+              {approving.product_name ? ` ${approving.product_name}` : ' staff loans'} (
+              {(() => {
+                const p = products.find((x) => x.id === approving.product_id);
+                return rateText(p?.annual_rate ?? settings.annual_rate, p?.interest_method ?? settings.interest_method);
+              })()}
+              ).
             </p>
             <label htmlFor="approve-start" className="block text-[12px] font-semibold text-ink mb-1">
               First repayment from
@@ -505,7 +503,10 @@ export default function LoansAdmin() {
         {viewing && (
           <>
             <p className="text-[12px] text-muted-foreground mb-3">
-              {viewing.months} months at {viewing.annual_rate}% a year, {interestMethodLabel(viewing.interest_method).toLowerCase()}, from {periodLabel(viewing.start_period)}.
+              {viewing.months} months at {rateText(viewing.annual_rate, viewing.interest_method)}, {interestMethodLabel(viewing.interest_method).toLowerCase()}, from {periodLabel(viewing.start_period)}.
+              {viewing.interest_method === 'upfront' && viewing.total_interest !== null
+                ? ` ${formatKsh(loanPaidOut(viewing))} is paid out and ${formatKsh(viewing.principal)} repaid.`
+                : ''}
               {['requested', 'approved'].includes(viewing.status) ? ' The schedule may still change until the loan is paid out.' : ''}
             </p>
             <LoanSchedule
@@ -519,7 +520,7 @@ export default function LoansAdmin() {
       <Modal open={!!creating} onClose={() => setCreating(null)} title="New loan" size="lg">
         {creating && (
           <>
-            <p className="text-[12px] text-muted-foreground mb-3">Set up a loan for an employee. It is approved straight away; mark it disbursed once finance has paid it.</p>
+            <p className="text-[12px] text-muted-foreground mb-3">Set up a loan for an employee. It is approved straight away when you are its only approver; otherwise it goes through the loan approvals first.</p>
             <div className="space-y-3">
               <div>
                 <label className="block text-[12px] font-semibold text-ink mb-1">Employee</label>
@@ -558,7 +559,7 @@ export default function LoansAdmin() {
                   </select>
                 </label>
                 <label className="block">
-                  <span className="block text-[12px] font-semibold text-ink mb-1">Interest rate (% a year)</span>
+                  <span className="block text-[12px] font-semibold text-ink mb-1">{rateFieldLabel(newMethod)}</span>
                   <input
                     className={inputClass}
                     type="number"
@@ -588,6 +589,7 @@ export default function LoansAdmin() {
               {newPreview && newPreview.totalRepayable > 0 && (
                 <p className="m-0 p-3 rounded-tile bg-secondary text-[12.5px] text-ink" data-testid="new-loan-preview">
                   {formatKsh(newPreview.instalment)} a month · {formatKsh(newPreview.totalInterest)} interest · {formatKsh(newPreview.totalRepayable)} in all
+                  {newMethod === 'upfront' ? ` · ${formatKsh(newPreview.paidOut)} paid out` : ''}
                 </p>
               )}
               {createWarning && <p className="m-0 text-[11.5px] text-orange-text-alt">{createWarning}</p>}

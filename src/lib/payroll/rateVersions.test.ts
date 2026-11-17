@@ -107,12 +107,13 @@ describe('the preview', () => {
     expect(p.map((r) => r.salary)).toEqual([30000, 100000, 500000]);
     expect(previewLabels(p)).toEqual(['PAYE', 'NSSF', 'SHIF', 'Housing levy']);
     const mid = p[1];
-    // cash pay 67,000 (33% per diem): the levy 1,005 -> 1,340, and PAYE a little lower as the levy is deductible
-    expect(lineAmount(mid.before.deductions, 'Housing levy')).toBe(1005);
-    expect(lineAmount(mid.after.deductions, 'Housing levy')).toBe(1340);
+    // cash pay 100,000 (no per diem share since October 2026): the levy 1,500 -> 2,000, and PAYE a little lower as the
+    // levy is deductible
+    expect(lineAmount(mid.before.deductions, 'Housing levy')).toBe(1500);
+    expect(lineAmount(mid.after.deductions, 'Housing levy')).toBe(2000);
     expect(mid.after.tax).toBeLessThan(mid.before.tax);
-    expect(mid.after.net).toBeCloseTo(mid.before.net - 335 + (mid.before.tax - mid.after.tax), 2);
-    expect(lineAmount(mid.after.employerCosts, 'Housing levy (employer)')).toBe(1005);
+    expect(mid.after.net).toBeCloseTo(mid.before.net - 500 + (mid.before.tax - mid.after.tax), 2);
+    expect(lineAmount(mid.after.employerCosts, 'Housing levy (employer)')).toBe(1500);
   });
 
   it('leaves out salaries that are not amounts, and countries without an engine', () => {

@@ -40,7 +40,8 @@ function StartExitModal({ open, onClose, onStarted }: { open: boolean; onClose: 
         last_working_day: lastDay,
         notice_pay: kind === 'termination' && noticePay,
       });
-      toast.success(kind === 'termination' ? 'Termination started: it now needs approval' : 'Resignation recorded: it now needs approval');
+      const what = kind === 'termination' ? 'Termination' : 'Resignation';
+      toast.success(exit.status === 'approved' ? `${what} started and approved` : `${what} started: it now needs approval by HR`);
       onStarted(exit.id);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not start the exit');
@@ -103,7 +104,7 @@ function StartExitModal({ open, onClose, onStarted }: { open: boolean; onClose: 
             Pay in lieu of the notice they don’t work
           </label>
         )}
-        <p className="m-0 text-[11px] text-subtle">It then needs approval by HR or an administrator other than you, where there is one.</p>
+        <p className="m-0 text-[11px] text-subtle">Started by someone who can approve exits, it is approved at once; otherwise HR or an administrator approves it.</p>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
           <Button type="submit" disabled={busy || !employee || (kind === 'termination' && !category)}>{busy ? 'Starting…' : 'Start exit'}</Button>

@@ -5,6 +5,7 @@ import { isContractor } from '../../workSettlement';
 import {
   type ExportFile,
   type Rates,
+  employeeNumberOf,
   isContractorSlip,
   nitaFile,
   nssfFile,
@@ -84,7 +85,7 @@ export function kenyaPayslipResult(record: PayslipRecord, rates: Rates): Payslip
 }
 
 // ---- the housing levy schedule ---------------------------------------------------------------------------------
-export const AHL_HEADERS = ['PAYROLL NUMBER', 'EMPLOYEE NAME', 'ID NO', 'KRA PIN', 'GROSS PAY', 'EMPLOYEE AHL', 'EMPLOYER AHL', 'TOTAL AHL'] as const;
+export const AHL_HEADERS = ['EMPLOYEE NUMBER', 'EMPLOYEE NAME', 'ID NO', 'KRA PIN', 'GROSS PAY', 'EMPLOYEE AHL', 'EMPLOYER AHL', 'TOTAL AHL'] as const;
 
 const amount = (value: number) => (Math.round(value * 100) / 100).toFixed(2);
 
@@ -100,7 +101,7 @@ export function ahlFile(payslips: PayslipRecord[], employees: EmployeeRecord[], 
       const own = num(p.housing_levy);
       const employer = employeeRate > 0 ? round2((own * employerRate) / employeeRate) : 0;
       return [
-        text(e['Payroll Number']) || text(p.employee_id), employeeName(e as EmployeeRecord) || text(p.employee_name), text(e['ID Number']),
+        employeeNumberOf(e as EmployeeRecord, p), employeeName(e as EmployeeRecord) || text(p.employee_name), text(e['ID Number']),
         text(e['Tax PIN']), amount(pensionablePayOf(p)), amount(own), amount(employer), amount(own + employer),
       ];
     });
@@ -109,7 +110,7 @@ export function ahlFile(payslips: PayslipRecord[], employees: EmployeeRecord[], 
 
 const KENYA_RETURNS: ReturnFile[] = [
   { key: 'p10', label: 'KRA PAYE (P10)', name: 'kra-p10', what: 'iTax P10 return', authority: 'KRA', build: (ps, es, { rates }) => p10File(ps, es, rates) },
-  { key: 'sha', label: 'SHA', name: 'sha', what: 'SHIF contributions', authority: 'SHA', build: (ps, es) => shaFile(ps, es) },
+  { key: 'sha', label: 'SHIF (SHA)', name: 'shif', what: 'SHIF contributions, filed with SHA', authority: 'SHA', build: (ps, es) => shaFile(ps, es) },
   { key: 'nssf', label: 'NSSF', name: 'nssf', what: 'NSSF contributions', authority: 'NSSF', build: (ps, es) => nssfFile(ps, es) },
   { key: 'ahl', label: 'Housing levy (AHL)', name: 'housing-levy', what: 'each employee’s levy, employee and employer shares', authority: 'KRA', build: (ps, es, { rates }) => ahlFile(ps, es, rates) },
   { key: 'nita', label: 'NITA training levy', name: 'nita-levy', what: 'employer levy per employee (not taken from pay)', authority: 'NITA', build: (ps, es) => nitaFile(ps, es) },

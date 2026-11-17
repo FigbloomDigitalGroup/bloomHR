@@ -54,6 +54,20 @@ export function appOrigin(appUrl: string): string {
   }
 }
 
+/**
+ * Platform emails (migration 20261029100000_platform_organisations.sql) are written in the database, which doesn't know
+ * the app's address: their links are paths ("/platform/organisations"). This puts the app's address in front of them.
+ * Without an https APP_URL the paths stay as they are.
+ */
+export function withAppLinks(html: string, appUrl: string): string {
+  const origin = appOrigin(appUrl);
+  if (!origin) return html;
+  return html.replace(/href="\/(?!\/)/g, `href="${origin}/`);
+}
+
+/** Queued emails from the platform itself (not a company's own email): their links point at the app. */
+export const isPlatformEmail = (purpose: string | null | undefined) => typeof purpose === 'string' && purpose.startsWith('platform-');
+
 /** The page an HR alert is handled on: the one all the items share, else the app's start page. */
 export const HR_PAGES: Record<string, string> = {
   leave_recommended: '/leaves',
@@ -70,6 +84,9 @@ export const HR_PAGES: Record<string, string> = {
   leave_document_overdue: '/leave-discipline',
   attendance_odd_hours: '/attendance',
   missed_scan_requested: '/attendance?tab=missed',
+  possible_absences: '/leave-discipline?tab=possible',
+  payment_due: '/payments',
+  requisition_requested: '/payments?tab=requisitions',
 };
 
 /**
@@ -90,6 +107,8 @@ export const STAFF_TABS: Record<string, string> = {
   incident_update: 'incident-report', task_assigned: 'tasks', exit_approved: 'resignation', exit_declined: 'resignation',
   contract_sent: 'contract', contract_sent_back: 'contract', contract_accepted: 'contract', contract_cancelled: 'contract',
   missed_scan_request: 'my-team', missed_scan_approved: 'home', missed_scan_declined: 'home',
+  possible_absence: 'home',
+  payment_made: 'home', requisition_approved: 'home', requisition_rejected: 'home',
 };
 
 /** The portal address opened on one section (the address as it is when it can't be read). */
@@ -132,13 +151,25 @@ interface Layout {
   companyName: string | null;
   firstName: string | null;
   intro: string;
-  rows: { title: string; message?: string }[];
+  rows: { title: string; message?: string; at?: string }[];
   link: string;
   button: string;
   footer: string;
 }
 
-/** The shared look: the company's name in a green band, a greeting, one row per item, a button, a small footer. */
+/**
+ * When something happened, as the email shows it: "23 Oct 2026, 13:05" in East Africa time (every company is in Kenya,
+ * Tanzania or Uganda, all UTC+3, as the daily email cap counts days). Empty for a missing or unreadable time.
+ */
+export function emailTime(iso: string | undefined): string {
+  const d = iso ? new Date(iso) : null;
+  if (!d || Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Africa/Nairobi',
+  }).format(d);
+}
+
+/** The shared look: the company's name in a green band, a greeting, one row per item (with its time), a button, a small footer. */
 function layout({ companyName, firstName, intro, rows, link, button, footer }: Layout): string {
   const company = escape(companyName || 'Figbloom HR');
   const hello = firstName ? `Hi ${escape(firstName)},` : 'Hi,';
@@ -149,6 +180,9 @@ function layout({ companyName, firstName, intro, rows, link, button, footer }: L
         <div style="font-weight:600;color:#16201A;font-size:14px">${escape(n.title)}</div>${
           n.message ? `
         <div style="color:#4B5563;font-size:13px;line-height:1.5;margin-top:4px">${escape(n.message).replace(/\r?\n/g, '<br>')}</div>` : ''
+        }${
+          emailTime(n.at) ? `
+        <div style="color:#9CA3AF;font-size:11px;margin-top:4px">${escape(emailTime(n.at))}</div>` : ''
         }
       </td></tr>`
     )

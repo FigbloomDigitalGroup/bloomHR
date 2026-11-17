@@ -75,7 +75,7 @@ export const FiltersSection = ({
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Employee Type</label>
+          <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide">Employment type</label>
           <select
             value={selectedType}
             onChange={(e) => setSelectedType(e.target.value)}

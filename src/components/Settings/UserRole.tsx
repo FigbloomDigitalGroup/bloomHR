@@ -33,6 +33,7 @@ import FigbloomLoader from '../UI/FigbloomLoader';
 import EmployeeNumberingCard from './EmployeeNumbering';
 import ApprovalWorkflowsCard from './ApprovalWorkflows';
 import TwoStepSignInCard from './TwoStepSignIn';
+import StaySignedInCard from './StaySignedIn';
 import MyTwoStepCard from './MyTwoStep';
 import CareersSettingsCard from './CareersSettings';
 import LoanSettingsCard from '../Loans/LoanSettingsCard';
@@ -863,6 +864,8 @@ export default function UserRolesSettings() {
 
         {/* two-step sign-in, per company (FIG-834) */}
         <TwoStepSignInCard />
+        {/* how long people stay signed in, per company */}
+        <StaySignedInCard />
         {/* your own sign-in code (FIG-891) */}
         <MyTwoStepCard />
 

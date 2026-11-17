@@ -38,7 +38,7 @@ import Scanners from './Scanners';
 const FRONT: Scanner = {
   id: 'd1', name: 'Front door', serialNumber: 'BRAV260421021', brand: 'zkteco', allowedIp: '41.90.12.34', active: true,
   lastSeenAt: '2026-10-22T05:05:00Z', lastIp: '41.90.12.34', lastError: null, lastErrorAt: null,
-  clockWarning: null, clockWarningAt: null, usersReceivedAt: null,
+  clockWarning: null, clockWarningAt: null, usersReceivedAt: null, punchMode: 'first_last',
 };
 
 beforeEach(() => {
@@ -96,10 +96,49 @@ describe('Scanners tab', () => {
     expect(api.checkSerialTried).toHaveBeenCalledWith('NEW0000001');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
     await waitFor(() =>
-      expect(api.saveScanner).toHaveBeenCalledWith(null, { name: 'Side door', serialNumber: 'new0000001', allowedIp: '', active: true })
+      expect(api.saveScanner).toHaveBeenCalledWith(null, { name: 'Side door', serialNumber: 'new0000001', allowedIp: '', active: true, punchMode: 'first_last' })
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(api.loadScanners).toHaveBeenCalledTimes(2);
+  });
+
+  it('sets how a scanner’s punches count: four modes, each described, first and last scan by default', async () => {
+    render(<Scanners />);
+    const row = (await screen.findByText('Front door')).closest('tr') as HTMLElement;
+    expect(within(row).getByText('Counts: First and last scan')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Add a scanner' }));
+    const dialog = await screen.findByRole('dialog');
+    const picker = within(dialog).getByRole('group', { name: 'How its punches count' });
+    const radios = within(picker).getAllByRole('radio') as HTMLInputElement[];
+    expect(radios.map((r) => r.value)).toEqual(['first_last', 'in_only', 'out_only', 'device_keys']);
+    expect(radios.map((r) => r.checked)).toEqual([true, false, false, false]);
+    expect(picker.textContent).toContain('First scan of the day is the clock-in, the last is the clock-out (one shared door)');
+    expect(picker.textContent).toContain('Clock-in only (an entrance device)');
+    expect(picker.textContent).toContain('Clock-out only (an exit device)');
+    expect(picker.textContent).toContain('Use the scanner’s In/Out keys');
+    // a new scanner: no "from now on" note
+    expect(within(dialog).queryByRole('note')).toBeNull();
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Exit' } });
+    fireEvent.change(within(dialog).getByLabelText('Serial number'), { target: { value: 'EXIT000001' } });
+    fireEvent.click(within(picker).getByRole('radio', { name: /Clock-out only/ }));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(api.saveScanner).toHaveBeenCalledWith(null, { name: 'Exit', serialNumber: 'EXIT000001', allowedIp: '', active: true, punchMode: 'out_only' })
+    );
+  });
+
+  it('editing a scanner’s mode says it applies from now on', async () => {
+    api.loadScanners.mockResolvedValue([{ ...FRONT, punchMode: 'device_keys' }]);
+    render(<Scanners />);
+    expect(await screen.findByText('Counts: In/Out keys')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Front door' }));
+    const dialog = await screen.findByRole('dialog');
+    expect((within(dialog).getByRole('radio', { name: /In\/Out keys/ }) as HTMLInputElement).checked).toBe(true);
+    expect(within(dialog).queryByRole('note')).toBeNull();
+    fireEvent.click(within(dialog).getByRole('radio', { name: /Clock-in only/ }));
+    expect(within(dialog).getByRole('note').textContent).toMatch(/from now on.*stay as they are/);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.saveScanner).toHaveBeenCalledWith('d1', expect.objectContaining({ punchMode: 'in_only' })));
   });
 
   it('shows a refusal in the form', async () => {

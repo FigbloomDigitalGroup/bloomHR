@@ -1,10 +1,12 @@
 // services/chatServices.ts
 import { supabase } from "../../../lib/supabase";
-import type { Channel, Message, Employee, DirectMessage } from "../types/types";
+import type { Attachment, Channel, Message, Employee, DirectMessage, ReactionRow } from "../types/types";
 import { AvatarService } from './avatar';
 import type { DirectoryPerson, Member } from '../lib/groups';
-import { chatDisplayName, directMessageId, initialsOf, isDirectMessageId, realChannelId } from '../lib/names';
+import { chatDisplayName, directMessageId, initialsOf, isDirectMessageId, isLocalOnlyMessage, realChannelId } from '../lib/names';
 import { toUnreadCounts, type UnreadCounts } from '../lib/unread';
+import { attachmentProblem, CHAT_ATTACHMENTS_BUCKET, MAX_ATTACHMENTS_PER_MESSAGE, toAttachments } from '../lib/attachments';
+import { currentUserAndTenant, randomFileName } from '../../../lib/privateFiles';
 
 /** How many of a channel's latest messages the chat loads. */
 const CHANNEL_HISTORY_LIMIT = 500;
@@ -18,12 +20,24 @@ interface MessageRow {
   author_initials?: string | null;
   author_town?: string | null;
   created_at: string;
-  reactions?: Message['reactions'] | null;
+  attachments?: unknown;
+  reply_to?: string | null;
+  is_edited?: boolean | null;
 }
 
-const toMessage = (msg: MessageRow): Message => ({
+/** How many reactions rows to ask for at once: the message ids go in the address, which has a length limit. */
+const REACTION_BATCH = 100;
+
+const toReactionRow = (r: { id: string; message_id: string; user_id: string; emoji: string }): ReactionRow => ({
+  id: r.id,
+  messageId: r.message_id,
+  userId: r.user_id,
+  emoji: r.emoji,
+});
+
+export const toMessage = (msg: MessageRow): Message => ({
   id: msg.id,
-  content: msg.content,
+  content: msg.content ?? '',
   author: {
     id: msg.author_id,
     name: msg.author_name || 'Unknown User',
@@ -34,7 +48,11 @@ const toMessage = (msg: MessageRow): Message => ({
     town: msg.author_town || 'Unknown'
   },
   timestamp: msg.created_at,
-  reactions: msg.reactions || []
+  // reactions are their own rows (message_reactions), loaded and kept live by the chat; the old reactions column is unused
+  reactions: [],
+  attachments: toAttachments(msg.attachments),
+  replyTo: msg.reply_to ?? null,
+  isEdited: !!msg.is_edited,
 });
 
 class ChatService {
@@ -370,7 +388,12 @@ class ChatService {
     ];
   }
 
-  async sendMessage(channelId: string, userId: string, content: string): Promise<Message | null> {
+  async sendMessage(
+    channelId: string,
+    userId: string,
+    content: string,
+    extras: { replyTo?: string | null; attachments?: Attachment[] } = {}
+  ): Promise<Message | null> {
     try {
       console.log("💬 Sending message to channel:", channelId);
 
@@ -412,15 +435,18 @@ class ChatService {
           author_name: fullName,
           author_initials: initials,
           author_town: town,
-          author_avatar: userAvatar
+          author_avatar: userAvatar,
+          reply_to: extras.replyTo || null,
+          attachments: extras.attachments ?? []
         })
         .select()
         .single();
 
       if (error) {
         console.error('Error sending message:', error);
-        // a private conversation must never pretend a message was delivered
-        if (isDirect) throw new Error(error.message || 'The message could not be sent');
+        // a private conversation must never pretend a message was delivered, nor a reply or a file anywhere: the
+        // placeholder below would show something nobody else will ever see
+        if (isDirect || extras.replyTo || extras.attachments?.length) throw new Error(error.message || 'The message could not be sent');
         return this.createMockMessage(userId, fullName, initials, content, town, userAvatar);
       }
 
@@ -437,7 +463,10 @@ class ChatService {
           town: town
         },
         timestamp: data.created_at,
-        reactions: []
+        reactions: [],
+        attachments: toAttachments(data.attachments),
+        replyTo: data.reply_to ?? null,
+        isEdited: false
       };
 
       console.log("✅ Message sent successfully:", newMessage.id);
@@ -445,7 +474,9 @@ class ChatService {
 
     } catch (error) {
       console.error('Error sending message:', error);
-      if (isDirectMessageId(channelId)) throw error instanceof Error ? error : new Error('The message could not be sent');
+      if (isDirectMessageId(channelId) || extras.replyTo || extras.attachments?.length) {
+        throw error instanceof Error ? error : new Error('The message could not be sent');
+      }
       const { data: userData } = await supabase.auth.getUser();
       const userName = chatDisplayName({ metadata: userData.user?.user_metadata, email: userData.user?.email });
 
@@ -545,7 +576,15 @@ class ChatService {
     }
   }
 
-  subscribeToMessages(channelId: string, callback: (message: Message) => void): any {
+  /**
+   * New messages in this chat, live, and (when given) edits and deletions. A deleted row's event carries only its id
+   * and can't be filtered by chat, so `onDelete` hears every deletion I may see and drops the ones not on screen.
+   */
+  subscribeToMessages(
+    channelId: string,
+    callback: (message: Message) => void,
+    handlers: { onUpdate?: (message: Message) => void; onDelete?: (messageId: string) => void } = {}
+  ): any {
     try {
       console.log(`🔔 Setting up real-time subscription for channel: ${channelId}`);
 
@@ -580,6 +619,17 @@ class ChatService {
             }
           }
         )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'messages', filter: `channel_id=eq.${conversationId}` },
+          (payload) => {
+            if (payload.new?.id) handlers.onUpdate?.(toMessage(payload.new as MessageRow));
+          }
+        )
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, (payload) => {
+          const id = (payload.old as { id?: string } | undefined)?.id;
+          if (id) handlers.onDelete?.(id);
+        })
         .subscribe();
 
       return subscription;
@@ -588,6 +638,132 @@ class ChatService {
       console.error('Error setting up real-time subscription:', error);
       return null;
     }
+  }
+
+  /** The reactions on these messages (as stored rows: one per person and emoji). */
+  async getReactions(messageIds: string[]): Promise<ReactionRow[]> {
+    const ids = messageIds.filter((id) => !isLocalOnlyMessage(id));
+    const rows: ReactionRow[] = [];
+    for (let i = 0; i < ids.length; i += REACTION_BATCH) {
+      const { data, error } = await supabase
+        .from('message_reactions')
+        .select('id, message_id, user_id, emoji')
+        .in('message_id', ids.slice(i, i + REACTION_BATCH))
+        .order('created_at', { ascending: true });
+      if (error) {
+        console.error('Error loading reactions:', error);
+        return rows;
+      }
+      rows.push(...(data || []).map(toReactionRow));
+    }
+    return rows;
+  }
+
+  /** Adds my reaction with this emoji, or takes it away if I already reacted with it. Returns what changed. */
+  async toggleReaction(
+    messageId: string,
+    emoji: string,
+    userId: string,
+    existing?: ReactionRow
+  ): Promise<{ added?: ReactionRow; removedId?: string }> {
+    if (existing) {
+      const { error } = await supabase.from('message_reactions').delete().eq('id', existing.id);
+      if (error) throw new Error(error.message || 'Could not remove the reaction');
+      return { removedId: existing.id };
+    }
+    const { data, error } = await supabase
+      .from('message_reactions')
+      .insert({ message_id: messageId, user_id: userId, emoji })
+      .select('id, message_id, user_id, emoji')
+      .single();
+    if (error || !data) throw new Error(error?.message || 'Could not add the reaction');
+    return { added: toReactionRow(data) };
+  }
+
+  /**
+   * Reactions in every chat I can read, live (the policies decide which reach me). A removed reaction's event carries
+   * only its id, which is enough to take it off the screen.
+   */
+  subscribeToReactions(onAdd: (row: ReactionRow) => void, onRemove: (reactionId: string) => void): ReturnType<typeof supabase.channel> {
+    return supabase
+      .channel('chat_message_reactions')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'message_reactions' }, (payload) => {
+        const row = payload.new as { id: string; message_id: string; user_id: string; emoji: string };
+        if (row?.id && row.message_id) onAdd(toReactionRow(row));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'message_reactions' }, (payload) => {
+        const id = (payload.old as { id?: string } | undefined)?.id;
+        if (id) onRemove(id);
+      })
+      .subscribe();
+  }
+
+  /**
+   * Uploads files for a message into the chat's own folder of the private bucket (<company>/<chat id>/<file>), where
+   * only the people who can read the chat can open them. All or nothing: if one fails, the others are removed.
+   */
+  async uploadAttachments(channelId: string, files: File[]): Promise<Attachment[]> {
+    if (files.length > MAX_ATTACHMENTS_PER_MESSAGE) throw new Error(`Send at most ${MAX_ATTACHMENTS_PER_MESSAGE} files in one message`);
+    for (const file of files) {
+      const problem = attachmentProblem(file);
+      if (problem) throw new Error(problem);
+    }
+    const { tenantId } = await currentUserAndTenant();
+    const folder = `${tenantId}/${realChannelId(channelId)}`;
+    const uploaded: Attachment[] = [];
+    try {
+      for (const file of files) {
+        const path = `${folder}/${randomFileName(file.name)}`;
+        const { error } = await supabase.storage.from(CHAT_ATTACHMENTS_BUCKET).upload(path, file, { contentType: file.type });
+        if (error) throw new Error(`${file.name} could not be uploaded: ${error.message}`);
+        uploaded.push({ path, name: file.name.slice(0, 200), type: file.type, size: file.size });
+      }
+      return uploaded;
+    } catch (error) {
+      if (uploaded.length) await this.removeFiles(uploaded);
+      throw error;
+    }
+  }
+
+  /** Takes uploaded files away again (a message that could not be sent, or one that was deleted). */
+  async removeFiles(attachments: Attachment[]): Promise<void> {
+    const paths = attachments.map((a) => a.path);
+    if (paths.length === 0) return;
+    const { error } = await supabase.storage.from(CHAT_ATTACHMENTS_BUCKET).remove(paths);
+    if (error) console.warn('Chat files were not removed:', error);
+  }
+
+  /** Changes the text of my message (the database marks it as edited). */
+  async editMessage(messageId: string, content: string): Promise<Message> {
+    const { data, error } = await supabase
+      .from('messages')
+      .update({ content })
+      .eq('id', messageId)
+      .select()
+      .single();
+    if (error || !data) throw new Error(error?.message || 'The message could not be changed');
+    return toMessage(data as MessageRow);
+  }
+
+  /** Deletes my message, then its files (a reply to it stays, without its quote). */
+  async deleteMessage(message: Message): Promise<void> {
+    const { data, error } = await supabase.from('messages').delete().eq('id', message.id).select('id');
+    if (error) throw new Error(error.message || 'The message could not be deleted');
+    if (!data || data.length === 0) throw new Error('You can only delete your own messages');
+    await this.removeFiles(message.attachments || []);
+  }
+
+  /** Login id -> name for the people of my company, to say who reacted. */
+  async getPeopleNames(employees: Employee[]): Promise<Record<string, string>> {
+    const { data, error } = await supabase.rpc('company_members');
+    if (error || !data) return {};
+    const byEmail = new Map(employees.map((e) => [(e.workEmail || '').toLowerCase(), e.fullName]));
+    const names: Record<string, string> = {};
+    for (const m of data as { user_id: string; email: string }[]) {
+      const email = (m.email || '').toLowerCase();
+      names[m.user_id] = byEmail.get(email) || email.split('@')[0];
+    }
+    return names;
   }
 
   unsubscribe(subscription: any): void {

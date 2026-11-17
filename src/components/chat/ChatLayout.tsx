@@ -11,7 +11,9 @@ import { canCreateChannels } from "./lib/permissions";
 import { usePermissions } from "../../hooks/usePermissions";
 import { isOnline, useOnlinePeople } from "./lib/presence";
 import { ChatPeopleContext } from "./lib/chatPeople";
-import type { Employee, User, Channel, DirectMessage, Message } from "../chat/types/types";
+import { myReaction, withReaction } from "./lib/reactions";
+import { messagePreview } from "./lib/attachments";
+import type { Employee, User, Channel, DirectMessage, Message, ReactionRow } from "../chat/types/types";
 import FigbloomLoader from "../UI/FigbloomLoader";
 import { loadMutedChats, setChatMuted } from "../../lib/notificationPreferences";
 
@@ -25,6 +27,10 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: (channelId: st
   const [directMessages, setDirectMessages] = useState<DirectMessage[]>([]);
   const [activeChannel, setActiveChannel] = useState<Channel | DirectMessage | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  // the reactions on the open chat's messages, one row per person and emoji (live: see the reactions listener below)
+  const [reactionRows, setReactionRows] = useState<ReactionRow[]>([]);
+  // login id -> name, to say who reacted
+  const [peopleNames, setPeopleNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -77,7 +83,7 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: (channelId: st
         const employeesData = await loadEmployeesData();
 
         // Find current user in employees using the returned data
-        const employeeData = employeesData.find(emp => 
+        const employeeData = employeesData.find(emp =>
           emp.workEmail?.toLowerCase() === user.email?.toLowerCase()
         );
 
@@ -87,13 +93,13 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: (channelId: st
 
         const userData: User = {
           id: user.id,
-          name: employeeData ? 
-            `${employeeData.firstName} ${employeeData.lastName}`.trim() : 
+          name: employeeData ?
+            `${employeeData.firstName} ${employeeData.lastName}`.trim() :
             user.user_metadata?.name || user.email?.split('@')[0] || 'User',
-          avatar: employeeData?.profileImage || 
-            user.user_metadata?.avatar || 
+          avatar: employeeData?.profileImage ||
+            user.user_metadata?.avatar ||
             `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
-          initials: employeeData ? 
+          initials: employeeData ?
             `${employeeData.firstName?.[0] || ''}${employeeData.lastName?.[0] || ''}`.toUpperCase() :
             user.user_metadata?.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'U',
           email: user.email || '',
@@ -124,6 +130,7 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: (channelId: st
       const employeesData = await chatService.getEmployees();
       console.log("✅ Employees loaded:", employeesData.length);
       setEmployees(employeesData);
+      chatService.getPeopleNames(employeesData).then(setPeopleNames, () => undefined);
       return employeesData;
     } catch (error: any) {
       console.error('❌ Error loading employees:', error);
@@ -155,7 +162,7 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: (channelId: st
           userId: partner?.id || partnerEmail,
           email: partnerEmail,
           unread_count: channel.unread_count,
-          lastMessage: lastMessage?.content,
+          lastMessage: lastMessage ? messagePreview(lastMessage) : undefined,
           lastMessageTime: lastMessage?.timestamp,
           hasMessages: !!lastMessage
         } as DirectMessage;
@@ -218,7 +225,8 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: (channelId: st
           town: data.author_town || 'Unknown'
         },
         timestamp: data.created_at,
-        reactions: data.reactions || []
+        reactions: [],
+        attachments: data.attachments || []
       };
     } catch (error) {
       console.error('Error getting last message:', error);
@@ -226,22 +234,31 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: (channelId: st
     }
   };
 
+  // the chat whose messages are on screen, so a slow load for a chat I already left doesn't replace them
+  const loadingChatRef = useRef<string | null>(null);
+
   const loadMessages = async (channelId: string) => {
     try {
       console.log("📨 Loading messages for channel:", channelId);
+      loadingChatRef.current = channelId;
       const channelMessages = await chatService.getChannelMessages(channelId);
+      if (loadingChatRef.current !== channelId) return;
       console.log("✅ Loaded messages:", channelMessages.length);
       setMessages(channelMessages);
+      setReactionRows([]);
+      chatService.getReactions(channelMessages.map(m => m.id)).then(rows => {
+        if (loadingChatRef.current === channelId) setReactionRows(rows);
+      });
 
       // Update DM activity status when messages are loaded
       if (channelId.startsWith('dm-')) {
-        setDirectMessages(prev => 
-          prev.map(dm => 
-            dm.id === channelId 
-              ? { 
-                  ...dm, 
+        setDirectMessages(prev =>
+          prev.map(dm =>
+            dm.id === channelId
+              ? {
+                  ...dm,
                   hasMessages: channelMessages.length > 1, // More than just welcome message
-                  lastMessage: channelMessages[channelMessages.length - 1]?.content,
+                  lastMessage: channelMessages.length ? messagePreview(channelMessages[channelMessages.length - 1]) : undefined,
                   lastMessageTime: channelMessages[channelMessages.length - 1]?.timestamp
                 }
               : dm
@@ -254,15 +271,22 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: (channelId: st
     }
   };
 
-  const handleSendMessage = async (content: string) => {
-    if (!activeChannel || !content.trim() || !currentUser) {
+  // Sends the text with any files (uploaded first, into the chat's own folder) and the message it replies to.
+  // Returns whether it was sent, so the box keeps the draft when it wasn't.
+  const handleSendMessage = async (content: string, files: File[] = [], replyTo?: Message | null): Promise<boolean> => {
+    if (!activeChannel || (!content.trim() && files.length === 0) || !currentUser) {
       console.log("❌ Cannot send message - missing requirements");
-      return;
+      return false;
     }
 
+    let attachments: Awaited<ReturnType<typeof chatService.uploadAttachments>> = [];
     try {
       console.log("💬 Sending message...");
-      const newMessage = await chatService.sendMessage(activeChannel.id, currentUser.id, content);
+      if (files.length > 0) attachments = await chatService.uploadAttachments(activeChannel.id, files);
+      const newMessage = await chatService.sendMessage(activeChannel.id, currentUser.id, content, {
+        replyTo: replyTo?.id,
+        attachments,
+      });
 
       if (newMessage) {
         // Now that realtime is actually enabled (see chat_realtime.sql),
@@ -283,13 +307,13 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: (channelId: st
 
         // Update DM activity status when a message is sent
         if (activeChannel.id.startsWith('dm-')) {
-          setDirectMessages(prev => 
-            prev.map(dm => 
-              dm.id === activeChannel.id 
-                ? { 
-                    ...dm, 
+          setDirectMessages(prev =>
+            prev.map(dm =>
+              dm.id === activeChannel.id
+                ? {
+                    ...dm,
                     hasMessages: true,
-                    lastMessage: newMessage.content,
+                    lastMessage: messagePreview(newMessage),
                     lastMessageTime: newMessage.timestamp
                   }
                 : dm
@@ -299,9 +323,49 @@ export function ChatLayout({ onMessagesRead }: { onMessagesRead?: (channelId: st
 
         console.log("✅ Message sent successfully");
       }
+      return true;
     } catch (error: any) {
       console.error('❌ Error sending message:', error);
-      setError(error.message || 'Failed to send message');
+      // the files went up but the message didn't: take them away again rather than leave files nobody can see
+      if (attachments.length) void chatService.removeFiles(attachments);
+      // a message that didn't go is said where it happened; the draft stays in the box to try again
+      toast.error(error?.message || 'The message could not be sent');
+      return false;
+    }
+  };
+
+  // Adds my reaction, or takes it back when I already chose that emoji. Shown at once; the realtime echo is ignored.
+  const handleReact = async (messageId: string, emoji: string) => {
+    if (!currentUser) return;
+    const existing = myReaction(reactionRows, messageId, emoji, currentUser.id);
+    try {
+      const { added, removedId } = await chatService.toggleReaction(messageId, emoji, currentUser.id, existing);
+      if (added) setReactionRows(prev => withReaction(prev, added));
+      if (removedId) setReactionRows(prev => prev.filter(r => r.id !== removedId));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not react to the message');
+    }
+  };
+
+  const handleEditMessage = async (messageId: string, content: string): Promise<boolean> => {
+    try {
+      const updated = await chatService.editMessage(messageId, content);
+      setMessages(prev => prev.map(m => (m.id === messageId ? { ...m, content: updated.content, isEdited: true } : m)));
+      return true;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'The message could not be changed');
+      return false;
+    }
+  };
+
+  const handleDeleteMessage = async (message: Message) => {
+    try {
+      await chatService.deleteMessage(message);
+      // a reply to it keeps its place, without the quote (the database empties reply_to)
+      setMessages(prev => prev.filter(m => m.id !== message.id).map(m => (m.replyTo === message.id ? { ...m, replyTo: null } : m)));
+      setReactionRows(prev => prev.filter(r => r.messageId !== message.id));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'The message could not be deleted');
     }
   };
 
@@ -472,19 +536,33 @@ const handleDMCreate = async (userId: string) => {
 
       // Update DM activity status for real-time messages
       if (activeChannel.id.startsWith('dm-')) {
-        setDirectMessages(prev => 
-          prev.map(dm => 
-            dm.id === activeChannel.id 
-              ? { 
-                  ...dm, 
+        setDirectMessages(prev =>
+          prev.map(dm =>
+            dm.id === activeChannel.id
+              ? {
+                  ...dm,
                   hasMessages: true,
-                  lastMessage: newMessage.content,
+                  lastMessage: messagePreview(newMessage),
                   lastMessageTime: newMessage.timestamp
                 }
               : dm
           )
         );
       }
+    }, {
+      // someone edited their message: new text, same place (the author, files and reply don't change)
+      onUpdate: (updated) => {
+        setMessages(prev => prev.map(m => (m.id === updated.id ? { ...m, content: updated.content, isEdited: updated.isEdited } : m)));
+      },
+      // someone deleted theirs: it goes, and replies to it lose their quote
+      onDelete: (messageId) => {
+        setMessages(prev =>
+          prev.some(m => m.id === messageId)
+            ? prev.filter(m => m.id !== messageId).map(m => (m.replyTo === messageId ? { ...m, replyTo: null } : m))
+            : prev
+        );
+        setReactionRows(prev => prev.filter(r => r.messageId !== messageId));
+      },
     });
 
     return () => {
@@ -494,6 +572,25 @@ const handleDMCreate = async (userId: string) => {
       }
     };
   }, [activeChannel?.id, currentUser]);
+
+  // Reactions, live: anyone in the open chat reacting (or taking a reaction back) shows for everyone at once. Only the
+  // open chat's messages are kept; the policies make sure I only hear about chats I can read.
+  const messageIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    messageIdsRef.current = new Set(messages.map(m => m.id));
+  }, [messages]);
+  useEffect(() => {
+    if (!currentUser) return;
+    const subscription = chatService.subscribeToReactions(
+      (row) => {
+        if (messageIdsRef.current.has(row.messageId)) setReactionRows(prev => withReaction(prev, row));
+      },
+      (reactionId) => setReactionRows(prev => prev.filter(r => r.id !== reactionId))
+    );
+    return () => {
+      chatService.unsubscribe(subscription);
+    };
+  }, [currentUser]);
 
   // Refresh channels when employees are loaded (for DM partner data)
   useEffect(() => {
@@ -584,7 +681,7 @@ const handleDMCreate = async (userId: string) => {
     <ChatPeopleContext.Provider value={people}>
     <SidebarProvider className="h-full">
       <div className="flex h-full w-full bg-background">
-        <AppSidebar 
+        <AppSidebar
           channels={channels.filter(ch => !ch.id.startsWith('dm-'))}
           directMessages={liveDirectMessages}
           activeChannel={liveActiveChannel}
@@ -596,7 +693,7 @@ const handleDMCreate = async (userId: string) => {
           users={getUsersForSidebar()}
         />
         {liveActiveChannel ? (
-          <ChatArea 
+          <ChatArea
             channel={liveActiveChannel}
             messages={messages}
             currentUserId={currentUser.id}
@@ -604,9 +701,14 @@ const handleDMCreate = async (userId: string) => {
             onToggleMute={(channelId) => void toggleMute(channelId)}
             isMuted={mutedChats.has(realChannelId(liveActiveChannel.id))}
             employees={liveEmployees}
+            reactionRows={reactionRows}
+            peopleNames={peopleNames}
+            onReact={(messageId, emoji) => void handleReact(messageId, emoji)}
+            onEditMessage={handleEditMessage}
+            onDeleteMessage={(message) => void handleDeleteMessage(message)}
           />
         ) : (
-          <WelcomeScreen 
+          <WelcomeScreen
             currentUser={currentUser}
             onCreateChannel={handleChannelCreate}
           />

@@ -26,6 +26,8 @@ const invite = (as: string, email: string, role: string) =>
 
 beforeAll(async () => {
   db = await bootLiveDb();
+  // new companies open straight away here (approving them is tested in platform_organisations.test.ts)
+  await db.exec(`update platform_settings set auto_approve_companies = true`);
   await db.exec(`
     insert into auth.users (id, email) values
       ('${OWNER}', 'owner@figbloom.org'), ('${HR}', 'hr@figbloom.org'), ('${STAFF}', 'staff@figbloom.org'),

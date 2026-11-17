@@ -1,4 +1,5 @@
 import { directMessageId, realChannelId } from './names';
+import { messagePreview } from './attachments';
 
 /**
  * Unread badges, kept up to date from the realtime messages themselves (FIG-817). The counts are loaded once, with
@@ -14,6 +15,7 @@ export interface IncomingMessage {
   channel_id?: string | null;
   author_id?: string | null;
   content?: string | null;
+  attachments?: unknown;
   created_at?: string | null;
 }
 
@@ -89,7 +91,8 @@ export function withIncomingDirectMessage<T extends DirectMessageEntry>(dms: T[]
             ...dm,
             unread_count: (dm.unread_count || 0) + (unread ? 1 : 0),
             hasMessages: true,
-            lastMessage: message.content ?? dm.lastMessage,
+            // a message that is only a file shows the file
+            lastMessage: messagePreview(message) || dm.lastMessage,
             lastMessageTime: message.created_at ?? dm.lastMessageTime,
           }
         : dm

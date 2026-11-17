@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 import { fetchAll } from './fetchAll';
 import { editedColumnsOf, withPayslipEdits, type PayslipChange, type PayslipOverride, type StatutoryContext, type EditablePayslip } from './payslipOverrides';
+import { reimbursementItemsOf, withReimbursements } from './reimbursements';
+import { savedReimbursements } from './reimbursementsDb';
 
 // The database side of payslip edits (lib/payslipOverrides; migration 20261018300000_payslip_edits): a run's edits,
 // saving / removing one payslip's edits with its history row, and the history itself.
@@ -35,8 +37,14 @@ export const loadRunOverrides = async (runId: string): Promise<Map<string, Paysl
   }
 };
 
+// the edit works out net pay again from the calculation, so the saved payslip's reimbursements are added back to it
 const writePayslip = async (runId: string, employeeId: string, payslip: Record<string, unknown>) => {
-  const { error } = await supabase.from('salary_history').update(editedColumnsOf(payslip)).eq('run_id', runId).eq('employee_id', employeeId);
+  const items = reimbursementItemsOf({ reimbursement_items: await savedReimbursements(runId, employeeId) });
+  const { error } = await supabase
+    .from('salary_history')
+    .update(editedColumnsOf(withReimbursements({ ...payslip, reimbursements: 0 }, items)))
+    .eq('run_id', runId)
+    .eq('employee_id', employeeId);
   if (error) throw error;
 };
 

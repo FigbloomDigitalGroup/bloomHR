@@ -7,7 +7,7 @@
     "build": "tsc --noEmit",
     "test": "vitest run",
     "synth": "cdk synth --quiet",
-    "diff": "cdk diff --profile figbloom",
+    "diff": "cdk diff",
     "cdk": "cdk"
   },
   "devDependencies": {

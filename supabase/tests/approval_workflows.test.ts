@@ -44,10 +44,21 @@ const run = async (sql: string) => {
     return (e as Error).message;
   }
 };
-const apply = async (user: string, employee: string, type = 'Annual Leave') =>
+
+// each application in these tests gets its own week (Monday to Wednesday), so none overlaps another of the same
+// employee (leave_application_overlap(), 20261108300000); the first keeps 2026-11-02
+let week = 0;
+const nextWeek = () => {
+  const start = new Date('2026-11-02T00:00:00Z');
+  start.setUTCDate(start.getUTCDate() + 7 * week++);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 2);
+  return [start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)];
+};
+const apply = async (user: string, employee: string, type = 'Annual Leave', [start, end] = nextWeek()) =>
   (await asUser(db, user, () => rows<{ id: string }>(
     `insert into leave_application ("Employee Number", name, "Leave Type", "Start Date", "End Date", days, status)
-     values ('${employee}', 'Applicant ${employee}', '${type}', '2026-11-02', '2026-11-04', 3, 'pending') returning id`)))[0].id;
+     values ('${employee}', 'Applicant ${employee}', '${type}', '${start}', '${end}', 3, 'pending') returning id`)))[0].id;
 const request = async (leave: string) =>
   (await rows<{ id: string; status: string; current_step: number; steps: unknown[] }>(
     `select id, status, current_step, steps from approval_requests where record_id = '${leave}'`))[0];
@@ -147,6 +158,10 @@ describe('the default leave workflow is today\'s', () => {
 
   it('HR may reject before the recommendation, and an admin may act at any step', async () => {
     const id = await apply(U.ME, 'E-ME');
+    // a rejection needs a reason (20261025500000), and nothing is decided without one
+    expect(await decide(U.HR, id, 'rejected')).toMatch(/Give a reason for rejecting/);
+    expect(await decide(U.HR, id, 'rejected', '   ')).toMatch(/Give a reason for rejecting/);
+    expect(await request(id)).toMatchObject({ status: 'pending' });
     expect(await decide(U.HR, id, 'rejected', 'too busy')).toBe('');
     expect(await leave(id)).toEqual({ status: 'rejected', recstatus: null, notes: 'too busy', recommendation_notes: null });
 
@@ -206,7 +221,7 @@ describe('only the current approver decides, in order', () => {
     expect(await request(id)).toMatchObject({ status: 'rejected', current_step: 2 });
     expect(await leave(id)).toMatchObject({ status: 'rejected', recstatus: 'not_recommended', notes: 'short staffed' });
     expect(await decide(U.CTO, id, 'approved')).toMatch(/already been rejected/);
-    expect((await notes('E-ME', 'leave_rejected')).at(-1)).toMatch(/has been rejected\. Reason: short staffed\./);
+    expect((await notes('E-ME', 'leave_rejected')).at(-1)).toMatch(/has been rejected by [^.]+\. Reason: short staffed\./);
     expect((await chain(U.ME, id)).steps.map((s) => s.status)).toEqual(['approved', 'rejected', 'not_reached']);
   });
 

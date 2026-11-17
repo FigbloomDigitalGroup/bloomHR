@@ -301,6 +301,16 @@ export async function approveOnboarding(employeeId: string, comment?: string) {
   if (error) fail(error, 'Could not approve.');
 }
 
+/**
+ * HR approves someone who never sent their form (still invited, not invited, or sent back): HR submits it for them, then
+ * approves it. The same essentials apply; the history shows HR did both.
+ */
+export async function approveOnBehalf(employeeId: string, comment?: string) {
+  const { error } = await supabase.rpc('submit_onboarding', { p_employee: employeeId });
+  if (error) fail(error, 'The record could not be submitted.');
+  await approveOnboarding(employeeId, comment);
+}
+
 export async function requestOnboardingChanges(employeeId: string, comment: string) {
   if (!comment.trim()) throw new Error('Say what needs changing.');
   const { error } = await supabase.rpc('review_onboarding', { p_employee: employeeId, p_decision: 'request_changes', p_comment: comment.trim() });

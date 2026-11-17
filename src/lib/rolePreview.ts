@@ -1,7 +1,7 @@
 import { ADMIN_ONLY_MODULES, moduleAllowedForBase } from './roles';
 import { moduleInfo } from './modules';
 import { SCREENS, canOpenScreen, inMenu, isHiddenScreen, screenFor, usesStaffPortal } from './routeModules';
-import { SIDEBAR_MENU, STAFF_PORTAL_MENU, STAFF_PORTAL_MY_TEAM, STAFF_PORTAL_MY_WORK } from './sidebarMenu';
+import { SIDEBAR_MENU, STAFF_PORTAL_MAIL, STAFF_PORTAL_MENU, STAFF_PORTAL_MY_TEAM, STAFF_PORTAL_MY_WORK } from './sidebarMenu';
 
 // "Preview as this role" on the Roles screen: exactly what someone holding a role would see, worked out with the
 // same rules the app uses (routeModules.ts for the admin app's menu and routes, usesStaffPortal for who gets the staff
@@ -104,6 +104,13 @@ function portalPreview(base: string, modules: string[]): RolePreview {
       if (has(x.module)) work.shown.push({ label: `Tasks: ${x.label}` });
       else work.hidden.push({ label: `Tasks: ${x.label}`, needs: whatWouldShow(base, [x.module]) });
     }
+  }
+  // Mail, their own mailbox, follows the My mailbox module
+  const communication = areas.find((a) => a.title === 'Communication');
+  if (communication) {
+    const label = `Communication: ${STAFF_PORTAL_MAIL.label}`;
+    if (has('mailbox')) communication.shown.unshift({ label });
+    else communication.hidden.push({ label, needs: whatWouldShow(base, ['mailbox']) });
   }
   // two sections follow the person, not the role
   areas.splice(1, 0,

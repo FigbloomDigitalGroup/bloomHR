@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
 const perms = vi.hoisted(() => ({ granted: null as string[] | null }));
@@ -10,6 +10,32 @@ vi.mock('../../hooks/usePermissions', () => ({
     loading: false,
   }),
 }));
+// the new-mail count (its asking is tested in useMailboxUnread.test.tsx): what the sidebar was given, and the count
+const mail = vi.hoisted(() => ({ unread: 0, calls: [] as [boolean, string | undefined][] }));
+vi.mock('../../hooks/useMailboxUnread', () => ({
+  useMailboxUnread: (enabled: boolean, who: string | undefined) => {
+    mail.calls.push([enabled, who]);
+    return enabled ? mail.unread : 0;
+  },
+}));
+// money waiting on the person (its counting is tested in useMoneyBadges.test.ts)
+const money = vi.hoisted(() => ({ badges: {} as Record<string, number>, calls: [] as [string | undefined, boolean][] }));
+vi.mock('../../hooks/useMoneyBadges', () => ({
+  useMoneyBadges: (who: string | undefined, paysOut: boolean) => {
+    money.calls.push([who, paysOut]);
+    return money.badges;
+  },
+}));
+const work = vi.hoisted(() => ({ badges: {} as Record<string, number>, calls: [] as Record<string, boolean>[] }));
+vi.mock('../../hooks/useWorkBadges', () => ({
+  useWorkBadges: (_who: string | undefined, access: Record<string, boolean>) => {
+    work.calls.push(access);
+    return work.badges;
+  },
+}));
+// Figbloom platform admins see the Platform menu (is_platform_admin() is tested in supabase/tests)
+const platform = vi.hoisted(() => ({ admin: false }));
+vi.mock('../../lib/platformRates', () => ({ isPlatformAdmin: () => Promise.resolve(platform.admin) }));
 vi.mock('../../hooks/useMyPreferences', () => ({
   useMyPreferences: () => ({ data: null }),
 }));
@@ -166,5 +192,157 @@ describe('Job groups in the menu', () => {
     perms.granted = ['dashboard', 'leaves'];
     sidebar();
     expect(screen.queryByText('Job groups')).toBeNull();
+  });
+});
+
+describe('the Platform menu', () => {
+  const sidebar = () =>
+    render(
+      <MemoryRouter>
+        <Sidebar user={{ email: 'ops@figbloom.org', role: 'ADMIN' }} isCollapsed={false} onToggle={() => {}} />
+      </MemoryRouter>,
+    );
+  afterEach(() => {
+    platform.admin = false;
+  });
+
+  it('shows Organisations and Statutory rates to platform admins', async () => {
+    setWidth(1280);
+    platform.admin = true;
+    sidebar();
+    expect(await screen.findByText('Organisations')).toBeTruthy();
+    expect(screen.getByText('Statutory rates')).toBeTruthy();
+  });
+
+  it('is hidden from everyone else, administrators included', async () => {
+    setWidth(1280);
+    sidebar();
+    await act(async () => {});
+    expect(screen.queryByText('Organisations')).toBeNull();
+    expect(screen.queryByText('Statutory rates')).toBeNull();
+  });
+});
+
+describe('new mail on Email Portal', () => {
+  const sidebar = (collapsed = false) =>
+    render(
+      <MemoryRouter>
+        <Sidebar user={{ email: 'mary@co.com', role: 'HR' }} isCollapsed={collapsed} onToggle={() => {}} />
+      </MemoryRouter>,
+    );
+  const portal = () => screen.getByText('Email Portal').closest('button') as HTMLElement;
+  beforeEach(() => {
+    setWidth(1280);
+    mail.unread = 0;
+    mail.calls = [];
+  });
+  afterEach(() => {
+    perms.granted = null;
+  });
+
+  it('shows the unread count (99+ past 99) for people with the My mailbox module', () => {
+    perms.granted = ['mailbox'];
+    mail.unread = 7;
+    sidebar();
+    expect(portal().textContent).toBe('Email Portal7');
+    expect(within(portal()).getByTitle('7 unread')).toBeTruthy();
+    expect(mail.calls.at(-1)).toEqual([true, 'mary@co.com']);
+    cleanup();
+    mail.unread = 120;
+    sidebar();
+    expect(portal().textContent).toBe('Email Portal99+');
+  });
+
+  it('hides at 0', () => {
+    perms.granted = ['mailbox'];
+    sidebar();
+    expect(portal().textContent).toBe('Email Portal');
+  });
+
+  it('a dot on the collapsed sidebar', () => {
+    perms.granted = ['mailbox'];
+    mail.unread = 2;
+    sidebar(true);
+    const icon = document.querySelector('[aria-label="2 unread"]');
+    expect(icon).toBeTruthy();
+  });
+
+  it('is not asked for without the module (sending only)', () => {
+    perms.granted = ['email-portal'];
+    mail.unread = 7;
+    sidebar();
+    expect(portal().textContent).toBe('Email Portal');
+    expect(mail.calls.every(([enabled]) => enabled === false)).toBe(true);
+  });
+});
+
+describe('money waiting on the person', () => {
+  const sidebar = () =>
+    render(
+      <MemoryRouter>
+        <Sidebar user={{ email: 'ops@co.com', role: 'HR' }} isCollapsed={false} onToggle={() => {}} />
+      </MemoryRouter>,
+    );
+  const item = (label: string) => screen.getByText(label).closest('button') as HTMLElement;
+  beforeEach(() => {
+    setWidth(1280);
+    money.badges = {};
+    money.calls = [];
+  });
+  afterEach(() => {
+    perms.granted = null;
+  });
+
+  it('counts advances, loans and payments on their items', () => {
+    perms.granted = ['salaryadmin', 'loans', 'payments'];
+    money.badges = { advanced: 1, loans: 2, payments: 3 };
+    sidebar();
+    expect(item('Salary Advance').textContent).toBe('Salary Advance1');
+    expect(within(item('Salary Advance')).getByTitle('1 pending')).toBeTruthy();
+    expect(item('Loans').textContent).toBe('Loans2');
+    expect(within(item('Payments to make')).getByTitle('3 to pay or approve')).toBeTruthy();
+    expect(money.calls.at(-1)).toEqual(['ops@co.com', true]);
+  });
+
+  it('nothing at 0, and payments to make are counted only for finance', () => {
+    perms.granted = ['salaryadmin'];
+    sidebar();
+    expect(item('Salary Advance').textContent).toBe('Salary Advance');
+    expect(money.calls.every(([, paysOut]) => paysOut === false)).toBe(true);
+  });
+});
+
+describe('HR requests waiting on the person', () => {
+  const sidebar = () =>
+    render(
+      <MemoryRouter>
+        <Sidebar user={{ email: 'hr@co.com', role: 'HR' }} isCollapsed={false} onToggle={() => {}} />
+      </MemoryRouter>,
+    );
+  const item = (label: string) => screen.getByText(label).closest('button') as HTMLElement;
+  beforeEach(() => {
+    setWidth(1280);
+    work.badges = {};
+    work.calls = [];
+  });
+  afterEach(() => {
+    perms.granted = null;
+  });
+
+  it('counts missed scans, exits, onboarding reviews and overtime on their items', () => {
+    perms.granted = ['employees', 'hr-lifecycle', 'approve-exits', 'payroll'];
+    work.badges = { attendance: 2, 'hr-lifecycle': 1, onboarding: 3, overtime: 4 };
+    sidebar();
+    expect(item('Attendance').textContent).toBe('Attendance2');
+    expect(item('HR Lifecycle').textContent).toBe('HR Lifecycle1');
+    expect(item('Onboarding').textContent).toBe('Onboarding3');
+    expect(item('Overtime').textContent).toBe('Overtime4');
+    expect(work.calls.at(-1)).toEqual({ attendance: true, exits: true, onboarding: true, overtime: true, signups: false });
+  });
+
+  it('asks only for what the person may decide', () => {
+    perms.granted = ['team-work'];
+    sidebar();
+    expect(work.calls.at(-1)).toEqual({ attendance: true, exits: false, onboarding: false, overtime: true, signups: false });
   });
 });

@@ -4,15 +4,32 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 vi.mock('react-hot-toast', () => ({ default: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 vi.mock('../../lib/salaryAdvanceApi', () => ({
   loadAdvanceQueue: vi.fn(),
-  loadPayees: vi.fn(),
   approveAdvance: vi.fn(),
   declineAdvance: vi.fn(),
-  markAdvancePaid: vi.fn(),
 }));
+// finance (the 'payments' module) records the payment in Payments to make
+const perms = { modules: ['salaryadmin', 'payments'] };
+vi.mock('../../hooks/usePermissions', () => ({
+  usePermissions: () => ({ hasPermission: (p: string) => perms.modules.includes(p), loading: false }),
+}));
+const navigate = vi.fn();
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router-dom')>()),
+  useNavigate: () => navigate,
+}));
+// a request's approval chain (20261025700000): none by default, so these decide directly as before
+const chains: { value: Record<string, unknown> } = { value: {} };
+vi.mock('../../lib/approvals', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/approvals')>()),
+  decideApproval: vi.fn(async () => 'approved'),
+  loadApprovalChains: vi.fn(async () => chains.value),
+}));
+vi.mock('./ApplyForSomeone', () => ({ default: ({ open }: { open: boolean }) => (open ? <div role="dialog" aria-label="Apply for someone" /> : null) }));
 // the real client must never be reached from the queue (it goes through salaryAdvanceApi)
 vi.mock('../../lib/supabase', () => ({ supabase: new Proxy({}, { get: () => { throw new Error('supabase used'); } }) }));
 
 import * as api from '../../lib/salaryAdvanceApi';
+import * as approvals from '../../lib/approvals';
 import AdvanceQueue from './AdvanceQueue';
 
 const mocked = vi.mocked(api);
@@ -22,18 +39,14 @@ const ROWS = [
   { id: 'a1', 'Employee Number': 'E2', 'Full Name': 'Peter Otieno', 'Amount Requested': 4000, status: 'approved', time_added: asked },
   { id: 'a2', 'Employee Number': 'E3', 'Full Name': 'Mary Akinyi', 'Amount Requested': 3000, status: 'approved', time_added: asked },
 ];
-const PAYEES = {
-  E1: { 'First Name': 'Jane', 'Last Name': 'Wanjiru', payment_method: 'M-Pesa', 'Mobile Number': '0712345678' },
-  E2: { 'First Name': 'Peter', 'Last Name': 'Otieno', payment_method: 'M-Pesa', 'Mobile Number': '0712345678' },
-  E3: { 'First Name': 'Mary', 'Last Name': 'Akinyi', payment_method: 'M-Pesa', 'Mobile Number': '' },
-};
 
 let fetchSpy: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   vi.clearAllMocks();
+  chains.value = {};
+  perms.modules = ['salaryadmin', 'payments'];
   mocked.loadAdvanceQueue.mockResolvedValue(ROWS);
-  mocked.loadPayees.mockResolvedValue(PAYEES);
-  for (const f of [mocked.approveAdvance, mocked.declineAdvance, mocked.markAdvancePaid]) f.mockResolvedValue(undefined);
+  for (const f of [mocked.approveAdvance, mocked.declineAdvance]) f.mockResolvedValue(undefined);
   fetchSpy = vi.fn();
   vi.stubGlobal('fetch', fetchSpy);
 });
@@ -42,10 +55,34 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const show = () => render(<AdvanceQueue canDecide demoDelayMs={20} />);
+const show = () => render(<AdvanceQueue canDecide />);
 const card = (id: string) => screen.getByTestId(`advance-${id}`);
 
+const chainFor = (canDecide: boolean) => ({
+  record_id: 'p1', request_id: 'q1', status: 'pending', current_step: 1, can_approve: canDecide, can_reject: canDecide,
+  steps: [{ position: 1, label: 'Line manager', approver_type: 'reports_to', status: 'current', waiting_on: 'Max Manager',
+            actor_name: null, acted_as: null, comment: null, acted_at: null }],
+});
+
 describe('the advance queue', () => {
+  it('a request on an approval chain is decided through it, and its chain shows', async () => {
+    chains.value = { p1: chainFor(true) };
+    show();
+    await screen.findByText('Jane Wanjiru');
+    expect(within(card('p1')).getByText(/Line manager/)).toBeTruthy();
+    fireEvent.click(within(card('p1')).getByRole('button', { name: 'Approve' }));
+    await vi.waitFor(() => expect(vi.mocked(approvals.decideApproval)).toHaveBeenCalledWith('q1', 'approved', ''));
+    expect(mocked.approveAdvance).not.toHaveBeenCalled();
+  });
+
+  it('on a chain, only its step’s approvers get the buttons, whatever the screen allows', async () => {
+    chains.value = { p1: chainFor(false) };
+    show();
+    await screen.findByText('Jane Wanjiru');
+    expect(within(card('p1')).queryByRole('button', { name: 'Approve' })).toBeNull();
+    expect(within(card('p1')).queryByRole('button', { name: 'Decline' })).toBeNull();
+  });
+
   it('approves a pending request', async () => {
     show();
     await screen.findByText('Jane Wanjiru');
@@ -66,51 +103,45 @@ describe('the advance queue', () => {
     await vi.waitFor(() => expect(mocked.declineAdvance).toHaveBeenCalledWith('p1', 'Over the limit'));
   });
 
-  it('demo pay: confirms, simulates the send, and saves or sends nothing', async () => {
+  it('an approved advance is paid from Payments to make: finance gets the way there, nothing is paid here', async () => {
     show();
     await screen.findByText('Jane Wanjiru');
     fireEvent.click(screen.getByRole('button', { name: /Approved \(2\)/ }));
-    fireEvent.click(within(card('a1')).getByRole('button', { name: /Pay advance/ }));
-    const dialog = screen.getByRole('dialog', { name: 'Pay advance' });
-    expect(within(dialog).getByText('Demo mode — no money moves')).toBeTruthy();
-    expect(within(dialog).getByText('M-Pesa 0712 *** 678')).toBeTruthy();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Pay KSh 4,000' }));
-    expect(await within(dialog).findByText('Advance of KSh 4,000 sent to Peter Otieno (M-Pesa 0712 *** 678)')).toBeTruthy();
+    expect(within(card('a1')).queryByRole('button', { name: /Mark as paid|Pay advance/ })).toBeNull();
+    fireEvent.click(within(card('a1')).getByRole('button', { name: 'Record payment' }));
+    expect(navigate).toHaveBeenCalledWith('/payments');
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(mocked.markAdvancePaid).not.toHaveBeenCalled();
-    expect(mocked.approveAdvance).not.toHaveBeenCalled();
-    expect(mocked.loadAdvanceQueue).toHaveBeenCalledTimes(1);
   });
 
-  it('demo pay: a missing M-Pesa number is an error and blocks paying', async () => {
+  it('without the payments module, an approved advance says finance pays it', async () => {
+    perms.modules = ['salaryadmin'];
     show();
     await screen.findByText('Jane Wanjiru');
     fireEvent.click(screen.getByRole('button', { name: /Approved \(2\)/ }));
-    fireEvent.click(within(card('a2')).getByRole('button', { name: /Pay advance/ }));
-    const dialog = screen.getByRole('dialog', { name: 'Pay advance' });
-    expect(within(dialog).getByRole('alert').textContent).toMatch(/No M-Pesa number/);
-    const pay = within(dialog).getByRole('button', { name: 'Pay KSh 3,000' }) as HTMLButtonElement;
-    expect(pay.disabled).toBe(true);
-    fireEvent.click(pay);
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(mocked.markAdvancePaid).not.toHaveBeenCalled();
-  });
-
-  it('mark as paid records the real payment, showing what payroll will take back', async () => {
-    show();
-    await screen.findByText('Jane Wanjiru');
-    fireEvent.click(screen.getByRole('button', { name: /Approved \(2\)/ }));
-    fireEvent.click(within(card('a1')).getByRole('button', { name: 'Mark as paid' }));
-    const dialog = screen.getByRole('dialog', { name: 'Mark as paid' });
-    expect(within(dialog).getByText(/KSh 4,000 off .* pay/)).toBeTruthy();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Mark as paid' }));
-    await vi.waitFor(() => expect(mocked.markAdvancePaid).toHaveBeenCalledWith('a1'));
-    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(within(card('a1')).queryByRole('button', { name: 'Record payment' })).toBeNull();
+    expect(within(card('a1')).getByText(/Waiting for finance to pay it/)).toBeTruthy();
   });
 
   it('shows the queue without actions to those who may not decide', async () => {
     render(<AdvanceQueue canDecide={false} />);
     await screen.findByText('Jane Wanjiru');
     expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+  });
+});
+
+describe('applying for someone', () => {
+  it('those who decide get Apply for someone; a request made for a person says who applied', async () => {
+    mocked.loadAdvanceQueue.mockResolvedValue([{ ...ROWS[0], requested_by_email: 'hr@acme.co' }]);
+    show();
+    expect(await screen.findByText('Applied on their behalf by hr@acme.co')).toBeTruthy();
+    expect(within(card('p1')).getByText('repaid in full on the next pay')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Apply for someone/ }));
+    expect(screen.getByRole('dialog', { name: 'Apply for someone' })).toBeTruthy();
+  });
+
+  it('those who only see the queue do not', async () => {
+    render(<AdvanceQueue canDecide={false} />);
+    await screen.findByText('Jane Wanjiru');
+    expect(screen.queryByRole('button', { name: /Apply for someone/ })).toBeNull();
   });
 });

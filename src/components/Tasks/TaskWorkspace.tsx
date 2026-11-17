@@ -114,15 +114,22 @@ export default function TaskWorkspace({ mode, teamNumbers, initialOpenId = null 
     const me = viewer.employeeNumber;
     return !!me && (p.lead_number === me || (members[p.id] ?? []).includes(me) || (!!p.department_id && p.department_id === myDepartment));
   }, [viewer, members, myDepartment]);
-  // edits the project and its members: its lead, or the people who run tasks
-  const leads = useCallback((p: TaskProject) => !!viewer && (viewer.manages || p.created_by === viewer.userId || (!!viewer.employeeNumber && p.lead_number === viewer.employeeNumber)), [viewer]);
+  // edits the project and its members: its lead, or the people who run tasks (the Personal project has neither)
+  const leads = useCallback((p: TaskProject) => !!viewer && !p.personal && (viewer.manages || p.created_by === viewer.userId || (!!viewer.employeeNumber && p.lead_number === viewer.employeeNumber)), [viewer]);
 
+  // the Personal project first: everyone has it
   const sidebarProjects = useMemo(
-    () => projects.filter((p) => (showArchived || !p.archived) && (mode === 'admin' || managesProjects || isMember(p) || tasks.some((t) => t.project_id === p.id))),
+    () => projects
+      .filter((p) => p.personal || ((showArchived || !p.archived) && (mode === 'admin' || managesProjects || isMember(p) || tasks.some((t) => t.project_id === p.id))))
+      .sort((a, b) => Number(!!b.personal) - Number(!!a.personal)),
     [projects, showArchived, mode, managesProjects, isMember, tasks]
   );
-  // the people who run tasks may add a task to any project (they then see it, as its creator)
-  const creatable = useMemo(() => projects.filter((p) => !p.archived && (!!viewer?.manages || isMember(p))), [projects, isMember, viewer]);
+  // anyone adds their own tasks to the Personal project; the people who run tasks may add a task to any project (they
+  // then see it, as its creator)
+  const creatable = useMemo(
+    () => projects.filter((p) => !p.archived && (p.personal || !!viewer?.manages || isMember(p))).sort((a, b) => Number(!!b.personal) - Number(!!a.personal)),
+    [projects, isMember, viewer]
+  );
 
   // what this scope shows, before the filters
   const scoped = useMemo(() => {
@@ -265,7 +272,12 @@ export default function TaskWorkspace({ mode, teamNumbers, initialOpenId = null 
                 </div>
               </div>
 
-              {currentProject && !viewer.oversees && !isMember(currentProject) && (
+              {currentProject?.personal && (
+                <p className="mb-3 text-[12px] text-muted-foreground">
+                  Your own tasks. Only you see the ones you add here, with your supervisor and HR.
+                </p>
+              )}
+              {currentProject && !currentProject.personal && !viewer.oversees && !isMember(currentProject) && (
                 <p className="mb-3 text-[12px] text-muted-foreground">
                   You are not in this project, so you only see its tasks you're involved in.{leads(currentProject) ? ' Add yourself as a member to see all of them.' : ''}
                 </p>

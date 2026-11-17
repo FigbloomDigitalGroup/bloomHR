@@ -12,20 +12,24 @@ import NotFound from './components/NOT FOUND/NotFound';
 import UpdatePasswordPage from './pages/UpdatePassword';
 
 import AuthCallback from './pages/AuthCallback';
+import { figbloomLogoutUrl, figbloomSignInEnabled } from './lib/figbloomSignIn';
 import React from 'react';
 import { UserProvider } from '../src/components/ProtectedRoutes/UserContext';
 import MFAVerification from './pages/MFAverification';
 import { landingTarget, useCompanyProfile, withProfileRole } from './hooks/useCompanyProfile';
 import { syncThemeWithAccount } from './lib/preferences';
 import CompanyGate from './components/Company/CompanyGate';
+import CompanyStatusGate from './components/Company/CompanyStatusGate';
 import FigbloomLoader from './components/UI/FigbloomLoader';
 import { useCompanySwitching } from './hooks/useMyCompanies';
 import { useMobileNav } from './components/Layout/useMobileNav';
 import { isStaleChunkError, reloadOnceForStaleChunk } from './lib/staleChunk';
 import { welcomeMessage } from './lib/welcome';
-import { IDLE_WARNING_MS, idleState, lastActivity, markActivity } from './lib/idleLogout';
+import { FALLBACK_IDLE_TIMEOUT_MS, IDLE_WARNING_MS, idleState, lastActivity, markActivity } from './lib/idleLogout';
+import { loadStaySignedIn } from './lib/mfaApi';
 import { isHiddenModule } from './lib/hiddenModules';
 import { usesStaffPortal } from './lib/routeModules';
+import { isConsoleHost } from './lib/console';
 
 // Route-level code splitting: each page is fetched when first visited.
 const AdminVideoUpload = lazy(() => import('./components/training/Training'));
@@ -36,6 +40,7 @@ const LoanRequestsAdmin = lazy(() => import('./components/Settings/StaffLoan'));
 const PayrollDashboard = lazy(() => import('./components/Payroll/PayrollDashboard'));
 const PayslipDesignPage = lazy(() => import('./components/Payroll/PayslipDesignPage'));
 const PlatformRatesPage = lazy(() => import('./components/Payroll/PlatformRatesPage'));
+const OrganisationsPage = lazy(() => import('./components/Platform/OrganisationsPage'));
 const StaffSignupRequests = lazy(() => import('./pages/admin'));
 const StaffPortalLanding = lazy(() => import('./components/staff portal/StaffPortal'));
 const RecruitmentDashboard = lazy(() => import('./components/Recruitment/RecruitmentDashboard'));
@@ -59,6 +64,7 @@ const BranchesPage = lazy(() => import('./components/Settings/Branches'));
 const AuditTrailPage = lazy(() => import('./components/Settings/AuditTrail'));
 const SalaryAdvanceAdmin = lazy(() => import('./components/Settings/SalaryAdmin'));
 const LoansAdmin = lazy(() => import('./components/Loans/LoansAdmin'));
+const PaymentsToMake = lazy(() => import('./components/Payments/PaymentsToMake'));
 const CasualWorkers = lazy(() => import('./components/Casual/CasualWorkers'));
 const LeaveDisciplinePage = lazy(() => import('./components/LeaveDiscipline/LeaveDisciplinePage'));
 const AttendancePage = lazy(() => import('./components/Attendance/AttendancePage'));
@@ -72,6 +78,12 @@ const ReportsList = lazy(() => import('./components/Reports/ReportLists'));
 const StaffLoansReport = lazy(() => import('./components/Reports/staffloans'));
 const StatutoryDeductionsReport = lazy(() => import('./components/Reports/statutory'));
 const GroupReport = lazy(() => import('./components/Reports/GroupReport'));
+const SalaryReport = lazy(() => import('./components/Reports/SalaryReport'));
+const OtherDeductionsReport = lazy(() => import('./components/Reports/OtherDeductionsReport'));
+const LeaveReport = lazy(() => import('./components/Reports/LeaveReport'));
+const TerminationReport = lazy(() => import('./components/Reports/TerminationReport'));
+const SmsReport = lazy(() => import('./components/Reports/SmsReport'));
+const BranchPerformanceReport = lazy(() => import('./components/Reports/BranchPerformanceReport'));
 const AssetManagement = lazy(() => import('./components/Asset/Asset'));
 const QRScanner = lazy(() => import('./components/Asset/scan'));
 const MpesaZapPortal = lazy(() => import('./components/Settings/MpesaZapPortal'));
@@ -86,6 +98,10 @@ const TaskManager = lazy(() => import('./components/Task Manager/TaskManager'));
 const SMSCenter = lazy(() => import('./components/SMS/Sms').then((m) => ({ default: m.SMSCenter })));
 const JoinCompany = lazy(() => import('./pages/JoinCompany'));
 const OfferPage = lazy(() => import('./pages/OfferPage'));
+// arriving from Figbloom Schools' HR & Payroll (one-click sign-in, src/lib/platformHandoff.ts)
+const PlatformHandoff = lazy(() => import('./pages/PlatformHandoff'));
+const FigbloomCallback = lazy(() => import('./pages/FigbloomCallback'));
+const HandoffLinker = lazy(() => import('./components/Platform/HandoffLinker'));
 const OffersPage = lazy(() => import('./components/AfterHiring/OffersPage'));
 const CreateCompany = lazy(() => import('./pages/CreateCompany'));
 const NoCompany = lazy(() => import('./pages/NoCompany'));
@@ -94,6 +110,8 @@ const InvitePeople = lazy(() => import('./components/Settings/InvitePeople'));
 const ChatLayout = lazy(() => import('./components/chat/ChatLayout').then((m) => ({ default: m.ChatLayout })));
 // the staff portal's Video Conference, for admins, HR, managers... (rooms private to the company: lib/meetingRooms.ts)
 const VideoCalls = lazy(() => import('./components/staff portal/VideoConf'));
+// the Figbloom console, on its own addresses only (src/lib/console.ts)
+const ConsoleApp = lazy(() => import('./components/Console/ConsoleApp'));
 
 interface User {
   email: string;
@@ -110,7 +128,8 @@ interface Branch {
 }
 
 // Pages a signed-in person may be on before two-step sign-in is done.
-const MFA_OPEN_PATHS = ['/login', '/mfa', '/update-password', '/join', '/create-company'];
+// /handoff signs a person in from Figbloom Schools and opens the next page at once; two-step sign-in is asked on that page.
+const MFA_OPEN_PATHS = ['/login', '/mfa', '/update-password', '/join', '/create-company', '/handoff', '/auth/figbloom'];
 
 const Loader = () => <FigbloomLoader fullScreen />;
 // while the person's company and workspace load
@@ -125,6 +144,49 @@ const PageLoader = () => (
   <div className="flex min-h-[60vh] items-center justify-center">
     <FigbloomLoader label="Loading" />
   </div>
+);
+
+// the same toasts in the company app and the console
+const AppToaster = () => (
+  <Toaster
+    position="top-right"
+    containerStyle={{
+      top: 20,
+      right: 20,
+    }}
+    reverseOrder={false}
+    gutter={8}
+    toastOptions={{
+      duration: 4000,
+      style: {
+        background: '#1f2937',
+        color: '#fff',
+        border: '1px solid #374151',
+        borderRadius: '8px',
+        fontSize: '14px',
+      },
+      success: {
+        iconTheme: {
+          primary: '#10b981',
+          secondary: '#fff',
+        },
+        duration: 3000,
+      },
+      error: {
+        iconTheme: {
+          primary: '#ef4444',
+          secondary: '#fff',
+        },
+        duration: 5000,
+      },
+      loading: {
+        iconTheme: {
+          primary: '#3b82f6',
+          secondary: '#fff',
+        },
+      },
+    }}
+  />
 );
 
 class ErrorBoundaryClass extends React.Component<
@@ -184,7 +246,8 @@ const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
   return <ErrorBoundaryClass resetKey={pathname}>{children}</ErrorBoundaryClass>;
 };
 
-function App() {
+// The company app: sign-in, a company's screens and the staff portal (on every address but the console's)
+function WorkspaceApp() {
   // All hooks at the top level
   const [authUser, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -276,7 +339,7 @@ function App() {
 
   // Check if current route should be excluded from inactivity timer
   const shouldExcludeFromInactivityTimer = useCallback(() => {
-    const excludedRoutes = ['/login', '/mfa', '/update-password', '/join', '/offer', '/create-company'];
+    const excludedRoutes = ['/login', '/mfa', '/update-password', '/join', '/offer', '/create-company', '/auth/figbloom'];
     const isExcludedRoute = excludedRoutes.includes(location.pathname);
     const isAuthProcess = sessionStorage.getItem('isMFAProcess') === 'true';
 
@@ -320,6 +383,20 @@ function App() {
   // Sign out after a spell away from every tab (see lib/idleLogout): activity in any tab is written to shared storage,
   // and each tab checks how long it has been since, so one idle tab no longer signs out someone working in another
   const watchIdle = !shouldExcludeFromInactivityTimer();
+  // how long is the company's "stay signed in" setting, read once per person signed in (the old 30 minutes until then)
+  const idleTimeoutRef = useRef(FALLBACK_IDLE_TIMEOUT_MS);
+  const idleUserId = session?.user?.id;
+  useEffect(() => {
+    idleTimeoutRef.current = FALLBACK_IDLE_TIMEOUT_MS;
+    if (!idleUserId) return;
+    let live = true;
+    loadStaySignedIn().then((s) => {
+      if (live && s?.minutes) idleTimeoutRef.current = s.minutes * 60 * 1000;
+    });
+    return () => {
+      live = false;
+    };
+  }, [idleUserId]);
   // the session object changes on each token refresh; that must not restart the watch and count as activity
   const autoLogoutRef = useRef(handleAutoLogout);
   autoLogoutRef.current = handleAutoLogout;
@@ -342,7 +419,7 @@ function App() {
     markActivity(lastActivityWriteRef.current);
 
     const check = () => {
-      const state = idleState(Date.now(), lastActivity());
+      const state = idleState(Date.now(), lastActivity(), idleTimeoutRef.current);
       if (state === 'expired') {
         autoLogoutRef.current();
       } else if (state === 'warn') {
@@ -520,6 +597,13 @@ function App() {
       setSelectedTown('');
       setSelectedRegion('All Regions');
       localStorage.removeItem('selectedTown');
+      // Figbloom sign-in: end Figbloom's own session too (it sends the browser back to /login). A timeout doesn't,
+      // so signing in again is one click.
+      const figbloomLogout = figbloomSignInEnabled() ? figbloomLogoutUrl('customers') : null;
+      if (figbloomLogout) {
+        window.location.assign(figbloomLogout);
+        return;
+      }
       navigate('/login', { replace: true });
     } catch (error) {
       console.error('Unexpected logout error:', error);
@@ -726,7 +810,8 @@ function App() {
         } else {
           setUser(null);
           const currentPath = location.pathname;
-          const publicPaths = ['/login', '/update-password', '/mfa', '/join', '/offer', '/create-company'];
+          // /handoff: arriving from Figbloom Schools, before anyone is signed in
+          const publicPaths = ['/login', '/update-password', '/mfa', '/join', '/offer', '/create-company', '/handoff', '/auth/figbloom'];
 
           const urlHasRecoveryToken = window.location.href.includes('type=recovery') ||
             window.location.hash.includes('type=recovery');
@@ -844,7 +929,7 @@ function App() {
           hasShownWelcomeToast.current = true;
 
           const currentPath = location.pathname;
-          const publicPaths = ['/login', '/update-password', '/mfa', '/join', '/offer', '/create-company'];
+          const publicPaths = ['/login', '/update-password', '/mfa', '/join', '/offer', '/create-company', '/auth/figbloom'];
 
           // a two-step sign-in still due is caught by the two-step effect, which asks the server
           toast.success(welcomeMessage(session?.user?.id, userData.email));
@@ -904,6 +989,11 @@ function App() {
       <ErrorBoundary>
         <div className="min-h-screen bg-page overflow-x-hidden">
           {switchingCompany && <FigbloomLoader fullScreen label="Switching company" />}
+          {session && (
+            <Suspense fallback={null}>
+              <HandoffLinker userId={session.user.id} email={session.user.email ?? ''} pathname={location.pathname} />
+            </Suspense>
+          )}
           <Suspense fallback={<Loader />}>
           <Routes>
             <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
@@ -914,6 +1004,9 @@ function App() {
               }
             />
             <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/handoff" element={<PlatformHandoff />} />
+            {/* back from Figbloom's sign-in page (ERP/HR_COGNITO_CONTRACT.md); /auth/callback stays Supabase's own */}
+            <Route path="/auth/figbloom" element={<FigbloomCallback pool="customers" onLoginSuccess={handleLoginSuccess} />} />
             <Route path="/join" element={<JoinCompany />} />
             {/* a candidate's offer letter: the link's token opens that one offer, signed in or not */}
             <Route path="/offer" element={<OfferPage />} />
@@ -928,7 +1021,7 @@ function App() {
                   // someone who belongs to no company yet must set one up, not be shown a staff portal
                   <NoCompany email={session.user.email ?? ''} />
                 ) : companyState.status === 'ready' ? (
-                  <CompanyGate userId={session.user.id}><StaffPortalLanding /></CompanyGate>
+                  <CompanyStatusGate userId={session.user.id}><CompanyGate userId={session.user.id}><StaffPortalLanding /></CompanyGate></CompanyStatusGate>
                 ) : companyState.status === 'error' ? (
                   <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-center px-4">
                     <p className="text-sm text-gray-700">We could not load your account: {companyState.message}</p>
@@ -949,7 +1042,7 @@ function App() {
                 !session ? (
                   <Login onLoginSuccess={handleLoginSuccess} />
                 ) : companyState.status === 'ready' ? (
-                  <CompanyGate userId={session.user.id}><OnboardingPrint /></CompanyGate>
+                  <CompanyStatusGate userId={session.user.id}><CompanyGate userId={session.user.id}><OnboardingPrint /></CompanyGate></CompanyStatusGate>
                 ) : (
                   <WorkspaceLoader />
                 )
@@ -973,11 +1066,11 @@ function App() {
                 ) : companyState.status === 'loading' ? (
                   <WorkspaceLoader />
                 ) : usesStaffPortal(user.role) ? (
-                  <CompanyGate userId={session.user.id}>
+                  <CompanyStatusGate userId={session.user.id}><CompanyGate userId={session.user.id}>
                     <StaffPortalLanding />
-                  </CompanyGate>
+                  </CompanyGate></CompanyStatusGate>
                 ) : (
-                  <CompanyGate userId={session.user.id}>
+                  <CompanyStatusGate userId={session.user.id}><CompanyGate userId={session.user.id}>
                   <div className="flex flex-col min-h-screen bg-page">
                     <div className="relative flex flex-1 min-h-0 w-full overflow-x-hidden">
                       <Sidebar
@@ -1033,6 +1126,12 @@ function App() {
                                 {gate('/sms', <SMSCenter />)}
                                 {gate('/reports', <ReportsList />)}
                                 {gate('/reports/group', <GroupReport />)}
+                                {gate('/reports/staff-salary', <SalaryReport />)}
+                                {gate('/reports/other-deductions', <OtherDeductionsReport />)}
+                                {gate('/reports/leave-management', <LeaveReport />)}
+                                {gate('/reports/termination-report', <TerminationReport />)}
+                                {gate('/reports/sms-reports', <SmsReport />)}
+                                {gate('/reports/branch-performance', <BranchPerformanceReport />)}
                                 {gate('/reports/base', <BaseReport
                                   selectedTown={selectedTown} selectedRegion={selectedRegion} onTownChange={handleTownChange} onRegionChange={handleRegionChange}
                                   reportTitle="Base Report"
@@ -1060,7 +1159,9 @@ function App() {
                                 {gate('/payroll', <PayrollDashboard />)}
                                 {gate('/settings/payslip-design', <PayslipDesignPage />)}
                                 {/* Figbloom platform admins only: the page checks, and the database refuses anyone else (FIG-813) */}
+                                {/* also in the Figbloom console (src/lib/console.ts); these two go once it is live in production */}
                                 {gate('/platform/rates', <PlatformRatesPage />)}
+                                {gate('/platform/organisations', <OrganisationsPage />)}
                                 {gate('/settings', <UserRolesSettings />)}
                                 {/* everyone in the company reads it; Settings changes it */}
                                 {gate('/settings/company', <CompanyProfilePage />)}
@@ -1076,6 +1177,7 @@ function App() {
                                 {gate('/piece-rate', <PieceRatePage />)}
                                 {gate('/overtime', <OvertimePage />)}
                                 {gate('/loans', <LoansAdmin />)}
+                                {gate('/payments', <PaymentsToMake />)}
                                 {gate('/incident-reports', <IncidentReportsManagement />)}
                                 {gate('/work-injuries', <WorkInjuries />)}
                                 {gate('/adminconfirm', <StaffSignupRequests />)}
@@ -1104,55 +1206,31 @@ function App() {
                       </div>
                     </div>
                   </div>
-                  </CompanyGate>
+                  </CompanyGate></CompanyStatusGate>
                 )
               }
             />
           </Routes>
           </Suspense>
-          <Toaster
-            position="top-right"
-            containerStyle={{
-              top: 20,
-              right: 20,
-            }}
-            reverseOrder={false}
-            gutter={8}
-            toastOptions={{
-              duration: 4000,
-              style: {
-                background: '#1f2937',
-                color: '#fff',
-                border: '1px solid #374151',
-                borderRadius: '8px',
-                fontSize: '14px',
-              },
-              success: {
-                iconTheme: {
-                  primary: '#10b981',
-                  secondary: '#fff',
-                },
-                duration: 3000,
-              },
-              error: {
-                iconTheme: {
-                  primary: '#ef4444',
-                  secondary: '#fff',
-                },
-                duration: 5000,
-              },
-              loading: {
-                iconTheme: {
-                  primary: '#3b82f6',
-                  secondary: '#fff',
-                },
-              },
-            }}
-          />
+          <AppToaster />
         </div>
       </ErrorBoundary>
     </UserProvider>
   );
 }
 
-export default App;
+// The address decides which app this is: the Figbloom console (src/lib/console.ts) is a separate, small app for
+// platform admins, with no company in it; every other address gets the company app, exactly as before.
+export default function App() {
+  if (!isConsoleHost()) return <WorkspaceApp />;
+  return (
+    <ErrorBoundary>
+      <div className="min-h-screen bg-page overflow-x-hidden">
+        <Suspense fallback={<Loader />}>
+          <ConsoleApp />
+        </Suspense>
+        <AppToaster />
+      </div>
+    </ErrorBoundary>
+  );
+}

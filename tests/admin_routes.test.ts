@@ -19,21 +19,34 @@ const state = vi.hoisted(() => ({
   updates: [] as Record<string, unknown>[],
   authUsers: [] as { id: string; email: string; user_metadata: Record<string, unknown> }[],
   calls: [] as string[],
+  employees: [] as Record<string, unknown>[],
+  exits: [] as Record<string, unknown>[],
 }));
 
 vi.mock('@supabase/supabase-js', () => {
   // Minimal query builder over state[table]: select / eq / maybeSingle / upsert / delete.
   // user_profiles is read-only here (authenticate); the database mirrors memberships into it.
-  const makeTable = (name: 'profiles' | 'memberships') => {
+  const makeTable = (name: 'profiles' | 'memberships' | 'employees' | 'exits') => {
     const filters: [string, unknown][] = [];
+    const tests: ((row: Record<string, unknown>) => boolean)[] = [];
     const rowsOf = () => state[name] as Record<string, unknown>[];
-    const run = () => rowsOf().filter((p) => filters.every(([k, v]) => p[k] === v));
+    const run = () => rowsOf().filter((p) => filters.every(([k, v]) => p[k] === v) && tests.every((t) => t(p)));
+    const unquote = (k: string) => k.replace(/^"|"$/g, '');
     const builder: Record<string, unknown> = {
       select: () => builder,
       eq: (k: string, v: unknown) => {
-        filters.push([k, v]);
+        filters.push([unquote(k), v]);
         return builder;
       },
+      ilike: (k: string, v: string) => {
+        tests.push((row) => String(row[unquote(k)] ?? '').toLowerCase() === v.replace(/\\(.)/g, '$1').toLowerCase());
+        return builder;
+      },
+      in: (k: string, vs: unknown[]) => {
+        tests.push((row) => vs.includes(row[unquote(k)]));
+        return builder;
+      },
+      limit: () => builder,
       maybeSingle: async () => ({ data: run()[0] ?? null, error: null }),
       then: (resolve: (v: unknown) => void) => resolve({ data: run(), error: null }),
       upsert: async (row: Record<string, unknown>) => {
@@ -94,6 +107,8 @@ vi.mock('@supabase/supabase-js', () => {
     from: (table: string) => {
       if (table === 'user_profiles') return makeTable('profiles');
       if (table === 'memberships') return makeTable('memberships');
+      if (table === 'employees') return makeTable('employees');
+      if (table === 'employee_exits') return makeTable('exits');
       throw new Error(`unexpected table ${table}`);
     },
   };
@@ -138,6 +153,8 @@ beforeEach(() => {
   ];
   state.memberships = state.profiles.map((p) => ({ user_id: p.user_id, tenant_id: p.tenant_id as string, role: p.role, account_status: p.account_status }));
   state.updates = [];
+  state.employees = [];
+  state.exits = [];
 });
 
 const call = (method: string, path: string, as: string, body?: unknown) =>
@@ -266,5 +283,35 @@ describe('a person in several companies', () => {
     await call('DELETE', '/users/staff-a', 'admin-a');
     expect(state.calls).toContain('deleteUser:staff-a');
     expect(state.memberships.some((m) => m.user_id === 'staff-a')).toBe(false);
+  });
+});
+
+describe('reactivating someone who has left (their employee record says so)', () => {
+  const leave = (status: string, ended: string | null) => {
+    state.memberships.find((m) => m.user_id === 'staff-a')!.account_status = 'DEACTIVATED';
+    state.employees.push({ 'Employee Number': 'E7', 'First Name': 'Given', 'Last Name': 'Jim', 'Work Email': 'Staff@A.co', Status: status, 'Termination Date': ended, tenant_id: TENANT_A });
+  };
+
+  it('points to Bring back when their exit is still open, and changes nothing', async () => {
+    leave('Terminated', '2026-11-03');
+    state.exits.push({ id: 'x1', tenant_id: TENANT_A, employee_number: 'E7', status: 'approved' });
+    const res = await call('PATCH', '/users/staff-a', 'admin-a', { account_status: 'ACTIVE' });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/Given Jim has left through an exit.*Bring back/);
+    expect(state.calls.some((c) => c.startsWith('updateUser') || c.startsWith('upsert'))).toBe(false);
+  });
+
+  it('points to the employee record when no exit is open (a Terminated status, or a termination date passed)', async () => {
+    leave('Active', '2020-01-31');
+    const res = await call('PATCH', '/users/staff-a', 'admin-a', { account_status: 'ACTIVE' });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/clear their Termination Date/);
+  });
+
+  it('reactivates as before once the employee record is back to Active', async () => {
+    leave('Active', null);
+    const res = await call('PATCH', '/users/staff-a', 'admin-a', { account_status: 'ACTIVE' });
+    expect(res.status).toBe(200);
+    expect(state.memberships.find((m) => m.user_id === 'staff-a')!.account_status).toBe('ACTIVE');
   });
 });

@@ -62,7 +62,7 @@ export default function OnboardingSummary({ record, showPay = true }: { record: 
           ['Identity type', text(e['Type of Identification'])],
           ['ID / passport number', text(e['ID Number'])],
           ['KRA PIN', text(e['Tax PIN'])],
-          ['SHA number', text(e['SHIF Number'])],
+          ['SHIF number', text(e['SHIF Number'])],
           ['NSSF number', text(e['NSSF Number'])],
           ['Residency', text(e['kra_residency'])],
           ['Person with disability', yesNo(e['is_pwd'])],
@@ -90,9 +90,9 @@ export default function OnboardingSummary({ record, showPay = true }: { record: 
         <Group
           title="Employment and pay (entered by HR)"
           rows={[
-            ['Payroll number', text(e['Payroll Number'])],
+            ['Employee number', text(e['Employee Number'])],
             ['Position', text(e['Job Title'])],
-            ['Type of employee (KRA)', text(e['kra_employee_type'])],
+            ['KRA tax status', text(e['kra_employee_type'])],
             ['Basic salary', money(e['Basic Salary'])],
             ['House allowance', money(e['house_allowance'])],
             ['Travel allowance', money(e['travel_allowance'])],
