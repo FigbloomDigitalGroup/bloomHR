@@ -349,11 +349,17 @@ router.get(
 router.post(
   "/users",
   guard(["invite-people"], async (req, res, caller) => {
-    const { password, account_status = "ACTIVE", location, branch } = req.body || {};
+    const { account_status = "ACTIVE", location, branch } = req.body || {};
+    // With Figbloom sign-in (ERP/HR_COGNITO_CONTRACT.md section 2) an admin never chooses someone's password: the person
+    // gets "Set your password" by email and chooses it themselves (figbloom_accounts.js)
+    const accounts = await import("./figbloom_accounts.js");
+    const figbloom = accounts.cognitoSignInEnabled();
+    const password = figbloom ? undefined : req.body?.password;
     const requested = await resolveRequestedRole(caller, req.body);
     const role = requested?.role;
     const email = normalizeEmail(req.body?.email);
-    validateFields({ email, role, account_status, password }, { requireAll: true });
+    validateFields({ email, role, account_status, password }, { requireAll: !figbloom });
+    if (figbloom && (!email || !role)) throw new HttpError(400, "email and role are required");
     await assertMayGrant(caller, requested);
 
     const user_metadata = {
@@ -364,7 +370,7 @@ router.post(
     };
     const { data, error } = await admin.auth.admin.createUser({
       email,
-      password,
+      password: figbloom ? accounts.randomPassword() : password,
       email_confirm: true,
       user_metadata,
       ...(account_status !== "ACTIVE" ? { ban_duration: banDuration(account_status) } : {}),
@@ -380,7 +386,30 @@ router.post(
       await admin.auth.admin.deleteUser(data.user.id);
       throw profileErr;
     }
+    let figbloomAccount = null;
+    if (figbloom) {
+      try {
+        // their Figbloom account: a new one waits for its first password; an existing one (another company, another
+        // product) keeps its password, and they simply sign in with it
+        const account = await accounts.figbloomAccounts.ensure({ email, name: req.body?.full_name || req.body?.name });
+        const linked = await accounts.figbloomAccounts.link(data.user.id, account.sub, { madeHere: account.created });
+        if (linked === "taken") throw new HttpError(409, "This person's Figbloom account is already connected to another login. Ask Figbloom support.");
+        if (account.created) {
+          // "Set your password": the existing recovery email, whose page sets the Figbloom password (cognito_routes.js)
+          const site = String(process.env.SITE_URL || "").trim().replace(/\/+$/, "");
+          const { error: mailError } = await admin.auth.resetPasswordForEmail(email, site ? { redirectTo: `${site}/update-password` } : undefined);
+          if (mailError) console.error("[admin] set-password email not sent:", mailError.message);
+        }
+        figbloomAccount = { created: account.created };
+      } catch (accountErr) {
+        // don't leave a login that can never sign in
+        await admin.auth.admin.deleteUser(data.user.id);
+        if (accountErr instanceof accounts.FigbloomAccountError) throw new HttpError(accountErr.status, accountErr.message);
+        throw accountErr;
+      }
+    }
     res.status(201).json({
+      ...(figbloomAccount ? { figbloom: figbloomAccount } : {}),
       user: toUserView(data.user, { role, account_status, company_role_id: requested.companyRoleId, role_name: requested.custom?.name }),
     });
   })
@@ -397,6 +426,14 @@ router.patch(
     const role = requested?.role;
     const email = req.body?.email === undefined ? undefined : normalizeEmail(req.body.email);
     validateFields({ email, role, account_status, password }, { requireAll: false });
+    const { cognitoSignInEnabled } = await import("./figbloom_accounts.js");
+    if (cognitoSignInEnabled()) {
+      // the password and the email belong to the person's Figbloom account now (ERP/HR_COGNITO_CONTRACT.md)
+      if (password !== undefined) {
+        throw new HttpError(409, 'People set their own password now. Send them a password reset email, or they use "Forgot password" on the Figbloom sign-in page.');
+      }
+      if (email !== undefined) throw new HttpError(409, "Email addresses can't be changed here while Figbloom sign-in is being introduced. Ask Figbloom support.");
+    }
 
     const currentProfile = await loadTenantProfile(id, caller);
     const { data: existing, error: getError } = await admin.auth.admin.getUserById(id);

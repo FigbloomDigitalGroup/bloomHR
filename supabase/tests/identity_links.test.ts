@@ -58,9 +58,29 @@ describe('identity_sign_in', () => {
     expect((await links()).map((l) => `${l.pool}:${l.sub}`)).toEqual(['customers:sub-amina', 'customers:sub-ben', 'staff:staff-1']);
   });
 
+  it('identity_link() links a login HR just made, at once, and never takes over another link', async () => {
+    const NEW = '00000000-0000-0000-0000-00000000e004';
+    await db.exec(`insert into auth.users (id, email) values ('${NEW}', 'new@acme.example')`);
+    const link = async (user: string, sub: string, madeHere = true) =>
+      (await db.query<{ identity_link: string }>(`select identity_link($1, 'customers', $2, $3)`, [user, sub, madeHere])).rows[0].identity_link;
+    expect(await link(NEW, 'sub-new')).toBe('linked');
+    expect(await link(NEW, 'sub-new')).toBe('already');
+    // the login already has another Figbloom account, or this account is someone else's
+    expect(await link(NEW, 'sub-other')).toBe('taken');
+    expect(await link(BEN, 'sub-new')).toBe('taken');
+    const of = async (user: string) => (await db.query<{ sub: string; made_here: boolean }>(`select * from identity_of($1, 'customers')`, [user])).rows;
+    expect(await of(NEW)).toEqual([{ sub: 'sub-new', made_here: true }]);
+    // linked at their first Figbloom sign-in, not made by HR
+    expect(await of(AMINA)).toEqual([{ sub: 'sub-amina', made_here: false }]);
+    // and a sign-in finds the new one by its sub
+    expect(await signIn('customers', 'sub-new', null, false)).toEqual({ outcome: 'linked', user_id: NEW, newly_linked: false });
+  });
+
   it('is for the backend only: people and visitors can neither call it nor read the links', async () => {
     await expect(asUser(db, AMINA, () => db.query(`select * from identity_sign_in('customers', 'sub-amina', null, false)`))).rejects.toThrow(/permission denied/);
     await expect(asAnon(db, () => db.query(`select * from identity_sign_in('customers', 'sub-amina', null, false)`))).rejects.toThrow(/permission denied/);
     await expect(asUser(db, AMINA, () => db.query(`select * from identity_links`))).rejects.toThrow(/permission denied/);
+    await expect(asUser(db, AMINA, () => db.query(`select identity_link('${AMINA}', 'customers', 'mine', true)`))).rejects.toThrow(/permission denied/);
+    await expect(asUser(db, AMINA, () => db.query(`select * from identity_of('${AMINA}', 'customers')`))).rejects.toThrow(/permission denied/);
   });
 });

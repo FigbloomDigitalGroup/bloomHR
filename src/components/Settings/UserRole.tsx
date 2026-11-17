@@ -40,6 +40,11 @@ import LoanSettingsCard from '../Loans/LoanSettingsCard';
 
 import { confirmDialog } from '../../lib/confirmDialog';
 import { CompanyRole, SYSTEM_ROLE_DESCRIPTIONS, rolesApi, roleDisplayName, roleKeyFor, roleSelection, useCompanyRoles } from '../../lib/roles';
+import { figbloomSignInEnabled } from '../../lib/figbloomSignIn';
+// With Figbloom sign-in (ERP/HR_COGNITO_CONTRACT.md) people choose their own password: a new person gets "Set your
+// password" by email, and admins can only send a reset email.
+const FIGBLOOM = figbloomSignInEnabled();
+
 // The system roles' look (icon, colour, whether they work at one location) and what each gets by default
 // (SYSTEM_ROLE_DESCRIPTIONS: the modules a new company's roles start with; a company may change them on Role
 // Permissions). The company's roles, its own and these by the names it gave them, come from useCompanyRoles(); a
@@ -345,6 +350,7 @@ const UserEditModal = ({
       : [`Based on ${roleDisplayName(roles, r.base_role)}`, r.description].filter(Boolean).join('. ');
 
   const validatePassword = () => {
+    if (FIGBLOOM) return true;
     if (!user && !editedUser.password) {
       setPasswordError('Password is required');
       return false;
@@ -404,7 +410,13 @@ const UserEditModal = ({
             />
           </div>
 
-          {!user && (
+          {!user && FIGBLOOM && (
+            <p className="text-xs text-gray-500">
+              They'll get an email to set their own password, and sign in with Figbloom.
+            </p>
+          )}
+
+          {!user && !FIGBLOOM && (
             <>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
@@ -619,7 +631,7 @@ const ResetPasswordModal = ({
               </div>
             </label>
 
-            <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+            {!FIGBLOOM && <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
               <input
                 type="radio"
                 name="resetMethod"
@@ -634,7 +646,7 @@ const ResetPasswordModal = ({
                   Set a new password directly for the user
                 </p>
               </div>
-            </label>
+            </label>}
           </div>
 
           {resetMethod === 'manual' && (

@@ -207,3 +207,160 @@ describe("cognito.signIn: Cognito's token endpoint and the ID token's checks", (
 });
 
 
+
+// ---- Figbloom accounts from HR's forms: /sign-up (creating a company), /email-confirmed, /set-password
+describe('sign-up, email-confirmed and set-password', () => {
+  let srv: Server;
+  let url = '';
+  type Login = { id: string; email: string; confirmed: boolean; password?: string };
+  let logins: Login[] = [];
+  let links: Map<string, { sub: string; madeHere: boolean }>;
+  let figbloom: Map<string, { sub: string; password: string | null; verified: boolean; madeHere: boolean }>;
+  const mail: Row[] = [];
+  let AccountError: typeof import('../figbloom_accounts.js').FigbloomAccountError;
+
+  const db = {
+    auth: {
+      getUser: async (token: string) => {
+        const l = logins.find((x) => `token-${x.id}` === token);
+        return l
+          ? { data: { user: { id: l.id, email: l.email, email_confirmed_at: l.confirmed ? '2026-11-17T10:00:00Z' : null, user_metadata: {} } }, error: null }
+          : { data: { user: null }, error: { message: 'bad' } };
+      },
+      resend: async (a: Row) => {
+        mail.push(a);
+        return { error: null };
+      },
+      admin: {
+        createUser: async (a: { email: string; password: string }) => {
+          if (logins.some((l) => l.email === a.email)) return { data: { user: null }, error: { status: 422, message: 'already registered' } };
+          const l = { id: `u${logins.length + 1}`, email: a.email, confirmed: false, password: a.password };
+          logins.push(l);
+          return { data: { user: { id: l.id } }, error: null };
+        },
+        deleteUser: async (id: string) => {
+          logins = logins.filter((l) => l.id !== id);
+          return { error: null };
+        },
+      },
+    },
+  };
+  const accounts = {
+    ensure: async ({ email, password }: { email: string; password?: string }) => {
+      const f = figbloom.get(email);
+      if (f) return { sub: f.sub, created: false };
+      if (password !== undefined && !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password)) {
+        throw new AccountError(400, 'invalid_password', 'Your password must be at least 8 characters, with ...');
+      }
+      const sub = `sub-${figbloom.size + 1}`;
+      figbloom.set(email, { sub, password: password ?? null, verified: false, madeHere: true });
+      return { sub, created: true };
+    },
+    link: async (userId: string, sub: string, { madeHere }: { madeHere: boolean }) => {
+      links.set(userId, { sub, madeHere });
+      return 'linked';
+    },
+    identityOf: async (userId: string) => links.get(userId) ?? null,
+    markEmailVerified: async (sub: string) => {
+      for (const f of figbloom.values()) if (f.sub === sub) f.verified = true;
+    },
+    setInitialPassword: async (sub: string, password: string, { emailProven }: { emailProven: boolean }) => {
+      const f = [...figbloom.values()].find((x) => x.sub === sub)!;
+      if (f.password) throw new AccountError(409, 'use_figbloom_reset', 'You already have a Figbloom password.');
+      f.password = password;
+      if (emailProven) f.verified = true;
+    },
+    retirePassword: async (userId: string) => {
+      const l = logins.find((x) => x.id === userId)!;
+      l.password = 'retired';
+    },
+  };
+
+  beforeAll(async () => {
+    AccountError = (await import('../figbloom_accounts.js')).FigbloomAccountError;
+    const app = express();
+    app.use(
+      '/api/auth/cognito',
+      mod.createCognitoRouter({ store, cognitoClient: fakeCognito, env: { ...ENV, SITE_URL: 'https://hr-staging.figbloom.org' }, accounts: accounts as never, db: db as never }),
+    );
+    srv = createServer(app);
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', r));
+    url = `http://127.0.0.1:${(srv.address() as AddressInfo).port}/api/auth/cognito`;
+  });
+  afterAll(() => new Promise<void>((r) => srv.close(() => r())));
+  beforeEach(() => {
+    logins = [];
+    links = new Map();
+    figbloom = new Map();
+    mail.length = 0;
+  });
+
+  const post = async (path: string, body: Row, token?: string) => {
+    const res = await fetch(`${url}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(body),
+    });
+    return { status: res.status, body: (await res.json()) as Row };
+  };
+
+  it("sign-up: the password goes to a new Figbloom account, HR's login is linked, and Supabase emails the confirmation", async () => {
+    const r = await post('/sign-up', { email: 'Owner@Farm.Example', password: 'Kenya-2024!' });
+    expect(r).toEqual({ status: 201, body: { ok: true } });
+    expect(figbloom.get('owner@farm.example')).toMatchObject({ password: 'Kenya-2024!', verified: false });
+    expect(logins[0].password).not.toBe('Kenya-2024!');
+    expect(links.get(logins[0].id)).toEqual({ sub: 'sub-1', madeHere: true });
+    expect(mail).toEqual([{ type: 'signup', email: 'owner@farm.example', options: { emailRedirectTo: 'https://hr-staging.figbloom.org/create-company' } }]);
+  });
+
+  it('sign-up: an email with an HR login, or a Figbloom account, signs in first, and nothing is left behind', async () => {
+    logins.push({ id: 'u0', email: 'old@farm.example', confirmed: true });
+    expect((await post('/sign-up', { email: 'old@farm.example', password: 'Kenya-2024!' })).body.code).toBe('account_exists');
+    expect(figbloom.size).toBe(0);
+    figbloom.set('fleet@farm.example', { sub: 'sub-fleet', password: 'x', verified: true, madeHere: false });
+    const r = await post('/sign-up', { email: 'fleet@farm.example', password: 'Kenya-2024!' });
+    expect(r.status).toBe(409);
+    expect(r.body.code).toBe('figbloom_account_exists');
+    expect(logins.map((l) => l.email)).toEqual(['old@farm.example']);
+  });
+
+  it("sign-up: a password Figbloom refuses is a 400 with the rule, and HR's login is removed again", async () => {
+    const r = await post('/sign-up', { email: 'owner@farm.example', password: 'weakpassword' });
+    expect(r.status).toBe(400);
+    expect(r.body.code).toBe('invalid_password');
+    expect(logins).toEqual([]);
+  });
+
+  it("email-confirmed: once Supabase has confirmed the email, the Figbloom account's is verified too", async () => {
+    await post('/sign-up', { email: 'owner@farm.example', password: 'Kenya-2024!' });
+    const id = logins[0].id;
+    expect((await post('/email-confirmed', {}, `token-${id}`)).body.code).toBe('not_confirmed');
+    logins[0].confirmed = true;
+    expect((await post('/email-confirmed', {}, `token-${id}`)).body).toEqual({ ok: true, changed: true });
+    expect(figbloom.get('owner@farm.example')!.verified).toBe(true);
+    expect((await post('/email-confirmed', {})).status).toBe(401);
+  });
+
+  it('set-password: the first password of an account HR made, with the email proven, once', async () => {
+    logins.push({ id: 'u9', email: 'added@farm.example', confirmed: true });
+    figbloom.set('added@farm.example', { sub: 'sub-9', password: null, verified: false, madeHere: true });
+    links.set('u9', { sub: 'sub-9', madeHere: true });
+    expect((await post('/set-password', { password: 'Kenya-2024!' }, 'token-u9')).body).toEqual({ ok: true });
+    expect(figbloom.get('added@farm.example')).toMatchObject({ password: 'Kenya-2024!', verified: true });
+    expect(logins[0].password).toBe('retired');
+    const again = await post('/set-password', { password: 'Other-2024!' }, 'token-u9');
+    expect(again.status).toBe(409);
+    expect(again.body.code).toBe('use_figbloom_reset');
+  });
+
+  it("set-password: someone not on Figbloom yet gets their account with it; a moved person (not HR's) changes it on Figbloom", async () => {
+    logins.push({ id: 'u7', email: 'notyet@farm.example', confirmed: true }, { id: 'u8', email: 'moved@farm.example', confirmed: true });
+    expect((await post('/set-password', { password: 'Kenya-2024!' }, 'token-u7')).body).toEqual({ ok: true });
+    expect(links.get('u7')).toMatchObject({ madeHere: true });
+    links.set('u8', { sub: 'sub-moved', madeHere: false });
+    const r = await post('/set-password', { password: 'Kenya-2024!' }, 'token-u8');
+    expect(r.status).toBe(409);
+    expect(r.body.code).toBe('use_figbloom_reset');
+    expect((await post('/set-password', { password: 'Kenya-2024!' })).status).toBe(401);
+  });
+});

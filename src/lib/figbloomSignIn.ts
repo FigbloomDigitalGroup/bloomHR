@@ -119,3 +119,55 @@ export function figbloomLogoutUrl(pool: FigbloomPool): string | null {
   const params = new URLSearchParams({ client_id: c.clientId, logout_uri: `${window.location.origin}${POOLS[pool].signOut}` });
   return `${c.domain}/logout?${params}`;
 }
+
+// ---- Figbloom accounts made from HR's own forms (cognito_routes.js: /sign-up, /email-confirmed, /set-password)
+
+/** What a person reads when a password doesn't meet the Figbloom rule (the customers pool's). */
+export const FIGBLOOM_PASSWORD_RULE = 'at least 8 characters, with an upper-case letter, a lower-case letter, a digit and a symbol';
+
+/** null when the password meets the Figbloom rule; otherwise what to fix. */
+export function figbloomPasswordProblem(password: string): string | null {
+  const missing: string[] = [];
+  if (password.length < 8) missing.push(`at least 8 characters (you've typed ${password.length})`);
+  if (!/[A-Z]/.test(password)) missing.push('an upper-case letter');
+  if (!/[a-z]/.test(password)) missing.push('a lower-case letter');
+  if (!/\d/.test(password)) missing.push('a digit');
+  if (!/[^A-Za-z0-9]/.test(password)) missing.push('a symbol');
+  return missing.length ? `Your password needs ${missing.join(', ')}.` : null;
+}
+
+export class FigbloomApiError extends Error {
+  constructor(message: string, readonly code?: string) {
+    super(message);
+  }
+}
+
+async function post(path: string, body: unknown, accessToken?: string) {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/auth/cognito${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+      body: JSON.stringify(body ?? {}),
+    });
+  } catch {
+    throw new FigbloomApiError("We couldn't reach Figbloom HR. Check your internet connection and try again.");
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    // these routes answer { error, code }; the exchange answers { error: { code, message } }
+    const message = typeof data?.error === 'string' ? data.error : data?.error?.message;
+    const code = typeof data?.code === 'string' ? data.code : data?.error?.code;
+    throw new FigbloomApiError(message || 'Something went wrong. Please try again.', code);
+  }
+  return data;
+}
+
+/** Creating a company: the person's Figbloom account and HR login; Supabase emails the confirmation link. */
+export const figbloomSignUp = (email: string, password: string) => post('/sign-up', { email, password });
+
+/** After the confirmation link: the Figbloom account's email is verified too (best effort). */
+export const confirmFigbloomEmail = (accessToken: string) => post('/email-confirmed', {}, accessToken);
+
+/** The "set your password" page: the person's Figbloom password (409 use_figbloom_reset once they have one). */
+export const setFigbloomPassword = (accessToken: string, password: string) => post('/set-password', { password }, accessToken);

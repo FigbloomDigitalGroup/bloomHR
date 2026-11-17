@@ -28,7 +28,21 @@ export const POOLS = ["customers", "staff"];
 const TIMEOUT_MS = 10_000;
 const MAX = { code: 2048, codeVerifier: 128, redirectUri: 2048 };
 
-export const cognitoSignInEnabled = (env = process.env) => String(env.COGNITO_SIGN_IN || "").trim() === "on";
+export { cognitoSignInEnabled } from "./figbloom_accounts.js";
+import { cognitoSignInEnabled, FigbloomAccountError, figbloomAccounts, randomPassword, sendAccountError, USE_FIGBLOOM_RESET } from "./figbloom_accounts.js";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** The person behind a Supabase session token (Bearer), or null. No company needed: a new sign-up has none yet. */
+async function sessionUser(db, req) {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+  if (!token || !db) return null;
+  const { data, error } = await db.auth.getUser(token);
+  return error || !data?.user ? null : data.user;
+}
+
+const site = (env) => String(env.SITE_URL || env.PUBLIC_SITE_URL || "").trim().replace(/\/+$/, "");
 
 export class CognitoError extends Error {
   constructor(message, status = 401, code = "sign_in_failed") {
@@ -103,7 +117,9 @@ export const cognito = {
     let payload;
     try {
       ({ payload } = await jwtVerify(data.id_token, keysFor(config.issuer), { issuer: config.issuer, audience: config.clientId, algorithms: ["RS256"] }));
-    } catch {
+    } catch (err) {
+      // why, for the log only (never the token): a wrong issuer usually means COGNITO_*_POOL_ID or COGNITO_REGION is wrong
+      console.error(TAG, `ID token refused: ${err?.code || err?.name || "error"}${err?.claim ? ` (${err.claim})` : ""}; expected issuer ${config.issuer}`);
       throw new CognitoError("Figbloom sign-in couldn't be verified. Please try again.", 401, "token_invalid");
     }
     if (payload.token_use !== "id" || typeof payload.sub !== "string") throw new CognitoError("Figbloom sign-in couldn't be verified.", 401, "token_invalid");
@@ -161,7 +177,13 @@ function failureLimiter() {
 }
 
 /** POST /exchange (mounted at /api/auth/cognito). store, cognitoClient and env are for tests. */
-export function createCognitoRouter({ store = supabaseIdentityStore(), cognitoClient = cognito, env = process.env } = {}) {
+export function createCognitoRouter({
+  store = supabaseIdentityStore(),
+  cognitoClient = cognito,
+  env = process.env,
+  accounts = figbloomAccounts,
+  db = admin,
+} = {}) {
   const router = express.Router();
   const limiter = failureLimiter();
   router.use(express.json({ limit: "10kb" }));
@@ -213,6 +235,98 @@ export function createCognitoRouter({ store = supabaseIdentityStore(), cognitoCl
       if (err instanceof CognitoError) return refuse(err.status, err.code, err.message);
       console.error(TAG, "sign-in failed:", err?.message || err);
       return res.status(500).json({ error: { code: "error", message: "Sign-in failed. Please try again." } });
+    }
+  });
+
+  const off = (res) => res.status(404).json({ error: { code: "cognito_off", message: "Figbloom sign-in isn't switched on here." } });
+
+  // POST /sign-up { email, password }: creating a company with Figbloom sign-in. The password goes to the person's new
+  // Figbloom account; HR makes their login (a random password nobody knows), links it, and Supabase emails the usual
+  // confirmation link, which brings them back to /create-company, where the company is made (as today).
+  router.post("/sign-up", async (req, res) => {
+    if (!cognitoSignInEnabled(env)) return off(res);
+    if (limiter.blocked(req.ip)) return res.status(429).json({ error: "Too many attempts from this network. Please try again in 15 minutes.", code: "too_many" });
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    const password = req.body?.password;
+    if (!EMAIL_RE.test(email) || email.length > 254) return res.status(400).json({ error: "Enter a valid email address.", code: "bad_request" });
+    if (typeof password !== "string" || password.length > 256) return res.status(400).json({ error: "Choose a password.", code: "bad_request" });
+    let userId = null;
+    try {
+      // HR's login first: an email that already has one signs in instead (its current password still works, through Figbloom)
+      const { data, error } = await db.auth.admin.createUser({ email, password: randomPassword(), email_confirm: false });
+      if (error || !data?.user) {
+        const exists = error?.status === 422 || /already (been )?registered|already exists/i.test(error?.message || "");
+        limiter.failed(req.ip);
+        if (exists) return res.status(409).json({ error: "You already have a Figbloom HR account with this email. Sign in with Figbloom, then create your company.", code: "account_exists" });
+        throw error || new Error("createUser failed");
+      }
+      userId = data.user.id;
+      const account = await accounts.ensure({ email, password });
+      if (!account.created) {
+        await db.auth.admin.deleteUser(userId);
+        userId = null;
+        return res.status(409).json({ error: "You already have a Figbloom account with this email. Sign in with Figbloom, then create your company.", code: "figbloom_account_exists" });
+      }
+      const linked = await accounts.link(userId, account.sub, { madeHere: true });
+      if (linked === "taken") throw new Error("the new Figbloom account is already linked to another login");
+      const redirect = site(env);
+      const { error: mailError } = await db.auth.resend({ type: "signup", email, ...(redirect ? { options: { emailRedirectTo: `${redirect}/create-company` } } : {}) });
+      if (mailError) console.error(TAG, "sign-up confirmation not sent:", mailError.message);
+      return res.status(201).json({ ok: true });
+    } catch (err) {
+      if (userId) await db.auth.admin.deleteUser(userId).catch(() => {});
+      if (err instanceof FigbloomAccountError) return sendAccountError(res, err);
+      console.error(TAG, "sign-up failed:", err?.message || err);
+      return res.status(500).json({ error: "Could not create your account. Please try again.", code: "error" });
+    }
+  });
+
+  // POST /email-confirmed (Bearer: the person's session after the confirmation link): their Figbloom account's email
+  // becomes verified too, so Figbloom's "Forgot password" can reach them. Repeating it is harmless.
+  router.post("/email-confirmed", async (req, res) => {
+    if (!cognitoSignInEnabled(env)) return off(res);
+    try {
+      const user = await sessionUser(db, req);
+      if (!user) return res.status(401).json({ error: "Sign in first.", code: "unauthorized" });
+      if (!user.email_confirmed_at) return res.status(409).json({ error: "Your email isn't confirmed yet.", code: "not_confirmed" });
+      const identity = await accounts.identityOf(user.id);
+      if (!identity?.madeHere) return res.json({ ok: true, changed: false });
+      await accounts.markEmailVerified(identity.sub);
+      return res.json({ ok: true, changed: true });
+    } catch (err) {
+      if (err instanceof FigbloomAccountError) return sendAccountError(res, err);
+      console.error(TAG, "email-confirmed failed:", err?.message || err);
+      return res.status(500).json({ error: "Could not confirm your email. Please try again.", code: "error" });
+    }
+  });
+
+  // POST /set-password { password } (Bearer: the session from a password email, /update-password): the Figbloom
+  // password. An account HR made gets its first password; someone not on Figbloom yet gets their account with it; anyone
+  // who already has a Figbloom password changes it on Figbloom's sign-in page (409 use_figbloom_reset).
+  router.post("/set-password", async (req, res) => {
+    if (!cognitoSignInEnabled(env)) return off(res);
+    const password = req.body?.password;
+    if (typeof password !== "string" || !password || password.length > 256) return res.status(400).json({ error: "Choose a password.", code: "bad_request" });
+    try {
+      const user = await sessionUser(db, req);
+      if (!user?.email) return res.status(401).json({ error: "This link has expired. Ask for a new one.", code: "unauthorized" });
+      const identity = await accounts.identityOf(user.id);
+      if (identity && !identity.madeHere) throw USE_FIGBLOOM_RESET();
+      if (identity) {
+        // the link came to this inbox: the email is proven too
+        await accounts.setInitialPassword(identity.sub, password, { emailProven: true });
+      } else {
+        const account = await accounts.ensure({ email: user.email, name: user.user_metadata?.full_name, password, emailProven: true });
+        if (!account.created) throw USE_FIGBLOOM_RESET();
+        const linked = await accounts.link(user.id, account.sub, { madeHere: true });
+        if (linked === "taken") throw USE_FIGBLOOM_RESET();
+      }
+      await accounts.retirePassword(user.id).catch((err) => console.error(TAG, "could not retire the Supabase password:", err?.message || err));
+      return res.json({ ok: true });
+    } catch (err) {
+      if (err instanceof FigbloomAccountError) return sendAccountError(res, err);
+      console.error(TAG, "set-password failed:", err?.message || err);
+      return res.status(500).json({ error: "Could not set your password. Please try again.", code: "error" });
     }
   });
 

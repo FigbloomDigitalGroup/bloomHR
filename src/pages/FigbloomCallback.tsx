@@ -5,6 +5,10 @@ import { LoaderBlock } from '../components/UI/FigbloomLoader';
 import { exchangeFigbloomCode, readFigbloomReturn, startFigbloomSignIn, type FigbloomPool } from '../lib/figbloomSignIn';
 import { checkCanSignIn } from '../lib/signInChecks';
 
+// Pages a sign-in may come back to (an invitation, creating a company), never another site
+const NEXT_PAGES = /^\/(join|create-company)(\?[^#]*)?$/;
+const safeNext = (next: string | null) => (next && NEXT_PAGES.test(next) ? next : null);
+
 interface Props {
   pool: FigbloomPool;
   // the app's usual next step after a sign-in (App: two-step code if the company asks for it, then the dashboard).
@@ -37,6 +41,13 @@ export default function FigbloomCallback({ pool, onLoginSuccess }: Props) {
       if (otpError || !data.user) throw new Error('Sign-in failed. Please try again.');
       if (pool === 'staff') {
         onLoginSuccess(null);
+        return;
+      }
+      // an invitation or a new company to finish: back there, signed in (someone with no company yet has no account
+      // and employment to check, and those pages need none)
+      const next = safeNext(back.next);
+      if (next) {
+        window.location.assign(next);
         return;
       }
       const check = await checkCanSignIn(data.user.id, data.user.email ?? '');
