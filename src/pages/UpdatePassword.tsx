@@ -8,6 +8,13 @@ import AuthShell, { AuthButton } from '../components/Company/AuthShell';
 import { authInput, authInputOpen, authLabel } from '../components/Auth/authStyles';
 import { LoaderBlock } from '../components/UI/FigbloomLoader';
 
+import { FigbloomApiError, figbloomSignInEnabled, setFigbloomPassword } from '../lib/figbloomSignIn';
+
+// With Figbloom sign-in (ERP/HR_COGNITO_CONTRACT.md) this page sets the person's Figbloom password: their first one
+// ("Set your password"), or their Figbloom account if they don't have one yet. Someone who already has a Figbloom
+// password changes it on Figbloom's sign-in page.
+const FIGBLOOM = figbloomSignInEnabled();
+
 /** How long to wait for the sign-in client to read a link before deciding it did not work. */
 const LINK_WAIT_MS = 5000;
 
@@ -93,6 +100,8 @@ const UpdatePasswordPage = ({ waitMs = LINK_WAIT_MS }: { waitMs?: number }) => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  // the person already has a Figbloom password: what to tell them (they change it on Figbloom's sign-in page)
+  const [figbloomResetNote, setFigbloomResetNote] = useState<string | null>(null);
   const [link, setLink] = useState<LinkState>({ status: 'checking' });
   const [resendEmail, setResendEmail] = useState(() => readLinkParams().email ?? '');
   const [resending, setResending] = useState(false);
@@ -214,6 +223,15 @@ const UpdatePasswordPage = ({ waitMs = LINK_WAIT_MS }: { waitMs?: number }) => {
     if (!Object.values(passwordStrength).every(v => v)) { toast.error('Please fulfill all security requirements'); return; }
     setLoading(true);
     try {
+      if (FIGBLOOM) {
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) throw new FigbloomApiError('This link has expired. Ask for a new one.');
+        await setFigbloomPassword(data.session.access_token, password);
+        sessionStorage.removeItem('isPasswordRecovery');
+        setIsSuccess(true);
+        supabase.auth.signOut().catch(() => { });
+        return;
+      }
       const { error } = await supabase.auth.updateUser({ password });
       if (error) { toast.error(error.message); }
       else {
@@ -221,8 +239,10 @@ const UpdatePasswordPage = ({ waitMs = LINK_WAIT_MS }: { waitMs?: number }) => {
         setIsSuccess(true);
         supabase.auth.signOut().catch(() => { });
       }
-    } catch {
-      toast.error('An unexpected error occurred');
+    } catch (err) {
+      if (err instanceof FigbloomApiError && err.code === 'use_figbloom_reset') setFigbloomResetNote(err.message);
+      else if (err instanceof FigbloomApiError) toast.error(err.message);
+      else toast.error('An unexpected error occurred');
     } finally {
       setLoading(false);
     }
@@ -238,13 +258,23 @@ const UpdatePasswordPage = ({ waitMs = LINK_WAIT_MS }: { waitMs?: number }) => {
     });
   };
 
+  if (figbloomResetNote) {
+    return (
+      <AuthShell title="Change it on Figbloom" subtitle={figbloomResetNote}>
+        <AuthButton onClick={() => navigate('/login')}>Go to sign in</AuthButton>
+      </AuthShell>
+    );
+  }
+
   if (isSuccess) {
     return (
       <AuthShell
         title="Password updated"
         subtitle={backToInvite
           ? 'Your password has been updated. Sign in on your invitation to join the company.'
-          : 'Your password has been updated. You can now sign in with your new password.'}
+          : FIGBLOOM
+            ? 'Your Figbloom password is set. Sign in with Figbloom, with your email and this password.'
+            : 'Your password has been updated. You can now sign in with your new password.'}
       >
         <div className="space-y-6">
           <div className="flex items-center gap-3 p-4 rounded-lg bg-gray-50 border border-gray-200">

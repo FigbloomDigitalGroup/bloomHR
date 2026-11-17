@@ -189,3 +189,67 @@ describe('POST /api/invites/accept', () => {
     expect(state.invitations[0].status).toBe('pending');
   });
 });
+
+// ---- With Figbloom sign-in (ERP/HR_COGNITO_CONTRACT.md section 2): the password goes to the person's new Figbloom
+// account (email proven by the invitation); HR's login gets a random one and is linked at once.
+describe('POST /api/invites/accept with Figbloom sign-in', () => {
+  let accounts: typeof import('../figbloom_accounts.js').figbloomAccounts;
+  const calls: Row[] = [];
+  let existing = false;
+  const saved: Row = {};
+
+  beforeAll(async () => {
+    accounts = (await import('../figbloom_accounts.js')).figbloomAccounts;
+    for (const k of ['ensure', 'link']) saved[k] = (accounts as unknown as Row)[k];
+    accounts.ensure = async (a) => {
+      calls.push({ call: 'ensure', ...a });
+      return { sub: 'sub-new', created: !existing };
+    };
+    accounts.link = async (userId, sub, opts) => {
+      calls.push({ call: 'link', userId, sub, ...opts });
+      return 'linked';
+    };
+  });
+  afterAll(() => {
+    Object.assign(accounts, saved);
+    delete process.env.COGNITO_SIGN_IN;
+  });
+  beforeEach(() => {
+    calls.length = 0;
+    existing = false;
+    process.env.COGNITO_SIGN_IN = 'on';
+  });
+
+  it("sends the password to the new Figbloom account, never into HR's login, and links them", async () => {
+    const res = await accept({ token: TOKEN, password: 'Kenya-2024!', fullName: 'New Person' });
+    expect(res.status).toBe(200);
+    expect(calls).toEqual([
+      { call: 'ensure', email: 'new.person@gmail.com', name: 'New Person', password: 'Kenya-2024!', emailProven: true },
+      { call: 'link', userId: 'user-1', sub: 'sub-new', madeHere: true },
+    ]);
+    expect(state.createdWith[0].password).not.toBe('Kenya-2024!');
+    expect(state.memberships).toHaveLength(1);
+  });
+
+  it('answers sign_in_first, and undoes everything, when the email already has a Figbloom account', async () => {
+    existing = true;
+    const res = await accept({ token: TOKEN, password: 'Kenya-2024!', fullName: 'New Person' });
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe('sign_in_first');
+    expect(state.authUsers).toEqual([]);
+    expect(state.invitations[0].status).toBe('pending');
+    expect(calls.some((c) => c.call === 'link')).toBe(false);
+  });
+
+  it("passes the platform's refusal of a weak password on, with nothing left behind", async () => {
+    const { FigbloomAccountError } = await import('../figbloom_accounts.js');
+    accounts.ensure = async () => {
+      throw new FigbloomAccountError(400, 'invalid_password', 'Your password must be at least 8 characters, with ...');
+    };
+    const res = await accept({ token: TOKEN, password: 'weakpassword', fullName: 'New Person' });
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe('invalid_password');
+    expect(state.authUsers).toEqual([]);
+    expect(state.invitations[0].status).toBe('pending');
+  });
+});

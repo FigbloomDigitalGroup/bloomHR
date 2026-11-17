@@ -315,3 +315,63 @@ describe('reactivating someone who has left (their employee record says so)', ()
     expect(state.memberships.find((m) => m.user_id === 'staff-a')!.account_status).toBe('ACTIVE');
   });
 });
+
+// ---- With Figbloom sign-in (ERP/HR_COGNITO_CONTRACT.md section 2): admins never choose someone's password
+describe('with Figbloom sign-in', () => {
+  let accounts: typeof import('../figbloom_accounts.js').figbloomAccounts;
+  const saved: Record<string, unknown> = {};
+  const figbloom: Record<string, unknown>[] = [];
+  let existing = false;
+
+  beforeAll(async () => {
+    accounts = (await import('../figbloom_accounts.js')).figbloomAccounts;
+    for (const k of ['ensure', 'link']) saved[k] = (accounts as unknown as Record<string, unknown>)[k];
+    accounts.ensure = async (a) => {
+      figbloom.push({ call: 'ensure', ...a });
+      return { sub: 'sub-added', created: !existing };
+    };
+    accounts.link = async (userId, sub, opts) => {
+      figbloom.push({ call: 'link', userId, sub, ...opts });
+      return 'linked';
+    };
+  });
+  afterAll(() => {
+    Object.assign(accounts, saved);
+    delete process.env.COGNITO_SIGN_IN;
+  });
+  beforeEach(() => {
+    figbloom.length = 0;
+    existing = false;
+    process.env.COGNITO_SIGN_IN = 'on';
+  });
+
+  it('adds a person without a password: their Figbloom account waits for it, and they get "Set your password"', async () => {
+    const res = await call('POST', '/users', 'admin-a', { email: 'New@A.co', role: 'STAFF' });
+    expect(res.status).toBe(201);
+    expect((await res.json()).figbloom).toEqual({ created: true });
+    expect(figbloom).toEqual([
+      { call: 'ensure', email: 'new@a.co', name: undefined },
+      { call: 'link', userId: 'new-new@a.co', sub: 'sub-added', madeHere: true },
+    ]);
+    expect(state.calls).toContain('reset:new@a.co');
+  });
+
+  it("links someone who already has a Figbloom account, and sends nothing: they sign in with their own password", async () => {
+    existing = true;
+    const res = await call('POST', '/users', 'admin-a', { email: 'known@a.co', role: 'STAFF', password: 'ignored1' });
+    expect(res.status).toBe(201);
+    expect(figbloom.at(-1)).toMatchObject({ call: 'link', madeHere: false });
+    expect(state.calls.some((c) => c.startsWith('reset:'))).toBe(false);
+  });
+
+  it("refuses to change someone's password or email: they belong to the person's Figbloom account", async () => {
+    const pw = await call('PATCH', '/users/staff-a', 'admin-a', { password: 'newsecret1' });
+    expect(pw.status).toBe(409);
+    expect((await pw.json()).error).toMatch(/reset email|Forgot password/);
+    const email = await call('PATCH', '/users/staff-a', 'admin-a', { email: 'other@a.co' });
+    expect(email.status).toBe(409);
+    expect(state.calls.filter((c) => c.startsWith('updateUser'))).toEqual([]);
+    // everything else still works
+    expect((await call('PATCH', '/users/staff-a', 'admin-a', { account_status: 'SUSPENDED' })).status).toBe(200);
+  });
+});

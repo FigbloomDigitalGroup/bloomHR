@@ -6,6 +6,8 @@ import { sendEmail } from '../services/email';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
+import { figbloomSignInEnabled } from '../lib/figbloomSignIn';
+
 export function useStaffSignupLogic() {
     const [requests, setRequests] = useState<any[]>([]);
     const [allBranches, setAllBranches] = useState<any[]>([]);
@@ -436,6 +438,9 @@ export function useStaffSignupLogic() {
     };
 
     const sendWelcomeEmail = async (email, tempPassword, branch, isResend = false, requestId = null) => {
+        // With Figbloom sign-in there is no temporary password to send: the server emails "Set your password" when it
+        // creates the login (ERP/HR_COGNITO_CONTRACT.md)
+        if (figbloomSignInEnabled()) return;
         const subject = isResend
             ? `Your Figbloom HR Login Credentials - Resent`
             : `Welcome to Figbloom HR - Staff Account Approved`;
