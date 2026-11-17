@@ -275,7 +275,7 @@ export function PayslipDocument({ record, companyInfo, id, extras, design: desig
             )}
           </div>
           <div className="border border-gray-300 p-3 space-y-1.5" data-testid="payslip-reliefs">
-            <div className="font-bold text-sm text-gray-900 border-b border-gray-300 pb-1 mb-1" style={heading}>Reliefs</div>
+            <div className="font-bold text-sm text-gray-900 border-b border-gray-300 pb-1 mb-1" style={heading}>PAYE calculation</div>
             {working && working.tax_before_reliefs !== null && working.reliefs.length > 0 && (
               <Amount label="Tax on taxable pay" amount={working.tax_before_reliefs} fmt={fmt} />
             )}

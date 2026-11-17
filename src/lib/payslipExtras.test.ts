@@ -71,4 +71,9 @@ describe('the run and the employee', () => {
       taxNumber: 'A1', nssfNumber: 'N1', shaNumber: 'H1', idNumber: '9', branch: 'Kampala', department: null, position: 'Clerk', jobGroup: null,
     });
   });
+
+  it("the department from the employee's record (the `Job Level` column the forms call Department) when the payslip has none", () => {
+    expect(employeeDetailsOf({}, { 'Job Level': 'Engineering' }, null).department).toBe('Engineering');
+    expect(employeeDetailsOf({ department: 'Finance' }, { 'Job Level': 'Engineering' }, null).department).toBe('Finance');
+  });
 });
