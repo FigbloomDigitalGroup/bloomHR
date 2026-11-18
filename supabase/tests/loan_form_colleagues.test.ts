@@ -55,7 +55,7 @@ describe('the witness, a colleague', () => {
   });
 
   it('they sign only after the loan is approved and the borrower has signed', async () => {
-    await expect(as(S2, `select loan_witness_sign('${loanId}', '${SIG}')`)).rejects.toThrow(/once the loan is approved/);
+    // the form exists from the request on (20261118600000): the witness waits for the borrower, not the approval
     await decide(loanId);
     await expect(as(S2, `select loan_witness_sign('${loanId}', '${SIG}')`)).rejects.toThrow(/borrower hasn't signed/);
     await as(S1, `select loan_form_sign_borrower('${loanId}', '${SIG}')`);

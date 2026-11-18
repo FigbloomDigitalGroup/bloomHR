@@ -93,8 +93,10 @@ export interface LoanFormContext {
   /** what the employee record says, and the corrections made for this loan */
   record?: FormValues;
   corrections?: FormValues;
-  /** the latest payslip's gross and net pay, when the reader may see it */
-  latestPay: { gross: number; net: number; period: string } | null;
+  /** gross and net pay: the latest payslip's, or the record's basic salary (and no net) after a pay change */
+  latestPay: { gross: number | null; net: number | null; period: string } | null;
+  /** the record's salary changed since the latest payslip: net pay is for the borrower to give */
+  payChanged?: boolean;
   /** finance's record of the payout, when the reader may see it */
   payout: { reference: string | null; paidOn: string | null } | null;
 }
@@ -109,24 +111,25 @@ const quiet = async <T,>(work: () => Promise<T>): Promise<T | null> => {
 
 /** Everything the form needs about the lender, the borrower and their pay, for one loan. */
 export async function loadLoanFormContext(loan: { id: string; employee_number: string }): Promise<LoanFormContext> {
-  const [settings, company, employee] = await Promise.all([
+  // the borrower's details as the database reads them: employment type from HR Lifecycle, pay from the latest payslip
+  // only while it matches the record's basic salary (20261118600000)
+  const [settings, company, details] = await Promise.all([
     loadLoanFormSettings(),
     quiet(loadCompanyProfile),
-    supabase.from('employees').select('*').eq('"Employee Number"', loan.employee_number).maybeSingle(),
+    supabase.rpc('loan_form_borrower', { p_loan: loan.id }),
   ]);
-  if (employee.error) fail(employee.error, 'Could not load the borrower’s details.');
-  const [pay, payout] = await Promise.all([
-    quiet(async () => {
-      const { data, error } = await supabase
-        .from('salary_history')
-        .select('gross_pay, net_pay, pay_period')
-        .eq('employee_id', loan.employee_number)
-        .order('pay_period', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    }),
+  if (details.error || !details.data) fail(details.error, 'Could not load the borrower’s details.');
+  const d = details.data as {
+    employee: Record<string, unknown> | null;
+    employment_type: string | null;
+    contract_end_date: string | null;
+    gross: number | string | null;
+    net: number | string | null;
+    pay_period: string | null;
+    pay_changed: boolean;
+    basic_salary: number | string | null;
+  };
+  const [payout] = await Promise.all([
     quiet(async () => {
       const { data, error } = await supabase
         .from('payment_requests')
@@ -138,8 +141,17 @@ export async function loadLoanFormContext(loan: { id: string; employee_number: s
       return data;
     }),
   ]);
-  const borrower = borrowerFromEmployee((employee.data ?? { 'Employee Number': loan.employee_number }) as Record<string, unknown>, company?.company_name ?? null);
-  const latestPay = pay ? { gross: Number(pay.gross_pay) || 0, net: Number(pay.net_pay) || 0, period: String(pay.pay_period) } : null;
+  const borrower = borrowerFromEmployee(
+    {
+      ...(d.employee ?? { 'Employee Number': loan.employee_number }),
+      'Basic Salary': d.basic_salary,
+      'Employee Type': d.employment_type,
+      'Contract End Date': d.contract_end_date,
+    },
+    company?.company_name ?? null
+  );
+  const num = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));
+  const latestPay = d.gross === null && d.net === null ? null : { gross: num(d.gross), net: num(d.net), period: d.pay_period ?? '' };
   const corrections: FormValues = (await loadFormValues([loan.id]).catch((): Record<string, FormValues> => ({})))[loan.id] ?? {};
   const corrected = withCorrections(borrower, latestPay, corrections);
   return {
@@ -149,6 +161,7 @@ export async function loadLoanFormContext(loan: { id: string; employee_number: s
     latestPay: corrected.latestPay,
     record: recordValues(borrower, latestPay),
     corrections,
+    payChanged: !!d.pay_changed,
     payout: payout && payout.status === 'paid' ? { reference: payout.payment_reference ?? null, paidOn: payout.paid_on ?? null } : null,
   };
 }

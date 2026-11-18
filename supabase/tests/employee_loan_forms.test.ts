@@ -55,13 +55,13 @@ beforeAll(async () => {
 }, 120000);
 
 describe('an approved loan gets its form', () => {
-  it('a request has none; approving makes one, required by default, and tells the borrower', async () => {
+  it('a request has its form already (20261118600000), required by default; approving tells the borrower to sign', async () => {
     loanId = await ask(
       S1,
       `(employee_number, principal, months, reason, status, residential_address, other_loan_repayments, disbursement_account)
        values ('E1', 30000, 3, 'school fees', 'requested', 'Kileleshwa, Nairobi', 2000, '0712 345 678')`
     );
-    expect(await form(loanId)).toBeUndefined();
+    expect(await form(loanId)).toMatchObject({ required: true, status: 'none' });
     await decide(HR, loanId);
     expect(await form(loanId)).toMatchObject({ required: true, status: 'none', borrower_signature: null });
     const notes = await rows<{ notification_type: string }>(`select notification_type from hr_notifications where employee_number = 'E1'`);

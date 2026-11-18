@@ -1,6 +1,6 @@
 import { forwardRef, type CSSProperties, type ReactNode } from 'react';
 import { formatKsh, interestMethodLabel, rateText, type LoanInstalment } from '../../lib/loans';
-import { CHECKLIST, employmentBox, formDate, keyFacts, loanReference, type LoanForm, type LoanGuarantor } from '../../lib/loanForm';
+import { CHECKLIST, employmentBox, formDate, keyFacts, loanReference, type LoanForm, type LoanGuarantor, type LoanWitness } from '../../lib/loanForm';
 import type { LoanFormContext } from '../../lib/loanFormApi';
 import type { EmployeeLoan } from '../../lib/loansApi';
 
@@ -56,10 +56,12 @@ export interface LoanAgreementDocumentProps {
   renewal?: boolean;
   /** the colleague guaranteeing it, once asked */
   guarantor?: LoanGuarantor | null;
+  /** the colleague asked to witness, shown by name until they sign */
+  witness?: LoanWitness | null;
 }
 
 const LoanAgreementDocument = forwardRef<HTMLDivElement, LoanAgreementDocumentProps>(function LoanAgreementDocument(
-  { loan, form, context, schedule, renewal = false, guarantor = null },
+  { loan, form, context, schedule, renewal = false, guarantor = null, witness = null },
   ref
 ) {
   const { lender, borrower, settings, latestPay, payout } = context;
@@ -445,7 +447,7 @@ const LoanAgreementDocument = forwardRef<HTMLDivElement, LoanAgreementDocumentPr
       <table style={table} className="loan-form-keep">
         <tbody>
           <tr>
-            <Field name="Witness full name">{form?.witness_name}</Field>
+            <Field name="Witness full name">{form?.witness_name ?? (witness && witness.status !== 'declined' ? witness.witness_name : null)}</Field>
             <Field name="Witness National ID number">{form?.witness_id_number}</Field>
           </tr>
           <tr>
