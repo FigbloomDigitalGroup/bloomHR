@@ -92,8 +92,9 @@ describe('signing', () => {
     expect(await form(loanId)).toMatchObject({ borrower_signature: SIG });
   });
 
-  it('only the approver signs the approval, once', async () => {
-    await expect(as(PAY, `select loan_form_sign_approver('${loanId}', '${SIG}', 'Pat Pay', 'Finance')`)).rejects.toThrow(/approved the loan/);
+  it('the approver (or anyone who manages loans, 20261119100000) signs the approval, once; not staff', async () => {
+    await expect(as(S2, `select loan_form_sign_approver('${loanId}', '${SIG}', 'Eric', 'Staff')`)).rejects.toThrow(/Only the approver/);
+    await expect(as(S1, `select loan_form_sign_approver('${loanId}', '${SIG}', 'Esther', 'Me')`)).rejects.toThrow(/Only the approver/);
     await as(HR, `select loan_form_sign_approver('${loanId}', '${SIG}', 'Hana Hr', 'HR Manager')`);
     expect(await form(loanId)).toMatchObject({ approver_signature: SIG, approver_name: 'Hana Hr', approver_title: 'HR Manager' });
     await expect(as(HR, `select loan_form_sign_approver('${loanId}', '${SIG}', 'Hana Hr', null)`)).rejects.toThrow(/already signed/);
@@ -226,6 +227,21 @@ describe('the signed copy', () => {
   it('then it can be paid out', async () => {
     await as(HR, `update employee_loans set status = 'disbursed' where id = '${loanId}'`);
     expect((await rows<{ status: string }>(`select status from employee_loans where id = '${loanId}'`))[0].status).toBe('disbursed');
+  });
+});
+
+describe('the owner signs the approval of a loan already paid out (20261119100000)', () => {
+  it('a loan approved before the form existed gets its form; someone who manages loans signs it as Owner, once', async () => {
+    // an old loan: approved and paid out with no form (as before 20261118100000)
+    await as(HR, `update loan_settings set require_signed_form = false`);
+    const id = await ask(S2, `(employee_number, principal, months, status) values ('E2', 6000, 3, 'requested')`);
+    await decide(HR, id);
+    await db.exec(`delete from employee_loan_forms where loan_id = '${id}'`);
+    await as(HR, `update employee_loans set status = 'disbursed' where id = '${id}'`);
+    await as(PAY, `select loan_form_sign_approver('${id}', '${SIG}', 'Olive Owner', 'Owner')`);
+    expect(await form(id)).toMatchObject({ approver_signature: SIG, approver_name: 'Olive Owner', approver_title: 'Owner', required: false });
+    await expect(as(HR, `select loan_form_sign_approver('${id}', '${SIG}', 'Hana Hr', 'HR')`)).rejects.toThrow(/already signed/);
+    await as(HR, `update loan_settings set require_signed_form = true`);
   });
 });
 

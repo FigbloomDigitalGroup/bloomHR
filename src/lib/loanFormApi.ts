@@ -198,9 +198,14 @@ export async function signAsBorrower(loanId: string, signature: string): Promise
 }
 
 /** The final approver signs the lender approval with their saved signature. */
-export async function signAsApprover(loanId: string, signature: string): Promise<void> {
+export async function signAsApprover(loanId: string, signature: string, designation?: string): Promise<void> {
   const me = await loadMySignerIdentity();
-  const { error } = await supabase.rpc('loan_form_sign_approver', { p_loan: loanId, p_signature: signature, p_name: me.name, p_title: me.title });
+  const { error } = await supabase.rpc('loan_form_sign_approver', {
+    p_loan: loanId,
+    p_signature: signature,
+    p_name: me.name,
+    p_title: designation?.trim() || me.title,
+  });
   if (error) fail(error, 'Your signature was not added to the approval.');
 }
 
