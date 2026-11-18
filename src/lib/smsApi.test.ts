@@ -5,7 +5,7 @@ vi.mock('./supabase', () => ({
   supabase: { auth: { getSession: async () => ({ data: { session: session.token ? { access_token: session.token } : null } }) } },
 }));
 
-import { getSmsBalance, sendSingleSms, sendSms } from './smsApi';
+import { getSmsBalance, sendSingleSms, sendSms, SmsNotConnectedError } from './smsApi';
 
 const fetchMock = vi.fn();
 beforeEach(() => {
@@ -65,5 +65,12 @@ describe('smsApi', () => {
     expect(await getSmsBalance()).toBe(1234.5);
     fetchMock.mockReturnValue(ok({ balance: null }));
     expect(await getSmsBalance()).toBeNull();
+  });
+  it('says SMS is not connected yet when the server has no provider set up (503)', async () => {
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ error: 'SMS service is not configured on the server' }), { status: 503 }))
+    );
+    await expect(getSmsBalance()).rejects.toBeInstanceOf(SmsNotConnectedError);
+    await expect(sendSingleSms('0712345678', 'Hi', { purpose: 'sms-center' })).rejects.toThrow("SMS isn't connected yet");
   });
 });

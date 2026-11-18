@@ -7,7 +7,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { fetchAllResult } from '../../lib/fetchAll';
 import { smsSegments } from '../../lib/smsSegments';
-import { getSmsBalance, sendSingleSms } from '../../lib/smsApi';
+import { getSmsBalance, sendSingleSms, SmsNotConnectedError, SMS_NOT_CONNECTED_MESSAGE } from '../../lib/smsApi';
 import { Card, Button, TabBar, Modal } from '../UI';
 import { CELCOM_AFRICA_CONFIG } from '../../config/sms';
 import toast from 'react-hot-toast';
@@ -382,12 +382,13 @@ export const SMSService = {
   }
 };
 
-// Balance from the SMS provider, via the backend.
-const checkSMSBalance = async (): Promise<string> => {
+// Balance from the SMS provider, via the backend; null when SMS isn't connected yet.
+const checkSMSBalance = async (): Promise<string | null> => {
   try {
     const balance = await getSmsBalance();
     return balance === null ? 'Unavailable' : balance.toLocaleString('en-KE', { maximumFractionDigits: 2 });
   } catch (error) {
+    if (error instanceof SmsNotConnectedError) return null;
     console.error('Balance check error:', error);
     return 'Unavailable';
   }
@@ -520,6 +521,8 @@ export function SMSCenter() {
     balance: 'Loading...'
   });
   const [isSending, setIsSending] = useState(false);
+  // false once the server says SMS isn't connected yet: the screens stay for a look around, sending is off
+  const [smsConnected, setSmsConnected] = useState(true);
   const [sendingProgress, setSendingProgress] = useState<{ current: number, total: number }>({ current: 0, total: 0 });
   const [selectedPackage, setSelectedPackage] = useState<string>('standard');
   const [showPackageModal, setShowPackageModal] = useState(false);
@@ -691,7 +694,9 @@ export function SMSCenter() {
 
   const loadSMSStats = async () => {
     try {
-      const balance = await checkSMSBalance();
+      const providerBalance = await checkSMSBalance();
+      setSmsConnected(providerBalance !== null);
+      const balance = providerBalance ?? 'Not connected yet';
 
       // Get current month start date
       const now = new Date();
@@ -890,6 +895,10 @@ export function SMSCenter() {
 
   // SMS sending function with Celcom Africa API
   const handleSendSMS = async (immediate = true) => {
+    if (!smsConnected) {
+      toast(SMS_NOT_CONNECTED_MESSAGE);
+      return;
+    }
     if (!message.trim()) {
       toast.error('Please enter a message');
       return;
@@ -1012,6 +1021,10 @@ export function SMSCenter() {
   };
 
   const testSMS = async () => {
+    if (!smsConnected) {
+      toast(SMS_NOT_CONNECTED_MESSAGE);
+      return;
+    }
     try {
       const testNumbers = ['254716431987', '0716431987'];
       const currentShortcode = getCurrentShortcode();
@@ -1073,6 +1086,10 @@ export function SMSCenter() {
   };
 
   const processBulkUpload = async () => {
+    if (!smsConnected) {
+      toast(SMS_NOT_CONNECTED_MESSAGE);
+      return;
+    }
     if (!uploadedFile) {
       toast.error('Please upload a CSV file first');
       return;
@@ -1284,6 +1301,13 @@ export function SMSCenter() {
           </div>
         </div>
       </div>
+
+      {!smsConnected && (
+        <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md text-[12.5px]" role="status">
+          <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" strokeWidth={2} />
+          <span>{SMS_NOT_CONNECTED_MESSAGE} You can still look around the SMS Center.</span>
+        </div>
+      )}
 
       {/* Stat tiles */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
