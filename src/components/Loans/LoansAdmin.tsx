@@ -139,7 +139,8 @@ export default function LoansAdmin() {
       const loaded = await loadSchedules(all.filter((l) => ['approved', 'disbursed', 'repaying', 'completed'].includes(l.status)).map((l) => l.id));
       setSchedules(loaded.schedules);
       setRepayments(loaded.repayments);
-      setForms(await loadLoanForms(all.filter((l) => l.status !== 'requested').map((l) => l.id)).catch(() => ({})));
+      // every loan's form, requests included: the borrower, witness and guarantor sign from the request on (20261118600000)
+      setForms(await loadLoanForms(all.filter((l) => !['rejected', 'cancelled'].includes(l.status)).map((l) => l.id)).catch(() => ({})));
       const liveIds = all.filter((l) => !['rejected', 'cancelled'].includes(l.status)).map((l) => l.id);
       const [g, w, c] = await Promise.all([
         loadGuarantors(liveIds).catch(() => ({})),
