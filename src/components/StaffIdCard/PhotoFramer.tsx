@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { Crosshair } from 'lucide-react';
 import { Button } from '../UI';
 import { hexagon, useImageSize } from './StaffIdCard';
-import { type PhotoFraming, CENTRED, placePhoto, setStaffIdCardPhotoFraming } from '../../lib/staffIdCards';
+import { type CardLayout, type PhotoFraming, CENTRED, placePhoto, setStaffIdCardPhotoFraming } from '../../lib/staffIdCards';
 
 // Framing the photo on a staff ID card (20261027600000): drag the photo inside the hexagon and zoom, then Save. Only
 // where the photo sits on the card changes; the photo itself is not edited.
@@ -16,6 +16,7 @@ export default function PhotoFramer({
   employeeId,
   photoUrl,
   framing: saved,
+  layout = 'portrait',
   onSaved,
   onCancel,
   onChange,
@@ -23,6 +24,8 @@ export default function PhotoFramer({
   employeeId: string;
   photoUrl: string;
   framing: PhotoFraming;
+  /** which card's framing this is: each layout keeps its own */
+  layout?: CardLayout;
   onSaved: (framing: PhotoFraming) => void;
   onCancel: () => void;
   /** the position as it is being moved, to show it on the card */
@@ -69,7 +72,7 @@ export default function PhotoFramer({
   const save = async () => {
     setSaving(true);
     try {
-      await setStaffIdCardPhotoFraming(employeeId, placed.framing);
+      await setStaffIdCardPhotoFraming(employeeId, placed.framing, layout);
       onSaved(placed.framing);
       toast.success('Photo position saved');
     } catch (e) {
