@@ -7,8 +7,8 @@ import LoanSettingsCard from './LoanSettingsCard';
 import LoanFormPanel from './LoanFormPanel';
 import LoanFormSettingsCard from './LoanFormSettingsCard';
 import MySignature from '../Signature/MySignature';
-import { currentUserId, loadLoanForms, signAsApprover } from '../../lib/loanFormApi';
-import { formHoldsPayout, type LoanForm } from '../../lib/loanForm';
+import { currentUserId, loadGuarantors, loadLoanForms, signAsApprover } from '../../lib/loanFormApi';
+import { formHoldsPayout, type LoanForm, type LoanGuarantor } from '../../lib/loanForm';
 import ApprovalChain from '../Approvals/ApprovalChain';
 import { loadApprovalChains, type ApprovalChain as Chain } from '../../lib/approvals';
 import RecordPaymentLink from '../Payments/RecordPaymentLink';
@@ -103,6 +103,7 @@ export default function LoansAdmin() {
   const [repayments, setRepayments] = useState<Record<string, LoanRepayment[]>>({});
   const [chains, setChains] = useState<Record<string, Chain>>({});
   const [forms, setForms] = useState<Record<string, LoanForm>>({});
+  const [guarantors, setGuarantors] = useState<Record<string, LoanGuarantor>>({});
   const [myUserId, setMyUserId] = useState<string | null>(null);
   const [approverSignature, setApproverSignature] = useState<string | null>(null);
   const [settings, setSettings] = useState<LoanSettings>(DEFAULT_LOAN_SETTINGS);
@@ -132,6 +133,7 @@ export default function LoansAdmin() {
       setSchedules(loaded.schedules);
       setRepayments(loaded.repayments);
       setForms(await loadLoanForms(all.filter((l) => l.status !== 'requested').map((l) => l.id)).catch(() => ({})));
+      setGuarantors(await loadGuarantors(all.filter((l) => !['rejected', 'cancelled'].includes(l.status)).map((l) => l.id)).catch(() => ({})));
       setMyUserId(await currentUserId().catch(() => null));
     } catch (error) {
       console.error('Error loading loans:', error);
@@ -451,6 +453,7 @@ export default function LoansAdmin() {
                       (o) => o.id !== loan.id && o.employee_number === loan.employee_number && o.created_at < loan.created_at && ['disbursed', 'repaying', 'completed'].includes(o.status)
                     )}
                     myUserId={myUserId}
+                    guarantor={guarantors[loan.id]}
                     onChanged={load}
                   />
                 </Card>

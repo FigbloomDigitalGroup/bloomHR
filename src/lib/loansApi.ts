@@ -177,8 +177,8 @@ const applicationColumns = (d: LoanApplicationDetails | undefined) =>
 export async function requestLoan(
   employee: MyEmployee,
   input: { productId: string | null; amount: number; months: number; reason: string; details?: LoanApplicationDetails }
-) {
-  const { error } = await supabase.from('employee_loans').insert({
+): Promise<string> {
+  const { data, error } = await supabase.from('employee_loans').insert({
     employee_number: employee.employeeNumber,
     product_id: input.productId,
     principal: input.amount,
@@ -186,8 +186,9 @@ export async function requestLoan(
     reason: input.reason.trim(),
     status: 'requested',
     ...applicationColumns(input.details),
-  });
+  }).select('id').single();
   if (error) throw friendly(error);
+  return String(data?.id ?? '');
 }
 
 // ---------------------------------------------------------------------------------------------

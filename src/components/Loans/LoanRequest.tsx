@@ -4,6 +4,7 @@ import { HandCoins, Lock } from 'lucide-react';
 import { Button, Card, EmptyState, PageHeader } from '../UI';
 import LoanSchedule, { LoanBalance, LoanStatusPill } from './LoanSchedule';
 import LoanFormPanel from './LoanFormPanel';
+import GuaranteeRequests from './GuaranteeRequests';
 import { confirmDialog } from '../../lib/confirmDialog';
 import {
   DEFAULT_LOAN_SETTINGS,
@@ -23,8 +24,8 @@ import {
   type LoanSettings,
 } from '../../lib/loans';
 import { loadLoanProducts, loadLoanSettings, loadMyLoans, requestLoan, withdrawLoan, type LoanApplicationDetails, type LoanWithSchedule } from '../../lib/loansApi';
-import { loadLoanForms } from '../../lib/loanFormApi';
-import { formHoldsPayout, type LoanForm } from '../../lib/loanForm';
+import { loadGuarantorChoices, loadGuarantors, loadLoanFormSettings, loadLoanForms, setGuarantor } from '../../lib/loanFormApi';
+import { formHoldsPayout, type LoanForm, type LoanGuarantor } from '../../lib/loanForm';
 import { loadMyEmployee, type MyEmployee } from '../../lib/salaryAdvanceApi';
 import { LoaderBlock } from '../UI/FigbloomLoader';
 
@@ -55,18 +56,24 @@ export default function LoanRequest() {
   const [openSchedule, setOpenSchedule] = useState<string | null>(null);
   const [details, setDetails] = useState<LoanApplicationDetails>(EMPTY_DETAILS);
   const [forms, setForms] = useState<Record<string, LoanForm>>({});
+  const [guarantors, setGuarantors] = useState<Record<string, LoanGuarantor>>({});
+  const [choices, setChoices] = useState<{ employee_number: string; name: string }[]>([]);
+  const [guarantorNeeded, setGuarantorNeeded] = useState(true);
+  const [guarantor, setGuarantorPick] = useState('');
 
   const loadMine = useCallback(async (employeeNumber: string) => {
     const mine = await loadMyLoans(employeeNumber);
-    const myForms = await loadLoanForms(mine.map((l) => l.id)).catch(() => ({}));
-    return { mine, myForms };
+    const ids = mine.map((l) => l.id);
+    const [myForms, myGuarantors] = await Promise.all([loadLoanForms(ids).catch(() => ({})), loadGuarantors(ids).catch(() => ({}))]);
+    return { mine, myForms, myGuarantors };
   }, []);
 
   const refresh = useCallback(async (emp: MyEmployee | null) => {
     if (!emp?.employeeNumber) return;
-    const { mine, myForms } = await loadMine(emp.employeeNumber);
+    const { mine, myForms, myGuarantors } = await loadMine(emp.employeeNumber);
     setLoans(mine);
     setForms(myForms);
+    setGuarantors(myGuarantors);
   }, [loadMine]);
 
   useEffect(() => {
@@ -80,10 +87,17 @@ export default function LoanRequest() {
         setProducts(p.filter((x) => x.active));
         setForm((f) => ({ ...f, months: f.months || Math.min(Math.max(s.min_months, 12), s.max_months) }));
         if (emp?.employeeNumber) {
-          const { mine, myForms } = await loadMine(emp.employeeNumber);
+          const [{ mine, myForms, myGuarantors }, colleagues, formSettings] = await Promise.all([
+            loadMine(emp.employeeNumber),
+            loadGuarantorChoices().catch(() => []),
+            loadLoanFormSettings().catch(() => null),
+          ]);
           if (live) {
             setLoans(mine);
             setForms(myForms);
+            setGuarantors(myGuarantors);
+            setChoices(colleagues);
+            setGuarantorNeeded(formSettings?.require_signed_form ?? true);
           }
         }
       } catch (error) {
@@ -104,9 +118,10 @@ export default function LoanRequest() {
   const maxMonths = maxMonthsFor(settings, product);
   const maxAmount = maxLoanFor(settings, employee?.basicSalary);
   const otherRepayments = details.otherLoanRepayments.trim();
-  const errors: Partial<Record<keyof LoanRequestInput | 'otherLoanRepayments', string>> = {
+  const errors: Partial<Record<keyof LoanRequestInput | 'otherLoanRepayments' | 'guarantor', string>> = {
     ...validateLoanRequest(form, { minMonths: settings.min_months, maxMonths, maxAmount }),
     ...(otherRepayments !== '' && !(Number(otherRepayments) >= 0) ? { otherLoanRepayments: 'Enter an amount in KSh, or leave it empty.' } : {}),
+    ...(guarantorNeeded && !guarantor ? { guarantor: 'Choose a colleague to guarantee your loan.' } : {}),
   };
   const amount = Number(form.amount) || 0;
   const firstMonth = addMonths(currentPeriod(), 1);
@@ -130,10 +145,15 @@ export default function LoanRequest() {
     if (blocked || !employee || Object.keys(errors).length > 0) return;
     setSaving(true);
     try {
-      await requestLoan(employee, { productId: productId || null, amount, months: form.months, reason: form.reason, details });
+      const loanId = await requestLoan(employee, { productId: productId || null, amount, months: form.months, reason: form.reason, details });
       toast.success('Your loan request was sent for approval');
+      if (guarantor) {
+        // the request is in either way; a guarantor not asked can be chosen again on the loan
+        await setGuarantor(loanId, guarantor).catch((error) => toast.error((error as Error).message || 'Your guarantor was not asked. Choose them again on the loan.'));
+      }
       setForm((f) => ({ ...f, amount: '', reason: '' }));
       setDetails(EMPTY_DETAILS);
+      setGuarantorPick('');
       setTriedSubmit(false);
       await refresh(employee);
     } catch (error) {
@@ -161,7 +181,7 @@ export default function LoanRequest() {
     }
   };
 
-  const showError = (field: keyof LoanRequestInput | 'otherLoanRepayments') =>
+  const showError = (field: keyof LoanRequestInput | 'otherLoanRepayments' | 'guarantor') =>
     (triedSubmit || (field === 'amount' && form.amount !== '')) && errors[field] ? (
       <p id={`loan-${field}-error`} className="mt-1 text-[11.5px] text-status-danger" role="alert">
         {errors[field]}
@@ -324,6 +344,21 @@ export default function LoanRequest() {
                     />
                   </div>
                 </div>
+                <div>
+                  <label htmlFor="loan-guarantor" className="block text-[12px] text-ink mb-1">
+                    Guarantor (a colleague at the company){guarantorNeeded ? '' : ', optional'}
+                  </label>
+                  <select id="loan-guarantor" value={guarantor} onChange={(e) => setGuarantorPick(e.target.value)} disabled={!!blocked} className={inputClass}>
+                    <option value="">Choose a colleague…</option>
+                    {choices.map((c) => (
+                      <option key={c.employee_number} value={c.employee_number}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 mb-0 text-[11.5px] text-muted-foreground">They are asked to read the loan’s terms and sign as guarantor in their staff portal.</p>
+                  {showError('guarantor')}
+                </div>
               </fieldset>
 
               {amount > 0 && !errors.amount && !errors.months && preview.length > 0 && (
@@ -424,6 +459,7 @@ export default function LoanRequest() {
                       mode="staff"
                       schedule={l.schedule}
                       renewal={isRenewal(l, loans)}
+                      guarantor={guarantors[l.id]}
                       onChanged={() => refresh(employee)}
                     />
                   </Card>
@@ -431,6 +467,7 @@ export default function LoanRequest() {
               ))}
             </ul>
           )}
+          {employee?.employeeNumber && <GuaranteeRequests employeeNumber={employee.employeeNumber} />}
         </div>
       </div>
     </div>

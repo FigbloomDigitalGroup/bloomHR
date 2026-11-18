@@ -105,3 +105,53 @@ describe('the loan agreement form', () => {
     expect(screen.getByTestId('loan-agreement').textContent).toMatch(/No late repayment penalty applies/);
   });
 });
+
+describe('the guarantor, the witness and the official parts', () => {
+  const GUARANTOR = {
+    loan_id: LOAN.id, employee_number: 'E2', guarantor_name: 'Peter Otieno', status: 'signed' as const, decline_reason: null,
+    relationship: 'Colleague', alternative_phone: '0733000000', residential_address: 'Ruaka', id_number: '22334455', kra_pin: 'A123456789B',
+    date_of_birth: '1988-02-03', mobile: '0722111222', email: 'peter@farm.co.ke', town: 'Kiambu', signature: 'data:image/png;base64,GUARANTOR',
+    signed_at: '2026-11-18T11:00:00Z',
+  };
+
+  it('fills in the guarantor’s details and signature, and the witness’s', () => {
+    render(
+      <LoanAgreementDocument
+        loan={LOAN}
+        form={{ ...FORM, witness_name: 'Wanjiku W', witness_id_number: '123', witness_signature: 'data:image/png;base64,WITNESS', witness_signed_at: '2026-11-18T10:05:00Z' }}
+        context={CONTEXT}
+        schedule={loanSchedule(30000, 20, 3, 'upfront', '2026-12')}
+        guarantor={GUARANTOR}
+      />
+    );
+    const doc = screen.getByTestId('loan-agreement');
+    expect(within(doc).getAllByText('Peter Otieno').length).toBe(2);
+    expect(within(doc).getAllByText('22334455').length).toBe(2);
+    expect(within(doc).getByText('Colleague')).toBeTruthy();
+    expect(screen.getByAltText("Guarantor's signature").getAttribute('src')).toBe('data:image/png;base64,GUARANTOR');
+    expect(screen.getByAltText("Witness's signature")).toBeTruthy();
+    expect(within(doc).getByText('Wanjiku W')).toBeTruthy();
+    expect(doc.textContent).toMatch(/I undertake to guarantee payment to Moneysta Capital Investment Ltd/);
+  });
+
+  it('a declined guarantor is not on it; the official part and the four checklist items follow the lender’s form', () => {
+    render(
+      <LoanAgreementDocument
+        loan={LOAN}
+        form={{ ...FORM, status: 'accepted', affordability_by: 'Hana Hr', checks: ['payslips'] }}
+        context={CONTEXT}
+        schedule={loanSchedule(30000, 20, 3, 'upfront', '2026-12')}
+        guarantor={{ ...GUARANTOR, status: 'declined', decline_reason: 'No' }}
+      />
+    );
+    const doc = screen.getByTestId('loan-agreement');
+    expect(screen.queryByAltText("Guarantor's signature")).toBeNull();
+    expect(within(doc).getByText('For Official Use')).toBeTruthy();
+    expect(doc.textContent).toMatch(/Affordability assessment completed byHana Hr/);
+    expect(doc.textContent).toMatch(/☑ Signed application\/agreement Loan form/);
+    expect(doc.textContent).toMatch(/☐ Signed Guarantor section, Guarantor ID & KRA/);
+    expect(doc.textContent).toMatch(/☐ Applicants Copy of National ID/);
+    expect(doc.textContent).toMatch(/☑ Latest three months’ pay slips/);
+    expect(doc.textContent).not.toMatch(/Disbursement confirmation retained/);
+  });
+});
