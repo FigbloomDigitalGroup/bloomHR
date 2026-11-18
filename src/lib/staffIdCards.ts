@@ -30,7 +30,7 @@ export interface StaffIdCardData {
   photo_x?: number | string | null;
   photo_y?: number | string | null;
   photo_zoom?: number | string | null;
-  /** the landscape card's own framing (20261118300000) */
+  /** the landscape card's own framing (20261118900000) */
   landscape_photo_x?: number | string | null;
   landscape_photo_y?: number | string | null;
   landscape_photo_zoom?: number | string | null;
