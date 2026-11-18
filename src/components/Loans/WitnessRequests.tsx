@@ -58,7 +58,7 @@ export default function WitnessRequests({ employeeNumber }: { employeeNumber: st
       <ul className="space-y-3">
         {asked.map((w) => {
           const v = views[w.loan_id];
-          const canSign = w.status === 'asked' && v?.loan_status === 'approved' && v.borrower_signed;
+          const canSign = w.status === 'asked' && ['requested', 'approved'].includes(v?.loan_status ?? '') && !!v?.borrower_signed;
           return (
             <li key={w.loan_id}>
               <Card>

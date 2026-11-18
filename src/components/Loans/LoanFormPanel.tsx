@@ -134,7 +134,7 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
   const [busy, setBusy] = useState(false);
   const [witnessing, setWitnessing] = useState<{ name: string; idNumber: string } | null>(null);
   const [choosing, setChoosing] = useState<{ role: 'guarantor' | 'witness'; choices: { employee_number: string; name: string }[]; picked: string } | null>(null);
-  const [correcting, setCorrecting] = useState<{ record: FormValues; values: FormValues } | null>(null);
+  const [correcting, setCorrecting] = useState<{ record: FormValues; values: FormValues; payChanged?: boolean } | null>(null);
   const [checking, setChecking] = useState<{ by: string; checks: ChecklistItem[] } | null>(null);
   const docRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -153,6 +153,8 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
   const stage = formStage(loan, form, ready);
   const open = loan.status === 'approved' && !!form && form.status !== 'accepted';
   const waitingOnReview = form?.status === 'uploaded' || ready;
+  // signing online works from the request on; a paper copy and HR's review wait for approval
+  const signable = ['requested', 'approved'].includes(loan.status) && !!form && form.status !== 'accepted';
   // the guarantor is chosen before payout; once they signed, only HR changes them
   const canChooseGuarantor =
     ['requested', 'approved'].includes(loan.status) && form?.status !== 'accepted' && (mode === 'hr' || guarantor?.status !== 'signed');
@@ -224,7 +226,7 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
     try {
       const ctx = await loadLoanFormContext(loan);
       const record = ctx.record ?? {};
-      setCorrecting({ record, values: { ...record, ...(ctx.corrections ?? {}) } });
+      setCorrecting({ record, values: { ...record, ...(ctx.corrections ?? {}) }, payChanged: !!ctx.payChanged });
     } catch (error) {
       toast.error(errorText(error, 'Could not load the form'));
     }
@@ -266,14 +268,12 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
   const nextStep =
     mode === 'staff'
       ? !form
-        ? loan.status === 'requested'
-          ? 'Once the loan is approved, you sign the loan form here.'
-          : null
+        ? null
         : form.status === 'accepted'
           ? null
           : waitingOnReview
             ? 'HR has your signed form and will review it.'
-            : !open
+            : !signable
               ? null
               : `To finish the form: ${missing.join(', ')}. HR then reviews it${form.required ? ', and the loan is paid out once HR accepts it' : ''}. Signed on paper instead? Upload the scanned PDF.`
       : !form
@@ -333,7 +333,7 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
         <Button variant="secondary" onClick={() => setViewing(true)} icon={<FileText className="w-3.5 h-3.5" />}>
           {loan.status === 'requested' ? 'Draft form' : 'View form'}
         </Button>
-        {mode === 'staff' && open && (
+        {mode === 'staff' && signable && (
           <Button variant={form?.borrower_signature ? 'ghost' : 'primary'} onClick={() => setSigning('borrower')} icon={<PenLine className="w-3.5 h-3.5" />}>
             {form?.borrower_signature ? 'Sign again' : 'Sign with my signature'}
           </Button>
@@ -423,7 +423,7 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
                 </Button>
               </div>
               <div className="max-h-[70vh] overflow-auto rounded-tile border border-border bg-white p-4">
-                <LoanAgreementDocument ref={docRef} loan={loan} form={form ?? null} context={context} schedule={docSchedule} renewal={renewal} guarantor={guarantor} />
+                <LoanAgreementDocument ref={docRef} loan={loan} form={form ?? null} context={context} schedule={docSchedule} renewal={renewal} guarantor={guarantor} witness={witness} />
               </div>
             </>
           ))}
@@ -537,6 +537,12 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
               The form shows what the employee record has. Correct anything wrong or missing here: it changes this loan’s form only, and HR sees what was
               corrected. Ask HR to update the employee record too.
             </p>
+            {correcting.payChanged && (
+              <p className="mb-3 p-2.5 rounded-tile bg-orange-tint text-[12px] text-ink">
+                The salary on the record changed after the last payslip, so gross pay is the record’s basic salary and net pay is empty. Enter your
+                current net pay (including per diem and other benefits).
+              </p>
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
               {FORM_VALUE_FIELDS.map((f) => (
                 <label key={f.id} className="block">

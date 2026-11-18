@@ -1,19 +1,37 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { PenLine } from 'lucide-react';
+import { ImageUp, PenLine } from 'lucide-react';
 import { Button, Card } from '../UI';
 import { confirmDialog } from '../../lib/confirmDialog';
 import { clearMySignature, loadMySignature, saveMySignature } from '../../lib/signatures';
 import SignaturePad from './SignaturePad';
+import { SIGNATURE_IMAGE_TYPES, signatureFromImage, signatureImageProblem } from '../../lib/signatureImage';
 
 /**
- * The signed-in person's signature: draw it once and it is kept (only they can see it) and put on the letters they send.
+ * The signed-in person's signature: draw it once (or upload a picture of it signed on paper) and it is kept (only they
+ * can see it) and put on the letters and forms they sign.
  * `bare` drops the card, for use inside another screen; `onChange` hears the saved signature (a data: URL) or null.
  */
 export default function MySignature({ bare = false, onChange }: { bare?: boolean; onChange?: (signature: string | null) => void }) {
   const [signature, setSignature] = useState<string | null | undefined>(undefined);
   const [drawing, setDrawing] = useState(false);
   const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const upload = async (file: File | undefined) => {
+    if (fileRef.current) fileRef.current.value = '';
+    if (!file) return;
+    const problem = signatureImageProblem(file);
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
+    try {
+      await save(await signatureFromImage(file));
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
 
   useEffect(() => {
     loadMySignature().then(
@@ -77,6 +95,17 @@ export default function MySignature({ bare = false, onChange }: { bare?: boolean
             <Button variant={signature ? 'secondary' : 'primary'} onClick={() => setDrawing(true)} disabled={busy} icon={<PenLine className="h-4 w-4" />}>
               {signature ? 'Draw a new one' : 'Draw your signature'}
             </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept={SIGNATURE_IMAGE_TYPES.join(',')}
+              className="sr-only"
+              aria-label="Upload a picture of your signature"
+              onChange={(e) => void upload(e.target.files?.[0])}
+            />
+            <Button variant="secondary" onClick={() => fileRef.current?.click()} disabled={busy} icon={<ImageUp className="h-4 w-4" />}>
+              Upload an image
+            </Button>
             {signature && <Button variant="ghost" onClick={() => void remove()} disabled={busy}>Remove</Button>}
           </div>
         </div>
@@ -89,7 +118,7 @@ export default function MySignature({ bare = false, onChange }: { bare?: boolean
     <Card className="mb-4">
       <h2 className="m-0 text-[14px] font-bold text-ink">My signature</h2>
       <p className="mt-0.5 mb-3.5 text-[12px] text-muted-foreground">
-        Draw it once with your mouse, finger or pen. It goes on the letters you send (where a template says {'{{signature}}'}); only you can see it here.
+        Draw it once with your mouse, finger or pen, or upload a picture of it signed in dark ink on white paper. It goes on the letters you send (where a template says {'{{signature}}'}); only you can see it here.
       </p>
       {body}
     </Card>

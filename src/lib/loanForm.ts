@@ -75,7 +75,7 @@ export type FormValueField = (typeof FORM_VALUE_FIELDS)[number]['id'];
 export type FormValues = Partial<Record<FormValueField, string>>;
 
 /** What the record says for each correctable field, as text (gross and net from the latest payslip, or basic pay). */
-export function recordValues(borrower: BorrowerDetails, latestPay: { gross: number; net: number } | null): FormValues {
+export function recordValues(borrower: BorrowerDetails, latestPay: { gross: number | null; net: number | null } | null): FormValues {
   const out: FormValues = {
     id_number: borrower.idNumber ?? undefined,
     kra_pin: borrower.kraPin ?? undefined,
@@ -88,8 +88,8 @@ export function recordValues(borrower: BorrowerDetails, latestPay: { gross: numb
     payroll_number: borrower.payrollNumber ?? undefined,
     employment_type: borrower.employmentType ?? undefined,
     contract_end_date: borrower.contractEndDate ?? undefined,
-    gross_salary: latestPay ? String(latestPay.gross) : borrower.basicSalary !== null ? String(borrower.basicSalary) : undefined,
-    net_salary: latestPay ? String(latestPay.net) : undefined,
+    gross_salary: latestPay?.gross != null ? String(latestPay.gross) : borrower.basicSalary !== null ? String(borrower.basicSalary) : undefined,
+    net_salary: latestPay?.net != null ? String(latestPay.net) : undefined,
   };
   return Object.fromEntries(Object.entries(out).filter(([, v]) => v !== undefined && v !== '')) as FormValues;
 }
@@ -97,12 +97,12 @@ export function recordValues(borrower: BorrowerDetails, latestPay: { gross: numb
 /** The borrower's details and pay with the loan's corrections on top. */
 export function withCorrections(
   borrower: BorrowerDetails,
-  latestPay: { gross: number; net: number; period: string } | null,
+  latestPay: { gross: number | null; net: number | null; period: string } | null,
   values: FormValues
-): { borrower: BorrowerDetails; latestPay: { gross: number; net: number; period: string } | null } {
+): { borrower: BorrowerDetails; latestPay: { gross: number | null; net: number | null; period: string } | null } {
   const v = (k: FormValueField, fallback: string | null) => values[k] ?? fallback;
-  const gross = values.gross_salary ?? (latestPay ? String(latestPay.gross) : borrower.basicSalary !== null ? String(borrower.basicSalary) : null);
-  const net = values.net_salary ?? (latestPay ? String(latestPay.net) : null);
+  const gross = values.gross_salary ?? (latestPay?.gross != null ? String(latestPay.gross) : borrower.basicSalary !== null ? String(borrower.basicSalary) : null);
+  const net = values.net_salary ?? (latestPay?.net != null ? String(latestPay.net) : null);
   return {
     borrower: {
       ...borrower,
@@ -121,7 +121,7 @@ export function withCorrections(
     latestPay:
       gross === null && net === null && !latestPay
         ? null
-        : { gross: Number(gross ?? 0), net: Number(net ?? 0), period: latestPay?.period ?? '' },
+        : { gross: gross === null ? null : Number(gross), net: net === null ? null : Number(net), period: latestPay?.period ?? '' },
   };
 }
 
