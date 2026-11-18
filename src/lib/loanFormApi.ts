@@ -128,6 +128,7 @@ export async function loadLoanFormContext(loan: { id: string; employee_number: s
     pay_period: string | null;
     pay_changed: boolean;
     basic_salary: number | string | null;
+    corrections?: FormValues;
   };
   const [payout] = await Promise.all([
     quiet(async () => {
@@ -152,7 +153,7 @@ export async function loadLoanFormContext(loan: { id: string; employee_number: s
   );
   const num = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));
   const latestPay = d.gross === null && d.net === null ? null : { gross: num(d.gross), net: num(d.net), period: d.pay_period ?? '' };
-  const corrections: FormValues = (await loadFormValues([loan.id]).catch((): Record<string, FormValues> => ({})))[loan.id] ?? {};
+  const corrections: FormValues = d.corrections ?? (await loadFormValues([loan.id]).catch((): Record<string, FormValues> => ({})))[loan.id] ?? {};
   const corrected = withCorrections(borrower, latestPay, corrections);
   return {
     settings,
@@ -362,19 +363,26 @@ export interface GuarantorView {
   loan: EmployeeLoan;
   schedule: LoanInstalment[];
   guarantor: LoanGuarantor;
+  /** the form as it stands (the borrower's, witness's and approver's signatures), and the witness */
+  form: LoanForm | null;
+  witness: LoanWitness | null;
   context: LoanFormContext;
 }
 
 const numOrNull = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 
 export async function loadGuarantorView(loanId: string): Promise<GuarantorView> {
-  const [{ data, error }, settings, company] = await Promise.all([
-    supabase.rpc('loan_form_for_guarantor', { p_loan: loanId }),
-    loadLoanFormSettings(),
-    quiet(loadCompanyProfile),
-  ]);
+  const { data, error } = await supabase.rpc('loan_form_for_guarantor', { p_loan: loanId });
   if (error || !data) fail(error, 'Could not load the loan.');
-  const v = data as { loan: Record<string, unknown>; borrower_name: string; schedule: Record<string, unknown>[]; guarantor: LoanGuarantor; employer: string | null };
+  const v = data as {
+    loan: Record<string, unknown>;
+    borrower_name: string;
+    schedule: Record<string, unknown>[];
+    guarantor: LoanGuarantor;
+    form: LoanForm | null;
+    witness: LoanWitness | null;
+    employer: string | null;
+  };
   const loan = {
     ...v.loan,
     principal: Number(v.loan.principal),
@@ -383,6 +391,7 @@ export async function loadGuarantorView(loanId: string): Promise<GuarantorView> 
     monthly_instalment: numOrNull(v.loan.monthly_instalment),
     total_interest: numOrNull(v.loan.total_interest),
     total_repayable: numOrNull(v.loan.total_repayable),
+    other_loan_repayments: numOrNull(v.loan.other_loan_repayments),
     employee_name: v.borrower_name,
     decided_by_email: null,
     decision_comment: null,
@@ -396,20 +405,9 @@ export async function loadGuarantorView(loanId: string): Promise<GuarantorView> 
     interest: Number(i.interest),
     balance: Number(i.balance),
   }));
-  const employer = v.employer ?? company?.company_name ?? null;
-  return {
-    loan,
-    schedule,
-    guarantor: v.guarantor,
-    context: {
-      settings,
-      lender: lenderDetails(settings, company),
-      // the borrower's name only: their ID, PIN, pay and address are not the guarantor's to see
-      borrower: { ...borrowerFromEmployee({ 'Employee Number': '' }, employer), fullName: v.borrower_name },
-      latestPay: null,
-      payout: null,
-    },
-  };
+  // the borrower's details as the form shows them, as for the borrower and HR (loan_form_borrower, 20261118700000)
+  const context = await loadLoanFormContext({ id: loanId, employee_number: String(v.loan.employee_number ?? '') });
+  return { loan, schedule, guarantor: v.guarantor, form: v.form, witness: v.witness, context };
 }
 
 /** The signed copy, a PDF: from the borrower, or from HR for a form signed on paper. Every copy is kept. */

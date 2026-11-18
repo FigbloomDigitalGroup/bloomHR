@@ -165,11 +165,12 @@ describe('the guarantor', () => {
     await expect(as(S2, `select loan_guarantor_sign('${loanId}', '${SIG}', ' ')`)).rejects.toThrow(/related/);
   });
 
-  it('sees the loan’s terms but not the borrower’s personal details', async () => {
+  it('sees the whole form: the loan, the borrower’s details and signature (20261118700000)', async () => {
     const [{ v }] = await read<{ v: Record<string, unknown> }>(S2, `select loan_form_for_guarantor('${loanId}') v`);
-    expect(v).toMatchObject({ borrower_name: 'Esther One', loan: { principal: 30000, months: 3 } });
-    // the borrower's own details stay out: address, other repayments, pay
-    expect(JSON.stringify(v)).not.toMatch(/Kileleshwa|other_loan_repayments|Basic Salary|60000/);
+    expect(v).toMatchObject({ borrower_name: 'Esther One', loan: { principal: 30000, months: 3, residential_address: 'Kileleshwa, Nairobi' } });
+    expect((v.form as Record<string, unknown>).borrower_signature).toBe(SIG);
+    const [{ b }] = await read<{ b: Record<string, unknown> }>(S2, `select loan_form_borrower('${loanId}') b`);
+    expect((b.employee as Record<string, unknown>)['First Name']).toBe('Esther');
     await expect(read(HR, `select loan_form_for_guarantor('${loanId}')`)).rejects.toThrow(/Loan not found/);
   });
 
