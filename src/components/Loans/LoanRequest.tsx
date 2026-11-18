@@ -5,6 +5,7 @@ import { Button, Card, EmptyState, PageHeader } from '../UI';
 import LoanSchedule, { LoanBalance, LoanStatusPill } from './LoanSchedule';
 import LoanFormPanel from './LoanFormPanel';
 import GuaranteeRequests from './GuaranteeRequests';
+import WitnessRequests from './WitnessRequests';
 import { confirmDialog } from '../../lib/confirmDialog';
 import {
   DEFAULT_LOAN_SETTINGS,
@@ -33,8 +34,8 @@ import {
   type LoanApplicationDetails,
   type LoanWithSchedule,
 } from '../../lib/loansApi';
-import { loadGuarantorChoices, loadGuarantors, loadLoanFormSettings, loadLoanForms, setGuarantor } from '../../lib/loanFormApi';
-import { formHoldsPayout, type LoanForm, type LoanGuarantor } from '../../lib/loanForm';
+import { loadGuarantorChoices, loadGuarantors, loadLoanFormSettings, loadLoanForms, loadWitnesses, setGuarantor, setWitness } from '../../lib/loanFormApi';
+import { formHoldsPayout, type LoanForm, type LoanGuarantor, type LoanWitness } from '../../lib/loanForm';
 import { loadMyEmployee, type MyEmployee } from '../../lib/salaryAdvanceApi';
 import { LoaderBlock } from '../UI/FigbloomLoader';
 
@@ -66,6 +67,8 @@ export default function LoanRequest() {
   const [details, setDetails] = useState<LoanApplicationDetails>(EMPTY_DETAILS);
   const [forms, setForms] = useState<Record<string, LoanForm>>({});
   const [guarantors, setGuarantors] = useState<Record<string, LoanGuarantor>>({});
+  const [witnesses, setWitnesses] = useState<Record<string, LoanWitness>>({});
+  const [witnessPick, setWitnessPick] = useState('');
   const [choices, setChoices] = useState<{ employee_number: string; name: string }[]>([]);
   const [guarantorNeeded, setGuarantorNeeded] = useState(true);
   const [guarantor, setGuarantorPick] = useState('');
@@ -76,16 +79,21 @@ export default function LoanRequest() {
   const loadMine = useCallback(async (employeeNumber: string) => {
     const mine = await loadMyLoans(employeeNumber);
     const ids = mine.map((l) => l.id);
-    const [myForms, myGuarantors] = await Promise.all([loadLoanForms(ids).catch(() => ({})), loadGuarantors(ids).catch(() => ({}))]);
-    return { mine, myForms, myGuarantors };
+    const [myForms, myGuarantors, myWitnesses] = await Promise.all([
+      loadLoanForms(ids).catch(() => ({})),
+      loadGuarantors(ids).catch(() => ({})),
+      loadWitnesses(ids).catch(() => ({})),
+    ]);
+    return { mine, myForms, myGuarantors, myWitnesses };
   }, []);
 
   const refresh = useCallback(async (emp: MyEmployee | null) => {
     if (!emp?.employeeNumber) return;
-    const { mine, myForms, myGuarantors } = await loadMine(emp.employeeNumber);
+    const { mine, myForms, myGuarantors, myWitnesses } = await loadMine(emp.employeeNumber);
     setLoans(mine);
     setForms(myForms);
     setGuarantors(myGuarantors);
+    setWitnesses(myWitnesses);
   }, [loadMine]);
 
   useEffect(() => {
@@ -101,7 +109,7 @@ export default function LoanRequest() {
         setProducts(p.filter((x) => x.active));
         setForm((f) => ({ ...f, months: f.months || Math.min(Math.max(s.min_months, 12), s.max_months) }));
         if (emp?.employeeNumber) {
-          const [{ mine, myForms, myGuarantors }, colleagues, formSettings] = await Promise.all([
+          const [{ mine, myForms, myGuarantors, myWitnesses }, colleagues, formSettings] = await Promise.all([
             loadMine(emp.employeeNumber),
             loadGuarantorChoices().catch(() => []),
             loadLoanFormSettings().catch(() => null),
@@ -110,6 +118,7 @@ export default function LoanRequest() {
             setLoans(mine);
             setForms(myForms);
             setGuarantors(myGuarantors);
+            setWitnesses(myWitnesses);
             setChoices(colleagues);
             setGuarantorNeeded(formSettings?.require_signed_form ?? true);
           }
@@ -166,9 +175,13 @@ export default function LoanRequest() {
         // the request is in either way; a guarantor not asked can be chosen again on the loan
         await setGuarantor(loanId, guarantor).catch((error) => toast.error((error as Error).message || 'Your guarantor was not asked. Choose them again on the loan.'));
       }
+      if (witnessPick) {
+        await setWitness(loanId, witnessPick).catch((error) => toast.error((error as Error).message || 'Your witness was not asked. Choose them again on the loan.'));
+      }
       setForm((f) => ({ ...f, amount: '', reason: '' }));
       setDetails(EMPTY_DETAILS);
       setGuarantorPick('');
+      setWitnessPick('');
       setTriedSubmit(false);
       await refresh(employee);
     } catch (error) {
@@ -392,6 +405,22 @@ export default function LoanRequest() {
                   <p className="mt-1 mb-0 text-[11.5px] text-muted-foreground">They are asked to read the loan’s terms and sign as guarantor in their staff portal.</p>
                   {showError('guarantor')}
                 </div>
+                <div>
+                  <label htmlFor="loan-witness" className="block text-[12px] text-ink mb-1">
+                    Witness (a colleague), optional now
+                  </label>
+                  <select id="loan-witness" value={witnessPick} onChange={(e) => setWitnessPick(e.target.value)} disabled={!!blocked} className={inputClass}>
+                    <option value="">Choose later…</option>
+                    {choices
+                      .filter((c) => c.employee_number !== guarantor)
+                      .map((c) => (
+                        <option key={c.employee_number} value={c.employee_number}>
+                          {c.name}
+                        </option>
+                      ))}
+                  </select>
+                  <p className="mt-1 mb-0 text-[11.5px] text-muted-foreground">They witness your signature from their portal once the loan is approved and you have signed.</p>
+                </div>
               </fieldset>
 
               {amount > 0 && !errors.amount && !errors.months && preview.length > 0 && (
@@ -493,6 +522,7 @@ export default function LoanRequest() {
                       schedule={l.schedule}
                       renewal={isRenewal(l, loans)}
                       guarantor={guarantors[l.id]}
+                      witness={witnesses[l.id]}
                       onChanged={() => refresh(employee)}
                     />
                   </Card>
@@ -501,6 +531,7 @@ export default function LoanRequest() {
             </ul>
           )}
           {employee?.employeeNumber && <GuaranteeRequests employeeNumber={employee.employeeNumber} />}
+          {employee?.employeeNumber && <WitnessRequests employeeNumber={employee.employeeNumber} />}
         </div>
       </div>
     </div>

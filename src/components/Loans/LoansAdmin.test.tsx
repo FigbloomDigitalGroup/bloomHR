@@ -77,6 +77,15 @@ vi.mock('../../lib/loanFormApi', () => ({
   addWitness: vi.fn(),
   saveFormChecks: vi.fn(),
   loadMySignerIdentity: vi.fn(),
+  loadWitnesses: vi.fn(async () => ({})),
+  loadFormValues: vi.fn(async () => ({})),
+  saveFormValues: vi.fn(),
+  setWitness: vi.fn(),
+  loadMyWitnessing: vi.fn(async () => []),
+  loadWitnessView: vi.fn(),
+  signAsWitness: vi.fn(),
+  declineWitness: vi.fn(),
+  deleteCancelledLoan: vi.fn(),
 }));
 // everyone here has a saved signature
 vi.mock('../../lib/signatures', () => ({
@@ -284,6 +293,40 @@ describe('the loans page', () => {
     fireEvent.click(within(dialog).getByLabelText(/Applicants Copy of National ID/));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save checklist' }));
     await vi.waitFor(() => expect(formApi.saveFormChecks).toHaveBeenCalledWith('a1', 'Hana Hr', ['id_kra']));
+  });
+
+  it('a cancelled loan can be deleted, after asking', async () => {
+    mocked.loadAllLoans.mockResolvedValue([...LOANS, { ...base, id: 'c1', employee_number: 'E4', employee_name: 'Test Loan', principal: 5000, status: 'cancelled' as const }]);
+    vi.mocked(formApi.deleteCancelledLoan).mockResolvedValue(undefined);
+    render(<LoansAdmin />);
+    await screen.findByTestId('loan-r1');
+    fireEvent.click(screen.getByText(/Closed \(/));
+    fireEvent.click(within(screen.getByTestId('loan-c1')).getByRole('button', { name: 'Delete' }));
+    await vi.waitFor(() => expect(formApi.deleteCancelledLoan).toHaveBeenCalledWith('c1'));
+  });
+
+  it('corrects details the employee record has wrong, for this loan’s form; HR sees what was corrected', async () => {
+    vi.mocked(formApi.loadLoanForms).mockResolvedValue({ a1: form({ loan_id: 'a1' }) } as never);
+    vi.mocked(formApi.loadFormValues).mockResolvedValue({ a1: { contract_end_date: '2027-06-30' } });
+    vi.mocked(formApi.loadLoanFormContext).mockResolvedValue({
+      record: { net_salary: '62000', kra_pin: 'A123456789B' },
+      corrections: { contract_end_date: '2027-06-30' },
+    } as never);
+    vi.mocked(formApi.saveFormValues).mockResolvedValue(undefined);
+    render(<LoansAdmin />);
+    await screen.findByTestId('loan-r1');
+    fireEvent.click(screen.getByText('To pay out (1)'));
+    const card = screen.getByTestId('loan-a1');
+    expect(within(card).getByText(/Corrected on the form:/).parentElement?.textContent).toMatch(/Contract end date/);
+    fireEvent.click(within(card).getByRole('button', { name: 'Correct details' }));
+    const dialog = await screen.findByRole('dialog');
+    const net = within(dialog).getByLabelText('Net monthly salary before this loan (KSh)') as HTMLInputElement;
+    expect(net.value).toBe('62000');
+    fireEvent.change(net, { target: { value: '84000' } });
+    expect(within(dialog).getByText('Record: 62000')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save corrections' }));
+    // only what differs from the record is saved
+    await vi.waitFor(() => expect(formApi.saveFormValues).toHaveBeenCalledWith('a1', { contract_end_date: '2027-06-30', net_salary: '84000' }));
   });
 
   it('sends a signed form back with what to fix', async () => {

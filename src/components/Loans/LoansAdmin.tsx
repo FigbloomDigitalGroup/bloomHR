@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Ban, CalendarClock, Check, HandCoins, Hourglass, Plus, RefreshCw, Wallet, X } from 'lucide-react';
+import { Ban, CalendarClock, Check, HandCoins, Hourglass, Plus, RefreshCw, Trash2, Wallet, X } from 'lucide-react';
 import { Button, Card, EmployeePicker, EmptyState, Modal, PageHeader, StatCard, TabBar } from '../UI';
 import LoanSchedule, { LoanBalance, LoanStatusPill } from './LoanSchedule';
 import LoanSettingsCard from './LoanSettingsCard';
 import LoanFormPanel from './LoanFormPanel';
 import LoanFormSettingsCard from './LoanFormSettingsCard';
 import MySignature from '../Signature/MySignature';
-import { currentUserId, loadGuarantors, loadLoanForms, signAsApprover } from '../../lib/loanFormApi';
-import { formHoldsPayout, type LoanForm, type LoanGuarantor } from '../../lib/loanForm';
+import { currentUserId, deleteCancelledLoan, loadFormValues, loadGuarantors, loadLoanForms, loadWitnesses, signAsApprover } from '../../lib/loanFormApi';
+import { formHoldsPayout, type FormValues, type LoanForm, type LoanGuarantor, type LoanWitness } from '../../lib/loanForm';
 import ApprovalChain from '../Approvals/ApprovalChain';
 import { loadApprovalChains, type ApprovalChain as Chain } from '../../lib/approvals';
 import RecordPaymentLink from '../Payments/RecordPaymentLink';
@@ -105,6 +105,8 @@ export default function LoansAdmin() {
   const [chains, setChains] = useState<Record<string, Chain>>({});
   const [forms, setForms] = useState<Record<string, LoanForm>>({});
   const [guarantors, setGuarantors] = useState<Record<string, LoanGuarantor>>({});
+  const [witnesses, setWitnesses] = useState<Record<string, LoanWitness>>({});
+  const [corrections, setCorrections] = useState<Record<string, FormValues>>({});
   // repayments can't start in a month whose payroll is already approved
   const [firstOpen, setFirstOpen] = useState(currentPeriod());
   const [myUserId, setMyUserId] = useState<string | null>(null);
@@ -137,7 +139,15 @@ export default function LoansAdmin() {
       setSchedules(loaded.schedules);
       setRepayments(loaded.repayments);
       setForms(await loadLoanForms(all.filter((l) => l.status !== 'requested').map((l) => l.id)).catch(() => ({})));
-      setGuarantors(await loadGuarantors(all.filter((l) => !['rejected', 'cancelled'].includes(l.status)).map((l) => l.id)).catch(() => ({})));
+      const liveIds = all.filter((l) => !['rejected', 'cancelled'].includes(l.status)).map((l) => l.id);
+      const [g, w, c] = await Promise.all([
+        loadGuarantors(liveIds).catch(() => ({})),
+        loadWitnesses(liveIds).catch(() => ({})),
+        loadFormValues(liveIds).catch(() => ({})),
+      ]);
+      setGuarantors(g);
+      setWitnesses(w);
+      setCorrections(c);
       setMyUserId(await currentUserId().catch(() => null));
     } catch (error) {
       console.error('Error loading loans:', error);
@@ -228,6 +238,17 @@ export default function LoansAdmin() {
       tone: 'danger',
     });
     if (ok) await act(loan, () => cancelLoan(loan.id), 'Loan cancelled');
+  };
+
+  const remove = async (loan: EmployeeLoan) => {
+    const ok = await confirmDialog({
+      title: 'Delete this cancelled loan?',
+      message: `${loan.employee_name}'s cancelled loan of ${formatKsh(loan.principal)} is deleted with its form and approval. It can't be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Keep it',
+      tone: 'danger',
+    });
+    if (ok) await act(loan, () => deleteCancelledLoan(loan.id), 'Loan deleted');
   };
 
   // ---- a new loan for an employee
@@ -447,6 +468,11 @@ export default function LoansAdmin() {
                         Cancel
                       </Button>
                     )}
+                    {canManage && loan.status === 'cancelled' && (
+                      <Button variant="ghost" onClick={() => void remove(loan)} disabled={busy} icon={<Trash2 className="w-3.5 h-3.5" />}>
+                        Delete
+                      </Button>
+                    )}
                   </div>
                   <LoanFormPanel
                     loan={loan}
@@ -458,6 +484,8 @@ export default function LoansAdmin() {
                     )}
                     myUserId={myUserId}
                     guarantor={guarantors[loan.id]}
+                    witness={witnesses[loan.id]}
+                    corrections={corrections[loan.id]}
                     onChanged={load}
                   />
                 </Card>

@@ -6,6 +6,7 @@ import { Button, Card, EmployeePicker, EmptyState, Modal, PageHeader, StatCard, 
 import type { StatusTone } from '../UI/StatusPill';
 import { LoaderBlock } from '../UI/FigbloomLoader';
 import ApprovalChain from '../Approvals/ApprovalChain';
+import LoanFormViewer from '../Loans/LoanFormViewer';
 import { loadApprovalChains, type ApprovalChain as Chain } from '../../lib/approvals';
 import { confirmDialog } from '../../lib/confirmDialog';
 import { formatKsh } from '../../lib/loans';
@@ -344,6 +345,7 @@ export default function PaymentsToMake() {
                     <Button onClick={() => openRecord(p)} disabled={busyId === p.id} icon={<CheckCircle2 className="w-3.5 h-3.5" />} title="You paid it outside the app">
                       Record payment
                     </Button>
+                    {p.source === 'loan' && <LoanFormViewer loanId={p.source_id} />}
                   </div>
                 </Card>
               </li>
