@@ -6,6 +6,8 @@ import type { MyEmployee } from './salaryAdvanceApi';
 import {
   ACTIVE_STATUSES,
   DEFAULT_LOAN_SETTINGS,
+  addMonths,
+  currentPeriod,
   type InterestMethod,
   type LoanInstalment,
   type LoanProduct,
@@ -36,12 +38,18 @@ export interface EmployeeLoan {
   total_repayable: number | null;
   status: LoanStatus;
   reason: string | null;
+  /** whoever gave the final approval (they sign the form's lender approval) */
+  decided_by?: string | null;
   decided_by_email: string | null;
   decided_at: string | null;
   decision_comment: string | null;
   disbursed_by_email: string | null;
   disbursed_at: string | null;
   created_at: string;
+  /** what the applicant adds for the loan form (20261118100000) */
+  residential_address?: string | null;
+  other_loan_repayments?: number | null;
+  disbursement_account?: string | null;
   /** added on the HR screen: the employee's name */
   employee_name?: string;
 }
@@ -57,6 +65,7 @@ const toLoan = (row: Record<string, unknown>): EmployeeLoan =>
     monthly_instalment: num(row.monthly_instalment),
     total_interest: num(row.total_interest),
     total_repayable: num(row.total_repayable),
+    other_loan_repayments: num(row.other_loan_repayments),
   }) as EmployeeLoan;
 
 const toInstalment = (row: Record<string, unknown>): LoanInstalment => ({
@@ -77,7 +86,7 @@ const friendly = (error: { message?: string } | null) => new Error(error?.messag
 export async function loadLoanSettings(): Promise<LoanSettings> {
   const { data, error } = await supabase
     .from('loan_settings')
-    .select('annual_rate, interest_method, min_months, max_months, max_amount, max_salary_multiple, staff_can_apply')
+    .select('annual_rate, interest_method, min_months, max_months, max_amount, max_salary_multiple, staff_can_apply, term_rates')
     .maybeSingle();
   if (error) throw error;
   if (!data) return DEFAULT_LOAN_SETTINGS;
@@ -89,6 +98,9 @@ export async function loadLoanSettings(): Promise<LoanSettings> {
     max_amount: num(data.max_amount),
     max_salary_multiple: num(data.max_salary_multiple),
     staff_can_apply: data.staff_can_apply !== false,
+    term_rates: Array.isArray(data.term_rates)
+      ? (data.term_rates as { months: unknown; rate: unknown }[]).map((t) => ({ months: Number(t.months), rate: Number(t.rate) })).sort((a, b) => a.months - b.months)
+      : [],
   };
 }
 
@@ -150,16 +162,49 @@ export async function loadMyLoans(employeeNumber: string): Promise<LoanWithSched
   return withSchedules((data ?? []).map(toLoan));
 }
 
-export async function requestLoan(employee: MyEmployee, input: { productId: string | null; amount: number; months: number; reason: string }) {
-  const { error } = await supabase.from('employee_loans').insert({
+/** What the applicant adds for the loan form: where they live, other loan repayments, and where to be paid. */
+export interface LoanApplicationDetails {
+  residentialAddress: string;
+  /** KSh a month; '' when none given */
+  otherLoanRepayments: string;
+  disbursementAccount: string;
+}
+
+const applicationColumns = (d: LoanApplicationDetails | undefined) =>
+  d
+    ? {
+        residential_address: d.residentialAddress.trim() || null,
+        other_loan_repayments: d.otherLoanRepayments.trim() === '' ? null : Number(d.otherLoanRepayments),
+        disbursement_account: d.disbursementAccount.trim() || null,
+      }
+    : {};
+
+/**
+ * The earliest pay month a loan can start in (20261118300000): this month while its payroll isn't approved, else the
+ * next open one. A failure falls back to next month, which is always safe.
+ */
+export async function loadFirstOpenPeriod(): Promise<string> {
+  const { data, error } = await supabase.rpc('loan_first_open_period');
+  if (error || typeof data !== 'string') return addMonths(currentPeriod(), 1);
+  return data;
+}
+
+export async function requestLoan(
+  employee: MyEmployee,
+  input: { productId: string | null; amount: number; months: number; reason: string; details?: LoanApplicationDetails; startPeriod?: string }
+): Promise<string> {
+  const { data, error } = await supabase.from('employee_loans').insert({
     employee_number: employee.employeeNumber,
     product_id: input.productId,
     principal: input.amount,
     months: input.months,
+    ...(input.startPeriod ? { start_period: input.startPeriod } : {}),
     reason: input.reason.trim(),
     status: 'requested',
-  });
+    ...applicationColumns(input.details),
+  }).select('id').single();
   if (error) throw friendly(error);
+  return String(data?.id ?? '');
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -198,9 +243,9 @@ export interface NewLoan {
   annualRate: number | null;
   interestMethod: InterestMethod | null;
   reason: string;
+  details?: LoanApplicationDetails;
 }
 
-/** HR sets up a loan for an employee: approved straight away. */
 /**
  * HR sets up a loan for an employee, approved at once. When the company's loan approvals have more than one step (or
  * one HR can't decide), the database puts it on the chain instead: the status it got is returned.
@@ -216,6 +261,7 @@ export async function createLoan(loan: NewLoan): Promise<LoanStatus> {
     interest_method: loan.interestMethod,
     reason: loan.reason.trim() || null,
     status: 'approved',
+    ...applicationColumns(loan.details),
   }).select('status').single();
   if (error) throw friendly(error);
   return (data?.status ?? 'approved') as LoanStatus;

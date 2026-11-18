@@ -3,6 +3,9 @@ import toast from 'react-hot-toast';
 import { HandCoins, Lock } from 'lucide-react';
 import { Button, Card, EmptyState, PageHeader } from '../UI';
 import LoanSchedule, { LoanBalance, LoanStatusPill } from './LoanSchedule';
+import LoanFormPanel from './LoanFormPanel';
+import GuaranteeRequests from './GuaranteeRequests';
+import WitnessRequests from './WitnessRequests';
 import { confirmDialog } from '../../lib/confirmDialog';
 import {
   DEFAULT_LOAN_SETTINGS,
@@ -16,12 +19,24 @@ import {
   maxMonthsFor,
   periodLabel,
   scheduleTotals,
+  termRateFor,
   validateLoanRequest,
   type LoanProduct,
   type LoanRequestInput,
   type LoanSettings,
 } from '../../lib/loans';
-import { loadLoanProducts, loadLoanSettings, loadMyLoans, requestLoan, withdrawLoan, type LoanWithSchedule } from '../../lib/loansApi';
+import {
+  loadFirstOpenPeriod,
+  loadLoanProducts,
+  loadLoanSettings,
+  loadMyLoans,
+  requestLoan,
+  withdrawLoan,
+  type LoanApplicationDetails,
+  type LoanWithSchedule,
+} from '../../lib/loansApi';
+import { loadGuarantorChoices, loadGuarantors, loadLoanFormSettings, loadLoanForms, loadWitnesses, setGuarantor, setWitness } from '../../lib/loanFormApi';
+import { formHoldsPayout, type LoanForm, type LoanGuarantor, type LoanWitness } from '../../lib/loanForm';
 import { loadMyEmployee, type MyEmployee } from '../../lib/salaryAdvanceApi';
 import { LoaderBlock } from '../UI/FigbloomLoader';
 
@@ -29,6 +44,12 @@ import { LoaderBlock } from '../UI/FigbloomLoader';
 
 const inputClass =
   'w-full px-3 py-2 text-[13px] border border-border rounded-tile bg-white focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand disabled:bg-secondary disabled:cursor-not-allowed';
+
+const EMPTY_DETAILS: LoanApplicationDetails = { residentialAddress: '', otherLoanRepayments: '', disbursementAccount: '' };
+
+/** A loan paid out to them before this one makes this one a renewal on the form. */
+const isRenewal = (loan: LoanWithSchedule, all: LoanWithSchedule[]) =>
+  all.some((o) => o.id !== loan.id && o.created_at < loan.created_at && ['disbursed', 'repaying', 'completed'].includes(o.status));
 
 const dateText = (value: string | null) =>
   value ? new Date(value).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
@@ -44,25 +65,65 @@ export default function LoanRequest() {
   const [triedSubmit, setTriedSubmit] = useState(false);
   const [saving, setSaving] = useState(false);
   const [openSchedule, setOpenSchedule] = useState<string | null>(null);
+  const [details, setDetails] = useState<LoanApplicationDetails>(EMPTY_DETAILS);
+  const [forms, setForms] = useState<Record<string, LoanForm>>({});
+  const [guarantors, setGuarantors] = useState<Record<string, LoanGuarantor>>({});
+  const [witnesses, setWitnesses] = useState<Record<string, LoanWitness>>({});
+  const [witnessPick, setWitnessPick] = useState('');
+  const [choices, setChoices] = useState<{ employee_number: string; name: string }[]>([]);
+  const [guarantorNeeded, setGuarantorNeeded] = useState(true);
+  const [guarantor, setGuarantorPick] = useState('');
+  // the earliest month repayments can start in, and the one chosen (next month unless they pick this one)
+  const [firstOpen, setFirstOpen] = useState(addMonths(currentPeriod(), 1));
+  const [startPeriod, setStartPeriod] = useState(addMonths(currentPeriod(), 1));
+
+  const loadMine = useCallback(async (employeeNumber: string) => {
+    const mine = await loadMyLoans(employeeNumber);
+    const ids = mine.map((l) => l.id);
+    const [myForms, myGuarantors, myWitnesses] = await Promise.all([
+      loadLoanForms(ids).catch(() => ({})),
+      loadGuarantors(ids).catch(() => ({})),
+      loadWitnesses(ids).catch(() => ({})),
+    ]);
+    return { mine, myForms, myGuarantors, myWitnesses };
+  }, []);
 
   const refresh = useCallback(async (emp: MyEmployee | null) => {
     if (!emp?.employeeNumber) return;
-    setLoans(await loadMyLoans(emp.employeeNumber));
-  }, []);
+    const { mine, myForms, myGuarantors, myWitnesses } = await loadMine(emp.employeeNumber);
+    setLoans(mine);
+    setForms(myForms);
+    setGuarantors(myGuarantors);
+    setWitnesses(myWitnesses);
+  }, [loadMine]);
 
   useEffect(() => {
     let live = true;
     (async () => {
       try {
-        const [emp, s, p] = await Promise.all([loadMyEmployee(), loadLoanSettings(), loadLoanProducts()]);
+        const [emp, s, p, open] = await Promise.all([loadMyEmployee(), loadLoanSettings(), loadLoanProducts(), loadFirstOpenPeriod()]);
         if (!live) return;
+        setFirstOpen(open);
+        setStartPeriod((chosen) => (chosen < open ? open : chosen));
         setEmployee(emp);
         setSettings(s);
         setProducts(p.filter((x) => x.active));
-        setForm((f) => ({ ...f, months: f.months || Math.min(Math.max(s.min_months, 12), s.max_months) }));
+        // fixed terms: the longest by default; otherwise up to a year
+        setForm((f) => ({ ...f, months: f.months || (s.term_rates.length ? s.term_rates[s.term_rates.length - 1].months : Math.min(Math.max(s.min_months, 12), s.max_months)) }));
         if (emp?.employeeNumber) {
-          const mine = await loadMyLoans(emp.employeeNumber);
-          if (live) setLoans(mine);
+          const [{ mine, myForms, myGuarantors, myWitnesses }, colleagues, formSettings] = await Promise.all([
+            loadMine(emp.employeeNumber),
+            loadGuarantorChoices().catch(() => []),
+            loadLoanFormSettings().catch(() => null),
+          ]);
+          if (live) {
+            setLoans(mine);
+            setForms(myForms);
+            setGuarantors(myGuarantors);
+            setWitnesses(myWitnesses);
+            setChoices(colleagues);
+            setGuarantorNeeded(formSettings?.require_signed_form ?? true);
+          }
         }
       } catch (error) {
         console.error('Error loading loans:', error);
@@ -74,16 +135,24 @@ export default function LoanRequest() {
     return () => {
       live = false;
     };
-  }, []);
+  }, [loadMine]);
 
-  const product = products.find((p) => p.id === productId) ?? null;
-  const rate = product?.annual_rate ?? settings.annual_rate;
+  const fixedTerms = settings.term_rates.length > 0;
+  // with fixed terms the term sets the rate (loan types don't apply)
+  const product = fixedTerms ? null : (products.find((p) => p.id === productId) ?? null);
+  const rate = termRateFor(settings, form.months) ?? product?.annual_rate ?? settings.annual_rate;
   const method = product?.interest_method ?? settings.interest_method;
   const maxMonths = maxMonthsFor(settings, product);
   const maxAmount = maxLoanFor(settings, employee?.basicSalary);
-  const errors = validateLoanRequest(form, { minMonths: settings.min_months, maxMonths, maxAmount });
+  const otherRepayments = details.otherLoanRepayments.trim();
+  const errors: Partial<Record<keyof LoanRequestInput | 'otherLoanRepayments' | 'guarantor', string>> = {
+    ...validateLoanRequest(form, { minMonths: settings.min_months, maxMonths, maxAmount }),
+    ...(otherRepayments !== '' && !(Number(otherRepayments) >= 0) ? { otherLoanRepayments: 'Enter an amount in KSh, or leave it empty.' } : {}),
+    ...(guarantorNeeded && !guarantor ? { guarantor: 'Choose a colleague to guarantee your loan.' } : {}),
+  };
   const amount = Number(form.amount) || 0;
-  const firstMonth = addMonths(currentPeriod(), 1);
+  const firstMonth = startPeriod;
+  const startOptions = [...new Set([firstOpen, addMonths(firstOpen, 1)])];
   const preview = useMemo(() => loanSchedule(amount, rate, form.months, method, firstMonth), [amount, rate, form.months, method, firstMonth]);
   const totals = scheduleTotals(preview);
   const waiting = loans.some((l) => l.status === 'requested');
@@ -104,9 +173,19 @@ export default function LoanRequest() {
     if (blocked || !employee || Object.keys(errors).length > 0) return;
     setSaving(true);
     try {
-      await requestLoan(employee, { productId: productId || null, amount, months: form.months, reason: form.reason });
+      const loanId = await requestLoan(employee, { productId: productId || null, amount, months: form.months, reason: form.reason, details, startPeriod });
       toast.success('Your loan request was sent for approval');
+      if (guarantor) {
+        // the request is in either way; a guarantor not asked can be chosen again on the loan
+        await setGuarantor(loanId, guarantor).catch((error) => toast.error((error as Error).message || 'Your guarantor was not asked. Choose them again on the loan.'));
+      }
+      if (witnessPick) {
+        await setWitness(loanId, witnessPick).catch((error) => toast.error((error as Error).message || 'Your witness was not asked. Choose them again on the loan.'));
+      }
       setForm((f) => ({ ...f, amount: '', reason: '' }));
+      setDetails(EMPTY_DETAILS);
+      setGuarantorPick('');
+      setWitnessPick('');
       setTriedSubmit(false);
       await refresh(employee);
     } catch (error) {
@@ -134,7 +213,7 @@ export default function LoanRequest() {
     }
   };
 
-  const showError = (field: keyof LoanRequestInput) =>
+  const showError = (field: keyof LoanRequestInput | 'otherLoanRepayments' | 'guarantor') =>
     (triedSubmit || (field === 'amount' && form.amount !== '')) && errors[field] ? (
       <p id={`loan-${field}-error`} className="mt-1 text-[11.5px] text-status-danger" role="alert">
         {errors[field]}
@@ -160,7 +239,7 @@ export default function LoanRequest() {
                 </div>
               )}
 
-              {products.length > 0 && (
+              {products.length > 0 && !fixedTerms && (
                 <div>
                   <label htmlFor="loan-product" className="block text-[12px] font-semibold text-ink mb-1">
                     Type of loan
@@ -223,13 +302,37 @@ export default function LoanRequest() {
                   disabled={!!blocked}
                   className={inputClass}
                 >
-                  {Array.from({ length: Math.max(0, maxMonths - settings.min_months + 1) }, (_, i) => settings.min_months + i).map((n) => (
-                    <option key={n} value={n}>
-                      {n} {n === 1 ? 'month' : 'months'}
+                  {fixedTerms
+                    ? settings.term_rates.map((t) => (
+                        <option key={t.months} value={t.months}>
+                          {t.months} {t.months === 1 ? 'month' : 'months'} at {rateText(t.rate, settings.interest_method)}
+                        </option>
+                      ))
+                    : Array.from({ length: Math.max(0, maxMonths - settings.min_months + 1) }, (_, i) => settings.min_months + i).map((n) => (
+                        <option key={n} value={n}>
+                          {n} {n === 1 ? 'month' : 'months'}
+                        </option>
+                      ))}
+                </select>
+                {showError('months')}
+              </div>
+
+              <div>
+                <label htmlFor="loan-start" className="block text-[12px] font-semibold text-ink mb-1">
+                  Start repaying from
+                </label>
+                <select id="loan-start" value={startPeriod} onChange={(e) => setStartPeriod(e.target.value)} disabled={!!blocked} className={inputClass}>
+                  {startOptions.map((p) => (
+                    <option key={p} value={p}>
+                      {periodLabel(p)} pay{p === currentPeriod() ? ' (this month)' : ''}
                     </option>
                   ))}
                 </select>
-                {showError('months')}
+                {firstOpen === currentPeriod() && (
+                  <p className="mt-1 mb-0 text-[11.5px] text-muted-foreground">
+                    This month is possible while its payroll isn’t approved yet. If it is approved before your loan is, you start the month after.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -247,6 +350,88 @@ export default function LoanRequest() {
                 />
                 {showError('reason')}
               </div>
+
+              <fieldset className="space-y-3">
+                <legend className="text-[12px] font-semibold text-ink mb-1">For the loan form</legend>
+                <div>
+                  <label htmlFor="loan-address" className="block text-[12px] text-ink mb-1">
+                    Where you live (residential address)
+                  </label>
+                  <input
+                    id="loan-address"
+                    value={details.residentialAddress}
+                    maxLength={300}
+                    onChange={(e) => setDetails({ ...details, residentialAddress: e.target.value })}
+                    disabled={!!blocked}
+                    className={inputClass}
+                    placeholder="For example: Kileleshwa, Nairobi"
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="loan-other" className="block text-[12px] text-ink mb-1">
+                      Other loan repayments a month (KSh)
+                    </label>
+                    <input
+                      id="loan-other"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      value={details.otherLoanRepayments}
+                      onChange={(e) => setDetails({ ...details, otherLoanRepayments: e.target.value })}
+                      disabled={!!blocked}
+                      className={inputClass}
+                      placeholder="0"
+                    />
+                    {showError('otherLoanRepayments')}
+                  </div>
+                  <div>
+                    <label htmlFor="loan-account" className="block text-[12px] text-ink mb-1">
+                      Pay the loan to (M-Pesa number or account)
+                    </label>
+                    <input
+                      id="loan-account"
+                      value={details.disbursementAccount}
+                      maxLength={100}
+                      onChange={(e) => setDetails({ ...details, disbursementAccount: e.target.value })}
+                      disabled={!!blocked}
+                      className={inputClass}
+                      placeholder="For example: 0712 345 678"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="loan-guarantor" className="block text-[12px] text-ink mb-1">
+                    Guarantor (a colleague at the company){guarantorNeeded ? '' : ', optional'}
+                  </label>
+                  <select id="loan-guarantor" value={guarantor} onChange={(e) => setGuarantorPick(e.target.value)} disabled={!!blocked} className={inputClass}>
+                    <option value="">Choose a colleague…</option>
+                    {choices.map((c) => (
+                      <option key={c.employee_number} value={c.employee_number}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 mb-0 text-[11.5px] text-muted-foreground">They are asked to read the loan’s terms and sign as guarantor in their staff portal.</p>
+                  {showError('guarantor')}
+                </div>
+                <div>
+                  <label htmlFor="loan-witness" className="block text-[12px] text-ink mb-1">
+                    Witness (a colleague), optional now
+                  </label>
+                  <select id="loan-witness" value={witnessPick} onChange={(e) => setWitnessPick(e.target.value)} disabled={!!blocked} className={inputClass}>
+                    <option value="">Choose later…</option>
+                    {choices
+                      .filter((c) => c.employee_number !== guarantor)
+                      .map((c) => (
+                        <option key={c.employee_number} value={c.employee_number}>
+                          {c.name}
+                        </option>
+                      ))}
+                  </select>
+                  <p className="mt-1 mb-0 text-[11.5px] text-muted-foreground">They witness your signature from their portal once the loan is approved and you have signed.</p>
+                </div>
+              </fieldset>
 
               {amount > 0 && !errors.amount && !errors.months && preview.length > 0 && (
                 <div className="p-3 rounded-tile bg-secondary text-[12.5px]" data-testid="loan-preview" aria-live="polite">
@@ -271,8 +456,8 @@ export default function LoanRequest() {
                         out, and you repay {formatKsh(totals.totalRepayable)}.{' '}
                       </>
                     )}
-                    {rateText(rate, method)}, {interestMethodLabel(method).toLowerCase()}. If approved, repayments come off your pay from about{' '}
-                    {periodLabel(firstMonth)}. HR confirms the start month.
+                    {rateText(rate, method)}, {interestMethodLabel(method).toLowerCase()}. If approved, repayments come off your{' '}
+                    {periodLabel(firstMonth)} pay. HR confirms the start month.
                   </p>
                 </div>
               )}
@@ -316,7 +501,13 @@ export default function LoanRequest() {
                         <strong>Reason:</strong> {l.decision_comment || 'No reason given.'}
                       </p>
                     )}
-                    {l.status === 'approved' && <p className="mt-2 text-[12px] text-muted-foreground">Approved. Finance will pay it out to you.</p>}
+                    {l.status === 'approved' && (
+                      <p className="mt-2 text-[12px] text-muted-foreground">
+                        {formHoldsPayout(forms[l.id])
+                          ? 'Approved. Sign the loan form below: finance pays it out once HR accepts the signed copy.'
+                          : 'Approved. Finance will pay it out to you.'}
+                      </p>
+                    )}
                     <div className="mt-3 flex flex-wrap gap-2">
                       {l.schedule.length > 0 && !['rejected', 'cancelled'].includes(l.status) && (
                         <Button variant="secondary" onClick={() => setOpenSchedule(openSchedule === l.id ? null : l.id)}>
@@ -334,11 +525,23 @@ export default function LoanRequest() {
                         <LoanSchedule schedule={l.schedule} repayments={l.repayments} />
                       </div>
                     )}
+                    <LoanFormPanel
+                      loan={{ ...l, employee_name: employee?.fullName }}
+                      form={forms[l.id]}
+                      mode="staff"
+                      schedule={l.schedule}
+                      renewal={isRenewal(l, loans)}
+                      guarantor={guarantors[l.id]}
+                      witness={witnesses[l.id]}
+                      onChanged={() => refresh(employee)}
+                    />
                   </Card>
                 </li>
               ))}
             </ul>
           )}
+          {employee?.employeeNumber && <GuaranteeRequests employeeNumber={employee.employeeNumber} />}
+          {employee?.employeeNumber && <WitnessRequests employeeNumber={employee.employeeNumber} />}
         </div>
       </div>
     </div>

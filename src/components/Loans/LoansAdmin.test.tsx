@@ -11,6 +11,7 @@ vi.mock('../../lib/loansApi', () => ({
   declineLoan: vi.fn(),
   cancelLoan: vi.fn(),
   createLoan: vi.fn(),
+  loadFirstOpenPeriod: vi.fn(),
   saveLoanSettings: vi.fn(),
   saveLoanProduct: vi.fn(),
 }));
@@ -54,11 +55,51 @@ vi.mock('../UI/EmployeePicker', () => ({
     </button>
   ),
 }));
+vi.mock('../../lib/loanFormApi', () => ({
+  loadLoanForms: vi.fn(),
+  currentUserId: vi.fn(),
+  signAsApprover: vi.fn(),
+  signAsBorrower: vi.fn(),
+  uploadSignedForm: vi.fn(),
+  reviewSignedForm: vi.fn(),
+  openSignedForm: vi.fn(),
+  loadLoanFormContext: vi.fn(),
+  downloadLoanFormPdf: vi.fn(),
+  loadLoanFormSettings: vi.fn(),
+  saveLoanFormSettings: vi.fn(),
+  loadGuarantors: vi.fn(),
+  loadGuarantorChoices: vi.fn(),
+  setGuarantor: vi.fn(),
+  loadMyGuarantees: vi.fn(),
+  loadGuarantorView: vi.fn(),
+  signAsGuarantor: vi.fn(),
+  declineGuarantee: vi.fn(),
+  addWitness: vi.fn(),
+  saveFormChecks: vi.fn(),
+  loadMySignerIdentity: vi.fn(),
+  loadWitnesses: vi.fn(async () => ({})),
+  loadFormValues: vi.fn(async () => ({})),
+  saveFormValues: vi.fn(),
+  setWitness: vi.fn(),
+  loadMyWitnessing: vi.fn(async () => []),
+  loadWitnessView: vi.fn(),
+  signAsWitness: vi.fn(),
+  declineWitness: vi.fn(),
+  deleteCancelledLoan: vi.fn(),
+}));
+// everyone here has a saved signature
+vi.mock('../../lib/signatures', () => ({
+  loadMySignature: vi.fn(async () => 'data:image/png;base64,SIG'),
+  saveMySignature: vi.fn(),
+  clearMySignature: vi.fn(),
+}));
 vi.mock('../../lib/supabase', () => ({ supabase: new Proxy({}, { get: () => { throw new Error('supabase used'); } }) }));
 
 import * as api from '../../lib/loansApi';
 import { DEFAULT_LOAN_SETTINGS, addMonths, currentPeriod, loanSchedule } from '../../lib/loans';
 import LoansAdmin from './LoansAdmin';
+import * as formApi from '../../lib/loanFormApi';
+import { DEFAULT_LOAN_FORM_SETTINGS } from '../../lib/loanForm';
 
 const mocked = vi.mocked(api);
 const base = {
@@ -79,6 +120,26 @@ const base = {
   disbursed_at: null,
   created_at: '2026-10-01T08:00:00Z',
 };
+const form = (over: Record<string, unknown>) => ({
+  loan_id: 'x',
+  required: true,
+  borrower_signature: null,
+  borrower_signed_at: null,
+  approver_signature: null,
+  approver_name: null,
+  approver_title: null,
+  approver_signed_at: null,
+  status: 'none',
+  file_path: null,
+  file_name: null,
+  uploaded_at: null,
+  send_back_reason: null,
+  employer_signature: null,
+  employer_officer: null,
+  employer_officer_title: null,
+  reviewed_at: null,
+  ...over,
+});
 const LOANS = [
   { ...base, id: 'r1', employee_number: 'E1', employee_name: 'Jane Wanjiru', principal: 100000, status: 'requested' as const, reason: 'School fees' },
   { ...base, id: 'a1', employee_number: 'E2', employee_name: 'Peter Otieno', principal: 100000, status: 'approved' as const, decided_by_email: 'hr@a.co' },
@@ -100,6 +161,13 @@ beforeEach(() => {
   for (const f of [mocked.declineLoan, mocked.cancelLoan]) f.mockResolvedValue(undefined);
   mocked.approveLoan.mockResolvedValue('approved');
   mocked.createLoan.mockResolvedValue('approved');
+  mocked.loadFirstOpenPeriod.mockResolvedValue(currentPeriod());
+  vi.mocked(formApi.loadLoanForms).mockResolvedValue({});
+  vi.mocked(formApi.currentUserId).mockResolvedValue('hr-user');
+  vi.mocked(formApi.signAsApprover).mockResolvedValue(undefined);
+  vi.mocked(formApi.reviewSignedForm).mockResolvedValue(undefined);
+  vi.mocked(formApi.loadLoanFormSettings).mockResolvedValue(DEFAULT_LOAN_FORM_SETTINGS);
+  vi.mocked(formApi.loadGuarantors).mockResolvedValue({});
   vi.stubGlobal('confirm', vi.fn(() => true));
 });
 afterEach(() => {
@@ -125,8 +193,21 @@ describe('the loans page', () => {
     const start = addMonths(currentPeriod(), 2);
     fireEvent.change(screen.getByLabelText('First repayment from'), { target: { value: start } });
     fireEvent.change(screen.getByLabelText('Note to the employee (optional)'), { target: { value: 'Approved by the committee' } });
+    await within(screen.getByRole('dialog')).findByAltText('Your signature');
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Approve' }));
     await vi.waitFor(() => expect(mocked.approveLoan).toHaveBeenCalledWith('r1', 'q1', { comment: 'Approved by the committee', startPeriod: start }));
+    // the final approval: the approver's saved signature goes on the form
+    await vi.waitFor(() => expect(formApi.signAsApprover).toHaveBeenCalledWith('r1', 'data:image/png;base64,SIG'));
+  });
+
+  it('the first repayment month can’t be one whose payroll is approved', async () => {
+    mocked.loadFirstOpenPeriod.mockResolvedValue(addMonths(currentPeriod(), 1));
+    render(<LoansAdmin />);
+    const card = await screen.findByTestId('loan-r1');
+    fireEvent.click(within(card).getByRole('button', { name: 'Approve' }));
+    const options = [...(screen.getByLabelText('First repayment from') as HTMLSelectElement).options].map((o) => o.value);
+    expect(options).not.toContain(currentPeriod());
+    expect(options[0]).toBe(addMonths(currentPeriod(), 1));
   });
 
   it('a decline needs a reason', async () => {
@@ -150,6 +231,127 @@ describe('the loans page', () => {
     expect(within(card).queryByRole('button', { name: /Mark as disbursed|Pay out/ })).toBeNull();
     fireEvent.click(within(card).getByRole('button', { name: 'Record payment' }));
     expect(navigate).toHaveBeenCalledWith('/payments');
+  });
+
+  it('a signed form holds the payout until HR accepts it, signing the employer undertaking', async () => {
+    perms.modules = [...HR_MODULES, 'payments'];
+    vi.mocked(formApi.loadLoanForms).mockResolvedValue({ a1: form({ loan_id: 'a1', status: 'uploaded', file_path: 'p', borrower_signature: 'x' }) } as never);
+    render(<LoansAdmin />);
+    await screen.findByTestId('loan-r1');
+    fireEvent.click(screen.getByText('To pay out (1)'));
+    const card = screen.getByTestId('loan-a1');
+    expect(within(card).getByText('Signed form to review')).toBeTruthy();
+    expect(within(card).queryByRole('button', { name: 'Record payment' })).toBeNull();
+    fireEvent.click(within(card).getByRole('button', { name: 'Accept form' }));
+    const dialog = screen.getByRole('dialog');
+    await within(dialog).findByAltText('Your signature');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Accept and sign' }));
+    await vi.waitFor(() => expect(formApi.reviewSignedForm).toHaveBeenCalledWith('a1', true, 'data:image/png;base64,SIG'));
+  });
+
+  it('a form signed, witnessed and guaranteed in the app is accepted with no upload', async () => {
+    perms.modules = [...HR_MODULES, 'payments'];
+    vi.mocked(formApi.loadLoanForms).mockResolvedValue({
+      a1: form({ loan_id: 'a1', borrower_signature: 'x', witness_signature: 'w', witness_name: 'Wanjiku W', witness_id_number: '123' }),
+    } as never);
+    vi.mocked(formApi.loadGuarantors).mockResolvedValue({ a1: { loan_id: 'a1', guarantor_name: 'Mary Akinyi', status: 'signed' } } as never);
+    render(<LoansAdmin />);
+    await screen.findByTestId('loan-r1');
+    fireEvent.click(screen.getByText('To pay out (1)'));
+    const card = screen.getByTestId('loan-a1');
+    expect(within(card).getByText('Signed form to review')).toBeTruthy();
+    expect(within(card).getByTestId('guarantor-a1').textContent).toMatch(/Mary Akinyi, signed/);
+    expect(within(card).getByText(/Wanjiku W \(ID 123\)/)).toBeTruthy();
+    fireEvent.click(within(card).getByRole('button', { name: 'Accept form' }));
+    const dialog = screen.getByRole('dialog');
+    await within(dialog).findByAltText('Your signature');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Accept and sign' }));
+    await vi.waitFor(() => expect(formApi.reviewSignedForm).toHaveBeenCalledWith('a1', true, 'data:image/png;base64,SIG'));
+  });
+
+  it('without the guarantor’s signature, a form signed in the app is not ready', async () => {
+    vi.mocked(formApi.loadLoanForms).mockResolvedValue({ a1: form({ loan_id: 'a1', borrower_signature: 'x', witness_signature: 'w' }) } as never);
+    vi.mocked(formApi.loadGuarantors).mockResolvedValue({ a1: { loan_id: 'a1', guarantor_name: 'Mary Akinyi', status: 'asked' } } as never);
+    render(<LoansAdmin />);
+    await screen.findByTestId('loan-r1');
+    fireEvent.click(screen.getByText('To pay out (1)'));
+    const card = screen.getByTestId('loan-a1');
+    expect(within(card).queryByRole('button', { name: 'Accept form' })).toBeNull();
+    expect(within(card).getByTestId('guarantor-a1').textContent).toMatch(/waiting for them to sign/);
+  });
+
+  it('HR fills in the checklist and who did the affordability assessment', async () => {
+    vi.mocked(formApi.loadLoanForms).mockResolvedValue({ a1: form({ loan_id: 'a1' }) } as never);
+    vi.mocked(formApi.loadMySignerIdentity).mockResolvedValue({ name: 'Hana Hr', title: 'HR Manager' });
+    vi.mocked(formApi.saveFormChecks).mockResolvedValue(undefined);
+    render(<LoansAdmin />);
+    await screen.findByTestId('loan-r1');
+    fireEvent.click(screen.getByText('To pay out (1)'));
+    fireEvent.click(within(screen.getByTestId('loan-a1')).getByRole('button', { name: 'Checklist' }));
+    const dialog = await screen.findByRole('dialog');
+    expect((within(dialog).getByLabelText('Affordability assessment completed by') as HTMLInputElement).value).toBe('Hana Hr');
+    fireEvent.click(within(dialog).getByLabelText(/Applicants Copy of National ID/));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save checklist' }));
+    await vi.waitFor(() => expect(formApi.saveFormChecks).toHaveBeenCalledWith('a1', 'Hana Hr', ['id_kra']));
+  });
+
+  it('a cancelled loan can be deleted, after asking', async () => {
+    mocked.loadAllLoans.mockResolvedValue([...LOANS, { ...base, id: 'c1', employee_number: 'E4', employee_name: 'Test Loan', principal: 5000, status: 'cancelled' as const }]);
+    vi.mocked(formApi.deleteCancelledLoan).mockResolvedValue(undefined);
+    render(<LoansAdmin />);
+    await screen.findByTestId('loan-r1');
+    fireEvent.click(screen.getByText(/Closed \(/));
+    fireEvent.click(within(screen.getByTestId('loan-c1')).getByRole('button', { name: 'Delete' }));
+    await vi.waitFor(() => expect(formApi.deleteCancelledLoan).toHaveBeenCalledWith('c1'));
+  });
+
+  it('corrects details the employee record has wrong, for this loan’s form; HR sees what was corrected', async () => {
+    vi.mocked(formApi.loadLoanForms).mockResolvedValue({ a1: form({ loan_id: 'a1' }) } as never);
+    vi.mocked(formApi.loadFormValues).mockResolvedValue({ a1: { contract_end_date: '2027-06-30' } });
+    vi.mocked(formApi.loadLoanFormContext).mockResolvedValue({
+      record: { net_salary: '62000', kra_pin: 'A123456789B' },
+      corrections: { contract_end_date: '2027-06-30' },
+    } as never);
+    vi.mocked(formApi.saveFormValues).mockResolvedValue(undefined);
+    render(<LoansAdmin />);
+    await screen.findByTestId('loan-r1');
+    fireEvent.click(screen.getByText('To pay out (1)'));
+    const card = screen.getByTestId('loan-a1');
+    expect(within(card).getByText(/Corrected on the form:/).parentElement?.textContent).toMatch(/Contract end date/);
+    fireEvent.click(within(card).getByRole('button', { name: 'Correct details' }));
+    const dialog = await screen.findByRole('dialog');
+    const net = within(dialog).getByLabelText('Net monthly salary before this loan (KSh)') as HTMLInputElement;
+    expect(net.value).toBe('62000');
+    fireEvent.change(net, { target: { value: '84000' } });
+    expect(within(dialog).getByText('Record: 62000')).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save corrections' }));
+    // only what differs from the record is saved
+    await vi.waitFor(() => expect(formApi.saveFormValues).toHaveBeenCalledWith('a1', { contract_end_date: '2027-06-30', net_salary: '84000' }));
+  });
+
+  it('sends a signed form back with what to fix', async () => {
+    vi.mocked(formApi.loadLoanForms).mockResolvedValue({ a1: form({ loan_id: 'a1', status: 'uploaded', file_path: 'p' }) } as never);
+    render(<LoansAdmin />);
+    await screen.findByTestId('loan-r1');
+    fireEvent.click(screen.getByText('To pay out (1)'));
+    fireEvent.click(within(screen.getByTestId('loan-a1')).getByRole('button', { name: 'Send back' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('What needs fixing?'), { target: { value: 'The witness has not signed' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Send back' }));
+    await vi.waitFor(() => expect(formApi.reviewSignedForm).toHaveBeenCalledWith('a1', false, 'The witness has not signed'));
+  });
+
+  it('whoever approved signs the approval later if they did not when approving', async () => {
+    mocked.loadAllLoans.mockResolvedValue(LOANS.map((l) => (l.id === 'a1' ? { ...l, decided_by: 'hr-user' } : l)));
+    vi.mocked(formApi.loadLoanForms).mockResolvedValue({ a1: form({ loan_id: 'a1' }) } as never);
+    render(<LoansAdmin />);
+    await screen.findByTestId('loan-r1');
+    fireEvent.click(screen.getByText('To pay out (1)'));
+    fireEvent.click(await within(screen.getByTestId('loan-a1')).findByRole('button', { name: 'Sign the approval' }));
+    const dialog = screen.getByRole('dialog');
+    await within(dialog).findByAltText('Your signature');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Sign the approval' }));
+    await vi.waitFor(() => expect(formApi.signAsApprover).toHaveBeenCalledWith('a1', 'data:image/png;base64,SIG'));
   });
 
   it('HR without the payments module is told finance pays the loan out', async () => {

@@ -44,6 +44,8 @@ const record = (user: string, id: string, via: string, ref: string | null, on = 
 
 beforeAll(async () => {
   db = await bootLiveDb();
+  // payout here doesn't wait for a signed loan form (that is employee_loan_forms.test.ts)
+  await db.exec(`insert into loan_settings (tenant_id, require_signed_form) values ('${A}', false)`);
   await db.exec(`
     insert into tenants (id, name, slug) values ('${B}', 'Other Co', 'other-co');
     insert into auth.users (id, email) values

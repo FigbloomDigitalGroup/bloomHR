@@ -99,7 +99,8 @@ describe('settings and loan types', () => {
   });
 
   it('HR and payroll users set the terms; staff and other managers only read them; other companies see nothing', async () => {
-    await as(HR, `insert into loan_settings (annual_rate, interest_method, min_months, max_months, max_salary_multiple) values (10, 'reducing_balance', 2, 24, 2)`);
+    // payout here doesn't wait for a signed loan form (that is employee_loan_forms.test.ts)
+    await as(HR, `insert into loan_settings (annual_rate, interest_method, min_months, max_months, max_salary_multiple, require_signed_form) values (10, 'reducing_balance', 2, 24, 2, false)`);
     await as(PAY, `update loan_settings set max_months = 18`);
     expect(await read(S1, `select annual_rate::int, max_months from loan_settings`)).toEqual([{ annual_rate: 10, max_months: 18 }]);
     await as(S1, `update loan_settings set annual_rate = 0`);
@@ -229,7 +230,8 @@ describe('paying out and repaying through payroll', () => {
 
   it('disbursing locks the terms and moves a past start to this month', async () => {
     paid = (await rows<{ id: string }>(`select id from employee_loans where employee_number = 'E2' and status = 'approved'`))[0].id;
-    await as(HR, `update employee_loans set start_period = '${month(-2)}' where id = '${paid}'`);
+    // approved long ago (a start month already past can't be chosen now: 20261118300000), set as it would have been then
+    await db.exec(`set session_replication_role = replica; update employee_loans set start_period = '${month(-2)}' where id = '${paid}'; set session_replication_role = origin;`);
     await as(HR, `update employee_loans set status = 'disbursed' where id = '${paid}'`);
     expect((await loan(paid)).start_period).toBe(month(0));
     expect((await rows<{ period: string }>(`select period from employee_loan_instalments where loan_id = '${paid}' order by instalment_no`)).map((r) => r.period)).toEqual([

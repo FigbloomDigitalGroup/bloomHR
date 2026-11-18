@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Ban, CalendarClock, Check, HandCoins, Hourglass, Plus, RefreshCw, Wallet, X } from 'lucide-react';
+import { Ban, CalendarClock, Check, HandCoins, Hourglass, Plus, RefreshCw, Trash2, Wallet, X } from 'lucide-react';
 import { Button, Card, EmployeePicker, EmptyState, Modal, PageHeader, StatCard, TabBar } from '../UI';
 import LoanSchedule, { LoanBalance, LoanStatusPill } from './LoanSchedule';
 import LoanSettingsCard from './LoanSettingsCard';
+import LoanFormPanel from './LoanFormPanel';
+import LoanFormSettingsCard from './LoanFormSettingsCard';
+import MySignature from '../Signature/MySignature';
+import { currentUserId, deleteCancelledLoan, loadFormValues, loadGuarantors, loadLoanForms, loadWitnesses, signAsApprover } from '../../lib/loanFormApi';
+import { formHoldsPayout, type FormValues, type LoanForm, type LoanGuarantor, type LoanWitness } from '../../lib/loanForm';
 import ApprovalChain from '../Approvals/ApprovalChain';
 import { loadApprovalChains, type ApprovalChain as Chain } from '../../lib/approvals';
 import RecordPaymentLink from '../Payments/RecordPaymentLink';
@@ -24,6 +29,7 @@ import {
   outstandingBalance,
   periodLabel,
   scheduleTotals,
+  termRateFor,
   type InterestMethod,
   type LoanProduct,
   type LoanSettings,
@@ -34,6 +40,7 @@ import {
   createLoan,
   declineLoan,
   loadAllLoans,
+  loadFirstOpenPeriod,
   loadLoanProducts,
   loadLoanSettings,
   loadSchedules,
@@ -49,6 +56,8 @@ import { LoaderBlock } from '../UI/FigbloomLoader';
 //     the step it is waiting on, for whoever may decide it; the chain shows under it.
 //   * An approved loan is paid out from Payments to make: finance pays it outside the app and records it there with its
 //     reference, which marks it disbursed and starts the payroll deductions.
+//   * Each approved loan has a loan form (LoanFormPanel): the approver's saved signature goes on it as they approve, the
+//     borrower signs and uploads it, and HR accepts it. When the company requires it, finance sees the loan only then.
 
 type Tab = 'requests' | 'approved' | 'active' | 'closed' | 'settings';
 
@@ -71,8 +80,8 @@ const failure = (error: unknown) => (error instanceof Error && error.message) ||
 const dateText = (value: string | null) =>
   value ? new Date(value).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 
-/** The next twelve months to start repaying in, from this one. */
-const startChoices = () => Array.from({ length: 12 }, (_, i) => addMonths(currentPeriod(), i));
+/** Twelve months to start repaying in, from the first whose payroll isn't approved yet. */
+const startChoices = (firstOpen: string) => Array.from({ length: 12 }, (_, i) => addMonths(firstOpen, i));
 
 interface NewLoanForm {
   employeeNumber: string;
@@ -95,6 +104,14 @@ export default function LoansAdmin() {
   const [schedules, setSchedules] = useState<Record<string, LoanInstalment[]>>({});
   const [repayments, setRepayments] = useState<Record<string, LoanRepayment[]>>({});
   const [chains, setChains] = useState<Record<string, Chain>>({});
+  const [forms, setForms] = useState<Record<string, LoanForm>>({});
+  const [guarantors, setGuarantors] = useState<Record<string, LoanGuarantor>>({});
+  const [witnesses, setWitnesses] = useState<Record<string, LoanWitness>>({});
+  const [corrections, setCorrections] = useState<Record<string, FormValues>>({});
+  // repayments can't start in a month whose payroll is already approved
+  const [firstOpen, setFirstOpen] = useState(currentPeriod());
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+  const [approverSignature, setApproverSignature] = useState<string | null>(null);
   const [settings, setSettings] = useState<LoanSettings>(DEFAULT_LOAN_SETTINGS);
   const [products, setProducts] = useState<LoanProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,14 +130,26 @@ export default function LoansAdmin() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [all, s, p] = await Promise.all([loadAllLoans(), loadLoanSettings(), loadLoanProducts()]);
+      const [all, s, p, open] = await Promise.all([loadAllLoans(), loadLoanSettings(), loadLoanProducts(), loadFirstOpenPeriod()]);
+      setFirstOpen(open);
       setLoans(all);
       setSettings(s);
       setProducts(p);
       setChains(await loadApprovalChains('loan', all.filter((l) => l.status === 'requested').map((l) => l.id)).catch(() => ({})));
-      const loaded = await loadSchedules(all.filter((l) => ['disbursed', 'repaying', 'completed'].includes(l.status)).map((l) => l.id));
+      const loaded = await loadSchedules(all.filter((l) => ['approved', 'disbursed', 'repaying', 'completed'].includes(l.status)).map((l) => l.id));
       setSchedules(loaded.schedules);
       setRepayments(loaded.repayments);
+      setForms(await loadLoanForms(all.filter((l) => l.status !== 'requested').map((l) => l.id)).catch(() => ({})));
+      const liveIds = all.filter((l) => !['rejected', 'cancelled'].includes(l.status)).map((l) => l.id);
+      const [g, w, c] = await Promise.all([
+        loadGuarantors(liveIds).catch(() => ({})),
+        loadWitnesses(liveIds).catch(() => ({})),
+        loadFormValues(liveIds).catch(() => ({})),
+      ]);
+      setGuarantors(g);
+      setWitnesses(w);
+      setCorrections(c);
+      setMyUserId(await currentUserId().catch(() => null));
     } catch (error) {
       console.error('Error loading loans:', error);
       toast.error('Could not load loans');
@@ -160,7 +189,7 @@ export default function LoansAdmin() {
 
   const openApprove = (loan: EmployeeLoan) => {
     setApproving(loan);
-    setApproveStart(loan.start_period < currentPeriod() ? addMonths(currentPeriod(), 1) : loan.start_period);
+    setApproveStart(loan.start_period < firstOpen ? firstOpen : loan.start_period);
     setComment('');
   };
 
@@ -180,6 +209,15 @@ export default function LoansAdmin() {
     if (ok) {
       setApproving(null);
       if (status === 'pending') toast('Your step is approved. It now goes to the next approver.');
+      // the final approval: the approver's saved signature goes on the form's lender approval
+      if (status === 'approved' && approverSignature) {
+        try {
+          await signAsApprover(loan.id, approverSignature);
+          await load();
+        } catch (error) {
+          toast.error(`Approved, but your signature was not added to the form: ${failure(error)}`);
+        }
+      }
     }
   };
 
@@ -203,9 +241,24 @@ export default function LoansAdmin() {
     if (ok) await act(loan, () => cancelLoan(loan.id), 'Loan cancelled');
   };
 
+  const remove = async (loan: EmployeeLoan) => {
+    const ok = await confirmDialog({
+      title: 'Delete this cancelled loan?',
+      message: `${loan.employee_name}'s cancelled loan of ${formatKsh(loan.principal)} is deleted with its form and approval. It can't be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Keep it',
+      tone: 'danger',
+    });
+    if (ok) await act(loan, () => deleteCancelledLoan(loan.id), 'Loan deleted');
+  };
+
   // ---- a new loan for an employee
   const newProduct = creating ? products.find((p) => p.id === creating.productId) ?? null : null;
-  const newRate = creating ? (creating.rate.trim() === '' ? newProduct?.annual_rate ?? settings.annual_rate : Number(creating.rate)) : 0;
+  const fixedTerms = settings.term_rates.length > 0;
+  const newTermRate = creating ? termRateFor(settings, Number(creating.months)) : null;
+  const newRate = creating
+    ? (newTermRate ?? (creating.rate.trim() === '' ? (newProduct?.annual_rate ?? settings.annual_rate) : Number(creating.rate)))
+    : 0;
   const newMethod: InterestMethod = creating?.method || newProduct?.interest_method || settings.interest_method;
   const newPreview = creating ? scheduleTotals(loanSchedule(Number(creating.amount) || 0, newRate, Number(creating.months) || 0, newMethod, creating.startPeriod)) : null;
   const createProblem = !creating
@@ -216,6 +269,8 @@ export default function LoansAdmin() {
         ? 'Enter the amount'
         : !Number.isInteger(Number(creating.months)) || Number(creating.months) < 1 || Number(creating.months) > 120
           ? 'Repay over 1 to 120 months'
+          : fixedTerms && newTermRate === null
+            ? `Loans are for ${settings.term_rates.map((t) => t.months).join(' or ')} months`
           : creating.rate.trim() !== '' && !(Number(creating.rate) >= 0 && Number(creating.rate) <= 100)
             ? 'The rate must be between 0% and 100%'
             : null;
@@ -271,8 +326,8 @@ export default function LoansAdmin() {
                   employeeNumber: '',
                   productId: '',
                   amount: '',
-                  months: String(Math.min(12, settings.max_months)),
-                  startPeriod: addMonths(currentPeriod(), 1),
+                  months: String(fixedTerms ? settings.term_rates[settings.term_rates.length - 1].months : Math.min(12, settings.max_months)),
+                  startPeriod: addMonths(currentPeriod(), 1) < firstOpen ? firstOpen : addMonths(currentPeriod(), 1),
                   rate: '',
                   method: '',
                   reason: '',
@@ -312,7 +367,10 @@ export default function LoansAdmin() {
       </div>
 
       {tab === 'settings' ? (
-        <LoanSettingsCard canEdit={canManage} />
+        <>
+          <LoanSettingsCard canEdit={canManage} className="mb-4" />
+          <LoanFormSettingsCard canEdit={canManage} />
+        </>
       ) : loading && loans.length === 0 ? (
         <Card>
           <LoaderBlock label="Loading loans" compact />
@@ -411,15 +469,32 @@ export default function LoansAdmin() {
                         </Button>
                       </>
                     )}
-                    {canManage && loan.status === 'approved' && (
-                      <RecordPaymentLink />
-                    )}
+                    {canManage && loan.status === 'approved' && !formHoldsPayout(forms[loan.id]) && <RecordPaymentLink />}
                     {canManage && ['requested', 'approved'].includes(loan.status) && (
                       <Button variant="ghost" onClick={() => void cancel(loan)} disabled={busy} icon={<Ban className="w-3.5 h-3.5" />}>
                         Cancel
                       </Button>
                     )}
+                    {canManage && loan.status === 'cancelled' && (
+                      <Button variant="ghost" onClick={() => void remove(loan)} disabled={busy} icon={<Trash2 className="w-3.5 h-3.5" />}>
+                        Delete
+                      </Button>
+                    )}
                   </div>
+                  <LoanFormPanel
+                    loan={loan}
+                    form={forms[loan.id]}
+                    mode="hr"
+                    schedule={schedules[loan.id]}
+                    renewal={loans.some(
+                      (o) => o.id !== loan.id && o.employee_number === loan.employee_number && o.created_at < loan.created_at && ['disbursed', 'repaying', 'completed'].includes(o.status)
+                    )}
+                    myUserId={myUserId}
+                    guarantor={guarantors[loan.id]}
+                    witness={witnesses[loan.id]}
+                    corrections={corrections[loan.id]}
+                    onChanged={load}
+                  />
                 </Card>
               </li>
             );
@@ -435,7 +510,7 @@ export default function LoansAdmin() {
               {approving.product_name ? ` ${approving.product_name}` : ' staff loans'} (
               {(() => {
                 const p = products.find((x) => x.id === approving.product_id);
-                return rateText(p?.annual_rate ?? settings.annual_rate, p?.interest_method ?? settings.interest_method);
+                return rateText(termRateFor(settings, approving.months) ?? p?.annual_rate ?? settings.annual_rate, p?.interest_method ?? settings.interest_method);
               })()}
               ).
             </p>
@@ -443,7 +518,7 @@ export default function LoansAdmin() {
               First repayment from
             </label>
             <select id="approve-start" value={approveStart} onChange={(e) => setApproveStart(e.target.value)} className={inputClass}>
-              {[...new Set([approveStart, ...startChoices()])].map((p) => (
+              {[...new Set([approveStart, ...startChoices(firstOpen)])].map((p) => (
                 <option key={p} value={p}>
                   {periodLabel(p)} pay
                 </option>
@@ -453,6 +528,13 @@ export default function LoansAdmin() {
               Note to the employee (optional)
             </label>
             <textarea id="approve-comment" rows={2} value={comment} onChange={(e) => setComment(e.target.value)} className={inputClass} />
+            <div className="mt-3">
+              <div className="text-[12px] font-semibold text-ink mb-1">Your signature on the loan form</div>
+              <p className="mt-0 mb-2 text-[11.5px] text-muted-foreground">
+                When yours is the final approval, your saved signature, name and job title go on the form's lender approval.
+              </p>
+              <MySignature bare onChange={setApproverSignature} />
+            </div>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <Button variant="secondary" onClick={() => setApproving(null)}>
                 Cancel
@@ -546,12 +628,22 @@ export default function LoansAdmin() {
                 </label>
                 <label className="block">
                   <span className="block text-[12px] font-semibold text-ink mb-1">Repay over (months)</span>
-                  <input className={inputClass} type="number" min={1} max={120} value={creating.months} onChange={(e) => setCreating({ ...creating, months: e.target.value })} />
+                  {fixedTerms ? (
+                    <select className={inputClass} value={creating.months} onChange={(e) => setCreating({ ...creating, months: e.target.value })}>
+                      {settings.term_rates.map((t) => (
+                        <option key={t.months} value={t.months}>
+                          {t.months} months at {rateText(t.rate, settings.interest_method)}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input className={inputClass} type="number" min={1} max={120} value={creating.months} onChange={(e) => setCreating({ ...creating, months: e.target.value })} />
+                  )}
                 </label>
                 <label className="block">
                   <span className="block text-[12px] font-semibold text-ink mb-1">First repayment from</span>
                   <select className={inputClass} value={creating.startPeriod} onChange={(e) => setCreating({ ...creating, startPeriod: e.target.value })}>
-                    {startChoices().map((p) => (
+                    {startChoices(firstOpen).map((p) => (
                       <option key={p} value={p}>
                         {periodLabel(p)} pay
                       </option>
@@ -566,7 +658,9 @@ export default function LoansAdmin() {
                     min={0}
                     max={100}
                     step="0.1"
-                    value={creating.rate}
+                    value={fixedTerms ? String(newTermRate ?? '') : creating.rate}
+                    disabled={fixedTerms}
+                    title={fixedTerms ? 'Set by the term (Loans > Settings > Fixed terms)' : undefined}
                     placeholder={`${newProduct?.annual_rate ?? settings.annual_rate} (the usual rate)`}
                     onChange={(e) => setCreating({ ...creating, rate: e.target.value })}
                   />
