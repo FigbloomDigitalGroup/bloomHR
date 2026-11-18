@@ -24,6 +24,17 @@ export interface SmsResult {
 
 const MAX_PER_REQUEST = 1000; // keep in step with MAX_BATCH in sms_routes.js
 
+/** Shown when the server has no SMS provider set up yet (it answers 503): the SMS screens still work for a look around. */
+export const SMS_NOT_CONNECTED_MESSAGE = "SMS isn't connected yet, so messages can't be sent.";
+
+/** The server has no SMS provider set up yet (sms_routes.js answers 503 only for that). */
+export class SmsNotConnectedError extends Error {
+  constructor() {
+    super(SMS_NOT_CONNECTED_MESSAGE);
+    this.name = 'SmsNotConnectedError';
+  }
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -40,6 +51,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     throw new Error('Could not reach the server. Is the backend running?');
   }
 
+  if (response.status === 503) throw new SmsNotConnectedError();
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
   return payload as T;
