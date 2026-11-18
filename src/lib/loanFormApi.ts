@@ -129,6 +129,7 @@ export async function loadLoanFormContext(loan: { id: string; employee_number: s
     pay_changed: boolean;
     basic_salary: number | string | null;
     corrections?: FormValues;
+    payout?: { reference: string | null; paid_on: string | null } | null;
   };
   const [payout] = await Promise.all([
     quiet(async () => {
@@ -163,7 +164,12 @@ export async function loadLoanFormContext(loan: { id: string; employee_number: s
     record: recordValues(borrower, latestPay),
     corrections,
     payChanged: !!d.pay_changed,
-    payout: payout && payout.status === 'paid' ? { reference: payout.payment_reference ?? null, paidOn: payout.paid_on ?? null } : null,
+    // finance's record of the payout: from the database for everyone who reads the form (staff can't read payments)
+    payout: d.payout
+      ? { reference: d.payout.reference ?? null, paidOn: d.payout.paid_on ?? null }
+      : payout && payout.status === 'paid'
+        ? { reference: payout.payment_reference ?? null, paidOn: payout.paid_on ?? null }
+        : null,
   };
 }
 
