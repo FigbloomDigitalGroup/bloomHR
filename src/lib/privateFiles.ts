@@ -17,7 +17,8 @@ export type PrivateBucket =
   | 'chat-attachments'
   | 'work-files'
   | 'signatures'
-  | 'generated-documents';
+  | 'generated-documents'
+  | 'loan-forms';
 
 const SIGNED_LINK_SECONDS = 60 * 60;
 

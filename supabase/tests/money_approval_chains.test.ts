@@ -39,6 +39,8 @@ const saveChain = (kind: string, steps: unknown[]) => as(SET, `select save_appro
 
 beforeAll(async () => {
   db = await bootLiveDb();
+  // payout here doesn't wait for a signed loan form (that is employee_loan_forms.test.ts)
+  await db.exec(`insert into loan_settings (tenant_id, require_signed_form) values ('${A}', false)`);
   await db.exec(`
     insert into auth.users (id, email) values
       ('${HR}', 'hr@a.co'), ('${MGR}', 'mgr@a.co'), ('${DIR}', 'dir@a.co'), ('${S1}', 's1@a.co'), ('${S2}', 's2@a.co'),

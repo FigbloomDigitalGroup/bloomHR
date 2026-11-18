@@ -99,7 +99,8 @@ describe('settings and loan types', () => {
   });
 
   it('HR and payroll users set the terms; staff and other managers only read them; other companies see nothing', async () => {
-    await as(HR, `insert into loan_settings (annual_rate, interest_method, min_months, max_months, max_salary_multiple) values (10, 'reducing_balance', 2, 24, 2)`);
+    // payout here doesn't wait for a signed loan form (that is employee_loan_forms.test.ts)
+    await as(HR, `insert into loan_settings (annual_rate, interest_method, min_months, max_months, max_salary_multiple, require_signed_form) values (10, 'reducing_balance', 2, 24, 2, false)`);
     await as(PAY, `update loan_settings set max_months = 18`);
     expect(await read(S1, `select annual_rate::int, max_months from loan_settings`)).toEqual([{ annual_rate: 10, max_months: 18 }]);
     await as(S1, `update loan_settings set annual_rate = 0`);
