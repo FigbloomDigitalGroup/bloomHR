@@ -22,6 +22,7 @@ import {
 } from '../../lib/loanForm';
 import {
   addWitness,
+  attachSignedForm,
   downloadLoanFormPdf,
   loadGuarantorChoices,
   loadLoanFormContext,
@@ -154,6 +155,7 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, gua
   const [checking, setChecking] = useState<{ by: string; checks: ChecklistItem[] } | null>(null);
   const docRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const attachRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!viewing || context) return;
@@ -168,6 +170,8 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, gua
   const ready = readyInApp(form, guarantor);
   const stage = formStage(loan, form, ready);
   const open = loan.status === 'approved' && !!form && form.status !== 'accepted';
+  // a loan paid out: HR attaches its paper-signed form as the record, unless it has an accepted signed copy already
+  const canAttach = ['disbursed', 'repaying', 'completed'].includes(loan.status) && !(form?.status === 'accepted' && form.file_path);
   const waitingOnReview = form?.status === 'uploaded' || ready;
   // signing online works from the request on; a paper copy and HR's review wait for approval
   const signable = ['requested', 'approved'].includes(loan.status) && !!form && form.status !== 'accepted';
@@ -204,6 +208,25 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, gua
       await done(mode === 'staff' ? 'Signed form sent to HR' : 'Signed form uploaded');
     } catch (error) {
       toast.error(errorText(error, 'The signed form was not uploaded'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const attach = async (file: File | undefined) => {
+    if (attachRef.current) attachRef.current.value = '';
+    if (!file) return;
+    const problem = signedFormProblem(file);
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
+    setBusy(true);
+    try {
+      await attachSignedForm(loan, file);
+      await done('Signed form attached to the loan');
+    } catch (error) {
+      toast.error(errorText(error, 'The signed form was not attached'));
     } finally {
       setBusy(false);
     }
@@ -402,6 +425,27 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, gua
             <input ref={fileRef} id={`loan-form-file-${loan.id}`} type="file" accept=".pdf,application/pdf" className="sr-only" onChange={(e) => void upload(e.target.files?.[0])} />
             <Button variant={mode === 'staff' && !waitingOnReview ? 'primary' : 'secondary'} onClick={() => fileRef.current?.click()} disabled={busy} icon={<Upload className="w-3.5 h-3.5" />}>
               {busy ? 'Uploading…' : form?.file_path ? 'Replace signed form' : mode === 'staff' ? 'Upload signed form (PDF)' : 'Upload a paper-signed form'}
+            </Button>
+          </>
+        )}
+        {mode === 'hr' && canAttach && (
+          <>
+            <input
+              ref={attachRef}
+              id={`loan-form-attach-${loan.id}`}
+              type="file"
+              accept=".pdf,application/pdf"
+              className="sr-only"
+              onChange={(e) => void attach(e.target.files?.[0])}
+            />
+            <Button
+              variant="secondary"
+              onClick={() => attachRef.current?.click()}
+              disabled={busy}
+              icon={<Upload className="w-3.5 h-3.5" />}
+              title="Signed on paper by someone not on the platform? Scan it to PDF and keep it with the loan"
+            >
+              {busy ? 'Attaching…' : 'Attach signed form (PDF)'}
             </Button>
           </>
         )}

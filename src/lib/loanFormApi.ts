@@ -434,6 +434,22 @@ export async function uploadSignedForm(loan: { id: string }, file: File): Promis
   if (error) fail(error, 'The signed form was not uploaded.');
 }
 
+/**
+ * HR attaches the signed form of a loan already paid out (signed on paper by someone not on the platform, scanned to
+ * PDF): kept as its signed form, accepted. Not for a loan whose signed copy was accepted already.
+ */
+export async function attachSignedForm(loan: { id: string }, file: File): Promise<void> {
+  const problem = signedFormProblem(file);
+  if (problem) throw new Error(problem);
+  const { data: row, error: rowError } = await supabase.from('employee_loans').select('tenant_id').eq('id', loan.id).maybeSingle();
+  if (rowError || !row) fail(rowError, 'Loan not found.');
+  const path = `${row!.tenant_id}/${loan.id}/signed-${randomFileName(file.name)}`;
+  const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: 'application/pdf', upsert: false });
+  if (uploadError) fail(uploadError, 'The signed form was not attached.');
+  const { error } = await supabase.rpc('loan_form_attach', { p_loan: loan.id, p_path: path, p_file_name: file.name.slice(0, 255) });
+  if (error) fail(error, 'The signed form was not attached.');
+}
+
 /** HR accepts the signed copy (signing the employer undertaking) or sends it back saying what to fix. */
 export async function reviewSignedForm(loanId: string, accept: true, signature: string): Promise<void>;
 export async function reviewSignedForm(loanId: string, accept: false, reason: string): Promise<void>;
