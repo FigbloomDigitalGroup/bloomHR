@@ -68,6 +68,12 @@ describe('the witness, a colleague', () => {
     expect(await form(loanId)).toMatchObject({ witness_name: 'Eric Two', witness_id_number: '11223344', witness_signature: SIG });
   });
 
+  it('once approved, a witness who signed stays (20261118900000), until HR sends the form back to be fixed', async () => {
+    await expect(as(S1, `select loan_set_witness('${loanId}', 'E3')`)).rejects.toThrow(/can't be changed/);
+    await expect(as(HR, `select loan_form_witness('${loanId}', 'Outside Person', '555', '${SIG}')`)).rejects.toThrow(/can't be changed/);
+    await db.exec(`update employee_loan_forms set status = 'sent_back', send_back_reason = 'Wrong witness' where loan_id = '${loanId}'`);
+  });
+
   it('asking another witness takes the last one off the form; HR can enter one not on staff', async () => {
     await as(S1, `select loan_set_witness('${loanId}', 'E3')`);
     expect(await form(loanId)).toMatchObject({ witness_name: null, witness_signature: null });
@@ -81,6 +87,7 @@ describe('the witness, a colleague', () => {
 
 describe('correcting the form’s values', () => {
   it('the borrower or HR set them; other staff can’t; only known fields; salaries are amounts', async () => {
+    // the form was sent back to be fixed (above): corrections are open again
     await as(S1, `select loan_form_set_values('${loanId}', '{"net_salary": "84000", "contract_end_date": "2027-06-30", "town": " "}')`);
     expect((await rows<{ values: unknown }>(`select "values" from employee_loan_form_values where loan_id = '${loanId}'`))[0].values).toEqual({
       net_salary: '84000', contract_end_date: '2027-06-30',
@@ -91,6 +98,13 @@ describe('correcting the form’s values', () => {
     await as(HR, `select loan_form_set_values('${loanId}', '{"net_salary": "84000", "gross_salary": "110000"}')`);
     expect(await read(S1, `select 1 from employee_loan_form_values`)).toHaveLength(1);
     expect(await read(S3, `select 1 from employee_loan_form_values`)).toHaveLength(0);
+  });
+
+  it('on an approved loan whose form isn’t sent back, nobody corrects anything (20261118900000)', async () => {
+    await db.exec(`update employee_loan_forms set status = 'none', send_back_reason = null where loan_id = '${loanId}'`);
+    await expect(as(S1, `select loan_form_set_values('${loanId}', '{"net_salary": "99000"}')`)).rejects.toThrow(/can't be changed/);
+    await expect(as(HR, `select loan_form_set_values('${loanId}', '{"net_salary": "99000"}')`)).rejects.toThrow(/can't be changed/);
+    await expect(as(HR, `update employee_loans set principal = 1 where id = '${loanId}'`)).rejects.toThrow(/agreement can't be changed/);
   });
 });
 

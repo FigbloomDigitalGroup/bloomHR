@@ -314,8 +314,17 @@ describe('the loans page', () => {
     await vi.waitFor(() => expect(formApi.deleteCancelledLoan).toHaveBeenCalledWith('c1'));
   });
 
+  it('an approved loan’s details are locked: no Correct details unless HR sent the form back', async () => {
+    vi.mocked(formApi.loadLoanForms).mockResolvedValue({ a1: form({ loan_id: 'a1', borrower_signature: 'x' }) } as never);
+    render(<LoansAdmin />);
+    await screen.findByTestId('loan-r1');
+    fireEvent.click(screen.getByText('To pay out (1)'));
+    expect(within(screen.getByTestId('loan-a1')).queryByRole('button', { name: 'Correct details' })).toBeNull();
+  });
+
   it('corrects details the employee record has wrong, for this loan’s form; HR sees what was corrected', async () => {
-    vi.mocked(formApi.loadLoanForms).mockResolvedValue({ a1: form({ loan_id: 'a1' }) } as never);
+    // HR sent the approved loan's form back to be fixed: corrections are open again
+    vi.mocked(formApi.loadLoanForms).mockResolvedValue({ a1: form({ loan_id: 'a1', status: 'sent_back', send_back_reason: 'Net pay wrong' }) } as never);
     vi.mocked(formApi.loadFormValues).mockResolvedValue({ a1: { contract_end_date: '2027-06-30' } });
     vi.mocked(formApi.loadLoanFormContext).mockResolvedValue({
       record: { net_salary: '62000', kra_pin: 'A123456789B' },

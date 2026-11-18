@@ -174,13 +174,14 @@ describe('the guarantor', () => {
     await expect(read(HR, `select loan_form_for_guarantor('${loanId}')`)).rejects.toThrow(/Loan not found/);
   });
 
-  it('signing copies their details from their employee record; once signed, only HR changes them', async () => {
+  it('signing copies their details from their employee record; once signed on an approved loan, nobody changes them', async () => {
     await as(S2, `select loan_guarantor_sign('${loanId}', '${SIG}', 'Colleague', '0733000000', 'Ruaka')`);
     expect((await rows(`select * from employee_loan_guarantors where loan_id = '${loanId}'`))[0]).toMatchObject({
       status: 'signed', relationship: 'Colleague', alternative_phone: '0733000000', id_number: '22334455', kra_pin: 'A123456789B',
       mobile: '0722111222', signature: SIG,
     });
-    await expect(as(S1, `select loan_set_guarantor('${loanId}', 'H1')`)).rejects.toThrow(/Ask HR/);
+    await expect(as(S1, `select loan_set_guarantor('${loanId}', 'H1')`)).rejects.toThrow(/can't be changed/);
+    await expect(as(HR, `select loan_set_guarantor('${loanId}', 'H1')`)).rejects.toThrow(/can't be changed/);
     // the borrower and HR read it; nobody writes it directly
     // (Esther also guarantees Eric's loan, so she reads two)
     expect(await read(S1, `select loan_id from employee_loan_guarantors`)).toHaveLength(2);

@@ -61,6 +61,13 @@ describe('fixed terms', () => {
     await as(HR, `select decide_approval(r.id, 'approved', null) from approval_requests r where r.kind = 'loan' and r.record_id = '${id}'`);
     expect(await loan(id)).toMatchObject({ status: 'approved' });
     expect(Number((await loan(id)).annual_rate)).toBe(25);
+    // approved: its terms are locked for everyone (20261118900000)
+    await expect(as(HR, `update employee_loans set months = 3 where id = '${id}'`)).rejects.toThrow(/agreement can't be changed/);
+    await expect(as(HR, `update employee_loans set annual_rate = 10 where id = '${id}'`)).rejects.toThrow(/agreement can't be changed/);
+  });
+
+  it('on a request, HR may change the term to another fixed one; the rate follows', async () => {
+    const id = await ask(6);
     await expect(as(HR, `update employee_loans set months = 5 where id = '${id}'`)).rejects.toThrow(/3 or 6 months/);
     await as(HR, `update employee_loans set annual_rate = 10 where id = '${id}'`);
     expect(Number((await loan(id)).annual_rate)).toBe(25);
