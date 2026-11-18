@@ -45,9 +45,9 @@ invitation).
 
 | Group | Account | Permission set | Can | Can't |
 | -- | -- | -- | -- | -- |
-| `figbloom-developers` (Ancel, Morris, Hassan, Given, Joseph) | staging | `Developer`, 8h sessions | Deploy and run anything: `cdk deploy`, servers, Lambda, databases, S3, logs (AWS managed `PowerUserAccess`) | Manage IAM users, roles or policies, Organizations, account settings, billing, Identity Center |
+| `figbloom-developers` (Ancel, Morris, Hassan, Given, Joseph, Esther) | staging | `Developer`, 8h sessions | Deploy and run anything: `cdk deploy`, servers, Lambda, databases, S3, logs (AWS managed `PowerUserAccess`) | Manage IAM users, roles or policies, Organizations, account settings, billing, Identity Center |
 | `figbloom-prod-viewers` (Ancel, Hassan, Morris) | production | `ViewOnly`, 8h sessions | See every resource and its settings, read CloudWatch logs (including Logs Insights and Live Tail), metrics, alarms and dashboards, X-Ray traces, CloudFormation stacks and events (AWS managed `ViewOnlyAccess` plus an inline policy) | Read any data or secrets: S3 objects, Secrets Manager values, SSM parameters, KMS decrypt, database connections and queries (RDS, Data API, DynamoDB), invoking Lambdas, Session Manager / Run Command / Instance Connect / ECS Exec, Cognito user details, queue and stream messages. These are explicit denies, so nothing else can grant them. Also no billing or Identity Center |
-| `figbloom-prod-deployers` (Morris) | production | `Deployer`, 4h sessions | The same as `Developer`, in production | The same as `Developer` |
+| `figbloom-prod-deployers` (Morris, Ancel, Joseph, Esther) | production | `Deployer`, 4h sessions | The same as `Developer`, in production | The same as `Developer` |
 
 Keep secrets out of Lambda environment variables and CloudFormation parameters: viewers can see resource settings, and
 those are settings. Put them in Secrets Manager.

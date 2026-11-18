@@ -25,9 +25,9 @@ param(
 
 # Who goes in which group. Group names must match GROUPS in infra/lib/access-stack.ts.
 $Membership = [ordered]@{
-  'figbloom-developers'     = @('ancel@figbloom.org', 'morris@figbloom.org', 'hassan@figbloom.org', 'given@figbloom.org', 'joseph@figbloom.org')
+  'figbloom-developers'     = @('ancel@figbloom.org', 'morris@figbloom.org', 'hassan@figbloom.org', 'given@figbloom.org', 'joseph@figbloom.org', 'esther@figbloom.org')
   'figbloom-prod-viewers'   = @('ancel@figbloom.org', 'hassan@figbloom.org', 'morris@figbloom.org')
-  'figbloom-prod-deployers' = @('morris@figbloom.org', 'ancel@figbloom.org')
+  'figbloom-prod-deployers' = @('morris@figbloom.org', 'ancel@figbloom.org', 'joseph@figbloom.org', 'esther@figbloom.org')
   'figbloom-leads'          = @('morris@figbloom.org', 'ancel@figbloom.org')
 }
 
