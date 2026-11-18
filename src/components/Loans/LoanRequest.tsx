@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { HandCoins, Lock } from 'lucide-react';
 import { Button, Card, EmptyState, PageHeader } from '../UI';
 import LoanSchedule, { LoanBalance, LoanStatusPill } from './LoanSchedule';
+import LoanFormPanel from './LoanFormPanel';
 import { confirmDialog } from '../../lib/confirmDialog';
 import {
   DEFAULT_LOAN_SETTINGS,
@@ -21,7 +22,9 @@ import {
   type LoanRequestInput,
   type LoanSettings,
 } from '../../lib/loans';
-import { loadLoanProducts, loadLoanSettings, loadMyLoans, requestLoan, withdrawLoan, type LoanWithSchedule } from '../../lib/loansApi';
+import { loadLoanProducts, loadLoanSettings, loadMyLoans, requestLoan, withdrawLoan, type LoanApplicationDetails, type LoanWithSchedule } from '../../lib/loansApi';
+import { loadLoanForms } from '../../lib/loanFormApi';
+import { formHoldsPayout, type LoanForm } from '../../lib/loanForm';
 import { loadMyEmployee, type MyEmployee } from '../../lib/salaryAdvanceApi';
 import { LoaderBlock } from '../UI/FigbloomLoader';
 
@@ -29,6 +32,12 @@ import { LoaderBlock } from '../UI/FigbloomLoader';
 
 const inputClass =
   'w-full px-3 py-2 text-[13px] border border-border rounded-tile bg-white focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand disabled:bg-secondary disabled:cursor-not-allowed';
+
+const EMPTY_DETAILS: LoanApplicationDetails = { residentialAddress: '', otherLoanRepayments: '', disbursementAccount: '' };
+
+/** A loan paid out to them before this one makes this one a renewal on the form. */
+const isRenewal = (loan: LoanWithSchedule, all: LoanWithSchedule[]) =>
+  all.some((o) => o.id !== loan.id && o.created_at < loan.created_at && ['disbursed', 'repaying', 'completed'].includes(o.status));
 
 const dateText = (value: string | null) =>
   value ? new Date(value).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
@@ -44,11 +53,21 @@ export default function LoanRequest() {
   const [triedSubmit, setTriedSubmit] = useState(false);
   const [saving, setSaving] = useState(false);
   const [openSchedule, setOpenSchedule] = useState<string | null>(null);
+  const [details, setDetails] = useState<LoanApplicationDetails>(EMPTY_DETAILS);
+  const [forms, setForms] = useState<Record<string, LoanForm>>({});
+
+  const loadMine = useCallback(async (employeeNumber: string) => {
+    const mine = await loadMyLoans(employeeNumber);
+    const myForms = await loadLoanForms(mine.map((l) => l.id)).catch(() => ({}));
+    return { mine, myForms };
+  }, []);
 
   const refresh = useCallback(async (emp: MyEmployee | null) => {
     if (!emp?.employeeNumber) return;
-    setLoans(await loadMyLoans(emp.employeeNumber));
-  }, []);
+    const { mine, myForms } = await loadMine(emp.employeeNumber);
+    setLoans(mine);
+    setForms(myForms);
+  }, [loadMine]);
 
   useEffect(() => {
     let live = true;
@@ -61,8 +80,11 @@ export default function LoanRequest() {
         setProducts(p.filter((x) => x.active));
         setForm((f) => ({ ...f, months: f.months || Math.min(Math.max(s.min_months, 12), s.max_months) }));
         if (emp?.employeeNumber) {
-          const mine = await loadMyLoans(emp.employeeNumber);
-          if (live) setLoans(mine);
+          const { mine, myForms } = await loadMine(emp.employeeNumber);
+          if (live) {
+            setLoans(mine);
+            setForms(myForms);
+          }
         }
       } catch (error) {
         console.error('Error loading loans:', error);
@@ -74,14 +96,18 @@ export default function LoanRequest() {
     return () => {
       live = false;
     };
-  }, []);
+  }, [loadMine]);
 
   const product = products.find((p) => p.id === productId) ?? null;
   const rate = product?.annual_rate ?? settings.annual_rate;
   const method = product?.interest_method ?? settings.interest_method;
   const maxMonths = maxMonthsFor(settings, product);
   const maxAmount = maxLoanFor(settings, employee?.basicSalary);
-  const errors = validateLoanRequest(form, { minMonths: settings.min_months, maxMonths, maxAmount });
+  const otherRepayments = details.otherLoanRepayments.trim();
+  const errors: Partial<Record<keyof LoanRequestInput | 'otherLoanRepayments', string>> = {
+    ...validateLoanRequest(form, { minMonths: settings.min_months, maxMonths, maxAmount }),
+    ...(otherRepayments !== '' && !(Number(otherRepayments) >= 0) ? { otherLoanRepayments: 'Enter an amount in KSh, or leave it empty.' } : {}),
+  };
   const amount = Number(form.amount) || 0;
   const firstMonth = addMonths(currentPeriod(), 1);
   const preview = useMemo(() => loanSchedule(amount, rate, form.months, method, firstMonth), [amount, rate, form.months, method, firstMonth]);
@@ -104,9 +130,10 @@ export default function LoanRequest() {
     if (blocked || !employee || Object.keys(errors).length > 0) return;
     setSaving(true);
     try {
-      await requestLoan(employee, { productId: productId || null, amount, months: form.months, reason: form.reason });
+      await requestLoan(employee, { productId: productId || null, amount, months: form.months, reason: form.reason, details });
       toast.success('Your loan request was sent for approval');
       setForm((f) => ({ ...f, amount: '', reason: '' }));
+      setDetails(EMPTY_DETAILS);
       setTriedSubmit(false);
       await refresh(employee);
     } catch (error) {
@@ -134,7 +161,7 @@ export default function LoanRequest() {
     }
   };
 
-  const showError = (field: keyof LoanRequestInput) =>
+  const showError = (field: keyof LoanRequestInput | 'otherLoanRepayments') =>
     (triedSubmit || (field === 'amount' && form.amount !== '')) && errors[field] ? (
       <p id={`loan-${field}-error`} className="mt-1 text-[11.5px] text-status-danger" role="alert">
         {errors[field]}
@@ -248,6 +275,57 @@ export default function LoanRequest() {
                 {showError('reason')}
               </div>
 
+              <fieldset className="space-y-3">
+                <legend className="text-[12px] font-semibold text-ink mb-1">For the loan form</legend>
+                <div>
+                  <label htmlFor="loan-address" className="block text-[12px] text-ink mb-1">
+                    Where you live (residential address)
+                  </label>
+                  <input
+                    id="loan-address"
+                    value={details.residentialAddress}
+                    maxLength={300}
+                    onChange={(e) => setDetails({ ...details, residentialAddress: e.target.value })}
+                    disabled={!!blocked}
+                    className={inputClass}
+                    placeholder="For example: Kileleshwa, Nairobi"
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="loan-other" className="block text-[12px] text-ink mb-1">
+                      Other loan repayments a month (KSh)
+                    </label>
+                    <input
+                      id="loan-other"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      value={details.otherLoanRepayments}
+                      onChange={(e) => setDetails({ ...details, otherLoanRepayments: e.target.value })}
+                      disabled={!!blocked}
+                      className={inputClass}
+                      placeholder="0"
+                    />
+                    {showError('otherLoanRepayments')}
+                  </div>
+                  <div>
+                    <label htmlFor="loan-account" className="block text-[12px] text-ink mb-1">
+                      Pay the loan to (M-Pesa number or account)
+                    </label>
+                    <input
+                      id="loan-account"
+                      value={details.disbursementAccount}
+                      maxLength={100}
+                      onChange={(e) => setDetails({ ...details, disbursementAccount: e.target.value })}
+                      disabled={!!blocked}
+                      className={inputClass}
+                      placeholder="For example: 0712 345 678"
+                    />
+                  </div>
+                </div>
+              </fieldset>
+
               {amount > 0 && !errors.amount && !errors.months && preview.length > 0 && (
                 <div className="p-3 rounded-tile bg-secondary text-[12.5px]" data-testid="loan-preview" aria-live="polite">
                   <div className="grid grid-cols-3 gap-2">
@@ -316,7 +394,13 @@ export default function LoanRequest() {
                         <strong>Reason:</strong> {l.decision_comment || 'No reason given.'}
                       </p>
                     )}
-                    {l.status === 'approved' && <p className="mt-2 text-[12px] text-muted-foreground">Approved. Finance will pay it out to you.</p>}
+                    {l.status === 'approved' && (
+                      <p className="mt-2 text-[12px] text-muted-foreground">
+                        {formHoldsPayout(forms[l.id])
+                          ? 'Approved. Sign the loan form below: finance pays it out once HR accepts the signed copy.'
+                          : 'Approved. Finance will pay it out to you.'}
+                      </p>
+                    )}
                     <div className="mt-3 flex flex-wrap gap-2">
                       {l.schedule.length > 0 && !['rejected', 'cancelled'].includes(l.status) && (
                         <Button variant="secondary" onClick={() => setOpenSchedule(openSchedule === l.id ? null : l.id)}>
@@ -334,6 +418,14 @@ export default function LoanRequest() {
                         <LoanSchedule schedule={l.schedule} repayments={l.repayments} />
                       </div>
                     )}
+                    <LoanFormPanel
+                      loan={{ ...l, employee_name: employee?.fullName }}
+                      form={forms[l.id]}
+                      mode="staff"
+                      schedule={l.schedule}
+                      renewal={isRenewal(l, loans)}
+                      onChanged={() => refresh(employee)}
+                    />
                   </Card>
                 </li>
               ))}

@@ -36,12 +36,18 @@ export interface EmployeeLoan {
   total_repayable: number | null;
   status: LoanStatus;
   reason: string | null;
+  /** whoever gave the final approval (they sign the form's lender approval) */
+  decided_by?: string | null;
   decided_by_email: string | null;
   decided_at: string | null;
   decision_comment: string | null;
   disbursed_by_email: string | null;
   disbursed_at: string | null;
   created_at: string;
+  /** what the applicant adds for the loan form (20261118100000) */
+  residential_address?: string | null;
+  other_loan_repayments?: number | null;
+  disbursement_account?: string | null;
   /** added on the HR screen: the employee's name */
   employee_name?: string;
 }
@@ -57,6 +63,7 @@ const toLoan = (row: Record<string, unknown>): EmployeeLoan =>
     monthly_instalment: num(row.monthly_instalment),
     total_interest: num(row.total_interest),
     total_repayable: num(row.total_repayable),
+    other_loan_repayments: num(row.other_loan_repayments),
   }) as EmployeeLoan;
 
 const toInstalment = (row: Record<string, unknown>): LoanInstalment => ({
@@ -150,7 +157,27 @@ export async function loadMyLoans(employeeNumber: string): Promise<LoanWithSched
   return withSchedules((data ?? []).map(toLoan));
 }
 
-export async function requestLoan(employee: MyEmployee, input: { productId: string | null; amount: number; months: number; reason: string }) {
+/** What the applicant adds for the loan form: where they live, other loan repayments, and where to be paid. */
+export interface LoanApplicationDetails {
+  residentialAddress: string;
+  /** KSh a month; '' when none given */
+  otherLoanRepayments: string;
+  disbursementAccount: string;
+}
+
+const applicationColumns = (d: LoanApplicationDetails | undefined) =>
+  d
+    ? {
+        residential_address: d.residentialAddress.trim() || null,
+        other_loan_repayments: d.otherLoanRepayments.trim() === '' ? null : Number(d.otherLoanRepayments),
+        disbursement_account: d.disbursementAccount.trim() || null,
+      }
+    : {};
+
+export async function requestLoan(
+  employee: MyEmployee,
+  input: { productId: string | null; amount: number; months: number; reason: string; details?: LoanApplicationDetails }
+) {
   const { error } = await supabase.from('employee_loans').insert({
     employee_number: employee.employeeNumber,
     product_id: input.productId,
@@ -158,6 +185,7 @@ export async function requestLoan(employee: MyEmployee, input: { productId: stri
     months: input.months,
     reason: input.reason.trim(),
     status: 'requested',
+    ...applicationColumns(input.details),
   });
   if (error) throw friendly(error);
 }
@@ -198,9 +226,9 @@ export interface NewLoan {
   annualRate: number | null;
   interestMethod: InterestMethod | null;
   reason: string;
+  details?: LoanApplicationDetails;
 }
 
-/** HR sets up a loan for an employee: approved straight away. */
 /**
  * HR sets up a loan for an employee, approved at once. When the company's loan approvals have more than one step (or
  * one HR can't decide), the database puts it on the chain instead: the status it got is returned.
@@ -216,6 +244,7 @@ export async function createLoan(loan: NewLoan): Promise<LoanStatus> {
     interest_method: loan.interestMethod,
     reason: loan.reason.trim() || null,
     status: 'approved',
+    ...applicationColumns(loan.details),
   }).select('status').single();
   if (error) throw friendly(error);
   return (data?.status ?? 'approved') as LoanStatus;

@@ -4,6 +4,11 @@ import { Ban, CalendarClock, Check, HandCoins, Hourglass, Plus, RefreshCw, Walle
 import { Button, Card, EmployeePicker, EmptyState, Modal, PageHeader, StatCard, TabBar } from '../UI';
 import LoanSchedule, { LoanBalance, LoanStatusPill } from './LoanSchedule';
 import LoanSettingsCard from './LoanSettingsCard';
+import LoanFormPanel from './LoanFormPanel';
+import LoanFormSettingsCard from './LoanFormSettingsCard';
+import MySignature from '../Signature/MySignature';
+import { currentUserId, loadLoanForms, signAsApprover } from '../../lib/loanFormApi';
+import { formHoldsPayout, type LoanForm } from '../../lib/loanForm';
 import ApprovalChain from '../Approvals/ApprovalChain';
 import { loadApprovalChains, type ApprovalChain as Chain } from '../../lib/approvals';
 import RecordPaymentLink from '../Payments/RecordPaymentLink';
@@ -49,6 +54,8 @@ import { LoaderBlock } from '../UI/FigbloomLoader';
 //     the step it is waiting on, for whoever may decide it; the chain shows under it.
 //   * An approved loan is paid out from Payments to make: finance pays it outside the app and records it there with its
 //     reference, which marks it disbursed and starts the payroll deductions.
+//   * Each approved loan has a loan form (LoanFormPanel): the approver's saved signature goes on it as they approve, the
+//     borrower signs and uploads it, and HR accepts it. When the company requires it, finance sees the loan only then.
 
 type Tab = 'requests' | 'approved' | 'active' | 'closed' | 'settings';
 
@@ -95,6 +102,9 @@ export default function LoansAdmin() {
   const [schedules, setSchedules] = useState<Record<string, LoanInstalment[]>>({});
   const [repayments, setRepayments] = useState<Record<string, LoanRepayment[]>>({});
   const [chains, setChains] = useState<Record<string, Chain>>({});
+  const [forms, setForms] = useState<Record<string, LoanForm>>({});
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+  const [approverSignature, setApproverSignature] = useState<string | null>(null);
   const [settings, setSettings] = useState<LoanSettings>(DEFAULT_LOAN_SETTINGS);
   const [products, setProducts] = useState<LoanProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,9 +128,11 @@ export default function LoansAdmin() {
       setSettings(s);
       setProducts(p);
       setChains(await loadApprovalChains('loan', all.filter((l) => l.status === 'requested').map((l) => l.id)).catch(() => ({})));
-      const loaded = await loadSchedules(all.filter((l) => ['disbursed', 'repaying', 'completed'].includes(l.status)).map((l) => l.id));
+      const loaded = await loadSchedules(all.filter((l) => ['approved', 'disbursed', 'repaying', 'completed'].includes(l.status)).map((l) => l.id));
       setSchedules(loaded.schedules);
       setRepayments(loaded.repayments);
+      setForms(await loadLoanForms(all.filter((l) => l.status !== 'requested').map((l) => l.id)).catch(() => ({})));
+      setMyUserId(await currentUserId().catch(() => null));
     } catch (error) {
       console.error('Error loading loans:', error);
       toast.error('Could not load loans');
@@ -180,6 +192,15 @@ export default function LoansAdmin() {
     if (ok) {
       setApproving(null);
       if (status === 'pending') toast('Your step is approved. It now goes to the next approver.');
+      // the final approval: the approver's saved signature goes on the form's lender approval
+      if (status === 'approved' && approverSignature) {
+        try {
+          await signAsApprover(loan.id, approverSignature);
+          await load();
+        } catch (error) {
+          toast.error(`Approved, but your signature was not added to the form: ${failure(error)}`);
+        }
+      }
     }
   };
 
@@ -312,7 +333,10 @@ export default function LoansAdmin() {
       </div>
 
       {tab === 'settings' ? (
-        <LoanSettingsCard canEdit={canManage} />
+        <>
+          <LoanSettingsCard canEdit={canManage} className="mb-4" />
+          <LoanFormSettingsCard canEdit={canManage} />
+        </>
       ) : loading && loans.length === 0 ? (
         <Card>
           <LoaderBlock label="Loading loans" compact />
@@ -411,15 +435,24 @@ export default function LoansAdmin() {
                         </Button>
                       </>
                     )}
-                    {canManage && loan.status === 'approved' && (
-                      <RecordPaymentLink />
-                    )}
+                    {canManage && loan.status === 'approved' && !formHoldsPayout(forms[loan.id]) && <RecordPaymentLink />}
                     {canManage && ['requested', 'approved'].includes(loan.status) && (
                       <Button variant="ghost" onClick={() => void cancel(loan)} disabled={busy} icon={<Ban className="w-3.5 h-3.5" />}>
                         Cancel
                       </Button>
                     )}
                   </div>
+                  <LoanFormPanel
+                    loan={loan}
+                    form={forms[loan.id]}
+                    mode="hr"
+                    schedule={schedules[loan.id]}
+                    renewal={loans.some(
+                      (o) => o.id !== loan.id && o.employee_number === loan.employee_number && o.created_at < loan.created_at && ['disbursed', 'repaying', 'completed'].includes(o.status)
+                    )}
+                    myUserId={myUserId}
+                    onChanged={load}
+                  />
                 </Card>
               </li>
             );
@@ -453,6 +486,13 @@ export default function LoansAdmin() {
               Note to the employee (optional)
             </label>
             <textarea id="approve-comment" rows={2} value={comment} onChange={(e) => setComment(e.target.value)} className={inputClass} />
+            <div className="mt-3">
+              <div className="text-[12px] font-semibold text-ink mb-1">Your signature on the loan form</div>
+              <p className="mt-0 mb-2 text-[11.5px] text-muted-foreground">
+                When yours is the final approval, your saved signature, name and job title go on the form's lender approval.
+              </p>
+              <MySignature bare onChange={setApproverSignature} />
+            </div>
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <Button variant="secondary" onClick={() => setApproving(null)}>
                 Cancel
