@@ -156,3 +156,17 @@ describe('files and names', () => {
     expect(signedFormProblem({ name: 'form.pdf', size: 0 })).toMatch(/empty/);
   });
 });
+
+describe('the borrowing limit by monthly repayment (20261119300000)', () => {
+  it('a third of basic salary a month: 3 months is the basic salary, 6 months twice it', async () => {
+    const { DEFAULT_LOAN_SETTINGS, maxLoanFor } = await import('./loans');
+    const s = { ...DEFAULT_LOAN_SETTINGS, max_instalment_divisor: 3 };
+    expect(maxLoanFor(s, '74,784', { months: 3, rate: 20, method: 'upfront' })).toBe(74784);
+    expect(maxLoanFor(s, 74784, { months: 6, rate: 25, method: 'upfront' })).toBe(149568);
+    // the lowest limit wins
+    expect(maxLoanFor({ ...s, max_amount: 100000 }, 74784, { months: 6, rate: 25, method: 'upfront' })).toBe(100000);
+    // without it, the other limits as before
+    expect(maxLoanFor({ ...DEFAULT_LOAN_SETTINGS, max_salary_multiple: 2 }, 74784, { months: 6, rate: 25, method: 'upfront' })).toBe(149568);
+  });
+});
+

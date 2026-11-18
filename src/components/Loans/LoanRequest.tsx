@@ -143,7 +143,8 @@ export default function LoanRequest() {
   const rate = termRateFor(settings, form.months) ?? product?.annual_rate ?? settings.annual_rate;
   const method = product?.interest_method ?? settings.interest_method;
   const maxMonths = maxMonthsFor(settings, product);
-  const maxAmount = maxLoanFor(settings, employee?.basicSalary);
+  // the limit can follow the term (repayment at most a share of basic salary): it changes with the months chosen
+  const maxAmount = maxLoanFor(settings, employee?.basicSalary, { months: form.months, rate, method });
   const otherRepayments = details.otherLoanRepayments.trim();
   const errors: Partial<Record<keyof LoanRequestInput | 'otherLoanRepayments' | 'guarantor', string>> = {
     ...validateLoanRequest(form, { minMonths: settings.min_months, maxMonths, maxAmount }),
@@ -285,7 +286,8 @@ export default function LoanRequest() {
                 />
                 {maxAmount !== null && (
                   <p className="mt-1 text-[11.5px] text-muted-foreground">
-                    You can borrow up to <strong className="text-ink">{formatKsh(maxAmount)}</strong>.
+                    You can borrow up to <strong className="text-ink">{formatKsh(maxAmount)}</strong>
+                    {settings.max_instalment_divisor ? ` over ${form.months} ${form.months === 1 ? 'month' : 'months'}` : ''}.
                   </p>
                 )}
                 {showError('amount')}

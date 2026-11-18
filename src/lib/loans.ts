@@ -28,6 +28,11 @@ export interface LoanSettings {
   max_amount: number | null;
   /** the most anyone may borrow as a multiple of their basic salary; null = no such limit */
   max_salary_multiple: number | null;
+  /**
+   * The monthly repayment at most the basic salary divided by this (3: a third), 20261119300000; null = no such limit.
+   * With interest off up front, a loan is then up to basic ÷ 3 × its months.
+   */
+  max_instalment_divisor: number | null;
   staff_can_apply: boolean;
   /**
    * Fixed terms, each with its own rate (20261118500000), e.g. 3 months at 20% and 6 at 25%. Empty: any term from the
@@ -53,6 +58,7 @@ export const DEFAULT_LOAN_SETTINGS: LoanSettings = {
   max_months: 12,
   max_amount: null,
   max_salary_multiple: null,
+  max_instalment_divisor: null,
   staff_can_apply: true,
   term_rates: [],
 };
@@ -301,11 +307,27 @@ export interface LoanRequestInput {
 }
 
 /** The most this person may borrow (the lower of the two limits), or null when there is no limit. */
-export const maxLoanFor = (settings: LoanSettings, basicSalary: unknown): number | null => {
+export const maxLoanFor = (
+  settings: LoanSettings,
+  basicSalary: unknown,
+  term?: { months: number; rate: number; method: InterestMethod }
+): number | null => {
+  const basic = parseFloat(String(basicSalary ?? '').replace(/[^0-9.]/g, '')) || 0;
   const limits: number[] = [];
   if (settings.max_amount) limits.push(Number(settings.max_amount));
-  if (settings.max_salary_multiple) limits.push(Math.floor((parseFloat(String(basicSalary ?? '')) || 0) * Number(settings.max_salary_multiple)));
+  if (settings.max_salary_multiple) limits.push(Math.floor(basic * Number(settings.max_salary_multiple)));
+  if (settings.max_instalment_divisor && term) limits.push(mostForInstalment(basic / settings.max_instalment_divisor, term.rate, term.months, term.method));
   return limits.length ? Math.min(...limits) : null;
+};
+
+/** The most that can be borrowed so each instalment is at most `cap` (as loan_most_for_instalment in the database). */
+export const mostForInstalment = (cap: number, rate: number, months: number, method: InterestMethod): number => {
+  const n = Math.max(1, Math.floor(months) || 1);
+  if (!(cap > 0)) return 0;
+  if (method === 'upfront' || !(rate > 0)) return Math.floor(cap * n + 1e-9);
+  if (method === 'flat') return Math.floor(cap / (1 / n + rate / 1200));
+  const i = rate / 1200;
+  return Math.floor((cap * (1 - Math.pow(1 + i, -n))) / i);
 };
 
 /** The longest term for a loan type (or the company's, without one). */
@@ -335,6 +357,7 @@ export const settingsError = (s: LoanSettings): string | null => {
   if (s.min_months > s.max_months) return 'The shortest term can’t be longer than the longest.';
   if (s.max_amount !== null && !(s.max_amount > 0)) return 'The most anyone may borrow must be above 0, or left empty.';
   if (s.max_salary_multiple !== null && !(s.max_salary_multiple > 0)) return 'The salary multiple must be above 0, or left empty.';
+  if (s.max_instalment_divisor !== null && !(s.max_instalment_divisor > 0)) return 'The basic salary divider must be above 0, or left empty.';
   for (const t of s.term_rates) {
     if (!Number.isInteger(t.months) || t.months < 1 || t.months > 120) return 'Each fixed term must be 1 to 120 whole months.';
     if (!(t.rate >= 0 && t.rate <= 100)) return 'Each fixed term’s rate must be between 0% and 100%.';

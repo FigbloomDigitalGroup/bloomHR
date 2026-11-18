@@ -31,6 +31,7 @@ interface Form {
   max_months: string;
   max_amount: string;
   max_salary_multiple: string;
+  max_instalment_divisor: string;
   staff_can_apply: boolean;
   terms: { months: string; rate: string }[];
 }
@@ -42,6 +43,7 @@ const toForm = (s: LoanSettings): Form => ({
   max_months: String(s.max_months),
   max_amount: s.max_amount === null ? '' : String(s.max_amount),
   max_salary_multiple: s.max_salary_multiple === null ? '' : String(s.max_salary_multiple),
+  max_instalment_divisor: s.max_instalment_divisor === null ? '' : String(s.max_instalment_divisor),
   staff_can_apply: s.staff_can_apply,
   terms: s.term_rates.map((t) => ({ months: String(t.months), rate: String(t.rate) })),
 });
@@ -53,6 +55,7 @@ const fromForm = (f: Form): LoanSettings => ({
   max_months: Number(f.max_months),
   max_amount: f.max_amount.trim() === '' ? null : Number(f.max_amount),
   max_salary_multiple: f.max_salary_multiple.trim() === '' ? null : Number(f.max_salary_multiple),
+  max_instalment_divisor: f.max_instalment_divisor.trim() === '' ? null : Number(f.max_instalment_divisor),
   staff_can_apply: f.staff_can_apply,
   term_rates: f.terms.filter((t) => t.months.trim() !== '' || t.rate.trim() !== '').map((t) => ({ months: Number(t.months), rate: Number(t.rate) })),
 });
@@ -221,6 +224,12 @@ export default function LoanSettingsCard({ canEdit: canEditProp, className = '' 
         <span />
         {field('max_amount', 'Most anyone may borrow (KSh)', 'Leave empty for no fixed limit', { min: 1 })}
         {field('max_salary_multiple', 'Or up to this many times basic salary', 'For example 3. The lower limit wins', { min: 0.1, step: '0.1' })}
+        {field(
+          'max_instalment_divisor',
+          'Monthly repayment up to basic salary ÷',
+          'For example 3: each month’s repayment is at most a third of basic salary, so the loan is up to basic ÷ 3 × its months. Empty: no such limit',
+          { min: 1, step: '0.5' }
+        )}
         <label className="flex items-start gap-2 pt-6">
           <input
             type="checkbox"
