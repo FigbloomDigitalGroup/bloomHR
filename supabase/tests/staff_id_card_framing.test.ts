@@ -70,6 +70,24 @@ describe('framing the photo', () => {
     expect(await fails(HR, `select set_staff_id_card_photo_framing($1, 0.5, 0.5, 1)`, [h1])).toMatch(/no photo to frame/);
   });
 
+  it('the landscape card is framed on its own (20261118300000): portrait unchanged, centred until framed', async () => {
+    type Both = Framing & { landscape_photo_x: string; landscape_photo_y: string; landscape_photo_zoom: string };
+    const both = async () => (await as<Both>(S1, `select photo_x, photo_y, photo_zoom, landscape_photo_x, landscape_photo_y,
+      landscape_photo_zoom from my_staff_id_card()`))[0];
+    const landscapeOf = (f: Both) => ({ x: Number(f.landscape_photo_x), y: Number(f.landscape_photo_y), zoom: Number(f.landscape_photo_zoom) });
+    const e1 = await idOf('E1');
+    const portraitBefore = asNumbers(await both());
+    expect(landscapeOf(await both())).toEqual({ x: 0.5, y: 0.5, zoom: 1 });
+
+    await as(S1, `select set_staff_id_card_photo_framing($1, 0.2, 0.7, 2.5, 'landscape')`, [e1]);
+    expect(landscapeOf(await both())).toEqual({ x: 0.2, y: 0.7, zoom: 2.5 });
+    expect(asNumbers(await both())).toEqual(portraitBefore);
+    // without a layout it is the portrait card, as before
+    await as(S1, `select set_staff_id_card_photo_framing($1, 0.4, 0.4, 1)`, [e1]);
+    expect(landscapeOf(await both())).toEqual({ x: 0.2, y: 0.7, zoom: 2.5 });
+    expect(await fails(S1, `select set_staff_id_card_photo_framing($1, 0.5, 0.5, 1, 'diagonal')`, [e1])).toMatch(/portrait or landscape/);
+  });
+
   it('the table is still not written directly', async () => {
     const e1 = await idOf('E1');
     expect(await fails(S1, `update staff_id_cards set photo_zoom = 2 where employee_id = $1`, [e1])).toMatch(/permission denied/);

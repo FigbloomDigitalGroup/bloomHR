@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 // Where the card shows: the employee's own in the staff portal (My ID card), and anyone's from their profile for the
 // staff-id-cards module, which can reissue it (the old QR code stops working).
@@ -42,11 +42,20 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('My ID card (staff portal)', () => {
-  it('shows the employee their own card with Download and Print, and nothing to reissue', async () => {
+  it('shows the employee their own card portrait and landscape, each with Download and Print, and nothing to reissue', async () => {
     api.loadMyStaffIdCard.mockResolvedValue(card);
     render(<MyIdCard />);
-    expect(await screen.findByRole('img', { name: 'Staff ID card of Esther One, front' })).toBeTruthy();
-    for (const name of ['Download PNG', 'Download PDF', 'Print']) expect(screen.getByRole('button', { name })).toBeTruthy();
+    expect(await screen.findAllByRole('img', { name: 'Staff ID card of Esther One, front' })).toHaveLength(2);
+    const section = (layout: string) => document.querySelector<HTMLElement>(`section[aria-label="${layout} card"]`)!;
+    for (const layout of ['Portrait', 'Landscape']) {
+      expect(section(layout).querySelectorAll('svg[data-card-face]')).toHaveLength(2);
+      for (const name of ['Download PNG', 'Download PDF', 'Print']) {
+        expect(within(section(layout)).getByRole('button', { name: `${name} (${layout.toLowerCase()})` })).toBeTruthy();
+      }
+    }
+    // the portrait card upright, the landscape one sideways
+    expect(section('Portrait').querySelector('svg')!.getAttribute('viewBox')).toBe('0 0 540 856');
+    expect(section('Landscape').querySelector('svg')!.getAttribute('viewBox')).toBe('0 0 856 540');
     expect(screen.queryByRole('button', { name: /Reissue/ })).toBeNull();
     expect(api.loadStaffIdCards).not.toHaveBeenCalled();
   });
@@ -65,30 +74,51 @@ describe('adjusting the photo', () => {
     api.loadMyStaffIdCard.mockResolvedValue({ ...card, photo_url: 'https://cdn/e1.png' });
     api.setStaffIdCardPhotoFraming.mockResolvedValue(undefined);
     const { container } = render(<MyIdCard />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Adjust photo' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Adjust photo (portrait)' }));
     const before = photoX(container);
 
     fireEvent.change(screen.getByLabelText('Zoom'), { target: { value: '2' } });
     fireEvent.keyDown(screen.getByRole('application'), { key: 'ArrowRight' });
     expect(photoX(container)).toBeLessThan(before); // the card shows it moved: more of the right of the photo
-    expect(screen.queryByRole('button', { name: 'Download PNG' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Download PNG (portrait)' })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(api.setStaffIdCardPhotoFraming).toHaveBeenCalled());
-    const [id, f] = api.setStaffIdCardPhotoFraming.mock.calls[0];
+    const [id, f, layout] = api.setStaffIdCardPhotoFraming.mock.calls[0];
     expect(id).toBe('e1');
+    expect(layout).toBe('portrait');
     expect(f.zoom).toBe(2);
     expect(f.x).toBeCloseTo(0.52);
     expect(f.y).toBeCloseTo(0.5);
     // back to the buttons, the card keeping the new position
-    expect(await screen.findByRole('button', { name: 'Download PNG' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Download PNG (portrait)' })).toBeTruthy();
     expect(photoX(container)).toBeLessThan(before);
+  });
+
+  it('frames the landscape card on its own: saved as landscape, the portrait photo stays where it was', async () => {
+    api.loadMyStaffIdCard.mockResolvedValue({ ...card, photo_url: 'https://cdn/e1.png' });
+    api.setStaffIdCardPhotoFraming.mockResolvedValue(undefined);
+    const { container } = render(<MyIdCard />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Adjust photo (landscape)' }));
+    const photos = () => Array.from(container.querySelectorAll('[data-card-image="photo"]')).map((p) => p.getAttribute('width'));
+    const before = photos();
+
+    fireEvent.change(screen.getByLabelText('Zoom'), { target: { value: '2' } });
+    const after = photos();
+    expect(after[0]).toBe(before[0]); // portrait unchanged
+    expect(after[1]).not.toBe(before[1]); // landscape zoomed
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.setStaffIdCardPhotoFraming).toHaveBeenCalled());
+    const [, f, layout] = api.setStaffIdCardPhotoFraming.mock.calls[0];
+    expect(layout).toBe('landscape');
+    expect(f.zoom).toBe(2);
   });
 
   it('Cancel puts the photo back, and a card without a photo has nothing to adjust', async () => {
     api.loadMyStaffIdCard.mockResolvedValue({ ...card, photo_url: 'https://cdn/e1.png' });
     const { container, unmount } = render(<MyIdCard />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Adjust photo' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Adjust photo (portrait)' }));
     const before = photoX(container);
     fireEvent.change(screen.getByLabelText('Zoom'), { target: { value: '3' } });
     expect(photoX(container)).not.toBe(before);
@@ -99,8 +129,8 @@ describe('adjusting the photo', () => {
 
     api.loadMyStaffIdCard.mockResolvedValue(card);
     render(<MyIdCard />);
-    await screen.findByRole('button', { name: 'Download PNG' });
-    expect(screen.queryByRole('button', { name: 'Adjust photo' })).toBeNull();
+    await screen.findByRole('button', { name: 'Download PNG (portrait)' });
+    expect(screen.queryByRole('button', { name: /Adjust photo/ })).toBeNull();
   });
 });
 
@@ -109,7 +139,7 @@ describe('the ID card from an employee’s profile', () => {
     api.loadStaffIdCards.mockResolvedValue([card]);
     api.regenerateStaffIdCard.mockResolvedValue({ token: 'b'.repeat(32), issued_at: '2026-10-28T08:00:00Z' });
     const { baseElement } = render(<StaffIdCardDialog employeeId="e1" open onClose={() => {}} />);
-    await screen.findByRole('img', { name: 'Staff ID card of Esther One, back' });
+    expect(await screen.findAllByRole('img', { name: 'Staff ID card of Esther One, back' })).toHaveLength(2);
     expect(api.loadStaffIdCards).toHaveBeenCalledWith(['e1']);
     const before = qrOf(baseElement);
 
