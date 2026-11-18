@@ -68,7 +68,7 @@ describe('the witness, a colleague', () => {
     expect(await form(loanId)).toMatchObject({ witness_name: 'Eric Two', witness_id_number: '11223344', witness_signature: SIG });
   });
 
-  it('once approved, a witness who signed stays (20261118900000), until HR sends the form back to be fixed', async () => {
+  it('once approved, a witness who signed stays (20261119000000), until HR sends the form back to be fixed', async () => {
     await expect(as(S1, `select loan_set_witness('${loanId}', 'E3')`)).rejects.toThrow(/can't be changed/);
     await expect(as(HR, `select loan_form_witness('${loanId}', 'Outside Person', '555', '${SIG}')`)).rejects.toThrow(/can't be changed/);
     await db.exec(`update employee_loan_forms set status = 'sent_back', send_back_reason = 'Wrong witness' where loan_id = '${loanId}'`);
@@ -100,7 +100,7 @@ describe('correcting the form’s values', () => {
     expect(await read(S3, `select 1 from employee_loan_form_values`)).toHaveLength(0);
   });
 
-  it('on an approved loan whose form isn’t sent back, nobody corrects anything (20261118900000)', async () => {
+  it('on an approved loan whose form isn’t sent back, nobody corrects anything (20261119000000)', async () => {
     await db.exec(`update employee_loan_forms set status = 'none', send_back_reason = null where loan_id = '${loanId}'`);
     await expect(as(S1, `select loan_form_set_values('${loanId}', '{"net_salary": "99000"}')`)).rejects.toThrow(/can't be changed/);
     await expect(as(HR, `select loan_form_set_values('${loanId}', '{"net_salary": "99000"}')`)).rejects.toThrow(/can't be changed/);

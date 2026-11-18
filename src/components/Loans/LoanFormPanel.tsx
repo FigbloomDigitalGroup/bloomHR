@@ -155,7 +155,7 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
   const waitingOnReview = form?.status === 'uploaded' || ready;
   // signing online works from the request on; a paper copy and HR's review wait for approval
   const signable = ['requested', 'approved'].includes(loan.status) && !!form && form.status !== 'accepted';
-  // Once approved, the agreement is locked (20261118900000): what is given stays, and only what is missing is added,
+  // Once approved, the agreement is locked (20261119000000): what is given stays, and only what is missing is added,
   // unless HR sent the form back to be fixed. Before approval the borrower (and HR) may change things.
   const reopened = loan.status === 'requested' || form?.status === 'sent_back';
   const beforePayout = ['requested', 'approved'].includes(loan.status) && form?.status !== 'accepted';
