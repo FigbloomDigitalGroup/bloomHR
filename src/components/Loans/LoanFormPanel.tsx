@@ -155,9 +155,15 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
   const waitingOnReview = form?.status === 'uploaded' || ready;
   // signing online works from the request on; a paper copy and HR's review wait for approval
   const signable = ['requested', 'approved'].includes(loan.status) && !!form && form.status !== 'accepted';
-  // the guarantor is chosen before payout; once they signed, only HR changes them
+  // Once approved, the agreement is locked (20261119000000): what is given stays, and only what is missing is added,
+  // unless HR sent the form back to be fixed. Before approval the borrower (and HR) may change things.
+  const reopened = loan.status === 'requested' || form?.status === 'sent_back';
+  const beforePayout = ['requested', 'approved'].includes(loan.status) && form?.status !== 'accepted';
   const canChooseGuarantor =
-    ['requested', 'approved'].includes(loan.status) && form?.status !== 'accepted' && (mode === 'hr' || guarantor?.status !== 'signed');
+    beforePayout && (guarantor?.status !== 'signed' || (reopened && (mode === 'hr' || loan.status === 'requested')));
+  const canChooseWitness = beforePayout && (!form?.witness_signature || reopened);
+  const canCorrect = beforePayout && reopened;
+  const canSignAgain = !form?.borrower_signature || reopened;
   const docSchedule = schedule && schedule.length ? schedule : loanSchedule(loan.principal, loan.annual_rate, loan.months, loan.interest_method, loan.start_period);
 
   const done = async (message: string) => {
@@ -333,7 +339,7 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
         <Button variant="secondary" onClick={() => setViewing(true)} icon={<FileText className="w-3.5 h-3.5" />}>
           {loan.status === 'requested' ? 'Draft form' : 'View form'}
         </Button>
-        {mode === 'staff' && signable && (
+        {mode === 'staff' && signable && canSignAgain && (
           <Button variant={form?.borrower_signature ? 'ghost' : 'primary'} onClick={() => setSigning('borrower')} icon={<PenLine className="w-3.5 h-3.5" />}>
             {form?.borrower_signature ? 'Sign again' : 'Sign with my signature'}
           </Button>
@@ -343,7 +349,7 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
             {guarantor ? 'Change guarantor' : 'Choose guarantor'}
           </Button>
         )}
-        {canChooseGuarantor && (
+        {canChooseWitness && (
           <Button
             variant={(witness && witness.status !== 'declined') || form?.witness_signature ? 'ghost' : 'secondary'}
             onClick={() => void openChoose('witness')}
@@ -353,12 +359,12 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
             {witness || form?.witness_signature ? 'Change witness' : 'Choose witness'}
           </Button>
         )}
-        {mode === 'hr' && open && (
+        {mode === 'hr' && open && canChooseWitness && (
           <Button variant="ghost" onClick={() => setWitnessing({ name: '', idNumber: '' })} disabled={busy} icon={<UserCheck className="w-3.5 h-3.5" />}>
             Witness not on staff
           </Button>
         )}
-        {canChooseGuarantor && (
+        {canCorrect && (
           <Button variant="ghost" onClick={() => void openCorrect()} disabled={busy} icon={<Pencil className="w-3.5 h-3.5" />}>
             Correct details
           </Button>

@@ -22,7 +22,7 @@ import {
 
 // The staff ID card (a "job card", migration 20261027400000): CR80, front and back, in the company's colours, portrait
 // (54 x 85.6 mm) or landscape (85.6 x 54 mm); every card is shown both ways, each with its own photo framing
-// (migration 20261118900000). Each face is one SVG drawn at 10 units per millimetre, so the same drawing is sharp on a phone,
+// (migration 20261119000000). Each face is one SVG drawn at 10 units per millimetre, so the same drawing is sharp on a phone,
 // in the PNG and PDF downloads (lib/staffIdCardExport.ts turns it into an image) and printed at its true size.
 // SVG rather than HTML because the hexagon photo and the angled colour panels need clipping that html2canvas can't
 // draw, and because a whole face as one image can be scaled to millimetres without anything reflowing.
