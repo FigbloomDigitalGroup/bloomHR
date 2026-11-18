@@ -295,6 +295,15 @@ describe('the loans page', () => {
     await vi.waitFor(() => expect(formApi.saveFormChecks).toHaveBeenCalledWith('a1', 'Hana Hr', ['id_kra']));
   });
 
+  it('a request’s form, signed before approval, shows its signatures to HR', async () => {
+    vi.mocked(formApi.loadLoanForms).mockResolvedValue({ r1: form({ loan_id: 'r1', borrower_signature: 'data:image/png;base64,JANE' }) } as never);
+    render(<LoansAdmin />);
+    const card = await screen.findByTestId('loan-r1');
+    // requests are loaded too
+    await vi.waitFor(() => expect(vi.mocked(formApi.loadLoanForms).mock.calls.at(-1)?.[0]).toContain('r1'));
+    expect(within(card).getByText('Signed, to upload')).toBeTruthy();
+  });
+
   it('a cancelled loan can be deleted, after asking', async () => {
     mocked.loadAllLoans.mockResolvedValue([...LOANS, { ...base, id: 'c1', employee_number: 'E4', employee_name: 'Test Loan', principal: 5000, status: 'cancelled' as const }]);
     vi.mocked(formApi.deleteCancelledLoan).mockResolvedValue(undefined);

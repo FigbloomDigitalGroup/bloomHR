@@ -126,6 +126,8 @@ describe('the borrower', () => {
 describe('where the form stands', () => {
   it('follows the loan and the signed copy', () => {
     expect(formStage({ status: 'requested' }, undefined).label).toBe('Form: signed after approval');
+    expect(formStage({ status: 'requested' }, form()).label).toBe('Form to sign');
+    expect(formStage({ status: 'requested' }, form({ borrower_signature: 'x' })).label).toBe('Signed, to upload');
     expect(formStage({ status: 'approved' }, form()).label).toBe('Form to sign');
     expect(formStage({ status: 'approved' }, form({ borrower_signature: 'x' })).label).toBe('Signed, to upload');
     expect(formStage({ status: 'approved' }, form({ status: 'uploaded' })).label).toBe('Signed form to review');

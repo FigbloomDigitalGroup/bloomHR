@@ -387,7 +387,8 @@ export function formStage(
   if (form.status === 'accepted') return { label: 'Signed form accepted', tone: 'success' };
   if (form.status === 'uploaded' || ready) return { label: 'Signed form to review', tone: 'info' };
   if (form.status === 'sent_back') return { label: 'Signed form sent back', tone: 'danger' };
-  if (loan.status !== 'approved') return { label: 'Form not uploaded', tone: 'neutral' };
+  // signing goes on from the request until payout (20261118600000)
+  if (loan.status !== 'approved' && loan.status !== 'requested') return { label: 'Form not uploaded', tone: 'neutral' };
   return form.borrower_signature ? { label: 'Signed, to upload', tone: 'warning' } : { label: 'Form to sign', tone: 'warning' };
 }
 
