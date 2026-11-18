@@ -6,6 +6,8 @@ import type { MyEmployee } from './salaryAdvanceApi';
 import {
   ACTIVE_STATUSES,
   DEFAULT_LOAN_SETTINGS,
+  addMonths,
+  currentPeriod,
   type InterestMethod,
   type LoanInstalment,
   type LoanProduct,
@@ -174,15 +176,26 @@ const applicationColumns = (d: LoanApplicationDetails | undefined) =>
       }
     : {};
 
+/**
+ * The earliest pay month a loan can start in (20261118300000): this month while its payroll isn't approved, else the
+ * next open one. A failure falls back to next month, which is always safe.
+ */
+export async function loadFirstOpenPeriod(): Promise<string> {
+  const { data, error } = await supabase.rpc('loan_first_open_period');
+  if (error || typeof data !== 'string') return addMonths(currentPeriod(), 1);
+  return data;
+}
+
 export async function requestLoan(
   employee: MyEmployee,
-  input: { productId: string | null; amount: number; months: number; reason: string; details?: LoanApplicationDetails }
+  input: { productId: string | null; amount: number; months: number; reason: string; details?: LoanApplicationDetails; startPeriod?: string }
 ): Promise<string> {
   const { data, error } = await supabase.from('employee_loans').insert({
     employee_number: employee.employeeNumber,
     product_id: input.productId,
     principal: input.amount,
     months: input.months,
+    ...(input.startPeriod ? { start_period: input.startPeriod } : {}),
     reason: input.reason.trim(),
     status: 'requested',
     ...applicationColumns(input.details),

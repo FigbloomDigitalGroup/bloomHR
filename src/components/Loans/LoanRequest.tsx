@@ -23,7 +23,16 @@ import {
   type LoanRequestInput,
   type LoanSettings,
 } from '../../lib/loans';
-import { loadLoanProducts, loadLoanSettings, loadMyLoans, requestLoan, withdrawLoan, type LoanApplicationDetails, type LoanWithSchedule } from '../../lib/loansApi';
+import {
+  loadFirstOpenPeriod,
+  loadLoanProducts,
+  loadLoanSettings,
+  loadMyLoans,
+  requestLoan,
+  withdrawLoan,
+  type LoanApplicationDetails,
+  type LoanWithSchedule,
+} from '../../lib/loansApi';
 import { loadGuarantorChoices, loadGuarantors, loadLoanFormSettings, loadLoanForms, setGuarantor } from '../../lib/loanFormApi';
 import { formHoldsPayout, type LoanForm, type LoanGuarantor } from '../../lib/loanForm';
 import { loadMyEmployee, type MyEmployee } from '../../lib/salaryAdvanceApi';
@@ -60,6 +69,9 @@ export default function LoanRequest() {
   const [choices, setChoices] = useState<{ employee_number: string; name: string }[]>([]);
   const [guarantorNeeded, setGuarantorNeeded] = useState(true);
   const [guarantor, setGuarantorPick] = useState('');
+  // the earliest month repayments can start in, and the one chosen (next month unless they pick this one)
+  const [firstOpen, setFirstOpen] = useState(addMonths(currentPeriod(), 1));
+  const [startPeriod, setStartPeriod] = useState(addMonths(currentPeriod(), 1));
 
   const loadMine = useCallback(async (employeeNumber: string) => {
     const mine = await loadMyLoans(employeeNumber);
@@ -80,8 +92,10 @@ export default function LoanRequest() {
     let live = true;
     (async () => {
       try {
-        const [emp, s, p] = await Promise.all([loadMyEmployee(), loadLoanSettings(), loadLoanProducts()]);
+        const [emp, s, p, open] = await Promise.all([loadMyEmployee(), loadLoanSettings(), loadLoanProducts(), loadFirstOpenPeriod()]);
         if (!live) return;
+        setFirstOpen(open);
+        setStartPeriod((chosen) => (chosen < open ? open : chosen));
         setEmployee(emp);
         setSettings(s);
         setProducts(p.filter((x) => x.active));
@@ -124,7 +138,8 @@ export default function LoanRequest() {
     ...(guarantorNeeded && !guarantor ? { guarantor: 'Choose a colleague to guarantee your loan.' } : {}),
   };
   const amount = Number(form.amount) || 0;
-  const firstMonth = addMonths(currentPeriod(), 1);
+  const firstMonth = startPeriod;
+  const startOptions = [...new Set([firstOpen, addMonths(firstOpen, 1)])];
   const preview = useMemo(() => loanSchedule(amount, rate, form.months, method, firstMonth), [amount, rate, form.months, method, firstMonth]);
   const totals = scheduleTotals(preview);
   const waiting = loans.some((l) => l.status === 'requested');
@@ -145,7 +160,7 @@ export default function LoanRequest() {
     if (blocked || !employee || Object.keys(errors).length > 0) return;
     setSaving(true);
     try {
-      const loanId = await requestLoan(employee, { productId: productId || null, amount, months: form.months, reason: form.reason, details });
+      const loanId = await requestLoan(employee, { productId: productId || null, amount, months: form.months, reason: form.reason, details, startPeriod });
       toast.success('Your loan request was sent for approval');
       if (guarantor) {
         // the request is in either way; a guarantor not asked can be chosen again on the loan
@@ -280,6 +295,24 @@ export default function LoanRequest() {
               </div>
 
               <div>
+                <label htmlFor="loan-start" className="block text-[12px] font-semibold text-ink mb-1">
+                  Start repaying from
+                </label>
+                <select id="loan-start" value={startPeriod} onChange={(e) => setStartPeriod(e.target.value)} disabled={!!blocked} className={inputClass}>
+                  {startOptions.map((p) => (
+                    <option key={p} value={p}>
+                      {periodLabel(p)} pay{p === currentPeriod() ? ' (this month)' : ''}
+                    </option>
+                  ))}
+                </select>
+                {firstOpen === currentPeriod() && (
+                  <p className="mt-1 mb-0 text-[11.5px] text-muted-foreground">
+                    This month is possible while its payroll isn’t approved yet. If it is approved before your loan is, you start the month after.
+                  </p>
+                )}
+              </div>
+
+              <div>
                 <label htmlFor="loan-reason" className="block text-[12px] font-semibold text-ink mb-1">
                   What is it for?
                 </label>
@@ -384,8 +417,8 @@ export default function LoanRequest() {
                         out, and you repay {formatKsh(totals.totalRepayable)}.{' '}
                       </>
                     )}
-                    {rateText(rate, method)}, {interestMethodLabel(method).toLowerCase()}. If approved, repayments come off your pay from about{' '}
-                    {periodLabel(firstMonth)}. HR confirms the start month.
+                    {rateText(rate, method)}, {interestMethodLabel(method).toLowerCase()}. If approved, repayments come off your{' '}
+                    {periodLabel(firstMonth)} pay. HR confirms the start month.
                   </p>
                 </div>
               )}

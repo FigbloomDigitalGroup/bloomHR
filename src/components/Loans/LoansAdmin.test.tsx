@@ -11,6 +11,7 @@ vi.mock('../../lib/loansApi', () => ({
   declineLoan: vi.fn(),
   cancelLoan: vi.fn(),
   createLoan: vi.fn(),
+  loadFirstOpenPeriod: vi.fn(),
   saveLoanSettings: vi.fn(),
   saveLoanProduct: vi.fn(),
 }));
@@ -151,6 +152,7 @@ beforeEach(() => {
   for (const f of [mocked.declineLoan, mocked.cancelLoan]) f.mockResolvedValue(undefined);
   mocked.approveLoan.mockResolvedValue('approved');
   mocked.createLoan.mockResolvedValue('approved');
+  mocked.loadFirstOpenPeriod.mockResolvedValue(currentPeriod());
   vi.mocked(formApi.loadLoanForms).mockResolvedValue({});
   vi.mocked(formApi.currentUserId).mockResolvedValue('hr-user');
   vi.mocked(formApi.signAsApprover).mockResolvedValue(undefined);
@@ -187,6 +189,16 @@ describe('the loans page', () => {
     await vi.waitFor(() => expect(mocked.approveLoan).toHaveBeenCalledWith('r1', 'q1', { comment: 'Approved by the committee', startPeriod: start }));
     // the final approval: the approver's saved signature goes on the form
     await vi.waitFor(() => expect(formApi.signAsApprover).toHaveBeenCalledWith('r1', 'data:image/png;base64,SIG'));
+  });
+
+  it('the first repayment month can’t be one whose payroll is approved', async () => {
+    mocked.loadFirstOpenPeriod.mockResolvedValue(addMonths(currentPeriod(), 1));
+    render(<LoansAdmin />);
+    const card = await screen.findByTestId('loan-r1');
+    fireEvent.click(within(card).getByRole('button', { name: 'Approve' }));
+    const options = [...(screen.getByLabelText('First repayment from') as HTMLSelectElement).options].map((o) => o.value);
+    expect(options).not.toContain(currentPeriod());
+    expect(options[0]).toBe(addMonths(currentPeriod(), 1));
   });
 
   it('a decline needs a reason', async () => {

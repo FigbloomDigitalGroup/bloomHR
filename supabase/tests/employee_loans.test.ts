@@ -230,7 +230,8 @@ describe('paying out and repaying through payroll', () => {
 
   it('disbursing locks the terms and moves a past start to this month', async () => {
     paid = (await rows<{ id: string }>(`select id from employee_loans where employee_number = 'E2' and status = 'approved'`))[0].id;
-    await as(HR, `update employee_loans set start_period = '${month(-2)}' where id = '${paid}'`);
+    // approved long ago (a start month already past can't be chosen now: 20261118300000), set as it would have been then
+    await db.exec(`set session_replication_role = replica; update employee_loans set start_period = '${month(-2)}' where id = '${paid}'; set session_replication_role = origin;`);
     await as(HR, `update employee_loans set status = 'disbursed' where id = '${paid}'`);
     expect((await loan(paid)).start_period).toBe(month(0));
     expect((await rows<{ period: string }>(`select period from employee_loan_instalments where loan_id = '${paid}' order by instalment_no`)).map((r) => r.period)).toEqual([
