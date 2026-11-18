@@ -5,8 +5,8 @@ import { Button, Modal } from '../UI';
 import { LoaderBlock } from '../UI/FigbloomLoader';
 import LoanAgreementDocument from './LoanAgreementDocument';
 import { supabase } from '../../lib/supabase';
-import { loanFormFileName, type LoanForm, type LoanGuarantor } from '../../lib/loanForm';
-import { downloadLoanFormPdf, loadGuarantors, loadLoanFormContext, loadLoanForms, type LoanFormContext } from '../../lib/loanFormApi';
+import { loanFormFileName, type LoanForm, type LoanGuarantor, type LoanWitness } from '../../lib/loanForm';
+import { downloadLoanFormPdf, loadGuarantors, loadLoanFormContext, loadLoanForms, loadWitnesses, type LoanFormContext } from '../../lib/loanFormApi';
 import { loadSchedules, type EmployeeLoan } from '../../lib/loansApi';
 import type { LoanInstalment } from '../../lib/loans';
 
@@ -19,6 +19,7 @@ interface Loaded {
   loan: EmployeeLoan;
   form: LoanForm | null;
   guarantor: LoanGuarantor | null;
+  witness: LoanWitness | null;
   schedule: LoanInstalment[];
   context: LoanFormContext;
 }
@@ -38,13 +39,14 @@ async function loadAll(loanId: string): Promise<Loaded> {
     total_repayable: num(row.total_repayable),
     other_loan_repayments: num(row.other_loan_repayments),
   } as EmployeeLoan;
-  const [forms, guarantors, schedules, context] = await Promise.all([
+  const [forms, guarantors, witnesses, schedules, context] = await Promise.all([
     loadLoanForms([loanId]),
     loadGuarantors([loanId]).catch(() => ({}) as Record<string, LoanGuarantor>),
+    loadWitnesses([loanId]).catch(() => ({}) as Record<string, LoanWitness>),
     loadSchedules([loanId]),
     loadLoanFormContext(loan),
   ]);
-  return { loan: { ...loan, employee_name: context.borrower.fullName }, form: forms[loanId] ?? null, guarantor: guarantors[loanId] ?? null, schedule: schedules.schedules[loanId] ?? [], context };
+  return { loan: { ...loan, employee_name: context.borrower.fullName }, form: forms[loanId] ?? null, guarantor: guarantors[loanId] ?? null, witness: witnesses[loanId] ?? null, schedule: schedules.schedules[loanId] ?? [], context };
 }
 
 /** A "Loan form" button that opens the loan's form to read and download. */
@@ -91,7 +93,7 @@ export default function LoanFormViewer({ loanId }: { loanId: string }) {
                 </Button>
               </div>
               <div className="max-h-[70vh] overflow-auto rounded-tile border border-border bg-white p-4">
-                <LoanAgreementDocument ref={docRef} loan={loaded.loan} form={loaded.form} context={loaded.context} schedule={loaded.schedule} guarantor={loaded.guarantor} />
+                <LoanAgreementDocument ref={docRef} loan={loaded.loan} form={loaded.form} context={loaded.context} schedule={loaded.schedule} guarantor={loaded.guarantor} witness={loaded.witness} />
               </div>
             </>
           ))}

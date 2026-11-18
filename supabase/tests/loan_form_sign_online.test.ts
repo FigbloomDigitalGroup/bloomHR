@@ -88,6 +88,14 @@ describe('the borrower’s details for the form', () => {
     expect(await borrower(S1)).toMatchObject({ gross: 74784, net: 84120, pay_changed: false });
   });
 
+  it('what finance records at payout shows for the borrower and the guarantor too (20261118800000)', async () => {
+    expect(await borrower(S1)).toMatchObject({ payout: null });
+    await db.exec(`insert into payment_requests (tenant_id, source, source_id, employee_number, payee_name, amount, status, payment_reference, paid_on)
+                   values ('${A}', 'loan', '${loanId}', 'E1', 'Esther One', 24000, 'paid', 'MPESA-QWE123', '2026-11-20')`);
+    expect(await borrower(S1)).toMatchObject({ payout: { reference: 'MPESA-QWE123', paid_on: '2026-11-20' } });
+    expect(await borrower(S2)).toMatchObject({ payout: { reference: 'MPESA-QWE123' } });
+  });
+
   it('for the borrower, those who read loans, and the loan’s guarantor and witness only (20261118700000)', async () => {
     expect(await borrower(HR)).toMatchObject({ gross: 74784 });
     // Eric guarantees the loan and Ella witnesses it: they see the form; a colleague with no part in it doesn't
