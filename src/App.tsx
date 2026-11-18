@@ -12,6 +12,7 @@ import NotFound from './components/NOT FOUND/NotFound';
 import UpdatePasswordPage from './pages/UpdatePassword';
 
 import AuthCallback from './pages/AuthCallback';
+import { figbloomLogoutUrl, figbloomSignInEnabled } from './lib/figbloomSignIn';
 import React from 'react';
 import { UserProvider } from '../src/components/ProtectedRoutes/UserContext';
 import MFAVerification from './pages/MFAverification';
@@ -99,6 +100,7 @@ const JoinCompany = lazy(() => import('./pages/JoinCompany'));
 const OfferPage = lazy(() => import('./pages/OfferPage'));
 // arriving from Figbloom Schools' HR & Payroll (one-click sign-in, src/lib/platformHandoff.ts)
 const PlatformHandoff = lazy(() => import('./pages/PlatformHandoff'));
+const FigbloomCallback = lazy(() => import('./pages/FigbloomCallback'));
 const HandoffLinker = lazy(() => import('./components/Platform/HandoffLinker'));
 const OffersPage = lazy(() => import('./components/AfterHiring/OffersPage'));
 const CreateCompany = lazy(() => import('./pages/CreateCompany'));
@@ -127,7 +129,7 @@ interface Branch {
 
 // Pages a signed-in person may be on before two-step sign-in is done.
 // /handoff signs a person in from Figbloom Schools and opens the next page at once; two-step sign-in is asked on that page.
-const MFA_OPEN_PATHS = ['/login', '/mfa', '/update-password', '/join', '/create-company', '/handoff'];
+const MFA_OPEN_PATHS = ['/login', '/mfa', '/update-password', '/join', '/create-company', '/handoff', '/auth/figbloom'];
 
 const Loader = () => <FigbloomLoader fullScreen />;
 // while the person's company and workspace load
@@ -337,7 +339,7 @@ function WorkspaceApp() {
 
   // Check if current route should be excluded from inactivity timer
   const shouldExcludeFromInactivityTimer = useCallback(() => {
-    const excludedRoutes = ['/login', '/mfa', '/update-password', '/join', '/offer', '/create-company'];
+    const excludedRoutes = ['/login', '/mfa', '/update-password', '/join', '/offer', '/create-company', '/auth/figbloom'];
     const isExcludedRoute = excludedRoutes.includes(location.pathname);
     const isAuthProcess = sessionStorage.getItem('isMFAProcess') === 'true';
 
@@ -595,6 +597,13 @@ function WorkspaceApp() {
       setSelectedTown('');
       setSelectedRegion('All Regions');
       localStorage.removeItem('selectedTown');
+      // Figbloom sign-in: end Figbloom's own session too (it sends the browser back to /login). A timeout doesn't,
+      // so signing in again is one click.
+      const figbloomLogout = figbloomSignInEnabled() ? figbloomLogoutUrl('customers') : null;
+      if (figbloomLogout) {
+        window.location.assign(figbloomLogout);
+        return;
+      }
       navigate('/login', { replace: true });
     } catch (error) {
       console.error('Unexpected logout error:', error);
@@ -802,7 +811,7 @@ function WorkspaceApp() {
           setUser(null);
           const currentPath = location.pathname;
           // /handoff: arriving from Figbloom Schools, before anyone is signed in
-          const publicPaths = ['/login', '/update-password', '/mfa', '/join', '/offer', '/create-company', '/handoff'];
+          const publicPaths = ['/login', '/update-password', '/mfa', '/join', '/offer', '/create-company', '/handoff', '/auth/figbloom'];
 
           const urlHasRecoveryToken = window.location.href.includes('type=recovery') ||
             window.location.hash.includes('type=recovery');
@@ -920,7 +929,7 @@ function WorkspaceApp() {
           hasShownWelcomeToast.current = true;
 
           const currentPath = location.pathname;
-          const publicPaths = ['/login', '/update-password', '/mfa', '/join', '/offer', '/create-company'];
+          const publicPaths = ['/login', '/update-password', '/mfa', '/join', '/offer', '/create-company', '/auth/figbloom'];
 
           // a two-step sign-in still due is caught by the two-step effect, which asks the server
           toast.success(welcomeMessage(session?.user?.id, userData.email));
@@ -996,6 +1005,8 @@ function WorkspaceApp() {
             />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/handoff" element={<PlatformHandoff />} />
+            {/* back from Figbloom's sign-in page (ERP/HR_COGNITO_CONTRACT.md); /auth/callback stays Supabase's own */}
+            <Route path="/auth/figbloom" element={<FigbloomCallback pool="customers" onLoginSuccess={handleLoginSuccess} />} />
             <Route path="/join" element={<JoinCompany />} />
             {/* a candidate's offer letter: the link's token opens that one offer, signed in or not */}
             <Route path="/offer" element={<OfferPage />} />

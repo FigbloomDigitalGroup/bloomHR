@@ -6,6 +6,8 @@ import { supabase } from '../../lib/supabase';
 import { isPlatformAdmin } from '../../lib/platformRates';
 import { myPlatformRole, type PlatformRole } from '../../lib/platformRoles';
 import ConsoleLogin from './ConsoleLogin';
+import FigbloomCallback from '../../pages/FigbloomCallback';
+import { figbloomLogoutUrl, figbloomSignInEnabled } from '../../lib/figbloomSignIn';
 import MFAVerification from '../../pages/MFAverification';
 import UpdatePasswordPage from '../../pages/UpdatePassword';
 import AuthShell, { AuthButton } from '../Company/AuthShell';
@@ -114,11 +116,21 @@ export default function ConsoleApp() {
     // this browser only, as in the company app
     const { error } = await supabase.auth.signOut({ scope: 'local' });
     if (error) toast.error('Error signing out: ' + error.message);
+    // Figbloom staff sign-in: end Figbloom's own session too (it sends the browser back here)
+    const figbloomLogout = figbloomSignInEnabled() ? figbloomLogoutUrl('staff') : null;
+    if (figbloomLogout) {
+      window.location.assign(figbloomLogout);
+      return;
+    }
     navigate('/', { replace: true });
   }, [navigate]);
 
   // the password reset link works signed in (the link's own session) or not
   if (pathname === '/update-password') return <UpdatePasswordPage />;
+  // back from Figbloom staff sign-in: the session it gives moves on by itself (the session change above)
+  if (pathname === '/auth/staff/callback' && !session) {
+    return <FigbloomCallback pool="staff" onLoginSuccess={() => navigate(HOME, { replace: true })} />;
+  }
   if (session === undefined) return <Loader />;
   // signing in moves on by itself: the session change above picks it up
   if (!session) return <ConsoleLogin />;

@@ -7,6 +7,8 @@ import ShowPasswordButton from '../components/UI/ShowPasswordButton';
 import AuthLayout from '../components/Auth/AuthLayout';
 import HandoffConnectNote from '../components/Platform/HandoffConnectNote';
 import { authButtonPrimary, authHeading, authInputOpen, authLabel, authLink, authQuietLink, authSubtitle } from '../components/Auth/authStyles';
+import { checkCanSignIn } from '../lib/signInChecks';
+import { figbloomSignInEnabled, startFigbloomSignIn } from '../lib/figbloomSignIn';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   EnvelopeSimple,
@@ -56,47 +58,29 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
-      const { data: userData } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
-
-      if (userData) {
-        // Immediate termination checks - verify account status
-        if (userData.account_status && userData.account_status !== 'ACTIVE') {
-          await supabase.auth.signOut();
-          toast.error(`Your account is ${userData.account_status.toLowerCase()}. Please contact support.`);
-          setLoading(false);
-          return;
-        }
-
-        // Verify employment status for everyone except ADMIN (admins may have no employee record)
-        if (userData.role !== 'ADMIN') {
-          const { data: empData } = await supabase
-            .from('employees')
-            .select('Status, "Termination Date"')
-            .eq('"Work Email"', email)
-            .maybeSingle();
-
-          // left: Inactive/Terminated, or their termination date has come (an exit approved for a later day keeps
-          // them signed in until then; it ends their access the day after their last day, FIG-832)
-          const left = String(empData?.['Termination Date'] ?? '').slice(0, 10);
-          const now = new Date();
-          const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-          if (empData && (['inactive', 'terminated'].includes(String(empData.Status ?? '').toLowerCase()) || (left && left < todayStr))) {
-            await supabase.auth.signOut();
-            toast.error('Your employment account has been deactivated. Please contact HR for assistance.');
-            setLoading(false);
-            return;
-          }
-        }
-
-        onLoginSuccess(userData);
+      // account status and employment (lib/signInChecks.ts), the same for "Sign in with Figbloom"
+      const check = await checkCanSignIn(data.user.id, email);
+      if (!check.ok) {
+        toast.error(check.message);
+        setLoading(false);
+        return;
       }
+      onLoginSuccess(check.userData);
     } catch (error: any) {
       toast.error(error.message || 'Login failed');
     } finally {
+      setLoading(false);
+    }
+  };
+
+  // "Sign in with Figbloom" (lib/figbloomSignIn.ts): off to Figbloom's sign-in page, back at /auth/figbloom
+  const figbloom = figbloomSignInEnabled();
+  const signInWithFigbloom = async () => {
+    setLoading(true);
+    try {
+      await startFigbloomSignIn('customers', searchParams.get('next'));
+    } catch (error: any) {
+      toast.error(error.message || "Figbloom sign-in isn't available right now.");
       setLoading(false);
     }
   };
@@ -140,6 +124,34 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
               <HandoffConnectNote />
 
+              {figbloom ? (
+                <div className="space-y-4">
+                  <motion.button
+                    type="button"
+                    onClick={signInWithFigbloom}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.98 }}
+                    disabled={loading}
+                    className={`${authButtonPrimary} ${loading ? 'cursor-not-allowed' : ''}`}
+                  >
+                    {loading ? (
+                      <>
+                        <CircleNotch size={20} className="animate-spin" />
+                        <span>Opening Figbloom sign-in...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Sign in with Figbloom</span>
+                        <ArrowRight size={18} weight="bold" />
+                      </>
+                    )}
+                  </motion.button>
+                  <p className={authSubtitle}>
+                    You sign in on Figbloom's sign-in page with your work email and your current password: one account for every Figbloom
+                    product. Forgotten it? Use "Forgot password" there.
+                  </p>
+                </div>
+              ) : (
               <form className="space-y-6" onSubmit={handleLogin}>
                 <div className="space-y-1.5">
                   <label className={authLabel}>Email address</label>
@@ -212,6 +224,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                   </motion.button>
                 </div>
               </form>
+              )}
 
               <div className="text-center pt-8 border-t border-gray-100">
                 <div>

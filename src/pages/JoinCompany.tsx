@@ -8,6 +8,11 @@ import AuthShell, { AuthButton, Field, authLinkClass } from '../components/Compa
 import { useSessionEmail } from '../components/Company/useSessionEmail';
 import { LoaderBlock } from '../components/UI/FigbloomLoader';
 import HandoffConnectNote from '../components/Platform/HandoffConnectNote';
+import { FIGBLOOM_PASSWORD_RULE, figbloomPasswordProblem, figbloomSignInEnabled, startFigbloomSignIn } from '../lib/figbloomSignIn';
+
+// With Figbloom sign-in (ERP/HR_COGNITO_CONTRACT.md): a new person's password goes to their Figbloom account; someone
+// who already has one signs in with Figbloom and comes back here to join in one click.
+const FIGBLOOM = figbloomSignInEnabled();
 
 const roleLabel = (role: string) => role.charAt(0) + role.slice(1).toLowerCase();
 
@@ -80,11 +85,44 @@ export default function JoinCompany() {
     }
   };
 
+  // Figbloom sign-in, then back to this invitation, signed in: the one-click join below
+  const signInWithFigbloom = async () => {
+    setBusy(true);
+    try {
+      await startFigbloomSignIn('customers', `/join?token=${encodeURIComponent(token)}`);
+    } catch (err) {
+      toast.error((err as Error).message);
+      setBusy(false);
+    }
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!preview || busy) return;
     setBusy(true);
     try {
+      if (FIGBLOOM && mode === 'create') {
+        const weak = figbloomPasswordProblem(password);
+        if (weak) throw new Error(weak);
+        if (password !== confirmPassword) throw new Error('The passwords don’t match.');
+        try {
+          await companyApi.createAccountAndJoin(token, password, fullName.trim());
+        } catch (err) {
+          if (err instanceof ApiError && (err.code === 'sign_in_first' || err.code === 'account_exists')) {
+            setMode('signin');
+            setPassword('');
+            setConfirmPassword('');
+            toast('You already have a Figbloom account with this email. Sign in with Figbloom to join.', { icon: 'ℹ️' });
+            setBusy(false);
+            return;
+          }
+          throw err;
+        }
+        // joined: now sign in, with the password just chosen, on Figbloom's page
+        setFinishing(true);
+        await startFigbloomSignIn('customers', '/dashboard');
+        return;
+      }
       if (mode === 'signin') {
         const { error } = await supabase.auth.signInWithPassword({ email: preview.email, password });
         if (error) throw new Error(error.message);
@@ -171,6 +209,19 @@ export default function JoinCompany() {
     );
   }
 
+  if (FIGBLOOM && mode === 'signin') {
+    return (
+      <AuthShell title={heading} subtitle={`${about} You already have a Figbloom account: sign in with it, and you come back here to join.`}>
+        <AuthButton onClick={() => void signInWithFigbloom()} disabled={busy}>
+          {busy ? 'Opening Figbloom sign-in…' : 'Sign in with Figbloom to join'}
+        </AuthButton>
+        <button type="button" onClick={() => setMode('create')} className={`mt-8 pt-8 border-t border-gray-100 w-full text-center ${authLinkClass}`}>
+          I need to create an account
+        </button>
+      </AuthShell>
+    );
+  }
+
   return (
     <AuthShell
       title={heading}
@@ -190,6 +241,9 @@ export default function JoinCompany() {
         {mode === 'create' && (
           <Field label="Confirm password" type="password" value={confirmPassword} onChange={setConfirmPassword} autoComplete="new-password"
             error={confirmPassword && confirmPassword !== password ? 'The passwords don’t match' : null} />
+        )}
+        {FIGBLOOM && mode === 'create' && (
+          <p className="text-xs text-gray-500">This is your Figbloom password, for every Figbloom product: {FIGBLOOM_PASSWORD_RULE}.</p>
         )}
         <AuthButton type="submit" disabled={busy || !password || (mode === 'create' && (!fullName.trim() || password !== confirmPassword))}>
           {busy ? 'Please wait…' : mode === 'create' ? `Create account and join ${preview.company_name}` : `Sign in and join ${preview.company_name}`}

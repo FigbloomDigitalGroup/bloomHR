@@ -11,6 +11,7 @@ import dotenv from "dotenv";
 import { Resend } from "resend";
 import { authenticate, HttpError, admin, loadCompanyRole, callerModules, roleModules } from "./admin_routes.js";
 import { callerHasModule } from "./authz.js";
+import { cognitoSignInEnabled, FigbloomAccountError, figbloomAccounts, randomPassword, sendAccountError } from "./figbloom_accounts.js";
 
 dotenv.config({ path: process.env.ENV_FILE || ".env" });
 
@@ -141,6 +142,10 @@ router.post("/send", async (req, res) => {
 
 // POST /api/invites/accept  { token, password, fullName? }  (no login: the invitation link is the proof)
 //
+// With Figbloom sign-in on (ERP/HR_COGNITO_CONTRACT.md section 2) the password goes to the person's new Figbloom
+// account (the invitation proves the email), HR's own login gets a random one and is linked to that account. If the
+// email already has a Figbloom account, nothing is made: 409 / sign_in_first, they sign in with Figbloom and join.
+//
 // For someone with no account yet. Only the person who received the email can have the token, so the invitation
 // itself proves they own that address and no confirmation email is needed. The account is created already
 // confirmed, in the inviting company, with the role chosen in the invitation. If the address already has an
@@ -159,6 +164,7 @@ router.post("/accept", async (req, res) => {
     const fullName = typeof req.body?.fullName === "string" ? req.body.fullName.trim().slice(0, 100) : "";
     if (typeof token !== "string" || token.length < 20 || token.length > 200) throw new HttpError(400, "A valid invitation token is required");
     if (typeof password !== "string" || password.length < 8 || password.length > 72) throw new HttpError(400, "Password must be 8 to 72 characters");
+    const figbloom = cognitoSignInEnabled();
 
     const { data: invitation, error } = await admin
       .from("invitations")
@@ -184,7 +190,8 @@ router.post("/accept", async (req, res) => {
 
     const { data: created, error: createError } = await admin.auth.admin.createUser({
       email: invitation.email,
-      password,
+      // with Figbloom sign-in, the password is the Figbloom account's (below); this one is never used
+      password: figbloom ? randomPassword() : password,
       email_confirm: true,
       user_metadata: fullName ? { full_name: fullName } : {},
     });
@@ -198,6 +205,21 @@ router.post("/accept", async (req, res) => {
       throw createError || new Error("Could not create the account");
     }
     createdUserId = created.user.id;
+
+    if (figbloom) {
+      const account = await figbloomAccounts.ensure({ email: invitation.email, name: fullName, password, emailProven: true });
+      if (!account.created) {
+        await undo();
+        claimedId = null;
+        createdUserId = null;
+        return res.status(409).json({
+          error: "You already have a Figbloom account with this email. Sign in with Figbloom, then open this invitation again to join.",
+          code: "sign_in_first",
+        });
+      }
+      const linked = await figbloomAccounts.link(createdUserId, account.sub, { madeHere: true });
+      if (linked === "taken") throw new Error("the new Figbloom account is already linked to another login");
+    }
 
     // the company role the invitation gives, if it is still in use (else the base role alone)
     const companyRole = invitation.company_role_id ? await loadCompanyRole(invitation.tenant_id, invitation.company_role_id) : null;
@@ -213,6 +235,7 @@ router.post("/accept", async (req, res) => {
     res.json({ ok: true, email: invitation.email });
   } catch (err) {
     await undo();
+    if (err instanceof FigbloomAccountError) return sendAccountError(res, err);
     const status = err instanceof HttpError ? err.status : 500;
     if (status >= 500) console.error("[invites] accept failed:", err);
     res.status(status).json({ error: err instanceof HttpError ? err.message : "Could not create your account. Please try again." });

@@ -22,6 +22,7 @@ import platformSettingsRouter from "./platform_settings_routes.js";
 import { createOutboxRouter, createPlatformEventsRouter } from "./platform_events_routes.js";
 import { createPlatformHandoffRouter } from "./platform_handoff_routes.js";
 import { createMyHrRouter } from "./my_hr_routes.js";
+import { createCognitoRouter } from "./cognito_routes.js";
 
 /**
  * @param {{ mpesaRouter?: import("express").Router, routes?: { path: string, router: import("express").Router }[] }} options
@@ -59,6 +60,8 @@ export function buildApp({ mpesaRouter, routes = [] } = {}) {
   app.use("/api/sms", smsRouter);
   app.use("/api/admin", adminRouter);
   app.use("/api/invites", inviteRouter);
+  // "Sign in with Figbloom" (ERP/HR_COGNITO_CONTRACT.md): the app hands over Cognito's code for a sign-in token
+  app.use("/api/auth/cognito", createCognitoRouter());
   // two-step sign-in codes, made and checked here (FIG-834)
   app.use("/api/mfa", mfaRouter);
   app.use("/api/ai", aiRouter);

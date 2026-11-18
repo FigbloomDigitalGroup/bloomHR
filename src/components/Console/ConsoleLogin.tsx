@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import ShowPasswordButton from '../UI/ShowPasswordButton';
 import { authButtonPrimary, authInputOpen, authLabel, authQuietLink } from '../Auth/authStyles';
+import { figbloomSignInEnabled, startFigbloomSignIn } from '../../lib/figbloomSignIn';
 
 // The console's own sign-in (src/lib/console.ts): Figbloom staff only, so none of the company app's sign-in page (its
 // brand photo, "create your company", the employee and account checks). Who gets in is decided after signing in, by
@@ -37,6 +38,17 @@ export default function ConsoleLogin() {
     else setResetSent(true);
   };
 
+  // Figbloom staff sign-in (the staff pool, MFA required): back at /auth/staff/callback (ConsoleApp)
+  const staffSignIn = async () => {
+    setBusy(true);
+    try {
+      await startFigbloomSignIn('staff');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Figbloom staff sign-in isn't available right now.");
+      setBusy(false);
+    }
+  };
+
   const backToSignIn = () => {
     setMode('signIn');
     setResetSent(false);
@@ -51,7 +63,16 @@ export default function ConsoleLogin() {
         </div>
 
         <div className="bg-white border border-border rounded-card shadow-sm p-6">
-          {mode === 'signIn' ? (
+          {figbloomSignInEnabled() ? (
+            <div className="space-y-4">
+              <button type="button" disabled={busy} onClick={() => void staffSignIn()} className={authButtonPrimary}>
+                {busy ? 'Opening Figbloom sign-in…' : 'Figbloom staff sign-in'}
+              </button>
+              <p className="m-0 text-[13px] text-muted-foreground">
+                Your Figbloom staff account, with its authenticator code. Forgotten your password? Use "Forgot password" on that page.
+              </p>
+            </div>
+          ) : mode === 'signIn' ? (
             <form onSubmit={signIn} className="space-y-4">
               <div className="space-y-1.5">
                 <label htmlFor="console-email" className={authLabel}>Email</label>

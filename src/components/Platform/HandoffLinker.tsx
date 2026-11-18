@@ -6,7 +6,7 @@ import { Button, Modal } from '../UI';
 import { clearPendingHandoff, handoffApi, loadPendingHandoff, safeNext, sourceLabel, type PendingPreview } from '../../lib/platformHandoff';
 
 // pages where the person is still signing in: ask once they are in
-const SIGNING_IN = ['/login', '/mfa', '/update-password', '/join', '/create-company', '/handoff', '/auth/callback', '/offer'];
+const SIGNING_IN = ['/login', '/mfa', '/update-password', '/join', '/create-company', '/handoff', '/auth/callback', '/auth/figbloom', '/offer'];
 
 type State =
   | { kind: 'idle' }
