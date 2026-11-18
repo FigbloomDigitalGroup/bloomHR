@@ -73,6 +73,18 @@ const LoanAgreementDocument = forwardRef<HTMLDivElement, LoanAgreementDocumentPr
   const lenderContact = [lender.postalAddress, lender.phone && `Tel: ${lender.phone}`, lender.email].filter(Boolean).join(' | ');
   const complaints = [lender.complaintsEmail && `by email to ${lender.complaintsEmail}`, lender.phone && `telephone ${lender.phone}`].filter(Boolean).join(', ');
   const L = lender.name;
+  // fixed terms: the lender's tick boxes ("Up to 3 months", "20% (up to 3 months)"), the loan's term ticked
+  const terms = settings.term_rates ?? [];
+  const termBoxes = terms.map((t) => (
+    <Box key={t.months} on={t.months === loan.months}>
+      Up to {t.months} months
+    </Box>
+  ));
+  const rateBoxes = terms.map((t) => (
+    <Box key={t.months} on={t.months === loan.months}>
+      {t.rate}% (up to {t.months} months)
+    </Box>
+  ));
   const g = guarantor && guarantor.status !== 'declined' ? guarantor : null;
   const dots = (v: string | null | undefined, width = 160) => (
     <span style={{ display: 'inline-block', minWidth: width, borderBottom: '1px dotted #6b7280', fontWeight: 600, marginRight: 10 }}>{v || '\u00a0'}</span>
@@ -161,9 +173,13 @@ const LoanAgreementDocument = forwardRef<HTMLDivElement, LoanAgreementDocumentPr
             <Field name="Type of loan">{loan.product_name || 'Staff loan'}</Field>
           </tr>
           <tr>
-            <Field name="Loan term requested">
-              {loan.months} {loan.months === 1 ? 'month' : 'months'}
-            </Field>
+            {terms.length ? (
+              <td style={cell}>Loan term requested: {termBoxes}</td>
+            ) : (
+              <Field name="Loan term requested">
+                {loan.months} {loan.months === 1 ? 'month' : 'months'}
+              </Field>
+            )}
             <Field name="Purpose of loan">{loan.reason}</Field>
           </tr>
         </tbody>
@@ -182,8 +198,11 @@ const LoanAgreementDocument = forwardRef<HTMLDivElement, LoanAgreementDocumentPr
           {(
             [
               ['Gross Loan Amount (principal repayable)', formatKsh(facts.grossLoan)],
-              ['Selected term', `${facts.months} ${facts.months === 1 ? 'month' : 'months'}`],
-              [upfront ? 'Upfront interest rate' : 'Interest rate', `${rateText(facts.rate, facts.method)} (${interestMethodLabel(facts.method).toLowerCase()})`],
+              ['Selected term', terms.length ? termBoxes : `${facts.months} ${facts.months === 1 ? 'month' : 'months'}`],
+              [
+                upfront ? 'Upfront interest rate' : 'Interest rate',
+                terms.length ? rateBoxes : `${rateText(facts.rate, facts.method)} (${interestMethodLabel(facts.method).toLowerCase()})`,
+              ],
               ['Upfront interest deducted', upfront ? formatKsh(facts.upfrontInterest) : 'None'],
               ...(!upfront ? [['Interest charged over the term', formatKsh(facts.termInterest)]] : []),
               ['Net Disbursement (cash borrower receives)', formatKsh(facts.netDisbursement)],
@@ -196,7 +215,7 @@ const LoanAgreementDocument = forwardRef<HTMLDivElement, LoanAgreementDocumentPr
               ['Late payment charge', late === null ? 'None' : `${late}% of overdue amount, charged once; not compounded`],
               ['If the borrower dies or becomes permanently incapacitated', settings.incapacity_terms ?? ''],
               ['Disbursement channel', loan.disbursement_account ? `Paid to ${loan.disbursement_account}` : ''],
-            ] as [string, string][]
+            ] as [string, ReactNode][]
           ).map(([k, v]) => (
             <tr key={k}>
               <td style={cell}>{k}</td>

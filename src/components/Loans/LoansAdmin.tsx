@@ -29,6 +29,7 @@ import {
   outstandingBalance,
   periodLabel,
   scheduleTotals,
+  termRateFor,
   type InterestMethod,
   type LoanProduct,
   type LoanSettings,
@@ -253,7 +254,11 @@ export default function LoansAdmin() {
 
   // ---- a new loan for an employee
   const newProduct = creating ? products.find((p) => p.id === creating.productId) ?? null : null;
-  const newRate = creating ? (creating.rate.trim() === '' ? newProduct?.annual_rate ?? settings.annual_rate : Number(creating.rate)) : 0;
+  const fixedTerms = settings.term_rates.length > 0;
+  const newTermRate = creating ? termRateFor(settings, Number(creating.months)) : null;
+  const newRate = creating
+    ? (newTermRate ?? (creating.rate.trim() === '' ? (newProduct?.annual_rate ?? settings.annual_rate) : Number(creating.rate)))
+    : 0;
   const newMethod: InterestMethod = creating?.method || newProduct?.interest_method || settings.interest_method;
   const newPreview = creating ? scheduleTotals(loanSchedule(Number(creating.amount) || 0, newRate, Number(creating.months) || 0, newMethod, creating.startPeriod)) : null;
   const createProblem = !creating
@@ -264,6 +269,8 @@ export default function LoansAdmin() {
         ? 'Enter the amount'
         : !Number.isInteger(Number(creating.months)) || Number(creating.months) < 1 || Number(creating.months) > 120
           ? 'Repay over 1 to 120 months'
+          : fixedTerms && newTermRate === null
+            ? `Loans are for ${settings.term_rates.map((t) => t.months).join(' or ')} months`
           : creating.rate.trim() !== '' && !(Number(creating.rate) >= 0 && Number(creating.rate) <= 100)
             ? 'The rate must be between 0% and 100%'
             : null;
@@ -319,7 +326,7 @@ export default function LoansAdmin() {
                   employeeNumber: '',
                   productId: '',
                   amount: '',
-                  months: String(Math.min(12, settings.max_months)),
+                  months: String(fixedTerms ? settings.term_rates[settings.term_rates.length - 1].months : Math.min(12, settings.max_months)),
                   startPeriod: addMonths(currentPeriod(), 1) < firstOpen ? firstOpen : addMonths(currentPeriod(), 1),
                   rate: '',
                   method: '',
@@ -503,7 +510,7 @@ export default function LoansAdmin() {
               {approving.product_name ? ` ${approving.product_name}` : ' staff loans'} (
               {(() => {
                 const p = products.find((x) => x.id === approving.product_id);
-                return rateText(p?.annual_rate ?? settings.annual_rate, p?.interest_method ?? settings.interest_method);
+                return rateText(termRateFor(settings, approving.months) ?? p?.annual_rate ?? settings.annual_rate, p?.interest_method ?? settings.interest_method);
               })()}
               ).
             </p>
@@ -621,7 +628,17 @@ export default function LoansAdmin() {
                 </label>
                 <label className="block">
                   <span className="block text-[12px] font-semibold text-ink mb-1">Repay over (months)</span>
-                  <input className={inputClass} type="number" min={1} max={120} value={creating.months} onChange={(e) => setCreating({ ...creating, months: e.target.value })} />
+                  {fixedTerms ? (
+                    <select className={inputClass} value={creating.months} onChange={(e) => setCreating({ ...creating, months: e.target.value })}>
+                      {settings.term_rates.map((t) => (
+                        <option key={t.months} value={t.months}>
+                          {t.months} months at {rateText(t.rate, settings.interest_method)}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input className={inputClass} type="number" min={1} max={120} value={creating.months} onChange={(e) => setCreating({ ...creating, months: e.target.value })} />
+                  )}
                 </label>
                 <label className="block">
                   <span className="block text-[12px] font-semibold text-ink mb-1">First repayment from</span>
@@ -641,7 +658,9 @@ export default function LoansAdmin() {
                     min={0}
                     max={100}
                     step="0.1"
-                    value={creating.rate}
+                    value={fixedTerms ? String(newTermRate ?? '') : creating.rate}
+                    disabled={fixedTerms}
+                    title={fixedTerms ? 'Set by the term (Loans > Settings > Fixed terms)' : undefined}
                     placeholder={`${newProduct?.annual_rate ?? settings.annual_rate} (the usual rate)`}
                     onChange={(e) => setCreating({ ...creating, rate: e.target.value })}
                   />

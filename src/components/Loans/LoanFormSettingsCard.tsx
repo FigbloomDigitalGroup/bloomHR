@@ -11,7 +11,7 @@ import { loadLoanFormSettings, saveLoanFormSettings } from '../../lib/loanFormAp
 
 const inputClass = 'w-full rounded-tile border border-border bg-white px-3 py-2 text-[12.5px] text-ink outline-none focus:border-brand disabled:bg-secondary';
 
-type TextKey = Exclude<keyof LoanFormSettings, 'late_charge_percent' | 'require_signed_form'>;
+type TextKey = Exclude<keyof LoanFormSettings, 'late_charge_percent' | 'require_signed_form' | 'term_rates'>;
 
 export default function LoanFormSettingsCard({ canEdit, className = '' }: { canEdit: boolean; className?: string }) {
   const [saved, setSaved] = useState<LoanFormSettings | null>(null);

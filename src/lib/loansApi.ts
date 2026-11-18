@@ -86,7 +86,7 @@ const friendly = (error: { message?: string } | null) => new Error(error?.messag
 export async function loadLoanSettings(): Promise<LoanSettings> {
   const { data, error } = await supabase
     .from('loan_settings')
-    .select('annual_rate, interest_method, min_months, max_months, max_amount, max_salary_multiple, staff_can_apply')
+    .select('annual_rate, interest_method, min_months, max_months, max_amount, max_salary_multiple, staff_can_apply, term_rates')
     .maybeSingle();
   if (error) throw error;
   if (!data) return DEFAULT_LOAN_SETTINGS;
@@ -98,6 +98,9 @@ export async function loadLoanSettings(): Promise<LoanSettings> {
     max_amount: num(data.max_amount),
     max_salary_multiple: num(data.max_salary_multiple),
     staff_can_apply: data.staff_can_apply !== false,
+    term_rates: Array.isArray(data.term_rates)
+      ? (data.term_rates as { months: unknown; rate: unknown }[]).map((t) => ({ months: Number(t.months), rate: Number(t.rate) })).sort((a, b) => a.months - b.months)
+      : [],
   };
 }
 

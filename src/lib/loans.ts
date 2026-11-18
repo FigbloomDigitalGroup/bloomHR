@@ -29,7 +29,21 @@ export interface LoanSettings {
   /** the most anyone may borrow as a multiple of their basic salary; null = no such limit */
   max_salary_multiple: number | null;
   staff_can_apply: boolean;
+  /**
+   * Fixed terms, each with its own rate (20261118500000), e.g. 3 months at 20% and 6 at 25%. Empty: any term from the
+   * shortest to the longest, at the company's or the loan type's rate.
+   */
+  term_rates: TermRate[];
 }
+
+export interface TermRate {
+  months: number;
+  rate: number;
+}
+
+/** The rate for a term when the company lends on fixed terms; null when it doesn't, or the term isn't one of them. */
+export const termRateFor = (settings: Pick<LoanSettings, 'term_rates'>, months: number): number | null =>
+  settings.term_rates.find((t) => t.months === months)?.rate ?? null;
 
 /** A company without saved settings lends on these (the database uses the same). */
 export const DEFAULT_LOAN_SETTINGS: LoanSettings = {
@@ -40,6 +54,7 @@ export const DEFAULT_LOAN_SETTINGS: LoanSettings = {
   max_amount: null,
   max_salary_multiple: null,
   staff_can_apply: true,
+  term_rates: [],
 };
 
 export interface LoanProduct {
@@ -320,5 +335,10 @@ export const settingsError = (s: LoanSettings): string | null => {
   if (s.min_months > s.max_months) return 'The shortest term can’t be longer than the longest.';
   if (s.max_amount !== null && !(s.max_amount > 0)) return 'The most anyone may borrow must be above 0, or left empty.';
   if (s.max_salary_multiple !== null && !(s.max_salary_multiple > 0)) return 'The salary multiple must be above 0, or left empty.';
+  for (const t of s.term_rates) {
+    if (!Number.isInteger(t.months) || t.months < 1 || t.months > 120) return 'Each fixed term must be 1 to 120 whole months.';
+    if (!(t.rate >= 0 && t.rate <= 100)) return 'Each fixed term’s rate must be between 0% and 100%.';
+  }
+  if (new Set(s.term_rates.map((t) => t.months)).size !== s.term_rates.length) return 'Each fixed term can be listed once.';
   return null;
 };

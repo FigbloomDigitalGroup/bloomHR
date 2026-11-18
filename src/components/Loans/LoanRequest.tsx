@@ -19,6 +19,7 @@ import {
   maxMonthsFor,
   periodLabel,
   scheduleTotals,
+  termRateFor,
   validateLoanRequest,
   type LoanProduct,
   type LoanRequestInput,
@@ -107,7 +108,8 @@ export default function LoanRequest() {
         setEmployee(emp);
         setSettings(s);
         setProducts(p.filter((x) => x.active));
-        setForm((f) => ({ ...f, months: f.months || Math.min(Math.max(s.min_months, 12), s.max_months) }));
+        // fixed terms: the longest by default; otherwise up to a year
+        setForm((f) => ({ ...f, months: f.months || (s.term_rates.length ? s.term_rates[s.term_rates.length - 1].months : Math.min(Math.max(s.min_months, 12), s.max_months)) }));
         if (emp?.employeeNumber) {
           const [{ mine, myForms, myGuarantors, myWitnesses }, colleagues, formSettings] = await Promise.all([
             loadMine(emp.employeeNumber),
@@ -135,8 +137,10 @@ export default function LoanRequest() {
     };
   }, [loadMine]);
 
-  const product = products.find((p) => p.id === productId) ?? null;
-  const rate = product?.annual_rate ?? settings.annual_rate;
+  const fixedTerms = settings.term_rates.length > 0;
+  // with fixed terms the term sets the rate (loan types don't apply)
+  const product = fixedTerms ? null : (products.find((p) => p.id === productId) ?? null);
+  const rate = termRateFor(settings, form.months) ?? product?.annual_rate ?? settings.annual_rate;
   const method = product?.interest_method ?? settings.interest_method;
   const maxMonths = maxMonthsFor(settings, product);
   const maxAmount = maxLoanFor(settings, employee?.basicSalary);
@@ -235,7 +239,7 @@ export default function LoanRequest() {
                 </div>
               )}
 
-              {products.length > 0 && (
+              {products.length > 0 && !fixedTerms && (
                 <div>
                   <label htmlFor="loan-product" className="block text-[12px] font-semibold text-ink mb-1">
                     Type of loan
@@ -298,11 +302,17 @@ export default function LoanRequest() {
                   disabled={!!blocked}
                   className={inputClass}
                 >
-                  {Array.from({ length: Math.max(0, maxMonths - settings.min_months + 1) }, (_, i) => settings.min_months + i).map((n) => (
-                    <option key={n} value={n}>
-                      {n} {n === 1 ? 'month' : 'months'}
-                    </option>
-                  ))}
+                  {fixedTerms
+                    ? settings.term_rates.map((t) => (
+                        <option key={t.months} value={t.months}>
+                          {t.months} {t.months === 1 ? 'month' : 'months'} at {rateText(t.rate, settings.interest_method)}
+                        </option>
+                      ))
+                    : Array.from({ length: Math.max(0, maxMonths - settings.min_months + 1) }, (_, i) => settings.min_months + i).map((n) => (
+                        <option key={n} value={n}>
+                          {n} {n === 1 ? 'month' : 'months'}
+                        </option>
+                      ))}
                 </select>
                 {showError('months')}
               </div>

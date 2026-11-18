@@ -173,6 +173,8 @@ export interface LoanFormSettings {
   /** what happens to the balance if the borrower dies or is permanently incapacitated */
   incapacity_terms: string | null;
   require_signed_form: boolean;
+  /** the company's fixed terms (read with these, saved with the loan settings): the form ticks the one chosen */
+  term_rates?: { months: number; rate: number }[];
 }
 
 export const DEFAULT_LOAN_FORM_SETTINGS: LoanFormSettings = {
