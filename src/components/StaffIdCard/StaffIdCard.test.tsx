@@ -4,7 +4,7 @@ import StaffIdCard, { StaffIdCardBack, StaffIdCardFront } from './StaffIdCard';
 import { wrapText } from './cardText';
 import { code128Bars, encodeCode128 } from '../../lib/code128';
 import { CENTRED, cardExpiry, framingOf, initials, parseRecordDate, placePhoto, type StaffIdCardData, DEFAULT_CARD_SETTINGS } from '../../lib/staffIdCards';
-import { sheetPages } from '../../lib/staffIdCardExport';
+import { sheetHtml, sheetPages } from '../../lib/staffIdCardExport';
 
 // The staff ID card (20261027400000): portrait, front and back, in the company's colours; the details, the photo or
 // initials, a barcode of the employee number, the terms, dates, signatory and the QR code that verifies it.
@@ -155,5 +155,46 @@ describe('placing the photo in the hexagon', () => {
   it('reads the framing from the card, centred when missing or out of range', () => {
     expect(framingOf({})).toEqual(CENTRED);
     expect(framingOf({ photo_x: '0.25', photo_y: 2, photo_zoom: '0.5' })).toEqual({ x: 0.25, y: 1, zoom: 1 });
+  });
+});
+
+describe('the landscape card (Card settings: Landscape)', () => {
+  const landscape = { ...DEFAULT_CARD_SETTINGS, layout: 'landscape' as const, show_date_of_birth: true };
+
+  it('draws both faces sideways, 85.6 x 54 mm, with the same details, barcode, terms and QR code', () => {
+    const front = render(<StaffIdCardFront card={{ ...card, date_of_birth: '1990-05-04' }} branding={branding} settings={landscape} />).container;
+    const svg = front.querySelector('svg')!;
+    expect(svg.getAttribute('viewBox')).toBe('0 0 856 540');
+    const words = text(front);
+    for (const w of ['Acme Ltd', 'Esther Wanjiru', 'ACCOUNTANT', 'ID NO', 'MCL-000123', 'Finance', 'esther@acme.co', 'DOB']) {
+      expect(words).toContain(w);
+    }
+    expect(front.querySelector('[data-barcode="MCL-000123"]')).not.toBeNull();
+    cleanup();
+
+    const back = render(<StaffIdCardBack card={card} branding={branding} settings={landscape} origin="https://hr.example" />).container;
+    expect(back.querySelector('svg')!.getAttribute('viewBox')).toBe('0 0 856 540');
+    const backWords = text(back);
+    expect(backWords).toContain('STAFF ID CARD');
+    expect(backWords).toContain('Joined Date:');
+    expect(backWords).toContain('Scan to verify');
+  });
+
+  it('stays portrait by default', () => {
+    const { container } = render(<StaffIdCardFront card={card} branding={branding} settings={DEFAULT_CARD_SETTINGS} />);
+    expect(container.querySelector('svg')!.getAttribute('viewBox')).toBe('0 0 540 856');
+  });
+
+  it('prints eight to an A4 page (2 across, 4 down), backs mirrored, at 85.6 x 54 mm', () => {
+    const cards = Array.from({ length: 9 }, (_, i) => ({ front: `F${i}`, back: `B${i}`, landscape: true }));
+    const pages = sheetPages(cards);
+    expect(pages).toHaveLength(4);
+    expect(pages[0]).toEqual(['F0', 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7']);
+    expect(pages[1]).toEqual(['B1', 'B0', 'B3', 'B2', 'B5', 'B4', 'B7', 'B6']);
+    expect(pages[2]).toEqual(['F8', null]);
+    expect(pages[3]).toEqual([null, 'B8']);
+    const html = sheetHtml(cards, 'Cards');
+    expect(html).toContain('width: 85.6mm; height: 54mm');
+    expect(html).toContain('repeat(2, 85.6mm)');
   });
 });

@@ -5,7 +5,7 @@ import { Button, Modal } from '../UI';
 import { StaffIdCardBack, StaffIdCardFront } from './StaffIdCard';
 import { useCardLook } from './useCardLook';
 import { type StaffIdCardData, loadStaffIdCards } from '../../lib/staffIdCards';
-import { SHEET, facesIn, printCards } from '../../lib/staffIdCardExport';
+import { facesIn, printCards, sheetFor } from '../../lib/staffIdCardExport';
 
 export interface PrintableEmployee {
   id: string;
@@ -17,7 +17,8 @@ type Who = 'selected' | 'department';
 
 /**
  * Prints several staff ID cards at once (the 'staff-id-cards' module): the employees ticked on the list, or a whole
- * department. Nine cards to an A4 page, a page of fronts then a page of their backs (lib/staffIdCardExport.ts).
+ * department. Nine portrait or eight landscape cards to an A4 page, a page of fronts then a page of their backs
+ * (lib/staffIdCardExport.ts).
  */
 export default function StaffIdCardsPrintDialog({
   open,
@@ -83,7 +84,9 @@ export default function StaffIdCardsPrintDialog({
   }, [cards, who, department]);
 
   // one card prints front and back on a single page
-  const pages = chosen.length === 1 ? 1 : Math.ceil(chosen.length / (SHEET.cols * SHEET.rows)) * 2;
+  const pageLayout = sheetFor(settings.layout === 'landscape');
+  const perPage = pageLayout.cols * pageLayout.rows;
+  const pages = chosen.length === 1 ? 1 : Math.ceil(chosen.length / perPage) * 2;
   return (
     <Modal open={open} onClose={onClose} title="Print ID cards" size="md" closeOnBackdrop={!busy}>
       <div className="space-y-4 text-[12.5px]">
@@ -113,7 +116,7 @@ export default function StaffIdCardsPrintDialog({
         </fieldset>
         <p className="m-0 text-muted-foreground">
           {chosen.length
-            ? `${chosen.length} card${chosen.length === 1 ? '' : 's'} on ${pages} A4 page${pages === 1 ? '' : 's'}: nine to a page, fronts then backs. Print both sides flipping on the long edge, or print the backs separately and stick them on, then cut along the dashed lines.`
+            ? `${chosen.length} card${chosen.length === 1 ? '' : 's'} on ${pages} A4 page${pages === 1 ? '' : 's'}: ${perPage === 9 ? 'nine' : 'eight'} to a page, fronts then backs. Print both sides flipping on the long edge, or print the backs separately and stick them on, then cut along the dashed lines.`
             : 'Choose whose cards to print.'}
         </p>
         <div className="flex justify-end gap-2">

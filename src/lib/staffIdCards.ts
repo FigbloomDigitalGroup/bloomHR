@@ -32,8 +32,12 @@ export interface StaffIdCardData {
   photo_zoom?: number | string | null;
 }
 
+/** Which way up the company's cards are: portrait 54 x 85.6 mm, or landscape 85.6 x 54 mm. */
+export type CardLayout = 'portrait' | 'landscape';
+
 /** What the company has chosen for its cards (staff_id_card_settings); a company with no row gets the defaults. */
 export interface StaffIdCardSettings {
+  layout: CardLayout;
   show_date_of_birth: boolean;
   signatory_name: string | null;
   signatory_title: string | null;
@@ -42,7 +46,7 @@ export interface StaffIdCardSettings {
 }
 
 export const DEFAULT_CARD_SETTINGS: StaffIdCardSettings = {
-  show_date_of_birth: false, signatory_name: null, signatory_title: null, signature: null,
+  layout: 'portrait', show_date_of_birth: false, signatory_name: null, signatory_title: null, signature: null,
 };
 
 /** What the public check shows (verify_staff_id_card). */
@@ -101,7 +105,7 @@ export async function verifyStaffIdCard(token: string): Promise<VerifiedCard | n
 export async function loadCardSettings(): Promise<StaffIdCardSettings> {
   const { data, error } = await supabase
     .from('staff_id_card_settings')
-    .select('show_date_of_birth, signatory_name, signatory_title, signature')
+    .select('layout, show_date_of_birth, signatory_name, signatory_title, signature')
     .maybeSingle();
   if (error) return DEFAULT_CARD_SETTINGS; // e.g. before the migration is applied: the cards still show
   return { ...DEFAULT_CARD_SETTINGS, ...((data as Partial<StaffIdCardSettings> | null) ?? {}) };
@@ -115,7 +119,7 @@ export async function saveCardSettings(settings: StaffIdCardSettings): Promise<S
       { ...settings, signatory_name: blank(settings.signatory_name), signatory_title: blank(settings.signatory_title) },
       { onConflict: 'tenant_id' },
     )
-    .select('show_date_of_birth, signatory_name, signatory_title, signature')
+    .select('layout, show_date_of_birth, signatory_name, signatory_title, signature')
     .single();
   if (error) fail(error, 'The card settings were not saved.');
   return data as StaffIdCardSettings;

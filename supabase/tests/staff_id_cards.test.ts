@@ -91,6 +91,14 @@ describe('my_staff_id_card', () => {
     await as(HR, `update staff_id_card_settings set show_date_of_birth = false`);
   });
 
+  it('keeps the card layout: portrait by default, landscape when chosen, nothing else (20261118300000)', async () => {
+    expect(await as(HR, `select layout from staff_id_card_settings`)).toEqual([{ layout: 'portrait' }]);
+    await as(HR, `update staff_id_card_settings set layout = 'landscape'`);
+    expect(await as(S1, `select layout from staff_id_card_settings`)).toEqual([{ layout: 'landscape' }]);
+    await expect(as(HR, `update staff_id_card_settings set layout = 'diagonal'`)).rejects.toThrow();
+    await as(HR, `update staff_id_card_settings set layout = 'portrait'`);
+  });
+
   it('staff cannot read anyone else’s card or token, nor write the cards table', async () => {
     await as(S2, `select * from my_staff_id_card()`);
     const seen = await as<{ employee_id: string }>(S1, `select employee_id from staff_id_cards`);
