@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '../UI';
-import { type StaffIdCardSettings, saveCardSettings } from '../../lib/staffIdCards';
+import { type CardLayout, type StaffIdCardSettings, saveCardSettings } from '../../lib/staffIdCards';
 import { loadMySignature } from '../../lib/signatures';
 
 /**
- * What every card in the company shows (the 'staff-id-cards' module): the date of birth (off by default, it's
+ * What every card in the company shows (the 'staff-id-cards' module): which way up the cards are (portrait or
+ * landscape), the date of birth (off by default, it's
  * personal data) and the authorised signatory on the back. The signature is the signer's own drawn signature (My
  * signature, as on letters), copied onto the cards so everyone's card can show it.
  */
@@ -50,6 +51,24 @@ export default function StaffIdCardSettingsPanel({
   return (
     <div className="space-y-3 rounded-tile border border-border bg-background p-4 text-[12.5px]">
       <p className="m-0 font-semibold text-ink">Card settings (every card in the company)</p>
+      <fieldset className="m-0 flex flex-wrap items-center gap-4 border-0 p-0">
+        <legend className="mb-1 text-muted-foreground">Card layout</legend>
+        {([
+          ['portrait', 'Portrait (upright)'],
+          ['landscape', 'Landscape (sideways)'],
+        ] as [CardLayout, string][]).map(([value, label]) => (
+          <label key={value} className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="card-layout"
+              value={value}
+              checked={draft.layout === value}
+              onChange={() => setDraft((d) => ({ ...d, layout: value }))}
+            />
+            {label}
+          </label>
+        ))}
+      </fieldset>
       <label className="flex items-center gap-2">
         <input
           type="checkbox"
