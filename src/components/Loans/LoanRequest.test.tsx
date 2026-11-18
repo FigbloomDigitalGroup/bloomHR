@@ -8,6 +8,7 @@ vi.mock('../../lib/loansApi', () => ({
   loadMyLoans: vi.fn(),
   requestLoan: vi.fn(),
   withdrawLoan: vi.fn(),
+  loadFirstOpenPeriod: vi.fn(),
 }));
 vi.mock('../../lib/salaryAdvanceApi', () => ({ loadMyEmployee: vi.fn() }));
 vi.mock('../../lib/loanFormApi', () => ({
@@ -45,7 +46,7 @@ vi.mock('../../lib/supabase', () => ({ supabase: new Proxy({}, { get: () => { th
 import * as api from '../../lib/loansApi';
 import * as advanceApi from '../../lib/salaryAdvanceApi';
 import * as formApi from '../../lib/loanFormApi';
-import { DEFAULT_LOAN_SETTINGS, loanSchedule } from '../../lib/loans';
+import { DEFAULT_LOAN_SETTINGS, addMonths, currentPeriod, loanSchedule } from '../../lib/loans';
 import { DEFAULT_LOAN_FORM_SETTINGS } from '../../lib/loanForm';
 import LoanRequest from './LoanRequest';
 
@@ -108,6 +109,8 @@ beforeEach(() => {
   mocked.loadLoanProducts.mockResolvedValue(PRODUCTS);
   mocked.loadMyLoans.mockResolvedValue([]);
   mocked.requestLoan.mockResolvedValue('new-loan');
+  // this month's payroll isn't approved yet
+  mocked.loadFirstOpenPeriod.mockResolvedValue(currentPeriod());
   mocked.withdrawLoan.mockResolvedValue(undefined);
   vi.mocked(formApi.loadLoanForms).mockResolvedValue({});
   vi.mocked(formApi.signAsBorrower).mockResolvedValue(undefined);
@@ -175,9 +178,33 @@ describe('applying for a loan', () => {
         months: 6,
         reason: 'School fees for next term',
         details: { residentialAddress: 'Kileleshwa, Nairobi', otherLoanRepayments: '2000', disbursementAccount: '0712 345 678' },
+        startPeriod: addMonths(currentPeriod(), 1),
       }),
     );
     await vi.waitFor(() => expect(formApi.setGuarantor).toHaveBeenCalledWith('new-loan', 'E2'));
+  });
+
+  it('may start repaying from this month’s pay while its payroll is open', async () => {
+    render(<LoanRequest />);
+    await screen.findByText('KSh 150,000');
+    const start = screen.getByLabelText('Start repaying from') as HTMLSelectElement;
+    expect(start.value).toBe(addMonths(currentPeriod(), 1));
+    expect([...start.options].map((o) => o.value)).toEqual([currentPeriod(), addMonths(currentPeriod(), 1)]);
+    expect(start.options[0].textContent).toMatch(/\(this month\)/);
+    fireEvent.change(start, { target: { value: currentPeriod() } });
+    fireEvent.change(amount(), { target: { value: '6000' } });
+    fireEvent.change(screen.getByLabelText('What is it for?'), { target: { value: 'School fees for next term' } });
+    fireEvent.change(screen.getByLabelText(/Guarantor \(a colleague at the company\)/), { target: { value: 'E2' } });
+    fireEvent.click(screen.getByRole('button', { name: /Send request/ }));
+    await vi.waitFor(() => expect(mocked.requestLoan).toHaveBeenCalledWith(ME, expect.objectContaining({ startPeriod: currentPeriod() })));
+  });
+
+  it('once this month’s payroll is approved, next month is the earliest', async () => {
+    mocked.loadFirstOpenPeriod.mockResolvedValue(addMonths(currentPeriod(), 1));
+    render(<LoanRequest />);
+    await screen.findByText('KSh 150,000');
+    const start = screen.getByLabelText('Start repaying from') as HTMLSelectElement;
+    await vi.waitFor(() => expect([...start.options].map((o) => o.value)).toEqual([addMonths(currentPeriod(), 1), addMonths(currentPeriod(), 2)]));
   });
 
   it('cannot apply while applications are closed', async () => {

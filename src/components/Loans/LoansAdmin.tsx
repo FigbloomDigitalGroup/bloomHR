@@ -39,6 +39,7 @@ import {
   createLoan,
   declineLoan,
   loadAllLoans,
+  loadFirstOpenPeriod,
   loadLoanProducts,
   loadLoanSettings,
   loadSchedules,
@@ -78,8 +79,8 @@ const failure = (error: unknown) => (error instanceof Error && error.message) ||
 const dateText = (value: string | null) =>
   value ? new Date(value).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 
-/** The next twelve months to start repaying in, from this one. */
-const startChoices = () => Array.from({ length: 12 }, (_, i) => addMonths(currentPeriod(), i));
+/** Twelve months to start repaying in, from the first whose payroll isn't approved yet. */
+const startChoices = (firstOpen: string) => Array.from({ length: 12 }, (_, i) => addMonths(firstOpen, i));
 
 interface NewLoanForm {
   employeeNumber: string;
@@ -104,6 +105,8 @@ export default function LoansAdmin() {
   const [chains, setChains] = useState<Record<string, Chain>>({});
   const [forms, setForms] = useState<Record<string, LoanForm>>({});
   const [guarantors, setGuarantors] = useState<Record<string, LoanGuarantor>>({});
+  // repayments can't start in a month whose payroll is already approved
+  const [firstOpen, setFirstOpen] = useState(currentPeriod());
   const [myUserId, setMyUserId] = useState<string | null>(null);
   const [approverSignature, setApproverSignature] = useState<string | null>(null);
   const [settings, setSettings] = useState<LoanSettings>(DEFAULT_LOAN_SETTINGS);
@@ -124,7 +127,8 @@ export default function LoansAdmin() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [all, s, p] = await Promise.all([loadAllLoans(), loadLoanSettings(), loadLoanProducts()]);
+      const [all, s, p, open] = await Promise.all([loadAllLoans(), loadLoanSettings(), loadLoanProducts(), loadFirstOpenPeriod()]);
+      setFirstOpen(open);
       setLoans(all);
       setSettings(s);
       setProducts(p);
@@ -174,7 +178,7 @@ export default function LoansAdmin() {
 
   const openApprove = (loan: EmployeeLoan) => {
     setApproving(loan);
-    setApproveStart(loan.start_period < currentPeriod() ? addMonths(currentPeriod(), 1) : loan.start_period);
+    setApproveStart(loan.start_period < firstOpen ? firstOpen : loan.start_period);
     setComment('');
   };
 
@@ -295,7 +299,7 @@ export default function LoansAdmin() {
                   productId: '',
                   amount: '',
                   months: String(Math.min(12, settings.max_months)),
-                  startPeriod: addMonths(currentPeriod(), 1),
+                  startPeriod: addMonths(currentPeriod(), 1) < firstOpen ? firstOpen : addMonths(currentPeriod(), 1),
                   rate: '',
                   method: '',
                   reason: '',
@@ -479,7 +483,7 @@ export default function LoansAdmin() {
               First repayment from
             </label>
             <select id="approve-start" value={approveStart} onChange={(e) => setApproveStart(e.target.value)} className={inputClass}>
-              {[...new Set([approveStart, ...startChoices()])].map((p) => (
+              {[...new Set([approveStart, ...startChoices(firstOpen)])].map((p) => (
                 <option key={p} value={p}>
                   {periodLabel(p)} pay
                 </option>
@@ -594,7 +598,7 @@ export default function LoansAdmin() {
                 <label className="block">
                   <span className="block text-[12px] font-semibold text-ink mb-1">First repayment from</span>
                   <select className={inputClass} value={creating.startPeriod} onChange={(e) => setCreating({ ...creating, startPeriod: e.target.value })}>
-                    {startChoices().map((p) => (
+                    {startChoices(firstOpen).map((p) => (
                       <option key={p} value={p}>
                         {periodLabel(p)} pay
                       </option>
