@@ -111,3 +111,64 @@ export { randomPassword };
 export function sendAccountError(res, err) {
   return res.status(err.status).json({ error: err.message, code: err.code });
 }
+
+// ---- "Set your password" for a person an admin added (admin_routes.js POST /users)
+
+const escapeHtml = (value) =>
+  String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+/** The subject, HTML and plain text of "Set your password". Everything inserted is escaped. */
+export function setPasswordEmail({ company, link }) {
+  const where = company ? `${company} has added you to Figbloom HR` : "You have been added to Figbloom HR";
+  const subject = company ? `Set your password for ${company} on Figbloom HR` : "Set your password for Figbloom HR";
+  const text = [
+    `${where}.`,
+    "",
+    `Choose your password here: ${link}`,
+    "",
+    "Then sign in with Figbloom, with this email address and that password: one account for every Figbloom product.",
+    "The link works once. If it has expired, open it anyway and ask for a new one.",
+  ].join("\n");
+  const html = `<!doctype html>
+<html>
+  <body style="margin:0;padding:24px;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#16201a;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center">
+      <table role="presentation" width="520" cellspacing="0" cellpadding="0" style="max-width:520px;background:#ffffff;border-radius:12px;padding:32px;">
+        <tr><td>
+          <p style="margin:0 0 16px;font-size:13px;font-weight:bold;color:#17402a;">Figbloom HR</p>
+          <h1 style="margin:0 0 12px;font-size:20px;">Set your password</h1>
+          <p style="margin:0 0 20px;font-size:14px;line-height:1.5;">${escapeHtml(where)}. Choose your password, then sign in with Figbloom: one account for every Figbloom product.</p>
+          <p style="margin:0 0 24px;"><a href="${escapeHtml(link)}" style="display:inline-block;background:#17402a;color:#ffffff;text-decoration:none;font-weight:bold;font-size:14px;padding:12px 22px;border-radius:8px;">Set your password</a></p>
+          <p style="margin:0 0 8px;font-size:12px;color:#5f6b62;">Or paste this link into your browser:<br><span style="word-break:break-all;">${escapeHtml(link)}</span></p>
+          <p style="margin:16px 0 0;font-size:12px;color:#5f6b62;">The link works once. If it has expired, open it anyway and ask for a new one. If you were not expecting this, you can ignore this email.</p>
+        </td></tr>
+      </table>
+    </td></tr></table>
+  </body>
+</html>`;
+  return { subject, html, text };
+}
+
+/**
+ * Emails "Set your password": a one-time recovery link (Supabase generateLink, nothing sent by Supabase) to
+ * /update-password, whose page sets the Figbloom password, sent with Resend like invitations. Without Resend, Supabase's
+ * own recovery email instead (its wording is "Reset your password"). Never throws: the person was added either way.
+ */
+export async function sendSetPasswordEmail({ db = admin, email, company, site, send }) {
+  const redirectTo = site ? `${site}/update-password` : undefined;
+  try {
+    if (send) {
+      const { data, error } = await db.auth.admin.generateLink({ type: "recovery", email, ...(redirectTo ? { options: { redirectTo } } : {}) });
+      const link = data?.properties?.action_link;
+      if (error || typeof link !== "string") throw new Error(`generateLink: ${error?.message || "no link"}`);
+      await send({ to: email, ...setPasswordEmail({ company, link }) });
+      return "sent";
+    }
+    const { error } = await db.auth.resetPasswordForEmail(email, redirectTo ? { redirectTo } : undefined);
+    if (error) throw new Error(error.message);
+    return "sent_by_supabase";
+  } catch (err) {
+    console.error(TAG, "set-password email not sent:", err?.message || err);
+    return "not_sent";
+  }
+}
