@@ -395,10 +395,31 @@ router.post(
         const linked = await accounts.figbloomAccounts.link(data.user.id, account.sub, { madeHere: account.created });
         if (linked === "taken") throw new HttpError(409, "This person's Figbloom account is already connected to another login. Ask Figbloom support.");
         if (account.created) {
-          // "Set your password": the existing recovery email, whose page sets the Figbloom password (cognito_routes.js)
+          // "Set your password" (figbloom_accounts.js): a one-time link to /update-password, whose page sets the
+          // Figbloom password (cognito_routes.js), sent with Resend like invitations
           const site = String(process.env.SITE_URL || "").trim().replace(/\/+$/, "");
-          const { error: mailError } = await admin.auth.resetPasswordForEmail(email, site ? { redirectTo: `${site}/update-password` } : undefined);
-          if (mailError) console.error("[admin] set-password email not sent:", mailError.message);
+          // the company's name in the email: best effort, the email goes either way
+          let company = null;
+          try {
+            const { data: tenant } = await admin.from("tenants").select("name").eq("id", caller.tenantId).maybeSingle();
+            company = tenant?.name || null;
+          } catch {
+            company = null;
+          }
+          const send = process.env.RESEND_API_KEY
+            ? async ({ to, subject, html, text }) => {
+                const { Resend } = await import("resend");
+                const { error: sendError } = await new Resend(process.env.RESEND_API_KEY).emails.send({
+                  from: process.env.SMTP_FROM || "Figbloom HR <onboarding@resend.dev>",
+                  to,
+                  subject,
+                  html,
+                  text,
+                });
+                if (sendError) throw new Error(sendError.message || "Resend refused the message");
+              }
+            : undefined;
+          await accounts.sendSetPasswordEmail({ db: admin, email, company, site, send });
         }
         figbloomAccount = { created: account.created };
       } catch (accountErr) {

@@ -375,3 +375,45 @@ describe('with Figbloom sign-in', () => {
     expect((await call('PATCH', '/users/staff-a', 'admin-a', { account_status: 'SUSPENDED' })).status).toBe(200);
   });
 });
+
+describe('"Set your password" email (figbloom_accounts.js)', () => {
+  it('is its own email, not "Reset your password", with the company and the link, everything escaped', async () => {
+    const { setPasswordEmail } = await import('../figbloom_accounts.js');
+    const m = setPasswordEmail({ company: 'Favor <Farm>', link: 'https://hr.example/verify?token=a&type=recovery' });
+    expect(m.subject).toBe('Set your password for Favor <Farm> on Figbloom HR');
+    expect(m.subject).not.toMatch(/reset/i);
+    expect(m.html).toContain('Favor &lt;Farm&gt;');
+    expect(m.html).toContain('https://hr.example/verify?token=a&amp;type=recovery');
+    expect(m.text).toContain('https://hr.example/verify?token=a&type=recovery');
+  });
+
+  it('sends a one-time link to /update-password with Resend, or falls back to Supabase\'s email, and never throws', async () => {
+    const { sendSetPasswordEmail } = await import('../figbloom_accounts.js');
+    const asked: unknown[] = [];
+    const sent: Record<string, string>[] = [];
+    const db = {
+      auth: {
+        admin: {
+          generateLink: async (a: unknown) => {
+            asked.push(a);
+            return { data: { properties: { action_link: 'https://db.example/verify?token=x' } }, error: null };
+          },
+        },
+        resetPasswordForEmail: async (email: string) => {
+          asked.push(`reset:${email}`);
+          return { error: null };
+        },
+      },
+    };
+    const site = 'https://hr.example';
+    expect(await sendSetPasswordEmail({ db: db as never, email: 'a@b.co', company: 'Acme', site, send: async (m: Record<string, string>) => void sent.push(m) })).toBe('sent');
+    expect(asked[0]).toEqual({ type: 'recovery', email: 'a@b.co', options: { redirectTo: 'https://hr.example/update-password' } });
+    expect(sent[0]).toMatchObject({ to: 'a@b.co', subject: 'Set your password for Acme on Figbloom HR' });
+    expect(await sendSetPasswordEmail({ db: db as never, email: 'a@b.co', company: null, site })).toBe('sent_by_supabase');
+    expect(asked.at(-1)).toBe('reset:a@b.co');
+    const failing = async () => {
+      throw new Error('resend down');
+    };
+    expect(await sendSetPasswordEmail({ db: db as never, email: 'a@b.co', company: null, site, send: failing })).toBe('not_sent');
+  });
+});
