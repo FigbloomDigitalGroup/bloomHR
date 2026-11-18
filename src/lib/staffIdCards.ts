@@ -30,14 +30,17 @@ export interface StaffIdCardData {
   photo_x?: number | string | null;
   photo_y?: number | string | null;
   photo_zoom?: number | string | null;
+  /** the landscape card's own framing (20261118300000) */
+  landscape_photo_x?: number | string | null;
+  landscape_photo_y?: number | string | null;
+  landscape_photo_zoom?: number | string | null;
 }
 
-/** Which way up the company's cards are: portrait 54 x 85.6 mm, or landscape 85.6 x 54 mm. */
+/** Which way up a card is: portrait 54 x 85.6 mm, or landscape 85.6 x 54 mm. Every card is shown both ways. */
 export type CardLayout = 'portrait' | 'landscape';
 
 /** What the company has chosen for its cards (staff_id_card_settings); a company with no row gets the defaults. */
 export interface StaffIdCardSettings {
-  layout: CardLayout;
   show_date_of_birth: boolean;
   signatory_name: string | null;
   signatory_title: string | null;
@@ -46,7 +49,7 @@ export interface StaffIdCardSettings {
 }
 
 export const DEFAULT_CARD_SETTINGS: StaffIdCardSettings = {
-  layout: 'portrait', show_date_of_birth: false, signatory_name: null, signatory_title: null, signature: null,
+  show_date_of_birth: false, signatory_name: null, signatory_title: null, signature: null,
 };
 
 /** What the public check shows (verify_staff_id_card). */
@@ -88,9 +91,13 @@ export async function regenerateStaffIdCard(employeeId: string): Promise<{ token
 }
 
 /** Moves or zooms the photo on a card (the card holder their own, the module anyone's). The photo itself is unchanged. */
-export async function setStaffIdCardPhotoFraming(employeeId: string, framing: PhotoFraming): Promise<void> {
+export async function setStaffIdCardPhotoFraming(
+  employeeId: string,
+  framing: PhotoFraming,
+  layout: CardLayout = 'portrait',
+): Promise<void> {
   const { error } = await supabase.rpc('set_staff_id_card_photo_framing', {
-    p_employee_id: employeeId, p_x: framing.x, p_y: framing.y, p_zoom: framing.zoom,
+    p_employee_id: employeeId, p_x: framing.x, p_y: framing.y, p_zoom: framing.zoom, p_layout: layout,
   });
   if (error) fail(error, 'The photo position was not saved.');
 }
@@ -105,7 +112,7 @@ export async function verifyStaffIdCard(token: string): Promise<VerifiedCard | n
 export async function loadCardSettings(): Promise<StaffIdCardSettings> {
   const { data, error } = await supabase
     .from('staff_id_card_settings')
-    .select('layout, show_date_of_birth, signatory_name, signatory_title, signature')
+    .select('show_date_of_birth, signatory_name, signatory_title, signature')
     .maybeSingle();
   if (error) return DEFAULT_CARD_SETTINGS; // e.g. before the migration is applied: the cards still show
   return { ...DEFAULT_CARD_SETTINGS, ...((data as Partial<StaffIdCardSettings> | null) ?? {}) };
@@ -119,7 +126,7 @@ export async function saveCardSettings(settings: StaffIdCardSettings): Promise<S
       { ...settings, signatory_name: blank(settings.signatory_name), signatory_title: blank(settings.signatory_title) },
       { onConflict: 'tenant_id' },
     )
-    .select('layout, show_date_of_birth, signatory_name, signatory_title, signature')
+    .select('show_date_of_birth, signatory_name, signatory_title, signature')
     .single();
   if (error) fail(error, 'The card settings were not saved.');
   return data as StaffIdCardSettings;
@@ -159,6 +166,19 @@ const num = (v: number | string | null | undefined, fallback: number) => {
   const n = Number(v);
   return v === null || v === undefined || v === '' || !Number.isFinite(n) ? fallback : n;
 };
+
+/** The card as drawn in a layout: the landscape card uses its own framing (landscape_photo_*). */
+export function forLayout(card: StaffIdCardData, layout: CardLayout): StaffIdCardData {
+  if (layout !== 'landscape') return card;
+  return { ...card, photo_x: card.landscape_photo_x, photo_y: card.landscape_photo_y, photo_zoom: card.landscape_photo_zoom };
+}
+
+/** The card with a new framing for one layout (after Adjust photo). */
+export function withFraming(card: StaffIdCardData, framing: PhotoFraming, layout: CardLayout): StaffIdCardData {
+  return layout === 'landscape'
+    ? { ...card, landscape_photo_x: framing.x, landscape_photo_y: framing.y, landscape_photo_zoom: framing.zoom }
+    : { ...card, photo_x: framing.x, photo_y: framing.y, photo_zoom: framing.zoom };
+}
 
 export function framingOf(card: Pick<StaffIdCardData, 'photo_x' | 'photo_y' | 'photo_zoom'>): PhotoFraming {
   return {

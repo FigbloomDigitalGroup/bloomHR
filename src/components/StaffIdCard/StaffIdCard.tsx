@@ -5,11 +5,13 @@ import { DEFAULT_PRIMARY_COLOR, DEFAULT_SECONDARY_COLOR } from '../../lib/compan
 import type { LetterBranding } from '../../lib/offers';
 import { companyAddress, wrapText } from './cardText';
 import {
+  type CardLayout,
   type StaffIdCardData,
   type StaffIdCardSettings,
   cardDate,
   cardExpiry,
   formatCardDate,
+  forLayout,
   framingOf,
   fullName,
   initials,
@@ -19,7 +21,8 @@ import {
 } from '../../lib/staffIdCards';
 
 // The staff ID card (a "job card", migration 20261027400000): CR80, front and back, in the company's colours, portrait
-// (54 x 85.6 mm) or landscape (85.6 x 54 mm) as the company chose in Card settings (migration 20261118300000). Each face is one SVG drawn at 10 units per millimetre, so the same drawing is sharp on a phone,
+// (54 x 85.6 mm) or landscape (85.6 x 54 mm); every card is shown both ways, each with its own photo framing
+// (migration 20261118300000). Each face is one SVG drawn at 10 units per millimetre, so the same drawing is sharp on a phone,
 // in the PNG and PDF downloads (lib/staffIdCardExport.ts turns it into an image) and printed at its true size.
 // SVG rather than HTML because the hexagon photo and the angled colour panels need clipping that html2canvas can't
 // draw, and because a whole face as one image can be scaled to millimetres without anything reflowing.
@@ -40,6 +43,8 @@ export interface CardFaceProps {
   settings: StaffIdCardSettings;
   /** where the QR code points (the app's address); defaults to this page's */
   origin?: string;
+  /** portrait (the default) or landscape */
+  layout?: CardLayout;
   /** width on screen (any CSS length); the height follows */
   width?: string;
   className?: string;
@@ -515,19 +520,21 @@ function LandscapeBack({ card, branding, settings, origin, width, className }: C
   );
 }
 
-/** The front, portrait or landscape as the company chose. */
+/** The front, portrait or landscape (with the landscape card's own photo framing). */
 export function StaffIdCardFront(props: CardFaceProps) {
-  return props.settings.layout === 'landscape' ? <LandscapeFront {...props} /> : <PortraitFront {...props} />;
+  return props.layout === 'landscape'
+    ? <LandscapeFront {...props} card={forLayout(props.card, 'landscape')} />
+    : <PortraitFront {...props} />;
 }
 
-/** The back, portrait or landscape as the company chose. */
+/** The back, portrait or landscape. */
 export function StaffIdCardBack(props: CardFaceProps) {
-  return props.settings.layout === 'landscape' ? <LandscapeBack {...props} /> : <PortraitBack {...props} />;
+  return props.layout === 'landscape' ? <LandscapeBack {...props} /> : <PortraitBack {...props} />;
 }
 
 /** Both faces side by side (one above the other on a narrow phone). */
 export default function StaffIdCard(props: Omit<CardFaceProps, 'width' | 'className'>) {
-  const face = `w-full ${props.settings.layout === 'landscape' ? 'max-w-[400px]' : 'max-w-[260px]'} rounded-[14px] overflow-hidden shadow-md ring-1 ring-black/5`;
+  const face = `w-full ${props.layout === 'landscape' ? 'max-w-[400px]' : 'max-w-[260px]'} rounded-[14px] overflow-hidden shadow-md ring-1 ring-black/5`;
   return (
     <div className="flex flex-wrap justify-center gap-4" data-testid="staff-id-card">
       <div className={face}>

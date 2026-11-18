@@ -158,11 +158,11 @@ describe('placing the photo in the hexagon', () => {
   });
 });
 
-describe('the landscape card (Card settings: Landscape)', () => {
-  const landscape = { ...DEFAULT_CARD_SETTINGS, layout: 'landscape' as const, show_date_of_birth: true };
+describe('the landscape card', () => {
+  const withDob = { ...DEFAULT_CARD_SETTINGS, show_date_of_birth: true };
 
   it('draws both faces sideways, 85.6 x 54 mm, with the same details, barcode, terms and QR code', () => {
-    const front = render(<StaffIdCardFront card={{ ...card, date_of_birth: '1990-05-04' }} branding={branding} settings={landscape} />).container;
+    const front = render(<StaffIdCardFront card={{ ...card, date_of_birth: '1990-05-04' }} branding={branding} settings={withDob} layout="landscape" />).container;
     const svg = front.querySelector('svg')!;
     expect(svg.getAttribute('viewBox')).toBe('0 0 856 540');
     const words = text(front);
@@ -172,7 +172,7 @@ describe('the landscape card (Card settings: Landscape)', () => {
     expect(front.querySelector('[data-barcode="MCL-000123"]')).not.toBeNull();
     cleanup();
 
-    const back = render(<StaffIdCardBack card={card} branding={branding} settings={landscape} origin="https://hr.example" />).container;
+    const back = render(<StaffIdCardBack card={card} branding={branding} settings={withDob} layout="landscape" origin="https://hr.example" />).container;
     expect(back.querySelector('svg')!.getAttribute('viewBox')).toBe('0 0 856 540');
     const backWords = text(back);
     expect(backWords).toContain('STAFF ID CARD');

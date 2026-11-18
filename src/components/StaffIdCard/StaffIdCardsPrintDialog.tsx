@@ -4,7 +4,7 @@ import { Printer } from 'lucide-react';
 import { Button, Modal } from '../UI';
 import { StaffIdCardBack, StaffIdCardFront } from './StaffIdCard';
 import { useCardLook } from './useCardLook';
-import { type StaffIdCardData, loadStaffIdCards } from '../../lib/staffIdCards';
+import { type CardLayout, type StaffIdCardData, loadStaffIdCards } from '../../lib/staffIdCards';
 import { facesIn, printCards, sheetFor } from '../../lib/staffIdCardExport';
 
 export interface PrintableEmployee {
@@ -38,6 +38,7 @@ export default function StaffIdCardsPrintDialog({
   );
   const [who, setWho] = useState<Who>(selectedNumbers.length ? 'selected' : 'department');
   const [department, setDepartment] = useState('');
+  const [layout, setLayout] = useState<CardLayout>('portrait');
   const [cards, setCards] = useState<StaffIdCardData[] | null>(null);
   const [busy, setBusy] = useState(false);
   const sheet = useRef<HTMLDivElement>(null);
@@ -84,7 +85,7 @@ export default function StaffIdCardsPrintDialog({
   }, [cards, who, department]);
 
   // one card prints front and back on a single page
-  const pageLayout = sheetFor(settings.layout === 'landscape');
+  const pageLayout = sheetFor(layout === 'landscape');
   const perPage = pageLayout.cols * pageLayout.rows;
   const pages = chosen.length === 1 ? 1 : Math.ceil(chosen.length / perPage) * 2;
   return (
@@ -114,6 +115,18 @@ export default function StaffIdCardsPrintDialog({
             </select>
           )}
         </fieldset>
+        <fieldset className="m-0 flex flex-wrap items-center gap-4 border-0 p-0">
+          <legend className="mb-1 text-muted-foreground">Card layout</legend>
+          {([
+            ['portrait', 'Portrait'],
+            ['landscape', 'Landscape'],
+          ] as [CardLayout, string][]).map(([value, label]) => (
+            <label key={value} className="flex items-center gap-2">
+              <input type="radio" name="print-layout" checked={layout === value} onChange={() => setLayout(value)} />
+              {label}
+            </label>
+          ))}
+        </fieldset>
         <p className="m-0 text-muted-foreground">
           {chosen.length
             ? `${chosen.length} card${chosen.length === 1 ? '' : 's'} on ${pages} A4 page${pages === 1 ? '' : 's'}: ${perPage === 9 ? 'nine' : 'eight'} to a page, fronts then backs. Print both sides flipping on the long edge, or print the backs separately and stick them on, then cut along the dashed lines.`
@@ -130,8 +143,8 @@ export default function StaffIdCardsPrintDialog({
         <div ref={sheet} aria-hidden="true" style={{ position: 'fixed', left: '-10000px', top: 0, width: '600px' }}>
           {cards.map((c) => (
             <div key={c.employee_id}>
-              <StaffIdCardFront card={c} branding={branding} settings={settings} />
-              <StaffIdCardBack card={c} branding={branding} settings={settings} />
+              <StaffIdCardFront card={c} branding={branding} settings={settings} layout={layout} />
+              <StaffIdCardBack card={c} branding={branding} settings={settings} layout={layout} />
             </div>
           ))}
         </div>
