@@ -42,6 +42,7 @@ vi.mock('../../lib/loanFormApi', () => ({
   signAsWitness: vi.fn(),
   declineWitness: vi.fn(),
   deleteCancelledLoan: vi.fn(),
+  attachSignedForm: vi.fn(),
 }));
 // everyone here has a saved signature
 vi.mock('../../lib/signatures', () => ({

@@ -86,6 +86,7 @@ vi.mock('../../lib/loanFormApi', () => ({
   signAsWitness: vi.fn(),
   declineWitness: vi.fn(),
   deleteCancelledLoan: vi.fn(),
+  attachSignedForm: vi.fn(),
 }));
 // everyone here has a saved signature
 vi.mock('../../lib/signatures', () => ({
@@ -302,6 +303,17 @@ describe('the loans page', () => {
     // requests are loaded too
     await vi.waitFor(() => expect(vi.mocked(formApi.loadLoanForms).mock.calls.at(-1)?.[0]).toContain('r1'));
     expect(within(card).getByText('Signed, to upload')).toBeTruthy();
+  });
+
+  it('HR attaches the paper-signed form of a loan already paid out', async () => {
+    vi.mocked(formApi.attachSignedForm).mockResolvedValue(undefined);
+    render(<LoansAdmin />);
+    await screen.findByTestId('loan-r1');
+    fireEvent.click(screen.getByText(/Repaying \(/));
+    expect(within(screen.getByTestId('loan-d1')).getByRole('button', { name: 'Attach signed form (PDF)' })).toBeTruthy();
+    const pdf = new File(['%PDF'], 'signed.pdf', { type: 'application/pdf' });
+    fireEvent.change(document.getElementById('loan-form-attach-d1')!, { target: { files: [pdf] } });
+    await vi.waitFor(() => expect(formApi.attachSignedForm).toHaveBeenCalledWith(expect.objectContaining({ id: 'd1' }), pdf));
   });
 
   it('a cancelled loan can be deleted, after asking', async () => {

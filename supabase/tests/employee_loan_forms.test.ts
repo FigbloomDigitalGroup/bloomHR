@@ -241,6 +241,18 @@ describe('the owner signs the approval of a loan already paid out (2026111910000
     await as(PAY, `select loan_form_sign_approver('${id}', '${SIG}', 'Olive Owner', 'Owner')`);
     expect(await form(id)).toMatchObject({ approver_signature: SIG, approver_name: 'Olive Owner', approver_title: 'Owner', required: false });
     await expect(as(HR, `select loan_form_sign_approver('${id}', '${SIG}', 'Hana Hr', 'HR')`)).rejects.toThrow(/already signed/);
+  });
+
+  it('HR attaches its paper-signed form (someone signed outside the platform): kept and accepted, never replaced', async () => {
+    const [{ id }] = await rows<{ id: string }>(`select id from employee_loans where employee_number = 'E2' and status = 'disbursed' and principal = 6000`);
+    const file = `${A}/${id}/signed-paper.pdf`;
+    await expect(as(S2, `select loan_form_attach('${id}', '${file}')`)).rejects.toThrow(/Only HR/);
+    await expect(as(HR, `select loan_form_attach('${id}', '${A}/${id}/signed-paper.docx')`)).rejects.toThrow(/PDF/);
+    await as(HR, `select loan_form_attach('${id}', '${file}', 'Paper form.pdf')`);
+    expect(await form(id)).toMatchObject({ status: 'accepted', file_path: file, file_name: 'Paper form.pdf', approver_name: 'Olive Owner' });
+    await expect(as(HR, `select loan_form_attach('${id}', '${A}/${id}/signed-again.pdf')`)).rejects.toThrow(/isn't replaced/);
+    // a loan that already had its accepted signed copy keeps it too
+    await expect(as(HR, `select loan_form_attach('${loanId}', '${A}/${loanId}/signed-x.pdf')`)).rejects.toThrow(/isn't replaced/);
     await as(HR, `update loan_settings set require_signed_form = true`);
   });
 });
