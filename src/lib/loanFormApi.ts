@@ -13,7 +13,11 @@ import {
   type LoanForm,
   type LoanFormSettings,
   type ChecklistItem,
+  type FormValues,
   type LoanGuarantor,
+  type LoanWitness,
+  recordValues,
+  withCorrections,
 } from './loanForm';
 import type { LoanInstalment } from './loans';
 import type { EmployeeLoan } from './loansApi';
@@ -81,7 +85,11 @@ export async function saveLoanFormSettings(settings: LoanFormSettings): Promise<
 export interface LoanFormContext {
   lender: LenderDetails;
   settings: LoanFormSettings;
+  /** the borrower's details, with the loan's corrections on top */
   borrower: BorrowerDetails;
+  /** what the employee record says, and the corrections made for this loan */
+  record?: FormValues;
+  corrections?: FormValues;
   /** the latest payslip's gross and net pay, when the reader may see it */
   latestPay: { gross: number; net: number; period: string } | null;
   /** finance's record of the payout, when the reader may see it */
@@ -127,11 +135,17 @@ export async function loadLoanFormContext(loan: { id: string; employee_number: s
       return data;
     }),
   ]);
+  const borrower = borrowerFromEmployee((employee.data ?? { 'Employee Number': loan.employee_number }) as Record<string, unknown>, company?.company_name ?? null);
+  const latestPay = pay ? { gross: Number(pay.gross_pay) || 0, net: Number(pay.net_pay) || 0, period: String(pay.pay_period) } : null;
+  const corrections: FormValues = (await loadFormValues([loan.id]).catch((): Record<string, FormValues> => ({})))[loan.id] ?? {};
+  const corrected = withCorrections(borrower, latestPay, corrections);
   return {
     settings,
     lender: lenderDetails(settings, company),
-    borrower: borrowerFromEmployee((employee.data ?? { 'Employee Number': loan.employee_number }) as Record<string, unknown>, company?.company_name ?? null),
-    latestPay: pay ? { gross: Number(pay.gross_pay) || 0, net: Number(pay.net_pay) || 0, period: String(pay.pay_period) } : null,
+    borrower: corrected.borrower,
+    latestPay: corrected.latestPay,
+    record: recordValues(borrower, latestPay),
+    corrections,
     payout: payout && payout.status === 'paid' ? { reference: payout.payment_reference ?? null, paidOn: payout.paid_on ?? null } : null,
   };
 }
@@ -190,6 +204,84 @@ export async function addWitness(loanId: string, witness: { name: string; idNumb
 export async function saveFormChecks(loanId: string, affordabilityBy: string, checks: ChecklistItem[]): Promise<void> {
   const { error } = await supabase.rpc('loan_form_checks', { p_loan: loanId, p_affordability_by: affordabilityBy.trim(), p_checks: checks });
   if (error) fail(error, 'The checklist was not saved.');
+}
+
+// ---- corrections to the form's values
+
+/** The corrections made on these loans' forms, by loan id. */
+export async function loadFormValues(loanIds: string[]): Promise<Record<string, FormValues>> {
+  const out: Record<string, FormValues> = {};
+  for (const ids of chunks([...new Set(loanIds)], IN_LIST_SIZE)) {
+    const { data, error } = await supabase.from('employee_loan_form_values').select('loan_id, values').in('loan_id', ids);
+    if (error) throw error;
+    for (const row of (data ?? []) as { loan_id: string; values: FormValues }[]) out[row.loan_id] = row.values ?? {};
+  }
+  return out;
+}
+
+/** Saves all of a loan's corrections (a field left empty shows the record's value again). */
+export async function saveFormValues(loanId: string, values: FormValues): Promise<void> {
+  const { error } = await supabase.rpc('loan_form_set_values', { p_loan: loanId, p_values: values });
+  if (error) fail(error, 'The corrections were not saved.');
+}
+
+// ---- the witness, a colleague
+
+const WITNESS_COLUMNS = 'loan_id, employee_number, witness_name, status, decline_reason, signed_at';
+
+export async function loadWitnesses(loanIds: string[]): Promise<Record<string, LoanWitness>> {
+  const out: Record<string, LoanWitness> = {};
+  for (const ids of chunks([...new Set(loanIds)], IN_LIST_SIZE)) {
+    const { data, error } = await supabase.from('employee_loan_witnesses').select(WITNESS_COLUMNS).in('loan_id', ids);
+    if (error) throw error;
+    for (const row of (data ?? []) as LoanWitness[]) out[row.loan_id] = row;
+  }
+  return out;
+}
+
+/** The loans the signed-in employee was asked to witness. */
+export async function loadMyWitnessing(employeeNumber: string): Promise<LoanWitness[]> {
+  const { data, error } = await supabase.from('employee_loan_witnesses').select(WITNESS_COLUMNS).eq('employee_number', employeeNumber).order('loan_id');
+  if (error) throw error;
+  return (data ?? []) as LoanWitness[];
+}
+
+export async function setWitness(loanId: string, employeeNumber: string): Promise<void> {
+  const { error } = await supabase.rpc('loan_set_witness', { p_loan: loanId, p_employee: employeeNumber });
+  if (error) fail(error, 'The witness was not asked.');
+}
+
+export interface WitnessView {
+  borrower_name: string;
+  principal: number;
+  months: number;
+  product_name: string | null;
+  loan_status: string;
+  borrower_signed: boolean;
+  borrower_signature: string | null;
+}
+
+export async function loadWitnessView(loanId: string): Promise<WitnessView> {
+  const { data, error } = await supabase.rpc('loan_witness_view', { p_loan: loanId });
+  if (error || !data) fail(error, 'Could not load the loan.');
+  const v = data as WitnessView;
+  return { ...v, principal: Number(v.principal), months: Number(v.months) };
+}
+
+export async function signAsWitness(loanId: string, signature: string): Promise<void> {
+  const { error } = await supabase.rpc('loan_witness_sign', { p_loan: loanId, p_signature: signature });
+  if (error) fail(error, 'You did not sign. Please try again.');
+}
+
+export async function declineWitness(loanId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('loan_witness_decline', { p_loan: loanId, p_reason: reason.trim() });
+  if (error) fail(error, 'Not declined. Please try again.');
+}
+
+/** HR deletes a cancelled loan with everything that belongs to it. */
+export async function deleteCancelledLoan(loanId: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_cancelled_loan', { p_loan: loanId });
+  if (error) fail(error, 'The loan was not deleted.');
 }
 
 // ---- the guarantor

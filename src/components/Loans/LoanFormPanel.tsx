@@ -1,13 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { Check, ClipboardCheck, Download, FileSignature, FileText, PenLine, Upload, UserCheck, UserPlus, X } from 'lucide-react';
+import { Check, ClipboardCheck, Download, FileSignature, FileText, Pencil, PenLine, Upload, UserCheck, UserPlus, X } from 'lucide-react';
 import { Button, Modal, StatusPill } from '../UI';
 import MySignature from '../Signature/MySignature';
 import SignaturePad from '../Signature/SignaturePad';
 import LoanAgreementDocument from './LoanAgreementDocument';
 import { LoaderBlock } from '../UI/FigbloomLoader';
 import { loanSchedule, type LoanInstalment } from '../../lib/loans';
-import { CHECKLIST, formStage, loanFormFileName, readyInApp, signedFormProblem, type ChecklistItem, type LoanForm, type LoanGuarantor } from '../../lib/loanForm';
+import {
+  CHECKLIST,
+  FORM_VALUE_FIELDS,
+  formStage,
+  loanFormFileName,
+  readyInApp,
+  signedFormProblem,
+  type ChecklistItem,
+  type FormValues,
+  type LoanForm,
+  type LoanGuarantor,
+  type LoanWitness,
+} from '../../lib/loanForm';
 import {
   addWitness,
   downloadLoanFormPdf,
@@ -15,7 +27,9 @@ import {
   loadLoanFormContext,
   loadMySignerIdentity,
   saveFormChecks,
+  saveFormValues,
   setGuarantor,
+  setWitness,
   openSignedForm,
   reviewSignedForm,
   signAsApprover,
@@ -27,7 +41,9 @@ import type { EmployeeLoan } from '../../lib/loansApi';
 
 // A loan's agreement form, on the borrower's loan card and on HR's: see and download it, and the step it is waiting
 // for. The borrower chooses a colleague as guarantor (who signs in their own staff portal), signs with their saved
-// signature and has a witness sign on the screen; then HR reviews it with no upload needed. A copy signed on paper can
+// signature and asks a colleague to witness it from their own portal; then HR reviews it with no upload needed. HR can
+// enter a witness who isn't on staff, who signs on the screen. The borrower or HR correct details the employee record
+// has wrong, for this loan's form only. A copy signed on paper can
 // be uploaded instead. HR accepts it (signing the employer undertaking with their saved signature) or sends it back,
 // and fills in the checklist; whoever approved the loan signs the lender approval if they did not when approving.
 // Payout waits for HR to accept it when the company requires that.
@@ -99,10 +115,16 @@ interface LoanFormPanelProps {
   myUserId?: string | null;
   /** the colleague guaranteeing it, once asked */
   guarantor?: LoanGuarantor;
+  /** the colleague asked to witness the borrower's signature */
+  witness?: LoanWitness;
+  /** the details corrected on this loan's form */
+  corrections?: FormValues;
   onChanged: () => void | Promise<void>;
 }
 
-export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myUserId, guarantor, onChanged }: LoanFormPanelProps) {
+const fieldLabel = (id: string) => FORM_VALUE_FIELDS.find((f) => f.id === id)?.label.replace(/ \(.*\)$/, '') ?? id;
+
+export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myUserId, guarantor, witness, corrections, onChanged }: LoanFormPanelProps) {
   const [viewing, setViewing] = useState(false);
   const [context, setContext] = useState<LoanFormContext | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -111,7 +133,8 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [witnessing, setWitnessing] = useState<{ name: string; idNumber: string } | null>(null);
-  const [choosing, setChoosing] = useState<{ choices: { employee_number: string; name: string }[]; picked: string } | null>(null);
+  const [choosing, setChoosing] = useState<{ role: 'guarantor' | 'witness'; choices: { employee_number: string; name: string }[]; picked: string } | null>(null);
+  const [correcting, setCorrecting] = useState<{ record: FormValues; values: FormValues } | null>(null);
   const [checking, setChecking] = useState<{ by: string; checks: ChecklistItem[] } | null>(null);
   const docRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -188,13 +211,34 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
     }
   };
 
-  const openChoose = async () => {
+  const openChoose = async (role: 'guarantor' | 'witness') => {
     try {
       const choices = (await loadGuarantorChoices()).filter((c) => c.employee_number !== loan.employee_number);
-      setChoosing({ choices, picked: '' });
+      setChoosing({ role, choices, picked: '' });
     } catch (error) {
       toast.error(errorText(error, 'Could not load your colleagues'));
     }
+  };
+
+  const openCorrect = async () => {
+    try {
+      const ctx = await loadLoanFormContext(loan);
+      const record = ctx.record ?? {};
+      setCorrecting({ record, values: { ...record, ...(ctx.corrections ?? {}) } });
+    } catch (error) {
+      toast.error(errorText(error, 'Could not load the form'));
+    }
+  };
+
+  const saveCorrections = async () => {
+    if (!correcting) return;
+    // only what differs from the record is a correction; a field matching it (or emptied) shows the record again
+    const changed: FormValues = {};
+    for (const f of FORM_VALUE_FIELDS) {
+      const v = (correcting.values[f.id] ?? '').trim();
+      if (v && v !== (correcting.record[f.id] ?? '').trim()) changed[f.id] = v;
+    }
+    if (await run(() => saveFormValues(loan.id, changed), 'Details corrected on the form')) setCorrecting(null);
   };
 
   const openChecklist = async () => {
@@ -216,7 +260,7 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
 
   const missing = [
     !form?.borrower_signature && 'sign it with your saved signature',
-    !form?.witness_signature && 'have a witness sign on the screen',
+    !form?.witness_signature && (witness?.status === 'asked' ? `${witness.witness_name} witnesses your signature from their portal` : 'choose a colleague to witness your signature'),
     form?.required && guarantor?.status !== 'signed' && 'your guarantor signs it in their staff portal',
   ].filter(Boolean) as string[];
   const nextStep =
@@ -265,9 +309,23 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
                 : `${guarantor.guarantor_name}, waiting for them to sign`}
         </p>
       )}
-      {form?.witness_name && (
-        <p className="mt-1 mb-0 text-[12px] text-ink">
-          <strong>Witness:</strong> {form.witness_name} (ID {form.witness_id_number})
+      {witness && !form?.witness_signature ? (
+        <p className="mt-1 mb-0 text-[12px] text-ink" data-testid={`witness-${loan.id}`}>
+          <strong>Witness:</strong>{' '}
+          {witness.status === 'declined'
+            ? `${witness.witness_name} declined: ${witness.decline_reason ?? ''}`
+            : `${witness.witness_name}, ${loan.status === 'approved' && form?.borrower_signature ? 'waiting for them to sign' : 'signs after you do'}`}
+        </p>
+      ) : (
+        form?.witness_name && (
+          <p className="mt-1 mb-0 text-[12px] text-ink" data-testid={`witness-${loan.id}`}>
+            <strong>Witness:</strong> {form.witness_name} (ID {form.witness_id_number}), signed
+          </p>
+        )
+      )}
+      {mode === 'hr' && corrections && Object.keys(corrections).length > 0 && (
+        <p className="mt-1 mb-0 text-[12px] text-orange-text-alt">
+          <strong>Corrected on the form:</strong> {Object.keys(corrections).map(fieldLabel).join(', ')}
         </p>
       )}
 
@@ -281,13 +339,28 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
           </Button>
         )}
         {canChooseGuarantor && (
-          <Button variant={guarantor && guarantor.status !== 'declined' ? 'ghost' : 'secondary'} onClick={() => void openChoose()} disabled={busy} icon={<UserPlus className="w-3.5 h-3.5" />}>
+          <Button variant={guarantor && guarantor.status !== 'declined' ? 'ghost' : 'secondary'} onClick={() => void openChoose('guarantor')} disabled={busy} icon={<UserPlus className="w-3.5 h-3.5" />}>
             {guarantor ? 'Change guarantor' : 'Choose guarantor'}
           </Button>
         )}
-        {open && (
-          <Button variant="ghost" onClick={() => setWitnessing({ name: form?.witness_name ?? '', idNumber: form?.witness_id_number ?? '' })} disabled={busy} icon={<UserCheck className="w-3.5 h-3.5" />}>
-            {form?.witness_signature ? 'Change witness' : 'Add witness'}
+        {canChooseGuarantor && (
+          <Button
+            variant={(witness && witness.status !== 'declined') || form?.witness_signature ? 'ghost' : 'secondary'}
+            onClick={() => void openChoose('witness')}
+            disabled={busy}
+            icon={<UserCheck className="w-3.5 h-3.5" />}
+          >
+            {witness || form?.witness_signature ? 'Change witness' : 'Choose witness'}
+          </Button>
+        )}
+        {mode === 'hr' && open && (
+          <Button variant="ghost" onClick={() => setWitnessing({ name: '', idNumber: '' })} disabled={busy} icon={<UserCheck className="w-3.5 h-3.5" />}>
+            Witness not on staff
+          </Button>
+        )}
+        {canChooseGuarantor && (
+          <Button variant="ghost" onClick={() => void openCorrect()} disabled={busy} icon={<Pencil className="w-3.5 h-3.5" />}>
+            Correct details
           </Button>
         )}
         {mode === 'hr' && form && !['rejected', 'cancelled'].includes(loan.status) && (
@@ -364,7 +437,7 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
         onClose={() => setSigning(null)}
         onSign={async (signature) => {
           await signAsBorrower(loan.id, signature);
-          await done('Signed. Add your witness if you haven’t yet.');
+          await done('Signed. Your witness can now sign from their portal.');
         }}
       />
       <SignWithMySignature
@@ -420,11 +493,13 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
         )}
       </Modal>
 
-      <Modal open={!!choosing} onClose={() => setChoosing(null)} title="Choose a guarantor" size="md">
+      <Modal open={!!choosing} onClose={() => setChoosing(null)} title={choosing?.role === 'witness' ? 'Choose a witness' : 'Choose a guarantor'} size="md">
         {choosing && (
           <>
             <p className="text-[12.5px] text-ink mb-3">
-              The guarantor must work for the same company. They are told, read the loan’s terms in their staff portal and sign with their saved signature (or decline).
+              {choosing.role === 'witness'
+                ? 'A colleague who witnesses the borrower’s signature. They are told, and sign from their staff portal with their saved signature once the borrower has signed. Their name and ID number go on the form from their record.'
+                : 'The guarantor must work for the same company. They are told, read the loan’s terms in their staff portal and sign with their saved signature (or decline).'}
             </p>
             <label className="block">
               <span className="block text-[12px] font-semibold text-ink mb-1">Colleague</span>
@@ -444,10 +519,47 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
               <Button
                 disabled={!choosing.picked || busy}
                 onClick={async () => {
-                  if (await run(() => setGuarantor(loan.id, choosing.picked), 'Guarantor asked')) setChoosing(null);
+                  const ask = choosing.role === 'witness' ? setWitness : setGuarantor;
+                  if (await run(() => ask(loan.id, choosing.picked), choosing.role === 'witness' ? 'Witness asked' : 'Guarantor asked')) setChoosing(null);
                 }}
               >
                 Ask them
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
+
+      <Modal open={!!correcting} onClose={() => setCorrecting(null)} title="Correct details on the form" size="lg">
+        {correcting && (
+          <>
+            <p className="text-[12.5px] text-ink mb-3">
+              The form shows what the employee record has. Correct anything wrong or missing here: it changes this loan’s form only, and HR sees what was
+              corrected. Ask HR to update the employee record too.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {FORM_VALUE_FIELDS.map((f) => (
+                <label key={f.id} className="block">
+                  <span className="block text-[12px] font-semibold text-ink mb-1">{f.label}</span>
+                  <input
+                    className={inputClass}
+                    type={'type' in f ? f.type : 'text'}
+                    value={correcting.values[f.id] ?? ''}
+                    maxLength={200}
+                    onChange={(e) => setCorrecting({ ...correcting, values: { ...correcting.values, [f.id]: e.target.value } })}
+                  />
+                  {(correcting.values[f.id] ?? '') !== (correcting.record[f.id] ?? '') && (
+                    <span className="block mt-0.5 text-[11px] text-muted-foreground">Record: {correcting.record[f.id] || 'empty'}</span>
+                  )}
+                </label>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <Button variant="secondary" onClick={() => setCorrecting(null)}>
+                Cancel
+              </Button>
+              <Button disabled={busy} onClick={() => void saveCorrections()}>
+                Save corrections
               </Button>
             </div>
           </>

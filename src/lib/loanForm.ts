@@ -42,6 +42,89 @@ export const CHECKLIST = [
   { id: 'payslips', label: 'Latest three months’ pay slips or employer salary confirmation' },
 ] as const;
 
+/** The colleague asked to witness the borrower's signature (employee_loan_witnesses, 20261118400000). */
+export interface LoanWitness {
+  loan_id: string;
+  employee_number: string;
+  witness_name: string;
+  status: 'asked' | 'signed' | 'declined';
+  decline_reason: string | null;
+  signed_at: string | null;
+}
+
+/**
+ * The details on the form that can be corrected for one loan when the employee record has them wrong or missing
+ * (employee_loan_form_values, 20261118400000). Corrections show on the form; the record stays as it is.
+ */
+export const FORM_VALUE_FIELDS = [
+  { id: 'id_number', label: 'National ID / Passport number' },
+  { id: 'kra_pin', label: 'KRA PIN' },
+  { id: 'date_of_birth', label: 'Date of birth', type: 'date' },
+  { id: 'mobile', label: 'Mobile number (registered M-Pesa line)' },
+  { id: 'email', label: 'Email address' },
+  { id: 'town', label: 'County / Town' },
+  { id: 'workstation', label: 'Workstation / Department' },
+  { id: 'job_title', label: 'Job title' },
+  { id: 'payroll_number', label: 'Payroll number' },
+  { id: 'employment_type', label: 'Employment type (Permanent, Fixed term or Probation)' },
+  { id: 'contract_end_date', label: 'Contract end date', type: 'date' },
+  { id: 'gross_salary', label: 'Gross monthly salary (KSh)', type: 'number' },
+  { id: 'net_salary', label: 'Net monthly salary before this loan (KSh)', type: 'number' },
+] as const;
+export type FormValueField = (typeof FORM_VALUE_FIELDS)[number]['id'];
+export type FormValues = Partial<Record<FormValueField, string>>;
+
+/** What the record says for each correctable field, as text (gross and net from the latest payslip, or basic pay). */
+export function recordValues(borrower: BorrowerDetails, latestPay: { gross: number; net: number } | null): FormValues {
+  const out: FormValues = {
+    id_number: borrower.idNumber ?? undefined,
+    kra_pin: borrower.kraPin ?? undefined,
+    date_of_birth: borrower.dateOfBirth ?? undefined,
+    mobile: borrower.mobile ?? undefined,
+    email: borrower.email ?? undefined,
+    town: borrower.town ?? undefined,
+    workstation: borrower.workstation ?? undefined,
+    job_title: borrower.jobTitle ?? undefined,
+    payroll_number: borrower.payrollNumber ?? undefined,
+    employment_type: borrower.employmentType ?? undefined,
+    contract_end_date: borrower.contractEndDate ?? undefined,
+    gross_salary: latestPay ? String(latestPay.gross) : borrower.basicSalary !== null ? String(borrower.basicSalary) : undefined,
+    net_salary: latestPay ? String(latestPay.net) : undefined,
+  };
+  return Object.fromEntries(Object.entries(out).filter(([, v]) => v !== undefined && v !== '')) as FormValues;
+}
+
+/** The borrower's details and pay with the loan's corrections on top. */
+export function withCorrections(
+  borrower: BorrowerDetails,
+  latestPay: { gross: number; net: number; period: string } | null,
+  values: FormValues
+): { borrower: BorrowerDetails; latestPay: { gross: number; net: number; period: string } | null } {
+  const v = (k: FormValueField, fallback: string | null) => values[k] ?? fallback;
+  const gross = values.gross_salary ?? (latestPay ? String(latestPay.gross) : borrower.basicSalary !== null ? String(borrower.basicSalary) : null);
+  const net = values.net_salary ?? (latestPay ? String(latestPay.net) : null);
+  return {
+    borrower: {
+      ...borrower,
+      idNumber: v('id_number', borrower.idNumber),
+      kraPin: v('kra_pin', borrower.kraPin),
+      dateOfBirth: v('date_of_birth', borrower.dateOfBirth),
+      mobile: v('mobile', borrower.mobile),
+      email: v('email', borrower.email),
+      town: v('town', borrower.town),
+      workstation: v('workstation', borrower.workstation),
+      jobTitle: v('job_title', borrower.jobTitle),
+      payrollNumber: v('payroll_number', borrower.payrollNumber),
+      employmentType: v('employment_type', borrower.employmentType),
+      contractEndDate: v('contract_end_date', borrower.contractEndDate),
+    },
+    latestPay:
+      gross === null && net === null && !latestPay
+        ? null
+        : { gross: Number(gross ?? 0), net: Number(net ?? 0), period: latestPay?.period ?? '' },
+  };
+}
+
 /** The colleague who guarantees a loan (employee_loan_guarantors, 20261118200000). */
 export interface LoanGuarantor {
   loan_id: string;

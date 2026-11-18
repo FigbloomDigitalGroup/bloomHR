@@ -33,6 +33,15 @@ vi.mock('../../lib/loanFormApi', () => ({
   addWitness: vi.fn(),
   saveFormChecks: vi.fn(),
   loadMySignerIdentity: vi.fn(),
+  loadWitnesses: vi.fn(async () => ({})),
+  loadFormValues: vi.fn(async () => ({})),
+  saveFormValues: vi.fn(),
+  setWitness: vi.fn(),
+  loadMyWitnessing: vi.fn(async () => []),
+  loadWitnessView: vi.fn(),
+  signAsWitness: vi.fn(),
+  declineWitness: vi.fn(),
+  deleteCancelledLoan: vi.fn(),
 }));
 // everyone here has a saved signature
 vi.mock('../../lib/signatures', () => ({
@@ -236,6 +245,37 @@ describe('my loans', () => {
     expect(await screen.findByText('You already have a loan request waiting for a decision.')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Withdraw request' }));
     await vi.waitFor(() => expect(mocked.withdrawLoan).toHaveBeenCalledWith('l1'));
+  });
+});
+
+describe('asked to witness', () => {
+  it('a colleague signs as witness once the borrower has signed', async () => {
+    vi.mocked(formApi.loadMyWitnessing).mockResolvedValue([{ loan_id: 'w1', witness_name: 'Jane Wanjiru', status: 'asked' }] as never);
+    vi.mocked(formApi.loadWitnessView).mockResolvedValue({
+      borrower_name: 'Peter Otieno', principal: 9000, months: 3, product_name: null, loan_status: 'approved', borrower_signed: true,
+      borrower_signature: 'data:image/png;base64,PETER',
+    });
+    vi.mocked(formApi.signAsWitness).mockResolvedValue(undefined);
+    render(<LoanRequest />);
+    const section = await screen.findByTestId('witness-requests');
+    expect(await within(section).findByText('Peter Otieno')).toBeTruthy();
+    expect(within(section).getByAltText("The borrower's signature")).toBeTruthy();
+    fireEvent.click(within(section).getByRole('button', { name: 'Sign as witness' }));
+    const dialog = screen.getByRole('dialog');
+    await within(dialog).findByAltText('Your signature');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Sign as witness' }));
+    await vi.waitFor(() => expect(formApi.signAsWitness).toHaveBeenCalledWith('w1', 'data:image/png;base64,SIG'));
+  });
+
+  it('before the borrower signs, the witness waits', async () => {
+    vi.mocked(formApi.loadMyWitnessing).mockResolvedValue([{ loan_id: 'w1', witness_name: 'Jane Wanjiru', status: 'asked' }] as never);
+    vi.mocked(formApi.loadWitnessView).mockResolvedValue({
+      borrower_name: 'Peter Otieno', principal: 9000, months: 3, product_name: null, loan_status: 'requested', borrower_signed: false, borrower_signature: null,
+    });
+    render(<LoanRequest />);
+    const section = await screen.findByTestId('witness-requests');
+    expect(await within(section).findByText('Borrower signs first')).toBeTruthy();
+    expect((within(section).getByRole('button', { name: 'Sign as witness' }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
 
