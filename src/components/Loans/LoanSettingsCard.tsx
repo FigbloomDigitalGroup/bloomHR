@@ -32,6 +32,7 @@ interface Form {
   max_amount: string;
   max_salary_multiple: string;
   staff_can_apply: boolean;
+  terms: { months: string; rate: string }[];
 }
 
 const toForm = (s: LoanSettings): Form => ({
@@ -42,6 +43,7 @@ const toForm = (s: LoanSettings): Form => ({
   max_amount: s.max_amount === null ? '' : String(s.max_amount),
   max_salary_multiple: s.max_salary_multiple === null ? '' : String(s.max_salary_multiple),
   staff_can_apply: s.staff_can_apply,
+  terms: s.term_rates.map((t) => ({ months: String(t.months), rate: String(t.rate) })),
 });
 
 const fromForm = (f: Form): LoanSettings => ({
@@ -52,7 +54,19 @@ const fromForm = (f: Form): LoanSettings => ({
   max_amount: f.max_amount.trim() === '' ? null : Number(f.max_amount),
   max_salary_multiple: f.max_salary_multiple.trim() === '' ? null : Number(f.max_salary_multiple),
   staff_can_apply: f.staff_can_apply,
+  term_rates: f.terms.filter((t) => t.months.trim() !== '' || t.rate.trim() !== '').map((t) => ({ months: Number(t.months), rate: Number(t.rate) })),
 });
+
+/** With fixed terms, the shortest and longest term are theirs (staff can ask for nothing else). */
+const withTermLimits = (s: LoanSettings): LoanSettings =>
+  s.term_rates.length === 0
+    ? s
+    : {
+        ...s,
+        term_rates: [...s.term_rates].sort((a, b) => a.months - b.months),
+        min_months: Math.min(...s.term_rates.map((t) => t.months)),
+        max_months: Math.max(...s.term_rates.map((t) => t.months)),
+      };
 
 interface ProductForm {
   id?: string;
@@ -105,10 +119,11 @@ export default function LoanSettingsCard({ canEdit: canEditProp, className = '' 
 
   if (!saved || !form) return null;
 
-  const next = fromForm(form);
+  const next = withTermLimits(fromForm(form));
   const problem = settingsError(next);
   const changed = JSON.stringify(next) !== JSON.stringify(saved);
-  const example = scheduleTotals(loanSchedule(100000, next.annual_rate, Math.min(12, next.max_months), next.interest_method, currentPeriod()));
+  const exampleMonths = next.term_rates[0]?.months ?? Math.min(12, next.max_months);
+  const example = scheduleTotals(loanSchedule(100000, next.term_rates[0]?.rate ?? next.annual_rate, exampleMonths, next.interest_method, currentPeriod()));
 
   const save = async () => {
     setBusy(true);
@@ -218,13 +233,64 @@ export default function LoanSettingsCard({ canEdit: canEditProp, className = '' 
         </label>
       </div>
 
+      <div className="mt-4 pt-3 border-t border-border">
+        <h3 className="m-0 text-[13px] font-bold text-ink">Fixed terms</h3>
+        <p className="mt-0.5 mb-2 text-[11.5px] text-muted-foreground">
+          Optional: lend only for these terms, each with its own rate (for example 3 months at 20% and 6 months at 25%). Staff then choose only these, the
+          rate follows the term, and the shortest and longest term above are set from them. Leave empty to allow any term.
+        </p>
+        <ul className="space-y-2 m-0 p-0 list-none">
+          {form.terms.map((t, i) => (
+            <li key={i} className="flex flex-wrap items-end gap-2">
+              <label className="block w-36">
+                <span className="block text-[11.5px] text-ink mb-1">Term (months)</span>
+                <input
+                  className={inputClass}
+                  type="number"
+                  min={1}
+                  max={120}
+                  aria-label={`Fixed term ${i + 1}: months`}
+                  value={t.months}
+                  disabled={!canEdit}
+                  onChange={(e) => setForm({ ...form, terms: form.terms.map((x, j) => (j === i ? { ...x, months: e.target.value } : x)) })}
+                />
+              </label>
+              <label className="block w-44">
+                <span className="block text-[11.5px] text-ink mb-1">{rateFieldLabel(form.interest_method)}</span>
+                <input
+                  className={inputClass}
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.1"
+                  aria-label={`Fixed term ${i + 1}: rate`}
+                  value={t.rate}
+                  disabled={!canEdit}
+                  onChange={(e) => setForm({ ...form, terms: form.terms.map((x, j) => (j === i ? { ...x, rate: e.target.value } : x)) })}
+                />
+              </label>
+              {canEdit && (
+                <Button variant="ghost" onClick={() => setForm({ ...form, terms: form.terms.filter((_, j) => j !== i) })}>
+                  Remove
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+        {canEdit && (
+          <Button variant="secondary" className="mt-2" icon={<Plus className="w-3.5 h-3.5" />} onClick={() => setForm({ ...form, terms: [...form.terms, { months: '', rate: '' }] })}>
+            Add a term
+          </Button>
+        )}
+      </div>
+
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <p className="m-0 text-[12.5px]" role="status" aria-live="polite">
           {problem ? (
             <span className="text-red-600">{problem}</span>
           ) : (
             <span className="text-muted-foreground">
-              Example: KSh 100,000 over {Math.min(12, next.max_months)} months is {formatKsh(example.instalment)} a month, {formatKsh(example.totalInterest)} interest
+              Example: KSh 100,000 over {exampleMonths} months is {formatKsh(example.instalment)} a month, {formatKsh(example.totalInterest)} interest
               {next.interest_method === 'upfront' ? `, ${formatKsh(example.paidOut)} paid out` : ''}.
             </span>
           )}

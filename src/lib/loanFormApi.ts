@@ -48,7 +48,7 @@ export async function loadLoanForms(loanIds: string[]): Promise<Record<string, L
 export async function loadLoanFormSettings(): Promise<LoanFormSettings> {
   const { data, error } = await supabase
     .from('loan_settings')
-    .select('lender_name, lender_licence, lender_address, lender_postal_address, lender_phone, lender_email, complaints_email, late_charge_percent, incapacity_terms, require_signed_form')
+    .select('lender_name, lender_licence, lender_address, lender_postal_address, lender_phone, lender_email, complaints_email, late_charge_percent, incapacity_terms, require_signed_form, term_rates')
     .maybeSingle();
   if (error) throw error;
   if (!data) return DEFAULT_LOAN_FORM_SETTINGS;
@@ -57,6 +57,9 @@ export async function loadLoanFormSettings(): Promise<LoanFormSettings> {
     ...data,
     late_charge_percent: data.late_charge_percent === null || data.late_charge_percent === undefined ? null : Number(data.late_charge_percent),
     require_signed_form: data.require_signed_form !== false,
+    term_rates: Array.isArray(data.term_rates)
+      ? (data.term_rates as { months: unknown; rate: unknown }[]).map((t) => ({ months: Number(t.months), rate: Number(t.rate) })).sort((a, b) => a.months - b.months)
+      : [],
   } as LoanFormSettings;
 }
 
