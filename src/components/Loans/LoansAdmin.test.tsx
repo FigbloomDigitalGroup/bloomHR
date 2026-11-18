@@ -66,6 +66,16 @@ vi.mock('../../lib/loanFormApi', () => ({
   downloadLoanFormPdf: vi.fn(),
   loadLoanFormSettings: vi.fn(),
   saveLoanFormSettings: vi.fn(),
+  loadGuarantors: vi.fn(),
+  loadGuarantorChoices: vi.fn(),
+  setGuarantor: vi.fn(),
+  loadMyGuarantees: vi.fn(),
+  loadGuarantorView: vi.fn(),
+  signAsGuarantor: vi.fn(),
+  declineGuarantee: vi.fn(),
+  addWitness: vi.fn(),
+  saveFormChecks: vi.fn(),
+  loadMySignerIdentity: vi.fn(),
 }));
 // everyone here has a saved signature
 vi.mock('../../lib/signatures', () => ({
@@ -146,6 +156,7 @@ beforeEach(() => {
   vi.mocked(formApi.signAsApprover).mockResolvedValue(undefined);
   vi.mocked(formApi.reviewSignedForm).mockResolvedValue(undefined);
   vi.mocked(formApi.loadLoanFormSettings).mockResolvedValue(DEFAULT_LOAN_FORM_SETTINGS);
+  vi.mocked(formApi.loadGuarantors).mockResolvedValue({});
   vi.stubGlobal('confirm', vi.fn(() => true));
 });
 afterEach(() => {
@@ -215,6 +226,52 @@ describe('the loans page', () => {
     await within(dialog).findByAltText('Your signature');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Accept and sign' }));
     await vi.waitFor(() => expect(formApi.reviewSignedForm).toHaveBeenCalledWith('a1', true, 'data:image/png;base64,SIG'));
+  });
+
+  it('a form signed, witnessed and guaranteed in the app is accepted with no upload', async () => {
+    perms.modules = [...HR_MODULES, 'payments'];
+    vi.mocked(formApi.loadLoanForms).mockResolvedValue({
+      a1: form({ loan_id: 'a1', borrower_signature: 'x', witness_signature: 'w', witness_name: 'Wanjiku W', witness_id_number: '123' }),
+    } as never);
+    vi.mocked(formApi.loadGuarantors).mockResolvedValue({ a1: { loan_id: 'a1', guarantor_name: 'Mary Akinyi', status: 'signed' } } as never);
+    render(<LoansAdmin />);
+    await screen.findByTestId('loan-r1');
+    fireEvent.click(screen.getByText('To pay out (1)'));
+    const card = screen.getByTestId('loan-a1');
+    expect(within(card).getByText('Signed form to review')).toBeTruthy();
+    expect(within(card).getByTestId('guarantor-a1').textContent).toMatch(/Mary Akinyi, signed/);
+    expect(within(card).getByText(/Wanjiku W \(ID 123\)/)).toBeTruthy();
+    fireEvent.click(within(card).getByRole('button', { name: 'Accept form' }));
+    const dialog = screen.getByRole('dialog');
+    await within(dialog).findByAltText('Your signature');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Accept and sign' }));
+    await vi.waitFor(() => expect(formApi.reviewSignedForm).toHaveBeenCalledWith('a1', true, 'data:image/png;base64,SIG'));
+  });
+
+  it('without the guarantor’s signature, a form signed in the app is not ready', async () => {
+    vi.mocked(formApi.loadLoanForms).mockResolvedValue({ a1: form({ loan_id: 'a1', borrower_signature: 'x', witness_signature: 'w' }) } as never);
+    vi.mocked(formApi.loadGuarantors).mockResolvedValue({ a1: { loan_id: 'a1', guarantor_name: 'Mary Akinyi', status: 'asked' } } as never);
+    render(<LoansAdmin />);
+    await screen.findByTestId('loan-r1');
+    fireEvent.click(screen.getByText('To pay out (1)'));
+    const card = screen.getByTestId('loan-a1');
+    expect(within(card).queryByRole('button', { name: 'Accept form' })).toBeNull();
+    expect(within(card).getByTestId('guarantor-a1').textContent).toMatch(/waiting for them to sign/);
+  });
+
+  it('HR fills in the checklist and who did the affordability assessment', async () => {
+    vi.mocked(formApi.loadLoanForms).mockResolvedValue({ a1: form({ loan_id: 'a1' }) } as never);
+    vi.mocked(formApi.loadMySignerIdentity).mockResolvedValue({ name: 'Hana Hr', title: 'HR Manager' });
+    vi.mocked(formApi.saveFormChecks).mockResolvedValue(undefined);
+    render(<LoansAdmin />);
+    await screen.findByTestId('loan-r1');
+    fireEvent.click(screen.getByText('To pay out (1)'));
+    fireEvent.click(within(screen.getByTestId('loan-a1')).getByRole('button', { name: 'Checklist' }));
+    const dialog = await screen.findByRole('dialog');
+    expect((within(dialog).getByLabelText('Affordability assessment completed by') as HTMLInputElement).value).toBe('Hana Hr');
+    fireEvent.click(within(dialog).getByLabelText(/Applicants Copy of National ID/));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save checklist' }));
+    await vi.waitFor(() => expect(formApi.saveFormChecks).toHaveBeenCalledWith('a1', 'Hana Hr', ['id_kra']));
   });
 
   it('sends a signed form back with what to fix', async () => {

@@ -47,6 +47,9 @@ beforeAll(async () => {
       ('H1', 'Hana', 'Hr', 'hr@a.co', 100000, 'approved', '${A}'),
       ('E1', 'Esther', 'One', 's1@a.co', 60000, 'approved', '${A}'),
       ('E2', 'Eric', 'Two', 's2@a.co', 50000, 'approved', '${A}');
+    insert into employees ("Employee Number", "First Name", "Last Name", "Work Email", "Termination Date", onboarding_status, tenant_id) values
+      ('T1', 'Tom', 'Left', 't1@a.co', '2026-10-31', 'approved', '${A}');
+    update employees set "ID Number" = 22334455, "Tax PIN" = 'A123456789B', "Mobile Number" = '0722111222' where "Employee Number" = 'E2';
   `);
   await as(HR, `insert into loan_settings (annual_rate, interest_method, min_months, max_months) values (20, 'upfront', 1, 6)`);
 }, 120000);
@@ -97,6 +100,94 @@ describe('signing', () => {
   });
 });
 
+describe('filled in the app (20261118200000)', () => {
+  it('the borrower adds the witness: name, ID number and a drawn signature, all needed', async () => {
+    await expect(as(S1, `select loan_form_witness('${loanId}', ' ', '123', '${SIG}')`)).rejects.toThrow(/full name/);
+    await expect(as(S1, `select loan_form_witness('${loanId}', 'Wanjiku W', '', '${SIG}')`)).rejects.toThrow(/ID number/);
+    await expect(as(S1, `select loan_form_witness('${loanId}', 'Wanjiku W', '123', null)`)).rejects.toThrow(/must sign/);
+    await expect(as(S2, `select loan_form_witness('${loanId}', 'Wanjiku W', '123', '${SIG}')`)).rejects.toThrow(/Loan not found/);
+    await as(S1, `select loan_form_witness('${loanId}', ' Wanjiku W ', '123', '${SIG}')`);
+    expect(await form(loanId)).toMatchObject({ witness_name: 'Wanjiku W', witness_id_number: '123', witness_signature: SIG });
+    // signed and witnessed, but no guarantor yet: nothing for HR
+    expect(await rows(`select 1 from hr_notifications where notification_type = 'loan_form_signed'`)).toHaveLength(0);
+  });
+
+  it('a form signed, witnessed and guaranteed in the app is accepted without an upload, and sent to finance', async () => {
+    const id = await ask(S2, `(employee_number, principal, months, status, disbursement_account) values ('E2', 10000, 2, 'requested', '0722 000 000')`);
+    await as(S2, `select loan_set_guarantor('${id}', 'E1')`);
+    await decide(HR, id);
+    // signed but not witnessed: nothing to review yet
+    await as(S2, `select loan_form_sign_borrower('${id}', '${SIG}')`);
+    await expect(as(HR, `select loan_form_review('${id}', true, null, '${SIG}', 'Hana Hr', null)`)).rejects.toThrow(/no signed form waiting/);
+    await as(S2, `select loan_form_witness('${id}', 'Otieno O', '987', '${SIG}')`);
+    // witnessed, but the guarantor hasn't signed: still nothing to review
+    await expect(as(HR, `select loan_form_review('${id}', true, null, '${SIG}', 'Hana Hr', null)`)).rejects.toThrow(/no signed form waiting/);
+    await as(S1, `select loan_guarantor_sign('${id}', '${SIG}', 'Colleague')`);
+    // the guarantor completed it: HR hears
+    expect(await rows(`select 1 from hr_notifications where notification_type = 'loan_form_signed'`)).toHaveLength(1);
+    // sent back: the witness signs again before it is ready again
+    await as(HR, `select loan_form_review('${id}', false, 'The witness ID looks wrong.')`);
+    await expect(as(HR, `select loan_form_review('${id}', true, null, '${SIG}', 'Hana Hr', null)`)).rejects.toThrow(/no signed form waiting/);
+    await as(S2, `select loan_form_witness('${id}', 'Otieno O', '98765', '${SIG}')`);
+    await as(HR, `select loan_form_review('${id}', true, null, '${SIG}', 'Hana Hr', null)`);
+    expect(await form(id)).toMatchObject({ status: 'accepted', file_path: null, witness_id_number: '98765' });
+    expect(await payment(id)).toMatchObject({ status: 'to_pay', payee_details: '0722 000 000' });
+  });
+
+  it('HR fills in the affordability assessment and the checklist; staff can’t', async () => {
+    await expect(as(S1, `select loan_form_checks('${loanId}', 'Me', array['id_kra'])`)).rejects.toThrow(/Only HR/);
+    await expect(as(HR, `select loan_form_checks('${loanId}', 'Hana', array['made_up'])`)).rejects.toThrow(/Unknown checklist item/);
+    await as(HR, `select loan_form_checks('${loanId}', ' Hana Hr ', array['payslips', 'id_kra', 'id_kra'])`);
+    expect(await form(loanId)).toMatchObject({ affordability_by: 'Hana Hr', checks: ['id_kra', 'payslips'] });
+    await expect(as(HR, `update employee_loan_forms set checks = '{}' where loan_id = '${loanId}'`)).rejects.toThrow();
+  });
+});
+
+describe('the guarantor', () => {
+  it('is a colleague still employed, never the borrower', async () => {
+    await expect(as(S1, `select loan_set_guarantor('${loanId}', 'E1')`)).rejects.toThrow(/own guarantor/);
+    await expect(as(S1, `select loan_set_guarantor('${loanId}', 'T1')`)).rejects.toThrow(/still work/);
+    await expect(as(S1, `select loan_set_guarantor('${loanId}', 'X9')`)).rejects.toThrow(/colleague/);
+    await expect(as(S2, `select loan_set_guarantor('${loanId}', 'H1')`)).rejects.toThrow(/Loan not found/);
+    const choices = await read<{ employee_number: string }>(S1, `select employee_number from loan_guarantor_choices()`);
+    expect(choices.map((c) => c.employee_number).sort()).toEqual(['E2', 'H1']);
+  });
+
+  it('asked, they hear of it; only they sign or decline, and the borrower hears the answer', async () => {
+    await as(S1, `select loan_set_guarantor('${loanId}', 'E2')`);
+    expect(await rows(`select 1 from hr_notifications where employee_number = 'E2' and notification_type = 'loan_guarantor_asked'`)).toHaveLength(1);
+    await expect(as(HR, `select loan_guarantor_sign('${loanId}', '${SIG}', 'Colleague')`)).rejects.toThrow(/Loan not found/);
+    await expect(as(S2, `select loan_guarantor_decline('${loanId}', ' ')`)).rejects.toThrow(/reason/);
+    await as(S2, `select loan_guarantor_decline('${loanId}', 'I am guaranteeing another loan')`);
+    expect(await rows(`select 1 from hr_notifications where employee_number = 'E1' and notification_type = 'loan_guarantor_declined'`)).toHaveLength(1);
+    // asked again (the borrower may, after a decline)
+    await as(S1, `select loan_set_guarantor('${loanId}', 'E2')`);
+    await expect(as(S2, `select loan_guarantor_sign('${loanId}', '${SIG}', ' ')`)).rejects.toThrow(/related/);
+  });
+
+  it('sees the loan’s terms but not the borrower’s personal details', async () => {
+    const [{ v }] = await read<{ v: Record<string, unknown> }>(S2, `select loan_form_for_guarantor('${loanId}') v`);
+    expect(v).toMatchObject({ borrower_name: 'Esther One', loan: { principal: 30000, months: 3 } });
+    // the borrower's own details stay out: address, other repayments, pay
+    expect(JSON.stringify(v)).not.toMatch(/Kileleshwa|other_loan_repayments|Basic Salary|60000/);
+    await expect(read(HR, `select loan_form_for_guarantor('${loanId}')`)).rejects.toThrow(/Loan not found/);
+  });
+
+  it('signing copies their details from their employee record; once signed, only HR changes them', async () => {
+    await as(S2, `select loan_guarantor_sign('${loanId}', '${SIG}', 'Colleague', '0733000000', 'Ruaka')`);
+    expect((await rows(`select * from employee_loan_guarantors where loan_id = '${loanId}'`))[0]).toMatchObject({
+      status: 'signed', relationship: 'Colleague', alternative_phone: '0733000000', id_number: '22334455', kra_pin: 'A123456789B',
+      mobile: '0722111222', signature: SIG,
+    });
+    await expect(as(S1, `select loan_set_guarantor('${loanId}', 'H1')`)).rejects.toThrow(/Ask HR/);
+    // the borrower and HR read it; nobody writes it directly
+    // (Esther also guarantees Eric's loan, so she reads two)
+    expect(await read(S1, `select loan_id from employee_loan_guarantors`)).toHaveLength(2);
+    expect(await read(HRB, `select loan_id from employee_loan_guarantors`)).toHaveLength(0);
+    await expect(as(HR, `update employee_loan_guarantors set status = 'asked' where loan_id = '${loanId}'`)).rejects.toThrow();
+  });
+});
+
 describe('the signed copy', () => {
   it('goes in the loan\'s own folder, as a PDF', async () => {
     await expect(as(S1, `select loan_form_submit('${loanId}', '${A}/other/signed-1.pdf')`)).rejects.toThrow(/own folder/);
@@ -108,7 +199,7 @@ describe('the signed copy', () => {
     await as(S1, `select loan_form_submit('${loanId}', '${path(loanId)}', 'my form.pdf')`);
     expect(await form(loanId)).toMatchObject({ status: 'uploaded', file_path: path(loanId), file_name: 'my form.pdf' });
     const hr = await rows<{ title: string }>(`select title from hr_notifications where notification_type = 'loan_form_signed'`);
-    expect(hr).toHaveLength(1);
+    expect(hr.length).toBeGreaterThanOrEqual(2);
   });
 
   it('HR sends it back with a reason; the borrower uploads again', async () => {

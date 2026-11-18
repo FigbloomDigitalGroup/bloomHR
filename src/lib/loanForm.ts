@@ -25,7 +25,43 @@ export interface LoanForm {
   employer_officer: string | null;
   employer_officer_title: string | null;
   reviewed_at: string | null;
+  /** the witness, added in the app (20261118200000) */
+  witness_name?: string | null;
+  witness_id_number?: string | null;
+  witness_signature?: string | null;
+  witness_signed_at?: string | null;
+  /** HR's part: who did the affordability assessment, and the checklist items ticked */
+  affordability_by?: string | null;
+  checks?: ChecklistItem[];
 }
+
+/** The checklist items HR ticks; "Signed application/agreement Loan form" ticks itself once HR accepts the form. */
+export const CHECKLIST = [
+  { id: 'guarantor_docs', label: 'Signed Guarantor section, Guarantor ID & KRA' },
+  { id: 'id_kra', label: 'Applicants Copy of National ID / passport & KRA Pin' },
+  { id: 'payslips', label: 'Latest three months’ pay slips or employer salary confirmation' },
+] as const;
+
+/** The colleague who guarantees a loan (employee_loan_guarantors, 20261118200000). */
+export interface LoanGuarantor {
+  loan_id: string;
+  employee_number: string;
+  guarantor_name: string;
+  status: 'asked' | 'signed' | 'declined';
+  decline_reason: string | null;
+  relationship: string | null;
+  alternative_phone: string | null;
+  residential_address: string | null;
+  id_number: string | null;
+  kra_pin: string | null;
+  date_of_birth: string | null;
+  mobile: string | null;
+  email: string | null;
+  town: string | null;
+  signature: string | null;
+  signed_at: string | null;
+}
+export type ChecklistItem = (typeof CHECKLIST)[number]['id'];
 
 /** Who lends, as the form's heading and terms name them (the company itself when no other lender is set). */
 export interface LenderDetails {
@@ -259,15 +295,28 @@ export const employmentBox = (type: string | null): 'permanent' | 'fixed_term' |
 /** Where a loan's form stands, for the borrower and HR. */
 export function formStage(
   loan: { status: LoanStatus },
-  form: LoanForm | null | undefined
+  form: LoanForm | null | undefined,
+  ready = false
 ): { label: string; tone: 'neutral' | 'warning' | 'info' | 'success' | 'danger' } {
   if (!form) return loan.status === 'requested' ? { label: 'Form: signed after approval', tone: 'neutral' } : { label: 'No form', tone: 'neutral' };
   if (form.status === 'accepted') return { label: 'Signed form accepted', tone: 'success' };
-  if (form.status === 'uploaded') return { label: 'Signed form to review', tone: 'info' };
+  if (form.status === 'uploaded' || ready) return { label: 'Signed form to review', tone: 'info' };
   if (form.status === 'sent_back') return { label: 'Signed form sent back', tone: 'danger' };
   if (loan.status !== 'approved') return { label: 'Form not uploaded', tone: 'neutral' };
   return form.borrower_signature ? { label: 'Signed, to upload', tone: 'warning' } : { label: 'Form to sign', tone: 'warning' };
 }
+
+/**
+ * Signed by the borrower, witnessed and (when the form is required) guaranteed in the app, the witness since HR last
+ * sent it back: ready for HR without an upload (as the database's loan_form_signed_in_app).
+ */
+export const readyInApp = (form: LoanForm | null | undefined, guarantor: Pick<LoanGuarantor, 'status'> | null | undefined) =>
+  !!form &&
+  (form.status === 'none' || form.status === 'sent_back') &&
+  !!form.borrower_signature &&
+  !!form.witness_signature &&
+  (!form.reviewed_at || (form.witness_signed_at ?? '') > form.reviewed_at) &&
+  (!form.required || guarantor?.status === 'signed');
 
 /** Payout waits for this loan's signed form. */
 export const formHoldsPayout = (form: LoanForm | null | undefined) => !!form && form.required && form.status !== 'accepted';

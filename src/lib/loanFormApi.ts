@@ -12,7 +12,11 @@ import {
   type LenderDetails,
   type LoanForm,
   type LoanFormSettings,
+  type ChecklistItem,
+  type LoanGuarantor,
 } from './loanForm';
+import type { LoanInstalment } from './loans';
+import type { EmployeeLoan } from './loansApi';
 
 // Reading and acting on loan forms (migration 20261118100000). The database checks who may sign, upload and review,
 // and holds payout until the signed form is accepted; these only call it.
@@ -24,7 +28,7 @@ const fail = (error: { message?: string } | null, fallback: string): never => {
 };
 
 const FORM_COLUMNS =
-  'loan_id, required, borrower_signature, borrower_signed_at, approver_signature, approver_name, approver_title, approver_signed_at, status, file_path, file_name, uploaded_at, send_back_reason, employer_signature, employer_officer, employer_officer_title, reviewed_at';
+  'loan_id, required, borrower_signature, borrower_signed_at, approver_signature, approver_name, approver_title, approver_signed_at, status, file_path, file_name, uploaded_at, send_back_reason, employer_signature, employer_officer, employer_officer_title, reviewed_at, witness_name, witness_id_number, witness_signature, witness_signed_at, affordability_by, checks';
 
 /** The forms of these loans (the ones the signed-in person may see), by loan id. */
 export async function loadLoanForms(loanIds: string[]): Promise<Record<string, LoanForm>> {
@@ -161,6 +165,143 @@ export async function signAsApprover(loanId: string, signature: string): Promise
   const me = await loadMySignerIdentity();
   const { error } = await supabase.rpc('loan_form_sign_approver', { p_loan: loanId, p_signature: signature, p_name: me.name, p_title: me.title });
   if (error) fail(error, 'Your signature was not added to the approval.');
+}
+
+const blobToDataUrl = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error('Could not read the signature.'));
+    reader.readAsDataURL(blob);
+  });
+
+/** The witness of the borrower's signature: their name, ID number and signature drawn on the screen (a PNG). */
+export async function addWitness(loanId: string, witness: { name: string; idNumber: string; signature: Blob }): Promise<void> {
+  const { error } = await supabase.rpc('loan_form_witness', {
+    p_loan: loanId,
+    p_name: witness.name.trim(),
+    p_id_number: witness.idNumber.trim(),
+    p_signature: await blobToDataUrl(witness.signature),
+  });
+  if (error) fail(error, 'The witness was not added.');
+}
+
+/** HR's part of the form: who did the affordability assessment and the checklist items ticked. */
+export async function saveFormChecks(loanId: string, affordabilityBy: string, checks: ChecklistItem[]): Promise<void> {
+  const { error } = await supabase.rpc('loan_form_checks', { p_loan: loanId, p_affordability_by: affordabilityBy.trim(), p_checks: checks });
+  if (error) fail(error, 'The checklist was not saved.');
+}
+
+// ---- the guarantor
+
+const GUARANTOR_COLUMNS =
+  'loan_id, employee_number, guarantor_name, status, decline_reason, relationship, alternative_phone, residential_address, id_number, kra_pin, date_of_birth, mobile, email, town, signature, signed_at';
+
+/** The guarantors of these loans (the ones the signed-in person may see), by loan id. */
+export async function loadGuarantors(loanIds: string[]): Promise<Record<string, LoanGuarantor>> {
+  const out: Record<string, LoanGuarantor> = {};
+  for (const ids of chunks([...new Set(loanIds)], IN_LIST_SIZE)) {
+    const { data, error } = await supabase.from('employee_loan_guarantors').select(GUARANTOR_COLUMNS).in('loan_id', ids);
+    if (error) throw error;
+    for (const row of (data ?? []) as LoanGuarantor[]) out[row.loan_id] = row;
+  }
+  return out;
+}
+
+/** The loans the signed-in employee was asked to guarantee. */
+export async function loadMyGuarantees(employeeNumber: string): Promise<LoanGuarantor[]> {
+  const { data, error } = await supabase.from('employee_loan_guarantors').select(GUARANTOR_COLUMNS).eq('employee_number', employeeNumber).order('loan_id');
+  if (error) throw error;
+  return (data ?? []) as LoanGuarantor[];
+}
+
+/** The colleagues a borrower may ask to guarantee their loan. */
+export async function loadGuarantorChoices(): Promise<{ employee_number: string; name: string }[]> {
+  const { data, error } = await supabase.rpc('loan_guarantor_choices');
+  if (error) throw error;
+  return (data ?? []) as { employee_number: string; name: string }[];
+}
+
+/** Asks a colleague to guarantee the loan (or another, after one declined). */
+export async function setGuarantor(loanId: string, employeeNumber: string): Promise<void> {
+  const { error } = await supabase.rpc('loan_set_guarantor', { p_loan: loanId, p_employee: employeeNumber });
+  if (error) fail(error, 'The guarantor was not asked.');
+}
+
+/** The guarantor signs with their saved signature, adding how they know the borrower and how to reach them. */
+export async function signAsGuarantor(
+  loanId: string,
+  signature: string,
+  details: { relationship: string; alternativePhone: string; address: string }
+): Promise<void> {
+  const { error } = await supabase.rpc('loan_guarantor_sign', {
+    p_loan: loanId,
+    p_signature: signature,
+    p_relationship: details.relationship.trim(),
+    p_alternative_phone: details.alternativePhone.trim() || null,
+    p_address: details.address.trim() || null,
+  });
+  if (error) fail(error, 'You did not sign. Please try again.');
+}
+
+export async function declineGuarantee(loanId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('loan_guarantor_decline', { p_loan: loanId, p_reason: reason.trim() });
+  if (error) fail(error, 'Not declined. Please try again.');
+}
+
+/** What the guarantor sees: the loan's terms and schedule and their own part, the borrower's name only. */
+export interface GuarantorView {
+  loan: EmployeeLoan;
+  schedule: LoanInstalment[];
+  guarantor: LoanGuarantor;
+  context: LoanFormContext;
+}
+
+const numOrNull = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+
+export async function loadGuarantorView(loanId: string): Promise<GuarantorView> {
+  const [{ data, error }, settings, company] = await Promise.all([
+    supabase.rpc('loan_form_for_guarantor', { p_loan: loanId }),
+    loadLoanFormSettings(),
+    quiet(loadCompanyProfile),
+  ]);
+  if (error || !data) fail(error, 'Could not load the loan.');
+  const v = data as { loan: Record<string, unknown>; borrower_name: string; schedule: Record<string, unknown>[]; guarantor: LoanGuarantor; employer: string | null };
+  const loan = {
+    ...v.loan,
+    principal: Number(v.loan.principal),
+    annual_rate: Number(v.loan.annual_rate),
+    months: Number(v.loan.months),
+    monthly_instalment: numOrNull(v.loan.monthly_instalment),
+    total_interest: numOrNull(v.loan.total_interest),
+    total_repayable: numOrNull(v.loan.total_repayable),
+    employee_name: v.borrower_name,
+    decided_by_email: null,
+    decision_comment: null,
+    disbursed_by_email: null,
+  } as unknown as EmployeeLoan;
+  const schedule = (v.schedule ?? []).map((i) => ({
+    instalment_no: Number(i.instalment_no),
+    period: String(i.period),
+    payment: Number(i.payment),
+    principal: Number(i.principal),
+    interest: Number(i.interest),
+    balance: Number(i.balance),
+  }));
+  const employer = v.employer ?? company?.company_name ?? null;
+  return {
+    loan,
+    schedule,
+    guarantor: v.guarantor,
+    context: {
+      settings,
+      lender: lenderDetails(settings, company),
+      // the borrower's name only: their ID, PIN, pay and address are not the guarantor's to see
+      borrower: { ...borrowerFromEmployee({ 'Employee Number': '' }, employer), fullName: v.borrower_name },
+      latestPay: null,
+      payout: null,
+    },
+  };
 }
 
 /** The signed copy, a PDF: from the borrower, or from HR for a form signed on paper. Every copy is kept. */

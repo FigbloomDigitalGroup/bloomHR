@@ -36,6 +36,7 @@ export interface HRNotification {
         | 'application_received'
         | 'loan_requested' | 'loan_disbursed' | 'loan_repaid'
         | 'loan_form_to_sign' | 'loan_form_signed' | 'loan_form_accepted' | 'loan_form_sent_back'
+        | 'loan_guarantor_asked' | 'loan_guarantor_signed' | 'loan_guarantor_declined'
         | 'contract_sent' | 'contract_sent_back' | 'contract_accepted' | 'contract_cancelled' | 'contract_signed'
         | 'leave_exhausted' | 'casual_limit'
         | 'leave_document_overdue'

@@ -22,6 +22,16 @@ vi.mock('../../lib/loanFormApi', () => ({
   downloadLoanFormPdf: vi.fn(),
   loadLoanFormSettings: vi.fn(),
   saveLoanFormSettings: vi.fn(),
+  loadGuarantors: vi.fn(),
+  loadGuarantorChoices: vi.fn(),
+  setGuarantor: vi.fn(),
+  loadMyGuarantees: vi.fn(),
+  loadGuarantorView: vi.fn(),
+  signAsGuarantor: vi.fn(),
+  declineGuarantee: vi.fn(),
+  addWitness: vi.fn(),
+  saveFormChecks: vi.fn(),
+  loadMySignerIdentity: vi.fn(),
 }));
 // everyone here has a saved signature
 vi.mock('../../lib/signatures', () => ({
@@ -36,6 +46,7 @@ import * as api from '../../lib/loansApi';
 import * as advanceApi from '../../lib/salaryAdvanceApi';
 import * as formApi from '../../lib/loanFormApi';
 import { DEFAULT_LOAN_SETTINGS, loanSchedule } from '../../lib/loans';
+import { DEFAULT_LOAN_FORM_SETTINGS } from '../../lib/loanForm';
 import LoanRequest from './LoanRequest';
 
 const mocked = vi.mocked(api);
@@ -96,11 +107,16 @@ beforeEach(() => {
   mocked.loadLoanSettings.mockResolvedValue(SETTINGS);
   mocked.loadLoanProducts.mockResolvedValue(PRODUCTS);
   mocked.loadMyLoans.mockResolvedValue([]);
-  mocked.requestLoan.mockResolvedValue(undefined);
+  mocked.requestLoan.mockResolvedValue('new-loan');
   mocked.withdrawLoan.mockResolvedValue(undefined);
   vi.mocked(formApi.loadLoanForms).mockResolvedValue({});
   vi.mocked(formApi.signAsBorrower).mockResolvedValue(undefined);
   vi.mocked(formApi.uploadSignedForm).mockResolvedValue(undefined);
+  vi.mocked(formApi.loadGuarantors).mockResolvedValue({});
+  vi.mocked(formApi.loadGuarantorChoices).mockResolvedValue([{ employee_number: 'E2', name: 'Peter Otieno' }]);
+  vi.mocked(formApi.loadLoanFormSettings).mockResolvedValue(DEFAULT_LOAN_FORM_SETTINGS);
+  vi.mocked(formApi.setGuarantor).mockResolvedValue(undefined);
+  vi.mocked(formApi.loadMyGuarantees).mockResolvedValue([]);
 });
 afterEach(() => {
   cleanup();
@@ -146,6 +162,11 @@ describe('applying for a loan', () => {
     fireEvent.change(screen.getByLabelText('Where you live (residential address)'), { target: { value: 'Kileleshwa, Nairobi' } });
     fireEvent.change(screen.getByLabelText('Other loan repayments a month (KSh)'), { target: { value: '2000' } });
     fireEvent.change(screen.getByLabelText('Pay the loan to (M-Pesa number or account)'), { target: { value: '0712 345 678' } });
+    // a guarantor is needed while the company requires the signed form
+    fireEvent.click(screen.getByRole('button', { name: /Send request/ }));
+    expect(await screen.findByText('Choose a colleague to guarantee your loan.')).toBeTruthy();
+    expect(mocked.requestLoan).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText(/Guarantor \(a colleague at the company\)/), { target: { value: 'E2' } });
     fireEvent.click(screen.getByRole('button', { name: /Send request/ }));
     await vi.waitFor(() =>
       expect(mocked.requestLoan).toHaveBeenCalledWith(ME, {
@@ -156,6 +177,7 @@ describe('applying for a loan', () => {
         details: { residentialAddress: 'Kileleshwa, Nairobi', otherLoanRepayments: '2000', disbursementAccount: '0712 345 678' },
       }),
     );
+    await vi.waitFor(() => expect(formApi.setGuarantor).toHaveBeenCalledWith('new-loan', 'E2'));
   });
 
   it('cannot apply while applications are closed', async () => {
@@ -187,6 +209,32 @@ describe('my loans', () => {
     expect(await screen.findByText('You already have a loan request waiting for a decision.')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Withdraw request' }));
     await vi.waitFor(() => expect(mocked.withdrawLoan).toHaveBeenCalledWith('l1'));
+  });
+});
+
+describe('asked to guarantee', () => {
+  it('a colleague reads the form and signs as guarantor with their saved signature', async () => {
+    vi.mocked(formApi.loadMyGuarantees).mockResolvedValue([{ loan_id: 'g1', guarantor_name: 'Jane Wanjiru', status: 'asked' }] as never);
+    vi.mocked(formApi.loadGuarantorView).mockResolvedValue({
+      loan: { ...loan({ id: 'g1', status: 'approved', principal: 30000 }), employee_name: 'Peter Otieno' },
+      schedule: [],
+      guarantor: { loan_id: 'g1', guarantor_name: 'Jane Wanjiru', status: 'asked' },
+      context: { settings: DEFAULT_LOAN_FORM_SETTINGS, lender: { name: 'Farm Ltd' }, borrower: { fullName: 'Peter Otieno' }, latestPay: null, payout: null },
+    } as never);
+    vi.mocked(formApi.signAsGuarantor).mockResolvedValue(undefined);
+    render(<LoanRequest />);
+    const section = await screen.findByTestId('guarantee-requests');
+    expect(await within(section).findByText('Peter Otieno')).toBeTruthy();
+    fireEvent.click(within(section).getByRole('button', { name: 'Sign as guarantor' }));
+    const dialog = screen.getByRole('dialog');
+    await within(dialog).findByAltText('Your signature');
+    const sign = within(dialog).getByRole('button', { name: 'Sign as guarantor' }) as HTMLButtonElement;
+    expect(sign.disabled).toBe(true); // the relationship is needed
+    fireEvent.change(within(dialog).getByLabelText('Relationship to borrower'), { target: { value: 'Colleague' } });
+    fireEvent.click(sign);
+    await vi.waitFor(() =>
+      expect(formApi.signAsGuarantor).toHaveBeenCalledWith('g1', 'data:image/png;base64,SIG', { relationship: 'Colleague', alternativePhone: '', address: '' })
+    );
   });
 });
 
