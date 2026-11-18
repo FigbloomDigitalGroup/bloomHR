@@ -70,7 +70,7 @@ describe('framing the photo', () => {
     expect(await fails(HR, `select set_staff_id_card_photo_framing($1, 0.5, 0.5, 1)`, [h1])).toMatch(/no photo to frame/);
   });
 
-  it('the landscape card is framed on its own (20261118300000): portrait unchanged, centred until framed', async () => {
+  it('the landscape card is framed on its own (20261118900000): portrait unchanged, centred until framed', async () => {
     type Both = Framing & { landscape_photo_x: string; landscape_photo_y: string; landscape_photo_zoom: string };
     const both = async () => (await as<Both>(S1, `select photo_x, photo_y, photo_zoom, landscape_photo_x, landscape_photo_y,
       landscape_photo_zoom from my_staff_id_card()`))[0];
