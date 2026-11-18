@@ -180,7 +180,9 @@ describe('applying: HR\'s checks, each refusal in HR\'s words', () => {
     expect(e.message).toMatch(/Sick Leave needs a document with the application/);
   });
   it('a half day is one day', async () => {
-    const e = await applyError({ type: await typeId(school, 'Annual Leave'), start: day(10), end: day(12), half: true });
+    // two different weekdays: day(10) and day(12) are the same Monday when day 10 falls on a Saturday (every
+    // Wednesday), and then the half day was accepted, leaving a pending application that broke the tests below
+    const e = await applyError({ type: await typeId(school, 'Annual Leave'), start: day(10), end: dayAfter(day(10)), half: true });
     expect(e.message).toMatch(/A half day is one day/);
   });
   it('a type of another company, or a document from elsewhere, is refused', async () => {
