@@ -88,8 +88,17 @@ describe('the borrower’s details for the form', () => {
     expect(await borrower(S1)).toMatchObject({ gross: 74784, net: 84120, pay_changed: false });
   });
 
-  it('for the borrower and those who read loans only', async () => {
+  it('for the borrower, those who read loans, and the loan’s guarantor and witness only (20261118700000)', async () => {
     expect(await borrower(HR)).toMatchObject({ gross: 74784 });
-    await expect(read(S2, `select loan_form_borrower('${loanId}')`)).rejects.toThrow(/Loan not found/);
+    // Eric guarantees the loan and Ella witnesses it: they see the form; a colleague with no part in it doesn't
+    expect(await borrower(S2)).toMatchObject({ gross: 74784 });
+    expect(await borrower(S3)).toMatchObject({ gross: 74784 });
+    const S4 = '00000000-0000-0000-0000-00000000a605';
+    await db.exec(`
+      insert into auth.users (id, email) values ('${S4}', 's4@a.co');
+      insert into user_profiles (user_id, email, role, tenant_id) values ('${S4}', 's4@a.co', 'STAFF', '${A}');
+      insert into employees ("Employee Number", "First Name", "Last Name", "Work Email", onboarding_status, tenant_id)
+      values ('E4', 'Otto', 'Four', 's4@a.co', 'approved', '${A}');`);
+    await expect(read(S4, `select loan_form_borrower('${loanId}')`)).rejects.toThrow(/Loan not found/);
   });
 });

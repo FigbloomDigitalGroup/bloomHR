@@ -128,13 +128,13 @@ export default function GuaranteeRequests({ employeeNumber }: { employeeNumber: 
           ) : (
             <>
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <p className="m-0 text-[12px] text-muted-foreground">The loan’s terms and your part as guarantor. The borrower’s personal details are not shown to you.</p>
+                <p className="m-0 text-[12px] text-muted-foreground">The whole form as it stands, with the signatures so far. Your part is the guarantor’s section.</p>
                 <Button onClick={() => void download()} disabled={downloading} icon={<Download className="w-3.5 h-3.5" />}>
                   {downloading ? 'Preparing…' : 'Download PDF'}
                 </Button>
               </div>
               <div className="max-h-[70vh] overflow-auto rounded-tile border border-border bg-white p-4">
-                <LoanAgreementDocument ref={docRef} loan={view.loan} form={null} context={view.context} schedule={view.schedule} guarantor={view.guarantor} />
+                <LoanAgreementDocument ref={docRef} loan={view.loan} form={view.form} context={view.context} schedule={view.schedule} guarantor={view.guarantor} witness={view.witness} />
               </div>
             </>
           ))}

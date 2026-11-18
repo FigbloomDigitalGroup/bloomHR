@@ -416,7 +416,7 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
                 <p className="m-0 text-[12px] text-muted-foreground">
                   {loan.status === 'requested'
                     ? 'A draft from the request: the figures are confirmed on approval.'
-                    : 'Filled in from the loan, with the signatures added so far. Only the stamps are added by hand.'}
+                    : 'Filled in from the loan, with the signatures and dates added so far.'}
                 </p>
                 <Button onClick={() => void download()} disabled={downloading} icon={<Download className="w-3.5 h-3.5" />}>
                   {downloading ? 'Preparing…' : 'Download PDF'}

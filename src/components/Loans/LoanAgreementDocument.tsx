@@ -9,7 +9,7 @@ import type { EmployeeLoan } from '../../lib/loansApi';
 // authority with the employer undertaking, the borrower's declaration with the witness, "For Official Use" (approval
 // and payout) and the checklist. It is filled in from the loan, and carries the signatures put on it in the app: the
 // borrower's, the guarantor's and the approver's saved signatures, the HR officer's who accepted the form (employer
-// undertaking), and the witness's drawn on the screen. Only the stamps are left to the paper copy. Inline styles, so
+// undertaking), and the witness's drawn on the screen. Nothing is left for paper. Inline styles, so
 // the PDF looks the same anywhere. For the guarantor, the borrower's personal details come in empty.
 
 const INK = '#111827';
@@ -411,9 +411,7 @@ const LoanAgreementDocument = forwardRef<HTMLDivElement, LoanAgreementDocumentPr
           </tr>
           <tr>
             <Field name="Date">{formDate(form?.employer_signature ? form.reviewed_at : null)}</Field>
-            <Field name="Official stamp">
-              <span style={{ display: 'block', height: 40 }} />
-            </Field>
+            <td style={cell} />
           </tr>
         </tbody>
       </table>
@@ -485,9 +483,7 @@ const LoanAgreementDocument = forwardRef<HTMLDivElement, LoanAgreementDocumentPr
             <Field name="Signature">
               <Signature src={form?.approver_signature} alt="Approver's signature" />
             </Field>
-            <Field name="Company stamp">
-              <span style={{ display: 'block', height: 40 }} />
-            </Field>
+            <Field name="Signed on">{formDate(form?.approver_signed_at)}</Field>
           </tr>
           <tr>
             <Field name="Disbursement date">{formDate(payout?.paidOn ?? loan.disbursed_at)}</Field>
