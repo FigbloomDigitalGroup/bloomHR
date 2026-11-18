@@ -359,7 +359,7 @@ describe('the loans page', () => {
     await vi.waitFor(() => expect(formApi.reviewSignedForm).toHaveBeenCalledWith('a1', false, 'The witness has not signed'));
   });
 
-  it('whoever approved signs the approval later if they did not when approving', async () => {
+  it('anyone who manages loans signs a missing approval, with their designation (e.g. Owner)', async () => {
     mocked.loadAllLoans.mockResolvedValue(LOANS.map((l) => (l.id === 'a1' ? { ...l, decided_by: 'hr-user' } : l)));
     vi.mocked(formApi.loadLoanForms).mockResolvedValue({ a1: form({ loan_id: 'a1' }) } as never);
     render(<LoansAdmin />);
@@ -368,8 +368,9 @@ describe('the loans page', () => {
     fireEvent.click(await within(screen.getByTestId('loan-a1')).findByRole('button', { name: 'Sign the approval' }));
     const dialog = screen.getByRole('dialog');
     await within(dialog).findByAltText('Your signature');
+    fireEvent.change(within(dialog).getByLabelText('Designation'), { target: { value: 'Owner' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Sign the approval' }));
-    await vi.waitFor(() => expect(formApi.signAsApprover).toHaveBeenCalledWith('a1', 'data:image/png;base64,SIG'));
+    await vi.waitFor(() => expect(formApi.signAsApprover).toHaveBeenCalledWith('a1', 'data:image/png;base64,SIG', 'Owner'));
   });
 
   it('HR without the payments module is told finance pays the loan out', async () => {

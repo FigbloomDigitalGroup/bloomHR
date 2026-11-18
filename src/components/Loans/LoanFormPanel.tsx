@@ -60,21 +60,31 @@ export function SignWithMySignature({
   confirmLabel,
   onClose,
   onSign,
+  askDesignation = false,
 }: {
   open: boolean;
   title: string;
   explain: string;
   confirmLabel: string;
   onClose: () => void;
-  onSign: (signature: string) => Promise<void>;
+  onSign: (signature: string, designation: string) => Promise<void>;
+  /** ask the signer's designation (e.g. "Owner"), filled from their job title */
+  askDesignation?: boolean;
 }) {
   const [signature, setSignature] = useState<string | null>(null);
+  const [designation, setDesignation] = useState('');
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!open || !askDesignation) return;
+    Promise.resolve(loadMySignerIdentity())
+      .then((me) => setDesignation((d) => d || me?.title || ''))
+      .catch(() => undefined);
+  }, [open, askDesignation]);
   const sign = async () => {
     if (!signature) return;
     setBusy(true);
     try {
-      await onSign(signature);
+      await onSign(signature, designation.trim());
       onClose();
     } catch (error) {
       toast.error(errorText(error, 'Not signed. Please try again.'));
@@ -87,6 +97,12 @@ export function SignWithMySignature({
       {open && (
         <>
           <p className="text-[12.5px] text-ink mb-3">{explain}</p>
+          {askDesignation && (
+            <label className="block mb-3">
+              <span className="block text-[12px] font-semibold text-ink mb-1">Designation</span>
+              <input className={inputClass} value={designation} maxLength={200} placeholder="For example: Owner" onChange={(e) => setDesignation(e.target.value)} />
+            </label>
+          )}
           <MySignature bare onChange={setSignature} />
           <div className="mt-4 flex flex-wrap justify-end gap-2">
             <Button variant="secondary" onClick={onClose}>
@@ -111,7 +127,7 @@ interface LoanFormPanelProps {
   schedule?: LoanInstalment[];
   /** the borrower had a loan paid out before */
   renewal?: boolean;
-  /** the signed-in login (to offer the approver their signature) */
+  /** the signed-in login (kept for callers; anyone who manages loans may sign the approval, 20261119100000) */
   myUserId?: string | null;
   /** the colleague guaranteeing it, once asked */
   guarantor?: LoanGuarantor;
@@ -124,7 +140,7 @@ interface LoanFormPanelProps {
 
 const fieldLabel = (id: string) => FORM_VALUE_FIELDS.find((f) => f.id === id)?.label.replace(/ \(.*\)$/, '') ?? id;
 
-export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myUserId, guarantor, witness, corrections, onChanged }: LoanFormPanelProps) {
+export default function LoanFormPanel({ loan, form, mode, schedule, renewal, guarantor, witness, corrections, onChanged }: LoanFormPanelProps) {
   const [viewing, setViewing] = useState(false);
   const [context, setContext] = useState<LoanFormContext | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -164,6 +180,8 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
   const canChooseWitness = beforePayout && (!form?.witness_signature || reopened);
   const canCorrect = beforePayout && reopened;
   const canSignAgain = !form?.borrower_signature || reopened;
+  // the lender approval: signed once, by the approver or anyone who manages loans (20261119100000), paid-out loans too
+  const canSignApproval = ['approved', 'disbursed', 'repaying', 'completed'].includes(loan.status) && !form?.approver_signature;
   const docSchedule = schedule && schedule.length ? schedule : loanSchedule(loan.principal, loan.annual_rate, loan.months, loan.interest_method, loan.start_period);
 
   const done = async (message: string) => {
@@ -374,7 +392,7 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
             Checklist
           </Button>
         )}
-        {mode === 'hr' && form && !form.approver_signature && myUserId && loan.decided_by === myUserId && (
+        {mode === 'hr' && canSignApproval && (
           <Button variant="secondary" onClick={() => setSigning('approver')} icon={<PenLine className="w-3.5 h-3.5" />}>
             Sign the approval
           </Button>
@@ -448,12 +466,13 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, myU
       />
       <SignWithMySignature
         open={signing === 'approver'}
+        askDesignation
         title="Sign the loan approval"
-        explain="Your saved signature, name and job title go on the lender approval (H) of this loan's form."
+        explain="Your saved signature, name and designation go on the lender approval (For Official Use) of this loan's form. Once signed, it can't be changed."
         confirmLabel="Sign the approval"
         onClose={() => setSigning(null)}
-        onSign={async (signature) => {
-          await signAsApprover(loan.id, signature);
+        onSign={async (signature, designation) => {
+          await signAsApprover(loan.id, signature, designation);
           await done('Approval signed');
         }}
       />
