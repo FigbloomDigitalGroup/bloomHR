@@ -84,8 +84,8 @@ export default function StaffIdCardsPrintDialog({
   }, [cards, who, department]);
 
   // one card prints front and back on a single page
-  const sheet = sheetFor(settings.layout === 'landscape');
-  const perPage = sheet.cols * sheet.rows;
+  const pageLayout = sheetFor(settings.layout === 'landscape');
+  const perPage = pageLayout.cols * pageLayout.rows;
   const pages = chosen.length === 1 ? 1 : Math.ceil(chosen.length / perPage) * 2;
   return (
     <Modal open={open} onClose={onClose} title="Print ID cards" size="md" closeOnBackdrop={!busy}>
