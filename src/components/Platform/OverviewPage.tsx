@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Building2, GraduationCap, Truck } from 'lucide-react';
+import { ArrowRight, Building2, Contact, GraduationCap, Truck } from 'lucide-react';
 import { Button, Card, PageHeader } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import { ConsoleStat } from './ConsoleStat';
@@ -9,10 +9,11 @@ import { organisationTotals, type OrganisationTotals } from '../../lib/platformO
 import { listSchools, schoolTotals, schoolsProblem, type SchoolsProblem } from '../../lib/platformSchools';
 import { activeWithin, schoolsNeedingAttention } from '../../lib/consoleAnalytics';
 import { fleetProblem, fleetTotals, listFleetCompanies, type FleetProblem, type FleetTotals } from '../../lib/platformFleet';
+import { crmProblem, crmTotals, listCrmOrganisations, type CrmProblem, type CrmTotals } from '../../lib/platformCrm';
 import { useConsoleBadge } from '../Console/consoleBadges';
 
 // The console's home (/platform/overview): one card per product, with its headline numbers and links to its pages.
-// Each product loads on its own, so Schools or Fleet being unreachable (or not connected) never hides another. Any role.
+// Each product loads on its own, so Schools, Fleet or CRM being unreachable (or not connected) never hides another. Any role.
 
 type HrState = { totals: OrganisationTotals } | { error: string } | null;
 interface SchoolNumbers {
@@ -26,6 +27,8 @@ interface SchoolNumbers {
 type SchoolsState = { numbers: SchoolNumbers } | { problem: SchoolsProblem; message: string } | null;
 /** platformOk: whether the platform's statuses came with Fleet's list (without them nothing shows as waiting) */
 type FleetState = { totals: FleetTotals; platformOk: boolean } | { problem: FleetProblem; message: string } | null;
+/** platformOk: whether the platform's statuses came with CRM's list (without them the suspended count is CRM's own) */
+type CrmState = { totals: CrmTotals; platformOk: boolean } | { problem: CrmProblem; message: string } | null;
 
 const n = (v: number) => v.toLocaleString('en-KE');
 
@@ -58,6 +61,7 @@ export default function OverviewPage() {
   const [hr, setHr] = useState<HrState>(null);
   const [schools, setSchools] = useState<SchoolsState>(null);
   const [fleet, setFleet] = useState<FleetState>(null);
+  const [crm, setCrm] = useState<CrmState>(null);
 
   useEffect(() => {
     void myPlatformRole().then(setRole);
@@ -100,12 +104,23 @@ export default function OverviewPage() {
     }
   }, []);
 
+  const loadCrm = useCallback(async () => {
+    setCrm(null);
+    try {
+      const { organizations, platform } = await listCrmOrganisations();
+      setCrm({ totals: crmTotals(organizations), platformOk: platform.ok });
+    } catch (err) {
+      setCrm({ problem: crmProblem(err), message: err instanceof Error ? err.message : 'Could not load Figbloom CRM.' });
+    }
+  }, []);
+
   useEffect(() => {
     if (!role) return;
     void loadHr();
     void loadSchools();
     void loadFleet();
-  }, [role, loadHr, loadSchools, loadFleet]);
+    void loadCrm();
+  }, [role, loadHr, loadSchools, loadFleet, loadCrm]);
 
   // the console menu's badges, from what this page loads anyway
   useConsoleBadge('/platform/organisations', hr && 'totals' in hr ? hr.totals.by_status.pending : null, (c) => `${c} waiting for approval`);
@@ -214,6 +229,37 @@ export default function OverviewPage() {
                 sub={fleet.platformOk ? 'need your approval' : "the platform couldn't be read"} />
               <ConsoleStat label="Vehicles" value={n(fleet.totals.vehicles)} sub={`${n(fleet.totals.drivers)} drivers`} />
               <ConsoleStat label="Trips, last 30 days" value={n(fleet.totals.trips)} />
+            </div>
+          )}
+        </ProductCard>
+
+        <ProductCard title="Figbloom CRM" icon={<Contact className="w-4 h-4" />} mark="bg-status-purple-tint text-status-purple"
+          links={[{ label: 'Organisations', to: '/platform/crm/organisations' }]}>
+          {!crm ? (
+            <FigbloomLoader label="Loading Figbloom CRM" size={40} />
+          ) : 'problem' in crm ? (
+            <div>
+              <p className="text-xs font-semibold text-ink">
+                {crm.problem === 'not_connected'
+                  ? "CRM isn't connected to the console yet"
+                  : crm.problem === 'unavailable'
+                    ? "Figbloom CRM didn't answer"
+                    : 'Could not load Figbloom CRM'}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {crm.problem === 'not_connected'
+                  ? 'The console needs CRM_PLATFORM_URL and CRM_PLATFORM_SECRET. The other products work as usual.'
+                  : crm.message}
+              </p>
+              {crm.problem !== 'not_connected' && (
+                <div className="mt-2"><Button variant="secondary" onClick={() => void loadCrm()}>Try again</Button></div>
+              )}
+            </div>
+          ) : (
+            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+              <ConsoleStat label="Organisations" value={n(crm.totals.organisations)} sub={`${n(crm.totals.active)} active`} />
+              <ConsoleStat label="Suspended" value={n(crm.totals.suspended)}
+                sub={crm.platformOk ? undefined : "as CRM reports it: the platform couldn't be read"} />
             </div>
           )}
         </ProductCard>

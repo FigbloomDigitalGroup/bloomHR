@@ -58,6 +58,10 @@ vi.mock('../../lib/platformFleet', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/platformFleet')>()),
   listFleetCompanies: () => Promise.resolve({ generated_at: null, companies: [], truncated: false, platform: { ok: true } }),
 }));
+vi.mock('../../lib/platformCrm', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/platformCrm')>()),
+  listCrmOrganisations: () => Promise.resolve({ organizations: [], truncated: false, platform: { ok: true } }),
+}));
 // the sign-in pages have tests of their own
 vi.mock('./ConsoleLogin', () => ({ default: () => <p>Sign-in form</p> }));
 vi.mock('../../pages/MFAverification', () => ({ default: () => <p>Two-step code form</p> }));
@@ -154,7 +158,8 @@ describe('the Figbloom console', () => {
     renderAt('/platform/rates');
     expect(await screen.findByRole('heading', { name: 'Statutory rates' })).toBeTruthy();
     expect(screen.queryByText(/staff portal/i)).toBeNull();
-    fireEvent.click(screen.getByRole('link', { name: 'Organisations' }));
+    const hr = within(screen.getByRole('navigation', { name: 'Console' })).getByRole('group', { name: 'Figbloom HR' });
+    fireEvent.click(within(hr).getByRole('link', { name: 'Organisations' }));
     expect(await screen.findByRole('heading', { name: 'Organisations' })).toBeTruthy();
     expect(state.from).not.toHaveBeenCalled();
   });
@@ -179,6 +184,18 @@ describe('the Figbloom console', () => {
     expect(await screen.findByRole('heading', { name: 'Schools' })).toBeTruthy();
     expect(screen.getByTestId('path').textContent).toBe('/platform/schools');
     expect(await screen.findByText('No schools on Figbloom Schools yet.')).toBeTruthy();
+    expect(state.from).not.toHaveBeenCalled();
+  });
+
+  it('opens Figbloom CRM > Organisations from the product menu', async () => {
+    state.session = signedIn();
+    renderAt('/platform/organisations');
+    await screen.findByRole('heading', { name: 'Organisations' });
+    const crm = within(screen.getByRole('navigation', { name: 'Console' })).getByRole('group', { name: 'Figbloom CRM' });
+    fireEvent.click(within(crm).getByRole('link', { name: 'Organisations' }));
+    expect(await screen.findByRole('heading', { name: 'CRM organisations' })).toBeTruthy();
+    expect(screen.getByTestId('path').textContent).toBe('/platform/crm/organisations');
+    expect(await screen.findByText('No organisations in Figbloom CRM yet.')).toBeTruthy();
     expect(state.from).not.toHaveBeenCalled();
   });
 

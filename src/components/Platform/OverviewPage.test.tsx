@@ -5,6 +5,7 @@ import { ApiError } from '../../lib/adminApi';
 import type { OrganisationTotals } from '../../lib/platformOrganisations';
 import type { School } from '../../lib/platformSchools';
 import type { FleetCompaniesList, FleetCompany } from '../../lib/platformFleet';
+import type { CrmOrganisation, CrmOrganisationsList } from '../../lib/platformCrm';
 
 const api = vi.hoisted(() => ({
   role: 'viewer' as import('../../lib/platformRoles').PlatformRole | null,
@@ -16,6 +17,9 @@ const api = vi.hoisted(() => ({
   fleet: null as FleetCompaniesList | null,
   fleetErrors: [] as Error[],
   fleetCalls: 0,
+  crm: null as CrmOrganisationsList | null,
+  crmErrors: [] as Error[],
+  crmCalls: 0,
 }));
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
 vi.mock('../../lib/platformRoles', async (importOriginal) => ({
@@ -44,6 +48,15 @@ vi.mock('../../lib/platformFleet', async (importOriginal) => ({
   },
 }));
 
+vi.mock('../../lib/platformCrm', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/platformCrm')>()),
+  listCrmOrganisations: () => {
+    api.crmCalls += 1;
+    const error = api.crmErrors.shift();
+    return error ? Promise.reject(error) : Promise.resolve(api.crm!);
+  },
+}));
+
 import OverviewPage from './OverviewPage';
 import { ConsoleBadgesContext } from '../Console/consoleBadges';
 
@@ -55,6 +68,12 @@ const school = (name: string, status: string, students: number, lastActive: stri
 const company = (id: string, status: FleetCompany['status'], vehicles: number, drivers: number, trips: number): FleetCompany => ({
   id, name: id, fleet_status: status, plan: 'trial', created_at: null, owner_name: null, owner_email: null, vehicles, drivers, admins: 1,
   trips_last_30_days: trips, last_location_at: null, in_fleet: true, organization_id: status ? `org-${id}` : null, status, status_reason: null,
+});
+
+const crmOrg = (id: string, status: string | null, crmStatus = 'active'): CrmOrganisation => ({
+  id, name: id, slug: id, crm_status: crmStatus, created_at: null, admin_name: null, admin_email: null, active_members: 2,
+  pending_invitations: 0, leads: 5, open_deals: 1, companies: 3, last_activity_at: null, platform_organization_id: status ? `org-${id}` : null,
+  in_crm: true, organization_id: status ? `org-${id}` : null, status, status_reason: null,
 });
 
 afterEach(cleanup);
@@ -83,6 +102,13 @@ beforeEach(() => {
   };
   api.fleetErrors = [];
   api.fleetCalls = 0;
+  api.crm = {
+    truncated: false,
+    platform: { ok: true },
+    organizations: [crmOrg('a', 'active'), crmOrg('b', 'suspended'), crmOrg('c', null)],
+  };
+  api.crmErrors = [];
+  api.crmCalls = 0;
 });
 
 const renderPage = () =>
@@ -182,12 +208,41 @@ describe('the console overview', () => {
     expect(figure(card('Figbloom Fleet'), 'Waiting for approval')).toBe('—');
   });
 
+  it('shows Figbloom CRM: organisations and suspended, with a link to its organisations', async () => {
+    renderPage();
+    await waitFor(() => expect(within(card('Figbloom CRM')).queryByText('Organisations', { selector: 'div' })).toBeTruthy());
+    const crm = card('Figbloom CRM');
+    expect(figure(crm, 'Organisations')).toBe('3');
+    expect(figure(crm, 'Suspended')).toBe('1');
+    expect(within(crm).getByRole('link', { name: 'Organisations' }).getAttribute('href')).toBe('/platform/crm/organisations');
+  });
+
+  it("says CRM isn't connected to the console yet, and the others still show", async () => {
+    api.crmErrors = [new ApiError("Figbloom CRM isn't connected to the console yet.", 503, 'crm_not_connected')];
+    renderPage();
+    const crm = await screen.findByRole('region', { name: 'Figbloom CRM' });
+    expect(await within(crm).findByText("CRM isn't connected to the console yet")).toBeTruthy();
+    expect(within(crm).getByText(/CRM_PLATFORM_URL and CRM_PLATFORM_SECRET/)).toBeTruthy();
+    expect(within(crm).queryByRole('button', { name: 'Try again' })).toBeNull();
+    await waitFor(() => expect(figure(card('Figbloom Fleet'), 'Companies')).toBe('4'));
+  });
+
+  it("says CRM didn't answer, and tries again", async () => {
+    api.crmErrors = [new ApiError("Figbloom CRM didn't answer. Try again.", 502, 'crm_unavailable')];
+    renderPage();
+    const crm = await screen.findByRole('region', { name: 'Figbloom CRM' });
+    fireEvent.click(await within(crm).findByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(figure(card('Figbloom CRM'), 'Organisations')).toBe('3'));
+    expect(api.crmCalls).toBe(2);
+  });
+
   it('is for platform admins only', async () => {
     api.role = null;
     renderPage();
     expect(await screen.findByText('Only Figbloom platform admins can see the console.')).toBeTruthy();
     expect(api.schoolsCalls).toBe(0);
     expect(api.fleetCalls).toBe(0);
+    expect(api.crmCalls).toBe(0);
   });
 
   it('publishes the menu badges: companies waiting for approval, schools needing attention', async () => {

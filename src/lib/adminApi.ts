@@ -48,8 +48,14 @@ export interface UpdateUserInput {
 }
 
 /** An error from the backend, with its HTTP status and the machine-readable `code` it may send (e.g. account_exists). */
+/** One field's problem, as the console's CRM routes send them ({ error: { field_errors: [{ path, message }] } }). */
+export interface ApiFieldError {
+  path: string;
+  message: string;
+}
+
 export class ApiError extends Error {
-  constructor(message: string, public status: number, public code?: string) {
+  constructor(message: string, public status: number, public code?: string, public fieldErrors: ApiFieldError[] = []) {
     super(message);
   }
 }
@@ -87,7 +93,11 @@ export async function apiRequest<T>(method: string, path: string, body?: unknown
     const error = payload?.error;
     const message = typeof error === 'string' ? error : typeof error?.message === 'string' ? error.message : '';
     const code = payload?.code ?? (typeof error?.code === 'string' ? error.code : undefined);
-    throw new ApiError(message || `Request failed (${response.status})`, response.status, code);
+    const fieldErrors: ApiFieldError[] = Array.isArray(error?.field_errors)
+      ? error.field_errors.filter((f: unknown): f is ApiFieldError =>
+          !!f && typeof (f as ApiFieldError).path === 'string' && typeof (f as ApiFieldError).message === 'string')
+      : [];
+    throw new ApiError(message || `Request failed (${response.status})`, response.status, code, fieldErrors);
   }
   if (payload === null || typeof payload !== 'object') throw new Error(BACKEND_UNAVAILABLE);
   return payload as T;
