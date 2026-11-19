@@ -332,7 +332,10 @@ const frontFacts = (card: StaffIdCardData, settings: StaffIdCardSettings) =>
     ...(settings.show_date_of_birth && card.date_of_birth ? [['DOB', cardDate(card.date_of_birth)] as [string, string]] : []),
   ] as [string, string][]).filter(([, v]) => v);
 
-/** Landscape front: the photo and company on a dark panel at the left, the name and details on the right. */
+/**
+ * Landscape front: the photo with the person's name and job title on a dark panel at the left; the company's name (in
+ * full: the right side has the room for it), its tagline and the details on the right, then the barcode.
+ */
 function LandscapeFront({ card, branding, settings, width, className }: CardFaceProps) {
   const W = LANDSCAPE_W;
   const H = LANDSCAPE_H;
@@ -341,21 +344,41 @@ function LandscapeFront({ card, branding, settings, width, className }: CardFace
   const logoClip = useSvgId('logo');
   const { first, rest } = nameParts(card);
   const name = [first, rest].filter(Boolean).join(' ');
-  // a long name goes on two lines: the first name, then the rest
-  const twoLines = name.length > 20 && !!first && !!rest;
-  const nameSize = twoLines ? fit(Math.max(first.length, rest.length), 466, 38) : fit(name.length, 466, 40);
-  const company = clip(branding.name || '', 22);
-  const title = card.job_title ? clip(card.job_title.toUpperCase(), 34) : '';
-  const facts = frontFacts(card, settings);
+  // under the photo the panel is about 230 wide: a longer name goes on two lines, the first name, then the rest
+  const panelX = 132;
+  const panelWidth = 230;
+  const twoLines = !!first && !!rest && fit(name.length, panelWidth, 30, 14) < 22;
+  const nameSize = twoLines ? fit(Math.max(first.length, rest.length), panelWidth, 30, 16) : fit(name.length, panelWidth, 30, 16);
+  const nameY = twoLines ? 382 : 398;
+  const title = card.job_title ? clip(card.job_title.toUpperCase(), 36) : '';
+  const titleY = (twoLines ? nameY + nameSize * 1.1 : nameY) + 30;
+
   const left = 360;
-  const nameY = twoLines ? 96 : 110;
-  const titleY = twoLines ? 182 : 150;
-  const factsTop = titleY + 58;
+  const rightWidth = W - left - 40;
+  const companyName = branding.name || '';
+  const company = clip(companyName, 44);
+  const companySize = fit(company.length, rightWidth, 38, 20);
+  const tagline = branding.tagline ? clip(branding.tagline, 48) : '';
+  const facts = frontFacts(card, settings);
+  const factGap = facts.length <= 3 ? 50 : facts.length === 4 ? 44 : 38;
+  const barcodeHeight = 64;
+  // the right side laid out from the top, then centred in the card's height so no empty band is left
+  const layoutTop = 0;
+  const companyAt = layoutTop + 38;
+  const ruleAt = companyAt + (tagline ? 58 : 28);
+  const factsAt = ruleAt + 48;
+  const barcodeAt = factsAt + (Math.max(facts.length, 1) - 1) * factGap + 44;
+  const blockHeight = barcodeAt + barcodeHeight - layoutTop;
+  const shift = Math.max(40, (H - 14 - blockHeight) / 2);
+  const companyY = companyAt + shift;
+  const ruleY = ruleAt + shift;
+  const factsTop = factsAt + shift;
+  const barcodeY = barcodeAt + shift;
   const barcode = code128Bars(card.employee_number);
   const unit = Math.min(3, 440 / barcode.width);
-  const hexR = 100;
-  const hexX = 140;
-  const hexY = 250;
+  const hexR = 92;
+  const hexX = 136;
+  const hexY = 218;
   // the photo covers the hexagon's square, moved and zoomed as framed (Adjust photo)
   const photoSize = useImageSize(card.photo_url);
   const photo = placePhoto(photoSize, framingOf(card), hexX, hexY, hexR * 2);
@@ -370,7 +393,7 @@ function LandscapeFront({ card, branding, settings, width, className }: CardFace
       <polygon points={`${W * 0.78},0 ${W},0 ${W},110`} fill={primary} opacity={0.35} />
       <polygon points={`${W * 0.9},0 ${W},0 ${W},48`} fill={secondary} opacity={0.8} />
 
-      <Logo branding={branding} x={30} y={28} size={64} clipId={logoClip} />
+      <Logo branding={branding} x={30} y={24} size={60} clipId={logoClip} />
 
       {/* the photo in a hexagon, initials when there is none (the photo covers them when it loads) */}
       <polygon points={hexagon(hexX, hexY, hexR + 14)} fill={primary} />
@@ -393,46 +416,47 @@ function LandscapeFront({ card, branding, settings, width, className }: CardFace
         </>
       )}
 
-      <text x={hexX - 5} y={branding.tagline ? 418 : 430} textAnchor="middle" fontSize={fit(company.length, 220, 26, 14)} fontWeight={800} fill="#FFFFFF">
-        {company}
-      </text>
-      {branding.tagline && (
-        <text x={hexX - 5} y={446} textAnchor="middle" fontSize={14} fill="#FFFFFF" opacity={0.75}>{clip(branding.tagline, 26)}</text>
-      )}
-
-      {/* the name, first name bold */}
+      {/* the person's name under the photo, first name bold, and their job title */}
       {twoLines ? (
-        <text x={left} y={nameY} fontSize={nameSize} fill={INK}>
-          <tspan x={left} fontWeight={800}>{first}</tspan>
-          <tspan x={left} dy={nameSize * 1.1} fontWeight={400}>{rest}</tspan>
+        <text x={panelX} y={nameY} textAnchor="middle" fontSize={nameSize} fill="#FFFFFF">
+          <tspan x={panelX} fontWeight={800}>{first}</tspan>
+          <tspan x={panelX} dy={nameSize * 1.1} fontWeight={400}>{rest}</tspan>
         </text>
       ) : (
-        <text x={left} y={nameY} fontSize={nameSize} fill={INK}>
+        <text x={panelX} y={nameY} textAnchor="middle" fontSize={nameSize} fill="#FFFFFF">
           <tspan fontWeight={800}>{first}</tspan>
           {rest && <tspan fontWeight={400}>{first ? ` ${rest}` : rest}</tspan>}
         </text>
       )}
       {title && (
-        <text x={left} y={titleY} fontSize={fit(title.length, 460, 19, 13)} fontWeight={600} letterSpacing={1.5} fill={MUTED}>
+        <text x={panelX} y={titleY} textAnchor="middle" fontSize={fit(title.length, panelWidth - 10, 15, 10)} fontWeight={600} letterSpacing={title.length > 26 ? 0.4 : 1.2} fill="#FFFFFF" opacity={0.8}>
           {title}
         </text>
       )}
-      <line x1={left} x2={left + 200} y1={titleY + 20} y2={titleY + 20} stroke={primary} strokeWidth={2} />
 
-      {/* the details */}
+      {/* the company, in full, and its tagline */}
+      <text x={left} y={companyY} fontSize={companySize} fontWeight={800} fill={INK}>
+        {company}
+      </text>
+      {tagline && (
+        <text x={left} y={companyY + 36} fontSize={17} fill={MUTED}>{tagline}</text>
+      )}
+      <line x1={left} x2={left + 200} y1={ruleY} y2={ruleY} stroke={primary} strokeWidth={2.5} />
+
+      {/* the details, large enough to read across the card */}
       {facts.map(([label, value], i) => (
         <g key={label}>
-          <text x={left} y={factsTop + i * 31} fontSize={15} fontWeight={700} letterSpacing={0.8} fill={MUTED}>{label}</text>
-          <text x={left + 128} y={factsTop + i * 31} fontSize={16.5} fontWeight={label === 'ID NO' ? 700 : 500} fill={INK}>
-            {`: ${clip(value, 34)}`}
+          <text x={left} y={factsTop + i * factGap} fontSize={17} fontWeight={700} letterSpacing={0.8} fill={MUTED}>{label}</text>
+          <text x={left + 140} y={factsTop + i * factGap} fontSize={20} fontWeight={label === 'ID NO' ? 700 : 500} fill={INK}>
+            {`: ${clip(value, 30)}`}
           </text>
         </g>
       ))}
 
       {/* the employee number as a barcode */}
-      <g transform={`translate(${left}, 452)`} data-barcode={card.employee_number}>
+      <g transform={`translate(${left}, ${barcodeY})`} data-barcode={card.employee_number}>
         {barcode.bars.map((b, i) => (
-          <rect key={i} x={b.x * unit} y={0} width={b.w * unit} height={48} fill={INK} />
+          <rect key={i} x={b.x * unit} y={0} width={b.w * unit} height={barcodeHeight} fill={INK} />
         ))}
       </g>
       <rect x={0} y={H - 14} width={W} height={14} fill={primary} />
