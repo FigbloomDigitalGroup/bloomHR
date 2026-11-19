@@ -32,6 +32,7 @@ interface Form {
   max_amount: string;
   max_salary_multiple: string;
   max_instalment_divisor: string;
+  min_take_home_divisor: string;
   staff_can_apply: boolean;
   terms: { months: string; rate: string }[];
 }
@@ -44,6 +45,7 @@ const toForm = (s: LoanSettings): Form => ({
   max_amount: s.max_amount === null ? '' : String(s.max_amount),
   max_salary_multiple: s.max_salary_multiple === null ? '' : String(s.max_salary_multiple),
   max_instalment_divisor: s.max_instalment_divisor === null ? '' : String(s.max_instalment_divisor),
+  min_take_home_divisor: s.min_take_home_divisor === null ? '' : String(s.min_take_home_divisor),
   staff_can_apply: s.staff_can_apply,
   terms: s.term_rates.map((t) => ({ months: String(t.months), rate: String(t.rate) })),
 });
@@ -56,6 +58,7 @@ const fromForm = (f: Form): LoanSettings => ({
   max_amount: f.max_amount.trim() === '' ? null : Number(f.max_amount),
   max_salary_multiple: f.max_salary_multiple.trim() === '' ? null : Number(f.max_salary_multiple),
   max_instalment_divisor: f.max_instalment_divisor.trim() === '' ? null : Number(f.max_instalment_divisor),
+  min_take_home_divisor: f.min_take_home_divisor.trim() === '' ? null : Number(f.min_take_home_divisor),
   staff_can_apply: f.staff_can_apply,
   term_rates: f.terms.filter((t) => t.months.trim() !== '' || t.rate.trim() !== '').map((t) => ({ months: Number(t.months), rate: Number(t.rate) })),
 });
@@ -228,6 +231,12 @@ export default function LoanSettingsCard({ canEdit: canEditProp, className = '' 
           'max_instalment_divisor',
           'Monthly repayment up to basic salary ÷',
           'For example 3: each month’s repayment is at most a third of basic salary, so the loan is up to basic ÷ 3 × its months. Empty: no such limit',
+          { min: 1, step: '0.5' }
+        )}
+        {field(
+          'min_take_home_divisor',
+          'Take-home pay left at least basic salary ÷',
+          'For example 3 (the Employment Act minimum): after the repayment and other loans, net pay must still be a third of basic salary. Checked when applying and again at approval. Empty: not checked',
           { min: 1, step: '0.5' }
         )}
         <label className="flex items-start gap-2 pt-6">

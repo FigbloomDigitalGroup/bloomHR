@@ -93,6 +93,8 @@ interface NewLoanForm {
   /** '' = the loan type's or the company's */
   method: InterestMethod | '';
   reason: string;
+  /** the borrower's current net pay, when their latest payslip is out of date (checked at approval) */
+  netPay: string;
 }
 
 export default function LoansAdmin() {
@@ -294,6 +296,7 @@ export default function LoansAdmin() {
         annualRate: creating.rate.trim() === '' ? null : Number(creating.rate),
         interestMethod: creating.method || null,
         reason: creating.reason,
+        statedNetPay: creating.netPay.trim() === '' ? null : Number(creating.netPay),
       });
       toast.success(
         status === 'approved'
@@ -332,6 +335,7 @@ export default function LoansAdmin() {
                   rate: '',
                   method: '',
                   reason: '',
+                  netPay: '',
                 });
               }}
             >
@@ -681,6 +685,21 @@ export default function LoansAdmin() {
                 <span className="block text-[12px] font-semibold text-ink mb-1">What it is for (optional)</span>
                 <input className={inputClass} value={creating.reason} onChange={(e) => setCreating({ ...creating, reason: e.target.value })} />
               </label>
+              {settings.min_take_home_divisor ? (
+                <label className="block">
+                  <span className="block text-[12px] font-semibold text-ink mb-1">Their current net monthly pay (KSh), if their latest payslip is out of date</span>
+                  <input
+                    className={inputClass}
+                    type="number"
+                    min={0}
+                    value={creating.netPay}
+                    onChange={(e) => setCreating({ ...creating, netPay: e.target.value })}
+                  />
+                  <span className="block mt-1 text-[11px] text-muted-foreground">
+                    The repayment must leave them at least their basic salary ÷ {settings.min_take_home_divisor} take-home: checked on approval.
+                  </span>
+                </label>
+              ) : null}
               {newPreview && newPreview.totalRepayable > 0 && (
                 <p className="m-0 p-3 rounded-tile bg-secondary text-[12.5px] text-ink" data-testid="new-loan-preview">
                   {formatKsh(newPreview.instalment)} a month · {formatKsh(newPreview.totalInterest)} interest · {formatKsh(newPreview.totalRepayable)} in all

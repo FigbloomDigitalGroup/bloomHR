@@ -86,7 +86,7 @@ const friendly = (error: { message?: string } | null) => new Error(error?.messag
 export async function loadLoanSettings(): Promise<LoanSettings> {
   const { data, error } = await supabase
     .from('loan_settings')
-    .select('annual_rate, interest_method, min_months, max_months, max_amount, max_salary_multiple, max_instalment_divisor, staff_can_apply, term_rates')
+    .select('annual_rate, interest_method, min_months, max_months, max_amount, max_salary_multiple, max_instalment_divisor, min_take_home_divisor, staff_can_apply, term_rates')
     .maybeSingle();
   if (error) throw error;
   if (!data) return DEFAULT_LOAN_SETTINGS;
@@ -98,6 +98,7 @@ export async function loadLoanSettings(): Promise<LoanSettings> {
     max_amount: num(data.max_amount),
     max_salary_multiple: num(data.max_salary_multiple),
     max_instalment_divisor: num(data.max_instalment_divisor),
+    min_take_home_divisor: num(data.min_take_home_divisor),
     staff_can_apply: data.staff_can_apply !== false,
     term_rates: Array.isArray(data.term_rates)
       ? (data.term_rates as { months: unknown; rate: unknown }[]).map((t) => ({ months: Number(t.months), rate: Number(t.rate) })).sort((a, b) => a.months - b.months)
@@ -180,6 +181,14 @@ const applicationColumns = (d: LoanApplicationDetails | undefined) =>
       }
     : {};
 
+/** The signed-in employee's basic salary, and net pay when their latest payslip is current (null: unknown). */
+export async function loadMyPay(): Promise<{ basic: number | null; net: number | null }> {
+  const { data, error } = await supabase.rpc('loan_my_pay');
+  if (error || !data) return { basic: null, net: null };
+  const d = data as { basic: number | string | null; net: number | string | null };
+  return { basic: d.basic == null ? null : Number(d.basic), net: d.net == null ? null : Number(d.net) };
+}
+
 /**
  * The earliest pay month a loan can start in (20261118300000): this month while its payroll isn't approved, else the
  * next open one. A failure falls back to next month, which is always safe.
@@ -192,7 +201,16 @@ export async function loadFirstOpenPeriod(): Promise<string> {
 
 export async function requestLoan(
   employee: MyEmployee,
-  input: { productId: string | null; amount: number; months: number; reason: string; details?: LoanApplicationDetails; startPeriod?: string }
+  input: {
+    productId: string | null;
+    amount: number;
+    months: number;
+    reason: string;
+    details?: LoanApplicationDetails;
+    startPeriod?: string;
+    /** their current net pay, when their latest payslip is out of date */
+    statedNetPay?: number | null;
+  }
 ): Promise<string> {
   const { data, error } = await supabase.from('employee_loans').insert({
     employee_number: employee.employeeNumber,
@@ -200,6 +218,7 @@ export async function requestLoan(
     principal: input.amount,
     months: input.months,
     ...(input.startPeriod ? { start_period: input.startPeriod } : {}),
+    ...(input.statedNetPay != null ? { stated_net_pay: input.statedNetPay } : {}),
     reason: input.reason.trim(),
     status: 'requested',
     ...applicationColumns(input.details),
@@ -245,6 +264,8 @@ export interface NewLoan {
   interestMethod: InterestMethod | null;
   reason: string;
   details?: LoanApplicationDetails;
+  /** the borrower's current net pay, when their latest payslip is out of date */
+  statedNetPay?: number | null;
 }
 
 /**
@@ -263,6 +284,7 @@ export async function createLoan(loan: NewLoan): Promise<LoanStatus> {
     reason: loan.reason.trim() || null,
     status: 'approved',
     ...applicationColumns(loan.details),
+    ...(loan.statedNetPay != null ? { stated_net_pay: loan.statedNetPay } : {}),
   }).select('status').single();
   if (error) throw friendly(error);
   return (data?.status ?? 'approved') as LoanStatus;
