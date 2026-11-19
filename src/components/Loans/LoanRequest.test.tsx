@@ -9,6 +9,7 @@ vi.mock('../../lib/loansApi', () => ({
   requestLoan: vi.fn(),
   withdrawLoan: vi.fn(),
   loadFirstOpenPeriod: vi.fn(),
+  loadMyPay: vi.fn(async () => ({ basic: null, net: null })),
 }));
 vi.mock('../../lib/salaryAdvanceApi', () => ({ loadMyEmployee: vi.fn() }));
 vi.mock('../../lib/loanFormApi', () => ({
@@ -189,6 +190,7 @@ describe('applying for a loan', () => {
         reason: 'School fees for next term',
         details: { residentialAddress: 'Kileleshwa, Nairobi', otherLoanRepayments: '2000', disbursementAccount: '0712 345 678' },
         startPeriod: addMonths(currentPeriod(), 1),
+        statedNetPay: null,
       }),
     );
     await vi.waitFor(() => expect(formApi.setGuarantor).toHaveBeenCalledWith('new-loan', 'E2'));
@@ -215,6 +217,16 @@ describe('applying for a loan', () => {
     await screen.findByText('KSh 150,000');
     const start = screen.getByLabelText('Start repaying from') as HTMLSelectElement;
     await vi.waitFor(() => expect([...start.options].map((o) => o.value)).toEqual([addMonths(currentPeriod(), 1), addMonths(currentPeriod(), 2)]));
+  });
+
+  it('with the take-home check on and an out-of-date payslip, asks for net pay; the limit follows it', async () => {
+    mocked.loadLoanSettings.mockResolvedValue({ ...SETTINGS, interest_method: 'upfront', annual_rate: 20, max_salary_multiple: null, max_instalment_divisor: 3, min_take_home_divisor: 3 });
+    // basic 50,000: a third is 16,667; with 30,000 net, the repayment can be at most 30,000 - 16,667 = 13,333 a month: 40,000 over 3 months
+    render(<LoanRequest />);
+    const net = await screen.findByLabelText('Your current net monthly pay (KSh)');
+    fireEvent.change(net, { target: { value: '30000' } });
+    fireEvent.change(screen.getByLabelText('Repay over (months)'), { target: { value: '3' } });
+    expect((await screen.findByText(/You can borrow up to/)).textContent).toMatch(/KSh 40,000/);
   });
 
   it('cannot apply while applications are closed', async () => {

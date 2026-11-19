@@ -27,6 +27,7 @@ import {
 } from '../../lib/loans';
 import {
   loadFirstOpenPeriod,
+  loadMyPay,
   loadLoanProducts,
   loadLoanSettings,
   loadMyLoans,
@@ -75,6 +76,9 @@ export default function LoanRequest() {
   const [guarantor, setGuarantorPick] = useState('');
   // the earliest month repayments can start in, and the one chosen (next month unless they pick this one)
   const [firstOpen, setFirstOpen] = useState(addMonths(currentPeriod(), 1));
+  // net pay from a current payslip (null: unknown, so they give it when the take-home check is on)
+  const [payslipNet, setPayslipNet] = useState<number | null>(null);
+  const [statedNet, setStatedNet] = useState('');
   const [startPeriod, setStartPeriod] = useState(addMonths(currentPeriod(), 1));
 
   const loadMine = useCallback(async (employeeNumber: string) => {
@@ -101,8 +105,9 @@ export default function LoanRequest() {
     let live = true;
     (async () => {
       try {
-        const [emp, s, p, open] = await Promise.all([loadMyEmployee(), loadLoanSettings(), loadLoanProducts(), loadFirstOpenPeriod()]);
+        const [emp, s, p, open, pay] = await Promise.all([loadMyEmployee(), loadLoanSettings(), loadLoanProducts(), loadFirstOpenPeriod(), loadMyPay()]);
         if (!live) return;
+        setPayslipNet(pay.net);
         setFirstOpen(open);
         setStartPeriod((chosen) => (chosen < open ? open : chosen));
         setEmployee(emp);
@@ -143,12 +148,19 @@ export default function LoanRequest() {
   const rate = termRateFor(settings, form.months) ?? product?.annual_rate ?? settings.annual_rate;
   const method = product?.interest_method ?? settings.interest_method;
   const maxMonths = maxMonthsFor(settings, product);
-  const maxAmount = maxLoanFor(settings, employee?.basicSalary);
   const otherRepayments = details.otherLoanRepayments.trim();
-  const errors: Partial<Record<keyof LoanRequestInput | 'otherLoanRepayments' | 'guarantor', string>> = {
+  const askNet = !!settings.min_take_home_divisor && payslipNet === null;
+  const netPay = payslipNet ?? (statedNet.trim() !== '' && Number(statedNet) >= 0 ? Number(statedNet) : null);
+  // the limit can follow the term and the pay left after it: it changes with the months chosen
+  const maxAmount = maxLoanFor(settings, employee?.basicSalary, { months: form.months, rate, method }, {
+    net: netPay,
+    otherRepayments: Number(otherRepayments) || 0,
+  });
+  const errors: Partial<Record<keyof LoanRequestInput | 'otherLoanRepayments' | 'guarantor' | 'statedNet', string>> = {
     ...validateLoanRequest(form, { minMonths: settings.min_months, maxMonths, maxAmount }),
     ...(otherRepayments !== '' && !(Number(otherRepayments) >= 0) ? { otherLoanRepayments: 'Enter an amount in KSh, or leave it empty.' } : {}),
     ...(guarantorNeeded && !guarantor ? { guarantor: 'Choose a colleague to guarantee your loan.' } : {}),
+    ...(askNet && netPay === null ? { statedNet: 'Give your current net monthly pay (after deductions).' } : {}),
   };
   const amount = Number(form.amount) || 0;
   const firstMonth = startPeriod;
@@ -173,7 +185,7 @@ export default function LoanRequest() {
     if (blocked || !employee || Object.keys(errors).length > 0) return;
     setSaving(true);
     try {
-      const loanId = await requestLoan(employee, { productId: productId || null, amount, months: form.months, reason: form.reason, details, startPeriod });
+      const loanId = await requestLoan(employee, { productId: productId || null, amount, months: form.months, reason: form.reason, details, startPeriod, statedNetPay: askNet ? netPay : null });
       toast.success('Your loan request was sent for approval');
       if (guarantor) {
         // the request is in either way; a guarantor not asked can be chosen again on the loan
@@ -213,7 +225,7 @@ export default function LoanRequest() {
     }
   };
 
-  const showError = (field: keyof LoanRequestInput | 'otherLoanRepayments' | 'guarantor') =>
+  const showError = (field: keyof LoanRequestInput | 'otherLoanRepayments' | 'guarantor' | 'statedNet') =>
     (triedSubmit || (field === 'amount' && form.amount !== '')) && errors[field] ? (
       <p id={`loan-${field}-error`} className="mt-1 text-[11.5px] text-status-danger" role="alert">
         {errors[field]}
@@ -285,7 +297,8 @@ export default function LoanRequest() {
                 />
                 {maxAmount !== null && (
                   <p className="mt-1 text-[11.5px] text-muted-foreground">
-                    You can borrow up to <strong className="text-ink">{formatKsh(maxAmount)}</strong>.
+                    You can borrow up to <strong className="text-ink">{formatKsh(maxAmount)}</strong>
+                    {settings.max_instalment_divisor ? ` over ${form.months} ${form.months === 1 ? 'month' : 'months'}` : ''}.
                   </p>
                 )}
                 {showError('amount')}
@@ -350,6 +363,30 @@ export default function LoanRequest() {
                 />
                 {showError('reason')}
               </div>
+
+              {askNet && (
+                <div>
+                  <label htmlFor="loan-net" className="block text-[12px] font-semibold text-ink mb-1">
+                    Your current net monthly pay (KSh)
+                  </label>
+                  <input
+                    id="loan-net"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    value={statedNet}
+                    onChange={(e) => setStatedNet(e.target.value)}
+                    disabled={!!blocked}
+                    className={inputClass}
+                    placeholder="What you take home after deductions"
+                  />
+                  <p className="mt-1 mb-0 text-[11.5px] text-muted-foreground">
+                    Your latest payslip is from before your current salary. After the repayment and other loans, you must still take home at least a
+                    {settings.min_take_home_divisor === 3 ? ' third' : ` 1/${settings.min_take_home_divisor}`} of your basic salary. HR checks it.
+                  </p>
+                  {showError('statedNet')}
+                </div>
+              )}
 
               <fieldset className="space-y-3">
                 <legend className="text-[12px] font-semibold text-ink mb-1">For the loan form</legend>

@@ -12,6 +12,7 @@ vi.mock('../../lib/loansApi', () => ({
   cancelLoan: vi.fn(),
   createLoan: vi.fn(),
   loadFirstOpenPeriod: vi.fn(),
+  loadMyPay: vi.fn(async () => ({ basic: null, net: null })),
   saveLoanSettings: vi.fn(),
   saveLoanProduct: vi.fn(),
 }));
@@ -423,6 +424,7 @@ describe('the loans page', () => {
         annualRate: null,
         interestMethod: null,
         reason: '',
+        statedNetPay: null,
       }),
     );
   });
