@@ -135,6 +135,18 @@ describe('filled in the app (20261118200000)', () => {
     expect(await payment(id)).toMatchObject({ status: 'to_pay', payee_details: '0722 000 000' });
   });
 
+  it('the witness is optional (20261120200000): signed by the borrower and guarantor, it is ready and accepted', async () => {
+    const id = await ask(S2, `(employee_number, principal, months, status) values ('E2', 8000, 2, 'requested')`);
+    await as(S2, `select loan_set_guarantor('${id}', 'E1')`);
+    await decide(HR, id);
+    await as(S2, `select loan_form_sign_borrower('${id}', '${SIG}')`);
+    await expect(as(HR, `select loan_form_review('${id}', true, null, '${SIG}', 'Hana Hr', null)`)).rejects.toThrow(/no signed form waiting/);
+    await as(S1, `select loan_guarantor_sign('${id}', '${SIG}', 'Colleague')`);
+    await as(HR, `select loan_form_review('${id}', true, null, '${SIG}', 'Hana Hr', null)`);
+    expect(await form(id)).toMatchObject({ status: 'accepted', witness_signature: null });
+    expect(await payment(id)).toMatchObject({ status: 'to_pay' });
+  });
+
   it('HR fills in the affordability assessment and the checklist; staff can’t', async () => {
     await expect(as(S1, `select loan_form_checks('${loanId}', 'Me', array['id_kra'])`)).rejects.toThrow(/Only HR/);
     await expect(as(HR, `select loan_form_checks('${loanId}', 'Hana', array['made_up'])`)).rejects.toThrow(/Unknown checklist item/);
@@ -184,8 +196,8 @@ describe('the guarantor', () => {
     await expect(as(S1, `select loan_set_guarantor('${loanId}', 'H1')`)).rejects.toThrow(/can't be changed/);
     await expect(as(HR, `select loan_set_guarantor('${loanId}', 'H1')`)).rejects.toThrow(/can't be changed/);
     // the borrower and HR read it; nobody writes it directly
-    // (Esther also guarantees Eric's loan, so she reads two)
-    expect(await read(S1, `select loan_id from employee_loan_guarantors`)).toHaveLength(2);
+    // (Esther also guarantees two of Eric's loans, so she reads three)
+    expect(await read(S1, `select loan_id from employee_loan_guarantors`)).toHaveLength(3);
     expect(await read(HRB, `select loan_id from employee_loan_guarantors`)).toHaveLength(0);
     await expect(as(HR, `update employee_loan_guarantors set status = 'asked' where loan_id = '${loanId}'`)).rejects.toThrow();
   });

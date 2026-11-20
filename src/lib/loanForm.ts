@@ -25,6 +25,8 @@ export interface LoanForm {
   employer_officer: string | null;
   employer_officer_title: string | null;
   reviewed_at: string | null;
+  /** when the form last changed (a signature, a witness, a review) */
+  updated_at?: string | null;
   /** the witness, added in the app (20261118200000) */
   witness_name?: string | null;
   witness_id_number?: string | null;
@@ -393,15 +395,14 @@ export function formStage(
 }
 
 /**
- * Signed by the borrower, witnessed and (when the form is required) guaranteed in the app, the witness since HR last
- * sent it back: ready for HR without an upload (as the database's loan_form_signed_in_app).
+ * Signed by the borrower and (when the form is required) guaranteed in the app, and changed since HR last sent it back:
+ * ready for HR without an upload (as the database's loan_form_signed_in_app). The witness is optional (20261120200000).
  */
 export const readyInApp = (form: LoanForm | null | undefined, guarantor: Pick<LoanGuarantor, 'status'> | null | undefined) =>
   !!form &&
   (form.status === 'none' || form.status === 'sent_back') &&
   !!form.borrower_signature &&
-  !!form.witness_signature &&
-  (!form.reviewed_at || (form.witness_signed_at ?? '') > form.reviewed_at) &&
+  (!form.reviewed_at || (form.updated_at ?? '') > form.reviewed_at) &&
   (!form.required || guarantor?.status === 'signed');
 
 /** Payout waits for this loan's signed form. */

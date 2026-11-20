@@ -32,7 +32,7 @@ const fail = (error: { message?: string } | null, fallback: string): never => {
 };
 
 const FORM_COLUMNS =
-  'loan_id, required, borrower_signature, borrower_signed_at, approver_signature, approver_name, approver_title, approver_signed_at, status, file_path, file_name, uploaded_at, send_back_reason, employer_signature, employer_officer, employer_officer_title, reviewed_at, witness_name, witness_id_number, witness_signature, witness_signed_at, affordability_by, checks';
+  'loan_id, required, borrower_signature, borrower_signed_at, approver_signature, approver_name, approver_title, approver_signed_at, status, file_path, file_name, uploaded_at, send_back_reason, employer_signature, employer_officer, employer_officer_title, reviewed_at, updated_at, witness_name, witness_id_number, witness_signature, witness_signed_at, affordability_by, checks';
 
 /** The forms of these loans (the ones the signed-in person may see), by loan id. */
 export async function loadLoanForms(loanIds: string[]): Promise<Record<string, LoanForm>> {

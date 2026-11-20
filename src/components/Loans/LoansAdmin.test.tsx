@@ -292,6 +292,17 @@ describe('the loans page', () => {
     await vi.waitFor(() => expect(formApi.reviewSignedForm).toHaveBeenCalledWith('a1', true, 'data:image/png;base64,SIG'));
   });
 
+  it('the witness is optional: signed by the borrower and guarantor, the form is ready to accept', async () => {
+    vi.mocked(formApi.loadLoanForms).mockResolvedValue({ a1: form({ loan_id: 'a1', borrower_signature: 'x' }) } as never);
+    vi.mocked(formApi.loadGuarantors).mockResolvedValue({ a1: { loan_id: 'a1', guarantor_name: 'Zilpar Okoth', status: 'signed' } } as never);
+    render(<LoansAdmin />);
+    await screen.findByTestId('loan-r1');
+    fireEvent.click(screen.getByText('To pay out (1)'));
+    const card = screen.getByTestId('loan-a1');
+    expect(within(card).getByText('Signed form to review')).toBeTruthy();
+    expect(within(card).getByRole('button', { name: 'Accept form' })).toBeTruthy();
+  });
+
   it('without the guarantor’s signature, a form signed in the app is not ready', async () => {
     vi.mocked(formApi.loadLoanForms).mockResolvedValue({ a1: form({ loan_id: 'a1', borrower_signature: 'x', witness_signature: 'w' }) } as never);
     vi.mocked(formApi.loadGuarantors).mockResolvedValue({ a1: { loan_id: 'a1', guarantor_name: 'Mary Akinyi', status: 'asked' } } as never);

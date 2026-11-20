@@ -309,7 +309,8 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, gua
 
   const missing = [
     !form?.borrower_signature && 'sign it with your saved signature',
-    !form?.witness_signature && (witness?.status === 'asked' ? `${witness.witness_name} witnesses your signature from their portal` : 'choose a colleague to witness your signature'),
+    // the witness is optional (20261120200000): only a witness already asked is waited for in the wording
+    !form?.witness_signature && witness?.status === 'asked' && `${witness.witness_name} may witness your signature from their portal`,
     form?.required && guarantor?.status !== 'signed' && 'your guarantor signs it in their staff portal',
   ].filter(Boolean) as string[];
   const nextStep =
@@ -328,7 +329,7 @@ export default function LoanFormPanel({ loan, form, mode, schedule, renewal, gua
         : waitingOnReview
           ? `Review the ${form.status === 'uploaded' ? 'signed copy' : 'form signed in the app'}. Accepting signs the employer undertaking with your saved signature and sends the loan to finance to pay out.`
           : open && form.required
-            ? 'Finance is told to pay it out once the form is signed (borrower, witness and guarantor) and you accept it.'
+            ? 'Finance is told to pay it out once the form is signed (borrower and guarantor; a witness is optional) and you accept it.'
             : null;
 
   return (
