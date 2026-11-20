@@ -23,8 +23,13 @@ import {
 const day = (d: string | null | undefined) => formatDay(parseDay(d));
 const errorText = (err: unknown, fallback: string) => (err instanceof Error && err.message ? err.message : fallback);
 
-/** A data: URL (the saved signature) as a PNG blob. */
-const dataUrlToBlob = async (url: string) => (await fetch(url)).blob();
+/** A data: URL (the saved signature) as a PNG blob. Decoded here, not fetched: the page's security policy may not allow fetching data: URLs. */
+function dataUrlToBlob(url: string): Blob {
+  const [head, data = ''] = url.split(',', 2);
+  const type = /^data:([^;,]+)/.exec(head)?.[1] || 'image/png';
+  const binary = head.includes(';base64') ? atob(data) : decodeURIComponent(data);
+  return new Blob([Uint8Array.from(binary, (c) => c.charCodeAt(0))], { type });
+}
 
 /**
  * Signing by drawing: the saved signature (if they have one) or a new one drawn here. The contract gets a signature
@@ -66,7 +71,7 @@ function SignHere({ contract, signerName, onSigned, onCancel }: { contract: Sign
             <img src={saved} alt="Your saved signature" className="block max-h-20 max-w-full" />
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button disabled={busy} onClick={async () => sign(await dataUrlToBlob(saved))} icon={<PenLine className="w-3.5 h-3.5" />}>
+            <Button disabled={busy} onClick={() => sign(dataUrlToBlob(saved))} icon={<PenLine className="w-3.5 h-3.5" />}>
               {busy ? 'Signing…' : 'Sign with this signature'}
             </Button>
             <Button variant="secondary" disabled={busy} onClick={() => setDrawNew(true)}>Draw a new one</Button>

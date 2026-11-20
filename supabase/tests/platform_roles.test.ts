@@ -260,7 +260,8 @@ describe('staff: owners, and the last owner', () => {
     expect(await roleOf(SUPPORT)).toBe('owner');
     await rows(`select set_platform_admin_role('${SUPPORT}', 'support', 'Recovery done')`);
     const [log] = await rows<{ changed_by: string | null; new_role: string }>(
-      `select changed_by, new_role from platform_admin_changes where user_id = '${SUPPORT}' order by changed_at desc limit 1`
+      // by its note: both changes can land in the same clock tick, so "the latest" by time is not reliable
+      `select changed_by, new_role from platform_admin_changes where user_id = '${SUPPORT}' and note = 'Recovery done'`
     );
     expect(log).toEqual({ changed_by: null, new_role: 'support' });
   });
