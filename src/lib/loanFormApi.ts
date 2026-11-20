@@ -173,6 +173,44 @@ export async function loadLoanFormContext(loan: { id: string; employee_number: s
   };
 }
 
+/** A loan's repayment against net pay, for HR and finance (20261120100000). */
+export interface LoanAffordability {
+  loan_id: string;
+  net_pay: number | null;
+  share_percent: number | null;
+  flag_percent: number | null;
+  over_flag: boolean;
+  checked_by_name: string | null;
+  checked_at: string | null;
+}
+
+export async function loadAffordability(loanIds: string[]): Promise<Record<string, LoanAffordability>> {
+  const out: Record<string, LoanAffordability> = {};
+  for (const ids of chunks([...new Set(loanIds)], IN_LIST_SIZE)) {
+    const { data, error } = await supabase.rpc('loan_affordability', { p_loans: ids });
+    if (error) throw error;
+    for (const r of (data ?? []) as Record<string, unknown>[]) {
+      out[String(r.loan_id)] = {
+        loan_id: String(r.loan_id),
+        net_pay: r.net_pay == null ? null : Number(r.net_pay),
+        share_percent: r.share_percent == null ? null : Number(r.share_percent),
+        flag_percent: r.flag_percent == null ? null : Number(r.flag_percent),
+        over_flag: !!r.over_flag,
+        checked_by_name: (r.checked_by_name as string | null) ?? null,
+        checked_at: (r.checked_at as string | null) ?? null,
+      };
+    }
+  }
+  return out;
+}
+
+/** HR or finance confirm they checked the borrower can afford the loan (needed to approve a flagged one). */
+export async function confirmAffordability(loanId: string): Promise<void> {
+  const me = await loadMySignerIdentity();
+  const { error } = await supabase.rpc('loan_confirm_affordability', { p_loan: loanId, p_name: me.name || null });
+  if (error) fail(error, 'Your check was not saved.');
+}
+
 /** The signed-in login's id (whoever approved a loan signs its approval). */
 export async function currentUserId(): Promise<string | null> {
   const { data } = await supabase.auth.getUser();

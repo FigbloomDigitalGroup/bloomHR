@@ -86,7 +86,7 @@ const friendly = (error: { message?: string } | null) => new Error(error?.messag
 export async function loadLoanSettings(): Promise<LoanSettings> {
   const { data, error } = await supabase
     .from('loan_settings')
-    .select('annual_rate, interest_method, min_months, max_months, max_amount, max_salary_multiple, max_instalment_divisor, min_take_home_divisor, staff_can_apply, term_rates')
+    .select('annual_rate, interest_method, min_months, max_months, max_amount, max_salary_multiple, max_instalment_divisor, min_take_home_divisor, affordability_flag_percent, staff_can_apply, term_rates')
     .maybeSingle();
   if (error) throw error;
   if (!data) return DEFAULT_LOAN_SETTINGS;
@@ -99,6 +99,7 @@ export async function loadLoanSettings(): Promise<LoanSettings> {
     max_salary_multiple: num(data.max_salary_multiple),
     max_instalment_divisor: num(data.max_instalment_divisor),
     min_take_home_divisor: num(data.min_take_home_divisor),
+    affordability_flag_percent: num(data.affordability_flag_percent),
     staff_can_apply: data.staff_can_apply !== false,
     term_rates: Array.isArray(data.term_rates)
       ? (data.term_rates as { months: unknown; rate: unknown }[]).map((t) => ({ months: Number(t.months), rate: Number(t.rate) })).sort((a, b) => a.months - b.months)
@@ -266,6 +267,8 @@ export interface NewLoan {
   details?: LoanApplicationDetails;
   /** the borrower's current net pay, when their latest payslip is out of date */
   statedNetPay?: number | null;
+  /** HR checked the borrower can afford it (needed when the loan is over the affordability flag): their login id */
+  affordabilityCheckedBy?: string | null;
 }
 
 /**
@@ -285,6 +288,7 @@ export async function createLoan(loan: NewLoan): Promise<LoanStatus> {
     status: 'approved',
     ...applicationColumns(loan.details),
     ...(loan.statedNetPay != null ? { stated_net_pay: loan.statedNetPay } : {}),
+    ...(loan.affordabilityCheckedBy ? { affordability_checked_by: loan.affordabilityCheckedBy } : {}),
   }).select('status').single();
   if (error) throw friendly(error);
   return (data?.status ?? 'approved') as LoanStatus;
