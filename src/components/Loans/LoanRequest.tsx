@@ -149,7 +149,7 @@ export default function LoanRequest() {
   const method = product?.interest_method ?? settings.interest_method;
   const maxMonths = maxMonthsFor(settings, product);
   const otherRepayments = details.otherLoanRepayments.trim();
-  const askNet = !!settings.min_take_home_divisor && payslipNet === null;
+  const askNet = (!!settings.min_take_home_divisor || !!settings.affordability_flag_percent) && payslipNet === null;
   const netPay = payslipNet ?? (statedNet.trim() !== '' && Number(statedNet) >= 0 ? Number(statedNet) : null);
   // the limit can follow the term and the pay left after it: it changes with the months chosen
   const maxAmount = maxLoanFor(settings, employee?.basicSalary, { months: form.months, rate, method }, {
@@ -381,8 +381,10 @@ export default function LoanRequest() {
                     placeholder="What you take home after deductions"
                   />
                   <p className="mt-1 mb-0 text-[11.5px] text-muted-foreground">
-                    Your latest payslip is from before your current salary. After the repayment and other loans, you must still take home at least a
-                    {settings.min_take_home_divisor === 3 ? ' third' : ` 1/${settings.min_take_home_divisor}`} of your basic salary. HR checks it.
+                    Your latest payslip is from before your current salary, so HR uses this to check you can afford the repayment.
+                    {settings.min_take_home_divisor
+                      ? ` After the repayment and other loans, you must still take home at least ${settings.min_take_home_divisor === 3 ? 'a third' : `1/${settings.min_take_home_divisor}`} of your basic salary.`
+                      : ''}
                   </p>
                   {showError('statedNet')}
                 </div>

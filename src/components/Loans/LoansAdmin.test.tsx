@@ -88,6 +88,8 @@ vi.mock('../../lib/loanFormApi', () => ({
   declineWitness: vi.fn(),
   deleteCancelledLoan: vi.fn(),
   attachSignedForm: vi.fn(),
+  loadAffordability: vi.fn(async () => ({})),
+  confirmAffordability: vi.fn(),
 }));
 // everyone here has a saved signature
 vi.mock('../../lib/signatures', () => ({
@@ -210,6 +212,25 @@ describe('the loans page', () => {
     const options = [...(screen.getByLabelText('First repayment from') as HTMLSelectElement).options].map((o) => o.value);
     expect(options).not.toContain(currentPeriod());
     expect(options[0]).toBe(addMonths(currentPeriod(), 1));
+  });
+
+  it('a loan over the affordability flag is approved only once the approver ticks that they checked it', async () => {
+    vi.mocked(formApi.loadAffordability).mockResolvedValue({
+      r1: { loan_id: 'r1', net_pay: 30000, share_percent: 29.6, flag_percent: 25, over_flag: true, checked_by_name: null, checked_at: null },
+    });
+    vi.mocked(formApi.confirmAffordability).mockResolvedValue(undefined);
+    render(<LoansAdmin />);
+    const card = await screen.findByTestId('loan-r1');
+    expect(within(card).getByTestId('affordability-r1').textContent).toMatch(/Repayment is 29.6% of net pay \(KSh 30,000\): over 25%/);
+    fireEvent.click(within(card).getByRole('button', { name: 'Approve' }));
+    const dialog = screen.getByRole('dialog');
+    const approve = within(dialog).getByRole('button', { name: 'Approve' }) as HTMLButtonElement;
+    expect(approve.disabled).toBe(true);
+    fireEvent.click(within(dialog).getByLabelText(/I’ve checked this employee can afford the repayment/));
+    expect(approve.disabled).toBe(false);
+    fireEvent.click(approve);
+    await vi.waitFor(() => expect(formApi.confirmAffordability).toHaveBeenCalledWith('r1'));
+    await vi.waitFor(() => expect(mocked.approveLoan).toHaveBeenCalled());
   });
 
   it('a decline needs a reason', async () => {
@@ -425,6 +446,7 @@ describe('the loans page', () => {
         interestMethod: null,
         reason: '',
         statedNetPay: null,
+        affordabilityCheckedBy: null,
       }),
     );
   });

@@ -38,6 +38,11 @@ export interface LoanSettings {
    * Employment Act's minimum), 20261119300000; null = no such check.
    */
   min_take_home_divisor: number | null;
+  /**
+   * Flag loans whose monthly repayment is over this % of net pay (or whose net pay isn't known): the approver must
+   * confirm they checked affordability, 20261120100000. Null: no flag.
+   */
+  affordability_flag_percent: number | null;
   staff_can_apply: boolean;
   /**
    * Fixed terms, each with its own rate (20261118500000), e.g. 3 months at 20% and 6 at 25%. Empty: any term from the
@@ -65,6 +70,7 @@ export const DEFAULT_LOAN_SETTINGS: LoanSettings = {
   max_salary_multiple: null,
   max_instalment_divisor: null,
   min_take_home_divisor: null,
+  affordability_flag_percent: null,
   staff_can_apply: true,
   term_rates: [],
 };
@@ -385,6 +391,9 @@ export const settingsError = (s: LoanSettings): string | null => {
   if (s.max_salary_multiple !== null && !(s.max_salary_multiple > 0)) return 'The salary multiple must be above 0, or left empty.';
   if (s.max_instalment_divisor !== null && !(s.max_instalment_divisor > 0)) return 'The basic salary divider must be above 0, or left empty.';
   if (s.min_take_home_divisor !== null && !(s.min_take_home_divisor > 0)) return 'The take-home divider must be above 0, or left empty.';
+  if (s.affordability_flag_percent !== null && !(s.affordability_flag_percent > 0 && s.affordability_flag_percent <= 100)) {
+    return 'The affordability flag must be between 0% and 100%, or left empty.';
+  }
   for (const t of s.term_rates) {
     if (!Number.isInteger(t.months) || t.months < 1 || t.months > 120) return 'Each fixed term must be 1 to 120 whole months.';
     if (!(t.rate >= 0 && t.rate <= 100)) return 'Each fixed term’s rate must be between 0% and 100%.';

@@ -7,6 +7,7 @@ import LoanSettingsCard from './LoanSettingsCard';
 import LoanFormPanel from './LoanFormPanel';
 import LoanFormSettingsCard from './LoanFormSettingsCard';
 import MySignature from '../Signature/MySignature';
+import { confirmAffordability, loadAffordability, type LoanAffordability } from '../../lib/loanFormApi';
 import { currentUserId, deleteCancelledLoan, loadFormValues, loadGuarantors, loadLoanForms, loadWitnesses, signAsApprover } from '../../lib/loanFormApi';
 import { formHoldsPayout, type FormValues, type LoanForm, type LoanGuarantor, type LoanWitness } from '../../lib/loanForm';
 import ApprovalChain from '../Approvals/ApprovalChain';
@@ -95,6 +96,23 @@ interface NewLoanForm {
   reason: string;
   /** the borrower's current net pay, when their latest payslip is out of date (checked at approval) */
   netPay: string;
+  /** HR checked they can afford it (needed when over the affordability flag) */
+  affordable: boolean;
+}
+
+/** The repayment against net pay: a warning when over the company's flag (or net pay unknown), and who checked it. */
+function AffordabilityLine({ a }: { a: LoanAffordability }) {
+  const share = a.share_percent === null ? null : `${a.share_percent.toLocaleString('en-KE', { maximumFractionDigits: 1 })}%`;
+  const text =
+    a.net_pay === null
+      ? 'Net pay not known: check the borrower can afford it'
+      : `Repayment is ${share} of net pay (${formatKsh(a.net_pay)})${a.over_flag ? `: over ${a.flag_percent}%, check they can afford it` : ''}`;
+  return (
+    <p className={`mt-1.5 mb-0 text-[12px] ${a.over_flag ? 'text-orange-text-alt font-semibold' : 'text-muted-foreground'}`} data-testid={`affordability-${a.loan_id}`}>
+      {text}
+      {a.checked_at && <span className="font-normal text-muted-foreground"> · checked by {a.checked_by_name || 'HR'}</span>}
+    </p>
+  );
 }
 
 export default function LoansAdmin() {
@@ -110,6 +128,8 @@ export default function LoansAdmin() {
   const [guarantors, setGuarantors] = useState<Record<string, LoanGuarantor>>({});
   const [witnesses, setWitnesses] = useState<Record<string, LoanWitness>>({});
   const [corrections, setCorrections] = useState<Record<string, FormValues>>({});
+  const [affordability, setAffordability] = useState<Record<string, LoanAffordability>>({});
+  const [affordabilityChecked, setAffordabilityChecked] = useState(false);
   // repayments can't start in a month whose payroll is already approved
   const [firstOpen, setFirstOpen] = useState(currentPeriod());
   const [myUserId, setMyUserId] = useState<string | null>(null);
@@ -152,6 +172,10 @@ export default function LoansAdmin() {
       setGuarantors(g);
       setWitnesses(w);
       setCorrections(c);
+      // the repayment against net pay, for loans still to be decided or paid out
+      setAffordability(
+        await loadAffordability(all.filter((l) => ['requested', 'approved'].includes(l.status)).map((l) => l.id)).catch(() => ({}))
+      );
       setMyUserId(await currentUserId().catch(() => null));
     } catch (error) {
       console.error('Error loading loans:', error);
@@ -194,6 +218,7 @@ export default function LoansAdmin() {
     setApproving(loan);
     setApproveStart(loan.start_period < firstOpen ? firstOpen : loan.start_period);
     setComment('');
+    setAffordabilityChecked(false);
   };
 
   const confirmApprove = async () => {
@@ -205,6 +230,8 @@ export default function LoansAdmin() {
     const ok = await act(
       loan,
       async () => {
+        // a flagged loan: the approver's confirmation that they checked affordability goes first
+        if (affordability[loan.id]?.over_flag && !affordability[loan.id]?.checked_at) await confirmAffordability(loan.id);
         status = await approveLoan(loan.id, chain.request_id, { comment, startPeriod: approveStart });
       },
       `Approved ${loan.employee_name}'s loan`
@@ -297,6 +324,7 @@ export default function LoansAdmin() {
         interestMethod: creating.method || null,
         reason: creating.reason,
         statedNetPay: creating.netPay.trim() === '' ? null : Number(creating.netPay),
+        affordabilityCheckedBy: settings.affordability_flag_percent && creating.affordable ? myUserId : null,
       });
       toast.success(
         status === 'approved'
@@ -336,6 +364,7 @@ export default function LoansAdmin() {
                   method: '',
                   reason: '',
                   netPay: '',
+                  affordable: false,
                 });
               }}
             >
@@ -411,6 +440,7 @@ export default function LoansAdmin() {
                   </div>
 
                   {loan.reason && <p className="mt-2 text-[12px] text-ink break-words">“{loan.reason}”</p>}
+                  {affordability[loan.id] && <AffordabilityLine a={affordability[loan.id]} />}
 
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <LoanStatusPill status={loan.status} />
@@ -519,6 +549,17 @@ export default function LoansAdmin() {
               })()}
               ).
             </p>
+            {affordability[approving.id] && (
+              <div className="mb-3">
+                <AffordabilityLine a={affordability[approving.id]} />
+                {affordability[approving.id].over_flag && !affordability[approving.id].checked_at && (
+                  <label className="mt-2 flex items-start gap-2 text-[12.5px] text-ink">
+                    <input type="checkbox" className="mt-0.5 accent-brand" checked={affordabilityChecked} onChange={(e) => setAffordabilityChecked(e.target.checked)} />
+                    I’ve checked this employee can afford the repayment
+                  </label>
+                )}
+              </div>
+            )}
             <label htmlFor="approve-start" className="block text-[12px] font-semibold text-ink mb-1">
               First repayment from
             </label>
@@ -544,7 +585,10 @@ export default function LoansAdmin() {
               <Button variant="secondary" onClick={() => setApproving(null)}>
                 Cancel
               </Button>
-              <Button onClick={() => void confirmApprove()} disabled={busyId === approving.id}>
+              <Button
+                onClick={() => void confirmApprove()}
+                disabled={busyId === approving.id || (!!affordability[approving.id]?.over_flag && !affordability[approving.id]?.checked_at && !affordabilityChecked)}
+              >
                 Approve
               </Button>
             </div>
@@ -685,7 +729,19 @@ export default function LoansAdmin() {
                 <span className="block text-[12px] font-semibold text-ink mb-1">What it is for (optional)</span>
                 <input className={inputClass} value={creating.reason} onChange={(e) => setCreating({ ...creating, reason: e.target.value })} />
               </label>
-              {settings.min_take_home_divisor ? (
+              {settings.affordability_flag_percent ? (
+                <label className="flex items-start gap-2 text-[12.5px] text-ink">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 accent-brand"
+                    checked={creating.affordable}
+                    onChange={(e) => setCreating({ ...creating, affordable: e.target.checked })}
+                  />
+                  I’ve checked they can afford it (needed when the repayment is over {settings.affordability_flag_percent}% of their net pay, or their net
+                  pay isn’t known)
+                </label>
+              ) : null}
+              {settings.min_take_home_divisor || settings.affordability_flag_percent ? (
                 <label className="block">
                   <span className="block text-[12px] font-semibold text-ink mb-1">Their current net monthly pay (KSh), if their latest payslip is out of date</span>
                   <input
