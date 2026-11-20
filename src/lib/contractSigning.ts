@@ -253,6 +253,47 @@ export async function uploadSignedCopy(contract: SigningContract, file: File): P
   return data as SigningContract;
 }
 
+/** A contract can be signed by drawing when HR sent a PDF (a Word file can't have a page added in the browser). */
+export const canSignByDrawing = (contract: Pick<SigningContract, 'file_path' | 'file_name' | 'status'>) =>
+  canUploadSigned(contract.status) && contentTypeFor(contract.file_name || contract.file_path) === 'application/pdf';
+
+/** "Employment contract.pdf" -> "Employment contract (signed).pdf" */
+export const signedFileName = (contract: Pick<SigningContract, 'file_name' | 'title'>) =>
+  `${(contract.file_name || contract.title).replace(/\.pdf$/i, '').slice(0, 230)} (signed).pdf`;
+
+/**
+ * The employee signs by drawing: the contract HR sent, with their signature page added (lib/contractSignature), goes
+ * to HR as the signed copy, exactly as an uploaded one would, and a copy is kept in the document archive.
+ */
+export async function signByDrawing(
+  contract: SigningContract,
+  signer: { name: string; signature: Blob },
+  signedAt: Date = new Date()
+): Promise<SigningContract> {
+  if (!canSignByDrawing(contract)) throw new Error('This contract cannot be signed here. Download it, sign it and upload the signed copy.');
+  const { data: original, error: downloadError } = await supabase.storage.from(BUCKET).download(contract.file_path);
+  if (downloadError || !original) fail(downloadError, 'Could not open the contract to sign it.');
+  const [{ signContractPdf }, { archiveDocument, sha256Hex }] = await Promise.all([import('./contractSignature'), import('./generatedDocuments')]);
+  const signedBytes = await signContractPdf(await original!.arrayBuffer(), {
+    name: signer.name,
+    employeeNumber: contract.employee_number,
+    title: contract.title,
+    signedAt,
+    signature: new Uint8Array(await signer.signature.arrayBuffer()),
+    originalSha256: await sha256Hex(original!),
+  });
+  const name = signedFileName(contract);
+  const file = new File([new Uint8Array(signedBytes)], name, { type: 'application/pdf' });
+  const submitted = await uploadSignedCopy(contract, file);
+  // the archive copy is the record; the contract is already with HR, so a failure here doesn't undo the signing
+  try {
+    await archiveDocument({ kind: 'signed_contract', title: `${contract.title} (signed)`, employeeNumber: contract.employee_number, referenceId: contract.id, pdf: file });
+  } catch (err) {
+    console.error('The signed contract was sent but not archived:', err);
+  }
+  return submitted;
+}
+
 /** HR accepts the signed copy, or sends it back saying what to fix. */
 export async function reviewContract(id: string, accept: boolean, reason?: string): Promise<SigningContract> {
   const { data, error } = await supabase.rpc('contract_review', { p_id: id, p_accept: accept, p_reason: reason?.trim() || null });

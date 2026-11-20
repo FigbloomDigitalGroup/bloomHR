@@ -62,12 +62,17 @@ afterEach(() => cleanup());
 
 describe('exit letters', () => {
   it('lists the letters sent so far, each to open', async () => {
-    mocks.docs = [{ id: 'd1', title: 'RE: TERMINATION OF EMPLOYMENT', emailed_to: ['jane@acme.co'], created_at: '2026-10-26T09:00:00Z', file_path: 'a/exit_letter/d1.pdf' }];
+    mocks.docs = [
+      { id: 'd1', kind: 'exit_letter', title: 'RE: TERMINATION OF EMPLOYMENT', emailed_to: ['jane@acme.co'], created_at: '2026-10-26T09:00:00Z', file_path: 'a/exit_letter/d1.pdf' },
+      // the exit's kept final dues statement is listed with the final dues, not here
+      { id: 'd2', kind: 'final_dues_statement', title: 'Final dues statement: Jane (reviewed)', emailed_to: [], created_at: '2026-10-27T09:00:00Z', file_path: 'a/final_dues_statement/d2.pdf' },
+    ];
     render(<ExitLetters exit={EXIT} />);
     expect(await screen.findByText('RE: TERMINATION OF EMPLOYMENT')).toBeTruthy();
     expect(screen.getByText(/Emailed to jane@acme.co/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Open PDF' }));
     expect(mocks.open).toHaveBeenCalledWith(expect.objectContaining({ id: 'd1' }));
+    expect(screen.queryByText(/Final dues statement/)).toBeNull();
   });
 
   it('starts from the default template, filled in for this exit, with only active templates to pick', async () => {

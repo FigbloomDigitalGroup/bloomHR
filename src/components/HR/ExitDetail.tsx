@@ -5,7 +5,8 @@ import { Button, Card, StatusPill, type StatusTone } from '../UI';
 import { formatDay, parseDay } from '../../lib/contract';
 import { openPrivateFile } from '../../lib/privateFiles';
 import { confirmDialog } from '../../lib/confirmDialog';
-import { downloadStatementCsv, downloadStatementPdf, duesTotals, money, periodOf, type FinalDuesLine } from '../../lib/finalDues';
+import { downloadStatementCsv, downloadStatementPdf, duesTotals, money, periodOf, statementPdfBlob, type FinalDuesLine } from '../../lib/finalDues';
+import { archiveDocument, loadDocumentsFor, openGeneratedDocument, type GeneratedDocument } from '../../lib/generatedDocuments';
 import {
   DEFAULT_INTERVIEW_QUESTIONS,
   STAGES,
@@ -222,6 +223,12 @@ function FinalDues({ exit, dues, onSaved }: { exit: ExitRecord; dues: FinalDuesR
     kind: reasonLabel(exit),
     payrollPeriod: dues?.payroll_period,
   };
+  // the statements kept in the document archive: one each time it is marked reviewed or included in payroll
+  const [kept, setKept] = useState<GeneratedDocument[]>([]);
+  const loadKept = useCallback(() => {
+    loadDocumentsFor(exit.id).then((docs) => setKept(docs.filter((d) => d.kind === 'final_dues_statement')), () => setKept([]));
+  }, [exit.id]);
+  useEffect(loadKept, [loadKept]);
 
   const workOut = async () => {
     setBusy(true);
@@ -240,6 +247,21 @@ function FinalDues({ exit, dues, onSaved }: { exit: ExitRecord; dues: FinalDuesR
     try {
       await saveFinalDues(exit, { id: dues?.id, lines, status: next, payroll_period: payrollPeriod });
       toast.success(next === 'included' ? `Marked as included in payroll ${payrollPeriod}` : 'Final dues saved');
+      if (next !== 'draft') {
+        // the agreed statement is kept; the figures are saved either way, so a failure here is only a warning
+        try {
+          await archiveDocument({
+            kind: 'final_dues_statement',
+            title: `Final dues statement: ${heading.employeeName} (${next === 'included' ? `included in payroll ${payrollPeriod}` : 'reviewed'})`,
+            employeeNumber: exit.employee_number,
+            referenceId: exit.id,
+            pdf: statementPdfBlob({ ...heading, payrollPeriod: next === 'included' ? payrollPeriod : null }, lines),
+          });
+          loadKept();
+        } catch (err) {
+          toast.error(message(err, 'The statement was saved but its PDF was not kept in the archive'));
+        }
+      }
       onSaved();
     } catch (err) {
       toast.error(message(err, 'Could not save the final dues'));
@@ -348,6 +370,21 @@ function FinalDues({ exit, dues, onSaved }: { exit: ExitRecord; dues: FinalDuesR
             <Button variant="secondary" onClick={() => downloadStatementPdf(heading, lines)} icon={<Download className="w-3.5 h-3.5" />}>PDF</Button>
             <Button variant="secondary" onClick={() => downloadStatementCsv(heading, lines)} icon={<Download className="w-3.5 h-3.5" />}>CSV</Button>
           </div>
+          {kept.length > 0 && (
+            <div className="mt-3">
+              <div className="text-[11.5px] font-semibold text-muted-foreground mb-1">Kept copies</div>
+              <ul className="m-0 p-0 list-none space-y-1">
+                {kept.map((d) => (
+                  <li key={d.id} className="flex flex-wrap items-center gap-2 text-[12px] text-ink">
+                    <span className="min-w-0 flex-1">{d.title} · {new Date(d.created_at).toLocaleString()}</span>
+                    <Button variant="ghost" icon={<FileText className="w-3.5 h-3.5" />} onClick={() => openGeneratedDocument(d).catch((err) => toast.error(message(err, 'Could not open the PDF')))}>
+                      Open PDF
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {status === 'reviewed' && !included && exit.status !== 'completed' && (
             <div className="mt-3 flex flex-col sm:flex-row sm:items-end gap-2">
               <div>

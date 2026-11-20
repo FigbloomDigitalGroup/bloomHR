@@ -180,7 +180,8 @@ export function downloadStatementCsv(heading: StatementHeading, lines: FinalDues
   URL.revokeObjectURL(url);
 }
 
-export function downloadStatementPdf(heading: StatementHeading, lines: FinalDuesLine[]) {
+/** The statement as a PDF (jsPDF document), for downloading or keeping in the archive. */
+function statementDoc(heading: StatementHeading, lines: FinalDuesLine[]) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   doc.setFontSize(14);
   doc.text('Final dues statement', 40, 40);
@@ -205,5 +206,12 @@ export function downloadStatementPdf(heading: StatementHeading, lines: FinalDues
     40,
     doc.internal.pageSize.getHeight() - 30
   );
-  doc.save(fileName(heading, 'pdf'));
+  return doc;
 }
+
+export function downloadStatementPdf(heading: StatementHeading, lines: FinalDuesLine[]) {
+  statementDoc(heading, lines).save(fileName(heading, 'pdf'));
+}
+
+/** The statement PDF as a file, for the document archive (FIG-1232). */
+export const statementPdfBlob = (heading: StatementHeading, lines: FinalDuesLine[]): Blob => statementDoc(heading, lines).output('blob');

@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Download, FileSignature, Upload } from 'lucide-react';
+import { Download, FileSignature, PenLine, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button, Card, StatusPill } from '../UI';
 import { formatDay, parseDay } from '../../lib/contract';
+import SignaturePad from '../Signature/SignaturePad';
+import { loadMySignature } from '../../lib/signatures';
 import {
   MY_STATUS_LABEL,
   SIGNED_FILE_ACCEPT,
   STATUS_TONE,
+  canSignByDrawing,
   canUploadSigned,
   contractFileProblem,
   dueState,
   listMyContracts,
   openContractFile,
+  signByDrawing,
   uploadSignedCopy,
   type SigningContract,
 } from '../../lib/contractSigning';
@@ -19,11 +23,75 @@ import {
 const day = (d: string | null | undefined) => formatDay(parseDay(d));
 const errorText = (err: unknown, fallback: string) => (err instanceof Error && err.message ? err.message : fallback);
 
-function ContractCard({ contract, onChanged }: { contract: SigningContract; onChanged: () => void }) {
+/** A data: URL (the saved signature) as a PNG blob. Decoded here, not fetched: the page's security policy may not allow fetching data: URLs. */
+function dataUrlToBlob(url: string): Blob {
+  const [head, data = ''] = url.split(',', 2);
+  const type = /^data:([^;,]+)/.exec(head)?.[1] || 'image/png';
+  const binary = head.includes(';base64') ? atob(data) : decodeURIComponent(data);
+  return new Blob([Uint8Array.from(binary, (c) => c.charCodeAt(0))], { type });
+}
+
+/**
+ * Signing by drawing: the saved signature (if they have one) or a new one drawn here. The contract gets a signature
+ * page and goes to HR, like an uploaded signed copy.
+ */
+function SignHere({ contract, signerName, onSigned, onCancel }: { contract: SigningContract; signerName: string; onSigned: () => void; onCancel: () => void }) {
+  const [saved, setSaved] = useState<string | null | undefined>(undefined);
+  const [drawNew, setDrawNew] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    loadMySignature().then(setSaved, () => setSaved(null));
+  }, []);
+
+  const sign = async (png: Blob) => {
+    setBusy(true);
+    try {
+      await signByDrawing(contract, { name: signerName, signature: png });
+      toast.success('Contract signed and sent to HR');
+      onSigned();
+    } catch (err) {
+      toast.error(errorText(err, 'Could not sign the contract'), { duration: 8000 });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 rounded-lg border border-border p-3">
+      <p className="m-0 mb-2 text-[12.5px] text-ink">
+        Signing as <span className="font-semibold">{signerName || contract.employee_number}</span>. Your signature is added on a page at the end of the
+        contract, with today&apos;s date, and HR gets the signed copy. Open the contract and read it before you sign.
+      </p>
+      {saved === undefined ? (
+        <p className="m-0 text-[12px] text-muted-foreground">Loading your signature…</p>
+      ) : saved && !drawNew ? (
+        <div className="space-y-2">
+          <div className="rounded-lg border border-border bg-white p-2 inline-block max-w-full">
+            <img src={saved} alt="Your saved signature" className="block max-h-20 max-w-full" />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button disabled={busy} onClick={() => sign(dataUrlToBlob(saved))} icon={<PenLine className="w-3.5 h-3.5" />}>
+              {busy ? 'Signing…' : 'Sign with this signature'}
+            </Button>
+            <Button variant="secondary" disabled={busy} onClick={() => setDrawNew(true)}>Draw a new one</Button>
+            <Button variant="ghost" disabled={busy} onClick={onCancel}>Cancel</Button>
+          </div>
+        </div>
+      ) : (
+        <SignaturePad busy={busy} saveLabel={busy ? 'Signing…' : 'Sign the contract'} onSave={sign} onCancel={onCancel} />
+      )}
+    </div>
+  );
+}
+
+function ContractCard({ contract, signerName, onChanged }: { contract: SigningContract; signerName: string; onChanged: () => void }) {
   const c = contract;
   const fileInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [signing, setSigning] = useState(false);
   const due = dueState(c);
+  const drawable = canSignByDrawing(c);
 
   const open = async (which: 'contract' | 'signed') => {
     try {
@@ -84,13 +152,20 @@ function ContractCard({ contract, onChanged }: { contract: SigningContract; onCh
           ? `HR accepted your signed copy on ${day(c.reviewed_at)}.`
           : c.status === 'signed'
             ? 'HR has your signed copy and will review it. You can still replace it until they accept it.'
-            : 'Download the contract, sign it, then upload the signed copy as a PDF. Signed on paper? Scan it to PDF (most phone scanner apps can).'}
+            : drawable
+              ? 'Open the contract and read it, then sign it here by drawing your signature. Signed on paper instead? Upload the signed copy as a PDF.'
+              : 'Download the contract, sign it, then upload the signed copy as a PDF. Signed on paper? Scan it to PDF (most phone scanner apps can).'}
       </p>
 
       <div className="mt-3 flex flex-wrap gap-2">
         <Button variant="secondary" onClick={() => open('contract')} icon={<Download className="w-3.5 h-3.5" />}>Download contract</Button>
         {c.signed_path && (
           <Button variant="secondary" onClick={() => open('signed')} icon={<Download className="w-3.5 h-3.5" />}>My signed copy</Button>
+        )}
+        {drawable && !signing && (
+          <Button onClick={() => setSigning(true)} icon={<PenLine className="w-3.5 h-3.5" />}>
+            {c.signed_path ? 'Sign again' : 'Sign here'}
+          </Button>
         )}
         {canUploadSigned(c.status) && (
           <>
@@ -103,18 +178,29 @@ function ContractCard({ contract, onChanged }: { contract: SigningContract; onCh
               aria-label={`Signed copy of ${c.title} (PDF)`}
               onChange={(e) => upload(e.target.files?.[0])}
             />
-            <Button disabled={busy} onClick={() => fileInput.current?.click()} icon={<Upload className="w-3.5 h-3.5" />}>
+            <Button variant={drawable ? 'secondary' : undefined} disabled={busy} onClick={() => fileInput.current?.click()} icon={<Upload className="w-3.5 h-3.5" />}>
               {busy ? 'Uploading…' : c.signed_path ? 'Replace signed copy (PDF)' : 'Upload signed copy (PDF)'}
             </Button>
           </>
         )}
       </div>
+      {signing && (
+        <SignHere
+          contract={c}
+          signerName={signerName}
+          onCancel={() => setSigning(false)}
+          onSigned={() => {
+            setSigning(false);
+            onChanged();
+          }}
+        />
+      )}
     </Card>
   );
 }
 
 /** The contracts HR has sent the signed-in employee to sign (shown on My contract). Nothing shows when there are none. */
-export default function ContractsToSign() {
+export default function ContractsToSign({ signerName = '' }: { signerName?: string }) {
   const [contracts, setContracts] = useState<SigningContract[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -144,7 +230,7 @@ export default function ContractsToSign() {
       </h2>
       <div className="space-y-3">
         {contracts.map((c) => (
-          <ContractCard key={c.id} contract={c} onChanged={load} />
+          <ContractCard key={c.id} contract={c} signerName={signerName} onChanged={load} />
         ))}
       </div>
     </section>
