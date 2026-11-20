@@ -246,7 +246,8 @@ export default function ExitLetters({ exit }: { exit: ExitRecord }) {
   const [templatesOpen, setTemplatesOpen] = useState(false);
 
   const load = useCallback(() => {
-    loadDocumentsFor(exit.id).then(setLetters, (err) => {
+    // only letters: the exit's kept final dues statements are listed with the final dues
+    loadDocumentsFor(exit.id).then((docs) => setLetters(docs.filter((d) => d.kind === 'exit_letter')), (err) => {
       setLetters([]);
       toast.error((err as Error).message);
     });

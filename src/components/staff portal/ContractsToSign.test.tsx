@@ -6,13 +6,16 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   open: vi.fn(),
   upload: vi.fn(),
+  sign: vi.fn(),
+  savedSignature: vi.fn(),
   toastError: vi.fn(),
 }));
 
 vi.mock('../../lib/contractSigning', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/contractSigning')>();
-  return { ...actual, listMyContracts: mocks.list, openContractFile: mocks.open, uploadSignedCopy: mocks.upload };
+  return { ...actual, listMyContracts: mocks.list, openContractFile: mocks.open, uploadSignedCopy: mocks.upload, signByDrawing: mocks.sign };
 });
+vi.mock('../../lib/signatures', () => ({ loadMySignature: mocks.savedSignature }));
 vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: mocks.toastError } }));
 
 import ContractsToSign from './ContractsToSign';
@@ -43,6 +46,8 @@ beforeEach(() => {
   mocks.open.mockReset().mockResolvedValue(undefined);
   mocks.upload.mockReset().mockResolvedValue(base);
   mocks.toastError.mockReset();
+  mocks.sign.mockReset().mockResolvedValue({ ...base, status: 'signed' });
+  mocks.savedSignature.mockReset().mockResolvedValue(null);
 });
 afterEach(() => cleanup());
 
@@ -95,6 +100,34 @@ describe('ContractsToSign', () => {
     await screen.findByText('Accepted');
     expect(screen.queryByRole('button', { name: /(Upload|Replace) signed copy/ })).toBeNull();
     expect(screen.getByText(/HR accepted your signed copy/)).toBeTruthy();
+  });
+
+  it('a PDF contract can be signed with the saved signature, under their name', async () => {
+    mocks.savedSignature.mockResolvedValue('data:image/png;base64,iVBORw0KGgo=');
+    mocks.list.mockResolvedValue([base]);
+    render(<ContractsToSign signerName="Collins Kimeli" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign here' }));
+    expect(await screen.findByText('Collins Kimeli')).toBeTruthy();
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign with this signature' }));
+    await waitFor(() => expect(mocks.sign).toHaveBeenCalledWith(base, { name: 'Collins Kimeli', signature: expect.any(Blob) }));
+    // the list reloads to show it is with HR
+    await waitFor(() => expect(mocks.list).toHaveBeenCalledTimes(2));
+  });
+
+  it('no saved signature: the pad to draw one opens', async () => {
+    mocks.list.mockResolvedValue([base]);
+    render(<ContractsToSign signerName="Collins Kimeli" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign here' }));
+    expect(await screen.findByLabelText(/Signature pad/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Sign the contract' })).toBeTruthy();
+  });
+
+  it('a Word contract has no Sign here: download, sign and upload as before', async () => {
+    mocks.list.mockResolvedValue([{ ...base, file_name: 'contract.docx', file_path: 't1/c1/original-x.docx' }]);
+    render(<ContractsToSign signerName="Collins Kimeli" />);
+    await screen.findByText('Employment contract 2027');
+    expect(screen.queryByRole('button', { name: 'Sign here' })).toBeNull();
+    expect(screen.getByRole('button', { name: /Upload signed copy/ })).toBeTruthy();
   });
 
   it('says so when the contracts cannot load', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_FILE_BYTES, canCancel, canUploadSigned, contentTypeFor, contractFileProblem, dueState, matchesFilter, type ContractSigningStatus } from './contractSigning';
+import { MAX_FILE_BYTES, canCancel, canSignByDrawing, canUploadSigned, contentTypeFor, contractFileProblem, dueState, matchesFilter, signedFileName, type ContractSigningStatus } from './contractSigning';
 
 const ALL: ContractSigningStatus[] = ['sent', 'viewed', 'signed', 'accepted', 'sent_back', 'cancelled'];
 
@@ -75,5 +75,24 @@ describe('dueState', () => {
     expect(dueState({ sign_by: '2027-01-01', status: 'signed' }, today)).toBeNull();
     expect(dueState({ sign_by: '2027-01-01', status: 'accepted' }, today)).toBeNull();
     expect(dueState({ sign_by: '2027-01-01', status: 'cancelled' }, today)).toBeNull();
+  });
+});
+
+describe('signing by drawing', () => {
+  const pdf = { file_path: 't/c/original-x.pdf', file_name: 'Contract.PDF' };
+  it('only a PDF contract, and only while the employee may still send a signed copy', () => {
+    expect(canSignByDrawing({ ...pdf, status: 'sent' })).toBe(true);
+    expect(canSignByDrawing({ ...pdf, status: 'sent_back' })).toBe(true);
+    expect(canSignByDrawing({ ...pdf, status: 'signed' })).toBe(true);
+    expect(canSignByDrawing({ ...pdf, status: 'accepted' })).toBe(false);
+    expect(canSignByDrawing({ ...pdf, status: 'cancelled' })).toBe(false);
+    expect(canSignByDrawing({ file_path: 't/c/original-x.docx', file_name: 'Contract.docx', status: 'sent' })).toBe(false);
+    // an old row without a file name goes by the stored path
+    expect(canSignByDrawing({ file_path: 't/c/original-x.pdf', file_name: null, status: 'sent' })).toBe(true);
+  });
+
+  it('the signed copy is named after the contract', () => {
+    expect(signedFileName({ file_name: 'Employment contract.pdf', title: 'x' })).toBe('Employment contract (signed).pdf');
+    expect(signedFileName({ file_name: null, title: 'Contract 2027' })).toBe('Contract 2027 (signed).pdf');
   });
 });

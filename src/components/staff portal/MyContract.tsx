@@ -14,14 +14,14 @@ const TONE: Record<ContractState, string> = {
   'not-started': 'bg-blue-100 text-blue-800',
 };
 
-const COLUMNS = '"Employee Type", "Job Title", "Job Group", "Manager", "Start Date", "Contract Start Date", "Contract End Date"';
+const COLUMNS = '"First Name", "Last Name", "Employee Type", "Job Title", "Job Group", "Manager", "Start Date", "Contract Start Date", "Contract End Date"';
 
 /**
  * The signed-in employee's contracts: any HR has sent them to sign (download, upload the signed copy), then their own
  * contract terms, read from their record. HR keeps these up to date under Employees.
  */
 export default function MyContract() {
-  const [record, setRecord] = useState<ContractRecord | null>(null);
+  const [record, setRecord] = useState<(ContractRecord & { 'First Name'?: string | null; 'Last Name'?: string | null }) | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'none' | 'error'>('loading');
 
   useEffect(() => {
@@ -34,7 +34,7 @@ export default function MyContract() {
         const { data, error } = await supabase.from('employees').select(COLUMNS).eq('"Work Email"', email).maybeSingle();
         if (cancelled) return;
         if (error) return setState('error');
-        setRecord((data as ContractRecord | null) ?? null);
+        setRecord((data as typeof record) ?? null);
         setState(data ? 'ready' : 'none');
       } catch {
         if (!cancelled) setState('error');
@@ -65,7 +65,8 @@ export default function MyContract() {
   return (
     <div className="p-6">
       <PageHeader title="My contract" subtitle="Contracts to sign, and your employment terms as HR has them on record." />
-      <ContractsToSign />
+      {/* their name goes on a contract they sign by drawing */}
+      <ContractsToSign signerName={[record['First Name'], record['Last Name']].filter(Boolean).join(' ')} />
       <Card className="mb-4">
         <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${TONE[summary.state]}`}>{summary.headline}</span>
         <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
