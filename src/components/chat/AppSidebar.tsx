@@ -201,7 +201,7 @@ export function AppSidebar({
                       <SidebarMenuButton
                         onClick={() => onChannelSelect(channel)}
                         isActive={isChannelActive(channel)}
-                        className="group mx-2 rounded-lg transition-all hover:bg-sidebar-accent"
+                        className="group mx-2 w-[calc(100%-1rem)] rounded-lg transition-all hover:bg-sidebar-accent"
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           {/* Channel Avatar */}
@@ -209,7 +209,7 @@ export function AppSidebar({
 
                           <span className="flex-1 truncate font-medium text-xs">{channel.name}</span>
                           {(channel.unread_count ?? 0) > 0 && (
-                            <Badge variant="default" className="h-5 min-w-5 px-1.5 text-xs bg-orange">
+                            <Badge variant="default" className="h-5 min-w-5 px-1.5 text-xs bg-orange flex-shrink-0 justify-center">
                               {(channel.unread_count ?? 0) > 99 ? '99+' : channel.unread_count}
                             </Badge>
                           )}
@@ -294,8 +294,9 @@ export function AppSidebar({
                           <SidebarMenuButton
                             onClick={() => onChannelSelect(dm)}
                             isActive={isChannelActive(dm)}
-                            className="group mx-2 rounded-lg transition-all hover:bg-sidebar-accent"
+                            className="group mx-2 w-[calc(100%-1rem)] h-auto min-h-8 py-1.5 rounded-lg transition-all hover:bg-sidebar-accent"
                           >
+                            {/* two lines (name, last message): the row grows to fit them instead of the fixed menu height */}
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                               <div className="relative flex-shrink-0">
                                 <Avatar className="h-6 w-6 ring-2 ring-white">
@@ -310,10 +311,10 @@ export function AppSidebar({
                                   }`}></span>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between">
-                                  <span className="font-medium text-xs text-gray-900">{dm.name}</span>
+                                <div className="flex items-center justify-between gap-2 min-w-0">
+                                  <span className="min-w-0 truncate font-medium text-xs text-gray-900">{dm.name}</span>
                                   {dm.lastMessageTime && (
-                                    <span className="text-xs text-gray-400 flex-shrink-0 ml-2">
+                                    <span className="text-xs text-gray-400 flex-shrink-0 whitespace-nowrap">
                                       {formatTime(dm.lastMessageTime)}
                                     </span>
                                   )}
@@ -325,7 +326,7 @@ export function AppSidebar({
                                 )}
                               </div>
                               {(dm.unread_count ?? 0) > 0 && (
-                                <Badge variant="default" className="h-5 min-w-5 px-1.5 text-xs bg-brand text-white">
+                                <Badge variant="default" className="h-5 min-w-5 px-1.5 text-xs bg-brand text-white flex-shrink-0 justify-center">
                                   {(dm.unread_count ?? 0) > 99 ? '99+' : dm.unread_count}
                                 </Badge>
                               )}
@@ -366,7 +367,7 @@ export function AppSidebar({
                           <SidebarMenuButton
                             onClick={() => onChannelSelect(dm)}
                             isActive={isChannelActive(dm)}
-                            className="group mx-2 rounded-lg transition-all hover:bg-sidebar-accent"
+                            className="group mx-2 w-[calc(100%-1rem)] rounded-lg transition-all hover:bg-sidebar-accent"
                           >
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                               <div className="relative flex-shrink-0">
@@ -383,7 +384,7 @@ export function AppSidebar({
                               </div>
                               <span className="flex-1 truncate font-medium text-xs">{dm.name || 'Unknown User'}</span>
                               {(dm.unread_count ?? 0) > 0 && (
-                                <Badge variant="default" className="h-5 min-w-5 px-1.5 text-xs bg-brand text-white">
+                                <Badge variant="default" className="h-5 min-w-5 px-1.5 text-xs bg-brand text-white flex-shrink-0 justify-center">
                                   {(dm.unread_count ?? 0) > 99 ? '99+' : dm.unread_count}
                                 </Badge>
                               )}
