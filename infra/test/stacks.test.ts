@@ -13,6 +13,7 @@ import {
   IDENTITY_CENTER_ROLES,
 } from '../lib/guardrails-stack.js';
 import { RELAY_HEADER, ScannerRelayStack } from '../lib/scanner-relay-stack.js';
+import { ThreatDetectionStack } from '../lib/threat-detection-stack.js';
 
 const env = { account: '123456789012', region: 'eu-west-1' };
 const settings: AccountSettings = {
@@ -102,6 +103,26 @@ describe('AccountSecurityStack', () => {
   it('refuses to build without anyone to alert or without a budget', () => {
     expect(() => securityTemplate({ alertEmails: [] })).toThrow(/alertEmails/);
     expect(() => securityTemplate({ monthlyBudgetUsd: 0 })).toThrow(/monthlyBudgetUsd/);
+  });
+});
+
+describe('ThreatDetectionStack', () => {
+  const template = (alertEmails = ['ops@example.com', 'cto@example.com']) =>
+    Template.fromStack(new ThreatDetectionStack(new App(), 'Threats', { env: { account: '374254524440', region: 'eu-west-1' }, alertEmails }));
+
+  it('turns GuardDuty on and emails high-severity findings to everyone listed', () => {
+    const t = template();
+    t.resourceCountIs('AWS::GuardDuty::Detector', 1);
+    t.hasResourceProperties('AWS::GuardDuty::Detector', { Enable: true, FindingPublishingFrequency: 'FIFTEEN_MINUTES' });
+    t.hasResourceProperties('AWS::Events::Rule', {
+      EventPattern: Match.objectLike({ source: ['aws.guardduty'], detail: { severity: [{ numeric: ['>=', 7] }] } }),
+    });
+    t.resourceCountIs('AWS::SNS::Subscription', 2);
+    t.hasResourceProperties('AWS::SNS::Subscription', { Protocol: 'email', Endpoint: 'ops@example.com' });
+  });
+
+  it('refuses to build with nobody to tell', () => {
+    expect(() => template([])).toThrow(/alertEmails is empty/);
   });
 });
 

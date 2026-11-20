@@ -15,6 +15,7 @@ import {
 import { EnvironmentStack } from '../lib/environment-stack.js';
 import { GuardrailsStack } from '../lib/guardrails-stack.js';
 import { ScannerRelayStack } from '../lib/scanner-relay-stack.js';
+import { ThreatDetectionStack } from '../lib/threat-detection-stack.js';
 
 const app = new App();
 const env = { account: ACCOUNT_ID, region: REGION };
@@ -45,6 +46,22 @@ new ScannerRelayStack(app, 'FigbloomScannerRelay', {
   env,
   description: 'Figbloom scanner relay - door scanners on office networks send punches over HTTP, forwarded to the app over HTTPS',
   appHost: APP_HOST,
+});
+
+// GuardDuty in the workload accounts (the management account's is in FigbloomAccountSecurity). Each is deployed with
+// that account's own profile: --profile figbloom-staging / figbloom-prod.
+new ThreatDetectionStack(app, 'FigbloomThreatDetectionStaging', {
+  env: { account: STAGING_ACCOUNT_ID, region: REGION },
+  description: 'Figbloom staging account threat detection - GuardDuty, high-severity findings emailed',
+  terminationProtection: true,
+  alertEmails: ACCOUNT_SETTINGS.alertEmails,
+});
+
+new ThreatDetectionStack(app, 'FigbloomThreatDetectionProduction', {
+  env: { account: PRODUCTION_ACCOUNT_ID, region: REGION },
+  description: 'Figbloom production account threat detection - GuardDuty, high-severity findings emailed',
+  terminationProtection: true,
+  alertEmails: ACCOUNT_SETTINGS.alertEmails,
 });
 
 // Developer sign-in (IAM Identity Center). Has to be in Identity Center's home Region, eu-north-1, so it has its own env.

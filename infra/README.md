@@ -5,6 +5,7 @@ AWS CDK app (TypeScript) for account 852845752791 in eu-west-1. This is its own 
 | Stack | What it holds |
 | -- | -- |
 | `FigbloomAccountSecurity` | Account-wide, deployed once: CloudTrail (all Regions, logs kept 7 years), GuardDuty with emails for high-severity findings, the monthly budget and cost anomaly alerts. Settings are in `lib/config.ts`. |
+| `FigbloomThreatDetectionStaging`, `FigbloomThreatDetectionProduction` | GuardDuty in the figbloom-staging and figbloom-prod accounts, with the same emails for high-severity findings (GuardDuty only watches the account it runs in). Deploy each with that account's profile: `npx cdk deploy FigbloomThreatDetectionStaging --profile figbloom-staging`. |
 | `FigbloomStaging` | The test environment. Self-hosted Supabase, the website and the API are added here in later stages. |
 | `FigbloomProduction` | The live environment, built by the same code as staging. Has termination protection. |
 | `FigbloomScannerRelay` | Relays punches from office door scanners (HTTP) to the app over HTTPS. |
