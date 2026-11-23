@@ -35,6 +35,12 @@ const PT_FLEET = '9d2c2a4e-3b7d-4c1e-9a55-2d8f0e7b9c12';
 const HR_FLEET = '3b1c2a4e-3b7d-4c1e-9a55-2d8f0e7b9c22';
 const FLEET_CO = 'clx0company0000000000001';
 const DRIVER = 'clx0driver00000000000001';
+// Figbloom Property (ERP/PROPERTY_HR_CONTRACT.md): its own client, uuid ids, the workspace in x-figbloom-tenant
+const PROPERTY_CLIENT = 'property-client-id';
+const PT_PROPERTY = '9e3d3b5f-4c8e-4d2f-8b66-3e9f1f8cad13';
+const HR_PROPERTY = '3c2d3b5f-4c8e-4d2f-8b66-3e9f1f8cad23';
+const WORKSPACE = 'c0000000-0000-4000-8000-0000000000a1';
+const CARETAKER = 'c0000000-0000-4000-8000-0000000000b1';
 
 type Row = Record<string, unknown>;
 let mod: typeof import('../my_hr_routes.js');
@@ -108,6 +114,9 @@ const platform = {
     if (school === SCHOOL_OTHER) return { platform_tenant_id: PT_OTHER, module: 'schools', local_id: SCHOOL_OTHER, caller_local_id: HR_OTHER };
     // the platform says HR_CO, but HR_CO is another platform tenant's company here
     if (school === FLEET_CO && path.includes('module=fleet')) return { platform_tenant_id: PT_FLEET, module: 'fleet', local_id: FLEET_CO, caller_local_id: HR_FLEET };
+    if (school === WORKSPACE && path.includes('module=property')) {
+      return { platform_tenant_id: PT_PROPERTY, module: 'property', local_id: WORKSPACE, caller_local_id: HR_PROPERTY };
+    }
     if (school === SCHOOL_MISMATCH) return { platform_tenant_id: PT_OTHER, module: 'schools', local_id: SCHOOL_MISMATCH, caller_local_id: HR_CO };
     throw new PlatformError(404, 'not_found', 'Not found');
   },
@@ -173,13 +182,16 @@ beforeEach(() => {
   companies.set(HR_CO, PT);
   companies.set(HR_OTHER, PT_OTHER);
   companies.set(HR_FLEET, PT_FLEET);
+  companies.set(HR_PROPERTY, PT_PROPERTY);
   delete process.env.PLATFORM_FLEET_CLIENT_ID;
+  delete process.env.PLATFORM_PROPERTY_CLIENT_ID;
   sources.length = 0;
   people.clear();
   people.set(`${HR_CO}|${MARY}`, { tenant: HR_CO, number: 'E1', onboarding: 'approved' });
   people.set(`${HR_CO}|${NEW}`, { tenant: HR_CO, number: 'E3', onboarding: 'draft' });
   people.set(`${HR_OTHER}|${OTHER_PERSON}`, { tenant: HR_OTHER, number: 'E1', onboarding: 'approved' });
   people.set(`${HR_FLEET}|${DRIVER}`, { tenant: HR_FLEET, number: 'F1', onboarding: 'approved' });
+  people.set(`${HR_PROPERTY}|${CARETAKER}`, { tenant: HR_PROPERTY, number: 'P1', onboarding: 'approved' });
   calls.length = 0;
   logRows.length = 0;
   platform.calls = [];
@@ -529,5 +541,50 @@ describe('Figbloom Fleet (PLATFORM_FLEET_CLIENT_ID)', () => {
     expect(await errorCode(res)).toBe('company_not_linked');
     expect((await fleetGet('summary', { person: 'a b' })).status).toBe(400);
     expect((await fleetGet('summary', { company: '' })).status).toBe(400);
+  });
+});
+
+describe('Figbloom Property (PLATFORM_PROPERTY_CLIENT_ID)', () => {
+  const propertyGet = async (path: string, { client = PROPERTY_CLIENT, workspace = WORKSPACE, person = CARETAKER, header = 'x-figbloom-tenant' } = {}) =>
+    fetch(`${base}/api/integrations/my-hr/${path}`, {
+      headers: { authorization: `Bearer ${await sign(access({ client_id: client, sub: client }))}`, [header]: workspace, 'x-figbloom-person': person },
+    });
+
+  it('productClients: Property\'s client maps to property', () => {
+    process.env.PLATFORM_PROPERTY_CLIENT_ID = PROPERTY_CLIENT;
+    expect([...mod.productClients()]).toEqual([[SCHOOLS_CLIENT, 'schools'], [PROPERTY_CLIENT, 'property']]);
+  });
+
+  it('a Property token is refused while Property\'s client isn\'t allowed', async () => {
+    const res = await propertyGet('summary');
+    expect(res.status).toBe(401);
+    expect(platform.calls).toEqual([]);
+  });
+
+  it('allowed: the workspace (x-figbloom-tenant) is resolved as a Property one, the person with source property', async () => {
+    process.env.PLATFORM_PROPERTY_CLIENT_ID = PROPERTY_CLIENT;
+    const res = await propertyGet('summary');
+    expect(res.status).toBe(200);
+    expect(platform.calls).toEqual([`/links/resolve?module=property&local_id=${WORKSPACE}`]);
+    expect(calls[0]).toEqual({ fn: 'person', tenantId: HR_PROPERTY, platformTenantId: PT_PROPERTY, externalId: CARETAKER });
+    expect(sources).toEqual(['property']);
+  });
+
+  it('Property does not read x-figbloom-school or x-figbloom-company', async () => {
+    process.env.PLATFORM_PROPERTY_CLIENT_ID = PROPERTY_CLIENT;
+    expect((await propertyGet('summary', { header: 'x-figbloom-school' })).status).toBe(400);
+    expect((await propertyGet('summary', { header: 'x-figbloom-company' })).status).toBe(400);
+    expect(platform.calls).toEqual([]);
+  });
+
+  it('a workspace the platform does not link: 403 workspace_not_linked; ids that are not uuids: 400', async () => {
+    process.env.PLATFORM_PROPERTY_CLIENT_ID = PROPERTY_CLIENT;
+    const res = await propertyGet('summary', { workspace: 'c0000000-0000-4000-8000-0000000000ff' });
+    expect(res.status).toBe(403);
+    expect(await errorCode(res)).toBe('workspace_not_linked');
+    platform.calls = [];
+    expect((await propertyGet('summary', { person: 'clx0driver00000000000001' })).status).toBe(400);
+    expect((await propertyGet('summary', { workspace: 'clx0company0000000000001' })).status).toBe(400);
+    expect(platform.calls).toEqual([]);
   });
 });

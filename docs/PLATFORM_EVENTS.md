@@ -120,7 +120,8 @@ known (company, employee number, route, status; no payload, no token; a per-comp
 | `PLATFORM_JWKS_URL` | `https://cognito-idp.<region>.amazonaws.com/<pool id>/.well-known/jwks.json` (the platform's customers pool) |
 | `PLATFORM_ISSUER` | `https://cognito-idp.<region>.amazonaws.com/<pool id>` |
 | `PLATFORM_SCHOOLS_CLIENT_ID` | the Schools service client's app client id |
-| `PLATFORM_FLEET_CLIENT_ID` | the Fleet service client's app client id (ERP/FLEET_HR_CONTRACT.md). The token's `client_id` must be one of these product clients; it decides the product (`schools`, `fleet`), never a header |
+| `PLATFORM_FLEET_CLIENT_ID` | the Fleet service client's app client id (ERP/FLEET_HR_CONTRACT.md) |
+| `PLATFORM_PROPERTY_CLIENT_ID` | the Property service client's app client id (ERP/PROPERTY_HR_CONTRACT.md). The token's `client_id` must be one of these product clients; it decides the product (`schools`, `fleet`, `property`), never a header |
 | `PLATFORM_API_URL`, `PLATFORM_TOKEN_URL`, `PLATFORM_CLIENT_ID`, `PLATFORM_CLIENT_SECRET` | as above (the `hr` service client, for `/links/resolve`) |
 
 ### Switching on (per environment)
@@ -194,3 +195,32 @@ Fleet takes Schools' place everywhere above, with product id `fleet` (migration 
 
 Switching on: apply the migration first, then merge; set `PLATFORM_FLEET_CLIENT_ID` (HR's Vercel production and the HR
 staging settings). The platform seeds the `fleet` subscriptions (figbloom-platform migration `0009_fleet_hr_events`).
+
+## Figbloom Property (ERP/PROPERTY_HR_CONTRACT.md section 2)
+
+Property takes Fleet's place, with product id `property` (migration `20261124100000_platform_property_hr.sql`, which
+adds `property` to `platform_sources()` and gives it its own words; everything else is Fleet's generic code):
+
+- **Workspaces:** one Property workspace is one HR company. `platform.module.enabled` is Property's when the platform
+  names it in `data.source`/`data.product`, or when an admin's role is `property_*` (the console sends the workspace's
+  creator as `property_owner`). Leave chain: 1. the Leave Approver, 2. role ADMIN, labelled *Property manager*.
+- **Staff:** `property.staff.created|updated|left` (`{person_id, full_name, phone, email, role, job_title}`; the
+  person is Property's `User.id`, a uuid) for every `property_manager` and `caretaker`, mapped in
+  `external_people (tenant_id, employee_number, 'property', person_id)`. Property's `job_title` is kept ("Caretaker,
+  Riverside Court"); without one, `property_manager` becomes *Property manager*. The workspace's creator is HR's admin
+  only and never sent; tenants, landlords and vendors are never employees. An exit reads "Left the workspace in
+  Figbloom Property on ...".
+- **Sent back:** `hr.employee.left` and `hr.leave.*` with `data.source` `property`, as for Fleet.
+- **One-click:** handoffs whose `source` is `property` are looked up in `external_logins` with source `property`.
+  Status pages for Property people get `&from=property` ("this workspace").
+- **My HR:** a token of `PLATFORM_PROPERTY_CLIENT_ID` is Property's: the workspace (`Workspace.id`, a uuid) in
+  `x-figbloom-tenant` (Property sends no `x-figbloom-school` or `x-figbloom-company`), the person in
+  `x-figbloom-person` (a uuid), resolved with `/links/resolve?module=property`; a workspace not linked is
+  `403 workspace_not_linked`.
+- **Console:** Figbloom Property > Workspaces shows **HR & Payroll: Off / Enabling / On** per workspace with **Enable**
+  (Owner, Admin: HR is a paid add-on, switched on once the customer has bought it):
+  `POST /api/platform/property/hr/:tenantId/enable` for the workspace's platform tenant (`platform.tenantId` in
+  Property's summary), the workspace's creator from Property's summary invited as `property_owner`.
+
+Switching on: apply the migration first, then merge; set `PLATFORM_PROPERTY_CLIENT_ID` (HR's Vercel production and the
+HR staging settings). The platform needs the `property` subscriptions (ERP/PROPERTY_HR_CONTRACT.md section 1).

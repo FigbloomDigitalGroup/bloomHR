@@ -452,3 +452,50 @@ describe('Figbloom Fleet (ERP/FLEET_HR_CONTRACT.md)', () => {
     expect(db.links).toEqual([]);
   });
 });
+
+describe('Figbloom Property (ERP/PROPERTY_HR_CONTRACT.md)', () => {
+  // the workspace creator: Property's User.id, a uuid
+  const CREATOR = 'a1b2c3d4-0000-4000-8000-000000000003';
+  const propertyClaims = () => claims({ source: 'property' }, { external_id: CREATOR, role: 'property_owner' });
+
+  it('a linked Property person is signed straight in, looked up with source property', async () => {
+    db.links.push({ tenant: SCHOOL, source: 'property', external: CREATOR, user: HEAD });
+    platform.answer = propertyClaims;
+    const res = await open();
+    expect(Object.fromEntries(fragment(res))).toMatchObject({ token_hash: 'hashed-token-for-c001' });
+    expect(db.log).toEqual([expect.objectContaining({ outcome: 'signed_in', source: 'property', externalId: CREATOR })]);
+  });
+
+  it('a Fleet link never signs in the Property person with the same id', async () => {
+    db.links.push({ tenant: SCHOOL, source: 'fleet', external: CREATOR, user: HEAD });
+    platform.answer = propertyClaims;
+    const res = await open();
+    expect(fragment(res).get('connect')).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(db.log).toEqual([expect.objectContaining({ outcome: 'not_linked', source: 'property' })]);
+  });
+
+  it('first time: connects as a Property link', async () => {
+    platform.answer = propertyClaims;
+    const res = await open();
+    const pending = fragment(res).get('connect')!;
+    const done = await post('/link', { pending }, { cookie: cookieOf(res) });
+    expect(done.status).toBe(200);
+    expect(db.links).toEqual([{ tenant: SCHOOL, source: 'property', external: CREATOR, user: HEAD }]);
+  });
+
+  it("a status page says it is Property's (?from=property)", async () => {
+    platform.answer = () => claims({ source: 'property', tenant_local_id: OTHER });
+    expect(location(await open())).toBe(`${SITE}/handoff?status=not_set_up&from=property`);
+  });
+
+  it("removing one's own Property link", async () => {
+    db.links.push({ tenant: SCHOOL, source: 'property', external: CREATOR, user: HEAD });
+    const res = await fetch(`${base}/api/platform/handoff/link`, {
+      method: 'DELETE',
+      headers: { authorization: 'Bearer session-head', 'content-type': 'application/json' },
+      body: JSON.stringify({ source: 'property' }),
+    });
+    expect(await res.json()).toEqual({ ok: true, removed: 1 });
+    expect(db.links).toEqual([]);
+  });
+});

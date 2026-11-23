@@ -14,7 +14,9 @@
 //                                         product it came from (enabledSource()) picks its leave chain.
 //   <product>.staff.created / .updated    the person's draft employee (platform_upsert_staff()), for each product in
 //                                         STAFF_SOURCES: schools (Figbloom Schools), fleet (Figbloom Fleet,
-//                                         ERP/FLEET_HR_CONTRACT.md), mapped in external_people with that source
+//                                         ERP/FLEET_HR_CONTRACT.md), property (Figbloom Property: property managers
+//                                         and caretakers, ERP/PROPERTY_HR_CONTRACT.md), mapped in external_people with
+//                                         that source
 //   <product>.staff.left                  HR's exit for them (platform_staff_left())
 //   anything else                         200, ignored
 // A staff event for a customer with no HR company yet is a 425, so the platform tries again later.
@@ -50,8 +52,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SYNTHETIC_EMAIL_RE = /@([a-z0-9-]+\.)*(figbloom\.internal|invalid|local|localhost|example\.(com|org|net))$/i;
 
 // the products whose staff become HR employees (external_people.source = the product id)
-export const STAFF_SOURCES = ["schools", "fleet"];
-export const PRODUCT_NAMES = { schools: "Figbloom Schools", fleet: "Figbloom Fleet" };
+export const STAFF_SOURCES = ["schools", "fleet", "property"];
+export const PRODUCT_NAMES = { schools: "Figbloom Schools", fleet: "Figbloom Fleet", property: "Figbloom Property" };
 const STAFF_EVENTS = new Set(STAFF_SOURCES.flatMap((p) => [`${p}.staff.created`, `${p}.staff.updated`, `${p}.staff.left`]));
 
 const on = (value) => /^(1|true|yes|on)$/i.test(String(value || "").trim());
@@ -193,7 +195,8 @@ function personId(data) {
 
 /**
  * Which product a platform.module.enabled is for: data.source / data.product when the platform names one, else
- * "fleet" when the console named Fleet's people (admin roles fleet_*), else "schools" (as before Fleet). HR corrects
+ * "fleet" or "property" when the console named that product's people (admin roles fleet_*, property_*), else "schools"
+ * (as before Fleet). HR corrects
  * it from the first staff event if it guessed wrong (platform_upsert_staff()).
  */
 export function enabledSource(data) {
@@ -202,6 +205,7 @@ export function enabledSource(data) {
   }
   const admins = Array.isArray(data?.admins) ? data.admins : [];
   if (admins.some((a) => typeof a?.role === "string" && /^fleet_/.test(a.role))) return "fleet";
+  if (admins.some((a) => typeof a?.role === "string" && /^property_/.test(a.role))) return "property";
   return "schools";
 }
 

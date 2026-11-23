@@ -5,14 +5,15 @@ import type { StatusTone } from '../UI';
 import { HR_STATE_LABELS, type HrState, type SchoolHr } from '../../lib/platformSchoolHr';
 import type { SchoolHrData } from './useSchoolHr';
 
-// "HR & Payroll: Off / Enabling / On" for each school on the Schools and School groups pages, and each company on the
-// Fleet companies page, with Enable for console roles that approve companies (Owner, Admin).
-// ERP/SCHOOLS_HR_PHASE1_CONTRACT.md, ERP/FLEET_HR_CONTRACT.md.
+// "HR & Payroll: Off / Enabling / On" for each school on the Schools and School groups pages, each company on the
+// Fleet companies page and each workspace on the Property workspaces page, with Enable for console roles that approve
+// companies (Owner, Admin).
+// ERP/SCHOOLS_HR_PHASE1_CONTRACT.md, ERP/FLEET_HR_CONTRACT.md, ERP/PROPERTY_HR_CONTRACT.md.
 
 const TONES: Record<HrState, StatusTone> = { off: 'neutral', enabling: 'warning', on: 'success', unknown: 'neutral' };
 
 interface HrPayrollCellProps {
-  /** the school's or company's name */
+  /** the school's, company's or workspace's name */
   name: string;
   state: HrState;
   canEnable: boolean;
@@ -25,7 +26,7 @@ interface HrPayrollCellProps {
   labelled?: boolean;
 }
 
-/** The HR state of one school or company, and Enable when it is off and the caller may switch it on. */
+/** The HR state of one school, company or workspace, and Enable when it is off and the caller may switch it on. */
 export function HrPayrollCell({ name, state, canEnable, enable, explain, invitees, labelled = false }: HrPayrollCellProps) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);

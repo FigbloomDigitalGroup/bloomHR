@@ -1,8 +1,8 @@
 import { supabase } from './supabase';
 import { ApiError } from './adminApi';
 
-// One-click sign-in from Figbloom Schools or Figbloom Fleet (ERP/SCHOOLS_HR_HANDOFF_CONTRACT.md,
-// ERP/FLEET_HR_CONTRACT.md, platform_handoff_routes.js).
+// One-click sign-in from Figbloom Schools, Figbloom Fleet or Figbloom Property (ERP/SCHOOLS_HR_HANDOFF_CONTRACT.md,
+// ERP/FLEET_HR_CONTRACT.md, ERP/PROPERTY_HR_CONTRACT.md, platform_handoff_routes.js).
 //
 // The backend sends the browser to /handoff with either a one-time sign-in token (a linked person), a status (off,
 // invalid, no access, ...), or, the first time, a pending id ("connect"). The pending id is kept in this browser for
@@ -85,13 +85,13 @@ export function readArrival(search: string, hash: string): HandoffArrival {
   if (TOKEN_RE.test(pending)) return { kind: 'connect', pending };
   const status = new URLSearchParams(search).get('status') ?? '';
   const from = new URLSearchParams(search).get('from') ?? '';
-  return { kind: 'status', status: /^[a-z_]{1,40}$/.test(status) ? status : 'invalid', from: from === 'fleet' ? 'fleet' : 'schools' };
+  return { kind: 'status', status: /^[a-z_]{1,40}$/.test(status) ? status : 'invalid', from: handoffSource(from) };
 }
 
 /** The page shown for each status the backend sends; `from` is the product the person came from (default Schools). */
 export function statusMessage(status: string, from = 'schools'): { title: string; body: string } {
-  const product = sourceLabel(from === 'fleet' ? 'fleet' : 'schools');
-  const place = from === 'fleet' ? 'company' : 'school';
+  const product = sourceLabel(handoffSource(from));
+  const place = sourcePlace(from);
   switch (status) {
     case 'off':
       return {
@@ -120,7 +120,7 @@ export function statusMessage(status: string, from = 'schools'): { title: string
 
 export interface PendingPreview {
   outcome: 'ready';
-  /** the product the person came from: schools, fleet */
+  /** the product the person came from: schools, fleet, property */
   source?: string | null;
   person_name: string | null;
   company_name: string | null;
@@ -177,5 +177,11 @@ export async function loadMyExternalLogins(): Promise<ExternalLogin[]> {
   return (data ?? []) as ExternalLogin[];
 }
 
-const SOURCE_LABELS: Record<string, string> = { schools: 'Figbloom Schools', fleet: 'Figbloom Fleet' };
+const SOURCE_LABELS: Record<string, string> = { schools: 'Figbloom Schools', fleet: 'Figbloom Fleet', property: 'Figbloom Property' };
 export const sourceLabel = (source: string) => SOURCE_LABELS[source] ?? source;
+// what each product calls its customer
+const SOURCE_PLACES: Record<string, string> = { schools: 'school', fleet: 'company', property: 'workspace' };
+/** A product HR knows people from, else Schools (as before Fleet). */
+export const handoffSource = (source: string | null | undefined) => (source && source in SOURCE_PLACES ? source : 'schools');
+/** "school", "company" or "workspace". */
+export const sourcePlace = (source: string | null | undefined) => SOURCE_PLACES[handoffSource(source)];

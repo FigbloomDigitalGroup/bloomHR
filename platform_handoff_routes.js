@@ -1,7 +1,8 @@
-// platform_handoff_routes.js: one-click sign-in from Figbloom Schools or Figbloom Fleet into HR ("handoff",
-// ERP/SCHOOLS_HR_HANDOFF_CONTRACT.md section 2, ERP/FLEET_HR_CONTRACT.md section 2). The redeemed claims' source is
-// the product the person came from (the platform's word: the product whose service client asked for the code); only
-// the products HR maps people from (STAFF_SOURCES: schools, fleet) are accepted, and the person is looked up with that
+// platform_handoff_routes.js: one-click sign-in from Figbloom Schools, Figbloom Fleet or Figbloom Property into HR
+// ("handoff", ERP/SCHOOLS_HR_HANDOFF_CONTRACT.md section 2, ERP/FLEET_HR_CONTRACT.md section 2,
+// ERP/PROPERTY_HR_CONTRACT.md section 2). The redeemed claims' source is the product the person came from (the
+// platform's word: the product whose service client asked for the code); only the products HR maps people from
+// (STAFF_SOURCES: schools, fleet, property) are accepted, and the person is looked up with that
 // source (external_logins).
 //
 //   browser --GET /api/platform/handoff?code=...-->  HR redeems the code on the platform (POST /handoffs/redeem, the
@@ -180,7 +181,7 @@ function defaultSite() {
   return String(process.env.SITE_URL || process.env.PUBLIC_SITE_URL || "").trim().replace(/\/+$/, "");
 }
 
-/** The product's name, for the person ("Figbloom Schools", "Figbloom Fleet"); Schools when not known. */
+/** The product's name, for the person ("Figbloom Schools", "Figbloom Fleet", "Figbloom Property"); Schools when not known. */
 export const productName = (source) => PRODUCT_NAMES[source] ?? PRODUCT_NAMES.schools;
 const notLinkedAgain = (source) =>
   `This connection link has expired or was already used. Open HR & Payroll from ${productName(source)} again, in this browser.`;
@@ -188,7 +189,7 @@ const NOT_LINKED_AGAIN = notLinkedAgain("schools");
 
 /** What the app is told for each outcome of finishing a pending handoff. */
 function completeAnswer(r, user) {
-  const company = r?.company_name || (r?.source === "fleet" ? "this company" : "this school");
+  const company = r?.company_name || (r?.source === "fleet" ? "this company" : r?.source === "property" ? "this workspace" : "this school");
   const product = productName(r?.source);
   switch (r?.outcome) {
     case "ready":
@@ -267,7 +268,7 @@ export function createPlatformHandoffRouter({
   };
 
   const page = (res, query) => res.redirect(302, `${site()}/handoff${query}`);
-  // a status page for a person of another product than Schools says which (?from=fleet)
+  // a status page for a person of another product than Schools says which (?from=fleet, ?from=property)
   const from = (claims) => (claims?.source && claims.source !== "schools" ? `&from=${claims.source}` : "");
 
   router.get("/", async (req, res) => {

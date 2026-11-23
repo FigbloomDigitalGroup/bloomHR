@@ -382,6 +382,58 @@ describe('Figbloom Fleet (fleet.staff.*, ERP/FLEET_HR_CONTRACT.md)', () => {
   });
 });
 
+describe('Figbloom Property (property.staff.*, ERP/PROPERTY_HR_CONTRACT.md)', () => {
+  // Property's person ids are User.id uuids; the workspace creator is HR's admin, never a staff event
+  const CARETAKER = 'a1b2c3d4-0000-4000-8000-000000000001';
+  const propertyEnabled = (extra: Row = {}) =>
+    event('platform.module.enabled', {
+      module: 'hr',
+      tenant: { name: 'Kilimani Homes', slug: 'kilimani-homes', country: 'KE' },
+      admins: [{ email: 'owner@kilimani.co.ke', name: 'Olga Owner', role: 'property_owner' }],
+      ...extra,
+    });
+  const caretaker = (type: string, data: Row = {}) =>
+    event(type, {
+      person_id: CARETAKER, full_name: 'Cate Wanjiku', phone: '+254 700 000 002', email: null, role: 'caretaker',
+      job_title: 'Caretaker, Riverside Court', ...data,
+    });
+
+  it('enabledSource: the platform\'s word, else Property\'s admins', () => {
+    expect(mod.enabledSource({ source: 'property' })).toBe('property');
+    expect(mod.enabledSource({ admins: [{ role: 'property_owner' }] })).toBe('property');
+    expect(mod.enabledSource({ admins: [{ role: 'fleet_owner' }] })).toBe('fleet');
+    expect(mod.enabledSource({ admins: [{ role: 'owner' }] })).toBe('schools');
+  });
+
+  it('module.enabled for a Property workspace passes source property', async () => {
+    await deliver(propertyEnabled());
+    expect(db.sources).toEqual(['property']);
+  });
+
+  it("created / updated / left: mapped with source property, Property's job title kept", async () => {
+    await deliver(propertyEnabled());
+    const created = await deliver(caretaker('property.staff.created'));
+    expect(created.json.result).toBe('created MCL-000001');
+    expect(db.people.get(`${PT}:${CARETAKER}`)!.fields).toMatchObject({
+      source: 'property', first: 'Cate', last: 'Wanjiku', jobTitle: 'Caretaker, Riverside Court', phone: '+254700000002',
+    });
+    expect((await deliver(caretaker('property.staff.updated', { full_name: 'Cate W. Wanjiku' }))).json.result).toBe('updated MCL-000001');
+    const left = await deliver(event('property.staff.left', { person_id: CARETAKER, left_on: '2026-11-20' }));
+    expect(left.json.result).toBe('exit_started MCL-000001');
+    expect(db.left).toEqual([{ platformTenantId: PT, source: 'property', person: CARETAKER, leftOn: '2026-11-20' }]);
+  });
+
+  it('a property manager without a job title gets the role in words', async () => {
+    await deliver(propertyEnabled());
+    await deliver(caretaker('property.staff.created', { person_id: 'a1b2c3d4-0000-4000-8000-000000000002', role: 'property_manager', job_title: null }));
+    expect(db.people.get(`${PT}:a1b2c3d4-0000-4000-8000-000000000002`)!.fields).toMatchObject({ source: 'property', jobTitle: 'Property manager' });
+  });
+
+  it('before HR is switched on: 425', async () => {
+    expect((await deliver(caretaker('property.staff.created'))).status).toBe(425);
+  });
+});
+
 describe('the outbox (hr.employee.left)', () => {
   const flush = (secret: string | null = CRON) =>
     fetch(`${base}/api/platform/outbox/flush`, { method: 'POST', headers: secret ? { 'x-cron-secret': secret } : {} });

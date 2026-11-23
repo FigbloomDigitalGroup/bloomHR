@@ -30,10 +30,21 @@
 // counts only (properties, units, occupied units, team members, tenants): no tenant names, contacts, leases or payments,
 // and toSummary() keeps only the fields below, so nothing else Property might add ever reaches the browser.
 //
+// HR & Payroll per workspace (ERP/PROPERTY_HR_CONTRACT.md section 2, as on Fleet's page: platform_fleet_routes.js):
+// each workspace's platform tenant (Property's platform.tenantId, else the organisation's tenant linked with the
+// workspace's ID) carries its HR state, off / enabling / on (hrState()); unknown ones are asked about one by one
+// (GET /tenants/{id}, up to MAX_HR_LOOKUPS). POST /hr/:tenantId/enable (approve_companies: HR is a paid add-on, switched
+// on by Figbloom staff once the customer has bought it) switches the hr module on for that tenant on the platform, with
+// the workspace's creator from Property's summary as the admin to invite (role property_owner, so HR knows it is a
+// Property workspace); Figbloom HR then creates the company, invites the creator and links it back. The creator is
+// HR's admin only, never an employee: Property sends no staff events for them.
+//
 // Errors are { error: { code, message } }.
 import express from "express";
 import { PLATFORM_TIMEOUT_MS, PlatformError } from "./platform_client.js";
 import { MAX_REASON, callPlatform, callerWith } from "./platform_school_groups_routes.js";
+import { hrState, tenantParts } from "./platform_school_hr_routes.js";
+import { realEmail } from "./platform_events_routes.js";
 
 export { MAX_REASON } from "./platform_school_groups_routes.js";
 export const PROPERTY_TIMEOUT_MS = 8 * 1000;
@@ -41,6 +52,11 @@ export const MODULE = "property";
 const PAGE = 200; // the platform's largest page
 const MAX_PAGES = 10; // 2,000 workspaces: more than the console shows at once
 const TAG = "[platform/property]";
+const MAX_HR_LOOKUPS = 100;
+const HR_LOOKUP_CONCURRENCY = 6;
+// the admin role HR is told about: property_* says the customer is a Property workspace
+// (platform_events_routes.js enabledSource())
+export const PROPERTY_OWNER_ROLE = "property_owner";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CODE_RE = /^[a-z][a-z0-9_]{0,63}$/;
@@ -189,15 +205,28 @@ export async function propertyWorkspace(id, timeoutMs) {
   return s;
 }
 
+/** The organisation's platform tenant for the workspace: the one Property linked with the workspace's ID, else the only one. */
+function propertyTenant(o, localId) {
+  const tenants = Array.isArray(o?.tenants) ? o.tenants.filter((t) => t && typeof t === "object" && typeof t.id === "string") : [];
+  const linked = tenants.find((t) => Array.isArray(t.links) && t.links.some((l) => l?.module === MODULE && localId != null && String(l.local_tenant_id) === localId));
+  return linked ?? (tenants.length === 1 ? tenants[0] : null);
+}
+
 function toPlatformOrganization(o) {
   const link = Array.isArray(o?.links) ? o.links.find((l) => l?.module === MODULE) ?? null : null;
+  const localId = link?.local_organization_id != null ? String(link.local_organization_id) : null;
+  const tenant = propertyTenant(o, localId);
+  const links = Array.isArray(tenant?.links) ? tenant.links.filter((l) => l && typeof l === "object") : [];
+  const modules = Array.isArray(tenant?.modules) ? tenant.modules.filter((m) => m && typeof m === "object") : undefined;
   return {
     id: String(o?.id ?? ""),
     name: String(o?.name ?? ""),
     status: String(o?.status ?? ""),
     status_reason: o?.status_reason ?? null,
     created_at: o?.created_at ?? null,
-    local_organization_id: link?.local_organization_id != null ? String(link.local_organization_id) : null,
+    local_organization_id: localId,
+    platform_tenant_id: tenant ? tenant.id : null,
+    hr: tenant ? hrState(modules, links) : null,
   };
 }
 
@@ -232,8 +261,28 @@ const EMPTY_SUMMARY = {
   platform_organization_id: null, platform_tenant_id: null, registered_at: null,
 };
 
+/**
+ * The workspace's HR state: the platform organisation's tenant's when it is the same tenant, else unknown (asked about
+ * by fillHrStates()) when the workspace has a platform tenant, else null (no platform account yet).
+ */
+function hrOf(tenantId, o) {
+  if (!tenantId) return null;
+  if (o?.hr && o.platform_tenant_id === tenantId) return o.hr;
+  return { state: "unknown", module_status: null, hr_tenant_id: null };
+}
+
 function withPlatform(s, o) {
-  return { ...s, in_property: true, organization_id: o?.id ?? null, status: o?.status || null, status_reason: o?.status_reason ?? null };
+  // the tenant to switch HR on for: Property's word for it, else the platform's
+  const tenantId = s.platform_tenant_id ?? o?.platform_tenant_id ?? null;
+  return {
+    ...s,
+    platform_tenant_id: tenantId,
+    in_property: true,
+    organization_id: o?.id ?? null,
+    status: o?.status || null,
+    status_reason: o?.status_reason ?? null,
+    hr: o ? hrOf(tenantId, o) : null,
+  };
 }
 
 /**
@@ -257,10 +306,12 @@ export function mergeWorkspaces(summaries, organizations) {
       id: o.local_organization_id ?? "",
       name: o.name,
       created_at: o.created_at,
+      platform_tenant_id: o.platform_tenant_id ?? null,
       in_property: false,
       organization_id: o.id,
       status: o.status || null,
       status_reason: o.status_reason,
+      hr: o.hr ?? null,
     });
   }
   return merged;
@@ -287,6 +338,43 @@ export function countByStatus(list) {
   return counts;
 }
 
+/** One platform tenant's HR state (GET /tenants/{id}). */
+export async function tenantHr(id, timeoutMs) {
+  const parts = tenantParts(await callPlatform("GET", `/tenants/${encodeURIComponent(id)}`, null, timeoutMs));
+  return { parts, hr: hrState(parts.modules, parts.links) };
+}
+
+/** Asks the platform about the workspaces whose HR state the list didn't carry, a few at a time (in place). */
+export async function fillHrStates(workspaces, timeoutMs) {
+  const ask = workspaces.filter((w) => w.platform_tenant_id && w.hr?.state === "unknown").slice(0, MAX_HR_LOOKUPS);
+  for (let i = 0; i < ask.length; i += HR_LOOKUP_CONCURRENCY) {
+    await Promise.all(ask.slice(i, i + HR_LOOKUP_CONCURRENCY).map(async (w) => {
+      try {
+        w.hr = (await tenantHr(w.platform_tenant_id, timeoutMs)).hr;
+      } catch (err) {
+        // that workspace stays unknown; the rest still show
+        if (!(err instanceof PlatformError)) throw err;
+      }
+    }));
+  }
+}
+
+/**
+ * The workspace's creator for HR to invite, from Property's summary: [{ email, name, role: property_owner }] when the
+ * creator has a real address, else nobody (HR's admins can then be invited from HR). Never throws.
+ */
+export async function propertyAdmins(workspaceId, timeoutMs) {
+  if (!workspaceId || !UUID_RE.test(workspaceId)) return [];
+  try {
+    const w = await propertyWorkspace(workspaceId, timeoutMs);
+    const email = realEmail(w.creator_email);
+    return email ? [{ email, name: (w.creator_name ?? email).slice(0, 200), role: PROPERTY_OWNER_ROLE }] : [];
+  } catch (err) {
+    console.warn(TAG, "the workspace's creator couldn't be read from Property:", err?.code || err?.message || err);
+    return [];
+  }
+}
+
 function send(res, err) {
   if (err instanceof PlatformError) return res.status(err.status).json({ error: { code: err.code, message: err.message } });
   console.error(TAG, err?.message || err);
@@ -307,6 +395,7 @@ export function createPropertyRouter({ timeoutMs = PROPERTY_TIMEOUT_MS, platform
       await callerWith(req, "view", "Your console role can't see Property workspaces.");
       const [summaries, platform] = await Promise.all([propertyWorkspaces(timeoutMs), platformOrNot(platformTimeoutMs)]);
       const workspaces = mergeWorkspaces(summaries, platform.organizations);
+      if (platform.ok) await fillHrStates(workspaces, platformTimeoutMs);
       res.json({ workspaces, counts: countByStatus(workspaces), truncated: platform.truncated, platform: platformNote(platform) });
     } catch (err) {
       send(res, err);
@@ -331,6 +420,7 @@ export function createPropertyRouter({ timeoutMs = PROPERTY_TIMEOUT_MS, platform
         [summary],
         platform.organizations.filter((o) => o.id === summary.platform_organization_id || o.local_organization_id === summary.id)
       );
+      if (platform.ok) await fillHrStates([workspace], platformTimeoutMs);
       res.json({ workspace, platform: platformNote(platform) });
     } catch (err) {
       send(res, err);
@@ -380,6 +470,41 @@ export function createPropertyRouter({ timeoutMs = PROPERTY_TIMEOUT_MS, platform
           status_reason: o.status_reason ?? (reason || null),
         },
       });
+    } catch (err) {
+      send(res, err);
+    }
+  });
+
+  // POST /api/platform/property/hr/:tenantId/enable -> { workspace: { platform_tenant_id, hr } }. Permission:
+  // approve_companies (Owner, Admin): HR is a paid add-on. :tenantId is the platform's tenant for the workspace
+  // (Property's platform.tenantId). Switches the hr module on for it on the platform (recorded as console:<your email>),
+  // with the workspace's creator from Property (propertyAdmins()); HR then creates and links the company and invites
+  // them. Already on: nothing is changed.
+  router.post("/hr/:id/enable", async (req, res) => {
+    try {
+      const caller = await callerWith(req, "approve_companies", "Only an owner or admin can switch HR & Payroll on for a workspace.");
+      const id = String(req.params.id || "");
+      if (!UUID_RE.test(id)) throw new PlatformError(400, "invalid_tenant_id", "That is not a Property workspace's platform ID.");
+      if (!caller.email) throw new PlatformError(400, "no_actor_email", "Your login has no email to record this under.");
+
+      const before = await tenantHr(id, platformTimeoutMs);
+      const propertyLink = before.parts.links.find((l) => l.module === MODULE && l.local_tenant_id);
+      if (!propertyLink) throw new PlatformError(404, "not_a_property_workspace", "That platform account isn't a Figbloom Property workspace.");
+      if (before.hr.state === "on") return res.json({ workspace: { platform_tenant_id: id, hr: before.hr } });
+
+      // HR invites whoever is listed here (passed on in platform.module.enabled)
+      const admins = await propertyAdmins(String(propertyLink.local_tenant_id), timeoutMs);
+      await callPlatform("PUT", `/tenants/${encodeURIComponent(id)}/modules/hr`, { status: "active", admins, actor_email: caller.email }, platformTimeoutMs);
+      let hr;
+      try {
+        hr = (await tenantHr(id, platformTimeoutMs)).hr;
+      } catch {
+        hr = { state: "enabling", module_status: "active", hr_tenant_id: null };
+      }
+      // switched on; HR links its company shortly
+      if (hr.state === "off" || hr.state === "unknown") hr = { ...hr, state: "enabling" };
+      console.log(TAG, "HR switched on for", id);
+      res.json({ workspace: { platform_tenant_id: id, hr } });
     } catch (err) {
       send(res, err);
     }
