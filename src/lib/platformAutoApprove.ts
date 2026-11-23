@@ -2,11 +2,12 @@ import { apiRequest } from './adminApi';
 
 // The Figbloom platform's auto-approve switch, per product, in the console (/platform/settings; the backend is
 // platform_settings_routes.js). The platform has a platform-wide default, and each product may have its own switch,
-// which decides whether a new organisation that product registers (an HR company, a school group, a Fleet company)
+// which decides whether a new organisation that product registers (an HR company, a school group, a Fleet company, a
+// Property workspace)
 // starts active or waits for approval in the console. A product with no switch of its own follows the default.
 // Anyone in the console sees them; Owner and Admin change them (the backend checks).
 
-export type AutoApproveModule = 'hr' | 'schools' | 'fleet';
+export type AutoApproveModule = 'hr' | 'schools' | 'fleet' | 'property';
 
 export interface ProductAutoApprove {
   module: AutoApproveModule;

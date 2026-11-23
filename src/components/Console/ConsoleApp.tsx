@@ -19,6 +19,7 @@ import SchoolsPage from '../Platform/SchoolsPage';
 import SchoolGroupsPage from '../Platform/SchoolGroupsPage';
 import FleetCompaniesPage from '../Platform/FleetCompaniesPage';
 import CrmOrganisationsPage from '../Platform/CrmOrganisationsPage';
+import PropertyWorkspacesPage from '../Platform/PropertyWorkspacesPage';
 import OverviewPage from '../Platform/OverviewPage';
 import PlatformSettingsPage from '../Platform/PlatformSettingsPage';
 import ConsoleLayout from './ConsoleLayout';
@@ -152,6 +153,7 @@ export default function ConsoleApp() {
         <Route path="/platform/school-groups" element={<SchoolGroupsPage />} />
         <Route path="/platform/fleet/companies" element={<FleetCompaniesPage />} />
         <Route path="/platform/crm/organisations" element={<CrmOrganisationsPage />} />
+        <Route path="/platform/property/workspaces" element={<PropertyWorkspacesPage />} />
         <Route path="/platform/staff" element={<StaffPage currentUserId={session.user.id} />} />
         <Route path="/platform/settings" element={<PlatformSettingsPage />} />
         <Route path="*" element={<Navigate to={HOME} replace />} />

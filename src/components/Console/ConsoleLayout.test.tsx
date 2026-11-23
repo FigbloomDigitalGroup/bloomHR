@@ -61,6 +61,9 @@ describe('the console menu', () => {
     const crm = within(products).getByRole('group', { name: 'Figbloom CRM' });
     expect(within(crm).getAllByRole('link').map((a) => a.textContent)).toEqual(['Organisations']);
     expect(within(crm).getByRole('link', { name: 'Organisations' }).getAttribute('href')).toBe('/platform/crm/organisations');
+    const property = within(products).getByRole('group', { name: 'Figbloom Property' });
+    expect(within(property).getAllByRole('link').map((a) => a.textContent)).toEqual(['Workspaces']);
+    expect(within(property).getByRole('link', { name: 'Workspaces' }).getAttribute('href')).toBe('/platform/property/workspaces');
     // Staff is Figbloom's own, apart from the products
     expect(within(products).queryByRole('link', { name: 'Staff' })).toBeNull();
     expect(within(screen.getByRole('navigation', { name: 'Figbloom' })).getByRole('link', { name: 'Staff' })).toBeTruthy();
@@ -124,7 +127,7 @@ describe('the console menu', () => {
   it('starts with the Overview, above the products', () => {
     renderLayout('/platform/overview');
     const links = within(screen.getByRole('navigation', { name: 'Console' })).getAllByRole('link');
-    expect(links.map((a) => a.textContent)).toEqual(['Overview', 'Organisations', 'Statutory rates', 'Schools', 'School groups', 'Companies', 'Organisations']);
+    expect(links.map((a) => a.textContent)).toEqual(['Overview', 'Organisations', 'Statutory rates', 'Schools', 'School groups', 'Companies', 'Organisations', 'Workspaces']);
     expect(links[0].getAttribute('href')).toBe('/platform/overview');
     expect(links[0].getAttribute('aria-current')).toBe('page');
   });
@@ -138,7 +141,7 @@ describe('the console menu', () => {
       </MemoryRouter>
     );
     expect(sidebar().innerHTML).not.toMatch(/orange/);
-    for (const product of ['Figbloom HR', 'Figbloom Schools', 'Figbloom Fleet', 'Figbloom CRM']) {
+    for (const product of ['Figbloom HR', 'Figbloom Schools', 'Figbloom Fleet', 'Figbloom CRM', 'Figbloom Property']) {
       const icon = screen.getByRole('button', { name: product }).querySelector('svg') as SVGElement;
       expect(icon.getAttribute('class')).toContain('text-shell-fg');
       expect(icon.parentElement?.tagName).toBe('BUTTON');
@@ -148,7 +151,7 @@ describe('the console menu', () => {
   it('gives every page an icon, and every product a mark', () => {
     renderLayout();
     for (const link of within(sidebar()).getAllByRole('link')) expect(link.querySelector('svg')).not.toBeNull();
-    for (const product of ['Figbloom HR', 'Figbloom Schools', 'Figbloom Fleet', 'Figbloom CRM']) {
+    for (const product of ['Figbloom HR', 'Figbloom Schools', 'Figbloom Fleet', 'Figbloom CRM', 'Figbloom Property']) {
       expect(screen.getByRole('button', { name: product }).querySelector('svg')).not.toBeNull();
     }
   });

@@ -62,6 +62,10 @@ vi.mock('../../lib/platformCrm', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/platformCrm')>()),
   listCrmOrganisations: () => Promise.resolve({ organizations: [], truncated: false, platform: { ok: true } }),
 }));
+vi.mock('../../lib/platformProperty', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/platformProperty')>()),
+  listPropertyWorkspaces: () => Promise.resolve({ workspaces: [], truncated: false, platform: { ok: true } }),
+}));
 // the sign-in pages have tests of their own
 vi.mock('./ConsoleLogin', () => ({ default: () => <p>Sign-in form</p> }));
 vi.mock('../../pages/MFAverification', () => ({ default: () => <p>Two-step code form</p> }));
@@ -196,6 +200,18 @@ describe('the Figbloom console', () => {
     expect(await screen.findByRole('heading', { name: 'CRM organisations' })).toBeTruthy();
     expect(screen.getByTestId('path').textContent).toBe('/platform/crm/organisations');
     expect(await screen.findByText('No organisations in Figbloom CRM yet.')).toBeTruthy();
+    expect(state.from).not.toHaveBeenCalled();
+  });
+
+  it('opens Figbloom Property > Workspaces from the product menu', async () => {
+    state.session = signedIn();
+    renderAt('/platform/organisations');
+    await screen.findByRole('heading', { name: 'Organisations' });
+    const property = within(screen.getByRole('navigation', { name: 'Console' })).getByRole('group', { name: 'Figbloom Property' });
+    fireEvent.click(within(property).getByRole('link', { name: 'Workspaces' }));
+    expect(await screen.findByRole('heading', { name: 'Property workspaces' })).toBeTruthy();
+    expect(screen.getByTestId('path').textContent).toBe('/platform/property/workspaces');
+    expect(await screen.findByText('No workspaces in Figbloom Property yet.')).toBeTruthy();
     expect(state.from).not.toHaveBeenCalled();
   });
 
