@@ -3,7 +3,9 @@ import toast from 'react-hot-toast';
 import { supabase } from '../../lib/supabase';
 import { ApiError } from '../../lib/adminApi';
 import { Button, Modal } from '../UI';
-import { clearPendingHandoff, handoffApi, loadPendingHandoff, safeNext, sourceLabel, type PendingPreview } from '../../lib/platformHandoff';
+import {
+  clearPendingHandoff, handoffApi, handoffSource, loadPendingHandoff, safeNext, sourceLabel, sourcePlace, type PendingPreview,
+} from '../../lib/platformHandoff';
 
 // pages where the person is still signing in: ask once they are in
 const SIGNING_IN = ['/login', '/mfa', '/update-password', '/join', '/create-company', '/handoff', '/auth/callback', '/auth/figbloom', '/offer'];
@@ -90,9 +92,9 @@ export default function HandoffLinker({ userId, email, pathname }: { userId: str
 
   if (state.kind === 'ask' || state.kind === 'working') {
     const { preview } = state;
-    const fleet = preview.source === 'fleet';
-    const product = sourceLabel(fleet ? 'fleet' : 'schools');
-    const company = preview.company_name || (fleet ? 'your company' : 'your school');
+    const source = handoffSource(preview.source);
+    const product = sourceLabel(source);
+    const company = preview.company_name || `your ${sourcePlace(source)}`;
     return (
       <Modal open onClose={notNow} title={`Connect your ${product} account?`} size="md" closeOnBackdrop={false}>
         <div className="space-y-3 text-[13px] text-ink">

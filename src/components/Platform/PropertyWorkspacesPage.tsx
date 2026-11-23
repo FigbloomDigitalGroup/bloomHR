@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import toast from 'react-hot-toast';
 import { AlertTriangle, Info } from 'lucide-react';
 import { Button, Card, Modal, PageHeader, SearchInput, StatusPill, TableScroll } from '../UI';
 import type { StatusTone } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import ConsoleStatRow, { ConsoleStat } from './ConsoleStat';
+import { HrPayrollCell } from './SchoolHr';
 import { myPlatformRole, roleCan, type PlatformRole } from '../../lib/platformRoles';
 import {
-  MAX_PROPERTY_REASON, PLAN_STATUS_LABELS, PROPERTY_STATUSES, PROPERTY_STATUS_LABELS, filterWorkspaces, getPropertyWorkspace,
-  listPropertyWorkspaces, propertyActions, propertyProblem, propertyTotals, registered, setPropertyWorkspaceStatus, statusOf,
+  MAX_PROPERTY_REASON, PLAN_STATUS_LABELS, PROPERTY_STATUSES, PROPERTY_STATUS_LABELS, enablePropertyHr, filterWorkspaces,
+  getPropertyWorkspace, listPropertyWorkspaces, propertyActions, propertyProblem, propertyTotals, registered,
+  setPropertyWorkspaceStatus, statusOf, withPropertyHr,
   type PropertyAction, type PropertyProblem, type PropertyWorkspace, type PropertyWorkspacesList,
 } from '../../lib/platformProperty';
 
@@ -20,6 +22,17 @@ import {
 // Owner/Admin/Support (suspend_companies), as for Fleet; every console role sees the list. A workspace opens a detail panel. A new workspace
 // can't be suspended until Property has registered it with the platform (within a minute). One its owner switched off
 // in Property shows as "Deactivated by owner", not as suspended.
+
+// HR & Payroll per workspace (ERP/PROPERTY_HR_CONTRACT.md): Off / Enabling / On, with Enable for Owner/Admin
+// (approve_companies: HR is a paid add-on), as on Fleet's page; Figbloom HR then creates the company and invites the
+// workspace's creator, who is HR's admin only, not an employee.
+const HR_POLL_MS = 10 * 1000;
+const HR_MAX_POLLS = 6; // a minute of "Enabling" before it waits for a reload
+const PROPERTY_HR_EXPLAIN =
+  "Figbloom HR creates an HR company for this workspace, links it and emails the workspace's creator an invitation to " +
+  'it. Property managers and caretakers sent from Figbloom Property are added as draft employees, who are not paid ' +
+  'until HR completes and approves their records. Tenants and landlords never are. HR is billed separately from ' +
+  "Property: switch it on once the customer has bought it. Recorded on the Figbloom platform with your email.";
 
 const TONES: Record<string, StatusTone> = {
   active: 'success', suspended: 'neutral', deactivated: 'warning', inactive: 'neutral', pending: 'warning', rejected: 'danger', unregistered: 'neutral',
@@ -97,6 +110,36 @@ export default function PropertyWorkspacesPage() {
   const canManage = roleCan(role, 'suspend_companies');
 
   const actionsFor = (w: PropertyWorkspace) => (platformOk && canManage ? propertyActions(w) : []);
+
+  // HR links the company a few seconds after it is switched on: refresh quietly meanwhile
+  const polls = useRef(0);
+  const hrEnabling = !!(load && 'workspaces' in load && load.workspaces.some((w) => w.hr?.state === 'enabling'));
+  useEffect(() => {
+    if (!hrEnabling || polls.current >= HR_MAX_POLLS) return;
+    const timer = setTimeout(() => {
+      polls.current += 1;
+      listPropertyWorkspaces().then(setLoad, () => {});
+    }, HR_POLL_MS);
+    return () => clearTimeout(timer);
+  }, [hrEnabling, load]);
+
+  const enableHr = async (w: PropertyWorkspace) => {
+    const tenant = w.platform_tenant_id;
+    if (!tenant) throw new Error('This workspace has no Figbloom platform account yet.');
+    const hr = await enablePropertyHr(tenant);
+    polls.current = 0;
+    setLoad((l) => (l && 'workspaces' in l ? { ...l, workspaces: withPropertyHr(l.workspaces, tenant, hr) } : l));
+    setViewing((v) => (v && v.platform_tenant_id === tenant ? { ...v, hr } : v));
+    return hr.state;
+  };
+  const canEnableHr = roleCan(role, 'approve_companies');
+  const hrCell = (w: PropertyWorkspace, labelled = false) =>
+    w.hr ? (
+      <HrPayrollCell name={w.name} state={w.hr.state} canEnable={canEnableHr && !!w.platform_tenant_id} labelled={labelled}
+        enable={() => enableHr(w)} explain={PROPERTY_HR_EXPLAIN} invitees="the workspace's creator" />
+    ) : (
+      <span className="text-muted-foreground" title="This workspace has no Figbloom platform account yet">{labelled ? 'HR & Payroll: ' : ''}—</span>
+    );
 
   const view = (w: PropertyWorkspace) => {
     setViewing(w);
@@ -250,6 +293,7 @@ export default function PropertyWorkspacesPage() {
                   <th className="py-1 pr-3 font-medium text-right">Properties</th>
                   <th className="py-1 pr-3 font-medium text-right">Units</th>
                   <th className="py-1 pr-3 font-medium">Created</th>
+                  <th className="py-1 pr-3 font-medium">HR &amp; Payroll</th>
                   <th />
                 </tr>
               </thead>
@@ -276,6 +320,7 @@ export default function PropertyWorkspacesPage() {
                       <td className="py-1.5 pr-3 text-right text-ink tabular-nums">{num(w.properties)}</td>
                       <td className="py-1.5 pr-3 text-right text-ink tabular-nums">{num(w.units)}</td>
                       <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">{day(w.created_at)}</td>
+                      <td className="py-1.5 pr-3">{hrCell(w)}</td>
                       <td className="py-1.5 text-right whitespace-nowrap">
                         {actionsFor(w).map((a) => (
                           <button key={a} type="button" onClick={() => open(w, a)}
@@ -317,6 +362,7 @@ export default function PropertyWorkspacesPage() {
               <Detail label="Tenants">{num(viewing.tenants)}</Detail>
               <Detail label="Team members">{num(viewing.team_members)}</Detail>
               <Detail label="Created">{day(viewing.created_at)}</Detail>
+              <Detail label="HR & Payroll">{hrCell(viewing)}</Detail>
               <Detail label="Active in Property">{viewing.property_active === null ? '—' : viewing.property_active ? 'Yes' : 'No'}</Detail>
               <Detail label="Workspace ID"><span className="font-mono text-[11px]">{viewing.id || '—'}</span></Detail>
               <Detail label="Platform ID">

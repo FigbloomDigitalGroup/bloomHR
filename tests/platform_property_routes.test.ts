@@ -61,7 +61,8 @@ const summary = (id: string, name: string, platformId: string | null, extra: Row
   creator: { name: `Owner of ${name}`, email: `owner@${name.toLowerCase().replace(/\s+/g, '')}.co.ke` },
   plan: { name: 'Growth', status: 'active', trialEndsAt: null },
   counts: { properties: 4, units: 60, occupiedUnits: 52, teamMembers: 3, tenants: 55 },
-  platform: platformId ? { organizationId: platformId, tenantId: `t-${platformId}`, registeredAt: '2026-10-01T08:01:00Z' } : null,
+  // the platform tenant only where a test gives one (HR & Payroll)
+  platform: platformId ? { organizationId: platformId, tenantId: null, registeredAt: '2026-10-01T08:01:00Z' } : null,
   ...extra,
 });
 const org = (id: string, status: string, localId: string, extra: Row = {}) => ({
@@ -252,8 +253,8 @@ describe('GET /api/platform/property/workspaces', () => {
       creator_name: 'Owner of Kilimani Homes', creator_email: 'owner@kilimanihomes.co.ke',
       plan_name: 'Growth', plan_status: 'active', trial_ends_at: null,
       properties: 4, units: 60, occupied_units: 52, team_members: 3, tenants: 55,
-      platform_organization_id: ACTIVE, platform_tenant_id: `t-${ACTIVE}`, registered_at: '2026-10-01T08:01:00Z',
-      in_property: true, organization_id: ACTIVE, status: 'active', status_reason: null,
+      platform_organization_id: ACTIVE, platform_tenant_id: null, registered_at: '2026-10-01T08:01:00Z',
+      in_property: true, organization_id: ACTIVE, status: 'active', status_reason: null, hr: null,
     });
     expect(body.workspaces[1]).toMatchObject({ id: W_PAUSED, property_active: false, status: 'suspended', status_reason: 'Unpaid' });
     expect(body.workspaces[2]).toMatchObject({ id: W_LOCAL, platform_organization_id: null, organization_id: BY_LOCAL, status: 'active' });
@@ -475,6 +476,103 @@ describe('POST /api/platform/property/workspaces/:organizationId/status', () => 
     expect(text).not.toContain(CLIENT_SECRET);
     expect(text).not.toContain(PROPERTY_SECRET);
     expect(text).not.toContain('deliveries');
+  });
+});
+
+describe('HR & Payroll per Property workspace (ERP/PROPERTY_HR_CONTRACT.md)', () => {
+  const T_ACTIVE = '66666666-6666-4666-8666-666666666666';
+  const T_OFF = '77777777-7777-4777-8777-777777777777';
+  const tenant = (id: string, localId: string, extra: Row = {}) => ({ id, name: localId, links: [{ module: 'property', local_tenant_id: localId }], ...extra });
+  const tenants: Record<string, Row> = {};
+  const hrOn = new Set<string>();
+  const withTenant = (w: Row, tenantId: string) => ({ ...w, platform: { ...(w.platform as Row), tenantId } });
+
+  beforeEach(() => {
+    // Kilimani Homes: HR off (Property gives its tenant; the platform list carries no tenant, so it is asked about)
+    fake.workspaces[0] = withTenant(fake.workspaces[0], T_OFF);
+    // Paused Estates: HR on (the platform list carries the tenant with HR's link)
+    fake.workspaces[1] = withTenant(fake.workspaces[1], T_ACTIVE);
+    fake.orgs[1] = org(SUSPENDED, 'suspended', W_PAUSED, {
+      status_reason: 'Unpaid',
+      tenants: [tenant(T_ACTIVE, W_PAUSED, { links: [{ module: 'property', local_tenant_id: W_PAUSED }, { module: 'hr', local_tenant_id: 'hr-co-1' }], modules: [] })],
+    });
+    tenants[T_OFF] = { modules: [{ module: 'property', status: 'active' }], links: [{ module: 'property', local_tenant_id: W_ACTIVE }] };
+    tenants[T_ACTIVE] = { modules: [], links: [{ module: 'property', local_tenant_id: W_PAUSED }, { module: 'hr', local_tenant_id: 'hr-co-1' }] };
+    hrOn.clear();
+    fake.platformOverride = (method, path) => {
+      const g = path.match(/^\/tenants\/([^/]+)$/);
+      if (method === 'GET' && g) {
+        const t = tenants[g[1]];
+        if (!t) return { status: 404, json: { error: { code: 'tenant_not_found', message: 'No such account' } } };
+        const modules = [...(t.modules as Row[]), ...(hrOn.has(g[1]) ? [{ module: 'hr', status: 'active' }] : [])];
+        return { status: 200, json: { tenant: { id: g[1], legal_name: 'X' }, modules, links: t.links } };
+      }
+      if (method === 'PUT' && /^\/tenants\/[^/]+\/modules\/hr$/.test(path)) {
+        hrOn.add(path.split('/')[2]);
+        return { status: 200, json: { module: { module: 'hr', status: 'active' }, event: {} } };
+      }
+      return null;
+    };
+  });
+
+  it("each workspace shows its HR state, for Property's platform tenant: linked is on; not linked is asked about (off)", async () => {
+    const body = await (await call('view')).json();
+    const byId = Object.fromEntries(body.workspaces.map((w: Row) => [w.id, w]));
+    expect(byId[W_PAUSED]).toMatchObject({ platform_tenant_id: T_ACTIVE, hr: { state: 'on', hr_tenant_id: 'hr-co-1' } });
+    expect(byId[W_ACTIVE]).toMatchObject({ platform_tenant_id: T_OFF, hr: { state: 'off' } });
+    // no platform tenant: no HR state, nothing asked
+    expect(byId[W_FRESH]).toMatchObject({ platform_tenant_id: null, hr: null });
+    expect(fake.apiCalls.filter((c) => c.path.startsWith('/tenants/')).map((c) => c.path)).toEqual([`/tenants/${T_OFF}`]);
+  });
+
+  it('the detail asks about its HR state too', async () => {
+    const body = await (await call('view', `/workspaces/${W_ACTIVE}`)).json();
+    expect(body.workspace).toMatchObject({ platform_tenant_id: T_OFF, hr: { state: 'off' } });
+  });
+
+  it("Enable: switches hr on for the workspace with its creator as a property_owner, recorded under the caller", async () => {
+    const res = await call('adm', `/hr/${T_OFF}/enable`, { method: 'POST' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ workspace: { platform_tenant_id: T_OFF, hr: { state: 'enabling', module_status: 'active', hr_tenant_id: null } } });
+    const put = fake.apiCalls.find((c) => c.method === 'PUT')!;
+    expect(put.path).toBe(`/tenants/${T_OFF}/modules/hr`);
+    expect(put.body).toEqual({
+      status: 'active', actor_email: 'adm@figbloom.org',
+      admins: [{ email: 'owner@kilimanihomes.co.ke', name: 'Owner of Kilimani Homes', role: 'property_owner' }],
+    });
+    // the creator came from Property's own summary of that workspace
+    expect(fake.propertyCalls.map((c) => c.path)).toEqual([`/property/api/platform/workspaces/${W_ACTIVE}/`]);
+  });
+
+  it('already on: nothing is changed', async () => {
+    const res = await call('own', `/hr/${T_ACTIVE}/enable`, { method: 'POST' });
+    expect((await res.json()).workspace.hr.state).toBe('on');
+    expect(fake.apiCalls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
+  it("only approve_companies (support can't: HR is a paid add-on); a bad id is a 400; another product's account is a 404", async () => {
+    const refused = await call('sup', `/hr/${T_OFF}/enable`, { method: 'POST' });
+    expect(refused.status).toBe(403);
+    expect((await refused.json()).error.message).toBe('Only an owner or admin can switch HR & Payroll on for a workspace.');
+    expect((await call('view', `/hr/${T_OFF}/enable`, { method: 'POST' })).status).toBe(403);
+    expect((await call('adm', '/hr/nope/enable', { method: 'POST' })).status).toBe(400);
+    tenants[T_OFF] = { modules: [], links: [{ module: 'fleet', local_tenant_id: 'cmp_1' }] };
+    const other = await call('adm', `/hr/${T_OFF}/enable`, { method: 'POST' });
+    expect(other.status).toBe(404);
+    expect((await other.json()).error.code).toBe('not_a_property_workspace');
+    expect(fake.apiCalls.some((c) => c.method === 'PUT')).toBe(false);
+  });
+
+  it('Property down, or a creator with no real address: still switched on, with nobody to invite', async () => {
+    fake.propertyOverride = () => ({ status: 500, json: {} });
+    expect((await call('adm', `/hr/${T_OFF}/enable`, { method: 'POST' })).status).toBe(200);
+    expect(fake.apiCalls.find((c) => c.method === 'PUT')!.body.admins).toEqual([]);
+    fake.propertyOverride = null;
+    hrOn.clear();
+    fake.apiCalls = [];
+    fake.workspaces[0] = { ...fake.workspaces[0], creator: { name: 'Demo', email: 'demo@figbloom.internal' } };
+    expect((await call('adm', `/hr/${T_OFF}/enable`, { method: 'POST' })).status).toBe(200);
+    expect(fake.apiCalls.find((c) => c.method === 'PUT')!.body.admins).toEqual([]);
   });
 });
 

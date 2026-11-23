@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
   decisions: [] as unknown[][],
   decisionError: null as Error | null,
   detail: null as PropertyWorkspace | null,
+  hrEnabled: [] as string[],
 }));
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
@@ -34,6 +35,10 @@ vi.mock('../../lib/platformProperty', async (importOriginal) => ({
     if (api.decisionError) return Promise.reject(api.decisionError);
     const to = action === 'suspend' ? 'suspended' : 'active';
     return Promise.resolve({ organization_id: id, status: to, status_reason: reason.trim() || null });
+  },
+  enablePropertyHr: (tenant: string) => {
+    api.hrEnabled.push(tenant);
+    return Promise.resolve({ state: 'enabling', module_status: 'active', hr_tenant_id: null });
   },
 }));
 
@@ -65,6 +70,7 @@ beforeEach(() => {
   api.decisions = [];
   api.decisionError = null;
   api.detail = null;
+  api.hrEnabled = [];
   toast.success.mockReset();
   toast.error.mockReset();
 });
@@ -120,7 +126,7 @@ describe('the Property workspaces page', () => {
     renderPage();
     await rowOf('Kilimani Homes');
     const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
-    expect(headers).toEqual(['Workspace', 'Status', 'Owner', 'Plan', 'Properties', 'Units', 'Created', '']);
+    expect(headers).toEqual(['Workspace', 'Status', 'Owner', 'Plan', 'Properties', 'Units', 'Created', 'HR & Payroll', '']);
   });
 
   it('shows the totals, and has no create button', async () => {
@@ -253,5 +259,53 @@ describe('the Property workspaces page: suspend and reactivate by role', () => {
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Reactivate' }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("An active workspace can't be reactivated."));
     expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+});
+
+describe('HR & Payroll per workspace (ERP/PROPERTY_HR_CONTRACT.md)', () => {
+  const withHr = () => {
+    api.workspaces = [
+      workspace('w1', 'Kilimani Homes', 'active', { platform_tenant_id: 't-1', hr: { state: 'off', module_status: null, hr_tenant_id: null } }),
+      workspace('w2', 'Paused Estates', 'suspended', { platform_tenant_id: 't-2', hr: { state: 'on', module_status: 'active', hr_tenant_id: 'hr-2' } }),
+      workspace('w3', 'Fresh Start', null, { platform_tenant_id: null, hr: null }),
+    ];
+  };
+
+  it('shows Off / On, and nothing for a workspace without a platform account', async () => {
+    withHr();
+    renderPage();
+    expect(within(await rowOf('Kilimani Homes')).getByText('Off')).toBeTruthy();
+    expect(within(await rowOf('Paused Estates')).getByText('On')).toBeTruthy();
+    expect(within(await rowOf('Fresh Start')).queryByRole('button', { name: /Enable HR/ })).toBeNull();
+  });
+
+  it("an owner enables it: the platform is asked, the workspace shows Enabling, and the creator is invited", async () => {
+    withHr();
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Enable HR & Payroll for Kilimani Homes' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/emails the workspace's creator an invitation/)).toBeTruthy();
+    expect(within(dialog).getByText(/Tenants and landlords never are/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Enable' }));
+    await waitFor(() => expect(api.hrEnabled).toEqual(['t-1']));
+    expect(within(await rowOf('Kilimani Homes')).getByText('Enabling')).toBeTruthy();
+    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("invites the workspace's creator"));
+  });
+
+  it('the detail panel shows it too', async () => {
+    withHr();
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Paused Estates' }));
+    const details = within(await screen.findByRole('dialog')).getByLabelText('Workspace details');
+    expect(within(details).getByText('HR & Payroll')).toBeTruthy();
+    expect(within(details).getByText('On')).toBeTruthy();
+  });
+
+  it.each(['support', 'viewer'] as const)('%s sees the state but cannot enable it (HR is a paid add-on)', async (role) => {
+    withHr();
+    api.role = role;
+    renderPage();
+    expect(within(await rowOf('Kilimani Homes')).getByText('Off')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Enable HR/ })).toBeNull();
   });
 });

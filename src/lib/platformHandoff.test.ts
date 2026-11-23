@@ -37,6 +37,8 @@ describe('readArrival: what /handoff was opened with', () => {
     expect(readArrival('?status=<script>', '')).toEqual({ kind: 'status', status: 'invalid', from: 'schools' });
     expect(readArrival('', '#connect=short')).toEqual({ kind: 'status', status: 'invalid', from: 'schools' });
     expect(readArrival('?status=not_set_up&from=fleet', '')).toEqual({ kind: 'status', status: 'not_set_up', from: 'fleet' });
+    expect(readArrival('?status=not_set_up&from=property', '')).toEqual({ kind: 'status', status: 'not_set_up', from: 'property' });
+    expect(readArrival('?status=not_set_up&from=crm', '')).toEqual({ kind: 'status', status: 'not_set_up', from: 'schools' });
   });
 
   it('the pages say what the contract says', () => {
@@ -45,6 +47,9 @@ describe('readArrival: what /handoff was opened with', () => {
     expect(statusMessage('anything').title).toBe('This link has expired');
     expect(statusMessage('no_access', 'fleet').body).toBe('You don\'t have access to HR for this company. Ask your HR administrator.');
     expect(statusMessage('invalid', 'fleet').body).toContain('Figbloom Fleet');
+    expect(statusMessage('no_access', 'property').body).toBe('You don\'t have access to HR for this workspace. Ask your HR administrator.');
+    expect(statusMessage('not_set_up', 'property').title).toBe('HR isn\'t set up for this workspace');
+    expect(statusMessage('invalid', 'property').body).toContain('Figbloom Property');
   });
 });
 

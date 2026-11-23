@@ -1,4 +1,5 @@
 import { ApiError, apiRequest } from './adminApi';
+import type { HrState } from './platformSchoolHr';
 
 // Figbloom Property's workspaces in the console (/platform/property/workspaces, ERP/PROPERTY_PLATFORM_CONTRACT.md 3).
 // Property's own summaries (creator, plan, properties, units, occupied units, team members, tenants: counts only, never
@@ -54,6 +55,7 @@ export interface PropertyWorkspace {
   tenants: number | null;
   /** the platform's IDs as Property knows them: null until Property has registered the workspace (within a minute) */
   platform_organization_id: string | null;
+  /** the platform's account (tenant) for the workspace, where HR & Payroll is switched on */
   platform_tenant_id: string | null;
   registered_at: string | null;
   /** false: on the platform, but not in Property's list */
@@ -63,6 +65,15 @@ export interface PropertyWorkspace {
   /** the platform's decision; null until registered */
   status: string | null;
   status_reason: string | null;
+  /** HR & Payroll for the workspace (ERP/PROPERTY_HR_CONTRACT.md); null without a platform account */
+  hr?: PropertyHr | null;
+}
+
+/** off: not switched on; enabling: switched on, HR hasn't linked its company yet; on: linked; unknown: couldn't ask. */
+export interface PropertyHr {
+  state: HrState;
+  module_status: string | null;
+  hr_tenant_id: string | null;
 }
 
 export interface PropertyWorkspacesList {
@@ -171,3 +182,17 @@ export function propertyTotals(list: PropertyWorkspace[]): PropertyTotals {
     units: list.reduce((t, w) => t + (Number(w.units) || 0), 0),
   };
 }
+
+/** Switches HR & Payroll on for a Property workspace (its platform account). Returns its HR state now. */
+export async function enablePropertyHr(platformTenantId: string): Promise<PropertyHr> {
+  const result = await apiRequest<{ workspace?: { platform_tenant_id: string; hr?: PropertyHr } }>(
+    'POST',
+    `/platform/property/hr/${encodeURIComponent(platformTenantId)}/enable`
+  );
+  if (!result?.workspace?.hr) throw new Error('The Figbloom platform sent something the console does not understand.');
+  return result.workspace.hr;
+}
+
+/** The list with one workspace's HR state replaced (after switching it on). */
+export const withPropertyHr = (list: PropertyWorkspace[], platformTenantId: string, hr: PropertyHr) =>
+  list.map((w) => (w.platform_tenant_id === platformTenantId ? { ...w, hr } : w));

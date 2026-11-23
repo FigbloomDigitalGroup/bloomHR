@@ -1,21 +1,24 @@
-// my_hr_routes.js: "My HR" for the staff of Figbloom Schools and Figbloom Fleet: ERP/SCHOOLS_HR_PHASE2_CONTRACT.md
-// section 2, ERP/FLEET_HR_CONTRACT.md section 2 (Fleet takes Schools' place, product "fleet").
+// my_hr_routes.js: "My HR" for the staff of Figbloom Schools, Figbloom Fleet and Figbloom Property:
+// ERP/SCHOOLS_HR_PHASE2_CONTRACT.md section 2, ERP/FLEET_HR_CONTRACT.md section 2 (Fleet takes Schools' place, product
+// "fleet"), ERP/PROPERTY_HR_CONTRACT.md section 2 (Property too, product "property").
 //
 //   a product's backend --GET /api/integrations/my-hr/<route>-->  (Bearer: that product's platform access token,
-//                                                                  the customer: x-figbloom-school (Schools) or
-//                                                                  x-figbloom-company (Fleet) or x-figbloom-tenant,
+//                                                                  the customer: x-figbloom-school (Schools),
+//                                                                  x-figbloom-company (Fleet) or x-figbloom-tenant
+//                                                                  (Property's workspace; any product's fallback),
 //                                                                  and x-figbloom-person)
 //     1. the switch MY_HR_API_ENABLED (off: 503 my_hr_off)
 //     2. the token: a Cognito ACCESS token of the platform's pool, signature checked against its JWKS
 //        (PLATFORM_JWKS_URL), issuer PLATFORM_ISSUER, token_use "access", not expired, and its client_id one of the
-//        product clients (productClients(): PLATFORM_SCHOOLS_CLIENT_ID -> schools, PLATFORM_FLEET_CLIENT_ID -> fleet),
+//        product clients (productClients(): PLATFORM_SCHOOLS_CLIENT_ID -> schools, PLATFORM_FLEET_CLIENT_ID -> fleet,
+//        PLATFORM_PROPERTY_CLIENT_ID -> property),
 //        which says which product is calling (401 invalid_token otherwise; an id token is refused)
 //     3. the customer: GET /links/resolve?module=<product>&local_id=<id> on the platform (the "hr" service client,
 //        answers kept 10 minutes) gives the platform tenant and HR's own company for it (caller_local_id); that
 //        company must be active and have that platform_tenant_id (403 school_not_linked for Schools,
-//        company_not_linked for Fleet, otherwise)
+//        company_not_linked for Fleet, workspace_not_linked for Property, otherwise)
 //     4. the person: only external_people (company, <product>, person id) (404 not_linked otherwise). Never by email,
-//        and never an employee number from the caller. Ids: Schools' are uuids, Fleet's cuids.
+//        and never an employee number from the caller. Ids: Schools' and Property's are uuids, Fleet's cuids.
 //     5. per person: 120 calls per 10 minutes (429)
 //     6. a draft employee (onboarding not approved): 200 {"status": "pending_hr"} and nothing else
 //   Then the employee's own data, with the staff portal's rules (supabase/migrations/20261107100000_my_hr_api.sql):
@@ -50,6 +53,7 @@
 //   PLATFORM_ISSUER              https://cognito-idp.<region>.amazonaws.com/<pool>
 //   PLATFORM_SCHOOLS_CLIENT_ID   the Schools service client's app client id
 //   PLATFORM_FLEET_CLIENT_ID     the Fleet service client's app client id
+//   PLATFORM_PROPERTY_CLIENT_ID  the Property service client's app client id
 //   PLATFORM_CLIENT_ID / PLATFORM_CLIENT_SECRET, PLATFORM_API_URL, PLATFORM_TOKEN_URL   the "hr" service client
 import { randomUUID } from "node:crypto";
 import express from "express";
@@ -87,15 +91,21 @@ const COMMENT_MAX = 1000;
 export const IMPORT_MAX_RECORDS = 5000;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-// each product's ids: Schools' (tenants.id, profiles.id) are uuids, Fleet's (Company.id, User.id, Driver.id) cuids;
-// anything else is refused before it goes anywhere
-const ID_RES = { schools: UUID_RE, fleet: /^[A-Za-z0-9_-]{8,64}$/ };
+// each product's ids: Schools' (tenants.id, profiles.id) and Property's (Workspace.id, User.id) are uuids, Fleet's
+// (Company.id, User.id, Driver.id) cuids; anything else is refused before it goes anywhere
+const ID_RES = { schools: UUID_RE, fleet: /^[A-Za-z0-9_-]{8,64}$/, property: UUID_RE };
 // the product client env settings: client id -> product
-export const PRODUCT_CLIENT_ENVS = { schools: "PLATFORM_SCHOOLS_CLIENT_ID", fleet: "PLATFORM_FLEET_CLIENT_ID" };
-// how each product calls its customers, in the answers
+export const PRODUCT_CLIENT_ENVS = {
+  schools: "PLATFORM_SCHOOLS_CLIENT_ID",
+  fleet: "PLATFORM_FLEET_CLIENT_ID",
+  property: "PLATFORM_PROPERTY_CLIENT_ID",
+};
+// how each product calls its customers, in the answers, and the header it names them in (x-figbloom-tenant is every
+// product's fallback)
 const CUSTOMER = {
-  schools: { noun: "school", notLinked: "school_not_linked", name: "Figbloom Schools" },
-  fleet: { noun: "company", notLinked: "company_not_linked", name: "Figbloom Fleet" },
+  schools: { noun: "school", notLinked: "school_not_linked", name: "Figbloom Schools", header: "x-figbloom-school" },
+  fleet: { noun: "company", notLinked: "company_not_linked", name: "Figbloom Fleet", header: "x-figbloom-company" },
+  property: { noun: "workspace", notLinked: "workspace_not_linked", name: "Figbloom Property", header: "x-figbloom-tenant" },
 };
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -137,7 +147,7 @@ export function productClients() {
 /**
  * Checks a product's bearer token: a Cognito access token signed by the platform's pool (keys: the JWKS, or `keys` in
  * tests), its issuer, not expired, for one of the product clients (productClients()). Resolves its claims with
- * `product` (schools, fleet) added, or throws a TokenError.
+ * `product` (schools, fleet, property) added, or throws a TokenError.
  */
 export async function verifyPlatformToken(header, keys = remoteKeys()) {
   const issuer = read("PLATFORM_ISSUER");
@@ -501,8 +511,7 @@ export function createMyHrRouter({
     // the product is the token's client's, never a header's
     const product = CUSTOMER[claims?.product] ? claims.product : "schools";
     const idRe = ID_RES[product];
-    const header = product === "fleet" ? "x-figbloom-company" : "x-figbloom-school";
-    const school = String(req.get(header) || req.get("x-figbloom-tenant") || "").trim();
+    const school = String(req.get(CUSTOMER[product].header) || req.get("x-figbloom-tenant") || "").trim();
     const person = String(req.get("x-figbloom-person") || "").trim();
     if (!idRe.test(school) || (needPerson && !idRe.test(person))) {
       const noun = CUSTOMER[product].noun;
