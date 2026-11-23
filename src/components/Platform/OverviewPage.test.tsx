@@ -6,6 +6,7 @@ import type { OrganisationTotals } from '../../lib/platformOrganisations';
 import type { School } from '../../lib/platformSchools';
 import type { FleetCompaniesList, FleetCompany } from '../../lib/platformFleet';
 import type { CrmOrganisation, CrmOrganisationsList } from '../../lib/platformCrm';
+import type { PropertyWorkspace, PropertyWorkspacesList } from '../../lib/platformProperty';
 
 const api = vi.hoisted(() => ({
   role: 'viewer' as import('../../lib/platformRoles').PlatformRole | null,
@@ -20,6 +21,9 @@ const api = vi.hoisted(() => ({
   crm: null as CrmOrganisationsList | null,
   crmErrors: [] as Error[],
   crmCalls: 0,
+  property: null as PropertyWorkspacesList | null,
+  propertyErrors: [] as Error[],
+  propertyCalls: 0,
 }));
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
 vi.mock('../../lib/platformRoles', async (importOriginal) => ({
@@ -57,6 +61,15 @@ vi.mock('../../lib/platformCrm', async (importOriginal) => ({
   },
 }));
 
+vi.mock('../../lib/platformProperty', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/platformProperty')>()),
+  listPropertyWorkspaces: () => {
+    api.propertyCalls += 1;
+    const error = api.propertyErrors.shift();
+    return error ? Promise.reject(error) : Promise.resolve(api.property!);
+  },
+}));
+
 import OverviewPage from './OverviewPage';
 import { ConsoleBadgesContext } from '../Console/consoleBadges';
 
@@ -74,6 +87,13 @@ const crmOrg = (id: string, status: string | null, crmStatus = 'active'): CrmOrg
   id, name: id, slug: id, crm_status: crmStatus, created_at: null, admin_name: null, admin_email: null, active_members: 2,
   pending_invitations: 0, leads: 5, open_deals: 1, companies: 3, last_activity_at: null, platform_organization_id: status ? `org-${id}` : null,
   in_crm: true, organization_id: status ? `org-${id}` : null, status, status_reason: null,
+});
+
+const propertyWorkspace = (id: string, status: string | null, active = true): PropertyWorkspace => ({
+  id, name: id, slug: id, property_active: active, created_at: null, creator_name: null, creator_email: null, plan_name: null,
+  plan_status: null, trial_ends_at: null, properties: 1, units: 10, occupied_units: 8, team_members: 2, tenants: 8,
+  platform_organization_id: status ? `org-${id}` : null, platform_tenant_id: null, registered_at: null,
+  in_property: true, organization_id: status ? `org-${id}` : null, status, status_reason: null,
 });
 
 afterEach(cleanup);
@@ -109,6 +129,16 @@ beforeEach(() => {
   };
   api.crmErrors = [];
   api.crmCalls = 0;
+  api.property = {
+    truncated: false,
+    platform: { ok: true },
+    workspaces: [
+      propertyWorkspace('a', 'active'), propertyWorkspace('b', 'suspended', false), propertyWorkspace('c', null),
+      propertyWorkspace('d', 'active', false),
+    ],
+  };
+  api.propertyErrors = [];
+  api.propertyCalls = 0;
 });
 
 const renderPage = () =>
@@ -236,6 +266,36 @@ describe('the console overview', () => {
     expect(api.crmCalls).toBe(2);
   });
 
+  it('shows Figbloom Property: workspaces, active and suspended, with a link to its workspaces', async () => {
+    renderPage();
+    await waitFor(() => expect(within(card('Figbloom Property')).queryByText('Workspaces', { selector: 'div' })).toBeTruthy());
+    const property = card('Figbloom Property');
+    expect(figure(property, 'Workspaces')).toBe('4');
+    expect(figure(property, 'Active')).toBe('2');
+    expect(within(property).getByText('1 deactivated by their owner')).toBeTruthy();
+    expect(figure(property, 'Suspended')).toBe('1');
+    expect(within(property).getByRole('link', { name: 'Workspaces' }).getAttribute('href')).toBe('/platform/property/workspaces');
+  });
+
+  it("says Property isn't connected to the console yet, and the others still show", async () => {
+    api.propertyErrors = [new ApiError("Figbloom Property isn't connected to the console yet.", 503, 'property_not_connected')];
+    renderPage();
+    const property = await screen.findByRole('region', { name: 'Figbloom Property' });
+    expect(await within(property).findByText("Property isn't connected to the console yet")).toBeTruthy();
+    expect(within(property).getByText(/PROPERTY_PLATFORM_URL and PROPERTY_PLATFORM_SECRET/)).toBeTruthy();
+    expect(within(property).queryByRole('button', { name: 'Try again' })).toBeNull();
+    await waitFor(() => expect(figure(card('Figbloom CRM'), 'Organisations')).toBe('3'));
+  });
+
+  it("says Property didn't answer, and tries again", async () => {
+    api.propertyErrors = [new ApiError("Figbloom Property didn't answer. Try again.", 502, 'property_unavailable')];
+    renderPage();
+    const property = await screen.findByRole('region', { name: 'Figbloom Property' });
+    fireEvent.click(await within(property).findByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(figure(card('Figbloom Property'), 'Workspaces')).toBe('4'));
+    expect(api.propertyCalls).toBe(2);
+  });
+
   it('is for platform admins only', async () => {
     api.role = null;
     renderPage();
@@ -243,6 +303,7 @@ describe('the console overview', () => {
     expect(api.schoolsCalls).toBe(0);
     expect(api.fleetCalls).toBe(0);
     expect(api.crmCalls).toBe(0);
+    expect(api.propertyCalls).toBe(0);
   });
 
   it('publishes the menu badges: companies waiting for approval, schools needing attention', async () => {

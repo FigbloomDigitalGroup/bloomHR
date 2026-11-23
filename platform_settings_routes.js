@@ -24,6 +24,7 @@ export const AUTO_APPROVE_PRODUCTS = [
   { module: "hr", label: "Figbloom HR" },
   { module: "schools", label: "Figbloom Schools" },
   { module: "fleet", label: "Figbloom Fleet" },
+  { module: "property", label: "Figbloom Property" },
 ];
 const KNOWN = new Set(AUTO_APPROVE_PRODUCTS.map((p) => p.module));
 
@@ -66,7 +67,7 @@ export function createSettingsRouter({ timeoutMs = PLATFORM_TIMEOUT_MS } = {}) {
     try {
       const caller = await callerWith(req, "approve_companies", "Only an owner or admin can change how new companies are approved.");
       const module = String(req.params.module || "");
-      if (!KNOWN.has(module)) throw new PlatformError(400, "unknown_product", "Choose Figbloom HR, Figbloom Schools or Figbloom Fleet.");
+      if (!KNOWN.has(module)) throw new PlatformError(400, "unknown_product", "Choose Figbloom HR, Figbloom Schools, Figbloom Fleet or Figbloom Property.");
       const enabled = req.body?.enabled;
       if (enabled !== true && enabled !== false && enabled !== null) {
         throw new PlatformError(400, "invalid_enabled", "Send enabled: true, false, or null to follow the platform default.");

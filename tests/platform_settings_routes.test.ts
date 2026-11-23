@@ -154,7 +154,7 @@ const put = (as: string, module: string, body: unknown) => call(as, `/auto-appro
 const puts = () => fake.apiCalls.filter((c) => c.method === 'PUT');
 
 describe('GET /api/platform/settings/auto-approve', () => {
-  it("shows HR, Schools and Fleet: each one's own switch, the one in effect, and whether it follows the default", async () => {
+  it("shows HR, Schools, Fleet and Property: each one's own switch, the one in effect, and whether it follows the default", async () => {
     fake.global = true;
     fake.own = { fleet: false };
     const res = await call('view');
@@ -166,6 +166,7 @@ describe('GET /api/platform/settings/auto-approve', () => {
         { module: 'hr', label: 'Figbloom HR', own: null, effective: true, inherited: true },
         { module: 'schools', label: 'Figbloom Schools', own: null, effective: true, inherited: true },
         { module: 'fleet', label: 'Figbloom Fleet', own: false, effective: false, inherited: false },
+        { module: 'property', label: 'Figbloom Property', own: null, effective: true, inherited: true },
       ],
     });
     expect(fake.apiCalls[0].headers.authorization).toBe('Bearer tok-1');
@@ -216,6 +217,15 @@ describe('PUT /api/platform/settings/auto-approve/:module', () => {
     expect((await res.json()).products[0]).toMatchObject({ module: 'hr', own: null, inherited: true });
   });
 
+  it('switches Property too', async () => {
+    const res = await put('own', 'property', { enabled: false });
+    expect(res.status).toBe(200);
+    expect(puts()[0].body).toEqual({ module: 'property', enabled: false, actor_email: 'own@figbloom.org' });
+    expect((await res.json()).products.find((p: Row) => p.module === 'property')).toEqual({
+      module: 'property', label: 'Figbloom Property', own: false, effective: false, inherited: false,
+    });
+  });
+
   it('lets only owners and admins change one', async () => {
     for (const who of ['sup', 'view', 'company-admin']) {
       const res = await put(who, 'fleet', { enabled: true });
@@ -250,6 +260,6 @@ describe('toAutoApprove', () => {
     expect(mod.toAutoApprove({ auto_approve: true, products: [{ module: 'fleet', auto_approve: 'yes' }] }).products[2]).toEqual({
       module: 'fleet', label: 'Figbloom Fleet', own: null, effective: true, inherited: true,
     });
-    expect(mod.toAutoApprove(null)).toMatchObject({ default: false, products: [{ effective: false }, { effective: false }, { effective: false }] });
+    expect(mod.toAutoApprove(null)).toMatchObject({ default: false, products: [{ effective: false }, { effective: false }, { effective: false }, { effective: false }] });
   });
 });

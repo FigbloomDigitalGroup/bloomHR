@@ -46,6 +46,7 @@ beforeEach(() => {
       { module: 'hr', label: 'Figbloom HR', own: null, effective: false, inherited: true },
       { module: 'schools', label: 'Figbloom Schools', own: null, effective: false, inherited: true },
       { module: 'fleet', label: 'Figbloom Fleet', own: null, effective: false, inherited: true },
+      { module: 'property', label: 'Figbloom Property', own: null, effective: false, inherited: true },
     ],
   };
   toast.success.mockReset();

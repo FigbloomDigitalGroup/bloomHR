@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Building2, Contact, GraduationCap, Truck } from 'lucide-react';
+import { ArrowRight, Building2, Contact, GraduationCap, House, Truck } from 'lucide-react';
 import { Button, Card, PageHeader } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import { ConsoleStat } from './ConsoleStat';
@@ -10,10 +10,11 @@ import { listSchools, schoolTotals, schoolsProblem, type SchoolsProblem } from '
 import { activeWithin, schoolsNeedingAttention } from '../../lib/consoleAnalytics';
 import { fleetProblem, fleetTotals, listFleetCompanies, type FleetProblem, type FleetTotals } from '../../lib/platformFleet';
 import { crmProblem, crmTotals, listCrmOrganisations, type CrmProblem, type CrmTotals } from '../../lib/platformCrm';
+import { listPropertyWorkspaces, propertyProblem, propertyTotals, type PropertyProblem, type PropertyTotals } from '../../lib/platformProperty';
 import { useConsoleBadge } from '../Console/consoleBadges';
 
 // The console's home (/platform/overview): one card per product, with its headline numbers and links to its pages.
-// Each product loads on its own, so Schools, Fleet or CRM being unreachable (or not connected) never hides another. Any role.
+// Each product loads on its own, so Schools, Fleet, CRM or Property being unreachable (or not connected) never hides another. Any role.
 
 type HrState = { totals: OrganisationTotals } | { error: string } | null;
 interface SchoolNumbers {
@@ -29,6 +30,8 @@ type SchoolsState = { numbers: SchoolNumbers } | { problem: SchoolsProblem; mess
 type FleetState = { totals: FleetTotals; platformOk: boolean } | { problem: FleetProblem; message: string } | null;
 /** platformOk: whether the platform's statuses came with CRM's list (without them the suspended count is CRM's own) */
 type CrmState = { totals: CrmTotals; platformOk: boolean } | { problem: CrmProblem; message: string } | null;
+/** platformOk: whether the platform's statuses came with Property's list (without them the suspended count is Property's own) */
+type PropertyState = { totals: PropertyTotals; platformOk: boolean } | { problem: PropertyProblem; message: string } | null;
 
 const n = (v: number) => v.toLocaleString('en-KE');
 
@@ -62,6 +65,7 @@ export default function OverviewPage() {
   const [schools, setSchools] = useState<SchoolsState>(null);
   const [fleet, setFleet] = useState<FleetState>(null);
   const [crm, setCrm] = useState<CrmState>(null);
+  const [property, setProperty] = useState<PropertyState>(null);
 
   useEffect(() => {
     void myPlatformRole().then(setRole);
@@ -114,13 +118,24 @@ export default function OverviewPage() {
     }
   }, []);
 
+  const loadProperty = useCallback(async () => {
+    setProperty(null);
+    try {
+      const { workspaces, platform } = await listPropertyWorkspaces();
+      setProperty({ totals: propertyTotals(workspaces), platformOk: platform.ok });
+    } catch (err) {
+      setProperty({ problem: propertyProblem(err), message: err instanceof Error ? err.message : 'Could not load Figbloom Property.' });
+    }
+  }, []);
+
   useEffect(() => {
     if (!role) return;
     void loadHr();
     void loadSchools();
     void loadFleet();
     void loadCrm();
-  }, [role, loadHr, loadSchools, loadFleet, loadCrm]);
+    void loadProperty();
+  }, [role, loadHr, loadSchools, loadFleet, loadCrm, loadProperty]);
 
   // the console menu's badges, from what this page loads anyway
   useConsoleBadge('/platform/organisations', hr && 'totals' in hr ? hr.totals.by_status.pending : null, (c) => `${c} waiting for approval`);
@@ -260,6 +275,39 @@ export default function OverviewPage() {
               <ConsoleStat label="Organisations" value={n(crm.totals.organisations)} sub={`${n(crm.totals.active)} active`} />
               <ConsoleStat label="Suspended" value={n(crm.totals.suspended)}
                 sub={crm.platformOk ? undefined : "as CRM reports it: the platform couldn't be read"} />
+            </div>
+          )}
+        </ProductCard>
+
+        <ProductCard title="Figbloom Property" icon={<House className="w-4 h-4" />} mark="bg-secondary text-status-success"
+          links={[{ label: 'Workspaces', to: '/platform/property/workspaces' }]}>
+          {!property ? (
+            <FigbloomLoader label="Loading Figbloom Property" size={40} />
+          ) : 'problem' in property ? (
+            <div>
+              <p className="text-xs font-semibold text-ink">
+                {property.problem === 'not_connected'
+                  ? "Property isn't connected to the console yet"
+                  : property.problem === 'unavailable'
+                    ? "Figbloom Property didn't answer"
+                    : 'Could not load Figbloom Property'}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {property.problem === 'not_connected'
+                  ? 'The console needs PROPERTY_PLATFORM_URL and PROPERTY_PLATFORM_SECRET. The other products work as usual.'
+                  : property.message}
+              </p>
+              {property.problem !== 'not_connected' && (
+                <div className="mt-2"><Button variant="secondary" onClick={() => void loadProperty()}>Try again</Button></div>
+              )}
+            </div>
+          ) : (
+            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+              <ConsoleStat label="Workspaces" value={n(property.totals.workspaces)} sub={`${n(property.totals.units)} units`} />
+              <ConsoleStat label="Active" value={n(property.totals.active)}
+                sub={property.totals.deactivated ? `${n(property.totals.deactivated)} deactivated by their owner` : undefined} />
+              <ConsoleStat label="Suspended" value={n(property.totals.suspended)}
+                sub={property.platformOk ? undefined : "as Property reports it: the platform couldn't be read"} />
             </div>
           )}
         </ProductCard>
