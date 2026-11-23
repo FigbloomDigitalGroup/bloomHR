@@ -85,19 +85,18 @@ describe('applying on someone’s behalf', () => {
   });
 });
 
-describe('at most 30% of basic salary (20261027800000)', () => {
-  it('for staff and for someone applying on their behalf alike, from the employee record', async () => {
-    // E-ME's basic is 40,000: up to 12,000; what the request says the basic is doesn't count
-    expect(await fails(STAFF, `insert into salary_advance ("Employee Number", "Amount Requested", "Basic Salary", status)
-      values ('E-ME', 12001, '900000', 'Pending')`)).toMatch(/most that can be asked for is KSh 12,000 \(30% of the basic salary\)/);
-    // E-AMINA's is 30,000: up to 9,000
-    expect(await fails(HR, `insert into salary_advance ("Employee Number", "Amount Requested", status)
-      values ('E-AMINA', 9001, 'Pending')`)).toMatch(/KSh 9,000/);
+describe('no limit on the amount (20261123100000)', () => {
+  it('for staff and for someone applying on their behalf alike, whatever the basic salary', async () => {
+    // E-ME's basic is 40,000 and E-AMINA's 30,000: more than the 30% that used to be the limit
+    expect(await as(STAFF, `insert into salary_advance ("Employee Number", "Amount Requested", status)
+      values ('E-ME', 12001, 'Pending') returning id`)).toHaveLength(1);
+    expect(await as(HR, `insert into salary_advance ("Employee Number", "Amount Requested", status)
+      values ('E-AMINA', 50000, 'Pending') returning id`)).toHaveLength(1);
   });
 
-  it('nothing without a basic salary on the record', async () => {
+  it('nor without a basic salary on the record', async () => {
     await rows(`insert into employees ("Employee Number", "First Name", tenant_id) values ('E-NOPAY', 'Nopay', '${A}')`);
-    expect(await fails(HR, `insert into salary_advance ("Employee Number", "Amount Requested", status)
-      values ('E-NOPAY', 100, 'Pending')`)).toMatch(/No basic salary/);
+    expect(await as(HR, `insert into salary_advance ("Employee Number", "Amount Requested", status)
+      values ('E-NOPAY', 100, 'Pending') returning id`)).toHaveLength(1);
   });
 });

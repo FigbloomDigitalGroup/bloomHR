@@ -4,12 +4,10 @@ import { HandCoins, Lock } from 'lucide-react';
 import { Button, Card, EmptyState, PageHeader } from '../UI';
 import AdvanceTimeline, { AdvanceStagePill, RepaymentSummary } from './AdvanceTimeline';
 import {
-  ADVANCE_LIMIT_SHARE,
   advanceAmount,
   advancePeriod,
   currentPeriod,
   formatKsh,
-  maxAdvanceFor,
   repaymentMonths,
   repaymentNote,
   validateAdvanceRequest,
@@ -78,8 +76,7 @@ export default function AdvanceRequest() {
     });
   }, [employee, refresh]);
 
-  const maxAmount = maxAdvanceFor(employee?.basicSalary);
-  const errors = validateAdvanceRequest(form, maxAmount);
+  const errors = validateAdvanceRequest(form);
   const thisMonth = currentPeriod();
   // one request a month; a declined one does not count
   const requestedThisMonth = advances.some(
@@ -151,7 +148,6 @@ export default function AdvanceRequest() {
                   type="number"
                   inputMode="numeric"
                   min={1}
-                  max={maxAmount}
                   value={form.amount}
                   onChange={(e) => setForm({ ...form, amount: e.target.value })}
                   disabled={!!blocked}
@@ -161,8 +157,7 @@ export default function AdvanceRequest() {
                   placeholder="0"
                 />
                 <p id="advance-amount-hint" className="mt-1 text-[11.5px] text-muted-foreground">
-                  You can ask for up to <strong className="text-ink">{formatKsh(maxAmount)}</strong> ({ADVANCE_LIMIT_SHARE * 100}% of your basic
-                  salary of {formatKsh(parseFloat(employee?.basicSalary ?? '') || 0)}). The whole amount comes off your next pay.
+                  The whole amount comes off your next pay.
                 </p>
                 {showError('amount')}
               </div>
