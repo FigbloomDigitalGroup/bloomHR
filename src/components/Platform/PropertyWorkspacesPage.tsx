@@ -17,7 +17,7 @@ import {
 // contacts, leases or payments) with the platform's status for each. The same page as CRM's organisations, without
 // creating: customers sign themselves up in Property and there is nothing to approve, so a workspace is only suspended
 // (with a reason) or reactivated, on the Figbloom platform, which tells Property. Suspending and reactivating are
-// Owner/Admin (approve_companies); every console role sees the list. A workspace opens a detail panel. A new workspace
+// Owner/Admin/Support (suspend_companies), as for Fleet; every console role sees the list. A workspace opens a detail panel. A new workspace
 // can't be suspended until Property has registered it with the platform (within a minute). One its owner switched off
 // in Property shows as "Deactivated by owner", not as suspended.
 
@@ -94,7 +94,7 @@ export default function PropertyWorkspacesPage() {
   const platformOk = !list || list.platform.ok;
   const totals = useMemo(() => (workspaces ? propertyTotals(workspaces) : null), [workspaces]);
   const shown = useMemo(() => filterWorkspaces(workspaces ?? [], { status, search }), [workspaces, status, search]);
-  const canManage = roleCan(role, 'approve_companies');
+  const canManage = roleCan(role, 'suspend_companies');
 
   const actionsFor = (w: PropertyWorkspace) => (platformOk && canManage ? propertyActions(w) : []);
 

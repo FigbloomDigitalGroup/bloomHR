@@ -209,7 +209,7 @@ describe('the Property workspaces page: suspend and reactivate by role', () => {
     return ['Suspend', 'Reactivate'].filter((a) => within(row).queryByText(a));
   };
 
-  it.each(['owner', 'admin'] as const)('%s suspends and reactivates', async (role) => {
+  it.each(['owner', 'admin', 'support'] as const)('%s suspends and reactivates', async (role) => {
     api.role = role;
     renderPage();
     expect(await actionsOf('Kilimani Homes')).toEqual(['Suspend']);
@@ -217,8 +217,8 @@ describe('the Property workspaces page: suspend and reactivate by role', () => {
     expect(await actionsOf('Fresh Start')).toEqual([]);
   });
 
-  it.each(['support', 'viewer'] as const)('%s sees every workspace but changes nothing', async (role) => {
-    api.role = role;
+  it('a viewer sees every workspace but changes nothing', async () => {
+    api.role = 'viewer';
     renderPage();
     await rowOf('Kilimani Homes');
     for (const a of ['Suspend', 'Reactivate']) expect(screen.queryByText(a)).toBeNull();

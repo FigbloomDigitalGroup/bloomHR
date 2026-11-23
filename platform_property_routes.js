@@ -16,8 +16,8 @@
 //
 // The caller is checked as on every console route (callerWith(): a bearer token, then a row in platform_admins), then
 // for their console role's permission: any console role sees the list (view); suspending and reactivating need
-// approve_companies (Owner, Admin), as for CRM. Neither Property nor the platform checks roles: they trust this backend,
-// so the check here is the only one.
+// suspend_companies (Owner, Admin, Support), as for Fleet (ERP/PROPERTY_PLATFORM_CONTRACT.md 3). Neither Property nor
+// the platform checks roles: they trust this backend, so the check here is the only one.
 //
 // Settings: PROPERTY_PLATFORM_URL (Property's API address, e.g. https://property-api.figbloom.org, with or without /api)
 // and PROPERTY_PLATFORM_SECRET (the same value as Property's PLATFORM_CONSOLE_SECRET). Either unset, or Property
@@ -47,11 +47,11 @@ const CODE_RE = /^[a-z][a-z0-9_]{0,63}$/;
 
 /**
  * What the console may do to a Property workspace: the platform status it becomes, from which, and the permission. Both
- * are approve_companies, as for CRM. A reason is needed to suspend.
+ * are suspend_companies, as for Fleet (the contract). A reason is needed to suspend.
  */
 export const ACTIONS = {
-  suspend: { to: "suspended", from: ["active"], permission: "approve_companies", reason: true },
-  reactivate: { to: "active", from: ["suspended"], permission: "approve_companies", reason: false },
+  suspend: { to: "suspended", from: ["active"], permission: "suspend_companies", reason: true },
+  reactivate: { to: "active", from: ["suspended"], permission: "suspend_companies", reason: false },
 };
 
 const notConnected = (message = "Figbloom Property isn't connected to the console yet.") =>
@@ -339,14 +339,14 @@ export function createPropertyRouter({ timeoutMs = PROPERTY_TIMEOUT_MS, platform
 
   // POST /api/platform/property/workspaces/:organizationId/status { action: suspend | reactivate, reason }
   //   -> { workspace: { organization_id, status, status_reason } }. :organizationId is the platform's ID for the
-  // workspace (Property's platform.organizationId). Permission: approve_companies. A reason (1-500 characters) is needed
+  // workspace (Property's platform.organizationId). Permission: suspend_companies. A reason (1-500 characters) is needed
   // to suspend. The platform records the caller's email as who decided, then tells Property.
   router.post("/workspaces/:id/status", async (req, res) => {
     try {
       const action = req.body?.action;
       const rule = typeof action === "string" && Object.hasOwn(ACTIONS, action) ? ACTIONS[action] : null;
       // who may do anything at all, before saying more about the request
-      const caller = await callerWith(req, rule ? rule.permission : "approve_companies", "Only an owner or admin can suspend or reactivate a Property workspace.");
+      const caller = await callerWith(req, rule ? rule.permission : "view", "Your console role can't do that to Property workspaces.");
       if (!rule) throw new PlatformError(400, "invalid_action", "Choose an action: suspend or reactivate.");
 
       const id = String(req.params.id || "");

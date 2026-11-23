@@ -4,7 +4,8 @@ import { ApiError, apiRequest } from './adminApi';
 // Property's own summaries (creator, plan, properties, units, occupied units, team members, tenants: counts only, never
 // tenant names, contacts, leases or payments) joined by bloomHR's backend (platform_property_routes.js) to the platform's
 // status for each workspace. Customers sign themselves up in Property, so there is nothing to create or approve here:
-// suspending and reactivating are decided on the Figbloom platform, as for CRM, and Property applies them. A workspace
+// suspending and reactivating (suspend_companies) are decided on the Figbloom platform, as for Fleet, and Property
+// applies them. A workspace
 // its owner switched off in Property (active: false while the platform says active) is "deactivated by owner".
 
 export type PropertyAction = 'suspend' | 'reactivate';

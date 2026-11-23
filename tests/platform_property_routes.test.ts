@@ -419,13 +419,21 @@ describe('POST /api/platform/property/workspaces/:organizationId/status', () => 
     expect((await decide('own', OWNER_OFF, 'suspend', 'Fraud')).status).toBe(200);
   });
 
-  it('support and viewers decide nothing (approve_companies)', async () => {
-    for (const as of ['sup', 'view']) {
-      const res = await decide(as, ACTIVE, 'suspend', 'x');
-      expect(res.status).toBe(403);
-      expect((await res.json()).error.message).toBe('Only an owner or admin can suspend or reactivate a Property workspace.');
-      expect((await decide(as, SUSPENDED, 'reactivate')).status).toBe(403);
-    }
+  it('support suspends and reactivates too (suspend_companies, as for Fleet)', async () => {
+    expect((await decide('sup', ACTIVE, 'suspend', 'Chargeback')).status).toBe(200);
+    expect((await decide('sup', SUSPENDED, 'reactivate')).status).toBe(200);
+    expect(posts().map((p) => p.body)).toEqual([
+      { status: 'suspended', reason: 'Chargeback', actor_email: 'sup@figbloom.org' },
+      { status: 'active', actor_email: 'sup@figbloom.org' },
+    ]);
+  });
+
+  it('viewers decide nothing, nor does anyone outside the console', async () => {
+    const res = await decide('view', ACTIVE, 'suspend', 'x');
+    expect(res.status).toBe(403);
+    expect((await res.json()).error.message).toBe("Your console role can't do that to Property workspaces.");
+    expect((await decide('view', SUSPENDED, 'reactivate')).status).toBe(403);
+    expect((await decide('company-admin', ACTIVE, 'suspend', 'x')).status).toBe(403);
     expect(posts()).toEqual([]);
   });
 
