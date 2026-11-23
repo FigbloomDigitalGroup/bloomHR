@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { HandCoins } from 'lucide-react';
 import { Button, Modal } from '../UI';
 import EmployeePicker from '../UI/EmployeePicker';
-import { ADVANCE_LIMIT_SHARE, currentPeriod, formatKsh, maxAdvanceFor, repaymentNote, validateAdvanceRequest } from '../../lib/salaryAdvance';
+import { currentPeriod, formatKsh, repaymentNote, validateAdvanceRequest } from '../../lib/salaryAdvance';
 import { type MyEmployee, loadEmployeeForAdvance, requestAdvanceFor } from '../../lib/salaryAdvanceApi';
 
 // An admin applies for a salary advance on someone's behalf: for a person who asked in person, by phone or on paper.
@@ -20,7 +20,7 @@ export default function ApplyForSomeone({ open, onClose, onSaved }: { open: bool
   const [approveNow, setApproveNow] = useState(false);
   const [tried, setTried] = useState(false);
   const [saving, setSaving] = useState(false);
-  // the chosen person's record: their limit is 30% of their basic salary
+  // the chosen person's record
   const [employee, setEmployee] = useState<MyEmployee | null>(null);
 
   useEffect(() => {
@@ -35,8 +35,7 @@ export default function ApplyForSomeone({ open, onClose, onSaved }: { open: bool
     };
   }, [employeeNumber]);
 
-  const maxAmount = maxAdvanceFor(employee?.basicSalary);
-  const errors = validateAdvanceRequest({ amount, reason }, maxAmount);
+  const errors = validateAdvanceRequest({ amount, reason });
   const value = Number(amount) || 0;
   const show = (message: string | undefined) =>
     tried && message ? (
@@ -95,9 +94,8 @@ export default function ApplyForSomeone({ open, onClose, onSaved }: { open: bool
           />
           {show(employeeNumber ? undefined : 'Choose who the advance is for.')}
           {employee && (
-            <p className="mt-1 text-[11.5px] text-muted-foreground" data-testid="apply-limit">
-              Up to <strong className="text-ink">{formatKsh(maxAmount)}</strong> ({ADVANCE_LIMIT_SHARE * 100}% of {employee.fullName}'s basic salary of{' '}
-              {formatKsh(parseFloat(employee.basicSalary) || 0)}).
+            <p className="mt-1 text-[11.5px] text-muted-foreground" data-testid="apply-basic">
+              {employee.fullName}'s basic salary is {formatKsh(parseFloat(employee.basicSalary) || 0)}.
             </p>
           )}
         </div>
