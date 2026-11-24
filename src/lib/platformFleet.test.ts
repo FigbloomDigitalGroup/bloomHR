@@ -20,7 +20,7 @@ describe('Fleet companies', () => {
 
   it('adds up the totals, unknown counts as nothing', () => {
     const t = fleetTotals([company('a', 'pending'), company('b', 'active'), company('c', 'rejected'), company('d', null, { vehicles: null, trips_last_30_days: null })]);
-    expect(t).toEqual({ companies: 4, pending: 1, active: 1, suspended: 0, rejected: 1, unregistered: 1, vehicles: 6, drivers: 4, trips: 15 });
+    expect(t).toEqual({ companies: 4, pending: 1, active: 1, suspended: 0, rejected: 1, unregistered: 1, hr_requested: 0, vehicles: 6, drivers: 4, trips: 15 });
   });
 
   it('filters by status and searches by name, owner or the exact Fleet ID', () => {
@@ -29,6 +29,22 @@ describe('Fleet companies', () => {
     expect(filterCompanies(list, { status: 'all', search: 'wanjiru' }).map((c) => c.id)).toEqual(['cmp2']);
     expect(filterCompanies(list, { status: 'all', search: 'CMP1' }).map((c) => c.id)).toEqual(['cmp1']);
     expect(filterCompanies(list, { status: 'active', search: 'cmp1' })).toEqual([]);
+  });
+
+  it('lists the companies asking for HR & Payroll that is still off, the longest waiting first', () => {
+    const off = { state: 'off' as const, module_status: null, hr_tenant_id: null };
+    const list = [
+      company('new', 'active', { hr: off, hr_requested_at: '2026-11-22T09:00:00Z' }),
+      company('old', 'active', { hr: off, hr_requested_at: '2026-11-18T09:00:00Z' }),
+      company('done', 'active', { hr: { ...off, state: 'on' }, hr_requested_at: '2026-11-10T09:00:00Z' }),
+      company('enabling', 'active', { hr: { ...off, state: 'enabling' }, hr_requested_at: '2026-11-10T09:00:00Z' }),
+      company('noaccount', null, { hr: null, hr_requested_at: '2026-11-20T09:00:00Z' }),
+      company('never', 'active', { hr: off }),
+    ];
+    expect(filterCompanies(list, { status: 'all', search: '', hrRequested: true }).map((c) => c.id)).toEqual(['old', 'noaccount', 'new']);
+    expect(filterCompanies(list, { status: 'all', search: 'new', hrRequested: true }).map((c) => c.id)).toEqual(['new']);
+    expect(filterCompanies(list, { status: 'all', search: '' })).toHaveLength(6);
+    expect(fleetTotals(list).hr_requested).toBe(3);
   });
 
   it('tells not connected, unavailable and other problems apart', () => {

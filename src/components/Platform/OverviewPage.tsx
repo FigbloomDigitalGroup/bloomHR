@@ -12,6 +12,7 @@ import { fleetProblem, fleetTotals, listFleetCompanies, type FleetProblem, type 
 import { crmProblem, crmTotals, listCrmOrganisations, type CrmProblem, type CrmTotals } from '../../lib/platformCrm';
 import { listPropertyWorkspaces, propertyProblem, propertyTotals, type PropertyProblem, type PropertyTotals } from '../../lib/platformProperty';
 import { useConsoleBadge } from '../Console/consoleBadges';
+import { attentionLabel } from '../../lib/hrRequests';
 
 // The console's home (/platform/overview): one card per product, with its headline numbers and links to its pages.
 // Each product loads on its own, so Schools, Fleet, CRM or Property being unreachable (or not connected) never hides another. Any role.
@@ -140,7 +141,11 @@ export default function OverviewPage() {
   // the console menu's badges, from what this page loads anyway
   useConsoleBadge('/platform/organisations', hr && 'totals' in hr ? hr.totals.by_status.pending : null, (c) => `${c} waiting for approval`);
   useConsoleBadge('/platform/schools', schools && 'numbers' in schools ? schools.numbers.attention : null, (c) => `${c} need attention`);
-  useConsoleBadge('/platform/fleet/companies', fleet && 'totals' in fleet ? fleet.totals.pending : null, (c) => `${c} waiting for approval`);
+  const fleetCounts = fleet && 'totals' in fleet ? fleet.totals : null;
+  useConsoleBadge('/platform/fleet/companies', fleetCounts ? fleetCounts.pending + fleetCounts.hr_requested : null,
+    () => (fleetCounts ? attentionLabel(fleetCounts.pending, fleetCounts.hr_requested) : ''));
+  useConsoleBadge('/platform/property/workspaces', property && 'totals' in property ? property.totals.hr_requested : null,
+    (c) => attentionLabel(0, c));
 
   const header = <PageHeader title="Overview" subtitle="Every Figbloom product at a glance" />;
 

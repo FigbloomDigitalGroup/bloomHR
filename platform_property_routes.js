@@ -142,6 +142,11 @@ export async function callProperty(method, path, timeoutMs = PROPERTY_TIMEOUT_MS
 const str = (v) => (typeof v === "string" && v.trim() ? v.trim() : null);
 const count = (v) => (v === null || v === undefined || v === "" || typeof v === "boolean" || !Number.isFinite(Number(v)) ? null : Number(v));
 const obj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : {});
+/** A date-time string (ISO), else null: what an older Property without it sends, or anything unreadable. */
+const when = (v) => {
+  const s = str(v);
+  return s && !Number.isNaN(Date.parse(s)) ? s : null;
+};
 
 /**
  * One of Property's workspace summaries, as the console shows it. Only these fields: whatever else Property might send
@@ -171,6 +176,9 @@ export function toSummary(w) {
     platform_organization_id: str(platform.organizationId),
     platform_tenant_id: str(platform.tenantId),
     registered_at: str(platform.registeredAt),
+    // when a customer admin asked for Figbloom HR in Property ("Request Figbloom HR"); null when not asked, or Property
+    // too old to send it
+    hr_requested_at: when(w?.hr_requested_at ?? w?.hrRequestedAt),
   };
 }
 
@@ -258,7 +266,7 @@ async function platformOrNot(timeoutMs) {
 const EMPTY_SUMMARY = {
   slug: null, property_active: null, creator_name: null, creator_email: null, plan_name: null, plan_status: null,
   trial_ends_at: null, properties: null, units: null, occupied_units: null, team_members: null, tenants: null,
-  platform_organization_id: null, platform_tenant_id: null, registered_at: null,
+  platform_organization_id: null, platform_tenant_id: null, registered_at: null, hr_requested_at: null,
 };
 
 /**

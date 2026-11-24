@@ -1,6 +1,7 @@
 import { ApiError, apiRequest } from './adminApi';
 import type { HrState } from './platformSchoolHr';
 import type { GroupAction } from './platformSchoolGroups';
+import { hrRequestPending } from './hrRequests';
 
 // Figbloom Fleet's companies in the console (/platform/fleet/companies, ERP/FLEET_PLATFORM_CONTRACT.md 3). Fleet's own
 // summaries (owner, plan, vehicles, drivers, trips, last ping) joined by bloomHR's backend (platform_fleet_routes.js)
@@ -49,6 +50,8 @@ export interface FleetCompany {
   platform_tenant_id?: string | null;
   /** HR & Payroll for the company (ERP/FLEET_HR_CONTRACT.md); null without a platform account */
   hr?: FleetHr | null;
+  /** when a customer admin asked for Figbloom HR in Fleet; null when not asked (or an older Fleet that doesn't say) */
+  hr_requested_at?: string | null;
 }
 
 /** off: not switched on; enabling: switched on, HR hasn't linked its company yet; on: linked; unknown: couldn't ask. */
@@ -119,15 +122,22 @@ export const withFleetHr = (list: FleetCompany[], platformTenantId: string, hr: 
 /** The status tab a company is under: the platform's, or unregistered. */
 export const statusOf = (c: FleetCompany) => c.status ?? 'unregistered';
 
-/** The companies with this status ('all' for any) whose name, owner or ID match. */
-export function filterCompanies(list: FleetCompany[], { status, search }: { status: string; search: string }): FleetCompany[] {
+/**
+ * The companies with this status ('all' for any) whose name, owner or ID match; with hrRequested, only those asking for
+ * HR & Payroll that isn't switched on yet, the longest waiting first.
+ */
+export function filterCompanies(
+  list: FleetCompany[],
+  { status, search, hrRequested = false }: { status: string; search: string; hrRequested?: boolean }
+): FleetCompany[] {
   const q = search.trim().toLowerCase();
   const matches = (c: FleetCompany) =>
     c.name.toLowerCase().includes(q) ||
     (c.owner_email ?? '').toLowerCase().includes(q) ||
     (c.owner_name ?? '').toLowerCase().includes(q) ||
     c.id.toLowerCase() === q;
-  return list.filter((c) => (status === 'all' || statusOf(c) === status) && (!q || matches(c)));
+  const shown = list.filter((c) => (status === 'all' || statusOf(c) === status) && (!q || matches(c)) && (!hrRequested || hrRequestPending(c)));
+  return hrRequested ? shown.sort((a, b) => Date.parse(a.hr_requested_at!) - Date.parse(b.hr_requested_at!)) : shown;
 }
 
 export interface FleetTotals {
@@ -137,6 +147,8 @@ export interface FleetTotals {
   suspended: number;
   rejected: number;
   unregistered: number;
+  /** asking for HR & Payroll that isn't switched on yet */
+  hr_requested: number;
   vehicles: number;
   drivers: number;
   trips: number;
@@ -152,6 +164,7 @@ export function fleetTotals(list: FleetCompany[]): FleetTotals {
     suspended: count('suspended'),
     rejected: count('rejected'),
     unregistered: count('unregistered'),
+    hr_requested: list.filter(hrRequestPending).length,
     vehicles: sum('vehicles'),
     drivers: sum('drivers'),
     trips: sum('trips_last_30_days'),

@@ -228,6 +228,7 @@ describe('GET /api/platform/fleet/companies', () => {
       id: 'cmp_pending', name: 'Swift Couriers', fleet_status: 'pending', plan: 'trial', created_at: '2026-10-01T08:00:00.000Z',
       owner_name: 'Owner of Swift Couriers', owner_email: 'owner@cmp_pending.co.ke',
       vehicles: 12, drivers: 9, admins: 2, trips_last_30_days: 340, last_location_at: '2026-11-12T07:55:00.000Z',
+      hr_requested_at: null,
       in_fleet: true, organization_id: PENDING, status: 'pending', status_reason: null, platform_tenant_id: null, hr: null,
     });
     // the platform's decision wins over Fleet's own status
@@ -260,6 +261,24 @@ describe('GET /api/platform/fleet/companies', () => {
       vehicles: 4, drivers: 3, admins: 1, trips_last_30_days: 0, last_location_at: null, status: 'active',
     });
     expect(fake.fleetCalls[0].path).toBe('/fleet/api/platform/companies');
+  });
+
+  it("passes on when a customer asked for HR (hr_requested_at or hrRequestedAt); nothing from an older Fleet", async () => {
+    fake.fleetOverride = () => ({
+      status: 200,
+      json: [
+        { id: 'cmp_a', name: 'A', hr_requested_at: '2026-11-20T09:30:00.000Z' },
+        { id: 'cmp_b', name: 'B', hrRequestedAt: '2026-11-21T10:00:00Z' },
+        { id: 'cmp_c', name: 'C' },
+        { id: 'cmp_d', name: 'D', hr_requested_at: 'not a date' },
+      ],
+    });
+    const body = await (await call('view')).json();
+    const byId = Object.fromEntries(body.companies.map((c: { id: string }) => [c.id, c]));
+    expect(byId.cmp_a.hr_requested_at).toBe('2026-11-20T09:30:00.000Z');
+    expect(byId.cmp_b.hr_requested_at).toBe('2026-11-21T10:00:00Z');
+    expect(byId.cmp_c.hr_requested_at).toBeNull();
+    expect(byId.cmp_d.hr_requested_at).toBeNull();
   });
 
   it('reads every page of the platform', async () => {
