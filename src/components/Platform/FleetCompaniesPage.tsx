@@ -122,7 +122,7 @@ export default function FleetCompaniesPage() {
     <WithHrRequest row={c}>
       {c.hr ? (
         <HrPayrollCell name={c.name} state={c.hr.state} canEnable={canEnableHr && !!c.platform_tenant_id} labelled={labelled}
-          enable={() => enableHr(c)} explain={FLEET_HR_EXPLAIN} invitees="the company's owner" />
+          platformTenantId={c.platform_tenant_id} enable={() => enableHr(c)} explain={FLEET_HR_EXPLAIN} invitees="the company's owner" />
       ) : (
         <span className="text-muted-foreground" title="This company has no Figbloom platform account yet">{labelled ? 'HR & Payroll: ' : ''}—</span>
       )}
