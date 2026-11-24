@@ -13,6 +13,7 @@ import ThemedConfigProvider from './theme/ThemedConfigProvider';
 import { applyStoredTheme } from './theme/applyTheme';
 import A11yMotion from './components/Accessibility/A11yMotion';
 import DialogHost from './components/UI/DialogHost';
+import { settleArrival } from './lib/arriving';
 
 // The app itself: sign-in, the company pages and every screen. src/main.tsx loads this file only when the address is
 // not the public landing page (src/lib/landingRoute.ts), so landing visitors never download it. Everything below used
@@ -71,4 +72,6 @@ export default function bootApp(): void {
       </React.StrictMode>
     )
   );
+  // arriving from another Figbloom product: the flag goes once a real page shows, even one with no full-screen loader
+  settleArrival();
 }
