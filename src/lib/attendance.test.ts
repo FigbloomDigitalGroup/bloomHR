@@ -240,6 +240,12 @@ describe('days without a clock-out, and days that don’t count', () => {
     expect(dayStatusLabel({ status: null, counted: true })).toBe('Not yet');
     expect(dayStatusLabel({ status: 'late' })).toBe('Late');
   });
+
+  it('half-day leave reads "Half day", a full day "On leave"', () => {
+    expect(dayStatusLabel({ status: 'leave', halfDay: true })).toBe('Half day');
+    expect(dayStatusLabel({ status: 'leave', halfDay: false })).toBe('On leave');
+    expect(dayStatusLabel({ status: 'leave', halfDay: true, counted: false })).toBe('Not counted');
+  });
 });
 
 describe('odd-hours flags and the scans of a day (20261023800000)', () => {

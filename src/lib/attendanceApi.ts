@@ -83,6 +83,7 @@ export const toToday = (r: Record<string, unknown>): AttendanceToday => ({
   source: (r.source as string | null) ?? null,
   place: (r.place as ClockPlace | null) ?? null,
   placeDetail: (r.place_detail as string | null) ?? null,
+  halfDay: r.half_day === true,
 });
 
 export async function loadToday(): Promise<AttendanceToday> {
@@ -191,6 +192,7 @@ export const toDay = (r: Record<string, unknown>): AttendanceDay => ({
   place: (r.place as ClockPlace | null) ?? null,
   placeDetail: (r.place_detail as string | null) ?? null,
   placeLocation: toPoint(r.place_location),
+  halfDay: r.half_day === true,
 });
 
 const toPoint = (v: unknown): { latitude: number; longitude: number } | null => {

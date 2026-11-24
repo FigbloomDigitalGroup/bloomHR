@@ -62,10 +62,11 @@ export const KIND_TONE: Record<TodayKind, 'success' | 'warning' | 'danger' | 'in
   not_counted: 'neutral',
 };
 
-/** "On time", "Late · 12 min", "Not in yet", "Absent", "On leave", "Holiday", "Off", "Not counted". */
-export function todayStatusLabel(d: Pick<AttendanceDay, 'day' | 'status' | 'counted' | 'lateMinutes'>, today: string): string {
+/** "On time", "Late · 12 min", "Not in yet", "Absent", "On leave", "Half day", "Holiday", "Off", "Not counted". */
+export function todayStatusLabel(d: Pick<AttendanceDay, 'day' | 'status' | 'counted' | 'lateMinutes' | 'halfDay'>, today: string): string {
   const kind = todayKind(d, today);
   if (kind === 'late' && d.lateMinutes) return `Late · ${d.lateMinutes} min`;
+  if (kind === 'leave' && d.halfDay) return 'Half day';
   return KIND_LABEL[kind];
 }
 
