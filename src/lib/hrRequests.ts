@@ -1,6 +1,6 @@
 import type { HrState } from './platformSchoolHr';
 
-// Customers asking for Figbloom HR from Figbloom Fleet and Property ("Request Figbloom HR" on the product's HR & Payroll
+// Customers asking for Figbloom HR from Figbloom Fleet, Property and Schools ("Request Figbloom HR" on the product's HR & Payroll
 // card). The product records when (hr_requested_at in the console summaries it serves); the console shows it next to
 // HR & Payroll "Off" so staff can switch it on with the usual Enable. Older product versions don't send it: no request.
 

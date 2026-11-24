@@ -4,6 +4,7 @@ import { Button, Modal, StatusPill } from '../UI';
 import type { StatusTone } from '../UI';
 import { HR_STATE_LABELS, type HrState, type SchoolHr } from '../../lib/platformSchoolHr';
 import type { SchoolHrData } from './useSchoolHr';
+import { WithHrRequest } from './HrRequest';
 
 // "HR & Payroll: Off / Enabling / On" for each school on the Schools and School groups pages, each company on the
 // Fleet companies page and each workspace on the Property workspaces page, with Enable for console roles that approve
@@ -85,20 +86,26 @@ interface CellProps {
   canEnable: boolean;
   /** show "HR & Payroll:" before the state (where no column header says it) */
   labelled?: boolean;
+  /** when the school asked for Figbloom HR in Schools (its hr_requested_at): "Requested …" beside Off */
+  requestedAt?: string | null;
 }
 
-/** One school's HR state, and Enable when it is off and the caller may switch it on. */
-export function SchoolHrCell({ school, data, canEnable, labelled = false }: CellProps) {
+/** One school's HR state, and Enable when it is off and the caller may switch it on; "Requested …" while asked for. */
+export function SchoolHrCell({ school, data, canEnable, labelled = false, requestedAt = null }: CellProps) {
   const prefix = labelled ? 'HR & Payroll: ' : '';
+  // no "Requested" until the HR state is known: it may already be on
   if (data.list === undefined) return <span className="text-muted-foreground">…</span>;
+  let cell;
   if (!school) {
     const why = data.list === null
       ? data.notConnected ? "The Figbloom platform isn't connected to the console yet" : "The Figbloom platform couldn't be asked"
       : "This school isn't on the Figbloom platform yet";
-    return <span className="text-muted-foreground" title={why}>{prefix}—</span>;
+    cell = <span className="text-muted-foreground" title={why}>{prefix}—</span>;
+  } else {
+    cell = (
+      <HrPayrollCell name={school.name} state={school.hr.state} canEnable={canEnable} labelled={labelled}
+        enable={async () => (await data.enable(school)).hr.state} explain={SCHOOL_EXPLAIN} invitees="the school's admins" />
+    );
   }
-  return (
-    <HrPayrollCell name={school.name} state={school.hr.state} canEnable={canEnable} labelled={labelled}
-      enable={async () => (await data.enable(school)).hr.state} explain={SCHOOL_EXPLAIN} invitees="the school's admins" />
-  );
+  return <WithHrRequest row={{ hr_requested_at: requestedAt, hr: school?.hr ?? null }}>{cell}</WithHrRequest>;
 }

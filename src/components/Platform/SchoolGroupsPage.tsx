@@ -262,7 +262,8 @@ export default function SchoolGroupsPage() {
                                   title={`${s.name} on the Schools page`}>
                                   {slug}
                                 </Link>
-                                <SchoolHrCell school={hr.byPlatformId.get(s.id)} data={hr} canEnable={canEnableHr} labelled />
+                                <SchoolHrCell school={hr.byPlatformId.get(s.id)} data={hr} canEnable={canEnableHr} labelled
+                                  requestedAt={s.local_tenant_id ? schoolsById.get(s.local_tenant_id)?.hr_requested_at : null} />
                               </li>
                             );
                           })}

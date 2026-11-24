@@ -1,4 +1,6 @@
 import { ApiError, apiRequest } from './adminApi';
+import { hrRequestPending } from './hrRequests';
+import type { HrState } from './platformSchoolHr';
 
 // Figbloom Schools in the console (/platform/schools, ERP/SCHOOLS_CONSOLE_CONTRACT.md). Schools keeps its own
 // database; the console reaches it through bloomHR's backend (platform_schools_routes.js), which checks the caller's
@@ -22,6 +24,8 @@ export interface School {
   parents: number;
   /** the latest sign-in of anyone in the school, or null */
   last_activity_at: string | null;
+  /** when a school admin asked for Figbloom HR in Schools; null when not asked (missing from an older Schools) */
+  hr_requested_at?: string | null;
 }
 
 export interface SchoolsList {
@@ -111,10 +115,29 @@ export function statusFilters(list: School[]): string[] {
 
 export const statusLabel = (status: string) => (status ? status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ') : '—');
 
-/** The schools with this status ('all' for any) whose name, slug or ID matches the search. */
-export function filterSchools(list: School[], { status, search }: { status: string; search: string }): School[] {
+/**
+ * A school's HR & Payroll state, which the console gets from the Figbloom platform, not from Schools
+ * (useSchoolHr.ts); null when the school isn't on the platform or the platform couldn't be asked.
+ */
+export type SchoolHrStateOf = (school: School) => { state: HrState } | null | undefined;
+
+/** Whether the school asked for Figbloom HR that isn't switched on (or being switched on) yet. */
+export const schoolHrRequestPending = (school: School, hrOf?: SchoolHrStateOf) =>
+  hrRequestPending({ hr_requested_at: school.hr_requested_at, hr: hrOf?.(school) ?? null });
+
+/**
+ * The schools with this status ('all' for any) whose name, slug or ID matches the search; with hrRequested, only those
+ * asking for HR & Payroll that isn't switched on yet, the longest waiting first.
+ */
+export function filterSchools(
+  list: School[],
+  { status, search, hrRequested = false, hrOf }: { status: string; search: string; hrRequested?: boolean; hrOf?: SchoolHrStateOf }
+): School[] {
   const q = search.trim().toLowerCase();
   const matches = (s: School) =>
     s.name.toLowerCase().includes(q) || s.slug.toLowerCase().includes(q) || s.id.toLowerCase().startsWith(q);
-  return list.filter((s) => (status === 'all' || s.status === status) && (!q || matches(s)));
+  const shown = list.filter(
+    (s) => (status === 'all' || s.status === status) && (!q || matches(s)) && (!hrRequested || schoolHrRequestPending(s, hrOf))
+  );
+  return hrRequested ? shown.sort((a, b) => Date.parse(a.hr_requested_at!) - Date.parse(b.hr_requested_at!)) : shown;
 }

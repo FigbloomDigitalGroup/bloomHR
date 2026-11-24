@@ -28,12 +28,14 @@ const school = (id: string, state: SchoolHr['hr']['state']): SchoolHr => ({
   hr: { state, module_status: null, hr_tenant_id: state === 'on' ? 'hr-1' : null },
 });
 
-function Harness({ canEnable }: { canEnable: boolean }) {
+function Harness({ canEnable, requested = {} }: { canEnable: boolean; requested?: Record<string, string> }) {
   const data = useSchoolHr(true);
   return (
     <ul>
       {['a', 'b', 'c', 'missing'].map((id) => (
-        <li key={id} data-testid={id}><SchoolHrCell school={data.bySchoolsId.get(`local-${id}`)} data={data} canEnable={canEnable} labelled /></li>
+        <li key={id} data-testid={id}>
+          <SchoolHrCell school={data.bySchoolsId.get(`local-${id}`)} data={data} canEnable={canEnable} labelled requestedAt={requested[id] ?? null} />
+        </li>
       ))}
     </ul>
   );
@@ -73,5 +75,18 @@ describe('HR & Payroll per school', () => {
     api.fail = true;
     render(<Harness canEnable />);
     await waitFor(() => expect(screen.getByTestId('a').textContent).toBe('HR & Payroll: —'));
+  });
+
+  it('"Requested …" beside Off (or —, not on the platform yet) once the state is known; not when Enabling or On', async () => {
+    api.schools = [school('a', 'off'), school('b', 'enabling'), school('c', 'on')];
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    render(<Harness canEnable={false} requested={{ a: yesterday, b: yesterday, c: yesterday, missing: yesterday }} />);
+    // while loading: nothing yet (it may already be on)
+    expect(screen.queryByText(/^Requested/)).toBeNull();
+    await screen.findByText('HR & Payroll: Off');
+    expect(screen.getByTestId('a').textContent).toBe('HR & Payroll: OffRequested yesterday');
+    expect(screen.getByTestId('b').textContent).toBe('HR & Payroll: Enabling');
+    expect(screen.getByTestId('c').textContent).toBe('HR & Payroll: On');
+    expect(screen.getByTestId('missing').textContent).toBe('HR & Payroll: —Requested yesterday');
   });
 });
