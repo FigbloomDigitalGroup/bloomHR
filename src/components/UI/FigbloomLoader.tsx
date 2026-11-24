@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ARRIVING_LABEL, isArriving, trackArrivalLoader } from '../../lib/arriving';
 
 // The Figbloom "Orbit" loader: the logo's ring sweeps round (green to orange) while the leaf folds away and
 // springs back. Shown while a page or the app is loading. Its animation is in index.css (.fb-loader…); it stands
@@ -8,6 +9,9 @@ import { useEffect, useState } from 'react';
 // every loader runs on the same clock, so the next one carries on where the last left off; and one that comes
 // right after another shows at once, while a first one fades in after a moment, so a quick load shows none.
 // It takes the page palette: the page colour behind it, the brand green (white on a dark page) and the page’s text grey.
+//
+// Arriving from another Figbloom product (src/lib/arriving.ts), a full-screen loader is the one "Opening Figbloom HR"
+// screen: that label whatever it would say, opaque, and there from the first frame, like index.html's boot screen.
 
 interface Props {
   /** what is loading, read by screen readers and shown under the logo */
@@ -41,9 +45,17 @@ function useLoaderTiming() {
   return timing;
 }
 
-export default function FigbloomLoader({ label = 'Getting things ready', fullScreen = false, compact = false, size = compact ? 56 : 120 }: Props) {
+function useArriving(fullScreen: boolean) {
+  const [arriving] = useState(() => fullScreen && isArriving());
+  useEffect(() => (fullScreen ? trackArrivalLoader() : undefined), [fullScreen]);
+  return arriving;
+}
+
+export default function FigbloomLoader({ label: ownLabel = 'Getting things ready', fullScreen = false, compact = false, size = compact ? 56 : 120 }: Props) {
   const { phase, followsOn } = useLoaderTiming();
-  const className = ['fb-loader', compact && 'fb-loader--compact', !followsOn && 'fb-loader--fade-in'].filter(Boolean).join(' ');
+  const arriving = useArriving(fullScreen);
+  const label = arriving ? ARRIVING_LABEL : ownLabel;
+  const className = ['fb-loader', compact && 'fb-loader--compact', !followsOn && !arriving && 'fb-loader--fade-in'].filter(Boolean).join(' ');
   const loader = (
     <div className={className} role="status" aria-live="polite" aria-label={label}
       style={{ ['--fb-phase' as string]: `${phase}ms` }}>
@@ -61,7 +73,7 @@ export default function FigbloomLoader({ label = 'Getting things ready', fullScr
     </div>
   );
   if (!fullScreen) return loader;
-  return <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-page/90">{loader}</div>;
+  return <div className={`fixed inset-0 z-[9999] flex items-center justify-center ${arriving ? 'bg-page' : 'bg-page/90'}`}>{loader}</div>;
 }
 
 /**

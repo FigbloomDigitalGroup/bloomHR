@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import FigbloomLoader, { LoaderBlock } from './FigbloomLoader';
+import { ARRIVING_KEY } from '../../lib/arriving';
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.useRealTimers();
+  sessionStorage.clear();
 });
 
 describe('FigbloomLoader', () => {
@@ -51,5 +54,52 @@ describe('FigbloomLoader', () => {
     const next = render(<FigbloomLoader label="Loading payroll" />);
     expect(next.getByRole('status').className).not.toMatch(/fb-loader--fade-in/);
     expect(next.getByRole('status').style.getPropertyValue('--fb-phase')).toMatch(/^-?\d+(\.\d+)?ms$/);
+  });
+
+  describe('arriving from another Figbloom product (fb-arriving)', () => {
+    it('a full-screen loader says "Opening Figbloom HR" instead of its own words, opaque and without fading in', () => {
+      sessionStorage.setItem(ARRIVING_KEY, '1');
+      vi.spyOn(performance, 'now').mockImplementation(() => 5_000_000); // nothing loading just before: it would fade in
+      const { container } = render(<FigbloomLoader fullScreen label="Loading your workspace" />);
+      const status = screen.getByRole('status', { name: 'Opening Figbloom HR' });
+      expect(status.textContent).toMatch(/^Opening Figbloom HR\.\.\.$/);
+      expect(status.className).not.toMatch(/fb-loader--fade-in/);
+      expect((container.firstChild as HTMLElement).className).toMatch(/(^|\s)bg-page(\s|$)/);
+    });
+
+    it('leaves loaders inside a page alone, and full-screen ones too once the flag is gone', () => {
+      sessionStorage.setItem(ARRIVING_KEY, '1');
+      render(<LoaderBlock label="Loading employees" />);
+      expect(screen.getByRole('status', { name: 'Loading employees' })).toBeTruthy();
+      cleanup();
+      sessionStorage.clear();
+      const { container } = render(<FigbloomLoader fullScreen label="Loading your workspace" />);
+      expect(screen.getByRole('status', { name: 'Loading your workspace' })).toBeTruthy();
+      expect((container.firstChild as HTMLElement).className).toMatch(/bg-page\/90/);
+    });
+
+    it('clears the flag once a real page shows (no full-screen loader for a moment), not between two loaders', () => {
+      vi.useFakeTimers();
+      sessionStorage.setItem(ARRIVING_KEY, '1');
+      document.title = 'Opening Figbloom HR';
+      const first = render(<FigbloomLoader fullScreen />);
+      first.unmount();
+      const next = render(<FigbloomLoader fullScreen label="Loading your workspace" />);
+      act(() => vi.advanceTimersByTime(2000));
+      expect(sessionStorage.getItem(ARRIVING_KEY)).toBe('1');
+      expect(next.getByRole('status', { name: 'Opening Figbloom HR' })).toBeTruthy();
+      next.unmount(); // the dashboard (or the sign-in form) is on screen
+      act(() => vi.advanceTimersByTime(700));
+      expect(sessionStorage.getItem(ARRIVING_KEY)).toBeNull();
+      expect(document.title).toBe('Figbloom HR');
+    });
+
+    it('never breaks a normal load when session storage is blocked', () => {
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('blocked');
+      });
+      render(<FigbloomLoader fullScreen label="Loading your workspace" />);
+      expect(screen.getByRole('status', { name: 'Loading your workspace' })).toBeTruthy();
+    });
   });
 });

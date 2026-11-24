@@ -45,19 +45,45 @@
 
 <body>
   <!-- Until the app's code has loaded: the Figbloom logo loader instead of a white page (React replaces it, and
-       its own loader, src/components/UI/FigbloomLoader.tsx, carries on). Signed-in visits only, and not on the
-       sign-in pages. -->
+       its own loader, src/components/UI/FigbloomLoader.tsx, carries on with the same 2.2 s orbit, copied here from
+       index.css). Signed-in visits only, and not on the sign-in pages; except when arriving from another Figbloom
+       product (src/lib/arriving.ts: /handoff, or the tab's "fb-arriving" flag), when it is the one "Opening Figbloom HR"
+       screen /handoff shows, on every page (the sign-in page too) until React draws it. -->
   <style>
-    .boot { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgb(var(--page, 246 248 246)); }
+    .boot { position: fixed; inset: 0; display: flex; flex-direction: column; gap: 24px; align-items: center; justify-content: center; background: rgb(var(--page, 246 248 246)); --boot-green: rgb(var(--brand, 23 64 42)); --boot-sweep: rgb(var(--highlight, 242 106 27)); }
     .boot svg { width: 120px; height: 120px; }
-    .boot circle { fill: none; stroke: rgb(var(--brand, 23 64 42)); }
-    .boot path { fill: rgb(var(--brand, 23 64 42)); }
-    .boot .arc { transform-box: view-box; transform-origin: 32px 29px; stroke-dasharray: 80 280; animation: boot-spin 1.4s linear infinite; }
-    @keyframes boot-spin { to { transform: rotate(360deg); } }
-    @media (prefers-reduced-motion: reduce) { .boot .arc { animation: none; } }
+    .boot circle { fill: none; stroke: var(--boot-green); }
+    .boot path { fill: var(--boot-green); }
+    .boot .arc { transform-box: view-box; transform-origin: 32px 29px; stroke-dasharray: 80 280; stroke-dashoffset: -50; animation: boot-orbit 2.2s infinite; }
+    .boot .leaf { transform-box: fill-box; transform-origin: 0% 100%; animation: boot-leaf 2.2s infinite; }
+    .boot .bowl { transform-box: fill-box; transform-origin: center; animation: boot-bowl 2.2s infinite; }
+    .boot-text { font-family: Outfit, system-ui, sans-serif; font-size: 15px; font-weight: 300; color: rgb(var(--text-600, 75 85 99)); letter-spacing: .02em; }
+    .boot-text[hidden] { display: none; }
+    .boot-dot { animation: boot-dots 1.4s ease-in-out infinite; }
+    .boot-dot:nth-child(2) { animation-delay: .2s; }
+    .boot-dot:nth-child(3) { animation-delay: .4s; }
+    @keyframes boot-orbit {
+      0% { transform: rotate(0deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: var(--boot-green); animation-timing-function: cubic-bezier(.55,0,.25,1); }
+      12% { transform: rotate(0deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: var(--boot-green); animation-timing-function: cubic-bezier(.6,0,.4,1); }
+      45% { transform: rotate(200deg); stroke-dasharray: 190 170; stroke-dashoffset: 5; stroke: var(--boot-sweep); animation-timing-function: cubic-bezier(.3,0,.2,1); }
+      78% { transform: rotate(360deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: var(--boot-green); }
+      100% { transform: rotate(360deg); stroke-dasharray: 80 280; stroke-dashoffset: -50; stroke: var(--boot-green); }
+    }
+    @keyframes boot-leaf {
+      0%, 16% { transform: scale(1) rotate(0deg); opacity: 1; animation-timing-function: cubic-bezier(.5,0,.75,0); }
+      26% { transform: scale(0) rotate(-35deg); opacity: 0; }
+      62% { transform: scale(0) rotate(-35deg); opacity: 0; animation-timing-function: cubic-bezier(.2,.8,.3,1.2); }
+      72% { transform: scale(1.22) rotate(10deg); opacity: 1; animation-timing-function: ease-in-out; }
+      80% { transform: scale(.92) rotate(-5deg); opacity: 1; animation-timing-function: ease-in-out; }
+      88%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+    @keyframes boot-bowl { 0%, 74% { transform: scale(1); } 80% { transform: scale(.94); } 88% { transform: scale(1.03); } 95%, 100% { transform: scale(1); } }
+    @keyframes boot-dots { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .boot .arc, .boot .leaf, .boot .bowl, .boot-dot { animation: none; } }
   </style>
-  <div id="root"><div class="boot" id="boot" role="status" aria-label="Loading">
-    <svg viewBox="8 5 48 48" aria-hidden="true"><circle class="arc" cx="32" cy="29" r="19" pathLength="360" stroke-width="5.5" stroke-linecap="round" /><circle cx="32" cy="29" r="9" stroke-width="6.5" /><path d="M33 14.5 C33 8.5 38 5.5 43 5.5 C43 11.5 39 14.5 33 14.5 Z" /></svg>
+  <div id="root"><div class="boot" id="boot" role="status" aria-live="polite" aria-label="Loading">
+    <svg viewBox="8 5 48 48" aria-hidden="true"><circle class="arc" cx="32" cy="29" r="19" pathLength="360" stroke-width="5.5" stroke-linecap="round" /><circle class="bowl" cx="32" cy="29" r="9" stroke-width="6.5" /><path class="leaf" d="M33 14.5 C33 8.5 38 5.5 43 5.5 C43 11.5 39 14.5 33 14.5 Z" /></svg>
+    <div class="boot-text" id="boot-text" hidden>Opening Figbloom HR<span class="boot-dot">.</span><span class="boot-dot">.</span><span class="boot-dot">.</span></div>
   </div></div>
   <script>
     (function () {
@@ -66,7 +92,16 @@
       try {
         for (var i = 0; i < localStorage.length; i++) if (/^sb-.*-auth-token$/.test(localStorage.key(i) || '')) signedIn = true;
       } catch (e) { /* storage blocked: no loader */ }
-      if (!signedIn || /^\/(login|mfa|join|create-company|update-password|auth)/.test(location.pathname)) boot.remove();
+      // arriving from another Figbloom product (the same test as src/lib/arriving.ts)
+      var arriving = location.pathname === '/handoff' && !/[?&]status=/.test(location.search);
+      try {
+        if (sessionStorage.getItem('fb-arriving') === '1') arriving = true;
+      } catch (e) { /* storage blocked: the usual loader */ }
+      if (arriving) {
+        document.getElementById('boot-text').hidden = false;
+        boot.setAttribute('aria-label', 'Opening Figbloom HR');
+        document.title = 'Opening Figbloom HR';
+      } else if (!signedIn || /^\/(login|mfa|join|create-company|update-password|auth)/.test(location.pathname)) boot.remove();
     })();
   </script>
   <noscript>
