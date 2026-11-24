@@ -21,6 +21,7 @@ const THEM = '00000000-0000-0000-0000-00000000f405';
 const ADMIN_B = '00000000-0000-0000-0000-00000000f406';
 const SERIAL = 'MISS000001';
 const MIGRATION = join(__dirname, '..', 'migrations', '20261025100000_attendance_missed_scan_requests.sql');
+const HALF_DAY_MIGRATION = join(__dirname, '..', 'migrations', '20261124300000_attendance_half_day.sql');
 
 let db: PGlite;
 // days counted back from today (Nairobi), as "YYYY-MM-DD"
@@ -316,7 +317,11 @@ describe('the migration', () => {
       settings: await rows(`select tenant_id, missed_scan_days_back, missed_scan_approver from attendance_settings order by tenant_id`),
     });
     const before = await snapshot();
+    // 20261124300000 added a column to the days (half_day): this migration's version can only be created again once
+    // it is gone, and running that one again afterwards puts it back
+    await db.exec(`drop function public.attendance_days(date, date, text); drop function public.attendance_days_for(uuid, date, date, text, date);`);
     await db.exec(readFileSync(MIGRATION, 'utf8'));
+    await db.exec(readFileSync(HALF_DAY_MIGRATION, 'utf8'));
     await db.exec('reset search_path');
     expect(await snapshot()).toEqual(before);
     // and still works

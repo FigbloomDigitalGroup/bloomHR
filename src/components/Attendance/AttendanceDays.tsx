@@ -14,6 +14,7 @@ import {
   dayHoursLabel,
   dayLabel,
   dayStatusLabel,
+  dayStatusText,
   daysInRange,
   flaggedByPerson,
   formatTime,
@@ -26,7 +27,6 @@ import {
   nairobiToIso,
   nairobiToday,
   scanLine,
-  statusLabel,
   summarise,
   weekOf,
   type AttendanceDay,
@@ -282,7 +282,7 @@ export function EmployeeDays({ days, canCorrect, onChanged }: {
                     )}
                   </td>
                   <td className={tdClass}>
-                    {d.status ? <StatusPill label={statusLabel(d.status)} tone={STATUS_TONE[d.status]} /> : <span className="text-[12px] text-muted-foreground">{dayStatusLabel(d)}</span>}
+                    {d.status ? <StatusPill label={dayStatusText(d)} tone={STATUS_TONE[d.status]} /> : <span className="text-[12px] text-muted-foreground">{dayStatusLabel(d)}</span>}
                     {d.status === 'late' && d.lateMinutes ? <div className="text-[11px] text-muted-foreground">{d.lateMinutes} min</div> : null}
                   </td>
                   <td className={`${tdClass} tabular-nums`}>

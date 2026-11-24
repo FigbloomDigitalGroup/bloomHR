@@ -123,7 +123,7 @@ export default function ClockCard() {
   const late = today?.status === 'late';
   const hours = today ? hoursBetween(today.clockIn, lastScan ? null : today.clockOut, now) : null;
   const dayNote = today && (today.status === 'holiday' || today.status === 'leave' || today.status === 'off')
-    ? (today.status === 'off' ? 'Not a working day for you' : `Today: ${STATUS_LABEL[today.status]}`)
+    ? (today.status === 'off' ? 'Not a working day for you' : `Today: ${today.status === 'leave' && today.halfDay ? 'Half day' : STATUS_LABEL[today.status]}`)
     : null;
 
   return (

@@ -28,6 +28,9 @@ describe('the Today view', () => {
     expect(todayStatusLabel(day('E1', { status: 'off' }), TODAY)).toBe('Off');
     expect(todayStatusLabel(day('E1', { status: 'holiday' }), TODAY)).toBe('Holiday');
     expect(todayStatusLabel(day('E1', { status: 'leave' }), TODAY)).toBe('On leave');
+    // half-day leave: the person is in for part of the day, came in or not yet
+    expect(todayStatusLabel(day('E1', { status: 'leave', halfDay: true, clockIn: '2026-10-23T08:13:00Z' }), TODAY)).toBe('Half day');
+    expect(todayStatusLabel(day('E1', { status: 'leave', halfDay: true }), TODAY)).toBe('Half day');
     expect(todayStatusLabel(day('E1', { status: 'absent', day: '2026-10-22' }), TODAY)).toBe('Absent');
     expect(todayStatusLabel(day('E1', { counted: false, clockIn: '2026-10-23T05:00:00Z' }), TODAY)).toBe('Not counted');
   });

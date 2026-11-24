@@ -31,6 +31,8 @@ export interface AttendanceDay {
   placeDetail?: string | null;
   /** the location the app sent with the clock-in */
   placeLocation?: { latitude: number; longitude: number } | null;
+  /** status 'leave' from half-day leave: shown as "Half day" (migration 20261124300000) */
+  halfDay?: boolean;
 }
 
 export type ClockOutVia = 'scanner' | 'app' | 'hr';
@@ -54,6 +56,8 @@ export interface AttendanceToday {
   source?: string | null;
   place?: ClockPlace | null;
   placeDetail?: string | null;
+  /** today's leave is a half day (migration 20261124300000) */
+  halfDay?: boolean;
 }
 
 export const STATUS_LABEL: Record<AttendanceStatus, string> = {
@@ -76,6 +80,10 @@ export const STATUS_TONE: Record<AttendanceStatus, 'success' | 'warning' | 'dang
 
 /** The label of a day's status; a day not over yet with no clock-in is "Not yet". */
 export const statusLabel = (s: AttendanceStatus | null) => (s ? STATUS_LABEL[s] : 'Not yet');
+
+/** A day's label: "Half day" for half-day leave (the person is in for part of the day), else its status's. */
+export const dayStatusText = (d: { status: AttendanceStatus | null; halfDay?: boolean }) =>
+  d.status === 'leave' && d.halfDay ? 'Half day' : statusLabel(d.status);
 
 /** Every time in the app is a Nairobi time (Tanzania and Uganda are on the same clock, with no summer time). */
 export const ATTENDANCE_TZ = 'Africa/Nairobi';
@@ -275,8 +283,8 @@ export function summarise(days: AttendanceDay[]): AttendanceSummary[] {
 }
 
 /** A day's status as the day view shows it: "Not counted" before attendance counts, else its label ("Not yet"...). */
-export const dayStatusLabel = (d: Pick<AttendanceDay, 'status' | 'counted'>) =>
-  d.counted === false ? 'Not counted' : statusLabel(d.status);
+export const dayStatusLabel = (d: Pick<AttendanceDay, 'status' | 'counted' | 'halfDay'>) =>
+  d.counted === false ? 'Not counted' : dayStatusText(d);
 
 /**
  * A day's hours as shown: the recorded hours; today with a clock-in and no clock-out yet, the time so far (now minus
@@ -574,7 +582,7 @@ export function attendanceCsv(days: AttendanceDay[], people: Map<string, CsvPers
       p?.department ?? '',
       p?.branch ?? '',
       d.day,
-      statusLabel(d.status),
+      dayStatusText(d),
       d.clockIn ? nairobiParts(d.clockIn).time : '',
       d.clockOut ? nairobiParts(d.clockOut).time : '',
       d.hours === null ? '' : d.hours.toFixed(2),
