@@ -20,6 +20,7 @@ import platformSchoolHrRouter from "./platform_school_hr_routes.js";
 import platformFleetRouter from "./platform_fleet_routes.js";
 import platformCrmRouter from "./platform_crm_routes.js";
 import platformPropertyRouter from "./platform_property_routes.js";
+import platformHrAdminRouter from "./platform_hr_admin_routes.js";
 import platformSettingsRouter from "./platform_settings_routes.js";
 import { createOutboxRouter, createPlatformEventsRouter } from "./platform_events_routes.js";
 import { createPlatformHandoffRouter } from "./platform_handoff_routes.js";
@@ -89,6 +90,8 @@ export function buildApp({ mpesaRouter, routes = [] } = {}) {
   app.use("/api/platform/crm", platformCrmRouter);
   // ...and Figbloom Property's workspaces: self-service, suspended on the platform (ERP/PROPERTY_PLATFORM_CONTRACT.md 3)
   app.use("/api/platform/property", platformPropertyRouter);
+  // ...and "Invite admin" for a customer's HR company (a school, Fleet company or Property workspace with HR on)
+  app.use("/api/platform/hr-admin", platformHrAdminRouter);
   // ...and the platform's auto-approve switch per product (figbloomHR-platform: GET /settings, PUT /settings/auto-approve)
   app.use("/api/platform/settings", platformSettingsRouter);
   for (const { path, router } of routes) app.use(path, router);

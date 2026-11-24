@@ -6,6 +6,9 @@ const api = vi.hoisted(() => ({
   schools: [] as SchoolHr[],
   enabled: [] as string[],
   fail: false,
+  invites: [] as { id: string; email: string; name?: string }[],
+  inviteAnswer: null as null | { outcome: string; member_role?: string | null },
+  inviteError: null as null | string,
 }));
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
@@ -20,7 +23,17 @@ vi.mock('../../lib/platformSchoolHr', async (importOriginal) => ({
   },
 }));
 
-import { SchoolHrCell } from './SchoolHr';
+vi.mock('../../lib/platformHrAdmin', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/platformHrAdmin')>()),
+  inviteHrAdmin: (id: string, email: string, name?: string) => {
+    api.invites.push({ id, email, name });
+    if (api.inviteError) return Promise.reject(new Error(api.inviteError));
+    const a = api.inviteAnswer ?? { outcome: 'queued' };
+    return Promise.resolve({ outcome: a.outcome, email: email.trim().toLowerCase(), company: { id: 'hr-1', name: 'x' }, member_role: a.member_role ?? null });
+  },
+}));
+
+import { HrPayrollCell, SchoolHrCell } from './SchoolHr';
 import { useSchoolHr } from './useSchoolHr';
 
 const school = (id: string, state: SchoolHr['hr']['state']): SchoolHr => ({
@@ -45,6 +58,9 @@ afterEach(() => {
   cleanup();
   api.enabled = [];
   api.fail = false;
+  api.invites = [];
+  api.inviteAnswer = null;
+  api.inviteError = null;
 });
 
 describe('HR & Payroll per school', () => {
@@ -88,5 +104,82 @@ describe('HR & Payroll per school', () => {
     expect(screen.getByTestId('b').textContent).toBe('HR & Payroll: Enabling');
     expect(screen.getByTestId('c').textContent).toBe('HR & Payroll: On');
     expect(screen.getByTestId('missing').textContent).toBe('HR & Payroll: —Requested yesterday');
+  });
+});
+
+describe('Invite admin (HR & Payroll on)', () => {
+  const cell = (props: Partial<Parameters<typeof HrPayrollCell>[0]> = {}) => render(
+    <HrPayrollCell name="Swift Haulage" state="on" canEnable platformTenantId="pt-1" enable={() => Promise.resolve('on')}
+      explain="" invitees="" {...props} />
+  );
+  const open = () => fireEvent.click(screen.getByRole('button', { name: 'Invite an HR admin for Swift Haulage' }));
+  const fill = (email: string, name = '') => {
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: email } });
+    if (name) fireEvent.change(screen.getByLabelText('Name (optional)'), { target: { value: name } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send invitation' }));
+  };
+
+  it('is offered only when On, to roles that approve companies, with a platform ID', () => {
+    cell({ state: 'off' });
+    expect(screen.queryByRole('button', { name: /Invite an HR admin/ })).toBeNull();
+    cleanup();
+    cell({ state: 'enabling' });
+    expect(screen.queryByRole('button', { name: /Invite an HR admin/ })).toBeNull();
+    cleanup();
+    cell({ canEnable: false });
+    expect(screen.queryByRole('button', { name: /Invite an HR admin/ })).toBeNull();
+    cleanup();
+    cell({ platformTenantId: null });
+    expect(screen.queryByRole('button', { name: /Invite an HR admin/ })).toBeNull();
+    cleanup();
+    cell();
+    expect(screen.getByRole('button', { name: 'Invite an HR admin for Swift Haulage' }).textContent).toBe('Invite admin');
+  });
+
+  it('a school that is On on the Schools page offers it too, for its platform ID', async () => {
+    api.schools = [school('c', 'on')];
+    render(<Harness canEnable />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Invite an HR admin for School c' }));
+    fill('head@school.ac.ke');
+    await screen.findByRole('status');
+    expect(api.invites).toEqual([{ id: 'c', email: 'head@school.ac.ke', name: '' }]);
+  });
+
+  it('sends the email and name, and says it was sent', async () => {
+    cell();
+    open();
+    expect(screen.getByText('Invite an HR admin for Swift Haulage')).toBeTruthy();
+    fill(' New.Admin@Swift.co.ke ', 'Jane Owner');
+    expect((await screen.findByRole('status')).textContent).toBe('Invitation sent to new.admin@swift.co.ke. Figbloom HR emails it within a few minutes.');
+    expect(api.invites).toEqual([{ id: 'pt-1', email: 'New.Admin@Swift.co.ke', name: 'Jane Owner' }]);
+    // cleared for another
+    expect((screen.getByLabelText('Email') as HTMLInputElement).value).toBe('');
+    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy();
+  });
+
+  it('says when they are already invited, or already an admin', async () => {
+    cell();
+    open();
+    api.inviteAnswer = { outcome: 'already_invited' };
+    fill('a@swift.co.ke');
+    expect((await screen.findByRole('status')).textContent).toBe('a@swift.co.ke is already invited. Nothing was sent again.');
+    api.inviteAnswer = { outcome: 'already_member', member_role: 'ADMIN' };
+    fill('b@swift.co.ke');
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('b@swift.co.ke is already an admin of this HR company.'));
+    api.inviteAnswer = { outcome: 'already_member', member_role: 'STAFF' };
+    fill('c@swift.co.ke');
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('already has a login in this HR company (staff)'));
+  });
+
+  it("refuses a malformed address without asking, and shows the server's refusal", async () => {
+    cell();
+    open();
+    fill('not-an-email');
+    expect((await screen.findByRole('alert')).textContent).toBe('Enter a valid email address.');
+    expect(api.invites).toEqual([]);
+    api.inviteError = 'Figbloom HR has no company for this customer yet.';
+    fill('a@swift.co.ke');
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('Figbloom HR has no company for this customer yet.'));
+    expect(screen.queryByRole('status')).toBeNull();
   });
 });

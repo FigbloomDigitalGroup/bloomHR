@@ -144,7 +144,7 @@ export default function PropertyWorkspacesPage() {
     <WithHrRequest row={w}>
       {w.hr ? (
         <HrPayrollCell name={w.name} state={w.hr.state} canEnable={canEnableHr && !!w.platform_tenant_id} labelled={labelled}
-          enable={() => enableHr(w)} explain={PROPERTY_HR_EXPLAIN} invitees="the workspace's creator" />
+          platformTenantId={w.platform_tenant_id} enable={() => enableHr(w)} explain={PROPERTY_HR_EXPLAIN} invitees="the workspace's creator" />
       ) : (
         <span className="text-muted-foreground" title="This workspace has no Figbloom platform account yet">{labelled ? 'HR & Payroll: ' : ''}—</span>
       )}
