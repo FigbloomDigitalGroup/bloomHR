@@ -6,6 +6,9 @@ import type { StatusTone } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import ConsoleStatRow, { ConsoleStat } from './ConsoleStat';
 import { HrPayrollCell } from './SchoolHr';
+import { HrRequestedChip, WithHrRequest } from './HrRequest';
+import { useConsoleBadge } from '../Console/consoleBadges';
+import { attentionLabel } from '../../lib/hrRequests';
 import { myPlatformRole, roleCan, type PlatformRole } from '../../lib/platformRoles';
 import {
   MAX_PROPERTY_REASON, PLAN_STATUS_LABELS, PROPERTY_STATUSES, PROPERTY_STATUS_LABELS, enablePropertyHr, filterWorkspaces,
@@ -25,7 +28,8 @@ import {
 
 // HR & Payroll per workspace (ERP/PROPERTY_HR_CONTRACT.md): Off / Enabling / On, with Enable for Owner/Admin
 // (approve_companies: HR is a paid add-on), as on Fleet's page; Figbloom HR then creates the company and invites the
-// workspace's creator, who is HR's admin only, not an employee.
+// workspace's creator, who is HR's admin only, not an employee. A workspace whose admin asked for HR in Property
+// ("Request Figbloom HR") shows "Requested …" beside Off, and the "HR requested" chip lists those, longest waiting first.
 const HR_POLL_MS = 10 * 1000;
 const HR_MAX_POLLS = 6; // a minute of "Enabling" before it waits for a reload
 const PROPERTY_HR_EXPLAIN =
@@ -80,6 +84,7 @@ export default function PropertyWorkspacesPage() {
   const [load, setLoad] = useState<Load>(null);
   const [status, setStatus] = useState('all');
   const [search, setSearch] = useState('');
+  const [hrRequested, setHrRequested] = useState(false);
   const [viewing, setViewing] = useState<PropertyWorkspace | null>(null);
   const [acting, setActing] = useState<{ workspace: PropertyWorkspace; action: PropertyAction } | null>(null);
   const [reason, setReason] = useState('');
@@ -106,7 +111,9 @@ export default function PropertyWorkspacesPage() {
   const workspaces = list?.workspaces ?? null;
   const platformOk = !list || list.platform.ok;
   const totals = useMemo(() => (workspaces ? propertyTotals(workspaces) : null), [workspaces]);
-  const shown = useMemo(() => filterWorkspaces(workspaces ?? [], { status, search }), [workspaces, status, search]);
+  const shown = useMemo(() => filterWorkspaces(workspaces ?? [], { status, search, hrRequested }), [workspaces, status, search, hrRequested]);
+  // the console menu's badge: workspaces asking for HR & Payroll
+  useConsoleBadge('/platform/property/workspaces', totals ? totals.hr_requested : null, (c) => attentionLabel(0, c));
   const canManage = roleCan(role, 'suspend_companies');
 
   const actionsFor = (w: PropertyWorkspace) => (platformOk && canManage ? propertyActions(w) : []);
@@ -133,13 +140,16 @@ export default function PropertyWorkspacesPage() {
     return hr.state;
   };
   const canEnableHr = roleCan(role, 'approve_companies');
-  const hrCell = (w: PropertyWorkspace, labelled = false) =>
-    w.hr ? (
-      <HrPayrollCell name={w.name} state={w.hr.state} canEnable={canEnableHr && !!w.platform_tenant_id} labelled={labelled}
-        enable={() => enableHr(w)} explain={PROPERTY_HR_EXPLAIN} invitees="the workspace's creator" />
-    ) : (
-      <span className="text-muted-foreground" title="This workspace has no Figbloom platform account yet">{labelled ? 'HR & Payroll: ' : ''}—</span>
-    );
+  const hrCell = (w: PropertyWorkspace, labelled = false) => (
+    <WithHrRequest row={w}>
+      {w.hr ? (
+        <HrPayrollCell name={w.name} state={w.hr.state} canEnable={canEnableHr && !!w.platform_tenant_id} labelled={labelled}
+          enable={() => enableHr(w)} explain={PROPERTY_HR_EXPLAIN} invitees="the workspace's creator" />
+      ) : (
+        <span className="text-muted-foreground" title="This workspace has no Figbloom platform account yet">{labelled ? 'HR & Payroll: ' : ''}—</span>
+      )}
+    </WithHrRequest>
+  );
 
   const view = (w: PropertyWorkspace) => {
     setViewing(w);
@@ -270,6 +280,7 @@ export default function PropertyWorkspacesPage() {
               </button>
             ))}
           </div>
+          <HrRequestedChip count={totals?.hr_requested ?? 0} on={hrRequested} onChange={setHrRequested} />
           <div className="ml-auto w-full sm:w-72">
             <SearchInput placeholder="Search by workspace or owner" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
@@ -280,7 +291,9 @@ export default function PropertyWorkspacesPage() {
         ) : workspaces.length === 0 ? (
           <p className="text-sm text-muted-foreground py-6 text-center">No workspaces in Figbloom Property yet.</p>
         ) : shown.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-6 text-center">No workspaces match.</p>
+          <p className="text-sm text-muted-foreground py-6 text-center">
+            {hrRequested ? 'No workspaces asking for HR & Payroll match.' : 'No workspaces match.'}
+          </p>
         ) : (
           <TableScroll>
             <table className="w-full text-xs">

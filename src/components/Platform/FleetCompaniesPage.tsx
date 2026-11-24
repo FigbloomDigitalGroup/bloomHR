@@ -6,9 +6,11 @@ import type { StatusTone } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import ConsoleStatRow, { ConsoleStat } from './ConsoleStat';
 import { HrPayrollCell } from './SchoolHr';
+import { HrRequestedChip, WithHrRequest } from './HrRequest';
 import { useConsoleBadge } from '../Console/consoleBadges';
 import { myPlatformRole, roleCan, type PlatformRole } from '../../lib/platformRoles';
 import { actionPermission, groupActions, needsReason } from '../../lib/platformSchoolGroups';
+import { attentionLabel } from '../../lib/hrRequests';
 import {
   FLEET_STATUSES, FLEET_STATUS_LABELS, MAX_FLEET_REASON, enableFleetHr, filterCompanies, fleetProblem, fleetTotals,
   listFleetCompanies, setFleetCompanyStatus, statusOf, withFleetHr,
@@ -20,7 +22,8 @@ import {
 // decided on the Figbloom platform, which tells Fleet. The backend checks the console role as for school groups
 // (Owner/Admin approve and reject; Support suspends and reactivates; Viewer views). A company opens a detail panel.
 // HR & Payroll per company (ERP/FLEET_HR_CONTRACT.md): Off / Enabling / On, with Enable for Owner/Admin, as on the
-// Schools page; Figbloom HR then creates the company and invites its owner.
+// Schools page; Figbloom HR then creates the company and invites its owner. A company whose admin asked for HR in Fleet
+// ("Request Figbloom HR") shows "Requested …" beside Off, and the "HR requested" chip lists those, longest waiting first.
 
 const HR_POLL_MS = 10 * 1000;
 const HR_MAX_POLLS = 6; // a minute of "Enabling" before it waits for a reload
@@ -71,6 +74,7 @@ export default function FleetCompaniesPage() {
   const [load, setLoad] = useState<Load>(null);
   const [status, setStatus] = useState('all');
   const [search, setSearch] = useState('');
+  const [hrRequested, setHrRequested] = useState(false);
   const [viewing, setViewing] = useState<FleetCompany | null>(null);
   const [acting, setActing] = useState<{ company: FleetCompany; action: FleetAction } | null>(null);
   const [reason, setReason] = useState('');
@@ -114,22 +118,26 @@ export default function FleetCompaniesPage() {
     return hr.state;
   };
   const canEnableHr = roleCan(role, 'approve_companies');
-  const hrCell = (c: FleetCompany, labelled = false) =>
-    c.hr ? (
-      <HrPayrollCell name={c.name} state={c.hr.state} canEnable={canEnableHr && !!c.platform_tenant_id} labelled={labelled}
-        enable={() => enableHr(c)} explain={FLEET_HR_EXPLAIN} invitees="the company's owner" />
-    ) : (
-      <span className="text-muted-foreground" title="This company has no Figbloom platform account yet">{labelled ? 'HR & Payroll: ' : ''}—</span>
-    );
+  const hrCell = (c: FleetCompany, labelled = false) => (
+    <WithHrRequest row={c}>
+      {c.hr ? (
+        <HrPayrollCell name={c.name} state={c.hr.state} canEnable={canEnableHr && !!c.platform_tenant_id} labelled={labelled}
+          enable={() => enableHr(c)} explain={FLEET_HR_EXPLAIN} invitees="the company's owner" />
+      ) : (
+        <span className="text-muted-foreground" title="This company has no Figbloom platform account yet">{labelled ? 'HR & Payroll: ' : ''}—</span>
+      )}
+    </WithHrRequest>
+  );
 
   const list = load && 'companies' in load ? load : null;
   const companies = list?.companies ?? null;
   const platformOk = !list || list.platform.ok;
   const totals = useMemo(() => (companies ? fleetTotals(companies) : null), [companies]);
-  const shown = useMemo(() => filterCompanies(companies ?? [], { status, search }), [companies, status, search]);
+  const shown = useMemo(() => filterCompanies(companies ?? [], { status, search, hrRequested }), [companies, status, search, hrRequested]);
 
-  // the console menu's badge: companies waiting for approval
-  useConsoleBadge('/platform/fleet/companies', totals ? totals.pending : null, (c) => `${c} waiting for approval`);
+  // the console menu's badge: companies waiting for approval, and asking for HR & Payroll
+  useConsoleBadge('/platform/fleet/companies', totals ? totals.pending + totals.hr_requested : null,
+    () => (totals ? attentionLabel(totals.pending, totals.hr_requested) : ''));
 
   const actionsFor = (c: FleetCompany) =>
     platformOk && c.organization_id && c.status ? groupActions(c.status).filter((a) => roleCan(role, actionPermission(a, c.status!))) : [];
@@ -246,6 +254,7 @@ export default function FleetCompaniesPage() {
               </button>
             ))}
           </div>
+          <HrRequestedChip count={totals?.hr_requested ?? 0} on={hrRequested} onChange={setHrRequested} />
           <div className="ml-auto w-full sm:w-72">
             <SearchInput placeholder="Search by company or owner" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
@@ -256,7 +265,9 @@ export default function FleetCompaniesPage() {
         ) : companies.length === 0 ? (
           <p className="text-sm text-muted-foreground py-6 text-center">No companies in Figbloom Fleet yet.</p>
         ) : shown.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-6 text-center">No companies match.</p>
+          <p className="text-sm text-muted-foreground py-6 text-center">
+            {hrRequested ? 'No companies asking for HR & Payroll match.' : 'No companies match.'}
+          </p>
         ) : (
           <TableScroll>
             <table className="w-full text-xs">

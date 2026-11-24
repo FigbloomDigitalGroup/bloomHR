@@ -253,7 +253,7 @@ describe('GET /api/platform/property/workspaces', () => {
       creator_name: 'Owner of Kilimani Homes', creator_email: 'owner@kilimanihomes.co.ke',
       plan_name: 'Growth', plan_status: 'active', trial_ends_at: null,
       properties: 4, units: 60, occupied_units: 52, team_members: 3, tenants: 55,
-      platform_organization_id: ACTIVE, platform_tenant_id: null, registered_at: '2026-10-01T08:01:00Z',
+      platform_organization_id: ACTIVE, platform_tenant_id: null, registered_at: '2026-10-01T08:01:00Z', hr_requested_at: null,
       in_property: true, organization_id: ACTIVE, status: 'active', status_reason: null, hr: null,
     });
     expect(body.workspaces[1]).toMatchObject({ id: W_PAUSED, property_active: false, status: 'suspended', status_reason: 'Unpaid' });
@@ -287,6 +287,21 @@ describe('GET /api/platform/property/workspaces', () => {
     const text = await (await call('view')).text();
     expect(text).not.toMatch(/Jane Tenant|rentRoll|1234567|arrears|\+254700000000/);
     expect(JSON.parse(text).workspaces[0]).toMatchObject({ units: 3, tenants: null, creator_email: 'o@x.co' });
+  });
+
+  it('passes on when a customer asked for HR (hrRequestedAt or hr_requested_at); nothing from an older Property', async () => {
+    fake.workspaces = [
+      summary(W_ACTIVE, 'A', null, { hrRequestedAt: '2026-11-20T09:30:00Z' }),
+      summary(W_PAUSED, 'B', null, { hr_requested_at: '2026-11-21T10:00:00Z' }),
+      summary(W_FRESH, 'C', null),
+      summary(W_OFF, 'D', null, { hrRequestedAt: 'soon' }),
+    ];
+    const body = await (await call('view')).json();
+    const byId = Object.fromEntries(body.workspaces.map((w: { id: string }) => [w.id, w]));
+    expect(byId[W_ACTIVE].hr_requested_at).toBe('2026-11-20T09:30:00Z');
+    expect(byId[W_PAUSED].hr_requested_at).toBe('2026-11-21T10:00:00Z');
+    expect(byId[W_FRESH].hr_requested_at).toBeNull();
+    expect(byId[W_OFF].hr_requested_at).toBeNull();
   });
 
   it('takes PROPERTY_PLATFORM_URL with or without /api', async () => {

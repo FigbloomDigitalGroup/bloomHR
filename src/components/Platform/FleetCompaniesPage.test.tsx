@@ -280,6 +280,64 @@ describe('HR & Payroll per company (ERP/FLEET_HR_CONTRACT.md)', () => {
     expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("invites the company's owner"));
   });
 
+  const daysAgo = (d: number) => new Date(Date.now() - d * 24 * 60 * 60 * 1000).toISOString();
+  const withRequests = () => {
+    withHr();
+    api.companies[0] = { ...api.companies[0], hr_requested_at: daysAgo(2) };
+    // already on: the request is done, nothing shows
+    api.companies[1] = { ...api.companies[1], hr_requested_at: daysAgo(9) };
+    api.companies.push(company('c6', 'Lake Freight', 'active', {
+      platform_tenant_id: 't-6', hr: { state: 'off', module_status: null, hr_tenant_id: null }, hr_requested_at: daysAgo(5),
+    }));
+  };
+
+  it('shows "Requested …" beside Off when the customer asked for HR in Fleet, in the table and the details', async () => {
+    withRequests();
+    renderPage();
+    const swift = await rowOf('Swift Couriers');
+    expect(within(swift).getByText('Off')).toBeTruthy();
+    expect(within(swift).getByText('Requested 2 days ago')).toBeTruthy();
+    expect(within(swift).getByRole('button', { name: 'Enable HR & Payroll for Swift Couriers' })).toBeTruthy();
+    expect(within(await rowOf('Rift Valley Haulage')).queryByText(/^Requested/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Swift Couriers' }));
+    const details = within(await screen.findByRole('dialog')).getByLabelText('Company details');
+    expect(within(details).getByText('Requested 2 days ago')).toBeTruthy();
+  });
+
+  it('the "HR requested" chip lists only those waiting, the longest waiting first', async () => {
+    withRequests();
+    renderPage();
+    await rowOf('Swift Couriers');
+    const chip = screen.getByRole('button', { name: 'HR requested (2)' });
+    expect(chip.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(chip);
+    expect(chip.getAttribute('aria-pressed')).toBe('true');
+    const names = screen.getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('button')[0].textContent);
+    expect(names).toEqual(['Lake Freight', 'Swift Couriers']);
+    fireEvent.click(chip);
+    expect(screen.getAllByRole('row')).toHaveLength(5);
+  });
+
+  it('no chip without requests (or from an older Fleet that does not send them)', async () => {
+    withHr();
+    renderPage();
+    await rowOf('Swift Couriers');
+    expect(screen.queryByRole('button', { name: /HR requested/ })).toBeNull();
+    expect(screen.queryByText(/^Requested/)).toBeNull();
+  });
+
+  it('the menu badge counts the HR requests with the companies waiting for approval', async () => {
+    withRequests();
+    api.companies.push(company('c7', 'Waiting Ltd', 'pending'));
+    const published: Record<string, unknown> = {};
+    renderPage((path, badge) => {
+      published[path] = badge;
+    });
+    await waitFor(() =>
+      expect(published['/platform/fleet/companies']).toEqual({ count: 3, label: '1 waiting for approval, 2 asking for HR & Payroll' })
+    );
+  });
+
   it('support and viewers see the state but cannot enable it', async () => {
     withHr();
     api.role = 'support';

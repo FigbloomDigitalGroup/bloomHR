@@ -1,5 +1,6 @@
 import { ApiError, apiRequest } from './adminApi';
 import type { HrState } from './platformSchoolHr';
+import { hrRequestPending } from './hrRequests';
 
 // Figbloom Property's workspaces in the console (/platform/property/workspaces, ERP/PROPERTY_PLATFORM_CONTRACT.md 3).
 // Property's own summaries (creator, plan, properties, units, occupied units, team members, tenants: counts only, never
@@ -67,6 +68,8 @@ export interface PropertyWorkspace {
   status_reason: string | null;
   /** HR & Payroll for the workspace (ERP/PROPERTY_HR_CONTRACT.md); null without a platform account */
   hr?: PropertyHr | null;
+  /** when a customer admin asked for Figbloom HR in Property; null when not asked (or an older Property that doesn't say) */
+  hr_requested_at?: string | null;
 }
 
 /** off: not switched on; enabling: switched on, HR hasn't linked its company yet; on: linked; unknown: couldn't ask. */
@@ -152,8 +155,14 @@ export function propertyActions(w: PropertyWorkspace): PropertyAction[] {
 /** Whether Property has registered it with the platform yet (it does so within a minute of sign-up). */
 export const registered = (w: PropertyWorkspace) => !!(w.platform_organization_id || w.organization_id);
 
-/** The workspaces with this status ('all' for any) whose name, slug, creator or ID match. */
-export function filterWorkspaces(list: PropertyWorkspace[], { status, search }: { status: string; search: string }): PropertyWorkspace[] {
+/**
+ * The workspaces with this status ('all' for any) whose name, slug, creator or ID match; with hrRequested, only those
+ * asking for HR & Payroll that isn't switched on yet, the longest waiting first.
+ */
+export function filterWorkspaces(
+  list: PropertyWorkspace[],
+  { status, search, hrRequested = false }: { status: string; search: string; hrRequested?: boolean }
+): PropertyWorkspace[] {
   const q = search.trim().toLowerCase();
   const matches = (w: PropertyWorkspace) =>
     w.name.toLowerCase().includes(q) ||
@@ -161,7 +170,8 @@ export function filterWorkspaces(list: PropertyWorkspace[], { status, search }: 
     (w.creator_email ?? '').toLowerCase().includes(q) ||
     (w.creator_name ?? '').toLowerCase().includes(q) ||
     w.id.toLowerCase() === q;
-  return list.filter((w) => (status === 'all' || statusOf(w) === status) && (!q || matches(w)));
+  const shown = list.filter((w) => (status === 'all' || statusOf(w) === status) && (!q || matches(w)) && (!hrRequested || hrRequestPending(w)));
+  return hrRequested ? shown.sort((a, b) => Date.parse(a.hr_requested_at!) - Date.parse(b.hr_requested_at!)) : shown;
 }
 
 export interface PropertyTotals {
@@ -169,6 +179,8 @@ export interface PropertyTotals {
   active: number;
   suspended: number;
   deactivated: number;
+  /** asking for HR & Payroll that isn't switched on yet */
+  hr_requested: number;
   units: number;
 }
 
@@ -179,6 +191,7 @@ export function propertyTotals(list: PropertyWorkspace[]): PropertyTotals {
     active: count('active'),
     suspended: count('suspended'),
     deactivated: count('deactivated'),
+    hr_requested: list.filter(hrRequestPending).length,
     units: list.reduce((t, w) => t + (Number(w.units) || 0), 0),
   };
 }

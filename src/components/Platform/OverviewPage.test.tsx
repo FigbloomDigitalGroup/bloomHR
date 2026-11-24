@@ -320,5 +320,29 @@ describe('the console overview', () => {
     expect(published['/platform/organisations']).toEqual({ count: 2, label: '2 waiting for approval' });
     await waitFor(() => expect(published['/platform/fleet/companies']).toEqual({ count: 2, label: '2 waiting for approval' }));
     expect(figure(card('Figbloom Schools'), 'Needs attention')).toBe('3');
+    // nobody asked for HR: no Property badge
+    await waitFor(() => expect('/platform/property/workspaces' in published).toBe(true));
+    expect(published['/platform/property/workspaces']).toBeNull();
+  });
+
+  it('counts the HR & Payroll requests from Fleet and Property in their menu badges', async () => {
+    const off = { state: 'off' as const, module_status: null, hr_tenant_id: null };
+    const at = '2026-11-20T09:00:00Z';
+    api.fleet!.companies[2] = { ...api.fleet!.companies[2], hr: off, hr_requested_at: at };
+    api.property!.workspaces[0] = { ...api.property!.workspaces[0], hr: off, hr_requested_at: at };
+    // switched on already: not counted
+    api.property!.workspaces[1] = { ...api.property!.workspaces[1], hr: { ...off, state: 'on' }, hr_requested_at: at };
+    const published: Record<string, unknown> = {};
+    render(
+      <ConsoleBadgesContext.Provider value={(path, badge) => { published[path] = badge; }}>
+        <MemoryRouter>
+          <OverviewPage />
+        </MemoryRouter>
+      </ConsoleBadgesContext.Provider>
+    );
+    await waitFor(() =>
+      expect(published['/platform/fleet/companies']).toEqual({ count: 3, label: '2 waiting for approval, 1 asking for HR & Payroll' })
+    );
+    await waitFor(() => expect(published['/platform/property/workspaces']).toEqual({ count: 1, label: '1 asking for HR & Payroll' }));
   });
 });

@@ -43,6 +43,7 @@ vi.mock('../../lib/platformProperty', async (importOriginal) => ({
 }));
 
 import PropertyWorkspacesPage from './PropertyWorkspacesPage';
+import { ConsoleBadgesContext } from '../Console/consoleBadges';
 
 function workspace(id: string, name: string, status: string | null, extra: Partial<PropertyWorkspace> = {}): PropertyWorkspace {
   return {
@@ -75,11 +76,13 @@ beforeEach(() => {
   toast.error.mockReset();
 });
 
-const renderPage = () =>
+const renderPage = (publish?: (path: string, badge: unknown) => void) =>
   render(
-    <MemoryRouter>
-      <PropertyWorkspacesPage />
-    </MemoryRouter>
+    <ConsoleBadgesContext.Provider value={publish ?? (() => {})}>
+      <MemoryRouter>
+        <PropertyWorkspacesPage />
+      </MemoryRouter>
+    </ConsoleBadgesContext.Provider>
   );
 const rowOf = async (name: string) => (await screen.findByRole('button', { name })).closest('tr') as HTMLElement;
 const stat = (label: string) => screen.getByText(label, { selector: 'div' }).nextElementSibling?.textContent;
@@ -299,6 +302,55 @@ describe('HR & Payroll per workspace (ERP/PROPERTY_HR_CONTRACT.md)', () => {
     const details = within(await screen.findByRole('dialog')).getByLabelText('Workspace details');
     expect(within(details).getByText('HR & Payroll')).toBeTruthy();
     expect(within(details).getByText('On')).toBeTruthy();
+  });
+
+  const daysAgo = (d: number) => new Date(Date.now() - d * 24 * 60 * 60 * 1000).toISOString();
+  const withRequests = () => {
+    withHr();
+    api.workspaces[0] = { ...api.workspaces[0], hr_requested_at: daysAgo(1) };
+    // already on: the request is done, nothing shows
+    api.workspaces[1] = { ...api.workspaces[1], hr_requested_at: daysAgo(9) };
+    // no platform account yet: still asked for
+    api.workspaces[2] = { ...api.workspaces[2], hr_requested_at: daysAgo(3) };
+  };
+
+  it('shows "Requested …" beside Off when the customer asked for HR in Property, and a chip lists those waiting', async () => {
+    withRequests();
+    const published: Record<string, unknown> = {};
+    renderPage((path, badge) => {
+      published[path] = badge;
+    });
+    const kilimani = await rowOf('Kilimani Homes');
+    expect(within(kilimani).getByText('Off')).toBeTruthy();
+    expect(within(kilimani).getByText('Requested yesterday')).toBeTruthy();
+    expect(within(await rowOf('Fresh Start')).getByText('Requested 3 days ago')).toBeTruthy();
+    expect(within(await rowOf('Paused Estates')).queryByText(/^Requested/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'HR requested (2)' }));
+    const names = screen.getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('button')[0].textContent);
+    expect(names).toEqual(['Fresh Start', 'Kilimani Homes']);
+    await waitFor(() =>
+      expect(published['/platform/property/workspaces']).toEqual({ count: 2, label: '2 asking for HR & Payroll' })
+    );
+  });
+
+  it('the detail panel shows the request too', async () => {
+    withRequests();
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Kilimani Homes' }));
+    const details = within(await screen.findByRole('dialog')).getByLabelText('Workspace details');
+    expect(within(details).getByText('Requested yesterday')).toBeTruthy();
+  });
+
+  it('no chip and no menu badge without requests', async () => {
+    withHr();
+    const published: Record<string, unknown> = {};
+    renderPage((path, badge) => {
+      published[path] = badge;
+    });
+    await rowOf('Kilimani Homes');
+    expect(screen.queryByRole('button', { name: /HR requested/ })).toBeNull();
+    await waitFor(() => expect('/platform/property/workspaces' in published).toBe(true));
+    expect(published['/platform/property/workspaces']).toBeNull();
   });
 
   it.each(['support', 'viewer'] as const)('%s sees the state but cannot enable it (HR is a paid add-on)', async (role) => {

@@ -110,6 +110,11 @@ export async function callFleet(path, timeoutMs = FLEET_TIMEOUT_MS) {
 
 const str = (v) => (typeof v === "string" && v.trim() ? v.trim() : null);
 const count = (v) => (v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
+/** A date-time string (ISO), else null: what an older Fleet without it sends, or anything unreadable. */
+const when = (v) => {
+  const s = str(v);
+  return s && !Number.isNaN(Date.parse(s)) ? s : null;
+};
 
 /** One of Fleet's company summaries, as the console shows it (nested or flat, snake_case or camelCase). */
 export function toSummary(c) {
@@ -132,6 +137,8 @@ export function toSummary(c) {
     admins: count(pick([counts, "admins"], [c, "admins"])),
     trips_last_30_days: count(pick([counts, "trips_last_30_days"], [counts, "tripsLast30Days"], [c, "trips_last_30_days"])),
     last_location_at: str(pick([c, "last_location_at"], [c, "lastLocationAt"], [c, "last_ping_at"], [c, "lastPingAt"])),
+    // when a customer admin asked for Figbloom HR in Fleet ("Request Figbloom HR"); null when not asked, or Fleet too old
+    hr_requested_at: when(pick([c, "hr_requested_at"], [c, "hrRequestedAt"])),
   };
 }
 
@@ -190,6 +197,7 @@ export async function fleetOrganizations(timeoutMs) {
 const EMPTY_SUMMARY = {
   platform_tenant_id: null, hr: null,
   fleet_status: null, plan: null, owner_name: null, vehicles: null, drivers: null, admins: null, trips_last_30_days: null, last_location_at: null,
+  hr_requested_at: null,
 };
 
 /**
