@@ -5,7 +5,9 @@ vi.mock('./supabase', () => ({ supabase: {} }));
 import { ApiError } from './adminApi';
 import {
   filterSchools, schoolAction, schoolTotals, schoolsProblem, statusChangeError, statusFilters, statusLabel, type School,
+  schoolHrRequestPending,
 } from './platformSchools';
+import type { HrState } from './platformSchoolHr';
 
 const school = (id: string, status: string, students: number, name = id): School => ({
   id, name, slug: name.toLowerCase(), status, status_reason: null, organization: null, created_at: '2026-09-14T08:00:00Z',
@@ -29,6 +31,25 @@ describe('platformSchools', () => {
     expect(filterSchools(list, { status: 'suspended', search: '' }).map((s) => s.id)).toEqual(['bbb']);
     expect(filterSchools(list, { status: 'all', search: 'gam' }).map((s) => s.id)).toEqual(['ccc']);
     expect(filterSchools(list, { status: 'all', search: 'AA' }).map((s) => s.id)).toEqual(['aaa']);
+  });
+
+  it('lists the schools asking for HR & Payroll that is still off, the longest waiting first', () => {
+    const at = (id: string, status: string, when: string | null | undefined): School => ({ ...school(id, status, 0), hr_requested_at: when });
+    const all = [
+      at('new', 'active', '2026-11-22T09:00:00Z'),
+      at('old', 'suspended', '2026-11-18T09:00:00Z'),
+      at('done', 'active', '2026-11-10T09:00:00Z'),
+      at('busy', 'active', '2026-11-11T09:00:00Z'),
+      at('never', 'active', null),
+      at('older-schools', 'active', undefined),
+      at('unplatformed', 'active', '2026-11-23T09:00:00Z'),
+    ];
+    const states: Record<string, HrState> = { new: 'off', old: 'off', done: 'on', busy: 'enabling', never: 'off', 'older-schools': 'off' };
+    const hrOf = (s: School) => (states[s.id] ? { state: states[s.id] } : null);
+    expect(filterSchools(all, { status: 'all', search: '', hrRequested: true, hrOf }).map((s) => s.id)).toEqual(['old', 'new', 'unplatformed']);
+    expect(filterSchools(all, { status: 'active', search: '', hrRequested: true, hrOf }).map((s) => s.id)).toEqual(['new', 'unplatformed']);
+    expect(filterSchools(all, { status: 'all', search: '', hrOf }).map((s) => s.id)).toEqual(all.map((s) => s.id));
+    expect(all.filter((s) => schoolHrRequestPending(s, hrOf))).toHaveLength(3);
   });
 
   it('tells "not connected" (503) from "did not answer" (502)', () => {

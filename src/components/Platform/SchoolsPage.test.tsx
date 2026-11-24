@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   listCalls: 0,
   changes: [] as unknown[][],
   changeError: null as Error | null,
+  hr: [] as import('../../lib/platformSchoolHr').SchoolHr[],
 }));
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
@@ -35,7 +36,14 @@ vi.mock('../../lib/platformSchools', async (importOriginal) => ({
   },
 }));
 
+vi.mock('../../lib/platformSchoolHr', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/platformSchoolHr')>()),
+  listSchoolHr: () => Promise.resolve({ schools: api.hr, truncated: false }),
+}));
+
 import SchoolsPage from './SchoolsPage';
+import { ConsoleBadgesContext } from '../Console/consoleBadges';
+import type { HrState } from '../../lib/platformSchoolHr';
 
 const school = (name: string, id: string, status: string, extra: Partial<School> = {}): School => ({
   id, name, slug: name.toLowerCase().replace(/ /g, '-'), status, status_reason: null, organization: null,
@@ -58,6 +66,7 @@ beforeEach(() => {
   api.listCalls = 0;
   api.changes = [];
   api.changeError = null;
+  api.hr = [];
   toast.success.mockReset();
   toast.error.mockReset();
 });
@@ -311,5 +320,67 @@ describe('the schools page: opened from a school group', () => {
     } finally {
       window.history.replaceState(null, '', '/');
     }
+  });
+});
+
+describe('schools asking for HR & Payroll', () => {
+  const KILIMANI = '6f1c2b9e-1d2a-4c3b-9e8f-0a1b2c3d4e5f';
+  const LAVINGTON = 'a2b3c4d5-0000-4000-8000-000000000001';
+  const RUIRU = 'c0ffee00-0000-4000-8000-000000000002';
+  const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
+  const onPlatform = (id: string, state: HrState) => ({
+    platform_tenant_id: `p-${id}`, name: id, schools_tenant_id: id, schools_slug: null,
+    hr: { state, module_status: null, hr_tenant_id: null },
+  });
+  const withRequests = () => {
+    api.schools[0] = { ...api.schools[0], hr_requested_at: daysAgo(1) };
+    api.schools[1] = { ...api.schools[1], hr_requested_at: daysAgo(3) };
+    // already on: the request is done, nothing shows
+    api.schools[2] = { ...api.schools[2], hr_requested_at: daysAgo(9) };
+    api.hr = [onPlatform(KILIMANI, 'off'), onPlatform(LAVINGTON, 'off'), onPlatform(RUIRU, 'on')];
+  };
+  const renderWithBadges = (published: Record<string, unknown>) =>
+    render(
+      <ConsoleBadgesContext.Provider value={(path, badge) => { published[path] = badge; }}>
+        <SchoolsPage />
+      </ConsoleBadgesContext.Provider>
+    );
+
+  it('shows "Requested …" beside Off, a chip lists those waiting (longest first), and the menu badge counts them', async () => {
+    withRequests();
+    const published: Record<string, unknown> = {};
+    renderWithBadges(published);
+    const kilimani = await rowOf('Kilimani Secondary');
+    expect(await within(kilimani).findByText('Requested yesterday')).toBeTruthy();
+    expect(within(kilimani).getByText('Off')).toBeTruthy();
+    expect(within(await rowOf('Lavington Primary')).getByText('Requested 3 days ago')).toBeTruthy();
+    expect(within(await rowOf('Ruiru Academy')).queryByText(/^Requested/)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'HR requested (2)' }));
+    const names = inTable().getAllByRole('row').slice(1).map((r) => r.querySelector('td span')?.textContent);
+    expect(names).toEqual(['Lavington Primary', 'Kilimani Secondary']);
+
+    // Ruiru needs attention (no admin, never active; Lavington is suspended), plus 2 asking for HR
+    await waitFor(() =>
+      expect(published['/platform/schools']).toEqual({ count: 3, label: '1 need attention, 2 asking for HR & Payroll' })
+    );
+  });
+
+  it('a school not on the platform yet still shows its request', async () => {
+    withRequests();
+    api.hr = [];
+    render(<SchoolsPage />);
+    expect(await within(await rowOf('Kilimani Secondary')).findByText('Requested yesterday')).toBeTruthy();
+    // a week or more ago: the date
+    expect(within(await rowOf('Ruiru Academy')).getByText(/^Requested \d{1,2} [A-Z][a-z]+/)).toBeTruthy();
+  });
+
+  it('no chip without requests (an older Schools sends none), and the badge is attention only', async () => {
+    api.hr = [onPlatform(KILIMANI, 'off')];
+    const published: Record<string, unknown> = {};
+    renderWithBadges(published);
+    await within(await rowOf('Kilimani Secondary')).findByText('Off');
+    expect(screen.queryByRole('button', { name: /HR requested/ })).toBeNull();
+    await waitFor(() => expect(published['/platform/schools']).toEqual({ count: 1, label: '1 need attention' }));
   });
 });

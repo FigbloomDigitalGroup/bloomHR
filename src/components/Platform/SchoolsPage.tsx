@@ -5,13 +5,14 @@ import { Button, Card, Modal, PageHeader, SearchInput, StatusPill, TableScroll }
 import SchoolsAnalytics from './SchoolsAnalytics';
 import { SchoolHrCell } from './SchoolHr';
 import { useSchoolHr } from './useSchoolHr';
+import { HrRequestedChip } from './HrRequest';
 import { useConsoleBadge } from '../Console/consoleBadges';
 import { schoolsNeedingAttention } from '../../lib/consoleAnalytics';
 import type { StatusTone } from '../UI';
 import FigbloomLoader from '../UI/FigbloomLoader';
 import { myPlatformRole, roleCan, type PlatformRole } from '../../lib/platformRoles';
 import {
-  MAX_REASON, filterSchools, listSchools, schoolAction, schoolTotals, schoolsProblem, setSchoolStatus, statusChangeError,
+  MAX_REASON, filterSchools, listSchools, schoolAction, schoolHrRequestPending, schoolTotals, schoolsProblem, setSchoolStatus, statusChangeError,
   statusFilters, statusLabel,
   type School, type SchoolStatusChange, type SchoolsProblem,
 } from '../../lib/platformSchools';
@@ -19,7 +20,9 @@ import {
 // Every school on Figbloom Schools, for Figbloom's platform admins (ERP/SCHOOLS_CONSOLE_CONTRACT.md): the console
 // reads Schools through bloomHR's backend, which checks the console role; Schools itself suspends and reactivates.
 // Roles that can suspend companies (owner, admin, support) can suspend schools too. HR & Payroll is switched on per school
-// by roles that approve companies (owner, admin), on the Figbloom platform (SchoolHr.tsx).
+// by roles that approve companies (owner, admin), on the Figbloom platform (SchoolHr.tsx). A school whose admin asked for
+// HR in Schools ("Request Figbloom HR") shows "Requested …" beside Off, and the "HR requested" chip lists those, longest
+// waiting first.
 
 const TONES: Record<string, StatusTone> = { active: 'success', suspended: 'neutral' };
 
@@ -41,6 +44,7 @@ export default function SchoolsPage() {
   const allowed = role === undefined ? null : role !== null;
   const [load, setLoad] = useState<Load>(null);
   const [status, setStatus] = useState('all');
+  const [hrRequested, setHrRequested] = useState(false);
   // ?q= opens the page searched (the School groups page links each school here by its slug)
   const [search, setSearch] = useState(() => {
     try {
@@ -74,12 +78,24 @@ export default function SchoolsPage() {
   const schools = load && 'schools' in load ? load.schools : null;
   const totals = useMemo(() => (schools ? schoolTotals(schools) : null), [schools]);
   const tabs = useMemo(() => statusFilters(schools ?? []), [schools]);
-  // the console menu's badge: schools needing attention
-  const attention = useMemo(() => (schools ? schoolsNeedingAttention(schools).length : null), [schools]);
-  useConsoleBadge('/platform/schools', attention, (n) => `${n} need attention`);
-  const shown = useMemo(() => filterSchools(schools ?? [], { status, search }), [schools, status, search]);
   const canSuspend = roleCan(role, 'suspend_companies');
   const hr = useSchoolHr(!!allowed);
+  // HR & Payroll comes from the platform, not Schools: no school counts as asking for it until that is known
+  const hrOf = useCallback((s: School) => hr.bySchoolsId.get(s.id)?.hr ?? null, [hr.bySchoolsId]);
+  const hrRequests = useMemo(
+    () => (schools && hr.list !== undefined ? schools.filter((s) => schoolHrRequestPending(s, hrOf)).length : null),
+    [schools, hr.list, hrOf]
+  );
+  // the console menu's badge: schools needing attention, and those asking for HR & Payroll
+  const attention = useMemo(() => (schools ? schoolsNeedingAttention(schools).length : null), [schools]);
+  const badgeLabel = [attention ? `${attention} need attention` : '', hrRequests ? `${hrRequests} asking for HR & Payroll` : '']
+    .filter(Boolean)
+    .join(', ');
+  useConsoleBadge('/platform/schools', attention === null ? null : attention + (hrRequests ?? 0), () => badgeLabel);
+  const shown = useMemo(
+    () => filterSchools(schools ?? [], { status, search, hrRequested: hrRequested && hrRequests !== null, hrOf }),
+    [schools, status, search, hrRequested, hrRequests, hrOf]
+  );
   const canEnableHr = roleCan(role, 'approve_companies');
 
   const copyId = async (school: School) => {
@@ -106,7 +122,8 @@ export default function SchoolsPage() {
       const updated = await setSchoolStatus(acting.school.id, acting.to, reason);
       toast.success(`${acting.school.name}: ${acting.to === 'suspended' ? 'suspended' : 'reactivated'}.`);
       setActing(null);
-      if (updated && schools) setLoad({ schools: schools.map((s) => (s.id === updated.id ? updated : s)) });
+      // spread over the old one: keeps hr_requested_at if Schools' answer leaves it out
+      if (updated && schools) setLoad({ schools: schools.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)) });
       else await fetchSchools();
     } catch (err) {
       toast.error(statusChangeError(err, acting.school, acting.to));
@@ -174,6 +191,7 @@ export default function SchoolsPage() {
               </button>
             ))}
           </div>
+          <HrRequestedChip count={hrRequests ?? 0} on={hrRequested} onChange={setHrRequested} />
           <div className="ml-auto w-full sm:w-64">
             <SearchInput placeholder="Search by name, slug or ID" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
@@ -184,7 +202,9 @@ export default function SchoolsPage() {
         ) : schools.length === 0 ? (
           <p className="text-sm text-muted-foreground py-6 text-center">No schools on Figbloom Schools yet.</p>
         ) : shown.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-6 text-center">No schools match.</p>
+          <p className="text-sm text-muted-foreground py-6 text-center">
+            {hrRequested ? 'No schools asking for HR & Payroll match.' : 'No schools match.'}
+          </p>
         ) : (
           <TableScroll>
             <table className="w-full text-xs">
@@ -227,7 +247,7 @@ export default function SchoolsPage() {
                       {s.status_reason && <span className="block mt-1 text-muted-foreground">{s.status_reason}</span>}
                     </td>
                     <td className="py-1.5 pr-3">
-                      <SchoolHrCell school={hr.bySchoolsId.get(s.id)} data={hr} canEnable={canEnableHr} />
+                      <SchoolHrCell school={hr.bySchoolsId.get(s.id)} data={hr} canEnable={canEnableHr} requestedAt={s.hr_requested_at} />
                     </td>
                     <td className="py-1.5 text-right whitespace-nowrap">
                       {canSuspend && schoolAction(s.status) === 'suspended' && (

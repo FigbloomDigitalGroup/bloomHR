@@ -104,6 +104,30 @@ async function callerWith(req, permission, refusal) {
   return caller;
 }
 
+const str = (v) => (typeof v === "string" && v.trim() ? v.trim() : null);
+/** A date-time string (ISO), else null: what an older Schools without it sends, or anything unreadable. */
+const when = (v) => {
+  const s = str(v);
+  return s && !Number.isNaN(Date.parse(s)) ? s : null;
+};
+
+/**
+ * Schools' list with hr_requested_at on every school: when a school admin asked for Figbloom HR in Schools ("Request
+ * Figbloom HR"), accepted as hr_requested_at or hrRequestedAt; null when not asked, unreadable, or Schools too old to
+ * send it. Everything else passes through as Schools sent it.
+ */
+export function withHrRequests(list) {
+  if (!Array.isArray(list?.schools)) return list;
+  return {
+    ...list,
+    schools: list.schools.map((s) => {
+      if (!s || typeof s !== "object" || Array.isArray(s)) return s;
+      const { hrRequestedAt, ...rest } = s;
+      return { ...rest, hr_requested_at: when(s.hr_requested_at ?? hrRequestedAt) };
+    }),
+  };
+}
+
 function send(res, err) {
   if (err instanceof SchoolsError) return res.status(err.status).json({ error: { code: err.code, message: err.message } });
   console.error("[platform/schools]", err?.message || err);
@@ -114,11 +138,12 @@ function send(res, err) {
 export function createSchoolsRouter({ timeoutMs = SCHOOLS_TIMEOUT_MS } = {}) {
   const router = express.Router();
 
-  // GET /api/platform/schools -> Schools' list: { generated_at, schools: [...] }. Permission: view.
+  // GET /api/platform/schools -> Schools' list: { generated_at, schools: [...] }, each school with hr_requested_at
+  // (withHrRequests). Permission: view.
   router.get("/", async (req, res) => {
     try {
       await callerWith(req, "view", "Your console role can't see schools.");
-      res.json(await callSchools({ action: "list" }, timeoutMs));
+      res.json(withHrRequests(await callSchools({ action: "list" }, timeoutMs)));
     } catch (err) {
       send(res, err);
     }

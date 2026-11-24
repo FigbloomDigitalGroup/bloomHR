@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({
   schoolsError: null as Error | null,
   decisions: [] as unknown[][],
   decisionError: null as Error | null,
+  hr: [] as import('../../lib/platformSchoolHr').SchoolHr[],
 }));
 vi.mock('../../lib/supabase', () => ({ supabase: {} }));
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
@@ -41,6 +42,11 @@ vi.mock('../../lib/platformSchoolGroups', async (importOriginal) => ({
     const to = { approve: 'active', reject: 'rejected', suspend: 'suspended', reactivate: 'active' }[action]!;
     return Promise.resolve({ ...g, status: to, status_reason: reason.trim() || null });
   },
+}));
+
+vi.mock('../../lib/platformSchoolHr', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/platformSchoolHr')>()),
+  listSchoolHr: () => Promise.resolve({ schools: api.hr, truncated: false }),
 }));
 
 import SchoolGroupsPage from './SchoolGroupsPage';
@@ -71,6 +77,7 @@ beforeEach(() => {
   api.schoolsError = null;
   api.decisions = [];
   api.decisionError = null;
+  api.hr = [];
   toast.success.mockReset();
   toast.error.mockReset();
 });
@@ -268,5 +275,28 @@ describe('the school groups page: decisions by role', () => {
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Approve' }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('A active organisation cannot become rejected'));
     expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+
+  it('shows "Requested …" beside a school\'s HR & Payroll Off when it asked for HR in Schools', async () => {
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    api.schools = [
+      { ...school('s1', 100, 10, 90), hr_requested_at: yesterday },
+      { ...school('s2', 50, 5, 40), hr_requested_at: yesterday },
+      school('s3', 300, 20, 250),
+    ];
+    const onPlatform = (slug: string, local: string, state: 'off' | 'on') => ({
+      platform_tenant_id: `p-${slug}`, name: slug, schools_tenant_id: local, schools_slug: slug,
+      hr: { state, module_status: null, hr_tenant_id: null },
+    });
+    api.hr = [onPlatform('hillside-primary', 's1', 'off'), onPlatform('hillside-secondary', 's2', 'on'), onPlatform('lakeview-high', 's3', 'off')];
+    renderPage();
+    const hill = await rowOf('Hillside Schools');
+    const item = (slug: string) => within(hill).getByText(slug).closest('li') as HTMLElement;
+    await waitFor(() => expect(within(item('hillside-primary')).getByText('Requested yesterday')).toBeTruthy());
+    expect(within(item('hillside-primary')).getByText('HR & Payroll: Off')).toBeTruthy();
+    // already on: nothing
+    expect(within(item('hillside-secondary')).queryByText(/^Requested/)).toBeNull();
+    const lake = await rowOf('Lakeview Trust');
+    expect(within(lake).queryByText(/^Requested/)).toBeNull();
   });
 });

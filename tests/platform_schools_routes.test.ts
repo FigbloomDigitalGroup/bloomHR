@@ -162,7 +162,29 @@ describe('GET /api/platform/schools', () => {
   it.each(['own', 'adm', 'sup', 'view'])('lists the schools for every role (%s), as Schools sends them', async (as) => {
     const { status, body } = await read(await list(as));
     expect(status).toBe(200);
-    expect(body).toEqual({ generated_at: '2026-11-02T10:00:00Z', schools: [school()] });
+    expect(body).toEqual({ generated_at: '2026-11-02T10:00:00Z', schools: [{ ...school(), hr_requested_at: null }] });
+  });
+
+  it('passes on when a school asked for HR (hr_requested_at or hrRequestedAt); null from an older Schools', async () => {
+    schools.answer = () => ({
+      status: 200,
+      json: {
+        generated_at: '2026-11-02T10:00:00Z',
+        schools: [
+          school({ id: 'a', hr_requested_at: '2026-11-20T09:30:00Z' }),
+          school({ id: 'b', hrRequestedAt: '2026-11-21T10:00:00Z' }),
+          school({ id: 'c' }),
+          school({ id: 'd', hr_requested_at: 'soon' }),
+          school({ id: 'e', hrRequestedAt: 42 }),
+        ],
+      },
+    });
+    const { body } = await read(await list('view'));
+    expect(body.schools.map((s: { hr_requested_at: unknown }) => s.hr_requested_at)).toEqual([
+      '2026-11-20T09:30:00Z', '2026-11-21T10:00:00Z', null, null, null,
+    ]);
+    expect(body.schools[1]).not.toHaveProperty('hrRequestedAt');
+    expect(body.schools[0]).toMatchObject({ ...school(), id: 'a' });
   });
 
   it("calls Schools' platform-schools function with the shared secret and action list", async () => {

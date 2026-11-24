@@ -3,7 +3,8 @@ import { StatusPill } from '../UI';
 import { hrRequestPending, requestedAt, requestedWhen } from '../../lib/hrRequests';
 import type { HrState } from '../../lib/platformSchoolHr';
 
-// "Requested 2 days ago" next to HR & Payroll "Off" on the Fleet companies and Property workspaces pages: the
+// "Requested 2 days ago" next to HR & Payroll "Off" on the Fleet companies, Property workspaces, Schools and School
+// groups pages (SchoolHrCell): the
 // customer asked for Figbloom HR in the product, and staff switch it on with the usual Enable (lib/hrRequests.ts).
 
 interface Row {
