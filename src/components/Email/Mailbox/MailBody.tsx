@@ -34,7 +34,7 @@ export default function MailBody({ html, text }: { html: string | null; text: st
           sandbox={MAIL_SANDBOX}
           referrerPolicy="no-referrer"
           srcDoc={srcDoc}
-          className="w-full flex-1 min-h-[360px] border-0 bg-white"
+          className="w-full flex-1 min-h-[220px] [@media(min-height:800px)]:min-h-[360px] border-0 bg-white"
         />
       </div>
     );

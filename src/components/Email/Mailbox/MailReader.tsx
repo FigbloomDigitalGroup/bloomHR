@@ -151,8 +151,8 @@ export default function MailReader({
         </div>
       )}
 
-      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col px-4 md:px-6 pt-4">
-        <h2 className="text-[18px] md:text-[20px] font-semibold text-ink break-words leading-snug shrink-0">{message.subject || '(no subject)'}</h2>
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col px-3 sm:px-4 md:px-6 pt-3 sm:pt-4">
+        <h2 className="text-[16px] sm:text-[18px] md:text-[20px] font-semibold text-ink break-words leading-snug shrink-0">{message.subject || '(no subject)'}</h2>
 
         <div className="mt-4 flex items-start gap-3 shrink-0">
           <MailAvatar name={senderName} />
@@ -165,9 +165,9 @@ export default function MailReader({
               type="button"
               onClick={() => setDetails((v) => !v)}
               aria-expanded={details}
-              className="inline-flex items-center gap-0.5 text-[12px] text-muted-foreground hover:text-ink"
+              className="inline-flex max-w-full items-center gap-0.5 text-[12px] text-muted-foreground hover:text-ink"
             >
-              <span className="truncate max-w-[28rem]">to {firstNames(message.to) || '(no one)'}{message.cc.length ? `, cc ${firstNames(message.cc)}` : ''}</span>
+              <span className="min-w-0 truncate max-w-[28rem]">to {firstNames(message.to) || '(no one)'}{message.cc.length ? `, cc ${firstNames(message.cc)}` : ''}</span>
               {details ? <ChevronUp className="w-3.5 h-3.5 shrink-0" aria-hidden /> : <ChevronDown className="w-3.5 h-3.5 shrink-0" aria-hidden />}
             </button>
           </div>
@@ -183,7 +183,8 @@ export default function MailReader({
           </div>
         )}
 
-        <div className="mt-4 flex flex-col flex-1 min-h-[360px]">
+        {/* a shorter floor on short screens (13" laptops and below), so less of the pane is spent scrolling */}
+        <div className="mt-4 flex flex-col flex-1 min-h-[220px] [@media(min-height:800px)]:min-h-[360px]">
           <MailBody html={message.html} text={message.text} />
         </div>
 
@@ -215,27 +216,32 @@ export default function MailReader({
           </div>
         )}
 
-        {/* answering: always in view at the bottom of the pane */}
-        {onRespond && (
-          <div className="sticky bottom-0 -mx-4 md:-mx-6 mt-4 px-4 md:px-6 py-3 bg-white/95 backdrop-blur border-t border-border flex flex-wrap gap-2 shrink-0">
-            <RespondButton icon={<Reply className="w-4 h-4" aria-hidden />} label="Reply" onClick={() => onRespond('reply')} />
-            <RespondButton icon={<ReplyAll className="w-4 h-4" aria-hidden />} label="Reply all" onClick={() => onRespond('replyAll')} />
-            <RespondButton icon={<Forward className="w-4 h-4" aria-hidden />} label="Forward" onClick={() => onRespond('forward')} />
-          </div>
-        )}
-        {!onRespond && <div className="h-4 shrink-0" />}
+        <div className="h-4 shrink-0" />
       </div>
+
+      {/* answering: a solid footer below the scrolling email, never laid over it. (It used to be a translucent, blurred
+          bar stuck over the body; on short screens it sat across the email's frame and drew like a glitch.) */}
+      {onRespond && (
+        <div className="shrink-0 border-t border-border bg-white px-3 sm:px-4 md:px-6 py-2 sm:py-3 flex gap-2">
+          <RespondButton icon={<Reply className="w-4 h-4" aria-hidden />} label="Reply" onClick={() => onRespond('reply')} />
+          <RespondButton icon={<ReplyAll className="w-4 h-4" aria-hidden />} label="Reply all" onClick={() => onRespond('replyAll')} />
+          <RespondButton icon={<Forward className="w-4 h-4" aria-hidden />} label="Forward" onClick={() => onRespond('forward')} />
+        </div>
+      )}
     </article>
   );
 }
 
-/** Gmail's outlined, rounded Reply / Reply all / Forward buttons. */
+/**
+ * Gmail's outlined, rounded Reply / Reply all / Forward buttons. On a narrow pane the three share the row equally
+ * (never wrapping onto a second line); from `sm` up they sit at their natural width.
+ */
 function RespondButton({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-4 py-1.5 text-[12.5px] font-semibold text-ink hover:bg-secondary hover:shadow-sm"
+      className="flex-1 sm:flex-none min-w-0 inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-full border border-border bg-white px-2.5 sm:px-4 py-1.5 text-[12px] sm:text-[12.5px] font-semibold text-ink whitespace-nowrap hover:bg-secondary hover:shadow-sm"
     >
       {icon}
       {label}
