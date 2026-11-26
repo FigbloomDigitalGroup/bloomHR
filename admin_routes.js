@@ -389,40 +389,43 @@ router.post(
     let figbloomAccount = null;
     if (figbloom) {
       try {
-        // their Figbloom account: a new one waits for its first password; an existing one (another company, another
-        // product) keeps its password, and they simply sign in with it
+        // their Figbloom account: a new one is ready for "Forgot password" from the start (the platform gives it an
+        // unknown password and a verified email); an existing one (another company, another product, or added here
+        // before) keeps its password, and they simply sign in with it
         const account = await accounts.figbloomAccounts.ensure({ email, name: req.body?.full_name || req.body?.name });
         const linked = await accounts.figbloomAccounts.link(data.user.id, account.sub, { madeHere: account.created });
         if (linked === "taken") throw new HttpError(409, "This person's Figbloom account is already connected to another login. Ask Figbloom support.");
-        if (account.created) {
-          // "Set your password" (figbloom_accounts.js): a one-time link to /update-password, whose page sets the
-          // Figbloom password (cognito_routes.js), sent with Resend like invitations
-          const site = String(process.env.SITE_URL || "").trim().replace(/\/+$/, "");
-          // the company's name in the email: best effort, the email goes either way
-          let company = null;
-          try {
-            const { data: tenant } = await admin.from("tenants").select("name").eq("id", caller.tenantId).maybeSingle();
-            company = tenant?.name || null;
-          } catch {
-            company = null;
-          }
-          const send = process.env.RESEND_API_KEY
-            ? async ({ to, subject, html, text }) => {
-                const { Resend } = await import("resend");
-                const { error: sendError } = await new Resend(process.env.RESEND_API_KEY).emails.send({
-                  from: process.env.SMTP_FROM || "Figbloom HR <onboarding@resend.dev>",
-                  to,
-                  subject,
-                  html,
-                  text,
-                });
-                if (sendError) throw new Error(sendError.message || "Resend refused the message");
-              }
-            : undefined;
-          await accounts.sendSetPasswordEmail({ db: admin, email, company, site, send });
+        const site = String(process.env.SITE_URL || "").trim().replace(/\/+$/, "");
+        // the company's name in the email: best effort, the email goes either way
+        let company = null;
+        try {
+          const { data: tenant } = await admin.from("tenants").select("name").eq("id", caller.tenantId).maybeSingle();
+          company = tenant?.name || null;
+        } catch {
+          company = null;
         }
+        const send = process.env.RESEND_API_KEY
+          ? async ({ to, subject, html, text }) => {
+              const { Resend } = await import("resend");
+              const { error: sendError } = await new Resend(process.env.RESEND_API_KEY).emails.send({
+                from: process.env.SMTP_FROM || "Figbloom HR <onboarding@resend.dev>",
+                to,
+                subject,
+                html,
+                text,
+              });
+              if (sendError) throw new Error(sendError.message || "Resend refused the message");
+            }
+          : undefined;
+        // Everyone added hears about it. A new account: "Set your password" (a one-time link to /update-password,
+        // whose page sets the Figbloom password, cognito_routes.js). An existing one: "You've been added", pointing to
+        // sign-in and "Forgot password". Adding someone again simply sends it again.
+        if (account.created) await accounts.sendSetPasswordEmail({ db: admin, email, company, site, send });
+        else await accounts.sendAddedEmail({ email, company, site, send });
         figbloomAccount = { created: account.created };
       } catch (accountErr) {
+        // why an add failed, for support: the admin sees the message, and nothing else would record it
+        console.error("[admin] adding a person failed:", accountErr?.status || "", accountErr?.message || accountErr);
         // don't leave a login that can never sign in
         await admin.auth.admin.deleteUser(data.user.id);
         if (accountErr instanceof accounts.FigbloomAccountError) throw new HttpError(accountErr.status, accountErr.message);
