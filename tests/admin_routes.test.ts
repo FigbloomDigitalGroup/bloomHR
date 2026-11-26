@@ -19,8 +19,20 @@ const state = vi.hoisted(() => ({
   updates: [] as Record<string, unknown>[],
   authUsers: [] as { id: string; email: string; user_metadata: Record<string, unknown> }[],
   calls: [] as string[],
+  sends: [] as Record<string, unknown>[],
   employees: [] as Record<string, unknown>[],
   exits: [] as Record<string, unknown>[],
+}));
+
+vi.mock('resend', () => ({
+  Resend: class {
+    emails = {
+      send: async (msg: Record<string, unknown>) => {
+        state.sends.push(msg);
+        return { error: null };
+      },
+    };
+  },
 }));
 
 vi.mock('@supabase/supabase-js', () => {
@@ -341,6 +353,7 @@ describe('with Figbloom sign-in', () => {
   });
   beforeEach(() => {
     figbloom.length = 0;
+    state.sends.length = 0;
     existing = false;
     process.env.COGNITO_SIGN_IN = 'on';
   });
@@ -356,12 +369,33 @@ describe('with Figbloom sign-in', () => {
     expect(state.calls).toContain('reset:new@a.co');
   });
 
-  it("links someone who already has a Figbloom account, and sends nothing: they sign in with their own password", async () => {
+  it('links someone who already has a Figbloom account and tells them: sign in, or "Forgot password"', async () => {
     existing = true;
-    const res = await call('POST', '/users', 'admin-a', { email: 'known@a.co', role: 'STAFF', password: 'ignored1' });
+    process.env.RESEND_API_KEY = 're_test';
+    process.env.SITE_URL = 'https://hr.example/';
+    try {
+      const res = await call('POST', '/users', 'admin-a', { email: 'known@a.co', role: 'STAFF', password: 'ignored1' });
+      expect(res.status).toBe(201);
+      expect(figbloom.at(-1)).toMatchObject({ call: 'link', madeHere: false });
+      // no link that sets a password: their own password stays theirs
+      expect(state.calls.some((c) => c.startsWith('reset:'))).toBe(false);
+      expect(state.sends).toHaveLength(1);
+      expect(state.sends[0]).toMatchObject({ to: 'known@a.co' });
+      expect(String(state.sends[0].subject)).toMatch(/^You've been added/);
+      expect(String(state.sends[0].text)).toContain('https://hr.example/login');
+      expect(String(state.sends[0].text)).toContain('Forgot your password?');
+    } finally {
+      delete process.env.RESEND_API_KEY;
+      delete process.env.SITE_URL;
+    }
+  });
+
+  it('adding the same person again (their account made by an earlier add) tells them again, instead of nothing', async () => {
+    existing = true;
+    const res = await call('POST', '/users', 'admin-a', { email: 'again@a.co', role: 'STAFF' });
     expect(res.status).toBe(201);
-    expect(figbloom.at(-1)).toMatchObject({ call: 'link', madeHere: false });
-    expect(state.calls.some((c) => c.startsWith('reset:'))).toBe(false);
+    // without Resend the email is skipped and logged; the add itself still succeeds
+    expect((await res.json()).figbloom).toEqual({ created: false });
   });
 
   it("refuses to change someone's password or email: they belong to the person's Figbloom account", async () => {
@@ -376,6 +410,27 @@ describe('with Figbloom sign-in', () => {
   });
 });
 
+describe(`"You've been added" email (figbloom_accounts.js)`, () => {
+  it('names the company, links to sign-in, explains "Forgot password", everything escaped', async () => {
+    const { addedEmail } = await import('../figbloom_accounts.js');
+    const m = addedEmail({ company: 'Favor <Farm>', signIn: 'https://hr.example/login?a=1&b=2' });
+    expect(m.subject).toBe("You've been added to Favor <Farm> on Figbloom HR");
+    expect(m.html).toContain('Favor &lt;Farm&gt;');
+    expect(m.html).toContain('https://hr.example/login?a=1&amp;b=2');
+    expect(m.text).toContain('Forgot your password?');
+    expect(addedEmail({ company: null, signIn: null }).html).not.toContain('<a ');
+  });
+
+  it('never throws, and says when it could not send', async () => {
+    const { sendAddedEmail } = await import('../figbloom_accounts.js');
+    expect(await sendAddedEmail({ email: 'a@b.co', company: null, site: '', send: undefined })).toBe('not_sent');
+    const failing = async () => {
+      throw new Error('resend down');
+    };
+    expect(await sendAddedEmail({ email: 'a@b.co', company: null, site: '', send: failing })).toBe('not_sent');
+  });
+});
+
 describe('"Set your password" email (figbloom_accounts.js)', () => {
   it('is its own email, not "Reset your password", with the company and the link, everything escaped', async () => {
     const { setPasswordEmail } = await import('../figbloom_accounts.js');
@@ -385,6 +440,8 @@ describe('"Set your password" email (figbloom_accounts.js)', () => {
     expect(m.html).toContain('Favor &lt;Farm&gt;');
     expect(m.html).toContain('https://hr.example/verify?token=a&amp;type=recovery');
     expect(m.text).toContain('https://hr.example/verify?token=a&type=recovery');
+    // a missed or expired link is never a dead end
+    expect(m.text).toContain('Forgot your password?');
   });
 
   it('sends a one-time link to /update-password with Resend, or falls back to Supabase\'s email, and never throws', async () => {

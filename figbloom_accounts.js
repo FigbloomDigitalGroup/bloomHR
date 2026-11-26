@@ -128,6 +128,7 @@ export function setPasswordEmail({ company, link }) {
     "",
     "Then sign in with Figbloom, with this email address and that password: one account for every Figbloom product.",
     "The link works once. If it has expired, open it anyway and ask for a new one.",
+    'Or, on the Figbloom sign-in page, choose "Forgot your password?" with this email address: you will get a code to set it.',
   ].join("\n");
   const html = `<!doctype html>
 <html>
@@ -140,13 +141,65 @@ export function setPasswordEmail({ company, link }) {
           <p style="margin:0 0 20px;font-size:14px;line-height:1.5;">${escapeHtml(where)}. Choose your password, then sign in with Figbloom: one account for every Figbloom product.</p>
           <p style="margin:0 0 24px;"><a href="${escapeHtml(link)}" style="display:inline-block;background:#17402a;color:#ffffff;text-decoration:none;font-weight:bold;font-size:14px;padding:12px 22px;border-radius:8px;">Set your password</a></p>
           <p style="margin:0 0 8px;font-size:12px;color:#5f6b62;">Or paste this link into your browser:<br><span style="word-break:break-all;">${escapeHtml(link)}</span></p>
-          <p style="margin:16px 0 0;font-size:12px;color:#5f6b62;">The link works once. If it has expired, open it anyway and ask for a new one. If you were not expecting this, you can ignore this email.</p>
+          <p style="margin:16px 0 0;font-size:12px;color:#5f6b62;">The link works once. If it has expired, open it anyway and ask for a new one. Or, on the Figbloom sign-in page, choose &ldquo;Forgot your password?&rdquo; with this email address: you will get a code to set it. If you were not expecting this, you can ignore this email.</p>
         </td></tr>
       </table>
     </td></tr></table>
   </body>
 </html>`;
   return { subject, html, text };
+}
+
+/**
+ * "You've been added": for a person added who already has a Figbloom account (another company or product, or added
+ * here before). No link that sets anything: they sign in with their own password, or use "Forgot password".
+ */
+export function addedEmail({ company, signIn }) {
+  const where = company ? `${company} has added you to Figbloom HR` : "You have been added to Figbloom HR";
+  const subject = company ? `You've been added to ${company} on Figbloom HR` : "You've been added to Figbloom HR";
+  const forgot = 'Don\'t know your password? On the sign-in page choose "Forgot your password?" with this email address: you will get a code to set a new one.';
+  const text = [
+    `${where}.`,
+    "",
+    `Sign in with Figbloom, with this email address and your Figbloom password${signIn ? `: ${signIn}` : "."}`,
+    "",
+    forgot,
+  ].join("\n");
+  const button = signIn
+    ? `<p style="margin:0 0 24px;"><a href="${escapeHtml(signIn)}" style="display:inline-block;background:#17402a;color:#ffffff;text-decoration:none;font-weight:bold;font-size:14px;padding:12px 22px;border-radius:8px;">Sign in</a></p>`
+    : "";
+  const html = `<!doctype html>
+<html>
+  <body style="margin:0;padding:24px;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#16201a;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center">
+      <table role="presentation" width="520" cellspacing="0" cellpadding="0" style="max-width:520px;background:#ffffff;border-radius:12px;padding:32px;">
+        <tr><td>
+          <p style="margin:0 0 16px;font-size:13px;font-weight:bold;color:#17402a;">Figbloom HR</p>
+          <h1 style="margin:0 0 12px;font-size:20px;">You've been added</h1>
+          <p style="margin:0 0 20px;font-size:14px;line-height:1.5;">${escapeHtml(where)}. Sign in with Figbloom, with this email address and your Figbloom password.</p>
+          ${button}
+          <p style="margin:16px 0 0;font-size:12px;color:#5f6b62;">${escapeHtml(forgot)} If you were not expecting this, you can ignore this email.</p>
+        </td></tr>
+      </table>
+    </td></tr></table>
+  </body>
+</html>`;
+  return { subject, html, text };
+}
+
+/** Sends "You've been added" with Resend. Never throws: the person was added either way. */
+export async function sendAddedEmail({ email, company, site, send }) {
+  if (!send) {
+    console.error(TAG, "added email not sent: no RESEND_API_KEY");
+    return "not_sent";
+  }
+  try {
+    await send({ to: email, ...addedEmail({ company, signIn: site ? `${site}/login` : null }) });
+    return "sent";
+  } catch (err) {
+    console.error(TAG, "added email not sent:", err?.message || err);
+    return "not_sent";
+  }
 }
 
 /**
