@@ -238,9 +238,23 @@ export function leftBefore(e: EmployeeRecord, period: string = thisPeriod()): bo
   return !!left && left[1] < period;
 }
 
+// a Status that says the person no longer works here (Terminate, Bulk terminate and Exits all write 'Terminated'; the
+// rest come from imported records)
+const LEFT_STATUS = /^(terminated|resigned|dismissed|exited|left|inactive)$/i;
+const hasLeavingDate = (e: EmployeeRecord) => /^\d{4}-\d{2}-\d{2}/.test(String(e['Termination Date'] ?? '').trim());
+
 /**
- * Only approved employees are paid (everyone else is still being onboarded), and not after the month they left.
- * Casual workers are paid by the day from their own page, never on the monthly payroll.
+ * Someone no longer employed by the pay period ('YYYY-MM'): they left in an earlier month, or they are marked as gone
+ * (Status Terminated...) with no leaving date to say when, so there is no final month to pay them for.
  */
-export const isPayrollReady = (e: EmployeeRecord) =>
-  e['onboarding_status'] === 'approved' && !leftBefore(e) && e['worker_kind'] !== 'casual';
+export function hasLeft(e: EmployeeRecord, period: string = thisPeriod()): boolean {
+  return leftBefore(e, period) || (!hasLeavingDate(e) && LEFT_STATUS.test(String(e['Status'] ?? '').trim()));
+}
+
+/**
+ * Only approved employees are paid (everyone else is still being onboarded), and not after the month they left: the
+ * period is the payroll month being worked out (this month when not given). Casual workers are paid by the day from
+ * their own page, never on the monthly payroll.
+ */
+export const isPayrollReady = (e: EmployeeRecord, period: string = thisPeriod()) =>
+  e['onboarding_status'] === 'approved' && !hasLeft(e, period) && e['worker_kind'] !== 'casual';
