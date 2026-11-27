@@ -48,7 +48,8 @@ export interface HRNotification {
         | 'attendance_odd_hours'
         | 'missed_scan_requested' | 'missed_scan_request' | 'missed_scan_approved' | 'missed_scan_declined'
         | 'payment_due' | 'payment_made' | 'requisition_requested' | 'requisition_approved' | 'requisition_rejected'
-        | 'possible_absences' | 'possible_absences_team' | 'possible_absence';
+        | 'possible_absences' | 'possible_absences_team' | 'possible_absence'
+        | 'salary_advance_requested';
     title: string;
     message: string;
     // Nullable for leave notifications - only contract/probation reminders

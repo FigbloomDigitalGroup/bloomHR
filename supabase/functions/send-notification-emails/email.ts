@@ -87,6 +87,7 @@ export const HR_PAGES: Record<string, string> = {
   possible_absences: '/leave-discipline?tab=possible',
   payment_due: '/payments',
   requisition_requested: '/payments?tab=requisitions',
+  salary_advance_requested: '/salaryadmin',
 };
 
 /**
