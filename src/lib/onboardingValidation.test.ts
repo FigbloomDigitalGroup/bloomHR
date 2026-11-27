@@ -3,6 +3,7 @@ import {
   employeePartMissing,
   employerPartMissing,
   fieldProblem,
+  hasLeft,
   isPayrollReady,
   leftBefore,
   isValidIdNumber,
@@ -162,5 +163,25 @@ describe('isPayrollReady', () => {
     expect(leftBefore({ 'Termination Date': '2026-10-15' }, '2026-10')).toBe(false);
     expect(leftBefore({ 'Termination Date': '2026-10-15' }, '2026-11')).toBe(true);
     expect(leftBefore({ 'Termination Date': '' }, '2026-11')).toBe(false);
+  });
+
+  it("goes by the payroll month being worked out, not today's", () => {
+    const leaver = { onboarding_status: 'approved', 'Termination Date': '2026-11-10' };
+    expect(isPayrollReady(leaver, '2026-11')).toBe(true); // their final month
+    expect(isPayrollReady(leaver, '2026-12')).toBe(false);
+    expect(isPayrollReady(leaver, '2026-10')).toBe(true);
+  });
+
+  it('someone marked as gone with no leaving date is not paid', () => {
+    for (const Status of ['Terminated', 'terminated', 'Resigned', 'Dismissed', 'Exited', 'Inactive']) {
+      expect(hasLeft({ Status }, '2026-11')).toBe(true);
+      expect(isPayrollReady({ onboarding_status: 'approved', Status }, '2026-11')).toBe(false);
+    }
+    // an unreadable date counts as none
+    expect(hasLeft({ Status: 'Terminated', 'Termination Date': '10/11/2026' }, '2026-11')).toBe(true);
+    // with a date, the date decides: paid for the month they leave in
+    expect(hasLeft({ Status: 'Terminated', 'Termination Date': '2026-11-10' }, '2026-11')).toBe(false);
+    expect(hasLeft({ Status: 'Active' }, '2026-11')).toBe(false);
+    expect(hasLeft({}, '2026-11')).toBe(false);
   });
 });

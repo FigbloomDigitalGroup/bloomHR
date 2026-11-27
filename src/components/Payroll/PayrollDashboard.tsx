@@ -75,7 +75,7 @@ import { returnsReadiness } from "../../lib/payrollExports";
 import { employeesMissingDetails } from "../../lib/missingPayrollDetails";
 import { isKesPayslip, isPaidByMpesa, mpesaKenyaNote, paymentMethodLabel } from "../../lib/paymentMethods";
 import { fetchAll } from "../../lib/fetchAll";
-import { isPayrollReady } from "../../lib/onboardingValidation";
+import { hasLeft, isPayrollReady } from "../../lib/onboardingValidation";
 import { isCasual } from "../../lib/casualPay";
 import { nitaTotal } from "../../lib/nitaLevy";
 
@@ -1157,7 +1157,7 @@ export default function PayrollDashboard() {
           // standard pay items, applied through the same deduction, earning and benefit inputs the engine already uses
           const monthWorkingDays = workingDaysInMonth(actualPeriod, workWeek);
           const catalogue = applyCatalogue({
-            employees: data.filter(isPayrollReady),
+            employees: data.filter((e) => isPayrollReady(e, actualPeriod)),
             items: payItems,
             voluntaryByEmployee,
             earningsByEmployee,
@@ -1310,7 +1310,7 @@ export default function PayrollDashboard() {
     const employee = catalogueEmployees.get(employeeNumber) ?? employees.find((e) => e["Employee Number"] === employeeNumber);
     const country = employee ? payrollCountryOf(employee, companyBranches).country : "Kenya";
     if (country === "Tanzania") {
-      const headcount = employees.filter((e) => isPayrollReady(e) && payrollCountryOf(e, companyBranches).country === "Tanzania").length;
+      const headcount = employees.filter((e) => isPayrollReady(e, actualPeriod) && payrollCountryOf(e, companyBranches).country === "Tanzania").length;
       return tanzaniaEditContext(employee, ratesByCountry?.get("Tanzania") ?? null, headcount);
     }
     if (country === "Uganda") {
@@ -1547,7 +1547,10 @@ export default function PayrollDashboard() {
   };
 
 
-  const missingDetails = useMemo(() => employeesMissingDetails(employees), [employees]);
+  // who still works here in the payroll month being looked at: people who left before it are not on this page at all
+  // (not "not onboarded", not missing details), only in their earlier months' payroll
+  const stillEmployed = useMemo(() => employees.filter((e) => !hasLeft(e, actualPeriod)), [employees, actualPeriod]);
+  const missingDetails = useMemo(() => employeesMissingDetails(stillEmployed), [stillEmployed]);
 
   // demo paying (PAYMENTS_DEMO): who would be paid how, and who was "paid" this month, in memory only (gone on reload)
   // (any approved country can be paid; a paid one can't be paid again)
@@ -1654,8 +1657,8 @@ export default function PayrollDashboard() {
     { label: "Export payroll table", icon: <Download className="w-3.5 h-3.5" />, onSelect: () => setShowExportModal(true) },
     { label: "Upload salary history", icon: <Upload className="w-3.5 h-3.5" />, onSelect: () => setShowBulkUploadModal(true) },
   ];
-  const notOnboarded = useMemo(() => employees.filter((e) => !isPayrollReady(e)), [employees]);
-  const onPayroll = useMemo(() => employees.filter(isPayrollReady), [employees]);
+  const notOnboarded = useMemo(() => stillEmployed.filter((e) => !isPayrollReady(e, actualPeriod)), [stillEmployed, actualPeriod]);
+  const onPayroll = useMemo(() => stillEmployed.filter((e) => isPayrollReady(e, actualPeriod)), [stillEmployed, actualPeriod]);
   // Kenya's returns (P10, SHA, NSSF) are for Kenya's staff only
   const kenyaOnPayroll = useMemo(() => onPayroll.filter((e) => payrollCountryOf(e, companyBranches).country === "Kenya"), [onPayroll, companyBranches]);
   const returnsGaps = useMemo(() => {
@@ -2525,7 +2528,7 @@ export default function PayrollDashboard() {
 
       {showMissingDetails && (
         <MissingPayrollDetailsModal
-          employees={employees}
+          employees={stillEmployed}
           onClose={() => setShowMissingDetails(false)}
           onChanged={() => setDetailsVersion((v) => v + 1)}
           draftNotice={

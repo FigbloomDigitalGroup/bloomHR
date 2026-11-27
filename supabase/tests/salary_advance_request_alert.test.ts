@@ -1,7 +1,8 @@
 // @vitest-environment node
 //
-// Admins hear of every salary advance request as it is made (20261127100000): one HR alert, emailed to the company's
-// admins only (the chain already tells the approvers), never shown or emailed to the employee who asked. An advance
+// Admins and finance hear of every salary advance request as it is made (20261127100000, 20261127200000): one HR
+// alert, emailed to the company's admins and the roles with "Payments to make" (not the approvers: the chain already
+// tells them), never shown or emailed to the employee who asked. An advance
 // recorded as already approved writes none.
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { PGlite } from '@electric-sql/pglite';
@@ -56,16 +57,19 @@ describe('a salary advance request', () => {
     expect(r).toEqual({ hr: true, imp: true });
   });
 
-  it("is emailed to that company's admins only: not to the approvers, finance, the employee or another company", async () => {
+  it("is emailed to that company's admins and finance: not to the approvers, the employee or another company", async () => {
     const to = (await rows<{ user_id: string }>(`select user_id from public.hr_alert_recipients($1, 'salary_advance_requested')`, [A]))
-      .map((r) => r.user_id);
-    expect(to).toEqual([ADMIN]);
+      .map((r) => r.user_id).sort();
+    expect(to).toEqual([FIN, ADMIN].sort());
     await db.query(`select public.queue_hr_alert_emails()`);
     const sent = await rows<{ user_id: string; to_email: string; status: string }>(
       `select d.user_id, d.to_email, d.status from notification_email_deliveries d
        join hr_notifications n on n.id = d.notification_id
        where n.notification_type = 'salary_advance_requested'`);
-    expect(sent).toEqual([{ user_id: ADMIN, to_email: 'admin@a.co', status: 'pending' }]);
+    expect(sent.sort((a, b) => a.user_id.localeCompare(b.user_id))).toEqual([
+      { user_id: FIN, to_email: 'fin@a.co', status: 'pending' },
+      { user_id: ADMIN, to_email: 'admin@a.co', status: 'pending' },
+    ].sort((a, b) => a.user_id.localeCompare(b.user_id)));
   });
 
   it('the approvers are still told by the chain', async () => {
