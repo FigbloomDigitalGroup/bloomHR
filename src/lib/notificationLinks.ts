@@ -150,6 +150,7 @@ const ADMIN_BY_TYPE: Record<string, string> = {
   onboarding_followups_overdue: '/onboarding',
   photo_removed: '/onboarding',
   policy_to_accept: '/onboarding',
+  salary_advance_requested: '/salaryadmin',
   salary_advance_approved: '/salaryadmin',
   salary_advance_rejected: '/salaryadmin',
   salary_advance_paid: '/salaryadmin',
