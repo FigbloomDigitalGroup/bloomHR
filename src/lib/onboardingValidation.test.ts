@@ -184,4 +184,17 @@ describe('isPayrollReady', () => {
     expect(hasLeft({ Status: 'Active' }, '2026-11')).toBe(false);
     expect(hasLeft({}, '2026-11')).toBe(false);
   });
+
+  it('someone paid off in an earlier month is not paid again, even when their last day is later', () => {
+    // fired in October, final pay with October's payroll, last working day 3 November
+    const leaver = { onboarding_status: 'approved', Status: 'Terminated', 'Termination Date': '2026-11-03' };
+    expect(isPayrollReady(leaver, '2026-10', '2026-10')).toBe(true);
+    expect(isPayrollReady(leaver, '2026-11', '2026-10')).toBe(false);
+    expect(hasLeft(leaver, '2026-11', '2026-10')).toBe(true);
+    // without a final pay month, the leaving date decides as before
+    expect(isPayrollReady(leaver, '2026-11')).toBe(true);
+    expect(isPayrollReady(leaver, '2026-11', null)).toBe(true);
+    // final pay in the month they leave in changes nothing
+    expect(isPayrollReady(leaver, '2026-11', '2026-11')).toBe(true);
+  });
 });

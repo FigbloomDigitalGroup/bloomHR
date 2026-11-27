@@ -264,6 +264,19 @@ export async function saveInterview(exit: Pick<ExitRecord, 'id' | 'employee_numb
   if (error) fail(error, 'Could not save the exit interview.');
 }
 
+/**
+ * Each leaver whose final pay is done, by employee number: the month their final dues were included in payroll
+ * (migration 20261127300000). Payroll leaves them out of every later month. Empty on a database without it yet.
+ */
+export async function loadFinalPayMonths(): Promise<Map<string, string>> {
+  const { data, error } = await supabase.rpc('final_pay_months');
+  if (error) {
+    if (['42883', 'PGRST202'].includes(error.code ?? '')) return new Map();
+    fail(error, 'Could not load who has had their final pay.');
+  }
+  return new Map(((data ?? []) as { employee_number: string; payroll_period: string }[]).map((r) => [r.employee_number, r.payroll_period]));
+}
+
 export async function loadFinalDues(exitId: string): Promise<FinalDuesRecord | null> {
   const { data, error } = await supabase
     .from('employee_exit_final_dues')
